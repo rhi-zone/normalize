@@ -1268,6 +1268,7 @@ def cmd_rules(args: Namespace) -> int:
         create_engine_with_builtins,
         load_rules_from_config,
     )
+    from moss.sarif import SARIFConfig, generate_sarif, write_sarif
 
     output = setup_output(args)
     directory = Path(getattr(args, "directory", ".")).resolve()
@@ -1301,6 +1302,21 @@ def cmd_rules(args: Namespace) -> int:
 
     if getattr(args, "json", False):
         output.data(result.to_dict())
+        return 0
+
+    # SARIF output
+    sarif_path = getattr(args, "sarif", None)
+    if sarif_path:
+        from moss import __version__
+
+        config = SARIFConfig(
+            tool_name="moss",
+            tool_version=__version__,
+            base_path=directory,
+        )
+        sarif = generate_sarif(result, config)
+        write_sarif(sarif, Path(sarif_path))
+        output.success(f"SARIF output written to {sarif_path}")
         return 0
 
     # Text output
@@ -1936,6 +1952,11 @@ def create_parser() -> argparse.ArgumentParser:
         "--no-builtins",
         action="store_true",
         help="Disable built-in rules",
+    )
+    rules_parser.add_argument(
+        "--sarif",
+        "-s",
+        help="Output results in SARIF format to file",
     )
     rules_parser.set_defaults(func=cmd_rules)
 

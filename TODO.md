@@ -15,7 +15,7 @@
 ## Backlog
 
 ### Export & Integration
-- [ ] SARIF output (for CI/CD integration)
+- [x] SARIF output (for CI/CD integration)
 - [ ] GitHub Actions integration
 - [ ] VS Code extension
 
