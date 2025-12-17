@@ -4,7 +4,7 @@
 
 ### Watch & Feedback
 - [x] Watch mode for tests (auto-run on file changes)
-- [ ] Metrics dashboard (HTML report of codebase health)
+- [x] Metrics dashboard (HTML report of codebase health)
 - [ ] Custom analysis rules (user-defined patterns)
 
 ### Git Integration

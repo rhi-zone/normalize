@@ -1262,6 +1262,68 @@ def cmd_hooks(args: Namespace) -> int:
         return 0
 
 
+def cmd_metrics(args: Namespace) -> int:
+    """Generate codebase metrics dashboard."""
+    from moss.metrics import collect_metrics, generate_dashboard
+
+    output = setup_output(args)
+    directory = Path(getattr(args, "directory", ".")).resolve()
+
+    if not directory.exists():
+        output.error(f"Directory {directory} does not exist")
+        return 1
+
+    # Collect metrics
+    pattern = getattr(args, "pattern", "**/*.py")
+    metrics = collect_metrics(directory, pattern=pattern)
+
+    if metrics.total_files == 0:
+        output.warning("No Python files found")
+        return 0
+
+    if getattr(args, "json", False):
+        output.data(metrics.to_dict())
+        return 0
+
+    # Generate HTML dashboard
+    if getattr(args, "html", False) or getattr(args, "output", None):
+        title = getattr(args, "title", None) or directory.name
+        dashboard_html = generate_dashboard(metrics, title=title)
+
+        output_path = getattr(args, "output", None)
+        if output_path:
+            Path(output_path).write_text(dashboard_html)
+            output.success(f"Dashboard saved to {output_path}")
+        else:
+            output.print(dashboard_html)
+        return 0
+
+    # Text summary
+    output.header("Codebase Metrics")
+    output.info(f"Directory: {directory}")
+    output.blank()
+
+    output.step("Overview")
+    output.info(f"  Files: {metrics.total_files}")
+    output.info(f"  Lines of code: {metrics.total_code_lines:,}")
+    output.info(f"  Total lines: {metrics.total_lines:,}")
+    output.info(f"  Avg file size: {metrics.avg_file_lines:.0f} lines")
+    output.blank()
+
+    output.step("Symbols")
+    output.info(f"  Classes: {metrics.total_classes}")
+    output.info(f"  Functions: {metrics.total_functions}")
+    output.info(f"  Methods: {metrics.total_methods}")
+    output.blank()
+
+    if metrics.modules:
+        output.step("Modules")
+        for mod in metrics.modules[:10]:
+            output.info(f"  {mod.name}: {mod.file_count} files, {mod.total_lines:,} lines")
+
+    return 0
+
+
 def cmd_pr(args: Namespace) -> int:
     """Generate PR review summary."""
     from moss.pr_review import analyze_pr
@@ -1739,6 +1801,37 @@ def create_parser() -> argparse.ArgumentParser:
         help="Only output suggested PR title",
     )
     pr_parser.set_defaults(func=cmd_pr)
+
+    # metrics command
+    metrics_parser = subparsers.add_parser("metrics", help="Generate codebase metrics dashboard")
+    metrics_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    metrics_parser.add_argument(
+        "--pattern",
+        "-p",
+        default="**/*.py",
+        help="Glob pattern for files (default: **/*.py)",
+    )
+    metrics_parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Output as HTML dashboard",
+    )
+    metrics_parser.add_argument(
+        "--output",
+        "-o",
+        help="Save HTML dashboard to file",
+    )
+    metrics_parser.add_argument(
+        "--title",
+        "-t",
+        help="Dashboard title (default: directory name)",
+    )
+    metrics_parser.set_defaults(func=cmd_metrics)
 
     return parser
 
