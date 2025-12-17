@@ -1,10 +1,10 @@
 # Moss Roadmap
 
-## Phase 10: Developer Experience
-- [ ] CLI interface (`moss init`, `moss run`, `moss status`)
-- [ ] Expand README with architecture overview
-- [ ] Usage examples and tutorials
-- [ ] API documentation (docstrings → generated docs)
+## Phase 10: Developer Experience ✓
+- [x] CLI interface (`moss init`, `moss run`, `moss status`)
+- [x] Expand README with architecture overview
+- [x] Usage examples and tutorials
+- [x] API documentation (docstrings → generated docs)
 
 ## Phase 11: Enhanced Capabilities
 - [ ] Real vector store integration (Chroma, Pinecone, etc.)

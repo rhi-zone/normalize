@@ -39,6 +39,7 @@ from moss.api import (
     TaskStatusResponse,
     create_api_handler,
 )
+from moss.cli import main as cli_main
 from moss.config import (
     Distro,
     LoopConfigWrapper,
@@ -258,6 +259,7 @@ __all__ = [
     "apply_patch",
     "apply_patch_with_fallback",
     "apply_text_patch",
+    "cli_main",
     "create_api_handler",
     "create_config",
     "create_default_policy_engine",
