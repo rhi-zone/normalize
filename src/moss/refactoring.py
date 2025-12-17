@@ -574,3 +574,497 @@ async def extract_function(
         file_patterns=[path.name],
     )
     return await refactorer.apply(refactoring, dry_run=dry_run)
+
+
+# =============================================================================
+# Inline Refactoring
+# =============================================================================
+
+
+@dataclass
+class InlineRefactoring(Refactoring):
+    """Inline a function or variable.
+
+    For functions: replaces all calls with the function body.
+    For variables: replaces all uses with the assigned value.
+    """
+
+    name: str = ""
+    remove_definition: bool = True
+
+    @property
+    def kind(self) -> RefactoringKind:
+        return RefactoringKind.INLINE
+
+    def apply_to_file(self, path: Path, content: str) -> str | None:
+        """Inline occurrences in file."""
+        if not self.name:
+            return None
+
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return None
+
+        # Find the definition
+        definition = _find_definition(tree, self.name)
+        if definition is None:
+            return None
+
+        # Inline based on type
+        if isinstance(definition, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return self._inline_function(tree, definition, content)
+        elif isinstance(definition, ast.Assign):
+            return self._inline_variable(tree, definition, content)
+
+        return None
+
+    def _inline_function(
+        self,
+        tree: ast.Module,
+        func: ast.FunctionDef | ast.AsyncFunctionDef,
+        content: str,
+    ) -> str | None:
+        """Inline a function."""
+        # Simple case: single-expression return
+        if len(func.body) == 1 and isinstance(func.body[0], ast.Return):
+            return_expr = func.body[0].value
+            if return_expr is None:
+                return None
+
+            transformer = _InlineFunctionTransformer(
+                self.name, func.args, return_expr, self.remove_definition
+            )
+            new_tree = transformer.visit(tree)
+
+            if transformer.changed:
+                return ast.unparse(new_tree)
+
+        return None
+
+    def _inline_variable(
+        self,
+        tree: ast.Module,
+        assign: ast.Assign,
+        content: str,
+    ) -> str | None:
+        """Inline a variable."""
+        # Only handle simple assignments
+        if len(assign.targets) != 1:
+            return None
+
+        target = assign.targets[0]
+        if not isinstance(target, ast.Name):
+            return None
+
+        transformer = _InlineVariableTransformer(self.name, assign.value, self.remove_definition)
+        new_tree = transformer.visit(tree)
+
+        if transformer.changed:
+            return ast.unparse(new_tree)
+
+        return None
+
+
+def _find_definition(tree: ast.Module, name: str) -> ast.stmt | None:
+    """Find the definition of a symbol."""
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name == name:
+                return node
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    return node
+    return None
+
+
+class _InlineFunctionTransformer(ast.NodeTransformer):
+    """AST transformer for inlining function calls."""
+
+    def __init__(
+        self,
+        func_name: str,
+        args: ast.arguments,
+        body: ast.expr,
+        remove_def: bool,
+    ):
+        self.func_name = func_name
+        self.args = args
+        self.body = body
+        self.remove_def = remove_def
+        self.changed = False
+
+    def visit_Call(self, node: ast.Call) -> ast.expr:
+        self.generic_visit(node)
+
+        if isinstance(node.func, ast.Name) and node.func.id == self.func_name:
+            # Build substitution map
+            subs: dict[str, ast.expr] = {}
+            for i, arg in enumerate(node.args):
+                if i < len(self.args.args):
+                    subs[self.args.args[i].arg] = arg
+
+            # Substitute in body copy
+            body_copy = _deep_copy_expr(self.body)
+            substituted = _SubstituteVars(subs).visit(body_copy)
+
+            self.changed = True
+            return substituted
+
+        return node
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef | None:
+        self.generic_visit(node)
+        if self.remove_def and node.name == self.func_name:
+            self.changed = True
+            return None  # Remove the function definition
+        return node
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef | None:
+        self.generic_visit(node)
+        if self.remove_def and node.name == self.func_name:
+            self.changed = True
+            return None
+        return node
+
+
+class _InlineVariableTransformer(ast.NodeTransformer):
+    """AST transformer for inlining variable uses."""
+
+    def __init__(self, var_name: str, value: ast.expr, remove_def: bool):
+        self.var_name = var_name
+        self.value = value
+        self.remove_def = remove_def
+        self.changed = False
+        self._in_definition = False
+
+    def visit_Assign(self, node: ast.Assign) -> ast.Assign | None:
+        # Check if this is the variable definition
+        is_our_definition = False
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == self.var_name:
+                is_our_definition = True
+                break
+
+        if is_our_definition:
+            if self.remove_def:
+                self.changed = True
+                return None  # Remove the assignment
+            # Keep the definition but don't inline in its value
+            return node
+
+        # Process other assignments normally
+        self.generic_visit(node)
+        return node
+
+    def visit_Name(self, node: ast.Name) -> ast.expr:
+        if node.id == self.var_name and isinstance(node.ctx, ast.Load):
+            self.changed = True
+            return _deep_copy_expr(self.value)
+        return node
+
+
+class _SubstituteVars(ast.NodeTransformer):
+    """Substitute variables in an expression."""
+
+    def __init__(self, subs: dict[str, ast.expr]):
+        self.subs = subs
+
+    def visit_Name(self, node: ast.Name) -> ast.expr:
+        if node.id in self.subs:
+            return _deep_copy_expr(self.subs[node.id])
+        return node
+
+
+def _deep_copy_expr(node: ast.expr) -> ast.expr:
+    """Deep copy an AST expression."""
+    import copy
+
+    return copy.deepcopy(node)
+
+
+async def inline_symbol(
+    path: Path,
+    name: str,
+    remove_definition: bool = True,
+    dry_run: bool = False,
+) -> RefactoringResult:
+    """Inline a function or variable.
+
+    Args:
+        path: File path
+        name: Symbol name to inline
+        remove_definition: Whether to remove the definition
+        dry_run: If True, don't write changes
+
+    Returns:
+        RefactoringResult
+    """
+    result = RefactoringResult(success=True)
+    refactoring = InlineRefactoring(
+        name=name,
+        remove_definition=remove_definition,
+    )
+
+    try:
+        path = Path(path).resolve()
+        content = path.read_text()
+        new_content = refactoring.apply_to_file(path, content)
+
+        if new_content is not None and new_content != content:
+            change = FileChange(
+                path=path,
+                original_content=content,
+                new_content=new_content,
+                description=f"inline {name}",
+            )
+            result.changes.append(change)
+            result.affected_files.append(path)
+
+            if not dry_run:
+                path.write_text(new_content)
+
+    except Exception as e:
+        result.errors.append(f"Error inlining {name}: {e}")
+        result.success = False
+
+    return result
+
+
+# =============================================================================
+# Codemod DSL
+# =============================================================================
+
+
+@dataclass
+class CodemodPattern:
+    """A pattern to match in code."""
+
+    # Pattern can be:
+    # - A string with $var placeholders: "assert $x == $y"
+    # - A regex pattern with named groups
+    pattern: str
+    is_regex: bool = False
+
+    def match(self, code: str) -> list[dict[str, str]]:
+        """Find all matches in code."""
+        if self.is_regex:
+            return self._match_regex(code)
+        return self._match_pattern(code)
+
+    def _match_regex(self, code: str) -> list[dict[str, str]]:
+        """Match using regex."""
+        matches = []
+        for m in re.finditer(self.pattern, code):
+            matches.append(m.groupdict())
+        return matches
+
+    def _match_pattern(self, code: str) -> list[dict[str, str]]:
+        """Match using placeholder pattern."""
+        # Convert pattern to regex
+        regex = self._pattern_to_regex()
+        matches = []
+        for m in re.finditer(regex, code):
+            matches.append(m.groupdict())
+        return matches
+
+    def _pattern_to_regex(self) -> str:
+        """Convert $var pattern to regex."""
+        # Escape regex special chars except $
+        escaped = re.escape(self.pattern)
+        # Replace escaped \$var with named groups
+        regex = re.sub(r"\\\$(\w+)", r"(?P<\1>[^,)]+)", escaped)
+        return regex
+
+
+@dataclass
+class CodemodRule:
+    """A single codemod transformation rule."""
+
+    name: str
+    description: str
+    pattern: CodemodPattern
+    replacement: str  # Can use $var or \\1 references
+    file_patterns: list[str] = field(default_factory=lambda: ["**/*.py"])
+
+    def apply(self, content: str) -> tuple[str, int]:
+        """Apply rule to content.
+
+        Returns:
+            Tuple of (new_content, num_replacements)
+        """
+        if self.pattern.is_regex:
+            new_content, count = re.subn(self.pattern.pattern, self.replacement, content)
+            return new_content, count
+
+        # Pattern-based replacement
+        regex = self.pattern._pattern_to_regex()
+
+        def replacer(m: re.Match) -> str:
+            result = self.replacement
+            for name, value in m.groupdict().items():
+                result = result.replace(f"${name}", value)
+            return result
+
+        new_content, count = re.subn(regex, replacer, content)
+        return new_content, count
+
+
+@dataclass
+class Codemod:
+    """A collection of codemod rules."""
+
+    name: str
+    description: str = ""
+    rules: list[CodemodRule] = field(default_factory=list)
+
+    def add_rule(
+        self,
+        name: str,
+        pattern: str,
+        replacement: str,
+        description: str = "",
+        is_regex: bool = False,
+    ) -> Codemod:
+        """Add a rule to the codemod.
+
+        Returns self for chaining.
+        """
+        self.rules.append(
+            CodemodRule(
+                name=name,
+                description=description,
+                pattern=CodemodPattern(pattern=pattern, is_regex=is_regex),
+                replacement=replacement,
+            )
+        )
+        return self
+
+
+class CodemodRunner:
+    """Runs codemods across files."""
+
+    def __init__(self, workspace: Path, exclude_patterns: list[str] | None = None):
+        self.workspace = Path(workspace).resolve()
+        self.exclude_patterns = exclude_patterns or [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/__pycache__/**",
+            "**/venv/**",
+            "**/.venv/**",
+        ]
+
+    async def run(self, codemod: Codemod, dry_run: bool = False) -> RefactoringResult:
+        """Run a codemod across the workspace."""
+        result = RefactoringResult(success=True)
+
+        for rule in codemod.rules:
+            for pattern in rule.file_patterns:
+                for path in self.workspace.glob(pattern):
+                    if path.is_file() and not self._is_excluded(path):
+                        try:
+                            content = path.read_text()
+                            new_content, count = rule.apply(content)
+
+                            if count > 0:
+                                change = FileChange(
+                                    path=path,
+                                    original_content=content,
+                                    new_content=new_content,
+                                    description=f"{rule.name}: {count} replacements",
+                                )
+                                result.changes.append(change)
+                                result.affected_files.append(path)
+
+                                if not dry_run:
+                                    path.write_text(new_content)
+
+                        except Exception as e:
+                            result.errors.append(f"Error in {path}: {e}")
+
+        if result.errors:
+            result.success = False
+
+        return result
+
+    def _is_excluded(self, path: Path) -> bool:
+        """Check if path matches exclusion patterns."""
+        import fnmatch
+
+        path_str = str(path)
+        for pattern in self.exclude_patterns:
+            if fnmatch.fnmatch(path_str, pattern):
+                return True
+        return False
+
+
+# =============================================================================
+# Built-in Codemods
+# =============================================================================
+
+
+def create_deprecation_codemod(
+    old_import: str,
+    new_import: str,
+    old_name: str,
+    new_name: str | None = None,
+) -> Codemod:
+    """Create a codemod for deprecating imports.
+
+    Example:
+        codemod = create_deprecation_codemod(
+            "old_module", "new_module", "OldClass", "NewClass"
+        )
+    """
+    new_name = new_name or old_name
+    codemod = Codemod(
+        name=f"deprecate_{old_name}",
+        description=f"Replace {old_import}.{old_name} with {new_import}.{new_name}",
+    )
+
+    # Update imports
+    codemod.add_rule(
+        name="update_import",
+        pattern=rf"from {re.escape(old_import)} import {re.escape(old_name)}",
+        replacement=f"from {new_import} import {new_name}",
+        is_regex=True,
+    )
+
+    # Update uses if name changed
+    if new_name != old_name:
+        codemod.add_rule(
+            name="update_usage",
+            pattern=rf"\b{re.escape(old_name)}\b",
+            replacement=new_name,
+            is_regex=True,
+        )
+
+    return codemod
+
+
+def create_api_migration_codemod(
+    old_pattern: str,
+    new_pattern: str,
+    name: str = "api_migration",
+) -> Codemod:
+    """Create a codemod for API migrations.
+
+    Example:
+        codemod = create_api_migration_codemod(
+            "assert_equal($x, $y)",
+            "assert $x == $y"
+        )
+    """
+    return Codemod(
+        name=name,
+        description=f"Migrate {old_pattern} to {new_pattern}",
+        rules=[
+            CodemodRule(
+                name="migrate",
+                description="",
+                pattern=CodemodPattern(pattern=old_pattern),
+                replacement=new_pattern,
+            )
+        ],
+    )

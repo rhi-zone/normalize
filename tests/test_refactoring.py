@@ -361,3 +361,374 @@ class TestPathToModule:
         module = _path_to_module(path)
 
         assert module == "package.subpackage.module"
+
+
+# =============================================================================
+# Inline Refactoring Tests
+# =============================================================================
+
+
+class TestInlineRefactoring:
+    """Tests for InlineRefactoring."""
+
+    def test_inline_simple_function(self):
+        from moss.refactoring import InlineRefactoring
+
+        refactoring = InlineRefactoring(name="double")
+
+        content = """
+def double(x):
+    return x * 2
+
+result = double(5)
+"""
+        new_content = refactoring.apply_to_file(Path("test.py"), content)
+
+        assert new_content is not None
+        assert "double" not in new_content  # Function removed
+        assert "5 * 2" in new_content  # Call inlined
+
+    def test_inline_function_multiple_args(self):
+        from moss.refactoring import InlineRefactoring
+
+        refactoring = InlineRefactoring(name="add")
+
+        content = """
+def add(a, b):
+    return a + b
+
+result = add(3, 4)
+"""
+        new_content = refactoring.apply_to_file(Path("test.py"), content)
+
+        assert new_content is not None
+        assert "3 + 4" in new_content
+
+    def test_inline_variable(self):
+        from moss.refactoring import InlineRefactoring
+
+        refactoring = InlineRefactoring(name="config")
+
+        content = """
+config = {"debug": True}
+print(config)
+"""
+        new_content = refactoring.apply_to_file(Path("test.py"), content)
+
+        assert new_content is not None
+        assert "config = " not in new_content  # Assignment removed
+        # AST unparsing uses single quotes for dict keys
+        assert "'debug'" in new_content
+
+    def test_inline_preserve_definition(self):
+        from moss.refactoring import InlineRefactoring
+
+        refactoring = InlineRefactoring(name="value", remove_definition=False)
+
+        content = """
+value = 42
+result = value + 1
+"""
+        new_content = refactoring.apply_to_file(Path("test.py"), content)
+
+        assert new_content is not None
+        # Definition preserved
+        assert "value = 42" in new_content
+        # Usage inlined
+        assert "42 + 1" in new_content
+
+    def test_inline_no_definition_found(self):
+        from moss.refactoring import InlineRefactoring
+
+        refactoring = InlineRefactoring(name="nonexistent")
+
+        content = "x = 1"
+        new_content = refactoring.apply_to_file(Path("test.py"), content)
+
+        assert new_content is None
+
+
+class TestInlineSymbol:
+    """Tests for inline_symbol convenience function."""
+
+    @pytest.mark.asyncio
+    async def test_inline_function(self, tmp_path: Path):
+        from moss.refactoring import inline_symbol
+
+        code_file = tmp_path / "code.py"
+        code_file.write_text("""
+def helper(x):
+    return x * 2
+
+result = helper(10)
+""")
+
+        result = await inline_symbol(code_file, "helper", dry_run=True)
+
+        assert result.success is True
+        assert len(result.changes) > 0
+
+
+# =============================================================================
+# Codemod Tests
+# =============================================================================
+
+
+class TestCodemodPattern:
+    """Tests for CodemodPattern."""
+
+    def test_regex_match(self):
+        from moss.refactoring import CodemodPattern
+
+        pattern = CodemodPattern(r"print\((?P<arg>.*?)\)", is_regex=True)
+        matches = pattern.match("print(x)\nprint(y)")
+
+        assert len(matches) == 2
+        assert matches[0]["arg"] == "x"
+        assert matches[1]["arg"] == "y"
+
+    def test_placeholder_match(self):
+        from moss.refactoring import CodemodPattern
+
+        pattern = CodemodPattern("assertEqual($x, $y)")
+        matches = pattern.match("assertEqual(a, b)\nassertEqual(1, 2)")
+
+        assert len(matches) == 2
+
+    def test_pattern_to_regex(self):
+        from moss.refactoring import CodemodPattern
+
+        pattern = CodemodPattern("func($a, $b)")
+        regex = pattern._pattern_to_regex()
+
+        assert "(?P<a>" in regex
+        assert "(?P<b>" in regex
+
+
+class TestCodemodRule:
+    """Tests for CodemodRule."""
+
+    def test_apply_regex_rule(self):
+        from moss.refactoring import CodemodPattern, CodemodRule
+
+        rule = CodemodRule(
+            name="test",
+            description="Test rule",
+            pattern=CodemodPattern(r"print\((.*?)\)", is_regex=True),
+            replacement=r"logger.info(\1)",
+        )
+
+        content = "print(x)\nprint(y)"
+        new_content, count = rule.apply(content)
+
+        assert count == 2
+        assert "logger.info(x)" in new_content
+        assert "logger.info(y)" in new_content
+
+    def test_apply_placeholder_rule(self):
+        from moss.refactoring import CodemodPattern, CodemodRule
+
+        rule = CodemodRule(
+            name="test",
+            description="Test rule",
+            pattern=CodemodPattern("assertEqual($x, $y)"),
+            replacement="assert $x == $y",
+        )
+
+        content = "assertEqual(a, b)"
+        new_content, count = rule.apply(content)
+
+        assert count == 1
+        assert "assert a == b" in new_content
+
+
+class TestCodemod:
+    """Tests for Codemod."""
+
+    def test_create_codemod(self):
+        from moss.refactoring import Codemod
+
+        codemod = Codemod(name="test", description="Test codemod")
+
+        assert codemod.name == "test"
+        assert len(codemod.rules) == 0
+
+    def test_add_rule_chaining(self):
+        from moss.refactoring import Codemod
+
+        codemod = (
+            Codemod(name="test").add_rule("rule1", "old1", "new1").add_rule("rule2", "old2", "new2")
+        )
+
+        assert len(codemod.rules) == 2
+        assert codemod.rules[0].name == "rule1"
+        assert codemod.rules[1].name == "rule2"
+
+
+class TestCodemodRunner:
+    """Tests for CodemodRunner."""
+
+    @pytest.mark.asyncio
+    async def test_run_codemod(self, tmp_path: Path):
+        from moss.refactoring import Codemod, CodemodRunner
+
+        # Create test file
+        (tmp_path / "test.py").write_text("print(x)\nprint(y)")
+
+        codemod = Codemod(name="test").add_rule(
+            name="replace_print",
+            pattern=r"print\((.*?)\)",
+            replacement=r"logger.info(\1)",
+            is_regex=True,
+        )
+
+        runner = CodemodRunner(tmp_path)
+        result = await runner.run(codemod, dry_run=True)
+
+        assert result.success is True
+        assert len(result.changes) == 1
+
+    @pytest.mark.asyncio
+    async def test_run_codemod_multiple_files(self, tmp_path: Path):
+        from moss.refactoring import Codemod, CodemodRunner
+
+        # Create test files
+        (tmp_path / "a.py").write_text("print(1)")
+        (tmp_path / "b.py").write_text("print(2)")
+
+        codemod = Codemod(name="test").add_rule(
+            name="replace_print",
+            pattern=r"print",
+            replacement="log",
+            is_regex=True,
+        )
+
+        runner = CodemodRunner(tmp_path)
+        result = await runner.run(codemod, dry_run=True)
+
+        assert result.success is True
+        assert len(result.changes) == 2
+
+    @pytest.mark.asyncio
+    async def test_exclude_patterns(self, tmp_path: Path):
+        from moss.refactoring import Codemod, CodemodRunner
+
+        # Create test files
+        (tmp_path / "src.py").write_text("print(1)")
+        venv = tmp_path / "venv"
+        venv.mkdir()
+        (venv / "lib.py").write_text("print(2)")
+
+        codemod = Codemod(name="test").add_rule(
+            name="replace_print",
+            pattern=r"print",
+            replacement="log",
+            is_regex=True,
+        )
+
+        runner = CodemodRunner(tmp_path)
+        result = await runner.run(codemod, dry_run=True)
+
+        # Should only change src.py, not venv/lib.py
+        assert len(result.changes) == 1
+        assert result.changes[0].path == tmp_path / "src.py"
+
+
+class TestBuiltinCodemods:
+    """Tests for built-in codemod factories."""
+
+    def test_create_deprecation_codemod(self):
+        from moss.refactoring import create_deprecation_codemod
+
+        codemod = create_deprecation_codemod("old_module", "new_module", "OldClass", "NewClass")
+
+        assert codemod.name == "deprecate_OldClass"
+        assert len(codemod.rules) == 2  # import + usage
+
+    def test_deprecation_codemod_same_name(self):
+        from moss.refactoring import create_deprecation_codemod
+
+        codemod = create_deprecation_codemod("old_module", "new_module", "MyClass")
+
+        # Only import rule when name doesn't change
+        assert len(codemod.rules) == 1
+
+    def test_create_api_migration_codemod(self):
+        from moss.refactoring import create_api_migration_codemod
+
+        codemod = create_api_migration_codemod("assertEqual($x, $y)", "assert $x == $y")
+
+        assert codemod.name == "api_migration"
+        assert len(codemod.rules) == 1
+
+    @pytest.mark.asyncio
+    async def test_api_migration_applies(self, tmp_path: Path):
+        from moss.refactoring import CodemodRunner, create_api_migration_codemod
+
+        (tmp_path / "test.py").write_text("assertEqual(a, b)\nassertEqual(1, 2)")
+
+        codemod = create_api_migration_codemod("assertEqual($x, $y)", "assert $x == $y")
+
+        runner = CodemodRunner(tmp_path)
+        result = await runner.run(codemod, dry_run=True)
+
+        assert result.success is True
+        assert len(result.changes) == 1
+        assert "assert a == b" in result.changes[0].new_content
+
+
+# =============================================================================
+# Integration Tests
+# =============================================================================
+
+
+class TestRefactoringIntegration:
+    """Integration tests for refactoring operations."""
+
+    @pytest.mark.asyncio
+    async def test_rename_and_verify(self, workspace: Path):
+        """Test rename refactoring updates all references."""
+        from moss.refactoring import Refactorer, RefactoringScope, RenameRefactoring
+
+        refactorer = Refactorer(workspace)
+        refactoring = RenameRefactoring(
+            old_name="helper_func",
+            new_name="utility_func",
+            scope=RefactoringScope.WORKSPACE,
+        )
+
+        # Apply the refactoring
+        result = await refactorer.apply(refactoring, dry_run=False)
+
+        assert result.success is True
+
+        # Verify changes
+        utils_content = (workspace / "utils.py").read_text()
+        assert "utility_func" in utils_content
+        assert "helper_func" not in utils_content
+
+        main_content = (workspace / "main.py").read_text()
+        assert "utility_func" in main_content
+
+    @pytest.mark.asyncio
+    async def test_extract_then_inline(self, tmp_path: Path):
+        """Test extracting code then inlining it back."""
+        from moss.refactoring import extract_function, inline_symbol
+
+        code_file = tmp_path / "code.py"
+        original = """def main():
+    x = 1
+    y = 2
+    z = x + y
+    return z
+"""
+        code_file.write_text(original)
+
+        # Extract lines 3-4
+        result = await extract_function(code_file, 3, 4, "compute", dry_run=False)
+        assert result.success
+
+        # Now inline it back
+        result = await inline_symbol(code_file, "compute", dry_run=True)
+        # Note: inline may not perfectly restore original due to AST unparsing
+        assert result.success
