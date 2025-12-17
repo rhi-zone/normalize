@@ -20,6 +20,17 @@ from moss.cli import (
     create_parser,
     main,
 )
+from moss.output import set_output
+
+
+@pytest.fixture(autouse=True)
+def reset_output():
+    """Reset global output before each test.
+
+    This ensures the Output instance uses pytest's captured stdout,
+    not the original stdout that was captured at module import time.
+    """
+    set_output(None)
 
 
 class TestCreateParser:
@@ -175,7 +186,8 @@ class TestCmdConfig:
 
         assert result == 1
         captured = capsys.readouterr()
-        assert "No config file" in captured.out
+        # Error messages go to stderr
+        assert "No config file" in captured.err
 
     def test_shows_config(self, tmp_path: Path, capsys):
         # Create a config

@@ -51,7 +51,7 @@ def output_result(data: Any, args: Namespace) -> None:
 
 def cmd_init(args: Namespace) -> int:
     """Initialize a new moss project."""
-    output = get_output()
+    output = setup_output(args)
     project_dir = Path(args.directory).resolve()
 
     if not project_dir.exists():
@@ -123,7 +123,7 @@ def cmd_run(args: Namespace) -> int:
     from moss.events import EventBus
     from moss.shadow_git import ShadowGit
 
-    output = get_output()
+    output = setup_output(args)
     project_dir = Path(args.directory).resolve()
     config_file = project_dir / "moss_config.py"
 
@@ -197,7 +197,7 @@ def cmd_status(args: Namespace) -> int:
     from moss.events import EventBus
     from moss.shadow_git import ShadowGit
 
-    output = get_output()
+    output = setup_output(args)
     project_dir = Path(args.directory).resolve()
     config_file = project_dir / "moss_config.py"
 
@@ -251,7 +251,7 @@ def cmd_config(args: Namespace) -> int:
     """Show or validate configuration."""
     from moss.config import list_distros, load_config_file
 
-    output = get_output()
+    output = setup_output(args)
 
     if args.list_distros:
         output.info("Available distros:")
@@ -313,7 +313,7 @@ def cmd_distros(args: Namespace) -> int:
     """List available configuration distros."""
     from moss.config import get_distro, list_distros
 
-    output = get_output()
+    output = setup_output(args)
     distros = list_distros()
 
     if getattr(args, "json", False):
@@ -346,7 +346,7 @@ def cmd_skeleton(args: Namespace) -> int:
     from moss.plugins import get_registry
     from moss.views import ViewOptions, ViewTarget
 
-    output = get_output()
+    output = setup_output(args)
     path = Path(args.path).resolve()
 
     if not path.exists():
@@ -426,7 +426,7 @@ def cmd_anchors(args: Namespace) -> int:
 
     from moss.skeleton import extract_python_skeleton
 
-    output = get_output()
+    output = setup_output(args)
     path = Path(args.path).resolve()
 
     if not path.exists():
@@ -510,7 +510,7 @@ def cmd_query(args: Namespace) -> int:
 
     from moss.skeleton import extract_python_skeleton
 
-    output = get_output()
+    output = setup_output(args)
     path = Path(args.path).resolve()
 
     if not path.exists():
@@ -637,7 +637,7 @@ def cmd_cfg(args: Namespace) -> int:
     from moss.plugins import get_registry
     from moss.views import ViewOptions, ViewTarget
 
-    output = get_output()
+    output = setup_output(args)
     path = Path(args.path).resolve()
 
     if not path.exists():
@@ -803,7 +803,7 @@ def cmd_deps(args: Namespace) -> int:
     from moss.plugins import get_registry
     from moss.views import ViewTarget
 
-    output = get_output()
+    output = setup_output(args)
     path = Path(args.path).resolve()
 
     if not path.exists():
@@ -927,7 +927,7 @@ def cmd_context(args: Namespace) -> int:
     from moss.plugins import get_registry
     from moss.views import ViewTarget
 
-    output = get_output()
+    output = setup_output(args)
     path = Path(args.path).resolve()
 
     if not path.exists():
@@ -1136,7 +1136,7 @@ def cmd_search(args: Namespace) -> int:
 
 def cmd_mcp_server(args: Namespace) -> int:
     """Start the MCP server for LLM tool access."""
-    output = get_output()
+    output = setup_output(args)
     try:
         from moss.mcp_server import main as mcp_main
 
@@ -1152,7 +1152,7 @@ def cmd_mcp_server(args: Namespace) -> int:
 
 def cmd_lsp(args: Namespace) -> int:
     """Start the LSP server for IDE integration."""
-    output = get_output()
+    output = setup_output(args)
     try:
         from moss.lsp_server import start_server
 

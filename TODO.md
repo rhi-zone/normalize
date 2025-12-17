@@ -9,7 +9,7 @@
 
 ### Performance
 - [x] Caching layer for AST/CFG (avoid re-parsing unchanged files)
-- [ ] Parallel file analysis (multi-threaded processing)
+- [x] Parallel file analysis (multi-threaded processing)
 
 ### Configuration
 - [ ] Project config file (`moss.toml` or `.mossrc`)
