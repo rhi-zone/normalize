@@ -302,6 +302,19 @@ class PluginRegistry:
         except ImportError:
             logger.debug("Tree-sitter plugin not available")
 
+        # Add non-code content plugins
+        from moss.plugins.data_files import JSONSchemaPlugin, TOMLSchemaPlugin, YAMLSchemaPlugin
+        from moss.plugins.markdown import MarkdownStructurePlugin
+
+        builtins.extend(
+            [
+                MarkdownStructurePlugin(),
+                JSONSchemaPlugin(),
+                YAMLSchemaPlugin(),
+                TOMLSchemaPlugin(),
+            ]
+        )
+
         for plugin in builtins:
             if plugin.metadata.name not in self._plugins:
                 self.register(plugin)

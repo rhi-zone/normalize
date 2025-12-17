@@ -14,6 +14,10 @@ python-skeleton = "moss.skeleton:PythonSkeletonPlugin"
 python-dependency = "moss.dependencies:PythonDependencyPlugin"
 python-cfg = "moss.cfg:PythonCFGPlugin"
 tree-sitter-skeleton = "moss.plugins.tree_sitter:TreeSitterSkeletonPlugin"
+markdown-structure = "moss.plugins.markdown:MarkdownStructurePlugin"
+json-schema = "moss.plugins.data_files:JSONSchemaPlugin"
+yaml-schema = "moss.plugins.data_files:YAMLSchemaPlugin"
+toml-schema = "moss.plugins.data_files:TOMLSchemaPlugin"
 
 [project.optional-dependencies]
 dev = [
