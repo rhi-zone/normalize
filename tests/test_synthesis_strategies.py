@@ -10,7 +10,7 @@ from moss.synthesis.strategies import (
 )
 from moss.synthesis.strategies.pattern_based import Pattern
 from moss.synthesis.strategies.test_driven import (
-    TestInfo,
+    ExtractedTestCase,
     categorize_test,
     cluster_tests,
     extract_test_info,
@@ -211,9 +211,9 @@ class TestClusterTests:
 
     def test_cluster_by_category(self):
         tests = [
-            TestInfo(name="test1", category="happy_path"),
-            TestInfo(name="test2", category="error_handling"),
-            TestInfo(name="test3", category="happy_path"),
+            ExtractedTestCase(name="test1", category="happy_path"),
+            ExtractedTestCase(name="test2", category="error_handling"),
+            ExtractedTestCase(name="test3", category="happy_path"),
         ]
         clusters = cluster_tests(tests)
         assert "happy_path" in clusters

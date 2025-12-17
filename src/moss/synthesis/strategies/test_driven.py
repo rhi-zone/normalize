@@ -15,8 +15,11 @@ from moss.synthesis.types import Context, Specification, Subproblem
 
 
 @dataclass
-class TestInfo:
-    """Information extracted from a test."""
+class ExtractedTestCase:
+    """Information extracted from a test case.
+
+    Named without 'Test' prefix to avoid pytest collection warnings.
+    """
 
     name: str
     description: str = ""
@@ -26,13 +29,13 @@ class TestInfo:
     category: str = ""
 
 
-def extract_test_info(test: str | dict) -> TestInfo:
+def extract_test_info(test: str | dict) -> ExtractedTestCase:
     """Extract information from a test case.
 
     Handles both string (test code) and dict (structured test) formats.
     """
     if isinstance(test, dict):
-        return TestInfo(
+        return ExtractedTestCase(
             name=test.get("name", "unknown"),
             description=test.get("description", ""),
             operations=test.get("operations", []),
@@ -58,7 +61,7 @@ def extract_test_info(test: str | dict) -> TestInfo:
     # Categorize test
     category = categorize_test(name, test_str)
 
-    return TestInfo(
+    return ExtractedTestCase(
         name=name,
         description=f"Test: {name}",
         operations=operations,
@@ -83,9 +86,9 @@ def categorize_test(name: str, content: str) -> str:
     return "general"
 
 
-def cluster_tests(tests: list[TestInfo]) -> dict[str, list[TestInfo]]:
+def cluster_tests(tests: list[ExtractedTestCase]) -> dict[str, list[ExtractedTestCase]]:
     """Group tests by what they exercise."""
-    clusters: dict[str, list[TestInfo]] = {}
+    clusters: dict[str, list[ExtractedTestCase]] = {}
 
     for test in tests:
         # Cluster by category
@@ -271,7 +274,7 @@ class TestDrivenDecomposition(DecompositionStrategy):
     def _spec_from_tests(
         self,
         description: str,
-        tests: list[TestInfo],
+        tests: list[ExtractedTestCase],
         parent_spec: Specification,
     ) -> Specification:
         """Create a specification from a group of tests."""

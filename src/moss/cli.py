@@ -1357,6 +1357,154 @@ def cmd_rules(args: Namespace) -> int:
     return 1 if errors > 0 else 0
 
 
+def cmd_synthesize(args: Namespace) -> int:
+    """Synthesize code from specification."""
+    from moss.synthesis import (
+        Context,
+        Specification,
+        SynthesisFramework,
+    )
+    from moss.synthesis.framework import SynthesisConfig
+    from moss.synthesis.strategies import (
+        PatternBasedDecomposition,
+        TestDrivenDecomposition,
+        TypeDrivenDecomposition,
+    )
+
+    output = setup_output(args)
+
+    # Parse examples from "input:output" format
+    examples: list[tuple[str, str]] = []
+    if args.examples:
+        for ex in args.examples:
+            if ":" in ex:
+                inp, out = ex.split(":", 1)
+                examples.append((inp.strip(), out.strip()))
+            else:
+                output.warning(f"Invalid example format: {ex} (expected 'input:output')")
+
+    # Build specification
+    spec = Specification(
+        description=args.description,
+        type_signature=getattr(args, "type_signature", None),
+        examples=tuple(examples),
+        constraints=tuple(args.constraints or []),
+    )
+
+    # Set up strategies
+    strategies = []
+    strategy_name = getattr(args, "strategy", "auto")
+
+    if strategy_name == "auto":
+        strategies = [
+            TypeDrivenDecomposition(),
+            TestDrivenDecomposition(),
+            PatternBasedDecomposition(),
+        ]
+    elif strategy_name == "type_driven":
+        strategies = [TypeDrivenDecomposition()]
+    elif strategy_name == "test_driven":
+        strategies = [TestDrivenDecomposition()]
+    elif strategy_name == "pattern_based":
+        strategies = [PatternBasedDecomposition()]
+
+    # Create framework
+    config = SynthesisConfig(max_depth=getattr(args, "max_depth", 5))
+    framework = SynthesisFramework(
+        strategies=strategies,
+        config=config,
+    )
+
+    # Show specification
+    output.header("Specification")
+    output.info(f"Description: {spec.description}")
+    if spec.type_signature:
+        output.info(f"Type signature: {spec.type_signature}")
+    if spec.examples:
+        output.info(f"Examples: {len(spec.examples)}")
+        for inp, out in spec.examples[:3]:
+            output.print(f"  {inp} -> {out}")
+    if spec.constraints:
+        output.info(f"Constraints: {', '.join(spec.constraints)}")
+    output.blank()
+
+    # Show decomposition if requested
+    if getattr(args, "show_decomposition", False) or getattr(args, "dry_run", False):
+        output.step("Analyzing decomposition...")
+
+        # Find applicable strategies
+        ctx = Context()
+        applicable = []
+        for strategy in strategies:
+            if strategy.can_handle(spec, ctx):
+                score = strategy.estimate_success(spec, ctx)
+                applicable.append((strategy, score))
+
+        if not applicable:
+            output.warning("No applicable strategies found for this specification")
+            return 1
+
+        applicable.sort(key=lambda x: x[1], reverse=True)
+        best_strategy, best_score = applicable[0]
+
+        output.info(f"Best strategy: {best_strategy.name} (score: {best_score:.2f})")
+        output.blank()
+
+        # Show decomposition
+        subproblems = best_strategy.decompose(spec, ctx)
+        if subproblems:
+            output.step(f"Decomposition ({len(subproblems)} subproblems):")
+            for i, sub in enumerate(subproblems):
+                deps = f" [deps: {sub.dependencies}]" if sub.dependencies else ""
+                output.print(f"  {i}. {sub.specification.description}{deps}")
+                if sub.specification.type_signature:
+                    output.print(f"     Type: {sub.specification.type_signature}")
+        else:
+            output.info("No decomposition needed (atomic problem)")
+
+        if getattr(args, "dry_run", False):
+            output.blank()
+            output.info("(dry-run mode, stopping before synthesis)")
+            return 0
+
+    # Run synthesis
+    output.step("Synthesizing...")
+
+    async def run_synthesis():
+        return await framework.synthesize(spec)
+
+    try:
+        result = asyncio.run(run_synthesis())
+    except Exception as e:
+        output.error(f"Synthesis failed: {e}")
+        return 1
+
+    # Output result
+    if getattr(args, "json", False):
+        output_result(
+            {
+                "success": result.success,
+                "code": result.code,
+                "confidence": result.confidence,
+                "metadata": result.metadata,
+            },
+            args,
+        )
+    else:
+        if result.success:
+            output.success(f"Synthesis complete (confidence: {result.confidence:.2f})")
+            output.blank()
+            if result.code:
+                output.print(result.code)
+        else:
+            output.error("Synthesis did not produce a result")
+            if result.metadata.get("error"):
+                output.error(f"Error: {result.metadata['error']}")
+            return 1
+
+    return 0
+
+
 def cmd_metrics(args: Namespace) -> int:
     """Generate codebase metrics dashboard."""
     from moss.metrics import collect_metrics, generate_dashboard
@@ -1959,6 +2107,61 @@ def create_parser() -> argparse.ArgumentParser:
         help="Output results in SARIF format to file",
     )
     rules_parser.set_defaults(func=cmd_rules)
+
+    # synthesize command
+    synth_parser = subparsers.add_parser("synthesize", help="Synthesize code from specification")
+    synth_parser.add_argument(
+        "description",
+        help="Description of what to synthesize",
+    )
+    synth_parser.add_argument(
+        "--type-signature",
+        "-t",
+        dest="type_signature",
+        help="Type signature (e.g., 'List[int] -> List[str]')",
+    )
+    synth_parser.add_argument(
+        "--example",
+        "-e",
+        action="append",
+        dest="examples",
+        help="Input-output example as 'input:output' (can be repeated)",
+    )
+    synth_parser.add_argument(
+        "--constraint",
+        "-c",
+        action="append",
+        dest="constraints",
+        help="Add constraint (can be repeated)",
+    )
+    synth_parser.add_argument(
+        "--strategy",
+        "-s",
+        choices=["type_driven", "test_driven", "pattern_based", "auto"],
+        default="auto",
+        help="Decomposition strategy (default: auto)",
+    )
+    synth_parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=5,
+        dest="max_depth",
+        help="Maximum decomposition depth (default: 5)",
+    )
+    synth_parser.add_argument(
+        "--show-decomposition",
+        "-d",
+        action="store_true",
+        dest="show_decomposition",
+        help="Show problem decomposition tree",
+    )
+    synth_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Show what would be synthesized without executing",
+    )
+    synth_parser.set_defaults(func=cmd_synthesize)
 
     return parser
 
