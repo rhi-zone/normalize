@@ -17,6 +17,15 @@ dev = [
 docs = [
     "pdoc>=14.0",
 ]
+tree-sitter = [
+    "tree-sitter>=0.21",
+    "tree-sitter-python>=0.21",
+    "tree-sitter-typescript>=0.21",
+    "tree-sitter-javascript>=0.21",
+]
+chroma = [
+    "chromadb>=0.4",
+]
 
 [build-system]
 requires = ["hatchling"]

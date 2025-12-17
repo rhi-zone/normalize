@@ -6,12 +6,12 @@
 - [x] Usage examples and tutorials
 - [x] API documentation (docstrings → generated docs)
 
-## Phase 11: Enhanced Capabilities
-- [ ] Real vector store integration (Chroma, Pinecone, etc.)
-- [ ] Tree-sitter integration for multi-language AST
+## Phase 11: Enhanced Capabilities (in progress)
+- [x] Real vector store integration (Chroma, Pinecone, etc.)
+- [x] Tree-sitter integration for multi-language AST
 - [ ] Control Flow Graph (CFG) view provider
 - [ ] Elided Literals view provider
-- [ ] Additional language support beyond Python
+- [x] Additional language support beyond Python (TypeScript, JS, Go, Rust)
 
 ## Phase 12: Hardening & Quality
 - [ ] Integration tests (component interactions)
