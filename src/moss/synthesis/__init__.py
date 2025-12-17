@@ -59,6 +59,14 @@ from .framework import (
     SynthesisState,
     create_synthesis_framework,
 )
+from .learning import (
+    StrategyLearner,
+    StrategyOutcome,
+    extract_features,
+    feature_similarity,
+    get_learner,
+    reset_learner,
+)
 from .presets import (
     PresetName,
     SynthesisPreset,
@@ -97,8 +105,10 @@ __all__ = [
     "SolutionCache",
     "Specification",
     "StrategyCache",
+    "StrategyLearner",
     "StrategyMatch",
     "StrategyMetadata",
+    "StrategyOutcome",
     "StrategyRouter",
     "Subproblem",
     "SynthesisCache",
@@ -112,7 +122,10 @@ __all__ = [
     "ValidationError",
     "clear_all_caches",
     "create_synthesis_framework",
+    "extract_features",
+    "feature_similarity",
     "get_cache_stats",
+    "get_learner",
     "get_preset",
     "get_preset_descriptions",
     "get_solution_cache",
@@ -120,4 +133,5 @@ __all__ = [
     "get_test_cache",
     "list_presets",
     "register_preset",
+    "reset_learner",
 ]

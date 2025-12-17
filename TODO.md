@@ -29,12 +29,11 @@ The synthesis framework is operational with a plugin architecture for generators
 - [x] **Code generators** - PlaceholderGenerator, TemplateGenerator
 - [x] **Validation retry loop** - compose, validate, fix, repeat
 
-#### 22c: CLI & Integration 🚧
+#### 22c: CLI & Integration ✅
 - [x] `moss synthesize` CLI command (shows decomposition)
 - [x] `--dry-run` and `--show-decomposition` flags
-- [ ] **`moss edit` integration** - fallback for complex tasks
-  - Design: `~/git/prose/moss/code-synthesis-domain.md` lines 462-521
-- [ ] Synthesis configuration presets (default/research/production)
+- [x] **`moss edit` integration** - fallback for complex tasks
+- [x] Synthesis configuration presets (default/research/production/minimal)
 
 #### 22d: Optimization & Learning 🚧
 - [x] Caching infrastructure

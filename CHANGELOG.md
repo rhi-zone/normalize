@@ -2,6 +2,13 @@
 
 ## v0.4.0
 
+### Phase 22c: CLI & Edit Integration
+- `moss edit` command with intelligent complexity routing
+- TaskComplexity analysis (simple/medium/complex/novel)
+- Structural edit handler (rename, typo fix, refactoring)
+- Synthesis fallback for complex/novel tasks
+- Configuration presets: default, research, production, minimal
+
 ### Phase 25: Synthesis Plugin Architecture
 Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCoder, λ²):
 - `CodeGenerator` protocol with PlaceholderGenerator, TemplateGenerator
