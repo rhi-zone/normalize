@@ -18,11 +18,6 @@
 - [ ] LSP integration
 - [ ] Live CFG rendering
 
-### Non-Code Content Plugins
-- [ ] Markdown structure extraction
-- [ ] JSON/YAML schema analysis
-- [ ] Config file parsing
-
 ## Backlog
 
 - Visual CFG output (graphviz/mermaid)
@@ -35,6 +30,7 @@
 ## Completed
 
 See `docs/` for details on completed work:
+- **Phase 19a**: Non-Code Content Plugins — Markdown structure, JSON/YAML/TOML schema extraction
 - **Phase 18**: Plugin Architecture — extensible view provider system, entry points discovery, multi-language support (tree-sitter)
 - **Phase 17**: Introspection Improvements — symbol metrics, reverse deps, DWIM tuning, output improvements
 - **Phase 15**: LLM Introspection Tooling (`docs/tools.md`, `docs/cli-architecture.md`)

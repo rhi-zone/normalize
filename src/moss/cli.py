@@ -937,6 +937,96 @@ def cmd_context(args: Namespace) -> int:
     return 0
 
 
+def cmd_search(args: Namespace) -> int:
+    """Semantic search across codebase."""
+    from moss.semantic_search import create_search_system
+
+    directory = Path(args.directory).resolve()
+    if not directory.exists():
+        print(f"Error: Directory {directory} does not exist", file=sys.stderr)
+        return 1
+
+    # Create search system
+    backend = "chroma" if args.persist else "memory"
+    kwargs: dict[str, Any] = {}
+    if args.persist:
+        kwargs["collection_name"] = "moss_search"
+        kwargs["persist_directory"] = str(directory / ".moss" / "search_index")
+
+    indexer, search = create_search_system(backend, **kwargs)
+
+    async def run_search():
+        # Index if requested or if no index exists
+        if args.index:
+            patterns = args.patterns.split(",") if args.patterns else None
+            exclude = args.exclude.split(",") if args.exclude else None
+            count = await indexer.index_directory(directory, patterns, exclude)
+            if not args.query:
+                print(f"Indexed {count} chunks from {directory}")
+                return None
+
+        if not args.query:
+            print("Error: No query provided. Use --query or --index", file=sys.stderr)
+            return None
+
+        # Search
+        results = await search.search(
+            args.query,
+            limit=args.limit,
+            mode=args.mode,
+        )
+        return results
+
+    results = asyncio.run(run_search())
+
+    if results is None:
+        return 0 if args.index else 1
+
+    if not results:
+        print("No results found.")
+        return 0
+
+    if getattr(args, "json", False):
+        output = [
+            {
+                "file": r.chunk.file_path,
+                "symbol": r.chunk.symbol_name,
+                "kind": r.chunk.symbol_kind,
+                "line_start": r.chunk.line_start,
+                "line_end": r.chunk.line_end,
+                "score": r.score,
+                "match_type": r.match_type,
+            }
+            for r in results
+        ]
+        output_result(output, args)
+    else:
+        print(f"Found {len(results)} results:\n")
+        for i, hit in enumerate(results, 1):
+            chunk = hit.chunk
+            location = f"{chunk.file_path}:{chunk.line_start}"
+            name = chunk.symbol_name or chunk.file_path
+            kind = chunk.symbol_kind or "file"
+            score = f"{hit.score:.2f}"
+
+            print(f"{i}. [{kind}] {name}")
+            print(f"   Location: {location}")
+            print(f"   Score: {score} ({hit.match_type})")
+
+            # Show snippet
+            if chunk.content:
+                snippet = chunk.content[:200]
+                if len(chunk.content) > 200:
+                    snippet += "..."
+                # Indent snippet
+                snippet_lines = snippet.split("\n")[:3]
+                for line in snippet_lines:
+                    print(f"   | {line}")
+            print()
+
+    return 0
+
+
 def cmd_mcp_server(args: Namespace) -> int:
     """Start the MCP server for LLM tool access."""
     try:
@@ -1158,6 +1248,32 @@ def create_parser() -> argparse.ArgumentParser:
     )
     context_parser.add_argument("path", help="Python file to analyze")
     context_parser.set_defaults(func=cmd_context)
+
+    # search command
+    search_parser = subparsers.add_parser("search", help="Semantic search across codebase")
+    search_parser.add_argument("--query", "-q", help="Search query (natural language or code)")
+    search_parser.add_argument(
+        "--directory", "-d", default=".", help="Directory to search (default: .)"
+    )
+    search_parser.add_argument(
+        "--index", "-i", action="store_true", help="Index files before searching"
+    )
+    search_parser.add_argument(
+        "--persist", "-p", action="store_true", help="Persist index to disk (uses ChromaDB)"
+    )
+    search_parser.add_argument("--patterns", help="Glob patterns to include (comma-separated)")
+    search_parser.add_argument("--exclude", help="Glob patterns to exclude (comma-separated)")
+    search_parser.add_argument(
+        "--limit", "-n", type=int, default=10, help="Max results (default: 10)"
+    )
+    search_parser.add_argument(
+        "--mode",
+        choices=["hybrid", "tfidf", "embedding"],
+        default="hybrid",
+        help="Search mode (default: hybrid)",
+    )
+    search_parser.add_argument("--json", action="store_true", help="JSON output")
+    search_parser.set_defaults(func=cmd_search)
 
     # mcp-server command
     mcp_parser = subparsers.add_parser("mcp-server", help="Start MCP server for LLM tool access")
