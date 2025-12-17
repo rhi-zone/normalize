@@ -127,7 +127,7 @@ class TestCFGBuilder:
 
     def test_simple_function(self):
         source = """
-def foo():
+def bar():
     x = 1
     y = 2
     return x + y
@@ -137,13 +137,13 @@ def foo():
 
         assert len(cfgs) == 1
         cfg = cfgs[0]
-        assert cfg.name == "foo"
+        assert cfg.name == "bar"
         assert cfg.entry_node == "ENTRY"
         assert cfg.exit_node == "EXIT"
 
     def test_if_statement(self):
         source = """
-def foo(x):
+def bar(x):
     if x > 0:
         return 1
     else:
@@ -159,7 +159,7 @@ def foo(x):
 
     def test_while_loop(self):
         source = """
-def foo():
+def bar():
     x = 0
     while x < 10:
         x += 1
@@ -178,7 +178,7 @@ def foo():
 
     def test_try_except(self):
         source = """
-def foo():
+def bar():
     try:
         risky()
     except ValueError:
@@ -194,7 +194,7 @@ def foo():
 
     def test_multiple_functions(self):
         source = """
-def foo():
+def bar():
     pass
 
 def bar():
@@ -208,16 +208,16 @@ def baz():
 
         assert len(cfgs) == 3
         names = [c.name for c in cfgs]
-        assert "foo" in names
+        assert "bar" in names
         assert "bar" in names
         assert "baz" in names
 
     def test_specific_function(self):
         source = """
-def foo():
+def bar():
     pass
 
-def bar():
+def baz():
     pass
 """
         builder = CFGBuilder()
@@ -228,7 +228,7 @@ def bar():
 
     def test_nested_if(self):
         source = """
-def foo(x, y):
+def bar(x, y):
     if x > 0:
         if y > 0:
             return 1

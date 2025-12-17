@@ -1357,6 +1357,143 @@ def cmd_rules(args: Namespace) -> int:
     return 1 if errors > 0 else 0
 
 
+def cmd_edit(args: Namespace) -> int:
+    """Edit code with intelligent complexity routing."""
+    from moss.edit import EditContext, TaskComplexity, analyze_complexity, edit
+
+    output = setup_output(args)
+    project_dir = Path(getattr(args, "directory", ".")).resolve()
+    task = args.task
+
+    # Build context
+    target_file = None
+    if args.file:
+        target_file = (project_dir / args.file).resolve()
+        if not target_file.exists():
+            output.error(f"File {target_file} does not exist")
+            return 1
+
+    context = EditContext(
+        project_root=project_dir,
+        target_file=target_file,
+        target_symbol=getattr(args, "symbol", None),
+        language=getattr(args, "language", "python"),
+        constraints=args.constraint or [],
+    )
+
+    # Analyze complexity
+    complexity = analyze_complexity(task, context)
+
+    if getattr(args, "analyze_only", False):
+        output.header("Complexity Analysis")
+        output.info(f"Task: {task}")
+        output.info(f"Complexity: {complexity.value}")
+
+        # Show which patterns matched
+        if complexity == TaskComplexity.SIMPLE:
+            output.info("Handler: structural editing (refactoring)")
+        elif complexity == TaskComplexity.MEDIUM:
+            output.info("Handler: multi-agent decomposition")
+        elif complexity == TaskComplexity.COMPLEX:
+            output.info("Handler: synthesis (with multi-agent fallback)")
+        else:
+            output.info("Handler: synthesis (novel problem)")
+
+        return 0
+
+    # Show what we're doing
+    output.step(f"Editing ({complexity.value} complexity)...")
+
+    # Force specific handler if requested
+    force_method = getattr(args, "method", None)
+    if force_method:
+        output.verbose(f"Forcing method: {force_method}")
+
+    async def run_edit():
+        if force_method == "structural":
+            from moss.edit import structural_edit
+
+            return await structural_edit(task, context)
+        elif force_method == "synthesis":
+            from moss.edit import synthesize_edit
+
+            return await synthesize_edit(task, context)
+        else:
+            return await edit(task, context)
+
+    try:
+        result = asyncio.run(run_edit())
+    except Exception as e:
+        output.error(f"Edit failed: {e}")
+        return 1
+
+    # Output result
+    if getattr(args, "json", False):
+        output_result(
+            {
+                "success": result.success,
+                "method": result.method,
+                "changes": [
+                    {
+                        "file": str(c.path),
+                        "has_changes": c.has_changes,
+                        "description": c.description,
+                    }
+                    for c in result.changes
+                ],
+                "iterations": result.iterations,
+                "error": result.error,
+                "metadata": result.metadata,
+            },
+            args,
+        )
+    else:
+        if result.success:
+            output.success(f"Edit complete (method: {result.method})")
+
+            if result.changes:
+                output.blank()
+                output.step(f"Changes ({len(result.changes)} files):")
+                for change in result.changes:
+                    if change.has_changes:
+                        output.info(f"  {change.path}")
+                        if change.description:
+                            output.verbose(f"    {change.description}")
+
+                # Show diff if requested
+                if getattr(args, "diff", False):
+                    output.blank()
+                    output.step("Diff:")
+                    for change in result.changes:
+                        if change.has_changes:
+                            import difflib
+
+                            diff = difflib.unified_diff(
+                                change.original.splitlines(keepends=True),
+                                change.modified.splitlines(keepends=True),
+                                fromfile=f"a/{change.path.name}",
+                                tofile=f"b/{change.path.name}",
+                            )
+                            output.print("".join(diff))
+
+                # Apply changes if not dry-run
+                if not getattr(args, "dry_run", False):
+                    for change in result.changes:
+                        if change.has_changes:
+                            change.path.parent.mkdir(parents=True, exist_ok=True)
+                            change.path.write_text(change.modified)
+                    output.success("Changes applied")
+                else:
+                    output.info("(dry-run mode, changes not applied)")
+            else:
+                output.info("No changes needed")
+        else:
+            output.error(f"Edit failed: {result.error}")
+            return 1
+
+    return 0
+
+
 def cmd_synthesize(args: Namespace) -> int:
     """Synthesize code from specification."""
     from moss.synthesis import (
@@ -2162,6 +2299,69 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show what would be synthesized without executing",
     )
     synth_parser.set_defaults(func=cmd_synthesize)
+
+    # edit command
+    edit_parser = subparsers.add_parser(
+        "edit", help="Edit code with intelligent complexity routing"
+    )
+    edit_parser.add_argument(
+        "task",
+        help="Description of the edit task",
+    )
+    edit_parser.add_argument(
+        "-f",
+        "--file",
+        help="Target file to edit",
+    )
+    edit_parser.add_argument(
+        "-s",
+        "--symbol",
+        help="Target symbol (function, class, method) to edit",
+    )
+    edit_parser.add_argument(
+        "-C",
+        "--directory",
+        default=".",
+        help="Project directory (default: current)",
+    )
+    edit_parser.add_argument(
+        "-l",
+        "--language",
+        default="python",
+        help="Programming language (default: python)",
+    )
+    edit_parser.add_argument(
+        "-c",
+        "--constraint",
+        action="append",
+        help="Add constraint (can be repeated)",
+    )
+    edit_parser.add_argument(
+        "--method",
+        choices=["structural", "synthesis", "auto"],
+        default="auto",
+        help="Force specific edit method (default: auto)",
+    )
+    edit_parser.add_argument(
+        "--analyze-only",
+        "-a",
+        action="store_true",
+        dest="analyze_only",
+        help="Only analyze complexity, don't edit",
+    )
+    edit_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Show what would change without applying",
+    )
+    edit_parser.add_argument(
+        "--diff",
+        "-d",
+        action="store_true",
+        help="Show unified diff of changes",
+    )
+    edit_parser.set_defaults(func=cmd_edit)
 
     return parser
 

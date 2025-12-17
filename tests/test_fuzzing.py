@@ -40,13 +40,13 @@ class TestSkeletonFuzzing:
         "source",
         [
             "def",  # Incomplete
-            "def foo",  # Missing parens
-            "def foo(",  # Unclosed paren
+            "def bar",  # Missing parens
+            "def bar(",  # Unclosed paren
             "class",  # Incomplete class
             "class Foo",  # Missing colon
             "class Foo:",  # No body
             "async def",  # Incomplete async
-            "def foo():\n",  # No body
+            "def bar():\n",  # No body
             "@",  # Lone decorator
             "@decorator",  # Decorator without function
         ],
@@ -119,15 +119,15 @@ class TestAnchorFuzzing:
             " ",  # Space
             "123",  # Numeric start
             "a" * 1000,  # Very long
-            "foo.bar",  # Dotted
-            "foo-bar",  # Hyphenated (invalid Python)
+            "bar.bar",  # Dotted
+            "bar-bar",  # Hyphenated (invalid Python)
             "λ",  # Unicode
             "\n",  # Newline
         ],
     )
     def test_unusual_anchor_names(self, anchor_name):
         """Test anchors with unusual names."""
-        source = "def foo(): pass"
+        source = "def bar(): pass"
         anchor = Anchor(type=AnchorType.FUNCTION, name=anchor_name)
 
         # Should not crash
@@ -141,34 +141,34 @@ class TestAnchorFuzzing:
     def test_duplicate_function_names(self):
         """Test source with duplicate function names."""
         source = """
-def foo():
+def bar():
     pass
 
-def foo():  # Redefined
+def bar():  # Redefined
     pass
 
 class Bar:
-    def foo(self):  # Different scope
+    def bar(self):  # Different scope
         pass
 """
-        anchor = Anchor(type=AnchorType.FUNCTION, name="foo")
+        anchor = Anchor(type=AnchorType.FUNCTION, name="bar")
         matches = find_anchors(source, anchor)
         # Should find multiple matches
         assert len(matches) >= 2
 
     def test_empty_source(self):
         """Test anchor resolution on empty source."""
-        anchor = Anchor(type=AnchorType.FUNCTION, name="foo")
+        anchor = Anchor(type=AnchorType.FUNCTION, name="bar")
         matches = find_anchors("", anchor)
         assert matches == []
 
     def test_syntax_error_source(self):
         """Test anchor resolution on invalid source."""
-        anchor = Anchor(type=AnchorType.FUNCTION, name="foo")
+        anchor = Anchor(type=AnchorType.FUNCTION, name="bar")
 
         # Invalid Python
         try:
-            matches = find_anchors("def foo(", anchor)
+            matches = find_anchors("def bar(", anchor)
             assert isinstance(matches, list)
         except SyntaxError:
             pass  # Acceptable
@@ -179,8 +179,8 @@ class TestPatchFuzzing:
 
     def test_patch_empty_content(self):
         """Test patching with empty content."""
-        source = "def foo(): pass"
-        anchor = Anchor(type=AnchorType.FUNCTION, name="foo")
+        source = "def bar(): pass"
+        anchor = Anchor(type=AnchorType.FUNCTION, name="bar")
         patch = Patch(anchor=anchor, patch_type=PatchType.DELETE)
 
         result = apply_patch(source, patch)
@@ -190,11 +190,11 @@ class TestPatchFuzzing:
     def test_patch_nonexistent_anchor(self):
         """Test patching nonexistent anchor."""
         source = "def bar(): pass"
-        anchor = Anchor(type=AnchorType.FUNCTION, name="foo")
+        anchor = Anchor(type=AnchorType.FUNCTION, name="nonexistent")
         patch = Patch(
             anchor=anchor,
             patch_type=PatchType.REPLACE,
-            content="def foo(): return 1",
+            content="def nonexistent(): return 1",
         )
 
         result = apply_patch(source, patch)
@@ -215,7 +215,7 @@ class TestPatchFuzzing:
         assert not result.success
 
         # Empty source
-        result = apply_text_patch("", "foo", "bar")
+        result = apply_text_patch("", "bar", "bar")
         assert not result.success
 
     def test_patch_preserves_structure(self):
@@ -253,8 +253,8 @@ class TestCFGFuzzing:
             "",  # Empty
             "pass",  # No function
             "x = 1",  # No function
-            "def foo(): ...",  # Ellipsis body
-            "async def foo(): pass",  # Async
+            "def bar(): ...",  # Ellipsis body
+            "async def bar(): pass",  # Async
             "lambda: None",  # Lambda (not a function def)
         ],
     )
@@ -365,7 +365,7 @@ fs = f"formatted {s}"
         source = '''
 """Module docstring."""
 
-def foo():
+def bar():
     """Function docstring."""
     return "not a docstring"
 
@@ -442,7 +442,7 @@ class TestInputBoundaries:
 
     def test_mixed_indentation(self):
         """Test handling of mixed tabs/spaces."""
-        source = "def foo():\n\treturn 1\n    x = 2"  # Mixed indentation
+        source = "def bar():\n\treturn 1\n    x = 2"  # Mixed indentation
 
         # Should handle without crashing (may fail to parse)
         try:

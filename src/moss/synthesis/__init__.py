@@ -59,6 +59,14 @@ from .framework import (
     SynthesisState,
     create_synthesis_framework,
 )
+from .presets import (
+    PresetName,
+    SynthesisPreset,
+    get_preset,
+    get_preset_descriptions,
+    list_presets,
+    register_preset,
+)
 from .router import StrategyMatch, StrategyRouter
 from .strategy import AtomicStrategy, DecompositionStrategy, StrategyMetadata
 from .types import (
@@ -84,6 +92,7 @@ __all__ = [
     "ExecutionResultCache",
     "FunctionComposer",
     "NoStrategyError",
+    "PresetName",
     "SequentialComposer",
     "SolutionCache",
     "Specification",
@@ -97,13 +106,18 @@ __all__ = [
     "SynthesisError",
     "SynthesisEventType",
     "SynthesisFramework",
+    "SynthesisPreset",
     "SynthesisResult",
     "SynthesisState",
     "ValidationError",
     "clear_all_caches",
     "create_synthesis_framework",
     "get_cache_stats",
+    "get_preset",
+    "get_preset_descriptions",
     "get_solution_cache",
     "get_strategy_cache",
     "get_test_cache",
+    "list_presets",
+    "register_preset",
 ]

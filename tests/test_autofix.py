@@ -21,19 +21,19 @@ class TestFix:
 
     def test_create_fix(self):
         fix = Fix(
-            file_path="src/foo.py",
-            old_text="def foo():",
-            new_text="def foo() -> None:",
+            file_path="src/bar.py",
+            old_text="def bar():",
+            new_text="def bar() -> None:",
             description="Add return type",
         )
 
-        assert fix.file_path == "src/foo.py"
+        assert fix.file_path == "src/bar.py"
         assert fix.safety == FixSafety.NEEDS_REVIEW
         assert not fix.is_safe
 
     def test_safe_fix(self):
         fix = Fix(
-            file_path="src/foo.py",
+            file_path="src/bar.py",
             old_text="x",
             new_text="y",
             description="Safe change",
@@ -44,7 +44,7 @@ class TestFix:
 
     def test_fix_with_metadata(self):
         fix = Fix(
-            file_path="src/foo.py",
+            file_path="src/bar.py",
             old_text="x",
             new_text="y",
             description="Fix",
@@ -92,8 +92,8 @@ class TestSafetyClassifier:
     def test_classify_type_annotation_as_safe(self, classifier: SafetyClassifier):
         fix = Fix(
             file_path="f.py",
-            old_text="def foo():",
-            new_text="def foo() -> None:",
+            old_text="def bar():",
+            new_text="def bar() -> None:",
             description="Add return type",
         )
 
@@ -149,8 +149,8 @@ class TestSafetyClassifier:
         fixes = [
             Fix(
                 file_path="f.py",
-                old_text="def foo():",
-                new_text="def foo() -> None:",
+                old_text="def bar():",
+                new_text="def bar() -> None:",
                 description="d",
             ),
             Fix(file_path="f.py", old_text="code", new_text="", description="d"),
@@ -277,8 +277,7 @@ class TestFixEngine:
     def repo(self, tmp_path: Path) -> Path:
         """Create a test repository."""
         (tmp_path / "src").mkdir()
-        (tmp_path / "src" / "foo.py").write_text("def foo():\n    pass\n")
-        (tmp_path / "src" / "bar.py").write_text("x = 1\ny = 2\n")
+        (tmp_path / "src" / "bar.py").write_text("def bar():\n    pass\n\nx = 1\ny = 2\n")
         return tmp_path
 
     @pytest.fixture
@@ -287,25 +286,25 @@ class TestFixEngine:
 
     def test_preview_single_fix(self, engine: FixEngine):
         fix = Fix(
-            file_path="src/foo.py",
-            old_text="def foo():",
-            new_text="def foo() -> None:",
+            file_path="src/bar.py",
+            old_text="def bar():",
+            new_text="def bar() -> None:",
             description="Add return type",
         )
 
         diff = engine.preview([fix])
 
-        assert "--- a/src/foo.py" in diff
-        assert "+++ b/src/foo.py" in diff
-        assert "-def foo():" in diff
-        assert "+def foo() -> None:" in diff
+        assert "--- a/src/bar.py" in diff
+        assert "+++ b/src/bar.py" in diff
+        assert "-def bar():" in diff
+        assert "+def bar() -> None:" in diff
 
     def test_preview_multiple_fixes(self, engine: FixEngine):
         fixes = [
             Fix(
-                file_path="src/foo.py",
-                old_text="def foo():",
-                new_text="def foo() -> None:",
+                file_path="src/bar.py",
+                old_text="def bar():",
+                new_text="def bar() -> None:",
                 description="d",
             ),
             Fix(
@@ -318,14 +317,14 @@ class TestFixEngine:
 
         diff = engine.preview(fixes)
 
-        assert "src/foo.py" in diff
+        assert "src/bar.py" in diff
         assert "src/bar.py" in diff
 
     async def test_apply_fix(self, engine: FixEngine, repo: Path):
         fix = Fix(
-            file_path="src/foo.py",
-            old_text="def foo():",
-            new_text="def foo() -> None:",
+            file_path="src/bar.py",
+            old_text="def bar():",
+            new_text="def bar() -> None:",
             description="Add return type",
         )
 
@@ -334,12 +333,12 @@ class TestFixEngine:
         assert result.success
         assert len(result.applied) == 1
 
-        content = (repo / "src" / "foo.py").read_text()
-        assert "def foo() -> None:" in content
+        content = (repo / "src" / "bar.py").read_text()
+        assert "def bar() -> None:" in content
 
     async def test_apply_fix_not_found(self, engine: FixEngine):
         fix = Fix(
-            file_path="src/foo.py",
+            file_path="src/bar.py",
             old_text="nonexistent text",
             new_text="replacement",
             description="d",
@@ -367,15 +366,15 @@ class TestFixEngine:
         # Two fixes targeting the same text
         fixes = [
             Fix(
-                file_path="src/foo.py",
-                old_text="def foo():",
-                new_text="def foo() -> None:",
+                file_path="src/bar.py",
+                old_text="def bar():",
+                new_text="def bar() -> None:",
                 description="first",
                 line_start=1,
             ),
             Fix(
-                file_path="src/foo.py",
-                old_text="def foo():",
+                file_path="src/bar.py",
+                old_text="def bar():",
                 new_text="def bar():",
                 description="second",
                 line_start=1,
@@ -394,18 +393,18 @@ class TestCreateFix:
 
     def test_creates_fix_with_classification(self):
         fix = create_fix(
-            file_path="foo.py",
-            old_text="def foo():",
-            new_text="def foo() -> None:",
+            file_path="bar.py",
+            old_text="def bar():",
+            new_text="def bar() -> None:",
             description="Add return type",
         )
 
-        assert fix.file_path == "foo.py"
+        assert fix.file_path == "bar.py"
         assert fix.safety == FixSafety.SAFE  # Type annotations are safe
 
     def test_creates_fix_with_metadata(self):
         fix = create_fix(
-            file_path="foo.py",
+            file_path="bar.py",
             old_text="x",
             new_text="y",
             description="Fix",
