@@ -19,6 +19,18 @@ json-schema = "moss.plugins.data_files:JSONSchemaPlugin"
 yaml-schema = "moss.plugins.data_files:YAMLSchemaPlugin"
 toml-schema = "moss.plugins.data_files:TOMLSchemaPlugin"
 
+# Synthesis plugin entry points
+[project.entry-points."moss.synthesis.generators"]
+placeholder = "moss.synthesis.plugins.generators:PlaceholderGenerator"
+template = "moss.synthesis.plugins.generators:TemplateGenerator"
+
+[project.entry-points."moss.synthesis.validators"]
+pytest = "moss.synthesis.plugins.validators:TestValidator"
+mypy = "moss.synthesis.plugins.validators:TypeValidator"
+
+[project.entry-points."moss.synthesis.libraries"]
+memory = "moss.synthesis.plugins.libraries:MemoryLibrary"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

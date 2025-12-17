@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.0
+
+### Phase 25: Synthesis Plugin Architecture
+Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCoder, λ²):
+- `CodeGenerator` protocol with PlaceholderGenerator, TemplateGenerator
+- `SynthesisValidator` protocol with TestValidator (pytest/jest), TypeValidator (mypy/pyright)
+- `LibraryPlugin` protocol with MemoryLibrary (DreamCoder-style abstractions)
+- `SynthesisRegistry` with sub-registries and entry point discovery
+- Validation retry loop in `_validate_with_retry()`
+- Framework integration: `_solve_atomic()` uses generator plugins
+- User-configurable templates (CRUD, validation, transform patterns)
+- 31 tests for plugin architecture
+
 ## v0.3.0
 
 ### Phase 24: Refactoring Tools

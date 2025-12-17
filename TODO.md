@@ -1,6 +1,6 @@
 # Moss Roadmap
 
-See `CHANGELOG.md` for completed features (Phases 15-21, 23-24).
+See `CHANGELOG.md` for completed features (Phases 15-21, 23-25).
 
 See `~/git/prose/moss/` for full synthesis design documents.
 
@@ -8,7 +8,7 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ### Phase 22: Synthesis Integration
 
-The synthesis **framework scaffolding** is complete, but **code generation and test validation are not implemented**. The framework can decompose problems but cannot generate or validate code.
+The synthesis framework is operational with a plugin architecture for generators, validators, and libraries.
 
 #### 22a: Core Framework ✅
 - [x] Directory structure (`src/moss/synthesis/`)
@@ -20,16 +20,14 @@ The synthesis **framework scaffolding** is complete, but **code generation and t
 - [x] Integration points for shadow git, memory, event bus
 - [x] Tests for framework structure
 
-#### 22b: Code Synthesis Domain 🚧
-Strategies exist but cannot generate actual code:
+#### 22b: Code Synthesis Domain ✅
 - [x] `TypeDrivenDecomposition` - decomposes by type signature
 - [x] `TestDrivenDecomposition` - analyzes tests for subproblems
 - [x] `PatternBasedDecomposition` - recognizes CRUD/validation patterns
-- [ ] **`TestExecutorValidator`** - run pytest/jest to validate code
-  - Design: `~/git/prose/moss/code-synthesis-domain.md` lines 43-119
-- [ ] **Atomic code generation** - `_solve_atomic()` returns placeholders
-  - Need: LLM integration OR template-based generation
-- [ ] **Validation retry loop** - compose, validate, fix, repeat
+- [x] **`TestValidator`** - run pytest/jest to validate code
+- [x] **`TypeValidator`** - mypy/pyright type checking
+- [x] **Code generators** - PlaceholderGenerator, TemplateGenerator
+- [x] **Validation retry loop** - compose, validate, fix, repeat
 
 #### 22c: CLI & Integration 🚧
 - [x] `moss synthesize` CLI command (shows decomposition)
@@ -43,42 +41,58 @@ Strategies exist but cannot generate actual code:
 - [x] Parallel subproblem solving (asyncio.gather)
 - [x] Scale testing structure
 - [ ] Memory-based strategy learning (record_outcome exists, no learning)
-- [ ] Performance benchmarks (need working code generation first)
+- [ ] Performance benchmarks
 
-## What's Needed to Make Synthesis Usable
+### Phase 25: Synthesis Plugin Architecture ✅
 
-### Option A: LLM Integration (Recommended)
-Add Claude/GPT integration for `_solve_atomic()`:
-```python
-async def _solve_atomic(self, spec, context, validator, state):
-    # Call LLM with specification and context
-    code = await llm.generate_code(spec, context)
+Plugin system for synthesis components inspired by Synquid, miniKanren, DreamCoder, and λ².
 
-    # Validate with tests
-    result = await validator.validate(code)
+#### 25a: Plugin Protocols ✅
+- [x] `CodeGenerator` protocol - pluggable code generation
+- [x] `SynthesisValidator` protocol - pluggable validation
+- [x] `LibraryPlugin` protocol - DreamCoder-style abstraction management
+- [x] Metadata types for all plugins
 
-    # Retry loop if validation fails
-    while not result.passed and state.iterations < max_iterations:
-        code = await llm.fix_code(code, result.issues)
-        result = await validator.validate(code)
-        state.iterations += 1
+#### 25b: Built-in Plugins ✅
+- [x] `PlaceholderGenerator` - fallback TODO generation
+- [x] `TemplateGenerator` - user-configurable templates (CRUD, validation, etc.)
+- [x] `TestValidator` - pytest/jest test execution
+- [x] `TypeValidator` - mypy/pyright type checking
+- [x] `MemoryLibrary` - in-memory abstraction storage
 
-    return code
-```
+#### 25c: Registry & Discovery ✅
+- [x] `SynthesisRegistry` with sub-registries
+- [x] Entry point discovery (`moss.synthesis.generators`, etc.)
+- [x] Global registry with lazy initialization
+- [x] 31 tests passing
 
-### Option B: Template-Based Generation
-For common patterns, use code templates:
-- CRUD operations
-- Authentication flows
-- Data transformations
-- API endpoints
+#### 25d: Framework Integration ✅
+- [x] `_solve_atomic()` uses generator plugins
+- [x] `_validate_with_retry()` implements retry loop
+- [x] Library plugin for abstraction lookup
 
-### Required Components
-1. **TestExecutorValidator** - Actually run tests (subprocess pytest)
-2. **Code generation backend** - LLM or templates
-3. **Validation retry loop** - Currently a TODO comment
+## Future Work
 
-## Backlog
+### Phase D: Strategy Auto-Discovery (TODO)
+- [ ] Convert DecompositionStrategy to StrategyPlugin protocol
+- [ ] Entry point discovery for strategies
+- [ ] Config-based enable/disable
+
+### Phase F: Configuration System (TODO)
+- [ ] `[synthesis.*]` sections in moss.toml
+- [ ] Template directory configuration
+- [ ] Plugin enable/disable
+- [ ] Validation retry settings
+
+### Future: LLM Integration
+- [ ] `LLMGenerator` - Claude/GPT code generation
+- [ ] Streaming generation support
+- [ ] Cost estimation and budgeting
+
+### Future: Advanced Library Learning
+- [ ] Frequency-based abstraction learning
+- [ ] DreamCoder-style compression-based learning
+- [ ] Persistent library storage
 
 ### Future: Multi-Language Expansion
 - Full TypeScript/JavaScript synthesis support

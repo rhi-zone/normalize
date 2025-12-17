@@ -376,15 +376,34 @@ class CFGBuilder:
         current_nodes = [prev_node]
 
         for stmt in body:
-            new_nodes = []
-            for node_id in current_nodes:
-                exits = self._process_statement(cfg, stmt, node_id)
-                new_nodes.extend(exits)
-            current_nodes = new_nodes
-
-            # If no exits (e.g., return), stop processing
             if not current_nodes:
+                # No exits (e.g., return), stop processing
                 break
+
+            if len(current_nodes) == 1:
+                # Single predecessor - process normally
+                exits = self._process_statement(cfg, stmt, current_nodes[0])
+            else:
+                # Multiple predecessors - create merge node to avoid exponential blowup
+                # Process statement from first predecessor
+                exits = self._process_statement(cfg, stmt, current_nodes[0])
+
+                # Connect remaining predecessors to the first node created
+                # (which is the entry point for this statement)
+                if exits:
+                    # Find the first node connected to current_nodes[0] for this statement
+                    first_created = None
+                    for edge in cfg.edges:
+                        if edge.source == current_nodes[0]:
+                            # This is likely the entry node for this statement
+                            first_created = edge.target
+                            break
+
+                    if first_created:
+                        for extra_node in current_nodes[1:]:
+                            cfg.add_edge(extra_node, first_created)
+
+            current_nodes = exits
 
         return current_nodes
 

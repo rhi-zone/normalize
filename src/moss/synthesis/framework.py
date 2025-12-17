@@ -3,11 +3,17 @@
 The SynthesisFramework orchestrates the recursive decomposition and
 composition process, integrating with moss primitives (validation,
 shadow git, memory, events).
+
+Supports pluggable components:
+- Code generators (placeholder, template, LLM)
+- Synthesis validators (test, type check)
+- Library plugins (abstraction management)
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -25,11 +31,16 @@ from .types import (
     Subproblem,
     SynthesisError,
     SynthesisResult,
+    ValidationError,
 )
 
 if TYPE_CHECKING:
     from moss.memory import EpisodicStore
     from moss.shadow_git import ShadowGit
+
+    from .plugins import CodeGenerator, LibraryPlugin, SynthesisValidator
+
+logger = logging.getLogger(__name__)
 
 
 # Extend EventType for synthesis events
@@ -58,6 +69,13 @@ class SynthesisConfig:
     stop_on_first_valid: bool = True
     emit_events: bool = True
 
+    # Validation retry loop settings
+    max_validation_retries: int = 3
+    validation_timeout_ms: int = 30000
+
+    # Generator selection
+    prefer_templates: bool = True  # Use templates before placeholder
+
 
 @dataclass
 class SynthesisState:
@@ -84,6 +102,11 @@ class SynthesisFramework:
     - Shadow git (atomic commits, rollback)
     - Memory (episodic learning)
     - Event bus (progress tracking)
+
+    Plugin support:
+    - Code generators (placeholder, template, LLM)
+    - Synthesis validators (test, type check)
+    - Library plugins (abstraction management)
     """
 
     def __init__(
@@ -96,6 +119,10 @@ class SynthesisFramework:
         memory: EpisodicStore | None = None,
         event_bus: EventBus | None = None,
         config: SynthesisConfig | None = None,
+        # Plugin support
+        generator: CodeGenerator | None = None,
+        synthesis_validators: list[SynthesisValidator] | None = None,
+        library: LibraryPlugin | None = None,
     ):
         # Default strategies include atomic
         self.strategies = strategies or [AtomicStrategy()]
@@ -106,6 +133,38 @@ class SynthesisFramework:
         self.memory = memory
         self.event_bus = event_bus or EventBus()
         self.config = config or SynthesisConfig()
+
+        # Plugin components (lazy initialization)
+        self._generator = generator
+        self._synthesis_validators = synthesis_validators
+        self._library = library
+        self._plugins_initialized = False
+
+    def _ensure_plugins(self) -> None:
+        """Ensure plugins are initialized from registry if not provided."""
+        if self._plugins_initialized:
+            return
+
+        from .plugins import get_synthesis_registry
+
+        registry = get_synthesis_registry()
+
+        # Use registry defaults if not provided
+        if self._generator is None:
+            generators = registry.generators.get_all()
+            if generators:
+                # Use highest priority generator
+                self._generator = generators[0]
+
+        if self._synthesis_validators is None:
+            self._synthesis_validators = registry.validators.get_all()
+
+        if self._library is None:
+            libraries = registry.libraries.get_all()
+            if libraries:
+                self._library = libraries[0]
+
+        self._plugins_initialized = True
 
     async def synthesize(
         self,
@@ -260,14 +319,20 @@ class SynthesisFramework:
         validator: Validator | None,
         state: SynthesisState,
     ) -> Any:
-        """Solve an atomic problem directly.
+        """Solve an atomic problem directly using code generator plugins.
 
         For atomic problems, we generate a solution directly without
-        further decomposition. This could be:
-        - Looking up in library/solved
-        - Template-based generation
-        - LLM call (future)
+        further decomposition. Uses the plugin system to select and
+        run the appropriate code generator.
+
+        Generation order:
+        1. Check if already solved in context
+        2. Check library for matching abstractions
+        3. Use code generator plugin (template, LLM, etc.)
+        4. Validate and retry if needed
         """
+        self._ensure_plugins()
+
         # Check if already solved
         if spec.description in context.solved:
             return context.solved[spec.description]
@@ -277,8 +342,52 @@ class SynthesisFramework:
             if primitive.lower() in spec.description.lower():
                 return primitive
 
-        # Generate placeholder solution
-        # In a real implementation, this would call an LLM or use templates
+        # Check library for matching abstractions
+        if self._library is not None:
+            abstractions = self._library.search_abstractions(spec, context)
+            if abstractions:
+                best_abstraction, score = abstractions[0]
+                if score > 0.7:  # High confidence match
+                    self._library.record_usage(best_abstraction)
+                    logger.debug(
+                        "Using abstraction '%s' (score=%.2f) for: %s",
+                        best_abstraction.name,
+                        score,
+                        spec.summary(),
+                    )
+                    return best_abstraction.code
+
+        # Build generation hints from library
+        from .plugins import GenerationHints
+
+        hints = GenerationHints()
+        if self._library is not None:
+            relevant_abstractions = self._library.search_abstractions(spec, context)
+            hints = GenerationHints(
+                abstractions=[a for a, _ in relevant_abstractions[:5]],
+                examples=list(spec.examples),
+                constraints=list(spec.constraints),
+            )
+
+        # Generate code using plugin
+        if self._generator is not None:
+            result = await self._generator.generate(spec, context, hints)
+
+            if result.success and result.code:
+                logger.debug(
+                    "Generated code using %s (confidence=%.2f)",
+                    self._generator.metadata.name,
+                    result.confidence,
+                )
+                return result.code
+            else:
+                logger.warning(
+                    "Generator %s failed: %s",
+                    self._generator.metadata.name,
+                    result.error,
+                )
+
+        # Fallback: generate placeholder
         solution = f"# Solution for: {spec.description}\n"
         if spec.type_signature:
             solution += f"# Type: {spec.type_signature}\n"
@@ -373,7 +482,16 @@ class SynthesisFramework:
         validator: Validator | None,
         state: SynthesisState,
     ) -> Any:
-        """Compose solutions and validate, with retry loop."""
+        """Compose solutions and validate, with retry loop.
+
+        Implements the validation retry loop:
+        1. Compose solutions
+        2. Run synthesis validators (if available)
+        3. On failure, attempt to fix and retry
+        4. Fall back to legacy validator if synthesis validators unavailable
+        """
+        self._ensure_plugins()
+
         await self._emit_event(
             SynthesisEventType.COMPOSITION_START,
             {
@@ -384,30 +502,163 @@ class SynthesisFramework:
 
         composed = await self.composer.compose(solutions, spec)
 
-        # Validate if validator provided
-        if validator:
+        # Run validation with retry loop
+        if self._synthesis_validators or validator:
+            composed = await self._validate_with_retry(composed, spec, validator, state)
+
+        return composed
+
+    async def _validate_with_retry(
+        self,
+        code: str,
+        spec: Specification,
+        legacy_validator: Validator | None,
+        state: SynthesisState,
+    ) -> str:
+        """Validate code with retry loop.
+
+        If validation fails, attempts to regenerate and retry up to
+        max_validation_retries times.
+
+        Args:
+            code: The composed code to validate
+            spec: The specification
+            legacy_validator: Optional legacy moss validator
+            state: Current synthesis state
+
+        Returns:
+            Validated code (possibly modified via retries)
+
+        Raises:
+            ValidationError: If validation fails after all retries
+        """
+        from .plugins import GenerationHints
+
+        current_code = code
+        retries = 0
+        issues: list[str] = []
+
+        while retries <= self.config.max_validation_retries:
             await self._emit_event(
                 SynthesisEventType.VALIDATION_START,
                 {
                     "spec": spec.summary(),
+                    "retry": retries,
                 },
             )
 
-            # TODO: Implement validation with retry loop
-            # For now, just return composed
-            # result = await validator.validate(composed)
-            # if not result.success:
-            #     raise ValidationError(...)
+            # Run synthesis validators (plugin-based)
+            all_passed = True
+            validation_issues: list[str] = []
 
-            await self._emit_event(
-                SynthesisEventType.VALIDATION_COMPLETE,
-                {
-                    "spec": spec.summary(),
-                    "success": True,
-                },
+            if self._synthesis_validators:
+                for sv in self._synthesis_validators:
+                    if sv.can_validate(spec, current_code):
+                        try:
+                            result = await sv.validate(spec, current_code, Context())
+
+                            if not result.success:
+                                all_passed = False
+                                validation_issues.extend(result.issues)
+                                logger.debug(
+                                    "Validator %s failed: %s",
+                                    sv.metadata.name,
+                                    result.issues,
+                                )
+
+                                # Try to get counterexample for better error reporting
+                                if sv.metadata.can_generate_counterexample:
+                                    counterexample = await sv.generate_counterexample(
+                                        spec, current_code, Context()
+                                    )
+                                    if counterexample:
+                                        ce_in, ce_out = counterexample
+                                        validation_issues.append(
+                                            f"Counterexample: {ce_in!r} -> expected {ce_out!r}"
+                                        )
+                            else:
+                                logger.debug(
+                                    "Validator %s passed (%d/%d checks)",
+                                    sv.metadata.name,
+                                    result.passed_checks,
+                                    result.total_checks,
+                                )
+
+                        except Exception as e:
+                            logger.warning("Validator %s error: %s", sv.metadata.name, e)
+                            # Don't fail on validator errors, continue with others
+
+            # Run legacy validator if provided and no synthesis validators
+            if legacy_validator and not self._synthesis_validators:
+                try:
+                    # Legacy validators have different interface
+                    legacy_result = await legacy_validator.validate(current_code)
+                    if not legacy_result.success:
+                        all_passed = False
+                        validation_issues.append(legacy_result.error or "Validation failed")
+                except Exception as e:
+                    logger.warning("Legacy validator error: %s", e)
+
+            # Check results
+            if all_passed:
+                await self._emit_event(
+                    SynthesisEventType.VALIDATION_COMPLETE,
+                    {
+                        "spec": spec.summary(),
+                        "success": True,
+                        "retries": retries,
+                    },
+                )
+                return current_code
+
+            # Validation failed - attempt retry
+            issues = validation_issues
+            retries += 1
+
+            if retries > self.config.max_validation_retries:
+                break
+
+            logger.info(
+                "Validation failed, retry %d/%d: %s",
+                retries,
+                self.config.max_validation_retries,
+                issues[:3],
             )
 
-        return composed
+            # Attempt to regenerate with issues as hints
+            if self._generator is not None:
+                hints = GenerationHints(
+                    constraints=[f"Fix: {issue}" for issue in issues[:5]],
+                    examples=list(spec.examples),
+                )
+
+                result = await self._generator.generate(spec, Context(), hints)
+                if result.success and result.code:
+                    current_code = result.code
+                    logger.debug("Regenerated code for retry")
+                else:
+                    # Generator failed, can't improve
+                    break
+            else:
+                # No generator to retry with
+                break
+
+        # All retries exhausted
+        await self._emit_event(
+            SynthesisEventType.VALIDATION_COMPLETE,
+            {
+                "spec": spec.summary(),
+                "success": False,
+                "retries": retries,
+                "issues": issues[:5],
+            },
+        )
+
+        raise ValidationError(
+            f"Validation failed after {retries} retries: {'; '.join(issues[:3])}",
+            iterations=state.iterations,
+            partial_solution=current_code,
+        )
 
     def _topological_sort(self, subproblems: list[Subproblem]) -> list[int]:
         """Sort subproblem indices by dependency order."""
@@ -490,8 +741,26 @@ def create_synthesis_framework(
     validator: Validator | None = None,
     memory: EpisodicStore | None = None,
     config: SynthesisConfig | None = None,
+    # Plugin support
+    generator: CodeGenerator | None = None,
+    synthesis_validators: list[SynthesisValidator] | None = None,
+    library: LibraryPlugin | None = None,
 ) -> SynthesisFramework:
-    """Factory function to create a configured SynthesisFramework."""
+    """Factory function to create a configured SynthesisFramework.
+
+    Args:
+        strategies: Decomposition strategies to use
+        composer: Composer for combining solutions
+        validator: Legacy moss validator
+        memory: Episodic memory store
+        config: Framework configuration
+        generator: Code generator plugin (or use registry default)
+        synthesis_validators: Synthesis validator plugins (or use registry default)
+        library: Library plugin for abstractions (or use registry default)
+
+    Returns:
+        Configured SynthesisFramework instance
+    """
     strategies = strategies or [AtomicStrategy()]
 
     return SynthesisFramework(
@@ -500,4 +769,7 @@ def create_synthesis_framework(
         validator=validator,
         memory=memory,
         config=config,
+        generator=generator,
+        synthesis_validators=synthesis_validators,
+        library=library,
     )
