@@ -18,20 +18,18 @@
 - SimpleSummarizer (extractive summarization)
 - Session search with tag filtering
 
-### Phase 22: Synthesis Integration
+### Phase 22: Synthesis Framework (Scaffolding)
 - Core synthesis framework (`src/moss/synthesis/`)
 - Abstract interfaces: Specification, Context, Subproblem, SynthesisResult
 - DecompositionStrategy ABC with metadata
 - Composer ABC: SequentialComposer, FunctionComposer, CodeComposer
 - StrategyRouter with TF-IDF keyword matching
 - SynthesisFramework engine with depth/iteration limits
-- TypeDrivenDecomposition strategy
-- TestDrivenDecomposition strategy (analysis/isolation/implementation)
-- PatternBasedDecomposition (CRUD, data transform, validation patterns)
-- CLI: `moss synthesize` command
-- Caching: SynthesisCache, SolutionCache, StrategyCache, ExecutionResultCache
+- Strategies: TypeDriven, TestDriven, PatternBased (decomposition only)
+- CLI: `moss synthesize --dry-run --show-decomposition`
+- Caching infrastructure: SynthesisCache, SolutionCache, StrategyCache
 - Scale testing (depth 20+ problems)
-- 191+ synthesis tests
+- **Note**: Code generation not implemented (returns placeholders)
 
 ## v0.2.0
 
