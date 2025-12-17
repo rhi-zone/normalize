@@ -1,33 +1,6 @@
 # Moss Roadmap
 
-## Current: Phase 17 — Introspection Improvements
-
-Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
-
-### Symbol Metrics
-- [x] Add `end_line` to Symbol for size calculation
-- [x] Add line count per function/method
-- [x] `--min-lines` / `--max-lines` filters for query command
-- [x] Cyclomatic complexity (in CFG output)
-
-### Reverse Dependencies
-- [x] "What imports this module?" query
-- [x] `moss deps --reverse <module>` command
-- [x] Internal dependency graph visualization (`moss deps --dot`)
-
-### DWIM Tuning
-- [x] Lower `SUGGEST_THRESHOLD` from 0.5 to 0.3
-- [x] Add more synonyms to tool descriptions
-- [x] Consider top-k results regardless of threshold (`suggest_tools`)
-
-### Output Improvements
-- [x] CFG summary mode (node/edge counts only)
-- [x] `--group-by=file` for multi-file query results
-- [x] `--public-only` filter for exported symbols
-
-## Phase 18: Plugin Architecture
-
-> Begin after Phase 17 validates current implementation.
+## Current: Phase 18 — Plugin Architecture
 
 ### Core
 - [ ] Plugin interface for view providers
@@ -79,6 +52,7 @@ Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 ## Completed
 
 See `docs/` for details on completed work:
+- **Phase 17**: Introspection Improvements — symbol metrics, reverse deps, DWIM tuning, output improvements
 - **Phase 15**: LLM Introspection Tooling (`docs/tools.md`, `docs/cli-architecture.md`)
 - **Phase 16**: DWIM semantic routing (`docs/dwim-architecture.md`)
 - **CI/CD**: Fixed in `.github/workflows/ci.yml`
