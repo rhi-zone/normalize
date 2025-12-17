@@ -47,6 +47,6 @@
 - [x] Distro system (composable presets)
 
 ## Phase 9: API Surface
-- [ ] Headless HTTP API
-- [ ] SSE/WebSocket streaming
-- [ ] Checkpoint approval endpoints
+- [x] Headless HTTP API
+- [x] SSE/WebSocket streaming
+- [x] Checkpoint approval endpoints
