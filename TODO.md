@@ -1,27 +1,23 @@
 # Moss Roadmap
 
-## Current: Phase 21 — Developer Experience
-
-### Watch & Feedback
-- [x] Watch mode for tests (auto-run on file changes)
-- [x] Metrics dashboard (HTML report of codebase health)
-- [x] Custom analysis rules (user-defined patterns)
-
-### Git Integration
-- [x] Pre-commit hook integration
-- [x] Diff analysis (analyze changes between commits)
-- [x] PR review helper (summarize changes, detect issues)
-
 ## Backlog
 
 ### Export & Integration
-- [x] SARIF output (for CI/CD integration)
-- [x] GitHub Actions integration
-- [ ] VS Code extension
+- [ ] VS Code extension (requires separate TypeScript project)
 
 ---
 
 ## Completed
+
+### Phase 21: Developer Experience & CI/CD
+- Watch mode for tests (auto-run on file changes)
+- Metrics dashboard (HTML report of codebase health)
+- Custom analysis rules (user-defined patterns)
+- Pre-commit hook integration
+- Diff analysis (analyze changes between commits)
+- PR review helper (summarize changes, detect issues)
+- SARIF output (for CI/CD integration)
+- GitHub Actions integration
 
 See `docs/phase19-features.md` for detailed documentation.
 
