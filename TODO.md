@@ -25,10 +25,10 @@
 - [x] Expose dependency extraction as MCP tool
 - [x] Expose context generation as MCP tool
 
-### LLM Evaluation
-- [ ] Use Moss CLI to explore codebases
-- [ ] Document what works well for LLM consumption
-- [ ] Identify gaps and iterate
+### LLM Evaluation ✅
+- [x] Use Moss CLI to explore codebases
+- [x] Document what works well for LLM consumption (see docs/llm-evaluation.md)
+- [x] Identify gaps and iterate
 
 ## Phase 16: Plugin Architecture
 
