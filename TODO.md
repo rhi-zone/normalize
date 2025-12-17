@@ -2,12 +2,15 @@
 
 ## Backlog
 
-### Export & Integration
-- [ ] VS Code extension (requires separate TypeScript project)
+(Empty - all planned features implemented!)
 
 ---
 
 ## Completed
+
+### Export & Integration
+- VS Code extension (`editors/vscode/`)
+
 
 ### Phase 21: Developer Experience & CI/CD
 - Watch mode for tests (auto-run on file changes)

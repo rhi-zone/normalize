@@ -1,0 +1,105 @@
+{
+  "name": "moss-vscode",
+  "displayName": "Moss",
+  "description": "Moss code analysis and introspection for VS Code",
+  "version": "0.1.0",
+  "publisher": "moss",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moss/moss"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "python",
+    "analysis",
+    "linter",
+    "code quality"
+  ],
+  "activationEvents": [
+    "onLanguage:python"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "moss.runRules",
+        "title": "Moss: Run Rules Check"
+      },
+      {
+        "command": "moss.showMetrics",
+        "title": "Moss: Show Metrics Dashboard"
+      },
+      {
+        "command": "moss.showSkeleton",
+        "title": "Moss: Show Code Skeleton"
+      },
+      {
+        "command": "moss.analyzeDiff",
+        "title": "Moss: Analyze Git Diff"
+      }
+    ],
+    "configuration": {
+      "title": "Moss",
+      "properties": {
+        "moss.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to Python interpreter with moss installed"
+        },
+        "moss.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show moss rule violations as diagnostics"
+        },
+        "moss.runOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run moss rules check on file save"
+        },
+        "moss.builtinRules": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable built-in rules"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "moss.showSkeleton",
+          "when": "editorLangId == python",
+          "group": "moss"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "moss.runRules",
+          "when": "explorerResourceIsFolder",
+          "group": "moss"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.0"
+  }
+}

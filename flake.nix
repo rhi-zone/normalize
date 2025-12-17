@@ -18,7 +18,11 @@
             python313
             uv
             ruff
-	    ripgrep
+            ripgrep
+            # VS Code extension development
+            nodejs_22
+            nodePackages.npm
+            nodePackages.typescript
           ];
         };
       }
