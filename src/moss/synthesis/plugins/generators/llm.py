@@ -855,6 +855,7 @@ def create_llm_generator(
             responses=["def foo(): return 42"],
         )
     """
+    provider: LLMProvider
     if mock:
         provider = MockLLMProvider(
             model=model or "mock-model",
