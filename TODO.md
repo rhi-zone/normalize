@@ -35,12 +35,12 @@ The synthesis framework is operational with a plugin architecture for generators
 - [x] **`moss edit` integration** - fallback for complex tasks
 - [x] Synthesis configuration presets (default/research/production/minimal)
 
-#### 22d: Optimization & Learning 🚧
+#### 22d: Optimization & Learning ✅
 - [x] Caching infrastructure
 - [x] Parallel subproblem solving (asyncio.gather)
 - [x] Scale testing structure
-- [ ] Memory-based strategy learning (record_outcome exists, no learning)
-- [ ] Performance benchmarks
+- [x] Memory-based strategy learning (StrategyLearner with feature extraction)
+- [x] Performance benchmarks (tests/test_synthesis_scale.py)
 
 ### Phase 25: Synthesis Plugin Architecture ✅
 

@@ -31,6 +31,11 @@ mypy = "moss.synthesis.plugins.validators:TypeValidator"
 [project.entry-points."moss.synthesis.libraries"]
 memory = "moss.synthesis.plugins.libraries:MemoryLibrary"
 
+[project.entry-points."moss.synthesis.strategies"]
+type_driven = "moss.synthesis.strategies:TypeDrivenDecomposition"
+test_driven = "moss.synthesis.strategies:TestDrivenDecomposition"
+pattern_based = "moss.synthesis.strategies:PatternBasedDecomposition"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

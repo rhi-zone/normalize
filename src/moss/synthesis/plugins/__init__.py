@@ -39,6 +39,12 @@ from .registry import (
     get_synthesis_registry,
     reset_synthesis_registry,
 )
+from .strategies import (
+    StrategyPlugin,
+    StrategyRegistry,
+    get_strategy_registry,
+    reset_strategy_registry,
+)
 
 __all__ = [
     "Abstraction",
@@ -52,12 +58,16 @@ __all__ = [
     "LibraryMetadata",
     "LibraryPlugin",
     "LibraryRegistry",
+    "StrategyPlugin",
+    "StrategyRegistry",
     "SynthesisRegistry",
     "SynthesisValidator",
     "ValidationResult",
     "ValidatorMetadata",
     "ValidatorRegistry",
     "ValidatorType",
+    "get_strategy_registry",
     "get_synthesis_registry",
+    "reset_strategy_registry",
     "reset_synthesis_registry",
 ]
