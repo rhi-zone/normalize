@@ -208,6 +208,49 @@ class ControlFlowGraph:
         lines.append("}")
         return "\n".join(lines)
 
+    def to_mermaid(self) -> str:
+        """Convert CFG to Mermaid flowchart format."""
+        lines = ["flowchart TD"]
+
+        # Nodes
+        for node in self.nodes.values():
+            label = node.id
+            if node.statements:
+                stmt_text = "<br/>".join(node.statements[:3])
+                if len(node.statements) > 3:
+                    stmt_text += "<br/>..."
+                # Escape special characters
+                stmt_text = stmt_text.replace('"', "'")
+                label = f"{node.id}<br/>{stmt_text}"
+
+            # Different shapes for different node types
+            if node.node_type == NodeType.ENTRY:
+                lines.append(f'    {node.id}(["{label}"])')
+            elif node.node_type == NodeType.EXIT:
+                lines.append(f'    {node.id}(["{label}"])')
+            elif node.node_type == NodeType.BRANCH:
+                lines.append(f'    {node.id}{{"{label}"}}')
+            else:
+                lines.append(f'    {node.id}["{label}"]')
+
+        # Edges
+        for edge in self.edges:
+            arrow = "-->"
+            label = ""
+
+            if edge.edge_type == EdgeType.CONDITIONAL_TRUE:
+                label = "|True|"
+            elif edge.edge_type == EdgeType.CONDITIONAL_FALSE:
+                label = "|False|"
+            elif edge.edge_type == EdgeType.LOOP_BACK:
+                arrow = "-.->>"
+            elif edge.edge_type == EdgeType.EXCEPTION:
+                label = "|exception|"
+
+            lines.append(f"    {edge.source} {arrow}{label} {edge.target}")
+
+        return "\n".join(lines)
+
     def to_text(self) -> str:
         """Convert CFG to human-readable text format."""
         lines = [f"CFG for {self.name}:"]

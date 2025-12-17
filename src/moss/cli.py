@@ -654,6 +654,14 @@ def cmd_cfg(args: Namespace) -> int:
         print("No functions found", file=sys.stderr)
         return 1
 
+    # Determine output format
+    output_format = None
+    if args.output:
+        # Auto-detect from file extension
+        ext = Path(args.output).suffix.lstrip(".")
+        if ext in ("svg", "png", "html", "dot", "mermaid", "md"):
+            output_format = ext
+
     if getattr(args, "json", False):
         results = []
         for cfg_data in cfgs:
@@ -671,20 +679,86 @@ def cmd_cfg(args: Namespace) -> int:
                 result["edges"] = cfg_data.get("edges", [])
             results.append(result)
         output_result(results, args)
-    else:
-        if args.summary:
-            # Summary mode: just show counts and complexity
-            for cfg_data in cfgs:
-                print(
-                    f"{cfg_data['name']}: {cfg_data['node_count']} nodes, "
-                    f"{cfg_data['edge_count']} edges, "
-                    f"complexity {cfg_data['cyclomatic_complexity']}"
-                )
-        elif args.dot:
-            # DOT output - use raw content from view
-            print(view.metadata.get("dot", view.content))
+    elif args.html or output_format == "html":
+        # HTML output with embedded Mermaid
+        from moss.cfg import CFGBuilder
+        from moss.visualization import visualize_cfgs
+
+        builder = CFGBuilder()
+        cfg_objects = []
+        source = path.read_text()
+        for cfg_data in cfgs:
+            cfg = builder.build_from_source(source, cfg_data["name"])
+            if cfg:
+                cfg_objects.append(cfg)
+
+        content = visualize_cfgs(cfg_objects, format="html")
+        if args.output:
+            Path(args.output).write_text(content)
+            print(f"Saved to {args.output}")
         else:
-            print(view.content)
+            print(content)
+    elif args.mermaid or output_format == "mermaid":
+        # Mermaid output
+        mermaid_lines = view.metadata.get("mermaid", "")
+        if not mermaid_lines:
+            # Generate from CFGs
+            from moss.cfg import CFGBuilder
+
+            builder = CFGBuilder()
+            source = path.read_text()
+            mermaid_parts = []
+            for cfg_data in cfgs:
+                cfg = builder.build_from_source(source, cfg_data["name"])
+                if cfg:
+                    mermaid_parts.append(cfg.to_mermaid())
+            mermaid_lines = "\n\n".join(mermaid_parts)
+
+        if args.output:
+            Path(args.output).write_text(mermaid_lines)
+            print(f"Saved to {args.output}")
+        else:
+            print(mermaid_lines)
+    elif args.summary:
+        # Summary mode: just show counts and complexity
+        for cfg_data in cfgs:
+            print(
+                f"{cfg_data['name']}: {cfg_data['node_count']} nodes, "
+                f"{cfg_data['edge_count']} edges, "
+                f"complexity {cfg_data['cyclomatic_complexity']}"
+            )
+    elif args.dot or output_format == "dot":
+        # DOT output - use raw content from view
+        dot_content = view.metadata.get("dot", view.content)
+        if args.output:
+            Path(args.output).write_text(dot_content)
+            print(f"Saved to {args.output}")
+        else:
+            print(dot_content)
+    elif output_format == "svg":
+        from moss.visualization import render_dot_to_svg
+
+        dot_content = view.metadata.get("dot", "")
+        if dot_content:
+            svg = render_dot_to_svg(dot_content)
+            Path(args.output).write_text(svg)
+            print(f"Saved to {args.output}")
+        else:
+            print("Error: No DOT content available for SVG rendering", file=sys.stderr)
+            return 1
+    elif output_format == "png":
+        from moss.visualization import render_dot_to_png
+
+        dot_content = view.metadata.get("dot", "")
+        if dot_content:
+            png = render_dot_to_png(dot_content)
+            Path(args.output).write_bytes(png)
+            print(f"Saved to {args.output}")
+        else:
+            print("Error: No DOT content available for PNG rendering", file=sys.stderr)
+            return 1
+    else:
+        print(view.content)
 
     return 0
 
@@ -1218,6 +1292,13 @@ def create_parser() -> argparse.ArgumentParser:
     cfg_parser.add_argument("function", nargs="?", help="Specific function to analyze")
     cfg_parser.add_argument(
         "--dot", action="store_true", help="Output in DOT format (for graphviz)"
+    )
+    cfg_parser.add_argument("--mermaid", action="store_true", help="Output in Mermaid format")
+    cfg_parser.add_argument(
+        "--html", action="store_true", help="Output as HTML with embedded diagram"
+    )
+    cfg_parser.add_argument(
+        "--output", "-o", help="Save output to file (format auto-detected from extension)"
     )
     cfg_parser.add_argument(
         "--summary", "-s", action="store_true", help="Show only node/edge counts"
