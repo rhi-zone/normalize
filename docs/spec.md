@@ -258,3 +258,68 @@ Validators can be:
 2.  **Dynamic:** Tests (Unit/Integration).
 3.  **Formal:** Logic solvers (Z3).
 4.  **Ad-Hoc:** Agent-written scripts for specific one-off verification tasks.
+
+---
+
+## 8. User Interaction Model
+
+The system must support asynchronous user interaction without compromising performance or correctness. Users should not block agent progress, but agents must respect user authority.
+
+### Design Principles
+
+* **Non-Blocking by Default:** Agents continue work while awaiting user input. They do not idle.
+* **Correctness Over Speed:** Async interaction must not introduce race conditions or inconsistent state. Shadow Git provides the serialization point.
+* **Interruptibility:** Users can halt, redirect, or cancel agent work at any time. The system must handle partial completion gracefully.
+
+### Interaction Patterns
+
+#### A. Fire-and-Forget
+User submits a task and disconnects. Agent completes work, commits to shadow branch, and notifies upon completion (webhook, email, polling endpoint).
+
+* **Use Case:** Long-running refactors, batch processing.
+* **Guarantee:** Work persists even if client disconnects.
+
+#### B. Streaming Progress
+User observes real-time progress via event stream (SSE, WebSocket).
+
+* **Events:** `PlanGenerated`, `LoopIteration`, `ValidationResult`, `CommitCreated`.
+* **Non-Blocking:** User can send new messages mid-stream; these queue as interrupts.
+
+#### C. Checkpoint Approval
+Agent pauses at defined gates (e.g., before destructive operations, after plan generation) and awaits explicit user approval.
+
+* **Timeout Policy:** Configurable. Agent can auto-proceed, auto-abort, or persist state indefinitely.
+* **State Preservation:** Checkpointed state is serialized to Shadow Git; user can resume hours/days later.
+
+#### D. Collaborative Editing
+User and agent operate on the same artifact concurrently.
+
+* **Conflict Model:** User edits take precedence. Agent detects conflicts via Shadow Git diff and re-plans.
+* **Granularity:** File-level locking or AST-node-level locking (via Structural Editor).
+
+### Async Guarantees
+
+| Property | Mechanism |
+| :--- | :--- |
+| **Atomicity** | Shadow Git commits; no partial states visible |
+| **Consistency** | Validator loop ensures correctness before commit |
+| **Isolation** | Each agent instance operates on its own branch |
+| **Durability** | Git persistence; survives crashes |
+
+### Interrupt Handling
+
+When a user interrupt arrives mid-operation:
+
+1. **Queue:** Interrupt is logged to Event Bus.
+2. **Drain:** Current tool call completes (atomic commit).
+3. **Evaluate:** System checks interrupt type:
+   * **Cancel:** Rollback to last checkpoint.
+   * **Redirect:** Inject new context, re-plan.
+   * **Pause:** Serialize state, await resume.
+4. **Acknowledge:** Return control to user with current state handle.
+
+### Performance Considerations
+
+* **Speculative Execution:** Agent may pre-compute likely next steps while awaiting user input at checkpoints.
+* **Lazy Loading:** Handles are resolved only when needed; user approval of a plan does not require loading all referenced files.
+* **Batched Notifications:** Progress events are debounced to avoid overwhelming slow clients.
