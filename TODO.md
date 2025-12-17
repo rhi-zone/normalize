@@ -26,7 +26,7 @@
 - [x] Performance profiling and optimization
 - [x] Error handling audit
 
-## Phase 14: Dogfooding
-- [ ] Self-hosting test (use Moss on Moss)
-- [ ] Real-world codebase testing
-- [ ] Gap analysis and iteration
+## Phase 14: Dogfooding ✓
+- [x] Self-hosting test (use Moss on Moss)
+- [x] Real-world codebase testing
+- [x] Gap analysis and iteration
