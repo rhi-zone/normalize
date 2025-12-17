@@ -2,7 +2,47 @@
 
 ## Backlog
 
-(Empty - all planned features implemented!)
+### Phase 22: Synthesis Integration (from prose)
+
+See `~/git/prose/moss/` for detailed design documents.
+
+#### Phase 22a: Core Synthesis Framework
+- [ ] Create directory structure (`src/moss/synthesis/`)
+- [ ] Implement abstract interfaces (`Specification`, `Context`, `Subproblem`)
+- [ ] Implement `DecompositionStrategy` ABC
+- [ ] Implement `Composer` ABC
+- [ ] Implement `StrategyRouter` (reuse DWIM TFIDFIndex)
+- [ ] Implement `SynthesisFramework` (domain-agnostic engine)
+- [ ] Integration with shadow git, memory, event bus
+- [ ] Tests for core framework (>80% coverage)
+
+#### Phase 22b: Code Synthesis Domain
+- [ ] Create domain structure (`src/moss/domains/synthesis/`)
+- [ ] Implement `TypeDrivenDecomposition` strategy
+- [ ] Implement `TestDrivenDecomposition` strategy
+- [ ] Implement `TestExecutorValidator`
+- [ ] Implement `CodeComposer`
+- [ ] Integration tests for code synthesis
+
+#### Phase 22c: CLI & Integration
+- [ ] Add `moss synthesize` CLI command
+- [ ] Integrate with `moss edit` (fallback for complex tasks)
+- [ ] Add synthesis configuration presets
+- [ ] Event emission for progress tracking
+- [ ] User documentation
+
+#### Phase 22d: Optimization & Learning
+- [ ] Test execution caching
+- [ ] Parallel subproblem solving
+- [ ] Memory-based strategy learning
+- [ ] Scale testing (depth 20+ problems)
+- [ ] Performance benchmarks
+
+#### Phase 22e: Polish & Documentation
+- [ ] User guide (`docs/synthesis-guide.md`)
+- [ ] Strategy guide (`docs/synthesis-strategies.md`)
+- [ ] Example gallery (`examples/synthesis/`)
+- [ ] API documentation
 
 ---
 
