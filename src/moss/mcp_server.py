@@ -170,6 +170,63 @@ def create_server() -> Any:
                     "required": ["path", "anchor_type", "anchor_name", "new_content"],
                 },
             ),
+            Tool(
+                name="analyze_intent",
+                description=(
+                    "Analyze a natural language description to find the best matching "
+                    "introspection tool. Uses TF-IDF cosine similarity and semantic matching. "
+                    "Call this when unsure which tool to use for a task."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": (
+                                "Natural language description of what you want to do, "
+                                "e.g. 'find all classes that inherit from BaseClass' or "
+                                "'show me the imports in this file'"
+                            ),
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "Number of suggestions to return (default: 3)",
+                            "default": 3,
+                        },
+                    },
+                    "required": ["query"],
+                },
+            ),
+            Tool(
+                name="resolve_tool",
+                description=(
+                    "Resolve a tool name that might be misspelled or an alias. "
+                    "Handles typos (e.g., 'skelton' -> 'skeleton') and semantic aliases "
+                    "(e.g., 'imports' -> 'deps', 'structure' -> 'skeleton')."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "tool_name": {
+                            "type": "string",
+                            "description": "The tool name to resolve",
+                        },
+                    },
+                    "required": ["tool_name"],
+                },
+            ),
+            Tool(
+                name="list_capabilities",
+                description=(
+                    "List all available introspection tools with their descriptions, "
+                    "parameters, keywords, and aliases. Use this to understand what "
+                    "tools are available."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {},
+                },
+            ),
         ]
 
     @server.call_tool()
@@ -188,6 +245,12 @@ def create_server() -> Any:
                 result = _tool_context(arguments)
             elif name == "apply_patch":
                 result = _tool_apply_patch(arguments)
+            elif name == "analyze_intent":
+                result = _tool_analyze_intent(arguments)
+            elif name == "resolve_tool":
+                result = _tool_resolve_tool(arguments)
+            elif name == "list_capabilities":
+                result = _tool_list_capabilities(arguments)
             else:
                 result = {"error": f"Unknown tool: {name}"}
 
@@ -542,6 +605,86 @@ def _tool_apply_patch(args: dict[str, Any]) -> dict:
             "name": args["anchor_name"],
             "line": match.lineno,
         },
+    }
+
+
+def _tool_analyze_intent(args: dict[str, Any]) -> dict:
+    """Analyze intent and suggest matching tools."""
+    from moss.dwim import analyze_intent
+
+    query = args.get("query", "")
+    top_k = args.get("top_k", 3)
+
+    if not query:
+        return {"error": "Query is required"}
+
+    matches = analyze_intent(query)[:top_k]
+
+    if not matches:
+        return {
+            "query": query,
+            "matches": [],
+            "message": "No matching tools found. Use list_capabilities to see available tools.",
+        }
+
+    return {
+        "query": query,
+        "matches": [
+            {
+                "tool": m.tool,
+                "confidence": round(m.confidence, 3),
+                "message": m.message,
+            }
+            for m in matches
+        ],
+        "recommended": matches[0].tool if matches else None,
+    }
+
+
+def _tool_resolve_tool(args: dict[str, Any]) -> dict:
+    """Resolve a tool name (handle typos and aliases)."""
+    from moss.dwim import resolve_tool
+
+    tool_name = args.get("tool_name", "")
+
+    if not tool_name:
+        return {"error": "tool_name is required"}
+
+    match = resolve_tool(tool_name)
+
+    return {
+        "input": tool_name,
+        "resolved": match.tool,
+        "confidence": round(match.confidence, 3),
+        "message": match.message,
+        "is_exact": match.confidence >= 1.0,
+    }
+
+
+def _tool_list_capabilities(args: dict[str, Any]) -> dict:
+    """List all available tools with metadata."""
+    from moss.dwim import TOOL_ALIASES, TOOL_REGISTRY
+
+    tools = []
+    for name, info in TOOL_REGISTRY.items():
+        aliases = [alias for alias, target in TOOL_ALIASES.items() if target == name]
+        tools.append(
+            {
+                "name": info.name,
+                "description": info.description,
+                "keywords": info.keywords,
+                "parameters": info.parameters,
+                "aliases": aliases,
+            }
+        )
+
+    return {
+        "tools": tools,
+        "count": len(tools),
+        "hint": (
+            "Use 'analyze_intent' with a natural language query to find the best tool "
+            "for your task, or 'resolve_tool' to handle typos and aliases."
+        ),
     }
 
 

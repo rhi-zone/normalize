@@ -25,6 +25,15 @@
 - [x] Expose dependency extraction as MCP tool
 - [x] Expose context generation as MCP tool
 
+### DWIM (Do What I Mean) ✅
+- [x] Create semantic tool routing module (`moss.dwim`)
+- [x] Implement TF-IDF cosine similarity for semantic matching
+- [x] Add fuzzy matching for typos (Levenshtein distance)
+- [x] Define semantic aliases for tools (e.g., "imports" → "deps")
+- [x] Add `analyze_intent` MCP tool for natural language → tool routing
+- [x] Add `resolve_tool` MCP tool for typo/alias resolution
+- [x] Add `list_capabilities` MCP tool for tool discovery
+
 ### LLM Evaluation ✅
 - [x] Use Moss CLI to explore codebases
 - [x] Document what works well for LLM consumption (see docs/llm-evaluation.md)
