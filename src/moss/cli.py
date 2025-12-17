@@ -1262,6 +1262,61 @@ def cmd_hooks(args: Namespace) -> int:
         return 0
 
 
+def cmd_diff(args: Namespace) -> int:
+    """Analyze git diff and show symbol changes."""
+    from moss.diff_analysis import (
+        analyze_diff,
+        get_commit_diff,
+        get_staged_diff,
+        get_working_diff,
+    )
+
+    output = setup_output(args)
+    repo_path = Path(getattr(args, "directory", ".")).resolve()
+
+    # Get the appropriate diff
+    try:
+        if getattr(args, "staged", False):
+            diff_output = get_staged_diff(repo_path)
+        elif getattr(args, "working", False):
+            diff_output = get_working_diff(repo_path)
+        else:
+            from_ref = getattr(args, "from_ref", "HEAD~1")
+            to_ref = getattr(args, "to_ref", "HEAD")
+            diff_output = get_commit_diff(repo_path, from_ref, to_ref)
+    except Exception as e:
+        output.error(f"Failed to get diff: {e}")
+        return 1
+
+    if not diff_output.strip():
+        output.info("No changes found")
+        return 0
+
+    # Analyze the diff
+    analysis = analyze_diff(diff_output)
+
+    if getattr(args, "json", False):
+        output.data(analysis.to_dict())
+        return 0
+
+    # Show statistics summary only
+    if getattr(args, "stat", False):
+        output.info(f"Files: {analysis.files_changed} changed")
+        if analysis.files_added:
+            output.info(f"  {analysis.files_added} added")
+        if analysis.files_deleted:
+            output.info(f"  {analysis.files_deleted} deleted")
+        if analysis.files_renamed:
+            output.info(f"  {analysis.files_renamed} renamed")
+        output.info(f"Lines: +{analysis.total_additions} -{analysis.total_deletions}")
+        return 0
+
+    # Full output
+    output.print(analysis.summary)
+
+    return 0
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -1578,6 +1633,43 @@ def create_parser() -> argparse.ArgumentParser:
         help="Force overwrite existing hooks",
     )
     hooks_parser.set_defaults(func=cmd_hooks)
+
+    # diff command
+    diff_parser = subparsers.add_parser("diff", help="Analyze git diff and show symbol changes")
+    diff_parser.add_argument(
+        "from_ref",
+        nargs="?",
+        default="HEAD~1",
+        help="Starting commit reference (default: HEAD~1)",
+    )
+    diff_parser.add_argument(
+        "to_ref",
+        nargs="?",
+        default="HEAD",
+        help="Ending commit reference (default: HEAD)",
+    )
+    diff_parser.add_argument(
+        "-C",
+        "--directory",
+        default=".",
+        help="Repository directory (default: current)",
+    )
+    diff_parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="Analyze staged changes instead of commits",
+    )
+    diff_parser.add_argument(
+        "--working",
+        action="store_true",
+        help="Analyze working directory changes (unstaged)",
+    )
+    diff_parser.add_argument(
+        "--stat",
+        action="store_true",
+        help="Show only statistics summary",
+    )
+    diff_parser.set_defaults(func=cmd_diff)
 
     return parser
 

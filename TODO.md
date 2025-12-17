@@ -9,7 +9,7 @@
 
 ### Git Integration
 - [x] Pre-commit hook integration
-- [ ] Diff analysis (analyze changes between commits)
+- [x] Diff analysis (analyze changes between commits)
 - [ ] PR review helper (summarize changes, detect issues)
 
 ## Backlog
