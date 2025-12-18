@@ -8,10 +8,13 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session, roughly by size:
 
-- [x] **Unix socket transport** (small) - Add Unix socket option to HTTP server ✓
-- [x] **`moss clones`** (medium) - Structural similarity via AST hashing ✓
-- [x] **RAG/semantic search** (medium) - `moss rag index/search` for doc retrieval ✓
-- [x] **`moss security`** (medium) - Security analysis command ✓
+- [ ] **ACP Server** (medium) - Agent Client Protocol for Zed/JetBrains integration
+  - See `docs/prior-art.md` for protocol details
+- [ ] **`moss patterns`** (medium) - Detect architectural patterns in codebase
+  - Plugin systems, factories, adapters, coupling analysis
+- [ ] **Security config** (small) - `.moss/security.yaml` for tool configuration
+- [ ] **Trust levels** (large) - Fine-grained composable permissions system
+  - See design in TODO.md under "Smart Trust Levels"
 
 ## Future Work
 
