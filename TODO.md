@@ -75,6 +75,32 @@ Multi-command aggregation:
 - [x] Custom presets via moss.toml or pyproject.toml `[tool.moss.presets.*]`
 - [ ] Format strings for custom output templates
 
+### Overview Comprehensiveness
+
+Current `moss overview` output is minimal. Enhance to include:
+
+- [ ] Pull metrics into overview (LOC, file count, symbols)
+- [ ] Show top issues from health check (not just grade)
+- [ ] Show next action items from roadmap
+- [ ] Include skeleton summary (top-level modules/classes)
+- [ ] Show critical vulnerabilities inline (not just count)
+
+Design principle: `--compact` should still be token-efficient but *informative*. Current output like `health: F (23%)` tells you there's a problem but not what. Better: `health: F (23%) - 18% docs, no tests`.
+
+### Codebase Analysis Gaps
+
+Tools we have:
+- Project health: `overview`, `health`, `metrics`
+- Structure: `skeleton`, `summarize`, `deps`
+- Dependencies: `external-deps` (vulns, licenses, weight)
+- Quality: `check-docs`, `check-todos`, `check-refs`
+
+Potential additions:
+- [ ] Test coverage integration (pytest-cov stats)
+- [ ] Cyclomatic complexity per function
+- [ ] Git hot spots (frequently changed files)
+- [ ] Architecture diagrams from dependency graph
+
 ### Enterprise Features
 
 - [ ] Team collaboration (shared caches)

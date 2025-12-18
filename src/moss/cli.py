@@ -2374,12 +2374,25 @@ def cmd_overview(args: Namespace) -> int:
         try:
             checker = StatusChecker(root)
             status = checker.check()
+            # Extract top issues by severity for display
+            high_issues = [w for w in status.weak_spots if w.severity == "high"]
+            med_issues = [w for w in status.weak_spots if w.severity == "medium"]
             results["health"] = {
                 "grade": status.health_grade,
                 "score": status.health_score,
                 "files": status.total_files,
                 "lines": status.total_lines,
+                "modules": status.total_modules,
+                "doc_coverage": status.doc_coverage,
+                "test_ratio": status.test_ratio,
+                "hotspots": status.struct_hotspots,
+                "circular_deps": status.dep_circular,
                 "issues": len(status.weak_spots),
+                "high_issues": len(high_issues),
+                "top_issues": [
+                    {"cat": w.category, "msg": w.message} for w in (high_issues + med_issues)[:5]
+                ],
+                "next_actions": [a.description for a in status.next_actions[:3]],
             }
             if status.weak_spots:
                 has_warnings = True
@@ -2425,10 +2438,15 @@ def cmd_overview(args: Namespace) -> int:
         try:
             checker = TodoChecker(root)
             todos = checker.check()
+            # Get top pending items for display
+            pending_items = [
+                item.text for item in todos.tracked_items if item.status.name == "PENDING"
+            ][:5]
             results["todos"] = {
                 "pending": todos.pending_count,
                 "done": todos.done_count,
                 "orphan": todos.orphan_count,
+                "top_pending": pending_items,
             }
             if todos.orphan_count:
                 has_warnings = True
@@ -2480,60 +2498,118 @@ def cmd_overview(args: Namespace) -> int:
 
 
 def _format_overview_compact(results: dict) -> str:
-    """Format overview results as compact single line.
+    """Format overview results as informative multi-line summary.
 
-    Example: health: F (24%) | deps: 0 direct, 6 dev | docs: 19% | todos: 20 pending
+    Compact but informative - explains WHY scores are what they are.
     """
-    parts = []
+    lines = []
 
-    # Health
+    # Health with context
     if "health" in results and "error" not in results["health"]:
         h = results["health"]
-        parts.append(f"health: {h['grade']} ({h['score']:.0f}%)")
+        # Format lines count
+        lines_k = h["lines"] / 1000 if h["lines"] >= 1000 else h["lines"]
+        lines_fmt = f"{lines_k:.0f}K" if h["lines"] >= 1000 else str(h["lines"])
+
+        line = f"health: {h['grade']} ({h['score']:.0f}%) - {h['files']} files, {lines_fmt} lines"
+
+        # Add key metrics that explain the score
+        details = []
+        if h.get("doc_coverage", 0) < 0.5:
+            details.append(f"{h['doc_coverage']:.0%} docs")
+        if h.get("test_ratio", 0) < 0.5:
+            details.append(f"{h['test_ratio']:.1f}x tests")
+        if h.get("hotspots", 0) > 10:
+            details.append(f"{h['hotspots']} hotspots")
+        if h.get("circular_deps", 0) > 0:
+            details.append(f"{h['circular_deps']} circular deps")
+
+        if details:
+            line += f" ({', '.join(details)})"
+        lines.append(line)
+
+        # Top issues
+        if h.get("top_issues"):
+            for issue in h["top_issues"][:3]:
+                lines.append(f"  - {issue['cat']}: {issue['msg']}")
     elif "health" in results:
-        parts.append("health: ERROR")
+        lines.append("health: ERROR")
 
     # Deps
     if "deps" in results and "error" not in results["deps"]:
         d = results["deps"]
-        deps_str = f"deps: {d['direct']} direct, {d['dev']} dev"
+        deps_line = f"deps: {d['direct']} direct, {d['dev']} dev"
         if d["vulns"]:
-            deps_str += f", {d['vulns']} vulns!"
-        parts.append(deps_str)
+            deps_line += f" - {d['vulns']} vulnerabilities!"
+        if d["license_issues"]:
+            deps_line += f" - {d['license_issues']} license issues"
+        lines.append(deps_line)
 
     # Docs
     if "docs" in results and "error" not in results["docs"]:
         doc = results["docs"]
-        parts.append(f"docs: {doc['coverage']:.0%}")
+        doc_line = f"docs: {doc['coverage']:.0%} coverage"
+        if doc["errors"]:
+            doc_line += f" - {doc['errors']} errors"
+        lines.append(doc_line)
 
-    # TODOs
+    # TODOs with actual items
     if "todos" in results and "error" not in results["todos"]:
         t = results["todos"]
-        parts.append(f"todos: {t['pending']} pending")
+        lines.append(f"todos: {t['pending']} pending, {t['done']} done")
+        if t.get("top_pending"):
+            for item in t["top_pending"][:3]:
+                # Truncate long items
+                text = item[:60] + "..." if len(item) > 60 else item
+                lines.append(f"  - {text}")
 
     # Refs
     if "refs" in results and "error" not in results["refs"]:
         r = results["refs"]
         if r["broken"]:
-            parts.append(f"refs: {r['broken']} broken!")
+            lines.append(f"refs: {r['broken']} broken!")
+        elif r["stale"]:
+            lines.append(f"refs: {r['stale']} stale")
         else:
-            parts.append("refs: ok")
+            lines.append("refs: ok")
 
-    return " | ".join(parts)
+    return "\n".join(lines)
 
 
 def _format_overview_markdown(results: dict) -> str:
-    """Format overview results for terminal display."""
+    """Format overview results for terminal display - comprehensive view."""
     lines = ["Project Overview", "=" * 16, ""]
 
     # Health
     if "health" in results:
         if "error" not in results["health"]:
             h = results["health"]
+            lines_k = h["lines"] / 1000 if h["lines"] >= 1000 else h["lines"]
+            lines_fmt = f"{lines_k:.0f}K" if h["lines"] >= 1000 else str(h["lines"])
+
             lines.append(f"Health: {h['grade']} ({h['score']:.0f}/100)")
-            lines.append(f"  {h['files']} files, {h['lines']} lines")
-            if h["issues"]:
-                lines.append(f"  {h['issues']} issues found")
+            lines.append(f"  {h['files']} files, {lines_fmt} lines, {h.get('modules', 0)} modules")
+            doc_cov = h.get("doc_coverage", 0)
+            test_rat = h.get("test_ratio", 0)
+            lines.append(f"  Docs: {doc_cov:.0%} | Tests: {test_rat:.1f}x ratio")
+            if h.get("hotspots"):
+                circ = h.get("circular_deps", 0)
+                lines.append(f"  Hotspots: {h['hotspots']} | Circular deps: {circ}")
+
+            # Show top issues
+            if h.get("top_issues"):
+                lines.append("")
+                lines.append("Issues:")
+                for issue in h["top_issues"]:
+                    lines.append(f"  [!] {issue['cat']}: {issue['msg']}")
+
+            # Show next actions
+            if h.get("next_actions"):
+                lines.append("")
+                lines.append("Next up:")
+                for action in h["next_actions"]:
+                    text = action[:70] + "..." if len(action) > 70 else action
+                    lines.append(f"  - {text}")
         else:
             lines.append(f"Health: ERROR - {results['health']['error']}")
         lines.append("")
@@ -2562,13 +2638,21 @@ def _format_overview_markdown(results: dict) -> str:
             lines.append(f"Documentation: ERROR - {results['docs']['error']}")
         lines.append("")
 
-    # TODOs
+    # TODOs with actual items
     if "todos" in results:
         if "error" not in results["todos"]:
             t = results["todos"]
             lines.append(f"TODOs: {t['pending']} pending, {t['done']} done")
             if t["orphan"]:
-                lines.append(f"  {t['orphan']} orphaned")
+                lines.append(f"  {t['orphan']} orphaned (in code but not tracked)")
+
+            # Show top pending items
+            if t.get("top_pending"):
+                lines.append("")
+                lines.append("Pending:")
+                for item in t["top_pending"]:
+                    text = item[:70] + "..." if len(item) > 70 else item
+                    lines.append(f"  - {text}")
         else:
             lines.append(f"TODOs: ERROR - {results['todos']['error']}")
         lines.append("")
