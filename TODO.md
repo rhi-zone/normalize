@@ -303,6 +303,58 @@ destroy the productivity gains of agentic coding.
 
 Key question answered: Interface design matters more than model scaling (SWE-agent proves this). Moss's structural-awareness approach is differentiated but unproven - needs benchmark validation.
 
+### Research Backlog (Future Sessions)
+
+Topics to explore when time permits:
+
+**Inference & Optimization:**
+- [ ] Speculative decoding for faster code generation
+- [ ] Model quantization trade-offs for code quality
+- [ ] Batching strategies for multi-file operations
+- [ ] Caching strategies for repeated queries
+
+**RAG & Retrieval:**
+- [ ] RAG specifically for code (vs general RAG)
+- [ ] Graph-based retrieval (call graphs, dependency graphs)
+- [ ] Hybrid retrieval (embeddings + keyword + AST)
+- [ ] Cross-file context assembly strategies
+
+**Fine-Tuning & Adaptation:**
+- [ ] LoRA for code-specific tasks
+- [ ] Instruction tuning for coding agents
+- [ ] Domain adaptation (finance, healthcare, etc.)
+- [ ] Continual learning from user feedback
+
+**Developer Experience:**
+- [ ] Commit message generation
+- [ ] Changelog generation from commits
+- [ ] Release notes automation
+- [ ] Code review comment templates
+
+**Code Quality:**
+- [ ] Code smell detection with LLMs
+- [ ] Technical debt estimation
+- [ ] Merge conflict resolution
+- [ ] Code deduplication / clone detection
+
+**Specialized Domains:**
+- [ ] Natural language to SQL/queries
+- [ ] API design and generation
+- [ ] Schema migration generation
+- [ ] Infrastructure as Code (Terraform, Pulumi)
+
+**Compliance & Governance:**
+- [ ] License compliance checking
+- [ ] API versioning and breaking change detection
+- [ ] Accessibility (a11y) in generated code
+- [ ] Internationalization (i18n) patterns
+
+**Evaluation & Benchmarks:**
+- [ ] CodeContests and competitive programming
+- [ ] APPS benchmark deep dive
+- [ ] Cross-language evaluation
+- [ ] Long-context code understanding
+
 ### Distilled Learnings → Implementation Plan
 
 From the competitor analysis, refined with project-specific insights:
