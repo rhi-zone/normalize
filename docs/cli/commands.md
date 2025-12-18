@@ -92,6 +92,7 @@ moss summarize [directory] [options]
 |--------|-------------|
 | `--include-private`, `-p` | Include private (_prefixed) modules and symbols |
 | `--include-tests`, `-t` | Include test files |
+| `--docs`, `-d` | Summarize documentation files instead of code |
 | `--json`, `-j` | Output as JSON |
 
 ### Examples
@@ -105,6 +106,9 @@ moss summarize ~/projects/myapp
 
 # Include everything
 moss summarize --include-private --include-tests
+
+# Summarize documentation instead of code
+moss summarize --docs
 
 # Get JSON for further processing
 moss summarize --json | jq .stats
@@ -123,6 +127,7 @@ moss check-docs [directory] [options]
 | Option | Description |
 |--------|-------------|
 | `--strict`, `-s` | Exit with error on warnings (not just errors) |
+| `--check-links`, `-l` | Check for broken internal links |
 | `--json`, `-j` | Output as JSON |
 
 ### What it checks
@@ -130,6 +135,7 @@ moss check-docs [directory] [options]
 - **Stale references**: Documentation mentions code that doesn't exist
 - **Missing documentation**: Code not mentioned in docs
 - **Outdated statistics**: Line counts in README don't match reality
+- **Broken links** (with `-l`): Internal links that point to non-existent files
 
 ### Examples
 
@@ -139,6 +145,9 @@ moss check-docs
 
 # Strict mode for CI
 moss check-docs --strict
+
+# Include link verification
+moss check-docs --check-links
 
 # Get structured output
 moss check-docs --json | jq .stats.coverage
