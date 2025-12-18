@@ -1857,6 +1857,76 @@ def cmd_summarize(args: Namespace) -> int:
     return 0
 
 
+def cmd_check_docs(args: Namespace) -> int:
+    """Check documentation freshness against codebase."""
+    from moss.check_docs import DocChecker
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Checking docs in {root.name}...")
+
+    checker = DocChecker(root)
+
+    try:
+        result = checker.check()
+    except Exception as e:
+        output.error(f"Failed to check docs: {e}")
+        return 1
+
+    # Output format
+    if getattr(args, "json", False):
+        output.data(result.to_dict())
+    else:
+        output.print(result.to_markdown())
+
+    # Exit code based on issues
+    if result.has_errors:
+        return 1
+    if getattr(args, "strict", False) and result.has_warnings:
+        return 1
+
+    return 0
+
+
+def cmd_check_todos(args: Namespace) -> int:
+    """Check TODOs against implementation status."""
+    from moss.check_todos import TodoChecker
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Checking TODOs in {root.name}...")
+
+    checker = TodoChecker(root)
+
+    try:
+        result = checker.check()
+    except Exception as e:
+        output.error(f"Failed to check TODOs: {e}")
+        return 1
+
+    # Output format
+    if getattr(args, "json", False):
+        output.data(result.to_dict())
+    else:
+        output.print(result.to_markdown())
+
+    # Exit code based on issues
+    if getattr(args, "strict", False) and result.orphan_count > 0:
+        return 1
+
+    return 0
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -2462,6 +2532,54 @@ def create_parser() -> argparse.ArgumentParser:
         help="Output as JSON",
     )
     summarize_parser.set_defaults(func=cmd_summarize)
+
+    # check-docs command
+    check_docs_parser = subparsers.add_parser(
+        "check-docs", help="Check documentation freshness against codebase"
+    )
+    check_docs_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to check (default: current)",
+    )
+    check_docs_parser.add_argument(
+        "--strict",
+        "-s",
+        action="store_true",
+        help="Exit with error on warnings (not just errors)",
+    )
+    check_docs_parser.add_argument(
+        "--json",
+        "-j",
+        action="store_true",
+        help="Output as JSON",
+    )
+    check_docs_parser.set_defaults(func=cmd_check_docs)
+
+    # check-todos command
+    check_todos_parser = subparsers.add_parser(
+        "check-todos", help="Check TODOs against implementation status"
+    )
+    check_todos_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to check (default: current)",
+    )
+    check_todos_parser.add_argument(
+        "--strict",
+        "-s",
+        action="store_true",
+        help="Exit with error on orphaned TODOs",
+    )
+    check_todos_parser.add_argument(
+        "--json",
+        "-j",
+        action="store_true",
+        help="Output as JSON",
+    )
+    check_todos_parser.set_defaults(func=cmd_check_todos)
 
     return parser
 
