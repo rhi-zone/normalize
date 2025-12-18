@@ -176,40 +176,50 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 - [ ] Compare anchor-based patching vs search/replace vs diff formats
 - [ ] Measure structural context (skeleton) value vs raw file context
 
+**Additional IDE/Tool Research:**
+- [ ] Warp (AI-native terminal) - https://www.warp.dev
+- [ ] Zed (GPU-accelerated editor with AI) - https://zed.dev
+- [ ] Windsurf (Codeium's IDE) - https://codeium.com/windsurf
+- [ ] Antigravity - https://antigravity.ai
+- [ ] VS Code Copilot integration patterns
+- Focus: What UX patterns do these tools use that moss could expose via TUI/LSP?
+
 Key question answered: Interface design matters more than model scaling (SWE-agent proves this). Moss's structural-awareness approach is differentiated but unproven - needs benchmark validation.
 
 ### Distilled Learnings → Implementation Plan
 
-From the competitor analysis, here are the most actionable patterns with implementation sketches:
+From the competitor analysis, refined with project-specific insights:
 
-**1. Architect/Editor Split (from Aider)**
-Separate "reasoning about what to change" from "making the change":
-- Phase 1: Planner generates high-level plan using reasoning model (o1, DeepSeek R1)
-- Phase 2: Executor applies changes using cheaper model with moss's anchor-based patching
-- Benefits: Better reasoning + reliable edits + cost savings
-- Implementation: Add `moss.synthesis.strategies.ArchitectEditorStrategy`
+**1. Multi-Agent Hierarchies (inspired by Aider's Architect/Editor)**
+Don't limit to two-level splits - support N-level agent hierarchies:
+- Configurable agent delegation, not hardcoded Architect→Editor
+- Example: Planner → Subtask Agents → Executors (3+ levels)
+- Each level can use different models/prompts/tool subsets
+- Implementation: Generalize `moss.agents` to support arbitrary delegation graphs
 
-**2. Edit-Time Guardrails (from SWE-agent)**
-Validate changes before they're committed, not after:
-- Integrate `ruff check` and type checking into patch application
-- If syntax/lint errors, force corrective edit before proceeding
-- Shadow Git already provides rollback; add validation gate before commit
-- Implementation: Extend `ValidationAPI` to support pre-commit hooks in patch flow
+**2. Configurable Agent Roles (inspired by OpenHands' Micro-Agents)**
+Task-specialized agents, but user-configurable rather than fixed:
+- Define agents via config (system prompt, tool subset, constraints)
+- Not hardcoded "DocAgent", "TestAgent" - user defines their own
+- Share: context loading, tool execution, validation infrastructure
+- Implementation: Agent config schema in `moss.agents`, load from `.moss/agents/`
 
-**3. Checkpoint/Rollback UX (from Claude Code)**
+**3. Non-LLM Auto-Fix Integration (from SWE-agent guardrails)**
+**Already implemented**: `moss/autofix.py` has FixEngine with safety classification.
+Still needed for patch flow integration:
+- [ ] Run `ruff check --fix` automatically on validation failures
+- [ ] Report what was auto-fixed (diff of deterministic changes)
+- [ ] Only escalate to LLM if auto-fix fails or changes are NEEDS_REVIEW/UNSAFE
+- [ ] Integrate `autofix.FixEngine` into `PatchAPI.apply()` flow
+- Key insight: Deterministic fixes first, LLM only for what tools can't fix
+
+**4. Checkpoint/Rollback UX (from Claude Code)**
 Make Shadow Git's rollback capability user-visible:
 - `moss checkpoint create <name>` - named snapshot
 - `moss checkpoint list` - show available checkpoints
 - `moss checkpoint restore <name>` - rollback to checkpoint
 - Currently: Shadow Git exists but users don't know about it
 - Implementation: Add `CheckpointAPI` to `MossAPI`, CLI commands
-
-**4. Micro-Agents (from OpenHands)**
-Task-specialized agents that share infrastructure:
-- Define micro-agent protocol: just override system prompt + tool subset
-- Examples: "DocAgent" (writes docstrings), "TestAgent" (writes tests), "RefactorAgent"
-- Share: context loading, tool execution, validation
-- Implementation: `moss.agents.micro` module with MicroAgent base class
 
 **5. Codebase Indexing (from Cursor)**
 Proactive embedding for semantic search:
