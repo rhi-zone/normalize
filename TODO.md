@@ -203,28 +203,25 @@ Potential additions:
   - Technical debt indicators
   - Self-analysis: moss should be able to identify its own architectural gaps
     (eating our own dogfood, providing actionable feedback during development)
-- [ ] `moss rules` - Custom structural analysis framework:
-  - User-defined rules as Python files (LLM-writable, type-checkable)
-  - Pre-filters for performance (don't run every rule on every AST node)
-  - Pattern: `@rule(backend="ast-grep")` decorator + check function
-  - Example rules: naming conventions, structural smells, project-specific checks
-  - Key insight: "code smell detection with LLMs" is backwards - build discoverability
-    tools so LLMs can *query* for smells, not scan every token
-  - Rules are testable, importable Python - not a novel DSL
-  - **Multi-backend architecture** (ast-grep isn't enough for everything):
-    - `ast-grep` plugin: structural patterns (wrap existing tool)
-    - `pyright` plugin: type-aware rules
-    - `deps` plugin: cross-file analysis (uses moss deps/call graph)
-    - `dataflow` plugin: taint tracking (maybe wrap Pysa?)
-    - `python` plugin: escape hatch for arbitrary checks
-  - **Multi-backend composition**: rules can require multiple backends
-    - `@rule(backend=["ast-grep", "pyright"])` for combined analysis
-    - Each backend contributes to shared context, rule combines them
-  - **Context detection**: auto-classify code context (test, example, CLI, library)
-    - Structural detection: imports pytest → test context
-    - Path heuristics: `/tests/` → test context
-    - User-extensible: define what "test context" means per-project
-    - Rule scoping: `@rule(context="not:test")` skips test code
+- [x] `moss rules` - Custom structural analysis framework (Phase A complete):
+  - [x] User-defined rules as Python files (LLM-writable, type-checkable)
+  - [x] Pattern: `@rule(backend="ast-grep")` decorator + check function
+  - [x] Rules are testable, importable Python - not a novel DSL
+  - [x] **Multi-backend architecture**:
+    - [x] `regex` backend: simple pattern matching
+    - [x] `ast-grep` backend: structural patterns (wraps ast-grep CLI)
+    - [x] `python` backend: escape hatch for arbitrary checks
+    - [ ] `pyright` backend: type-aware rules (future)
+    - [ ] `deps` backend: cross-file analysis (future)
+  - [x] **Context detection**: auto-classify code context (test, library, CLI, etc.)
+    - [x] Path heuristics: `/tests/` → test context
+    - [x] Import detection: imports pytest → test context
+    - [x] Rule scoping: `@rule(context="not:test")` skips test code
+  - [x] Config loading from TOML (moss.toml, .moss/rules.toml, pyproject.toml)
+  - [x] CLI: `moss rules [dir] --list --sarif`
+  - Future improvements:
+    - [ ] Pre-filters for performance (don't run every rule on every file)
+    - [ ] Multi-backend composition: `@rule(backend=["ast-grep", "pyright"])`
 - [ ] `moss clones` - Structural similarity via hashing:
   - Normalize AST subtrees: replace variable names with positional placeholders ($1, $2, $3)
   - Hash normalized structure → same hash = same structure
