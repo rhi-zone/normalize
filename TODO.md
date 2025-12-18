@@ -8,15 +8,16 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session, roughly by size:
 
-- [x] **ACP Server** (medium) - Agent Client Protocol for Zed/JetBrains integration
-  - Basic implementation in `src/moss/acp_server.py`, CLI: `moss acp-server`
-- [x] **`moss patterns`** (medium) - Detect architectural patterns in codebase
-  - Plugin systems, factories, singletons, coupling analysis
-- [x] **Security config** (small) - `.moss/security.toml` for tool configuration
-- [x] **Trust levels** (large) - Fine-grained composable permissions system
-  - Basic implementation in `src/moss/trust.py`
-  - Built-in presets: full, high, medium, low
-  - Config loading from `.moss/trust.yaml` or `moss.toml`
+- [ ] **Integrate trust into policy engine** (small) - Wire TrustManager into PolicyEngine
+  - Use trust decisions in tool execution flow
+- [ ] **Strategy pattern detection** (small) - Add to `moss patterns`
+  - Detect interface + multiple implementations pattern
+- [ ] **`moss weaknesses`** (medium) - Identify architectural gaps
+  - See TODO.md under "Codebase Analysis Gaps"
+- [ ] **ACP agent integration** (medium) - Connect ACP server to moss tools
+  - Currently returns basic responses, needs full tool integration
+- [ ] **EnumerativeGenerator** (large) - Non-LLM code synthesis
+  - Bottom-up AST enumeration, see "Non-LLM Code Generators" section
 
 ## Future Work
 
