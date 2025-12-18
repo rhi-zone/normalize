@@ -56,12 +56,21 @@ Still needed:
 
 ### Non-LLM Code Generators
 
-Alternative synthesis approaches that don't rely on LLMs. See `docs/synthesis-generators.md` for details.
+Alternative synthesis approaches that don't rely on LLMs. See `docs/synthesis-generators.md` and `docs/prior-art.md` for details.
 
 #### High Priority
 - [ ] `EnumerativeGenerator` - enumerate ASTs, test against examples (Escher/Myth)
+  - Bottom-up AST enumeration with special handling for conditionals/recursion
+  - Use Python type hints as refinement constraints (from Myth's approach)
+  - Combine types + examples: tests = examples, type hints = types
 - [ ] `ComponentGenerator` - combine library functions bottom-up (SyPet/InSynth)
+  - Build type graph from available functions (use `moss deps` + `external-deps`)
+  - Petri net representation: places=types, transitions=methods, tokens=variables
+  - Two-phase: sketch generation via reachability, then SAT for argument binding
 - [ ] `SMTGenerator` - Z3-based type-guided synthesis (Synquid)
+  - Translate Python specs to Z3 constraints (`pip install z3-solver`)
+  - Use docstrings/contracts as refinement types
+  - Bidirectional type propagation (top-down + bottom-up)
 
 #### Medium Priority
 - [ ] `PBEGenerator` - Programming by Example (FlashFill/PROSE)
@@ -70,7 +79,11 @@ Alternative synthesis approaches that don't rely on LLMs. See `docs/synthesis-ge
 
 #### Research/Experimental
 - [ ] `GeneticGenerator` - evolutionary search (PushGP)
-- [ ] `NeuralGuidedGenerator` - small model guides enumeration (DeepCoder)
+- [ ] `NeuralGuidedGenerator` - hybrid LLM + enumeration (2024 research)
+  - LLM proposes (possibly incorrect) solutions
+  - Build probabilistic CFG from LLM proposals
+  - Use pCFG to guide enumerative search in CEGIS loop
+  - 2-way info exchange: LLM → enumerator → LLM (80% benchmark completion)
 - [ ] `BidirectionalStrategy` - λ²-style type+example guided search
 
 ### Multi-Language Expansion
@@ -176,13 +189,19 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 - [ ] Compare anchor-based patching vs search/replace vs diff formats
 - [ ] Measure structural context (skeleton) value vs raw file context
 
-**Additional IDE/Tool Research:**
-- [ ] Warp (AI-native terminal) - https://www.warp.dev
-- [ ] Zed (GPU-accelerated editor with AI) - https://zed.dev
-- [ ] Windsurf (Codeium's IDE) - https://codeium.com/windsurf
-- [ ] Antigravity - https://antigravity.ai
-- [ ] VS Code Copilot integration patterns
-- Focus: What UX patterns do these tools use that moss could expose via TUI/LSP?
+**Additional IDE/Tool Research:** ✓ Completed Dec 2025 - see `docs/prior-art.md`
+- [x] Warp (AI-native terminal) - Dispatch mode, Active AI, multi-model
+- [x] Zed (GPU-accelerated editor) - ACP protocol, Edit Prediction, B-tree buffers
+- [x] Windsurf (Codeium's IDE) - Cascade, Supercomplete, Rules system
+- [x] Google Antigravity - Agent-first IDE, Manager View, multi-agent dispatch
+- [x] VS Code Copilot - Agent Mode, MCP integration (128 tool limit), LSP→MCP lineage
+
+**New patterns to adopt from IDE research:**
+- [ ] **Trust Levels** (Warp's Dispatch mode) - configurable confirmation requirements
+- [ ] **ACP Adapter** (Zed) - implement Agent Client Protocol for Zed integration
+- [ ] **Intent Prediction** (Windsurf's Supercomplete) - predict what user wants, not just next token
+- [ ] **Manager View** (Antigravity) - UI for orchestrating multiple concurrent agents
+- [ ] **Browser Automation** (Antigravity) - add Playwright/Selenium tools for UI testing
 
 Key question answered: Interface design matters more than model scaling (SWE-agent proves this). Moss's structural-awareness approach is differentiated but unproven - needs benchmark validation.
 
@@ -253,6 +272,40 @@ Agents should learn from their mistakes and successes. When moss makes an error,
 - "Last time I tried X on this codebase, Y happened"
 - "This codebase prefers pattern A over pattern B"
 - "Don't modify files in vendor/ directory"
+
+### Sessions as First-Class Citizens
+
+Sessions should be resumable and observable for both humans and LLMs.
+
+**Core concept:**
+- A "session" is a unit of work with state: task description, progress, checkpoints, context
+- Both human users and LLM agents can start/pause/resume sessions
+- Session state persists across process restarts
+
+**Session lifecycle:**
+- [ ] `moss session start <name>` - begin a named session
+- [ ] `moss session list` - show active/paused sessions
+- [ ] `moss session resume <name>` - continue a paused session
+- [ ] `moss session status <name>` - show progress, last action, context size
+- [ ] `moss session end <name>` - complete and archive session
+
+**Session state includes:**
+- Task description / goals
+- Progress (completed steps, pending work)
+- Checkpoints (Shadow Git snapshots)
+- Context summaries (what was learned)
+- Error history (for learning)
+
+**Why this matters:**
+- Long-running tasks can be interrupted and resumed
+- Multiple agents can hand off work via sessions
+- Humans can review/approve session progress before continuation
+- Natural integration with Agent Learning (session = learning context)
+
+**Implementation ideas:**
+- Store in `.moss/sessions/<name>/`
+- JSONL for events, markdown for summaries
+- Integrate with checkpoint system
 
 ---
 

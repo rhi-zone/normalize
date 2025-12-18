@@ -119,6 +119,8 @@ When finishing one task, immediately pick up the next from TODO.md. Keep the mom
 - You're re-reading files you already read earlier (sign of forgetting)
 - The conversation has drifted across many unrelated topics
 
+**Write while researching, not after.** When doing research tasks, write findings to the appropriate doc (e.g., `docs/prior-art.md`) incrementally as you gather information. Don't accumulate research in context and write it all at the end - context may be full or stale by then. After every few web searches, write what you learned.
+
 Before suggesting `/exit`:
 1. Note down all discoveries, insights, and open questions to appropriate files
 2. Update TODO.md with any pending work

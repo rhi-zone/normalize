@@ -181,6 +181,262 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
    - Different: Moss emphasizes synthesis (creating code from specs) over repair (fixing bugs)
    - Different: Moss's structural views vs their text-based approaches
 
+## Additional IDE/Tool Research (Dec 2025)
+
+### Warp (AI-Native Terminal)
+- **Site**: https://www.warp.dev
+- **What it is**: Rust-based GPU-accelerated terminal with deep AI integration
+
+**Key Architecture Insights:**
+- **Agent Mode (Agents 3.0)**: Multi-step task execution with terminal capabilities. Agents run interactive commands, work inside CLI apps, use MCP and codebase embeddings.
+- **Active AI**: Proactive suggestions based on terminal errors/output (e.g., "folder doesn't exist, create it?")
+- **Dispatch Mode**: Fully autonomous mode (Ctrl+Shift+I) - AI operates without permission prompts
+- **Multi-Model**: Claude 3.5 Sonnet (default), Claude 3.5 Haiku, GPT-4o. Enterprise can bring custom LLMs.
+- **Rust + GPU**: Fast input/output, low memory vs Electron-based terminals
+
+**Security**: TLS 1.3 in transit, AES 256 at rest. No data stored on Warp servers. No training on user data.
+
+**Moss Observations:**
+- Dispatch mode is interesting - moss could have a "trust level" that determines how much confirmation is needed
+- Active AI (proactive suggestions) could inform moss's policy engine - suggest fixes before failures
+- Terminal-level integration gives access to system events that IDE plugins can't see
+
+### Zed (GPU-Accelerated Editor)
+- **Site**: https://zed.dev
+- **Repo**: https://github.com/zed-industries/zed (GPL v3, fully open source)
+- **What it is**: High-performance collaborative code editor in Rust
+
+**Key Architecture Insights:**
+- **GPUI Framework**: Custom GPU-accelerated UI, ~200 workspace crates, layered architecture
+- **Buffer Architecture**: "Multi-thread-friendly snapshot-able copy-on-write B-tree" vs Atom's "array of strings"
+- **Agent Client Protocol (ACP)**: Open protocol for third-party AI agents - enables external agents to connect
+- **Edit Prediction**: Zeta, their open-source model that anticipates next edits
+- **Agent Panel**: Agentic editing that leverages installed LSPs, linters, tests
+
+**Privacy**: All code and agent interactions remain local, no data to Zed servers.
+
+**Model Flexibility**: Claude 3.7 Sonnet, bring-your-own keys, Ollama for local models.
+
+**Moss Observations:**
+- ACP is interesting - moss could implement an ACP adapter to work inside Zed
+- Their B-tree buffer is similar to what moss's structural editor needs
+- Edit Prediction is a form of synthesis - predicting code before it's written
+- Background AI work (continues while you code) aligns with moss's async design
+
+### Windsurf (Codeium's Agentic IDE)
+- **Site**: https://windsurf.com (formerly https://codeium.com/windsurf)
+- **What it is**: VS Code fork built around AI-first philosophy
+
+**Key Architecture Insights:**
+- **Cascade**: Agentic assistant with deep codebase understanding, multi-step planning, tool calls
+- **Supercomplete**: Predicts *intent* not just code - e.g., renaming variable suggests all occurrences
+- **Rules System**: Granular rules in `.windsurf/rules/` - always-on, @mentionable, glob-attached
+- **Preview + Deploy**: Preview web apps in editor, deploy to Netlify via Cascade tool calls
+- **VS Code Fork**: Familiar environment but unconstrained by extension limitations
+
+**Models**: Windsurf's SWE models, Claude 4 Sonnet/Opus via own API key, MCP server connections.
+
+**Security**: SOC 2 Type II, FedRAMP High, ZDR (Zero Data Retention) options, self-hosted deployments.
+
+**Moss Observations:**
+- Rules system is like moss's policy engine - could sync or interop
+- Supercomplete (intent prediction) is what moss's DWIM aims for
+- Their deep fork approach shows IDE integration limits - why moss prioritizes library-first
+- Cascade's multi-step planning + tool calls is very similar to moss's planner → executor flow
+
+### Google Antigravity
+- **Site**: https://antigravityai.org
+- **What it is**: Google's agentic IDE, announced Nov 2025 with Gemini 3
+
+**Key Architecture Insights:**
+- **Agent-First IDE**: Not code completion or chat - agents with direct editor/terminal/browser access
+- **Two Views**: Editor view (IDE + agent sidebar) and Manager view (orchestrate multiple agents)
+- **Multi-Agent Management**: Dispatch 5 agents on 5 bugs simultaneously
+- **Browser UI Testing**: Agents can interact with browser for testing
+- **Self-Validation**: Agents validate their own work
+
+**Models**: Gemini 3 Pro/Deep Think/Flash, Claude Sonnet 4.5/Opus 4.5, GPT-OSS-120B.
+
+**Origin**: Google acquired Windsurf team for $2.4B, so Antigravity builds on that foundation.
+
+**Moss Observations:**
+- Manager View for multi-agent is what moss's ticket-based agent model enables
+- Self-validation aligns with moss's verification loops
+- Browser access for UI testing is interesting - moss could add browser automation tools
+- The Windsurf acquisition shows value of agentic IDE approach
+
+### VS Code + GitHub Copilot
+- **Docs**: https://code.visualstudio.com/docs/copilot/overview
+- **What it is**: Microsoft's AI integration in VS Code via GitHub Copilot
+
+**Key Architecture Insights:**
+- **Agent Mode** (GA in VS Code 1.99+): Autonomous multi-step coding, monitors errors, auto-corrects in loop
+- **Tool System**: LLM calls tools (search workspace, read files, run terminal, get errors, apply changes)
+- **MCP Integration** (GA in 1.102+): Supports stdio and SSE transports, max 128 tools per request
+- **Three Extension Points**: Built-in tools, extension-contributed tools, MCP servers
+- **LSP → MCP**: VS Code team invented LSP in 2016, MCP was inspired by it, now MCP returns to VS Code
+
+**Moss Observations:**
+- 128 tool limit is interesting - moss should be aware of tool count constraints
+- MCP standardization means moss's MCP server can integrate directly
+- Their tool architecture (workspace search, file read, terminal, errors, apply) maps well to moss tools
+- Agent mode's error-monitoring loop is exactly what moss's validator does
+
+## Program Synthesis Systems (Detailed)
+
+### Escher (Enumerative Synthesis)
+- **Paper**: "Recursive Program Synthesis" (CAV 2013)
+- **What it is**: Generic enumerative synthesizer for recursive programs from I/O examples
+
+**Technical Approach:**
+- Parameterized by components (instructions) - can be instantiated for different domains
+- Special data structures for inferring conditionals and synthesizing recursive procedures
+- Outperformed SAT-based synthesis tools on integers, lists, and trees
+- Used within LoopInvGen, a high-performing SyGuS synthesizer
+
+**Moss Implementation Notes:**
+- `EnumerativeGenerator` should enumerate ASTs bottom-up
+- Key insight: special handling for conditionals and recursion patterns
+- Could use moss's skeleton to identify likely recursion patterns in codebase
+
+### Myth (Type-and-Example-Directed)
+- **Paper**: "Type-and-Example-Directed Program Synthesis" (PLDI 2015)
+- **Repo**: https://github.com/silky/myth
+- **What it is**: Synthesizes recursive functions over algebraic datatypes
+
+**Technical Approach:**
+- Combines type information AND I/O examples to prune search space
+- Uses "refinement trees" - data structure representing constraints on code shape
+- Proof-theoretic techniques from type theory
+- Smyth (successor) adds sketching: "Smyth = Sketching + Myth"
+
+**Moss Implementation Notes:**
+- `EnumerativeGenerator` could use Python type hints as refinement constraints
+- Combining types + examples is powerful - moss has both (tests = examples, type hints = types)
+- Refinement trees could map to moss's AST representation
+
+### SyPet (Component-Based Synthesis)
+- **Paper**: "Component-Based Synthesis for Complex APIs" (POPL 2017)
+- **Repo**: https://github.com/utopia-group/sypet
+- **What it is**: Synthesizes Java programs by composing API calls
+
+**Technical Approach:**
+- **Petri Net Representation**: Places = types, transitions = methods, tokens = variable counts
+- **Two-Phase**: (1) Sketch generation via Petri net reachability, (2) Sketch completion via SAT
+- Outperformed InSynth and CodeHint on real-world tasks
+
+**Moss Implementation Notes:**
+- `ComponentGenerator` should build type graph from available functions
+- Petri net approach is elegant for API composition
+- Could use moss's `deps` and `external-deps` to know available components
+- SAT for argument binding is tractable for small sketches
+
+### Synquid (Refinement Type Synthesis)
+- **Paper**: "Program Synthesis from Polymorphic Refinement Types" (PLDI 2016)
+- **Repo**: https://github.com/nadia-polikarpova/synquid
+- **Demo**: http://comcom.csail.mit.edu/demos/
+- **What it is**: Synthesizes programs from refinement types using Z3
+
+**Technical Approach:**
+- **Liquid Types**: Refinement types with logical predicates (e.g., `{List a | len _v = n}`)
+- **Bidirectional**: Top-down and bottom-up type propagation
+- **Liquid Abduction**: Novel rule for branching terms
+- Uses Z3 SMT solver for constraint solving
+- Evaluated on 64 synthesis problems
+
+**Moss Implementation Notes:**
+- `SMTGenerator` should translate Python specs to Z3 constraints
+- Refinement types are more expressive than plain types - could use docstrings/contracts
+- Z3 integration via `pip install z3-solver`
+- Key insight: modularity enables pruning - check components independently
+
+### LLM-Guided Enumerative Synthesis (2024)
+- **Paper**: "Guiding Enumerative Program Synthesis with Large Language Models" (2024)
+- **What it is**: Hybrid approach combining LLMs with enumerative synthesis
+
+**Technical Approach:**
+- LLM proposes (possibly incorrect) solutions
+- Build probabilistic CFG (pCFG) from LLM proposals
+- Use pCFG to guide enumerative search in CEGIS loop
+- 2-way information exchange: LLM → enumerator → LLM
+- Achieves 80% benchmark completion (vs lower for either alone)
+
+**Moss Implementation Notes:**
+- `NeuralGuidedGenerator` should use this hybrid approach
+- LLM provides probability distribution over likely programs
+- Enumerator explores systematically using that distribution
+- CEGIS loop with counterexamples improves both components
+
+## SWE-bench Evaluation
+
+### Overview
+- **Site**: https://www.swebench.com
+- **Repo**: https://github.com/SWE-bench/SWE-bench
+- **What it is**: Benchmark for LLMs resolving real GitHub issues
+
+**Methodology:**
+- Task: Given codebase + issue, generate patch that resolves it
+- Evaluation: Apply patch, run repo's tests
+- Environment: Docker containers for reproducibility
+- Subsets: Full (~2000), Lite (~300), Verified (500 human-validated)
+
+**Setup Requirements:**
+- x86_64 machine, 120GB storage, 16GB RAM, 8 CPU cores
+- Docker required (or Modal for cloud evaluation)
+- ARM (M-series Mac): Use `--namespace ''` to build images locally
+
+**Current SOTA (Dec 2025):**
+- SWE-bench Verified: Claude 4 Opus at 73.20%
+- SWE-bench Lite: Claude 4 Sonnet + ExpeRepair at 60.3%
+- SWE-bench Pro: GPT-5 at 23.1%, Claude Opus 4.1 at 22.7%
+- Pass@5 leader: Claude Sonnet 4.5 at 55.1%
+- Budget options: Grok Code Fast 1, gpt-oss-120b ~30% at $0.03-0.04/problem
+
+**Key Insights:**
+- Frontier models dramatically outperform older models (GPT-4o at 4.9%)
+- Agent architecture matters as much as model capability
+- Multiple attempts (pass@k) significantly improves scores
+
+### Moss Evaluation Plan
+- [ ] Install SWE-bench harness: `pip install swebench`
+- [ ] Start with Lite subset (smaller, faster iteration)
+- [ ] Compare: moss patches vs raw LLM patches
+- [ ] Measure: Does skeleton context improve patch accuracy?
+- [ ] Measure: Does anchor-based patching reduce failed applies?
+
+## Code Patching Approaches
+
+### The Problem
+Applying AI-generated code changes is "surprisingly difficult." LLMs generate valid code but fail to integrate it. Formats like unified diff are "too algorithmically complex for LLMs."
+
+### Approaches Compared
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Whole File Rewrite** | Simple, no matching needed | Expensive (tokens), loses unrelated changes |
+| **Search/Replace Blocks** | Intuitive, works without line numbers | Fails if search text not unique |
+| **Unified Diff** | Standard format, efficient | Brittle, fails if file changed |
+| **Fuzzy/Anchor-Based** | Robust to drift, confidence scoring | More complex implementation |
+| **Semantic Edit** | 98% vs 70% success (claimed) | Requires deeper understanding |
+
+### Key Insights from Research
+- **Avoid line numbers**: LLMs struggle with exact line numbers
+- **Clear delimiters**: Original vs replacement must be obvious
+- **Fuzzy matching**: Cascade of methods (exact → anchor → similarity → Levenshtein)
+- **Confidence scores**: Only apply if confidence > threshold (e.g., 0.95)
+- **Error feedback**: When patches fail, explain why so LLM can retry
+
+### Moss's Anchor-Based Approach
+Moss uses structural anchors (AST nodes) rather than line numbers:
+- Anchors identify code by structure, not position
+- Robust to reformatting, comment changes, nearby edits
+- Maps to actual semantic units (functions, classes, blocks)
+
+**Comparison TODO:**
+- [ ] Benchmark anchor-based vs search/replace on same tasks
+- [ ] Measure retry rate (how often does first attempt fail?)
+- [ ] Measure drift resistance (apply patch after other edits)
+
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness
