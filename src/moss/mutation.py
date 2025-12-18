@@ -211,21 +211,37 @@ class MutationAnalyzer:
         if not mutate_paths:
             return MutationResult(execution_time_seconds=time.time() - start_time)
 
-        # Build mutmut command
-        cmd = ["mutmut", "run", "--no-progress"]
+        # Create temporary setup.cfg with mutmut config
+        # (mutmut v3 uses config file instead of CLI flags)
+        setup_cfg = self.root / "setup.cfg"
+        setup_cfg_backup = None
+        if setup_cfg.exists():
+            setup_cfg_backup = setup_cfg.read_text()
 
-        for path in mutate_paths:
-            cmd.extend(["--paths-to-mutate", str(path)])
-
-        if self.test_command:
-            cmd.extend(["--runner", self.test_command])
-
-        if quick_check:
-            # In quick mode, we'll run and then only examine a sample
-            pass  # mutmut doesn't have native sampling, we handle in results
-
-        # Run mutmut
         try:
+            # Write mutmut configuration (v3 uses config file)
+            config_lines = ["[mutmut]"]
+            paths_str = ",".join(str(p) for p in mutate_paths)
+            config_lines.append(f"paths_to_mutate={paths_str}")
+            if self.test_command:
+                config_lines.append(f"runner={self.test_command}")
+            config_lines.append("tests_dir=tests")
+            # v3 needs src dir copied for imports to work
+            config_lines.append("also_copy=src/")
+            config_lines.append("")
+
+            if setup_cfg_backup:
+                # Append to existing config
+                full_config = setup_cfg_backup + "\n" + "\n".join(config_lines)
+            else:
+                full_config = "\n".join(config_lines)
+
+            setup_cfg.write_text(full_config)
+
+            # Build mutmut command (v3 simplified)
+            cmd = ["mutmut", "run"]
+
+            # Run mutmut
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 cwd=self.root,
@@ -239,6 +255,18 @@ class MutationAnalyzer:
                 execution_time_seconds=time.time() - start_time,
                 tested_files=[p for p in mutate_paths],
             )
+        finally:
+            # Restore original setup.cfg
+            if setup_cfg_backup is not None:
+                setup_cfg.write_text(setup_cfg_backup)
+            elif setup_cfg.exists():
+                setup_cfg.unlink()
+            # Clean up mutmut artifacts
+            import shutil
+
+            mutants_dir = self.root / "mutants"
+            if mutants_dir.exists():
+                shutil.rmtree(mutants_dir, ignore_errors=True)
 
         # Parse results
         result = self._parse_results()

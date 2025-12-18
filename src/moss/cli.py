@@ -2002,6 +2002,43 @@ def cmd_mutate(args: Namespace) -> int:
     return 0
 
 
+def cmd_check_refs(args: Namespace) -> int:
+    """Check bidirectional references between code and docs."""
+    from moss.check_refs import RefChecker
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    staleness_days = getattr(args, "staleness_days", 30)
+    checker = RefChecker(root, staleness_days=staleness_days)
+
+    output.info(f"Checking references in {root.name}...")
+
+    try:
+        result = checker.check()
+    except Exception as e:
+        output.error(f"Failed to check references: {e}")
+        return 1
+
+    # Output format
+    if getattr(args, "json", False):
+        output.data(result.to_dict())
+    else:
+        output.print(result.to_markdown())
+
+    # Exit codes
+    if result.has_errors:
+        return 1
+    if getattr(args, "strict", False) and result.has_warnings:
+        return 1
+
+    return 0
+
+
 def cmd_roadmap(args: Namespace) -> int:
     """Show project roadmap and progress from TODO.md."""
     from moss.roadmap import display_roadmap, find_todo_md
@@ -2894,6 +2931,37 @@ def create_parser() -> argparse.ArgumentParser:
         help="Output as JSON",
     )
     mutate_parser.set_defaults(func=cmd_mutate)
+
+    # check-refs command
+    check_refs_parser = subparsers.add_parser(
+        "check-refs", help="Check bidirectional references between code and docs"
+    )
+    check_refs_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to check (default: current)",
+    )
+    check_refs_parser.add_argument(
+        "--staleness-days",
+        type=int,
+        default=30,
+        metavar="N",
+        help="Warn if code changed more than N days after docs (default: 30)",
+    )
+    check_refs_parser.add_argument(
+        "--strict",
+        "-s",
+        action="store_true",
+        help="Exit with error on warnings (stale refs)",
+    )
+    check_refs_parser.add_argument(
+        "--json",
+        "-j",
+        action="store_true",
+        help="Output as JSON",
+    )
+    check_refs_parser.set_defaults(func=cmd_check_refs)
 
     # health command
     health_parser = subparsers.add_parser(
