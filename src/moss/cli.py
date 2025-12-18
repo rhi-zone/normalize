@@ -2580,6 +2580,158 @@ def cmd_coverage(args: Namespace) -> int:
     return 0
 
 
+def cmd_lint(args: Namespace) -> int:
+    """Run unified linting across multiple tools.
+
+    Runs configured linters (ruff, mypy, etc.) and combines their output
+    into a unified format.
+    """
+    import asyncio
+
+    from moss.plugins.linters import get_linter_registry
+
+    output = setup_output(args)
+    paths_arg = getattr(args, "paths", None) or ["."]
+    paths = [Path(p).resolve() for p in paths_arg]
+
+    # Validate paths
+    for path in paths:
+        if not path.exists():
+            output.error(f"Path not found: {path}")
+            return 1
+
+    # Get registry and available linters
+    registry = get_linter_registry()
+    registry.register_builtins()
+
+    # Filter by linter name if specified
+    linter_names = getattr(args, "linters", None)
+    if linter_names:
+        linters = [registry.get(name) for name in linter_names.split(",")]
+        linters = [linter for linter in linters if linter is not None]
+        if not linters:
+            output.error(f"No linters found matching: {linter_names}")
+            output.info(
+                f"Available: {', '.join(p.metadata.name for p in registry.get_available())}"
+            )
+            return 1
+    else:
+        linters = registry.get_available()
+
+    if not linters:
+        output.warning("No linters available")
+        return 0
+
+    linter_names_str = ", ".join(linter.metadata.name for linter in linters)
+    output.info(f"Running {len(linters)} linter(s): {linter_names_str}")
+
+    # Collect files to lint
+    files_to_lint: list[Path] = []
+    pattern = getattr(args, "pattern", "**/*.py")
+    for path in paths:
+        if path.is_file():
+            files_to_lint.append(path)
+        else:
+            files_to_lint.extend(path.glob(pattern))
+
+    if not files_to_lint:
+        output.info("No files to lint")
+        return 0
+
+    output.info(f"Checking {len(files_to_lint)} file(s)...")
+
+    # Run linters
+    async def run_linters() -> list[tuple[str, Any]]:
+        results = []
+        for linter in linters:
+            # Check file extension against supported languages
+            supported_exts = {
+                "python": {".py", ".pyi"},
+                "javascript": {".js", ".jsx", ".mjs"},
+                "typescript": {".ts", ".tsx"},
+            }
+            linter_exts: set[str] = set()
+            for lang in linter.metadata.languages:
+                linter_exts.update(supported_exts.get(lang, set()))
+
+            for file_path in files_to_lint:
+                if not linter_exts or file_path.suffix in linter_exts:
+                    result = await linter.run(file_path)
+                    results.append((linter.metadata.name, result))
+        return results
+
+    all_results = asyncio.run(run_linters())
+
+    # Combine and format results
+    total_issues = 0
+    errors = 0
+    warnings = 0
+    grouped_by_file: dict[Path, list] = {}
+
+    for linter_name, result in all_results:
+        if not result.success:
+            errors += 1
+        for issue in result.issues:
+            total_issues += 1
+            if issue.severity.name == "ERROR":
+                errors += 1
+            elif issue.severity.name == "WARNING":
+                warnings += 1
+
+            file_key = issue.file or Path("unknown")
+            if file_key not in grouped_by_file:
+                grouped_by_file[file_key] = []
+            grouped_by_file[file_key].append((linter_name, issue))
+
+    # Output
+    if wants_json(args):
+        json_output = {
+            "total_issues": total_issues,
+            "errors": errors,
+            "warnings": warnings,
+            "files": {
+                str(f): [
+                    {
+                        "linter": ln,
+                        "message": i.message,
+                        "severity": i.severity.name,
+                        "line": i.line,
+                        "column": i.column,
+                        "rule_id": i.rule_id,
+                    }
+                    for ln, i in issues
+                ]
+                for f, issues in grouped_by_file.items()
+            },
+        }
+        output.data(json_output)
+    else:
+        # Text output grouped by file
+        for file_path, issues in sorted(grouped_by_file.items()):
+            output.header(str(file_path))
+            for _linter_name, issue in issues:
+                loc = f":{issue.line}" if issue.line else ""
+                loc += f":{issue.column}" if issue.column else ""
+                rule = f" [{issue.rule_id}]" if issue.rule_id else ""
+                severity = issue.severity.name.lower()
+                output.print(f"  {loc} {severity}{rule}: {issue.message}")
+
+        output.blank()
+        if total_issues == 0:
+            output.success("No issues found")
+        else:
+            output.info(f"Found {total_issues} issue(s): {errors} error(s), {warnings} warning(s)")
+
+    # Return non-zero if errors found
+    fix = getattr(args, "fix", False)
+    if fix and errors == 0:
+        output.info("Running fixes...")
+        # TODO: Implement fix mode by calling linter.fix() methods
+        output.warning("Fix mode not yet implemented")
+
+    return 1 if errors > 0 else 0
+
+
 def cmd_complexity(args: Namespace) -> int:
     """Analyze cyclomatic complexity of functions."""
     from moss.complexity import analyze_complexity
@@ -4253,6 +4405,33 @@ def create_parser() -> argparse.ArgumentParser:
         help="Run pytest with coverage first",
     )
     coverage_parser.set_defaults(func=cmd_coverage)
+
+    # lint command
+    lint_parser = subparsers.add_parser("lint", help="Run unified linting across multiple tools")
+    lint_parser.add_argument(
+        "paths",
+        nargs="*",
+        default=["."],
+        help="Paths to lint (default: current directory)",
+    )
+    lint_parser.add_argument(
+        "--pattern",
+        "-p",
+        default="**/*.py",
+        help="Glob pattern for files (default: **/*.py)",
+    )
+    lint_parser.add_argument(
+        "--linters",
+        "-l",
+        help="Comma-separated list of linters to run (default: all available)",
+    )
+    lint_parser.add_argument(
+        "--fix",
+        "-f",
+        action="store_true",
+        help="Attempt to fix issues automatically",
+    )
+    lint_parser.set_defaults(func=cmd_lint)
 
     # complexity command
     complexity_parser = subparsers.add_parser(
