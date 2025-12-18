@@ -141,6 +141,53 @@ Use moss to analyze itself and keep documentation current.
   - Cross-reference TODOs with implementation status
   - Detect completed items still marked pending
   - Find undocumented TODOs in code comments
+- [x] `moss health` - Basic project health overview (v1)
+  - Health score with letter grade
+  - Doc coverage, TODO stats
+  - Next actions from TODO.md
+
+#### Phase 28: Comprehensive Health Analysis
+
+Expand `moss health` into a comprehensive but concise project analysis. Rename current verbose output to `moss report` if needed.
+
+##### 28a: Dependency Analysis
+- [ ] Circular dependency detection (use existing `extract_dependencies()`)
+- [ ] "God modules" - modules with high fan-in (everything depends on them)
+- [ ] Orphan modules - modules nothing imports
+- [ ] Coupling metrics - inter-module dependency density
+- [ ] Layer violation detection (if Architecture.md defines layers)
+- [ ] Dependency graph visualization (optional `--graph` output)
+
+##### 28b: Structural Hotspots
+- [ ] Functions with too many parameters (>5)
+- [ ] Classes with too many methods (>15)
+- [ ] Files over threshold (>500 lines)
+- [ ] Deep nesting detection (from CFG analysis)
+- [ ] Long functions (>50 lines)
+- [ ] Complex conditionals (high branching factor)
+- [ ] Configurable thresholds in moss.toml
+
+##### 28c: Test Coverage Analysis
+- [ ] Module-to-test mapping (which modules have tests)
+- [ ] Test-to-code ratio per package
+- [ ] Untested public API surface (exports without tests)
+- [ ] Test file organization health
+- [ ] Missing test fixtures detection
+
+##### 28d: API Surface Analysis
+- [ ] Public exports inventory (`__all__`, non-underscore names)
+- [ ] Public/private ratio per module
+- [ ] "Breaking change risk" - widely-imported exports
+- [ ] Undocumented public APIs
+- [ ] Inconsistent naming patterns
+
+##### 28e: Health Command Refactor
+- [ ] Concise single-screen output (no scrolling for healthy projects)
+- [ ] Severity-based filtering (show only issues above threshold)
+- [ ] `moss report` for full verbose output
+- [ ] `moss health --focus=deps|tests|complexity|api` for targeted analysis
+- [ ] Machine-readable `--json` with all metrics
+- [ ] Exit codes for CI integration (0=healthy, 1=warnings, 2=critical)
 
 ### Future: Enterprise Features
 - Team collaboration (shared caches)
