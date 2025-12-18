@@ -39,6 +39,7 @@ Still needed:
 - [x] Resource providers: codebase overview, project structure, file skeletons
 - [x] Prompt templates: understand-file, prepare-refactor, code-review, find-bugs
 - [x] Test it works end-to-end with Claude Code (config added in `.mcp.json`)
+- [x] Output optimization: prefer `to_compact()` over JSON, truncate large outputs
 
 ### Interface Generators (Single Source of Truth)
 
