@@ -8,6 +8,8 @@ dependencies = []
 
 [project.scripts]
 moss = "moss.cli:main"
+moss-server = "moss.server.app:main"
+moss-mcp = "moss.mcp_server:main"
 
 [project.entry-points."moss.plugins"]
 python-skeleton = "moss.skeleton:PythonSkeletonPlugin"
@@ -80,6 +82,10 @@ lsp = [
 ]
 llm = [
     "litellm>=1.0.0",
+]
+# Meta-group: install all optional features
+all = [
+    "moss[server,mcp,lsp,llm,tree-sitter,chroma]",
 ]
 
 [build-system]

@@ -32,20 +32,21 @@ Refactor moss into a hyper-modular library-first architecture where the core is 
 - [ ] `moss.gen.lsp` - Generate LSP handlers from API (future)
 - [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API (future)
 
-#### 29d: Wrapper Packages
-- [ ] `moss` - Core library only
-- [ ] `moss-cli` - CLI wrapper (depends on moss)
-- [ ] `moss-server` - HTTP/WebSocket server (depends on moss)
-- [ ] `moss-mcp` - MCP server (depends on moss)
-- [ ] `moss-lsp` - LSP server (depends on moss)
-- [ ] `moss-all` - Meta-package installing everything
+#### 29d: Wrapper Packages ✅
+- [x] `moss` - Core library with optional extras
+- [x] `moss-cli` entry point (built-in)
+- [x] `moss-server` entry point (requires `[server]` extra)
+- [x] `moss-mcp` entry point (requires `[mcp]` extra)
+- [x] `moss[all]` meta-group for all features
+- [ ] `moss-lsp` entry point (future, requires `[lsp]` extra)
+- Note: Separate PyPI packages deferred pending name resolution
 
-#### 29e: Server Architecture
-- [ ] HTTP + WebSocket for web clients
-- [ ] Unix socket for local high-performance
-- [ ] Persistent state (parse once, query many)
-- [ ] Streaming results for long-running analysis
-- [ ] Multiple concurrent clients
+#### 29e: Server Architecture ✅
+- [x] HTTP + WebSocket for web clients
+- [x] Persistent state (parse once, query many)
+- [x] Streaming results via WebSocket
+- [x] Multiple concurrent clients
+- [ ] Unix socket for local high-performance (future)
 
 ### Phase 22: Synthesis Integration (Complete)
 

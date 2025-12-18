@@ -478,8 +478,49 @@ def run_server(
     uvicorn.run(app, host=host, port=port, **kwargs)
 
 
+def main() -> None:
+    """CLI entry point for moss-server."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="moss-server",
+        description="Run the Moss API server",
+    )
+    parser.add_argument(
+        "root",
+        nargs="?",
+        default=".",
+        help="Project root directory (default: current directory)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind to (default: 8000)",
+    )
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable auto-reload for development",
+    )
+
+    args = parser.parse_args()
+    run_server(
+        root=args.root,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+    )
+
+
 __all__ = [
     "MossServer",
     "create_app",
+    "main",
     "run_server",
 ]
