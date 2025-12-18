@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.0
+
+### Phase 28: Comprehensive Health Analysis
+Expanded `moss health` into a comprehensive project analysis tool:
+- **Dependency Analysis**: Circular dependency detection, god modules (high fan-in), orphan modules, coupling metrics
+- **Structural Hotspots**: Functions with too many parameters, classes with too many methods, deep nesting, long functions, complex conditionals
+- **Test Coverage Analysis**: Module-to-test mapping, test-to-code ratio, untested public API surface
+- **API Surface Analysis**: Public exports inventory, undocumented APIs, naming convention checking, breaking change risk
+- **Health Command Refactor**: Concise single-screen output, `--severity` and `--focus` flags, `moss report` for verbose output, `--ci` flag with exit codes (0=healthy, 1=warnings, 2=critical)
+
 ## v0.4.0
 
 ### Phase 27: Advanced Library Learning
