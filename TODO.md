@@ -71,7 +71,8 @@ The `--jq` option is straightforward (shell out to jq). The `--query` variant wo
 Multi-command aggregation:
 
 - [x] `moss overview` - run all checks (health, deps, docs, todos, refs) and output combined results
-- [ ] `--preset NAME` flag - named presets for command combinations (e.g., `--preset ci`)
+- [x] `--preset NAME` flag - named presets for command combinations (ci, quick, full)
+- [x] Custom presets via moss.toml or pyproject.toml `[tool.moss.presets.*]`
 - [ ] Format strings for custom output templates
 
 ### Enterprise Features
