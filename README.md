@@ -4,7 +4,7 @@ Tooling orchestration with structural awareness.
 
 Moss implements a "Compiled Context" approach that prioritizes architectural awareness (AST-based understanding) over raw text processing, with verification loops ensuring correctness before output.
 
-**[Documentation](https://pterror.github.io/moss/)** | **[GitHub](https://github.com/pterror/moss)**
+**[Documentation](https://pterror.github.io/moss/)** | **[GitHub](https://github.com/pterror/moss)** | **[LLM Guide](LLMS.md)**
 
 ## Features
 
