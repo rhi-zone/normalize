@@ -24,7 +24,7 @@ bus = EventBus()
 # Publish an event
 await bus.publish(Event(
     type=EventType.TOOL_CALL,
-    payload={"tool": "read", "path": "/src/main.py"}
+    payload={"tool": "read", "path": "src/moss/events.py"}
 ))
 ```
 
@@ -64,7 +64,7 @@ Events carry typed payloads:
 # Tool call event
 {
     "tool": "edit",
-    "path": "/src/app.py",
+    "path": "src/moss/events.py",
     "operation": "replace",
     "line": 42
 }

@@ -1,4 +1,7 @@
-"""Shadow Git: Atomic commits on shadow branches with rollback support."""
+"""Shadow Git: Atomic commits on shadow branches with rollback support.
+
+# See: docs/architecture/overview.md
+"""
 
 from __future__ import annotations
 

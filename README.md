@@ -30,8 +30,8 @@ moss roadmap --plain     # Plain text output (better for LLMs)
 
 # Code analysis
 moss skeleton src/       # Extract code structure (classes, functions)
-moss deps src/main.py    # Show imports and exports
-moss cfg src/main.py     # Build control flow graphs
+moss deps src/moss/cli.py    # Show imports and exports
+moss cfg src/moss/cli.py     # Build control flow graphs
 
 # Code operations
 moss run "Fix the bug"   # Submit a task
@@ -303,7 +303,7 @@ chain = ValidatorChain([
     PytestValidator(),
 ])
 
-result = await chain.validate(Path("src/main.py"))
+result = await chain.validate(Path("src/moss/cli.py"))
 if not result.passed:
     print(f"Validation failed: {result.issues}")
 ```
@@ -318,7 +318,7 @@ from moss import create_default_policy_engine
 engine = create_default_policy_engine()
 
 # Check if action is allowed
-result = await engine.check("edit", target=Path("src/main.py"))
+result = await engine.check("edit", target=Path("src/moss/cli.py"))
 if not result.allowed:
     print(f"Blocked by {result.blocking_result.policy_name}")
 ```

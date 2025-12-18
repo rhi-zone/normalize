@@ -1,5 +1,7 @@
 """DWIM (Do What I Mean) - Semantic tool routing for LLM usage.
 
+# See: docs/dwim-architecture.md
+
 This module provides fuzzy matching and semantic routing for tool discovery,
 making Moss interfaces robust against minor variations in how tools are invoked.
 

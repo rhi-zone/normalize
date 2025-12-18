@@ -64,6 +64,18 @@ Analyze PyPI/npm dependencies (not just internal imports):
 
 ---
 
+## Vision: Augmenting the Vibe Coding Loop
+
+Moss should both **replace** and **augment** conventional AI coding assistants like Claude Code, Gemini CLI, and Codex CLI. The goal is not to compete on chat UX, but to provide the structural awareness layer that makes any agentic coding loop more reliable:
+
+- **As a replacement**: `moss run` can orchestrate full tasks with verification loops, shadow git, and checkpoint approval
+- **As an augmentation**: Tools like `moss skeleton`, `moss deps`, `moss check-refs`, `moss mutate` can be called by *any* agent to get architectural context before making changes
+- **MCP integration**: `moss-mcp` exposes all capabilities to MCP-compatible agents
+
+The key insight: vibe coding works better when the agent understands structure, not just text.
+
+---
+
 ## Notes
 
 ### PyPI Naming Collision

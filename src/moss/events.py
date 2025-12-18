@@ -1,4 +1,7 @@
-"""Event Bus: Async pub/sub with typed events."""
+"""Event Bus: Async pub/sub with typed events.
+
+# See: docs/architecture/events.md
+"""
 
 from __future__ import annotations
 

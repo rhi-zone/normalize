@@ -1,4 +1,7 @@
-"""Command-line interface for Moss."""
+"""Command-line interface for Moss.
+
+# See: docs/cli/commands.md
+"""
 
 from __future__ import annotations
 
@@ -87,7 +90,7 @@ config = (
 )
 
 # Add static context files (architecture docs, etc.)
-# config = config.with_static_context(Path("docs/architecture.md"))
+# config = config.with_static_context(Path("docs/architecture/overview.md"))
 
 # Add custom validators
 # from moss.validators import CommandValidator
