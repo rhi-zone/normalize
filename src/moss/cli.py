@@ -1160,6 +1160,17 @@ def cmd_mcp_server(args: Namespace) -> int:
         return 0
 
 
+def cmd_acp_server(args: Namespace) -> int:
+    """Start the ACP server for IDE integration (Zed, JetBrains)."""
+    try:
+        from moss.acp_server import run_acp_server
+
+        run_acp_server()
+        return 0
+    except KeyboardInterrupt:
+        return 0
+
+
 def cmd_gen(args: Namespace) -> int:
     """Generate interface code from MossAPI introspection."""
     import json as json_mod
@@ -2971,6 +2982,39 @@ def cmd_security(args: Namespace) -> int:
     return 0
 
 
+def cmd_patterns(args: Namespace) -> int:
+    """Detect architectural patterns in the codebase."""
+    from moss.patterns import analyze_patterns, format_pattern_analysis
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+    patterns_arg = getattr(args, "patterns", None)
+
+    if patterns_arg:
+        patterns_list = [p.strip() for p in patterns_arg.split(",")]
+    else:
+        patterns_list = None
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Analyzing patterns in {root.name}...")
+
+    try:
+        analysis = analyze_patterns(root, patterns=patterns_list)
+    except Exception as e:
+        output.error(f"Pattern analysis failed: {e}")
+        return 1
+
+    if wants_json(args):
+        output.data(analysis.to_dict())
+    else:
+        output.print(format_pattern_analysis(analysis))
+
+    return 0
+
+
 def cmd_rag(args: Namespace) -> int:
     """Semantic search with RAG indexing."""
     import asyncio
@@ -3976,6 +4020,13 @@ def create_parser() -> argparse.ArgumentParser:
     mcp_parser = subparsers.add_parser("mcp-server", help="Start MCP server for LLM tool access")
     mcp_parser.set_defaults(func=cmd_mcp_server)
 
+    # acp-server command
+    acp_parser = subparsers.add_parser(
+        "acp-server",
+        help="Start ACP server for IDE integration (Zed, JetBrains)",
+    )
+    acp_parser.set_defaults(func=cmd_acp_server)
+
     # gen command
     gen_parser = subparsers.add_parser(
         "gen", help="Generate interface code from MossAPI introspection"
@@ -4959,6 +5010,23 @@ def create_parser() -> argparse.ArgumentParser:
         help="Minimum severity to report (default: low)",
     )
     security_parser.set_defaults(func=cmd_security)
+
+    # patterns command
+    patterns_parser = subparsers.add_parser(
+        "patterns", help="Detect architectural patterns in the codebase"
+    )
+    patterns_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    patterns_parser.add_argument(
+        "--patterns",
+        "-p",
+        help="Comma-separated patterns to detect (plugin,factory,singleton,coupling)",
+    )
+    patterns_parser.set_defaults(func=cmd_patterns)
 
     # eval command
     eval_parser = subparsers.add_parser("eval", help="Run evaluation benchmarks (SWE-bench, etc.)")

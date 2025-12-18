@@ -8,13 +8,15 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session, roughly by size:
 
-- [ ] **ACP Server** (medium) - Agent Client Protocol for Zed/JetBrains integration
-  - See `docs/prior-art.md` for protocol details
-- [ ] **`moss patterns`** (medium) - Detect architectural patterns in codebase
-  - Plugin systems, factories, adapters, coupling analysis
-- [ ] **Security config** (small) - `.moss/security.yaml` for tool configuration
-- [ ] **Trust levels** (large) - Fine-grained composable permissions system
-  - See design in TODO.md under "Smart Trust Levels"
+- [x] **ACP Server** (medium) - Agent Client Protocol for Zed/JetBrains integration
+  - Basic implementation in `src/moss/acp_server.py`, CLI: `moss acp-server`
+- [x] **`moss patterns`** (medium) - Detect architectural patterns in codebase
+  - Plugin systems, factories, singletons, coupling analysis
+- [x] **Security config** (small) - `.moss/security.toml` for tool configuration
+- [x] **Trust levels** (large) - Fine-grained composable permissions system
+  - Basic implementation in `src/moss/trust.py`
+  - Built-in presets: full, high, medium, low
+  - Config loading from `.moss/trust.yaml` or `moss.toml`
 
 ## Future Work
 
@@ -166,7 +168,7 @@ Moss must not contribute to this problem.
   - [x] Multi-tool orchestration (bandit, semgrep)
   - [x] Unified output with severity, CWE/OWASP mapping
   - [x] Dedupe overlapping findings
-  - [ ] Plugin architecture: tools configured in `.moss/security.yaml`
+  - [x] Plugin architecture: tools configured in `.moss/security.toml` or `moss.toml [security]`
   - [ ] More tools: Snyk, CodeQL, ast-grep
 - [ ] **Validator integration**: Run security checks in synthesis loop
 - [ ] **Iteration tracking**: Monitor vuln count across refinements (37.6% increase after 5 iterations is alarming)
@@ -193,13 +195,14 @@ Potential additions:
   - [ ] Suggest linter configurations based on project structure
   - [ ] Auto-fix where possible
   - [ ] Manage scripts/commands (list available, run, explain)
-- [ ] `moss patterns` - Detect and analyze architectural patterns:
-  - Plugin systems (Protocol + Registry + Entry Points)
-  - Factory patterns, strategy patterns, adapter patterns
-  - Inconsistent patterns (e.g., some registries use entry points, others don't)
-  - Hardcoded implementations that could be plugins
-  - Coupling analysis (which modules know about each other)
-  - Report: "X uses plugin pattern, Y could benefit from it"
+- [x] `moss patterns` - Detect and analyze architectural patterns:
+  - [x] Plugin systems (Protocol detection)
+  - [x] Factory patterns
+  - [x] Singleton patterns
+  - [x] Coupling analysis (which modules know about each other)
+  - [ ] Strategy patterns, adapter patterns
+  - [ ] Inconsistent patterns (e.g., some registries use entry points, others don't)
+  - [ ] Report: "X uses plugin pattern, Y could benefit from it"
 - [ ] `moss weaknesses` / `moss gaps` - Identify architectural weaknesses and gaps:
   - Hardcoded assumptions (e.g., parsing only supports one format)
   - Missing abstractions (e.g., no plugin system where one would help)
@@ -310,7 +313,7 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 
 **New patterns to adopt from IDE research:**
 - [ ] **Smart Trust Levels** (inspired by Warp's Dispatch mode) - see design below
-- [ ] **ACP Server** (HIGH PRIORITY) - implement Agent Client Protocol for Zed/JetBrains integration
+- [x] **ACP Server** (HIGH PRIORITY) - implement Agent Client Protocol for Zed/JetBrains integration
   - Create `moss.acp_server` module
   - JSON-RPC 2.0 over stdio
   - Map moss tools to ACP capabilities
@@ -380,13 +383,13 @@ Example use cases:
 
 Smart features beyond basic approve/deny:
 - [ ] **Pattern learning**: "You approved `ruff check` 10 times, auto-approve it?"
-- [ ] **Scope-based**: "Trust writes to `src/` but confirm for `config/`"
+- [x] **Scope-based**: "Trust writes to `src/` but confirm for `config/`" (via glob patterns)
 - [ ] **Time-bounded**: "Trust for this session" vs "Trust permanently"
 - [ ] **Rollback-aware**: "This can be undone via Shadow Git" (lower risk = less friction)
 - [ ] **Batch approval**: "Approve all 5 pending writes at once?"
 - [ ] **Explain risk**: Show what command does, why it's flagged, what could go wrong
-- [ ] **Glob patterns**: `write:src/**/*.py` for fine-grained path matching
-- [ ] **Command patterns**: `bash:git *` to trust all git commands
+- [x] **Glob patterns**: `write:src/**/*.py` for fine-grained path matching
+- [x] **Command patterns**: `bash:git *` to trust all git commands
 
 Key insight: The goal isn't "maximum safety" - it's *appropriate* safety that doesn't
 destroy the productivity gains of agentic coding.

@@ -3,16 +3,25 @@
 Aggregates results from multiple security analysis tools:
 - bandit: Python-specific security linting
 - semgrep: SAST pattern matching with community rules
-- (future) Snyk, CodeQL, etc.
+- (future) Snyk, CodeQL, ast-grep
 
-Usage:
-    from moss.security import SecurityAnalyzer
+Configuration via moss.toml [security] section:
 
-    analyzer = SecurityAnalyzer(project_root)
-    results = analyzer.analyze()
+    [security]
+    min_severity = "medium"
 
-    # Or via CLI:
-    # moss security [directory] [--tools bandit,semgrep] [--severity medium]
+    [security.bandit]
+    enabled = true
+    excludes = [".venv", "venv", "node_modules"]
+    args = []
+
+    [security.semgrep]
+    enabled = true
+    config = "auto"
+    excludes = [".venv", "venv"]
+
+Or via CLI:
+    moss security [directory] [--tools bandit,semgrep] [--severity medium]
 """
 
 from __future__ import annotations
@@ -21,6 +30,7 @@ import json
 import logging
 import shutil
 import subprocess
+import tomllib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -28,6 +38,100 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SecurityToolConfig:
+    """Configuration for a security tool."""
+
+    enabled: bool = True
+    excludes: list[str] = field(default_factory=lambda: [".venv", "venv", "node_modules", ".git"])
+    args: list[str] = field(default_factory=list)
+    config: str | None = None  # Tool-specific config (e.g., semgrep ruleset)
+    timeout: int = 300  # Timeout in seconds
+
+
+@dataclass
+class SecurityConfig:
+    """Configuration for security analysis."""
+
+    min_severity: str = "low"
+    tools: dict[str, SecurityToolConfig] = field(default_factory=dict)
+
+    @classmethod
+    def load(cls, root: Path) -> SecurityConfig:
+        """Load security config from moss.toml or .moss/security.toml.
+
+        Config sources (in order of precedence):
+        1. .moss/security.toml (dedicated security config)
+        2. moss.toml [security] section
+        3. pyproject.toml [tool.moss.security] section
+        """
+        config = cls()
+        root = Path(root).resolve()
+
+        # Try .moss/security.toml first
+        security_toml = root / ".moss" / "security.toml"
+        if security_toml.exists():
+            config = cls._from_toml(security_toml)
+            return config
+
+        # Try moss.toml
+        moss_toml = root / "moss.toml"
+        if moss_toml.exists():
+            try:
+                data = tomllib.loads(moss_toml.read_text())
+                if "security" in data:
+                    config = cls._from_dict(data["security"])
+                    return config
+            except Exception as e:
+                logger.warning("Failed to load security config from moss.toml: %s", e)
+
+        # Try pyproject.toml
+        pyproject = root / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                data = tomllib.loads(pyproject.read_text())
+                security_data = data.get("tool", {}).get("moss", {}).get("security", {})
+                if security_data:
+                    config = cls._from_dict(security_data)
+                    return config
+            except Exception as e:
+                logger.warning("Failed to load security config from pyproject.toml: %s", e)
+
+        return config
+
+    @classmethod
+    def _from_toml(cls, path: Path) -> SecurityConfig:
+        """Load from a dedicated security TOML file."""
+        data = tomllib.loads(path.read_text())
+        return cls._from_dict(data)
+
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> SecurityConfig:
+        """Create config from dictionary."""
+        config = cls()
+
+        if "min_severity" in data:
+            config.min_severity = data["min_severity"]
+
+        # Load per-tool configs
+        for tool_name in ["bandit", "semgrep", "snyk", "codeql", "ast-grep"]:
+            if tool_name in data:
+                tool_data = data[tool_name]
+                config.tools[tool_name] = SecurityToolConfig(
+                    enabled=tool_data.get("enabled", True),
+                    excludes=tool_data.get("excludes", [".venv", "venv", "node_modules", ".git"]),
+                    args=tool_data.get("args", []),
+                    config=tool_data.get("config"),
+                    timeout=tool_data.get("timeout", 300),
+                )
+
+        return config
+
+    def get_tool_config(self, tool_name: str) -> SecurityToolConfig:
+        """Get config for a specific tool, with defaults."""
+        return self.tools.get(tool_name, SecurityToolConfig())
 
 
 class Severity(IntEnum):
@@ -170,8 +274,13 @@ class SecurityTool(ABC):
         ...
 
     @abstractmethod
-    def analyze(self, root: Path, **options: Any) -> list[Finding]:
-        """Run the tool and return findings."""
+    def analyze(self, root: Path, config: SecurityToolConfig | None = None) -> list[Finding]:
+        """Run the tool and return findings.
+
+        Args:
+            root: Project root directory
+            config: Tool-specific configuration (optional)
+        """
         ...
 
 
@@ -183,25 +292,32 @@ class BanditTool(SecurityTool):
     def is_available(self) -> bool:
         return shutil.which("bandit") is not None
 
-    def analyze(self, root: Path, **options: Any) -> list[Finding]:
+    def analyze(self, root: Path, config: SecurityToolConfig | None = None) -> list[Finding]:
         """Run bandit on Python files."""
+        config = config or SecurityToolConfig()
         findings = []
 
+        # Build exclude list from config
+        excludes = ",".join([*config.excludes, "__pycache__", "dist", "build"])
+
         try:
+            cmd = [
+                "bandit",
+                "-r",
+                str(root),
+                "-f",
+                "json",
+                "-q",  # quiet, don't print to stderr
+                "--exclude",
+                excludes,
+                *config.args,
+            ]
+
             result = subprocess.run(
-                [
-                    "bandit",
-                    "-r",
-                    str(root),
-                    "-f",
-                    "json",
-                    "-q",  # quiet, don't print to stderr
-                    "--exclude",
-                    ".venv,venv,node_modules,.git,__pycache__,dist,build",
-                ],
+                cmd,
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=config.timeout,
             )
 
             if result.stdout:
@@ -301,31 +417,34 @@ class SemgrepTool(SecurityTool):
     def is_available(self) -> bool:
         return shutil.which("semgrep") is not None
 
-    def analyze(self, root: Path, **options: Any) -> list[Finding]:
+    def analyze(self, root: Path, config: SecurityToolConfig | None = None) -> list[Finding]:
         """Run semgrep with security rules."""
+        config = config or SecurityToolConfig()
         findings = []
+
+        # Build command with excludes from config
+        cmd = [
+            "semgrep",
+            "--config",
+            config.config or "auto",  # Use configured ruleset or auto-detect
+            "--json",
+            "--quiet",
+        ]
+
+        # Add excludes from config
+        for exclude in config.excludes:
+            cmd.extend(["--exclude", exclude])
+
+        # Add any extra args
+        cmd.extend(config.args)
+        cmd.append(str(root))
 
         try:
             result = subprocess.run(
-                [
-                    "semgrep",
-                    "--config",
-                    "auto",  # Auto-detect language and use default rules
-                    "--json",
-                    "--quiet",
-                    "--exclude",
-                    ".venv",
-                    "--exclude",
-                    "venv",
-                    "--exclude",
-                    "node_modules",
-                    "--exclude",
-                    ".git",
-                    str(root),
-                ],
+                cmd,
                 capture_output=True,
                 text=True,
-                timeout=600,
+                timeout=config.timeout,
             )
 
             if result.stdout:
@@ -384,6 +503,7 @@ class SecurityAnalyzer:
         root: Path,
         tools: list[str] | None = None,
         min_severity: Severity = Severity.LOW,
+        config: SecurityConfig | None = None,
     ):
         """Initialize the analyzer.
 
@@ -391,10 +511,16 @@ class SecurityAnalyzer:
             root: Project root directory
             tools: List of tool names to use (None = all available)
             min_severity: Minimum severity to report
+            config: Security configuration (loads from file if None)
         """
         self.root = Path(root).resolve()
         self.requested_tools = tools
         self.min_severity = min_severity
+        self.config = config or SecurityConfig.load(self.root)
+
+        # Override min_severity from config if not explicitly set
+        if min_severity == Severity.LOW and self.config.min_severity:
+            self.min_severity = Severity.from_string(self.config.min_severity)
 
     def analyze(self, dedupe: bool = True) -> SecurityAnalysis:
         """Run all available security tools.
@@ -408,18 +534,24 @@ class SecurityAnalyzer:
         result = SecurityAnalysis(root=self.root)
 
         for tool in SECURITY_TOOLS:
-            # Skip if not requested
+            # Skip if not requested via CLI
             if self.requested_tools and tool.name not in self.requested_tools:
                 continue
 
+            # Check config for enabled status
+            tool_config = self.config.get_tool_config(tool.name)
+            if tool.name in self.config.tools and not tool_config.enabled:
+                result.tools_skipped.append(f"{tool.name} (disabled in config)")
+                continue
+
             if not tool.is_available():
-                result.tools_skipped.append(tool.name)
+                result.tools_skipped.append(f"{tool.name} (not installed)")
                 logger.debug("Skipping %s (not installed)", tool.name)
                 continue
 
             logger.info("Running %s...", tool.name)
             try:
-                findings = tool.analyze(self.root)
+                findings = tool.analyze(self.root, tool_config)
                 result.findings.extend(findings)
                 result.tools_run.append(tool.name)
                 logger.info("%s found %d issues", tool.name, len(findings))

@@ -139,7 +139,9 @@ Before suggesting `/exit`:
 - One-line description of what it involves
 - Any context the next session needs (e.g., "see docs/X for design")
 
-This creates continuity between sessions - the next session starts by checking "Next Up" and picking a task. Move completed items from "Next Up" to CHANGELOG.md or mark them done in their original TODO.md section.
+This creates continuity between sessions - the next session starts by checking "Next Up" and working through it. **The goal is to complete ALL items in "Next Up" each session**, not just pick one. Size the list accordingly when writing it. Move completed items from "Next Up" to CHANGELOG.md or mark them done in their original TODO.md section.
+
+If new "Next Up" candidates emerge during a session, add them to the appropriate section in TODO.md (unless already present there).
 
 A fresh session with good documentation beats a stale session with bloated context.
 
