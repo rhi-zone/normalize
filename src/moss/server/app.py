@@ -134,14 +134,16 @@ def run_server(
     root: str | Path = ".",
     host: str = "127.0.0.1",
     port: int = 8000,
+    uds: str | Path | None = None,
     **kwargs: Any,
 ) -> None:
     """Run the Moss server.
 
     Args:
         root: Project root directory
-        host: Host to bind to
-        port: Port to bind to
+        host: Host to bind to (ignored if uds is set)
+        port: Port to bind to (ignored if uds is set)
+        uds: Unix domain socket path (takes precedence over host/port)
         **kwargs: Additional uvicorn arguments
     """
     try:
@@ -152,7 +154,12 @@ def run_server(
         ) from e
 
     app = create_app(root)
-    uvicorn.run(app, host=host, port=port, **kwargs)
+
+    if uds:
+        # Unix domain socket - don't pass host/port
+        uvicorn.run(app, uds=str(uds), **kwargs)
+    else:
+        uvicorn.run(app, host=host, port=port, **kwargs)
 
 
 def main() -> None:
@@ -181,6 +188,12 @@ def main() -> None:
         help="Port to bind to (default: 8000)",
     )
     parser.add_argument(
+        "--socket",
+        "--uds",
+        dest="uds",
+        help="Unix domain socket path (overrides --host/--port)",
+    )
+    parser.add_argument(
         "--reload",
         action="store_true",
         help="Enable auto-reload for development",
@@ -191,6 +204,7 @@ def main() -> None:
         root=args.root,
         host=args.host,
         port=args.port,
+        uds=args.uds,
         reload=args.reload,
     )
 

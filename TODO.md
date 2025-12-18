@@ -8,10 +8,10 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session, roughly by size:
 
-- [ ] **Unix socket transport** (small) - Add Unix socket option to HTTP server
-- [ ] **`moss clones`** (medium) - Structural similarity via AST hashing
-- [ ] **RAG/semantic search** (medium) - `moss rag index/search` for doc retrieval
-- [ ] **`moss security`** (medium) - Security analysis command (see details below)
+- [x] **Unix socket transport** (small) - Add Unix socket option to HTTP server ✓
+- [x] **`moss clones`** (medium) - Structural similarity via AST hashing ✓
+- [x] **RAG/semantic search** (medium) - `moss rag index/search` for doc retrieval ✓
+- [x] **`moss security`** (medium) - Security analysis command ✓
 
 ## Future Work
 
@@ -159,17 +159,12 @@ Remaining token-efficient output features:
 **Problem**: 45% of AI-generated code has security vulnerabilities (Veracode 2025).
 Moss must not contribute to this problem.
 
-- [ ] **`moss security`** - Security analysis command:
-  - **Multi-tool orchestration** (don't reinvent, aggregate):
-    - semgrep: SAST pattern matching, large community rule registry
-    - Snyk: SCA (dependency vulnerabilities), AI-driven
-    - bandit: Python-specific security checks
-    - CodeQL: deep semantic/dataflow (optional, GitHub Enterprise)
-    - ast-grep: custom structural security rules
-  - Plugin architecture: tools configured in `.moss/security.yaml`
-  - Unified output: aggregate findings from all tools
-  - OWASP Top 10 / CWE Top 25 coverage via tool combination
-  - Report severity, suggest fixes, dedupe overlapping findings
+- [x] **`moss security`** - Security analysis command:
+  - [x] Multi-tool orchestration (bandit, semgrep)
+  - [x] Unified output with severity, CWE/OWASP mapping
+  - [x] Dedupe overlapping findings
+  - [ ] Plugin architecture: tools configured in `.moss/security.yaml`
+  - [ ] More tools: Snyk, CodeQL, ast-grep
 - [ ] **Validator integration**: Run security checks in synthesis loop
 - [ ] **Iteration tracking**: Monitor vuln count across refinements (37.6% increase after 5 iterations is alarming)
 - [ ] **Security-aware prompting**: Include security requirements in synthesis specs
@@ -422,6 +417,16 @@ resource-intensive topics (inference optimization, fine-tuning, training).
   - Mutation tracking (what does this modify?)
   - Use cases: safe refactoring, parallelization hints, smell detection
     ("this pure function calls impure function")
+
+**Git Infrastructure:**
+- [ ] Git worktrees support - ensure all moss tooling handles worktrees correctly
+  - Worktrees share objects but have separate working directories
+  - Need to resolve correct .git location (file vs directory)
+  - Shadow Git operations must work in worktree context
+- [ ] Git submodules support - handle nested repositories
+  - Detect and optionally recurse into submodules
+  - Respect submodule boundaries in dependency analysis
+  - Handle mixed ownership (submodule may have different .moss config)
 
 **Specialized Domains:**
 - [ ] Natural language to SQL/queries

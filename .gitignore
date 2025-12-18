@@ -1,6 +1,9 @@
 # Documentation build
 site/
 
+# Moss runtime data
+.moss/
+
 # Python
 __pycache__/
 *.py[cod]

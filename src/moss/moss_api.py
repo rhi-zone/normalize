@@ -645,6 +645,89 @@ class ComplexityAPI:
 
 
 @dataclass
+class ClonesAPI:
+    """API for structural clone detection.
+
+    Detects structurally similar code by normalizing AST subtrees and
+    comparing hashes. Helps identify code that could potentially be
+    abstracted into shared functions.
+    """
+
+    root: Path
+
+    def detect(self, level: int = 0, min_lines: int = 3) -> dict[str, Any]:
+        """Detect structural clones in the codebase.
+
+        Args:
+            level: Elision level (0-3) controlling normalization:
+                   0 = names only (exact structural clones)
+                   1 = + literals (same structure, different constants)
+                   2 = + calls (same pattern, different functions)
+                   3 = control flow skeleton only
+            min_lines: Minimum function lines to consider (default: 3)
+
+        Returns:
+            Dict with clone groups and statistics
+        """
+        from moss.clones import ElisionLevel, detect_clones
+
+        analysis = detect_clones(self.root, level=ElisionLevel(level), min_lines=min_lines)
+        return analysis.to_dict()
+
+    def get_groups(self, level: int = 0, min_count: int = 2) -> list[dict[str, Any]]:
+        """Get clone groups with at least min_count members.
+
+        Args:
+            level: Elision level (0-3)
+            min_count: Minimum clones per group (default: 2)
+
+        Returns:
+            List of clone group details
+        """
+        result = self.detect(level=level)
+        return [g for g in result.get("groups", []) if g.get("count", 0) >= min_count]
+
+
+@dataclass
+class SecurityAPI:
+    """API for security analysis.
+
+    Orchestrates multiple security tools (bandit, semgrep) to detect
+    vulnerabilities and security issues in the codebase.
+    """
+
+    root: Path
+
+    def analyze(
+        self,
+        tools: list[str] | None = None,
+        min_severity: str = "low",
+    ) -> dict[str, Any]:
+        """Run security analysis.
+
+        Args:
+            tools: List of tools to use (None = all available)
+            min_severity: Minimum severity to report ("low", "medium", "high", "critical")
+
+        Returns:
+            Dict with findings and summary
+        """
+        from moss.security import analyze_security
+
+        analysis = analyze_security(self.root, tools=tools, min_severity=min_severity)
+        return analysis.to_dict()
+
+    def get_high_severity(self) -> list[dict[str, Any]]:
+        """Get high and critical severity findings.
+
+        Returns:
+            List of high/critical security findings
+        """
+        result = self.analyze(min_severity="high")
+        return result.get("findings", [])
+
+
+@dataclass
 class RefCheckAPI:
     """API for bidirectional reference checking.
 
@@ -955,6 +1038,8 @@ class MossAPI:
     _health: HealthAPI | None = None
     _dwim: DWIMAPI | None = None
     _complexity: ComplexityAPI | None = None
+    _clones: ClonesAPI | None = None
+    _security: SecurityAPI | None = None
     _ref_check: RefCheckAPI | None = None
     _git_hotspots: GitHotspotsAPI | None = None
     _external_deps: ExternalDepsAPI | None = None
@@ -1047,6 +1132,20 @@ class MossAPI:
         if self._complexity is None:
             self._complexity = ComplexityAPI(root=self.root)
         return self._complexity
+
+    @property
+    def clones(self) -> ClonesAPI:
+        """Access structural clone detection functionality."""
+        if self._clones is None:
+            self._clones = ClonesAPI(root=self.root)
+        return self._clones
+
+    @property
+    def security(self) -> SecurityAPI:
+        """Access security analysis functionality."""
+        if self._security is None:
+            self._security = SecurityAPI(root=self.root)
+        return self._security
 
     @property
     def ref_check(self) -> RefCheckAPI:

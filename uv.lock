@@ -2024,6 +2024,9 @@ mcp = [
 openai = [
     { name = "openai" },
 ]
+rag = [
+    { name = "chromadb" },
+]
 server = [
     { name = "fastapi" },
     { name = "uvicorn", extra = ["standard"] },
@@ -2043,6 +2046,7 @@ requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.18.0" },
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.22.0" },
     { name = "chromadb", marker = "extra == 'chroma'", specifier = ">=0.4" },
+    { name = "chromadb", marker = "extra == 'rag'", specifier = ">=0.4" },
     { name = "datasets", marker = "extra == 'eval'", specifier = ">=2.0.0" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.124.4" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.60.0" },
@@ -2073,7 +2077,7 @@ requires-dist = [
     { name = "tree-sitter-typescript", marker = "extra == 'tree-sitter'", specifier = ">=0.21" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.38.0" },
 ]
-provides-extras = ["dev", "docs", "tree-sitter", "chroma", "server", "mcp", "lsp", "llm", "anthropic", "openai", "llm-lib", "local-llm", "tui", "grpc", "eval", "all"]
+provides-extras = ["dev", "docs", "tree-sitter", "chroma", "rag", "server", "mcp", "lsp", "llm", "anthropic", "openai", "llm-lib", "local-llm", "tui", "grpc", "eval", "all"]
 
 [[package]]
 name = "mpmath"

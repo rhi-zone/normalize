@@ -2905,6 +2905,153 @@ def cmd_complexity(args: Namespace) -> int:
     return 0
 
 
+def cmd_clones(args: Namespace) -> int:
+    """Detect structural clones via AST hashing."""
+    from moss.clones import ElisionLevel, detect_clones, format_clone_analysis
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+    level = getattr(args, "level", 0)
+    min_lines = getattr(args, "min_lines", 3)
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Detecting clones in {root.name} (level {level})...")
+
+    try:
+        analysis = detect_clones(root, level=ElisionLevel(level), min_lines=min_lines)
+    except Exception as e:
+        output.error(f"Failed to detect clones: {e}")
+        return 1
+
+    if wants_json(args):
+        output.data(analysis.to_dict())
+    else:
+        show_source = getattr(args, "source", False)
+        output.print(format_clone_analysis(analysis, show_source=show_source))
+
+    return 0
+
+
+def cmd_security(args: Namespace) -> int:
+    """Run security analysis with multiple tools."""
+    from moss.security import analyze_security, format_security_analysis
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+    tools = getattr(args, "tools", None)
+    min_severity = getattr(args, "severity", "low")
+
+    if tools:
+        tools = [t.strip() for t in tools.split(",")]
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Running security analysis on {root.name}...")
+
+    try:
+        analysis = analyze_security(root, tools=tools, min_severity=min_severity)
+    except Exception as e:
+        output.error(f"Security analysis failed: {e}")
+        return 1
+
+    if wants_json(args):
+        output.data(analysis.to_dict())
+    else:
+        output.print(format_security_analysis(analysis))
+
+    # Return non-zero if critical/high findings
+    if analysis.critical_count > 0 or analysis.high_count > 0:
+        return 1
+
+    return 0
+
+
+def cmd_rag(args: Namespace) -> int:
+    """Semantic search with RAG indexing."""
+    import asyncio
+
+    from moss.rag import RAGIndex, format_search_results
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+    action = getattr(args, "action", "search")
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    rag = RAGIndex(root)
+
+    if action == "index":
+        output.info(f"Indexing {root.name}...")
+        force = getattr(args, "force", False)
+        try:
+            count = asyncio.run(rag.index(force=force))
+            output.success(f"Indexed {count} chunks")
+            return 0
+        except Exception as e:
+            output.error(f"Indexing failed: {e}")
+            return 1
+
+    elif action == "search":
+        query = getattr(args, "query", None)
+        if not query:
+            output.error("Query required for search")
+            return 1
+
+        limit = getattr(args, "limit", 10)
+        mode = getattr(args, "mode", "hybrid")
+
+        try:
+            results = asyncio.run(rag.search(query, limit=limit, mode=mode))
+        except Exception as e:
+            output.error(f"Search failed: {e}")
+            return 1
+
+        if wants_json(args):
+            output.data([r.to_dict() for r in results])
+        else:
+            output.print(format_search_results(results))
+
+        return 0
+
+    elif action == "stats":
+        try:
+            stats = asyncio.run(rag.stats())
+        except Exception as e:
+            output.error(f"Failed to get stats: {e}")
+            return 1
+
+        if wants_json(args):
+            output.data(stats.to_dict())
+        else:
+            output.print("**Index Statistics**")
+            output.print(f"  Backend: {stats.backend}")
+            output.print(f"  Path: {stats.index_path}")
+            output.print(f"  Documents: {stats.total_documents}")
+            output.print(f"  Files indexed: {stats.files_indexed}")
+
+        return 0
+
+    elif action == "clear":
+        try:
+            asyncio.run(rag.clear())
+            output.success("Index cleared")
+            return 0
+        except Exception as e:
+            output.error(f"Failed to clear index: {e}")
+            return 1
+
+    else:
+        output.error(f"Unknown action: {action}")
+        return 1
+
+
 def cmd_health(args: Namespace) -> int:
     """Show project health and what needs attention."""
     from moss.status import StatusChecker
@@ -4718,6 +4865,100 @@ def create_parser() -> argparse.ArgumentParser:
         help="Glob pattern for files (default: src/**/*.py)",
     )
     complexity_parser.set_defaults(func=cmd_complexity)
+
+    # clones command
+    clones_parser = subparsers.add_parser("clones", help="Detect structural clones via AST hashing")
+    clones_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    clones_parser.add_argument(
+        "--level",
+        "-l",
+        type=int,
+        choices=[0, 1, 2, 3],
+        default=0,
+        help="Elision level: 0=names, 1=+literals, 2=+calls, 3=control-flow (default: 0)",
+    )
+    clones_parser.add_argument(
+        "--min-lines",
+        type=int,
+        default=3,
+        help="Minimum function lines to consider (default: 3)",
+    )
+    clones_parser.add_argument(
+        "--source",
+        "-s",
+        action="store_true",
+        help="Show source code for clones",
+    )
+    clones_parser.set_defaults(func=cmd_clones)
+
+    # rag command
+    rag_parser = subparsers.add_parser("rag", help="Semantic search with RAG indexing")
+    rag_parser.add_argument(
+        "action",
+        choices=["index", "search", "stats", "clear"],
+        help="Action: index (build), search (query), stats (show info), clear (reset)",
+    )
+    rag_parser.add_argument(
+        "query",
+        nargs="?",
+        help="Search query (required for search action)",
+    )
+    rag_parser.add_argument(
+        "--directory",
+        "-d",
+        default=".",
+        help="Project directory (default: current)",
+    )
+    rag_parser.add_argument(
+        "--limit",
+        "-n",
+        type=int,
+        default=10,
+        help="Maximum search results (default: 10)",
+    )
+    rag_parser.add_argument(
+        "--mode",
+        "-m",
+        choices=["hybrid", "embedding", "tfidf"],
+        default="hybrid",
+        help="Search mode (default: hybrid)",
+    )
+    rag_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force re-indexing (for index action)",
+    )
+    rag_parser.set_defaults(func=cmd_rag)
+
+    # security command
+    security_parser = subparsers.add_parser(
+        "security", help="Run security analysis with multiple tools"
+    )
+    security_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    security_parser.add_argument(
+        "--tools",
+        "-t",
+        help="Comma-separated list of tools to use (default: all available)",
+    )
+    security_parser.add_argument(
+        "--severity",
+        "-s",
+        choices=["low", "medium", "high", "critical"],
+        default="low",
+        help="Minimum severity to report (default: low)",
+    )
+    security_parser.set_defaults(func=cmd_security)
 
     # eval command
     eval_parser = subparsers.add_parser("eval", help="Run evaluation benchmarks (SWE-bench, etc.)")
