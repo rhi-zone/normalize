@@ -438,9 +438,17 @@ def format_tui(
 
         display_future = pending_future if max_items == 0 else pending_future[:max_items]
         for phase in display_future:
-            status_text = f"{DIM}{phase.title}{RESET}" if use_color else phase.title
             phase_prefix = f"Phase {phase.id}: " if phase.id else ""
-            lines.append(box_line(f"  ○ {phase_prefix}{status_text}"))
+            completed, total = phase.progress
+            if total > 0:
+                pct = int(100 * completed / total)
+                progress_str = f"[{completed}/{total}] {pct}%"
+                if use_color:
+                    progress_str = f"{DIM}{progress_str}{RESET}"
+                phase_line = f"  ○ {phase_prefix}{phase.title} {progress_str}"
+            else:
+                phase_line = f"  ○ {phase_prefix}{phase.title}"
+            lines.append(box_line(phase_line))
 
         remaining = len(pending_future) - len(display_future)
         if remaining > 0:
