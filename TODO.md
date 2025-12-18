@@ -24,13 +24,13 @@ Refactor moss into a hyper-modular library-first architecture where the core is 
 - [x] Version detection and availability checking
 - [x] Plugin discovery via entry points
 
-#### 29c: Interface Generator Layer
-- [ ] `moss.gen.cli` - Generate argparse CLI from API introspection
-- [ ] `moss.gen.http` - Generate FastAPI routes from API
-- [ ] `moss.gen.mcp` - Generate MCP tool definitions from API
-- [ ] `moss.gen.lsp` - Generate LSP handlers from API
-- [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API
-- [ ] `moss.gen.openapi` - Generate OpenAPI spec from API
+#### 29c: Interface Generator Layer ✅
+- [x] `moss.gen.cli` - Generate argparse CLI from API introspection
+- [x] `moss.gen.http` - Generate FastAPI routes from API
+- [x] `moss.gen.mcp` - Generate MCP tool definitions from API
+- [x] `moss.gen.openapi` - Generate OpenAPI spec from API
+- [ ] `moss.gen.lsp` - Generate LSP handlers from API (future)
+- [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API (future)
 
 #### 29d: Wrapper Packages
 - [ ] `moss` - Core library only
