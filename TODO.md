@@ -512,6 +512,26 @@ Multi-agent coordination, trust levels, checkpoints.
 **From prior-art:** SWE-agent proves interface design > model scaling.
 Moss's structural awareness is the differentiator.
 
+**Parallel Agents:**
+- [ ] **Multi-subtree parallelism**: Run agents concurrently on independent subtrees
+  - Detect independence via `moss deps` (no shared dependencies = safe to parallelize)
+  - Example: refactor `src/api/` and `src/utils/` in parallel if no cross-deps
+  - Merge results, detect conflicts, resolve or escalate
+- [ ] **Intra-subtree parallelism**: Parallelize work within a single subtree
+  - Pipeline stages: analyze → plan → implement → validate (some stages parallelizable)
+  - Speculative execution: start likely next steps before current completes
+  - Fan-out: multiple agents propose solutions, pick best (tournament style)
+  - Divide-and-conquer: split large file into functions, parallelize per-function work
+- [ ] **Coordination primitives**:
+  - Locks: prevent concurrent edits to same file/symbol
+  - Barriers: sync points where agents wait for each other
+  - Channels: typed message passing between agents
+  - Conflict detection: structural diff to detect overlapping edits
+- [ ] **Resource management**:
+  - Token budget allocation across parallel agents
+  - Rate limiting for API calls
+  - Priority queues for agent scheduling
+
 **Already implemented:**
 - [x] `moss/autofix.py` - FixEngine with safety classification
 - [ ] Integrate autofix into PatchAPI.apply() flow
