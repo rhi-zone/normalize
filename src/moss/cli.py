@@ -1981,6 +1981,7 @@ def cmd_roadmap(args: Namespace) -> int:
     use_color = not getattr(args, "no_color", False) and tui
     width = getattr(args, "width", 80)
     show_completed = getattr(args, "completed", False)
+    max_items = getattr(args, "max_items", 0)
 
     return display_roadmap(
         path=todo_path,
@@ -1988,6 +1989,7 @@ def cmd_roadmap(args: Namespace) -> int:
         show_completed=show_completed,
         use_color=use_color,
         width=width,
+        max_items=max_items,
     )
 
 
@@ -2892,6 +2894,13 @@ def create_parser() -> argparse.ArgumentParser:
         "--no-color",
         action="store_true",
         help="Disable colors in output",
+    )
+    roadmap_parser.add_argument(
+        "--max-items",
+        "-m",
+        type=int,
+        default=0,
+        help="Max items per section (0 = unlimited, default: 0)",
     )
     roadmap_parser.set_defaults(func=cmd_roadmap)
 

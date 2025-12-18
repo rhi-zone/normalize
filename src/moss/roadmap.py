@@ -198,12 +198,13 @@ def parse_todo_md(path: Path) -> Roadmap:
 # =============================================================================
 
 
-def format_plain(roadmap: Roadmap, show_completed: bool = False) -> str:
+def format_plain(roadmap: Roadmap, show_completed: bool = False, max_items: int = 0) -> str:
     """Format roadmap as plain text.
 
     Args:
         roadmap: Parsed roadmap
         show_completed: Include completed phases
+        max_items: Max items per section (0 = unlimited)
 
     Returns:
         Formatted string
@@ -231,11 +232,12 @@ def format_plain(roadmap: Roadmap, show_completed: bool = False) -> str:
     if pending_future:
         lines.append("NEXT UP")
         lines.append("=" * 50)
-        # Show first few future phases
-        for phase in pending_future[:3]:
+        display_future = pending_future if max_items == 0 else pending_future[:max_items]
+        for phase in display_future:
             lines.extend(_format_phase_plain(phase, brief=True))
-        if len(pending_future) > 3:
-            lines.append(f"  ... and {len(pending_future) - 3} more phases")
+        remaining = len(pending_future) - len(display_future)
+        if remaining > 0:
+            lines.append(f"  ... and {remaining} more phases")
         lines.append("")
 
     # Recently Completed section - phases still in TODO but done (marked or 100%)
@@ -244,11 +246,13 @@ def format_plain(roadmap: Roadmap, show_completed: bool = False) -> str:
     if recently_completed:
         lines.append("RECENTLY COMPLETED")
         lines.append("=" * 50)
-        for phase in recently_completed[:5]:
+        display_completed = recently_completed if max_items == 0 else recently_completed[:max_items]
+        for phase in display_completed:
             phase_prefix = f"Phase {phase.id}: " if phase.id else ""
             lines.append(f"  ✓ {phase_prefix}{phase.title}")
-        if len(recently_completed) > 5:
-            lines.append(f"  ... and {len(recently_completed) - 5} more")
+        remaining = len(recently_completed) - len(display_completed)
+        if remaining > 0:
+            lines.append(f"  ... and {remaining} more")
         lines.append("")
 
     # Archived completed section (optional)
@@ -341,6 +345,7 @@ def format_tui(
     width: int = 80,
     show_completed: bool = False,
     use_color: bool = True,
+    max_items: int = 0,
 ) -> str:
     """Format roadmap as TUI with box drawing.
 
@@ -349,6 +354,7 @@ def format_tui(
         width: Terminal width
         show_completed: Include completed phases
         use_color: Use ANSI colors
+        max_items: Max items per section (0 = unlimited)
 
     Returns:
         Formatted string with box drawing
@@ -430,13 +436,14 @@ def format_tui(
         lines.append(box_line(section_title))
         lines.append(box_line(""))
 
-        for phase in pending_future[:3]:
+        display_future = pending_future if max_items == 0 else pending_future[:max_items]
+        for phase in display_future:
             status_text = f"{DIM}{phase.title}{RESET}" if use_color else phase.title
             phase_prefix = f"Phase {phase.id}: " if phase.id else ""
             lines.append(box_line(f"  ○ {phase_prefix}{status_text}"))
 
-        if len(pending_future) > 3:
-            remaining = len(pending_future) - 3
+        remaining = len(pending_future) - len(display_future)
+        if remaining > 0:
             plain_more = f"... and {remaining} more"
             more_text = f"{DIM}{plain_more}{RESET}" if use_color else plain_more
             lines.append(box_line(f"    {more_text}"))
@@ -452,13 +459,14 @@ def format_tui(
         lines.append(box_line(section_title))
         lines.append(box_line(""))
 
-        for phase in recently_completed[:5]:
+        display_completed = recently_completed if max_items == 0 else recently_completed[:max_items]
+        for phase in display_completed:
             check = f"{GREEN}✓{RESET}" if use_color else "✓"
             phase_prefix = f"Phase {phase.id}: " if phase.id else ""
             lines.append(box_line(f"  {check} {phase_prefix}{phase.title}"))
 
-        if len(recently_completed) > 5:
-            remaining = len(recently_completed) - 5
+        remaining = len(recently_completed) - len(display_completed)
+        if remaining > 0:
             plain_more = f"... and {remaining} more"
             more_text = f"{DIM}{plain_more}{RESET}" if use_color else plain_more
             lines.append(box_line(f"    {more_text}"))
@@ -600,6 +608,7 @@ def display_roadmap(
     use_color: bool = True,
     width: int = 80,
     output: TextIO | None = None,
+    max_items: int = 0,
 ) -> int:
     """Display the roadmap.
 
@@ -610,6 +619,7 @@ def display_roadmap(
         use_color: Use ANSI colors
         width: Terminal width for TUI mode
         output: Output stream (defaults to stdout)
+        max_items: Max items per section (0 = unlimited)
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -633,10 +643,14 @@ def display_roadmap(
     # Format and display
     if tui:
         formatted = format_tui(
-            roadmap, width=width, show_completed=show_completed, use_color=use_color
+            roadmap,
+            width=width,
+            show_completed=show_completed,
+            use_color=use_color,
+            max_items=max_items,
         )
     else:
-        formatted = format_plain(roadmap, show_completed=show_completed)
+        formatted = format_plain(roadmap, show_completed=show_completed, max_items=max_items)
 
     print(formatted, file=output)
     return 0
