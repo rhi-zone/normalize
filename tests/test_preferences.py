@@ -27,10 +27,9 @@ from moss.preferences.extractors import (
     ExplicitExtractor,
     WorkflowExtractor,
 )
-from moss.preferences.parsing import (
-    ClaudeCodeParser,
-    GenericChatParser,
-)
+from moss.preferences.parsers import get_parser, list_parsers
+from moss.preferences.parsers.claude_code import ClaudeCodeParser
+from moss.preferences.parsers.generic import GenericChatParser
 
 
 class TestPreferenceModels:
@@ -445,3 +444,39 @@ class TestLLMProviders:
 
         with pytest.raises(ValueError, match="not found"):
             get_provider("nonexistent_provider")
+
+
+class TestParserPlugins:
+    """Tests for parser plugin system."""
+
+    def test_list_parsers(self):
+        """Test listing registered parsers."""
+        parsers = list_parsers()
+        assert isinstance(parsers, list)
+        assert "claude_code" in parsers
+        assert "generic_chat" in parsers
+
+    def test_get_parser(self):
+        """Test getting a parser by name."""
+        parser_class = get_parser("claude_code")
+        assert parser_class is ClaudeCodeParser
+
+    def test_get_parser_invalid(self):
+        """Test getting invalid parser raises error."""
+        with pytest.raises(ValueError, match="not found"):
+            get_parser("nonexistent_parser")
+
+    def test_all_builtin_parsers_registered(self):
+        """Test all builtin parsers are registered."""
+        parsers = list_parsers()
+        expected = [
+            "claude_code",
+            "cline",
+            "roo_code",
+            "gemini_cli",
+            "aider",
+            "generic_jsonl",
+            "generic_chat",
+        ]
+        for name in expected:
+            assert name in parsers, f"Parser '{name}' not registered"
