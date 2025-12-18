@@ -56,6 +56,10 @@ Multi-agent model: Ticket-based (not shared chat history). Agents are isolated m
 
 ### Working Style
 
+**Start by checking TODO.md.** At the beginning of each session, review TODO.md to understand current priorities and pending work.
+
+**Plan the session.** Propose a work queue - a prioritized list of items to tackle this session, ordered sensibly (dependencies first, quick wins vs. deep work balanced, etc.). Get a quick confirmation, then work through the queue autonomously.
+
 **Agentic by default.** Prefer an indefinite agentic loop - continue working through tasks autonomously, including committing work, unless instructed otherwise.
 
 **Bail out early.** If you hit repeated failures or get stuck in a loop, stop and ask for guidance rather than burning tokens on increasingly unlikely fixes.
