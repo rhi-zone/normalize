@@ -824,10 +824,13 @@ Enhanced web fetching for agents - more than basic HTTP GET.
   - Remove nav, footer, ads, scripts, styles
   - Extract main content (article, main, .content, etc.)
   - Convert to clean markdown
-- [ ] **Cheap pre-summarization**: Lightweight extraction before LLM
-  - Extract title, headings, first paragraphs
-  - Schema.org / OpenGraph metadata
-  - Useful for deciding "is this page relevant?"
+- [ ] **Cheap pre-summarization**: Specialized models before LLM
+  - **Extractive**: TextRank (graph-based, no NN), sentence-transformers embeddings
+  - **Abstractive**: distilbart-cnn, Pegasus, T5-small - fine-tuned for summarization
+  - **Hybrid**: Extract key sentences, then small model to clean up
+  - Much cheaper than LLM API calls (local inference or cheap APIs)
+  - Also: extract title, headings, OpenGraph metadata (zero-cost)
+  - Useful for deciding "is this page relevant?" before expensive LLM call
 - [ ] **Web search**: Search capability (via API or scraping)
   - DuckDuckGo/Google integration
   - Return structured results (title, snippet, URL)
