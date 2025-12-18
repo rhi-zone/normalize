@@ -52,7 +52,51 @@ Multi-agent model: Ticket-based (not shared chat history). Agents are isolated m
 
 **Library is the API.** The library is the canonical API surface. CLI, TUI, HTTP server, MCP, and LSP are all frontends to the library. The server adds optional benefits (concurrent clients, persistent state, network access) but isn't required.
 
+## Dogfooding
+
+**Use moss tools.** We built them - use them. Before making significant changes:
+
+```bash
+# Understand structure before editing
+moss skeleton src/moss/module.py
+
+# Check dependencies before refactoring
+moss deps src/moss/module.py
+
+# Find complex functions that might need care
+moss complexity src/moss/
+
+# After changes, validate references
+moss check-refs src/
+```
+
+This isn't just about testing the tools - it's about getting better context before making changes. If a tool isn't useful, that's valuable feedback → add to TODO.md.
+
 ## Conventions
+
+### Updating CLAUDE.md
+
+**Add to this file when you discover:**
+- Workflow patterns that help (like "run X before Y")
+- Conventions that should be consistent across sessions
+- Project-specific knowledge that future sessions need
+- Tool usage patterns worth remembering
+
+**Don't add:**
+- Temporary notes (use TODO.md)
+- Implementation details (use code comments or docs/)
+- One-off decisions (use commit messages)
+
+### Updating TODO.md
+
+**Proactively add to TODO.md when you notice:**
+- Features that would help but don't exist yet
+- Ideas mentioned in conversation that shouldn't be forgotten
+- Patterns that could be generalized
+- Technical debt or shortcuts taken
+- Integration opportunities between existing components
+
+Don't wait to be asked - if it's worth remembering, write it down.
 
 ### Working Style
 

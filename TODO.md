@@ -6,14 +6,42 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ## Future Work
 
-### Interface Generators
+### MCP Server (EXISTS - needs dogfooding)
 
-Additional interface generators for the library-first architecture:
+**Already implemented** in `src/moss/mcp_server.py`:
+- Tools: `skeleton`, `anchors`, `cfg`, `deps`, `context`, `apply_patch`, `analyze_intent`, `resolve_tool`, `list_capabilities`
+- Entry point: `python -m moss.mcp_server` or `moss mcp-server`
 
+**Why aren't we using it?** Need to actually configure Claude Code to use it.
+
+Still needed:
+- [ ] Documentation: how to add to Claude Code's MCP config
+- [ ] Add missing tools: `complexity`, `check-refs`, `git-hotspots`, `external-deps`
+- [ ] Resource providers: file summaries, codebase overview
+- [ ] Prompt templates: "understand this file", "prepare for refactor"
+- [ ] Test it works end-to-end with Claude Code
+
+### Interface Generators (Single Source of Truth)
+
+**Goal**: Library is the source of truth. Run a generator → server code stays in sync. No manual maintenance of multiple server implementations.
+
+**Already have generators:**
+- `moss.gen.introspect` - Introspect MossAPI structure
+- `moss.gen.http` - Generate FastAPI routes from API
+- `moss.gen.mcp` - Generate MCP tools from API
+- `moss.gen.cli` - Generate CLI commands from API
+
+**But are they actually used?** The servers (`mcp_server.py`, `server/app.py`) look hand-written, not generated. Need to verify:
+- [ ] Are current servers generated or hand-written?
+- [ ] If hand-written, migrate to generated
+- [ ] Add `moss gen --target=mcp` command to regenerate
+- [ ] CI check: generated code matches committed code (no drift)
+
+**Still needed:**
 - [ ] `moss.gen.lsp` - Generate LSP handlers from API
 - [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API
-- [ ] `moss-lsp` entry point (requires `[lsp]` extra)
-- [ ] Unix socket transport for local high-performance server
+- [ ] Unix socket transport option
+- [ ] Documentation: how the generation pipeline works
 
 ### Non-LLM Code Generators
 
@@ -33,13 +61,6 @@ Alternative synthesis approaches that don't rely on LLMs. See `docs/synthesis-ge
 - [ ] `GeneticGenerator` - evolutionary search (PushGP)
 - [ ] `NeuralGuidedGenerator` - small model guides enumeration (DeepCoder)
 - [ ] `BidirectionalStrategy` - λ²-style type+example guided search
-
-### DreamCoder-style Learning
-
-Advanced abstraction discovery:
-
-- [ ] Compression-based abstraction discovery
-- [ ] MDL-based abstraction scoring
 
 ### Multi-Language Expansion
 
@@ -106,17 +127,16 @@ Manual analysis complete - see `docs/log-analysis.md` for methodology and insigh
 Basic automation: `moss analyze-session <path>` parses Claude Code JSONL logs.
 Preference extraction: `moss extract-preferences` and `moss diff-preferences` are now implemented (see Phase 31 in CHANGELOG.md).
 
-### Research: SOTA Coding Agents
+### Self-Analysis / Dogfooding Meta
 
-Investigate and potentially learn from state-of-the-art coding agents:
+Can moss answer questions about itself? Examples:
+- "Do we have a server?" → should be answerable by `moss skeleton` + `moss deps`
+- "What tools exist?" → `moss overview` or a new `moss inventory` command
+- "What's implemented vs TODO?" → compare code to TODO.md
 
-- [ ] [SWE-agent](https://github.com/swe-agent/swe-agent) - Princeton's autonomous agent for software engineering tasks
-- [ ] [GUIRepair](https://sites.google.com/view/guirepair) - GUI-based program repair
+This is dogfooding at the meta level - using moss to understand moss.
 
-### Enterprise Features
-
-- [ ] Team collaboration (shared caches)
-- [ ] Role-based access control
+See `docs/prior-art.md` for research references and competitor analysis.
 
 ---
 
