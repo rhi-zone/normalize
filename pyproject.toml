@@ -96,9 +96,12 @@ llm-lib = [
 local-llm = [
     "llama-cpp-python>=0.2.0",
 ]
+tui = [
+    "textual>=0.89.0",
+]
 # Meta-group: install all optional features
 all = [
-    "moss[server,mcp,lsp,llm,anthropic,openai,tree-sitter,chroma]",
+    "moss[server,mcp,lsp,llm,anthropic,openai,tree-sitter,chroma,tui]",
 ]
 
 [build-system]

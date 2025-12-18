@@ -1262,6 +1262,23 @@ def cmd_gen(args: Namespace) -> int:
         return 1
 
 
+def cmd_tui(args: Namespace) -> int:
+    """Start the interactive terminal UI."""
+    output = setup_output(args)
+    try:
+        from moss.gen.tui import run_tui
+
+        directory = Path(getattr(args, "directory", ".")).resolve()
+        run_tui(directory)
+        return 0
+    except ImportError as e:
+        output.error("TUI dependencies not installed. Install with: pip install 'moss[tui]'")
+        output.debug(f"Details: {e}")
+        return 1
+    except KeyboardInterrupt:
+        return 0
+
+
 def cmd_lsp(args: Namespace) -> int:
     """Start the LSP server for IDE integration."""
     output = setup_output(args)
@@ -3390,6 +3407,16 @@ def create_parser() -> argparse.ArgumentParser:
         help="List generated items instead of full output",
     )
     gen_parser.set_defaults(func=cmd_gen)
+
+    # tui command
+    tui_parser = subparsers.add_parser("tui", help="Interactive terminal UI for exploring MossAPI")
+    tui_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Project root directory (default: current)",
+    )
+    tui_parser.set_defaults(func=cmd_tui)
 
     # lsp command
     lsp_parser = subparsers.add_parser("lsp", help="Start LSP server for IDE integration")

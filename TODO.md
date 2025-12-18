@@ -42,11 +42,13 @@ Still needed:
 - [x] HTTPExecutor for executing API methods with proper parameter handling
 
 **Still needed:**
-- [ ] `moss.gen.tui` - Generate TUI (terminal UI) from API
-- [ ] `moss.gen.lsp` - Generate LSP handlers from API
-- [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API
+- [ ] `moss.gen.lsp` - Generate LSP handlers from API (pygls)
+- [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API (grpcio)
 - [ ] Unix socket transport option
 - [ ] Documentation: how the generation pipeline works
+
+**Completed:**
+- [x] `moss.gen.tui` - Textual-based TUI (`moss tui` command)
 
 **CI/Automation:**
 - [x] Drift detection script (`scripts/check_gen_drift.py`) - compares generated OpenAPI/MCP specs to committed versions

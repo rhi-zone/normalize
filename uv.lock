@@ -1688,6 +1688,7 @@ all = [
     { name = "mcp" },
     { name = "openai" },
     { name = "pygls" },
+    { name = "textual" },
     { name = "tree-sitter" },
     { name = "tree-sitter-javascript" },
     { name = "tree-sitter-python" },
@@ -1744,6 +1745,9 @@ tree-sitter = [
     { name = "tree-sitter-python" },
     { name = "tree-sitter-typescript" },
 ]
+tui = [
+    { name = "textual" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1760,7 +1764,7 @@ requires-dist = [
     { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = ">=0.6" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.27" },
-    { name = "moss", extras = ["server", "mcp", "lsp", "llm", "anthropic", "openai", "tree-sitter", "chroma"], marker = "extra == 'all'" },
+    { name = "moss", extras = ["server", "mcp", "lsp", "llm", "anthropic", "openai", "tree-sitter", "chroma", "tui"], marker = "extra == 'all'" },
     { name = "mutmut", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.1" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0.0" },
@@ -1769,13 +1773,14 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+    { name = "textual", marker = "extra == 'tui'", specifier = ">=0.89.0" },
     { name = "tree-sitter", marker = "extra == 'tree-sitter'", specifier = ">=0.21" },
     { name = "tree-sitter-javascript", marker = "extra == 'tree-sitter'", specifier = ">=0.21" },
     { name = "tree-sitter-python", marker = "extra == 'tree-sitter'", specifier = ">=0.21" },
     { name = "tree-sitter-typescript", marker = "extra == 'tree-sitter'", specifier = ">=0.21" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.38.0" },
 ]
-provides-extras = ["dev", "docs", "tree-sitter", "chroma", "server", "mcp", "lsp", "llm", "anthropic", "openai", "llm-lib", "local-llm", "all"]
+provides-extras = ["dev", "docs", "tree-sitter", "chroma", "server", "mcp", "lsp", "llm", "anthropic", "openai", "llm-lib", "local-llm", "tui", "all"]
 
 [[package]]
 name = "mpmath"
