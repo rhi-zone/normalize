@@ -1891,7 +1891,7 @@ def cmd_check_docs(args: Namespace) -> int:
 
     output.info(f"Checking docs in {root.name}...")
 
-    checker = DocChecker(root)
+    checker = DocChecker(root, check_links=getattr(args, "check_links", False))
 
     try:
         result = checker.check()
@@ -2581,6 +2581,13 @@ def create_parser() -> argparse.ArgumentParser:
         "-j",
         action="store_true",
         help="Output as JSON",
+    )
+    check_docs_parser.add_argument(
+        "--check-links",
+        "-l",
+        action="store_true",
+        dest="check_links",
+        help="Check for broken internal links in documentation",
     )
     check_docs_parser.set_defaults(func=cmd_check_docs)
 

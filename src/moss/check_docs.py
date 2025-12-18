@@ -125,9 +125,13 @@ class DocCheckResult:
 class DocChecker:
     """Check documentation freshness against codebase."""
 
-    def __init__(self, root: Path):
+    # Pattern for markdown links [text](url)
+    LINK_PATTERN = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+    def __init__(self, root: Path, *, check_links: bool = False):
         self.root = root.resolve()
         self.summarizer = Summarizer(include_private=False, include_tests=False)
+        self.check_links = check_links
 
     def check(self) -> DocCheckResult:
         """Run all documentation checks."""
@@ -192,6 +196,12 @@ class DocChecker:
         # Check README specifically
         readme_issues = self._check_readme(summary)
         result.issues.extend(readme_issues)
+
+        # Check links if enabled
+        if self.check_links:
+            for doc_file in doc_files:
+                link_issues = self._check_links(doc_file)
+                result.issues.extend(link_issues)
 
         return result
 
@@ -387,5 +397,55 @@ class DocChecker:
                         suggestion="Update line count statistics",
                     )
                 )
+
+        return issues
+
+    def _check_links(self, doc_file: Path) -> list[DocIssue]:
+        """Check links in a documentation file."""
+        issues: list[DocIssue] = []
+
+        try:
+            content = doc_file.read_text()
+        except Exception:
+            return issues
+
+        lines = content.splitlines()
+        for i, line in enumerate(lines, 1):
+            for match in self.LINK_PATTERN.finditer(line):
+                link_text = match.group(1)
+                link_url = match.group(2)
+
+                # Skip external URLs
+                if link_url.startswith(("http://", "https://", "mailto:")):
+                    continue
+
+                # Skip anchor-only links
+                if link_url.startswith("#"):
+                    continue
+
+                # Handle relative links
+                if link_url.startswith("/"):
+                    # Absolute path from root
+                    target = self.root / link_url[1:]
+                else:
+                    # Relative to current file
+                    target = doc_file.parent / link_url
+
+                # Remove anchor from path
+                if "#" in str(target):
+                    target = Path(str(target).split("#")[0])
+
+                # Check if target exists
+                if not target.exists():
+                    issues.append(
+                        DocIssue(
+                            severity="warning",
+                            category="broken_link",
+                            message=f"Broken link: [{link_text}]({link_url})",
+                            file=doc_file,
+                            line=i,
+                            suggestion=f"Fix or remove link to `{link_url}`",
+                        )
+                    )
 
         return issues
