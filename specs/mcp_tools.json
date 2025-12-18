@@ -1,0 +1,427 @@
+[
+  {
+    "description": "Extract skeleton from a Python file. List of Symbol objects representing the code structure",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the Python file (relative to root or absolute)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "skeleton_extract"
+  },
+  {
+    "description": "Extract and format skeleton as readable text. Formatted string representation of the skeleton",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the Python file",
+          "type": "string"
+        },
+        "include_docstrings": {
+          "default": true,
+          "description": "Whether to include docstrings in output",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "skeleton_format"
+  },
+  {
+    "description": "Find anchors matching a name in a file. List of AnchorMatch objects with locations and confidence scores",
+    "inputSchema": {
+      "properties": {
+        "anchor_type": {
+          "default": "function",
+          "description": "Type filter - \"function\", \"class\", \"variable\", \"method\", \"import\"",
+          "type": "string"
+        },
+        "file_path": {
+          "description": "Path to search in",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name to search for (supports fuzzy matching)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "anchor_find"
+  },
+  {
+    "description": "Resolve a single anchor (raises if ambiguous or not found). Single best AnchorMatch AnchorNotFoundError: If no match found AmbiguousAnchorError: If multiple matches with equal confidence",
+    "inputSchema": {
+      "properties": {
+        "anchor_type": {
+          "default": "function",
+          "description": "Type filter",
+          "type": "string"
+        },
+        "file_path": {
+          "description": "Path to search in",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name to search for",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "anchor_resolve"
+  },
+  {
+    "description": "Apply a patch to a file. PatchResult with success status and modified content",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the file to patch",
+          "type": "string"
+        },
+        "patch": {
+          "description": "Patch object describing the change",
+          "type": "string"
+        },
+        "write": {
+          "default": true,
+          "description": "Whether to write changes to disk",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file_path",
+        "patch"
+      ],
+      "type": "object"
+    },
+    "name": "patch_apply"
+  },
+  {
+    "description": "Apply a patch with automatic text fallback. First tries AST-aware patching, falls back to text-based if that fails. PatchResult with success status and modified content",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the file to patch",
+          "type": "string"
+        },
+        "patch": {
+          "description": "Patch object describing the change",
+          "type": "string"
+        },
+        "write": {
+          "default": true,
+          "description": "Whether to write changes to disk",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file_path",
+        "patch"
+      ],
+      "type": "object"
+    },
+    "name": "patch_apply_with_fallback"
+  },
+  {
+    "description": "Create a Patch object. Patch object ready for application",
+    "inputSchema": {
+      "properties": {
+        "anchor_name": {
+          "description": "Name of the anchor to target",
+          "type": "string"
+        },
+        "content": {
+          "description": "New content for the patch",
+          "type": "string"
+        },
+        "kwargs": {
+          "type": "string"
+        },
+        "patch_type": {
+          "description": "Type of patch - \"insert\", \"replace\", \"delete\", \"wrap\"",
+          "type": "string"
+        }
+      },
+      "required": [
+        "patch_type",
+        "anchor_name",
+        "content",
+        "kwargs"
+      ],
+      "type": "object"
+    },
+    "name": "patch_create"
+  },
+  {
+    "description": "Run full dependency analysis on the project. DependencyAnalysis with circular deps, god modules, orphans, etc.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "dependencies_analyze"
+  },
+  {
+    "description": "Extract imports and exports from a file. DependencyInfo with imports and exports",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to analyze",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "dependencies_extract"
+  },
+  {
+    "description": "Extract and format dependencies as readable text. Formatted string with imports and exports",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to analyze",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "dependencies_format"
+  },
+  {
+    "description": "Build CFGs for all functions in a file. List of ControlFlowGraph objects for each function",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the Python file",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "cfg_build"
+  },
+  {
+    "description": "Create a standard Python validator chain. ValidatorChain configured for Python (syntax + ruff + pytest)",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "validation_create_chain"
+  },
+  {
+    "description": "Validate a Python file with the default chain. ValidationResult with any issues found",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to validate",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "validation_validate"
+  },
+  {
+    "description": "Create a commit on the current shadow branch. CommitHandle referencing the new commit",
+    "inputSchema": {
+      "properties": {
+        "message": {
+          "description": "Commit message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "type": "object"
+    },
+    "name": "git_commit"
+  },
+  {
+    "description": "Create an isolated shadow branch for agent work. ShadowBranch context manager",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "Optional branch name (auto-generated if not provided)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "git_create_branch"
+  },
+  {
+    "description": "Initialize shadow git for the project. ShadowGit instance for managing branches",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "git_init"
+  },
+  {
+    "description": "Compile context for the given files. CompiledContext with rendered views",
+    "inputSchema": {
+      "properties": {
+        "file_paths": {
+          "description": "Files to include in context",
+          "type": "string"
+        },
+        "view_types": {
+          "description": "View types to generate (default: skeleton, dependencies)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_paths"
+      ],
+      "type": "object"
+    },
+    "name": "context_compile"
+  },
+  {
+    "description": "Initialize the context host with default view providers. ContextHost instance",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "context_init"
+  },
+  {
+    "description": "Analyze structural code quality. StructuralAnalysis with hotspots and metrics",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "health_analyze_structure"
+  },
+  {
+    "description": "Analyze test coverage structure. TestAnalysis with module-test mappings",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "health_analyze_tests"
+  },
+  {
+    "description": "Run full health analysis on the project. ProjectStatus with health score, grade, and detailed metrics",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "health_check"
+  },
+  {
+    "description": "Check documentation health. DocCheckResult with coverage and issues",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "health_check_docs"
+  },
+  {
+    "description": "Check TODO tracking health. TodoCheckResult with tracked and orphaned TODOs",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "health_check_todos"
+  },
+  {
+    "description": "Generate a project summary. ProjectSummary with module information",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "health_summarize"
+  },
+  {
+    "description": "Analyze a natural language query to find matching tools. Uses TF-IDF cosine similarity combined with keyword matching to find the best tools for a given description. List of ToolMatchResult sorted by confidence (highest first)",
+    "inputSchema": {
+      "properties": {
+        "query": {
+          "description": "Natural language description of what you want to do",
+          "type": "string"
+        },
+        "top_k": {
+          "default": 3,
+          "description": "Maximum number of suggestions to return",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "dwim_analyze_intent"
+  },
+  {
+    "description": "Get detailed information about a specific tool. ToolInfoResult or None if tool not found",
+    "inputSchema": {
+      "properties": {
+        "tool_name": {
+          "description": "Tool name (can be alias or misspelled)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_name"
+      ],
+      "type": "object"
+    },
+    "name": "dwim_get_tool_info"
+  },
+  {
+    "description": "List all available tools with their metadata. List of ToolInfoResult with descriptions, keywords, etc.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "dwim_list_tools"
+  },
+  {
+    "description": "Resolve a tool name to its canonical form. Handles exact matches, semantic aliases, and fuzzy matching for typos. ToolMatchResult with canonical name and confidence",
+    "inputSchema": {
+      "properties": {
+        "tool_name": {
+          "description": "Tool name to resolve (may be misspelled or alias)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_name"
+      ],
+      "type": "object"
+    },
+    "name": "dwim_resolve_tool"
+  }
+]

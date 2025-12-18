@@ -37,15 +37,20 @@ Still needed:
 - [x] MCP server now uses generated tools (28 tools from MossAPI introspection)
 - [x] DWIMAPI added to MossAPI (analyze_intent, resolve_tool, list_tools, get_tool_info)
 - [x] `moss gen` CLI command for regenerating interfaces
+- [x] HTTP server (`server/app.py`) now uses generated routes via HTTPGenerator
+- [x] Shared serialization module (`moss.gen.serialize`) for consistent API output
+- [x] HTTPExecutor for executing API methods with proper parameter handling
 
 **Still needed:**
 - [ ] `moss.gen.tui` - Generate TUI (terminal UI) from API
 - [ ] `moss.gen.lsp` - Generate LSP handlers from API
 - [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API
 - [ ] Unix socket transport option
-- [ ] CI check: generated code matches committed code (no drift)
 - [ ] Documentation: how the generation pipeline works
-- [ ] Migrate HTTP server (`server/app.py`) to use generated routes
+
+**CI/Automation:**
+- [x] Drift detection script (`scripts/check_gen_drift.py`) - compares generated OpenAPI/MCP specs to committed versions
+- [ ] Add drift check to CI workflow (GitHub Actions)
 
 ### Non-LLM Code Generators
 
@@ -91,6 +96,12 @@ Tools we have:
 
 Potential additions:
 - [ ] Architecture diagrams from dependency graph
+- [ ] `moss lint` - Unified linting interface:
+  - Configure linters (ruff, mypy, etc.) from a single place
+  - Suggest linter configurations based on project structure
+  - Run all configured linters with unified output
+  - Auto-fix where possible
+  - Manage scripts/commands (list available, run, explain)
 - [ ] `moss patterns` - Detect and analyze architectural patterns:
   - Plugin systems (Protocol + Registry + Entry Points)
   - Factory patterns, strategy patterns, adapter patterns

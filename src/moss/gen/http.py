@@ -9,14 +9,31 @@ Example generated structure:
     POST /anchor/find
     GET /health/check
     GET /health/summarize
+
+Usage:
+    # Generate OpenAPI spec
+    from moss.gen.http import generate_openapi
+    spec = generate_openapi()
+
+    # Execute API method via HTTP-style call
+    from moss.gen.http import HTTPExecutor
+    executor = HTTPExecutor()
+    result = executor.execute("skeleton.extract", {"file_path": "src/main.py"})
+
+    # Generate FastAPI app
+    from moss.gen.http import HTTPGenerator
+    generator = HTTPGenerator()
+    app = generator.generate_app()
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from moss.gen.introspect import APIMethod, APIParameter, SubAPI, introspect_api
+from moss.gen.serialize import serialize
 
 
 @dataclass
@@ -78,6 +95,127 @@ class HTTPRouter:
     tag: str
     description: str = ""
     endpoints: list[HTTPEndpoint] = field(default_factory=list)
+
+
+class HTTPExecutor:
+    """Executor for HTTP API calls.
+
+    Provides a clean interface for executing MossAPI methods via HTTP-style
+    calls. Handles parameter passing, error handling, and result serialization.
+
+    Usage:
+        executor = HTTPExecutor()
+        result = executor.execute("skeleton.extract", {"file_path": "src/main.py"})
+    """
+
+    def __init__(self, root: str | Path = "."):
+        """Initialize the executor.
+
+        Args:
+            root: Project root directory (default: current directory)
+        """
+        self._root = Path(root).resolve()
+        self._api = None
+
+    @property
+    def api(self):
+        """Lazy-initialize and cache the MossAPI instance."""
+        if self._api is None:
+            from moss import MossAPI
+
+            self._api = MossAPI.for_project(self._root)
+        return self._api
+
+    def execute(
+        self,
+        api_path: str,
+        arguments: dict[str, Any] | None = None,
+        *,
+        root: str | Path | None = None,
+    ) -> Any:
+        """Execute an API method and return serialized result.
+
+        Args:
+            api_path: Path to API method (e.g., "skeleton.extract")
+            arguments: Method arguments as dict
+            root: Override project root for this call
+
+        Returns:
+            Serialized result (JSON-compatible dict/list/primitive)
+
+        Raises:
+            ValueError: If api_path is invalid
+            FileNotFoundError: If referenced file doesn't exist
+        """
+        parts = api_path.split(".")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid API path: {api_path}. Expected 'subapi.method'")
+
+        subapi_name, method_name = parts
+        arguments = arguments or {}
+
+        # Handle root override
+        if root is not None:
+            from moss import MossAPI
+
+            api = MossAPI.for_project(Path(root).resolve())
+        else:
+            api = self.api
+
+        # Get sub-API
+        subapi = getattr(api, subapi_name, None)
+        if subapi is None:
+            raise ValueError(f"Unknown sub-API: {subapi_name}")
+
+        # Get method
+        method = getattr(subapi, method_name, None)
+        if method is None:
+            raise ValueError(f"Unknown method: {subapi_name}.{method_name}")
+
+        # Execute and serialize result
+        result = method(**arguments)
+        return serialize(result)
+
+    def execute_raw(
+        self,
+        api_path: str,
+        arguments: dict[str, Any] | None = None,
+        *,
+        root: str | Path | None = None,
+    ) -> Any:
+        """Execute an API method and return raw (unserialized) result.
+
+        Args:
+            api_path: Path to API method (e.g., "skeleton.extract")
+            arguments: Method arguments as dict
+            root: Override project root for this call
+
+        Returns:
+            Raw result from API method
+        """
+        parts = api_path.split(".")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid API path: {api_path}. Expected 'subapi.method'")
+
+        subapi_name, method_name = parts
+        arguments = arguments or {}
+
+        if root is not None:
+            from moss import MossAPI
+
+            api = MossAPI.for_project(Path(root).resolve())
+        else:
+            api = self.api
+
+        subapi = getattr(api, subapi_name, None)
+        if subapi is None:
+            raise ValueError(f"Unknown sub-API: {subapi_name}")
+
+        method = getattr(subapi, method_name, None)
+        if method is None:
+            raise ValueError(f"Unknown method: {subapi_name}.{method_name}")
+
+        return method(**arguments)
 
 
 def _method_to_http_method(method: APIMethod) -> str:
@@ -302,8 +440,15 @@ class HTTPGenerator:
             ],
         }
 
-    def generate_app(self) -> Any:
-        """Generate a FastAPI application.
+    def generate_app(self, root: str | Path = ".") -> Any:
+        """Generate a FastAPI application with all API routes.
+
+        Creates a fully-functional FastAPI app with routes for all MossAPI
+        methods. Each route extracts parameters from query strings (GET) or
+        JSON body (POST) and returns serialized results.
+
+        Args:
+            root: Default project root directory
 
         Returns:
             FastAPI app instance
@@ -312,9 +457,12 @@ class HTTPGenerator:
             ImportError: If FastAPI is not installed
         """
         try:
-            from fastapi import APIRouter, FastAPI
+            from fastapi import FastAPI
         except ImportError as e:
             raise ImportError("FastAPI is required. Install with: pip install fastapi") from e
+
+        root_path = Path(root).resolve()
+        executor = HTTPExecutor(root_path)
 
         app = FastAPI(
             title="Moss API",
@@ -322,63 +470,82 @@ class HTTPGenerator:
             version="0.1.0",
         )
 
-        # Create a router for each sub-API
+        # Health check endpoint
+        @app.get("/")
+        async def root_endpoint():
+            return {
+                "name": "moss",
+                "version": "0.1.0",
+                "root": str(root_path),
+                "status": "running",
+            }
+
+        @app.get("/health")
+        async def health_check():
+            return {"status": "healthy", "root": str(root_path)}
+
+        # Generate routes for each endpoint
         for router_spec in self.generate_routers():
-            router = APIRouter(prefix=router_spec.prefix, tags=[router_spec.tag])
-
             for endpoint in router_spec.endpoints:
-                # Create dynamic route handler
-                self._add_endpoint_to_router(router, endpoint)
-
-            app.include_router(router)
+                self._register_endpoint(app, endpoint, executor)
 
         return app
 
-    def _add_endpoint_to_router(self, router: Any, endpoint: HTTPEndpoint) -> None:
-        """Add an endpoint to a FastAPI router.
+    def _register_endpoint(self, app: Any, endpoint: HTTPEndpoint, executor: HTTPExecutor) -> None:
+        """Register an endpoint on the FastAPI app.
 
-        This creates a dynamic handler that calls the appropriate MossAPI method.
+        Creates a route handler that:
+        1. Extracts parameters from request (query params or JSON body)
+        2. Calls the API method via executor
+        3. Returns serialized result or appropriate HTTP error
         """
-        from pathlib import Path
+        from fastapi import HTTPException, Request
 
-        from moss import MossAPI
+        # Capture endpoint info in closure
+        api_path = endpoint.api_path
 
-        api_parts = endpoint.api_path.split(".")
-        if len(api_parts) != 2:
-            return
-
-        subapi_name, method_name = api_parts
-
-        # Build route path (strip prefix since router already has it)
-        route_path = "/" + endpoint.path.split("/")[-1]
+        tag = endpoint.path.split("/")[1]
 
         if endpoint.method == "GET":
-            # For GET requests with query parameters
-            @router.get(route_path, summary=endpoint.description)
-            async def handler(
-                root: str = ".",
-                _endpoint: HTTPEndpoint = endpoint,
-                _subapi: str = subapi_name,
-                _method: str = method_name,
-            ):
-                api = MossAPI.for_project(Path(root))
-                subapi = getattr(api, _subapi)
-                method = getattr(subapi, _method)
-                return method()
+
+            @app.get(endpoint.path, summary=endpoint.description, tags=[tag])
+            async def get_handler(request: Request, _api_path: str = api_path):
+                # Extract query parameters
+                args = dict(request.query_params)
+                # Remove 'root' if present and use it separately
+                root_override = args.pop("root", None)
+
+                try:
+                    return executor.execute(_api_path, args, root=root_override)
+                except FileNotFoundError as e:
+                    raise HTTPException(status_code=404, detail=str(e)) from None
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from None
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=str(e)) from None
 
         else:
-            # For POST requests with body
-            @router.post(route_path, summary=endpoint.description)
-            async def handler(
-                root: str = ".",
-                _endpoint: HTTPEndpoint = endpoint,
-                _subapi: str = subapi_name,
-                _method: str = method_name,
-            ):
-                api = MossAPI.for_project(Path(root))
-                subapi = getattr(api, _subapi)
-                method = getattr(subapi, _method)
-                return method()
+
+            @app.post(endpoint.path, summary=endpoint.description, tags=[tag])
+            async def post_handler(request: Request, _api_path: str = api_path):
+                # Extract JSON body
+                try:
+                    body = await request.json()
+                except Exception:
+                    body = {}
+
+                # Merge with query params (query params override body)
+                args = {**body, **dict(request.query_params)}
+                root_override = args.pop("root", None)
+
+                try:
+                    return executor.execute(_api_path, args, root=root_override)
+                except FileNotFoundError as e:
+                    raise HTTPException(status_code=404, detail=str(e)) from None
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from None
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=str(e)) from None
 
 
 def generate_http() -> list[HTTPRouter]:
@@ -407,6 +574,7 @@ def generate_openapi() -> dict[str, Any]:
 
 __all__ = [
     "HTTPEndpoint",
+    "HTTPExecutor",
     "HTTPGenerator",
     "HTTPParameter",
     "HTTPRouter",
