@@ -52,6 +52,12 @@ Multi-agent model: Ticket-based (not shared chat history). Agents are isolated m
 
 **Library is the API.** The library is the canonical API surface. CLI, TUI, HTTP server, MCP, and LSP are all frontends to the library. The server adds optional benefits (concurrent clients, persistent state, network access) but isn't required.
 
+**Maximally useful defaults.** Every configurable option should have a default that:
+- Works well for the common case (80% of users shouldn't need to configure it)
+- Errs on the side of usefulness over safety-theater (don't interrupt flow with meaningless confirmations)
+- Can be discovered and changed when needed (document what the default is and why)
+- Examples: High trust for known codebases, auto-approve read/search/lint, confirm destructive ops
+
 ## Dogfooding
 
 **Use moss tools.** We built them - use them. Before making significant changes:
@@ -120,6 +126,8 @@ When finishing one task, immediately pick up the next from TODO.md. Keep the mom
 - The conversation has drifted across many unrelated topics
 
 **Write while researching, not after.** When doing research tasks, write findings to the appropriate doc (e.g., `docs/prior-art.md`) incrementally as you gather information. Don't accumulate research in context and write it all at the end - context may be full or stale by then. After every few web searches, write what you learned.
+
+**Queue review, don't block for it.** After research tasks, add a "Review [topic] research with user" item to TODO.md, but don't stop the agentic loop waiting for it. Continue with implementation if it makes sense - accumulate design questions in TODO.md or a dedicated file (e.g., `QUESTIONS.md`) for the user to address when convenient. The user can review asynchronously. This keeps momentum while ensuring nothing is forgotten.
 
 Before suggesting `/exit`:
 1. Note down all discoveries, insights, and open questions to appropriate files

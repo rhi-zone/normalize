@@ -196,12 +196,48 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 - [x] Google Antigravity - Agent-first IDE, Manager View, multi-agent dispatch
 - [x] VS Code Copilot - Agent Mode, MCP integration (128 tool limit), LSP→MCP lineage
 
+**Review with user (async, don't block):**
+- [ ] Review IDE/tool research (Warp, Zed, Windsurf, Antigravity, VS Code Copilot)
+- [ ] Review synthesis research (Escher, Myth, SyPet, Synquid, PROSE, Sketch, miniKanren, DeepCoder)
+- [ ] Review trust levels design
+- [ ] Review sessions-as-first-class design
+
 **New patterns to adopt from IDE research:**
-- [ ] **Trust Levels** (Warp's Dispatch mode) - configurable confirmation requirements
-- [ ] **ACP Adapter** (Zed) - implement Agent Client Protocol for Zed integration
+- [ ] **Smart Trust Levels** (inspired by Warp's Dispatch mode) - see design below
+- [ ] **ACP Server** (HIGH PRIORITY) - implement Agent Client Protocol for Zed/JetBrains integration
+  - Create `moss.acp_server` module
+  - JSON-RPC 2.0 over stdio
+  - Map moss tools to ACP capabilities
+  - See `docs/prior-art.md` for protocol details
 - [ ] **Intent Prediction** (Windsurf's Supercomplete) - predict what user wants, not just next token
 - [ ] **Manager View** (Antigravity) - UI for orchestrating multiple concurrent agents
 - [ ] **Browser Automation** (Antigravity) - add Playwright/Selenium tools for UI testing
+
+**Smart Trust Levels Design:**
+
+Most IDEs use basic "approve X command?" prompts - safe but interrupts the agentic loop.
+We want *smarter* security that's still robust but doesn't ask yes/no for everything.
+
+Levels (configurable, with maximally useful defaults):
+1. **Full Trust** (dispatch mode): No confirmations, agent runs freely
+2. **High Trust** (default for known codebases):
+   - Auto-approve: read, search, lint, test, git status/diff/log
+   - Confirm: write, delete, git commit/push, external commands
+3. **Medium Trust** (default for new codebases):
+   - Auto-approve: read, search
+   - Confirm: write, delete, any command execution
+4. **Low Trust** (sandbox mode): Confirm everything, useful for demos/untrusted
+
+Smart features beyond basic approve/deny:
+- [ ] **Pattern learning**: "You approved `ruff check` 10 times, auto-approve it?"
+- [ ] **Scope-based**: "Trust writes to `src/` but confirm for `config/`"
+- [ ] **Time-bounded**: "Trust for this session" vs "Trust permanently"
+- [ ] **Rollback-aware**: "This can be undone via Shadow Git" (lower risk = less friction)
+- [ ] **Batch approval**: "Approve all 5 pending writes at once?"
+- [ ] **Explain risk**: Show what command does, why it's flagged, what could go wrong
+
+Key insight: The goal isn't "maximum safety" - it's *appropriate* safety that doesn't
+destroy the productivity gains of agentic coding.
 
 Key question answered: Interface design matters more than model scaling (SWE-agent proves this). Moss's structural-awareness approach is differentiated but unproven - needs benchmark validation.
 

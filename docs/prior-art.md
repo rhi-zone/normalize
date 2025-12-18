@@ -223,6 +223,60 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
 - Edit Prediction is a form of synthesis - predicting code before it's written
 - Background AI work (continues while you code) aligns with moss's async design
 
+## Protocols & Standards
+
+### Agent Client Protocol (ACP)
+- **Site**: https://zed.dev/acp
+- **Repo**: https://github.com/zed-industries/agent-client-protocol
+- **Spec**: https://agentclientprotocol.com
+- **What it is**: Open standard for editor ↔ coding agent communication
+
+**Vision**: "Just as LSP unbundled language intelligence from monolithic IDEs, ACP enables switching between agents without switching editors."
+
+**Technical Details:**
+- Bidirectional JSON-RPC 2.0 over stdio (stdin/stdout)
+- Reuses MCP data types where possible (text content, code diffs, tool results)
+- Human-readable text defaults to Markdown
+- Schema-based validation (see `schema/schema.json`)
+
+**SDKs Available:**
+- Rust: `agent-client-protocol` (crates.io)
+- TypeScript: `@agentclientprotocol/sdk` (npm)
+- Python: Official SDK with examples
+- Kotlin: JVM support
+
+**Current Agents:**
+- Gemini CLI (reference implementation)
+- Claude Code (via ACP)
+- Codex
+- Custom agents via `agent_servers` config
+
+**Editor Support:**
+- Zed (native)
+- JetBrains (coming soon)
+- Neovim, Emacs (community adapters)
+
+**Config Example:**
+```json
+{
+  "agent_servers": {
+    "My Custom Agent": {
+      "type": "custom",
+      "command": "python",
+      "args": ["-m", "moss.acp_server"],
+      "env": {}
+    }
+  }
+}
+```
+
+**Moss Implementation Plan:**
+- [ ] Create `moss.acp_server` module
+- [ ] Implement ACP JSON-RPC handlers
+- [ ] Map moss tools to ACP capabilities (multi-file edit, codebase context)
+- [ ] Test with Zed as client
+- Priority: High - gives moss access to Zed's growing user base
+
 ### Windsurf (Codeium's Agentic IDE)
 - **Site**: https://windsurf.com (formerly https://codeium.com/windsurf)
 - **What it is**: VS Code fork built around AI-first philosophy
@@ -366,6 +420,113 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
 - LLM provides probability distribution over likely programs
 - Enumerator explores systematically using that distribution
 - CEGIS loop with counterexamples improves both components
+
+### FlashFill / PROSE (Programming by Example)
+- **Project**: https://www.microsoft.com/en-us/research/group/prose/
+- **Repo**: https://github.com/microsoft/prose
+- **What it is**: Microsoft's framework for synthesizing programs from I/O examples
+
+**Technical Approach:**
+- User provides input-output examples
+- System synthesizes programs in a domain-specific language (DSL)
+- Deductive meta-algorithm parameterized by DSL
+- Synthesizes scripts with complex business logic in <1 second
+- Ranking/disambiguation among multiple valid programs
+
+**Applications:**
+- FlashFill in Excel 2013 (hundreds of millions of users)
+- Text extraction, web extraction, data wrangling
+- Visual Studio, Office, PowerQuery, PowerApps, SQL
+
+**Key Insight**: Requires (a) DSL design, (b) synthesis algorithm, (c) ranking for disambiguation.
+
+**Status**: As of Oct 2025, Microsoft stopped releasing new PROSE SDK versions.
+
+**Moss Implementation Notes:**
+- `PBEGenerator` should define a Python-subset DSL
+- Key challenge: disambiguation when multiple programs fit examples
+- Ranking could use: complexity (prefer simpler), coverage (prefer more general)
+- Could integrate with moss's test suite as example source
+
+### Sketch / Rosette (Solver-Aided Synthesis)
+- **Rosette Site**: https://emina.github.io/rosette/
+- **Rosette Repo**: https://github.com/emina/rosette
+- **Sketch Site**: https://people.csail.mit.edu/asolar/sketch.html
+- **What it is**: Languages where you write programs with "holes" that solvers fill
+
+**Technical Approach:**
+- **Sketches**: Programs with holes (e.g., `(bvadd x (?? int32?))` = all programs adding constant to x)
+- **Hole types**: Constants (`??`), choices (`choose`), grammars (`define-grammar`)
+- Compiler translates to SMT constraints, solver fills holes
+- Works for synthesis, verification, debugging, repair
+
+**Example:**
+```racket
+; Sketch: multiply x by unknown constant
+(define (mul c x) (* c x))
+; Solver finds c such that assertions pass
+```
+
+**Moss Implementation Notes:**
+- `SketchGenerator` should support Python-style hole syntax
+- Could use comments: `# HOLE: int` or type annotations: `x: Hole[int]`
+- Translate to Z3 constraints (same as SMTGenerator)
+- Useful for "fill in the blanks" style synthesis
+
+### miniKanren (Relational Programming)
+- **Wikipedia**: https://en.wikipedia.org/wiki/MiniKanren
+- **Book**: "The Reasoned Schemer"
+- **What it is**: Family of languages for relational (bidirectional) programming
+
+**Key Capability: Running Programs Backwards**
+- Relations are bidirectional: specify inputs → get outputs, OR specify outputs → get inputs
+- An interpreter written as a relation can synthesize programs from I/O examples
+- Can generate quines (programs that output themselves)
+- Can differentiate AND integrate (run differentiation backwards)
+
+**Example:**
+```scheme
+; evalo relates expressions to their values
+(evalo q q)  ; finds quines - expressions q that evaluate to themselves
+```
+
+**Technical Approach:**
+- Core fits on 2 printed pages
+- Unification-based search
+- Purely relational programs run forward, backward, or "strangely"
+
+**Moss Implementation Notes:**
+- `RelationalGenerator` could embed miniKanren in Python
+- Libraries exist: `kanren` (Python), `microKanren` (minimal impl)
+- Key use case: given output spec, find program that produces it
+- Could write moss tools as relations for "inverse" queries
+
+### DeepCoder (Neural-Guided Synthesis)
+- **Paper**: "DeepCoder: Learning to Write Programs" (ICLR 2017)
+- **Recent**: ExeDec (ICLR 2024) builds on DeepCoder
+- **What it is**: Neural network predicts program properties to guide search
+
+**Technical Approach:**
+- Train neural net to predict which DSL functions appear in solution
+- Use predictions to prioritize search (enumerative or SMT-based)
+- Order of magnitude speedup over non-augmented baselines
+- Solves programming competition-style problems from I/O examples
+
+**2024 Developments (ExeDec):**
+- Execution decomposition for compositional generalization
+- Breaks synthesis into sub-problems based on intermediate execution
+- Improves generalization to larger/more complex programs
+
+**Related: DeepSynth**
+- Open-source synthesizer using DeepCoder approach
+- Repo: https://github.com/nathanael-fijalkow/DeepSynth
+- Combines ML predictions with efficient enumeration
+
+**Moss Implementation Notes:**
+- `NeuralGuidedGenerator` could train small model on codebase patterns
+- Predict likely imports, function names, patterns
+- Use predictions to weight enumeration (not replace it)
+- Could fine-tune on repo-specific style
 
 ## SWE-bench Evaluation
 
