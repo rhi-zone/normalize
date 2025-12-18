@@ -1,10 +1,5 @@
 # Moss CI workflow
-# Runs moss analysis and uploads SARIF results to GitHub Code Scanning
-#
-# Usage in your project:
-#   1. Copy this file to .github/workflows/moss.yml
-#   2. Customize the options below
-#   3. Results will appear in the Security tab
+# Runs linting and uploads SARIF results to GitHub Code Scanning
 
 name: Moss Analysis
 
@@ -14,14 +9,13 @@ on:
   pull_request:
     branches: [main, master]
 
-# Allow the workflow to upload SARIF results
 permissions:
   security-events: write
   contents: read
 
 jobs:
   analyze:
-    name: Run Moss Analysis
+    name: Lint and Analysis
     runs-on: ubuntu-latest
 
     steps:
@@ -31,30 +25,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
-      - name: Install moss
-        run: pip install moss
-
-      - name: Run moss rules check
+      - name: Install dependencies
         run: |
-          moss rules . --sarif results.sarif
-        continue-on-error: true
+          pip install ruff
+
+      - name: Run ruff check (SARIF output)
+        run: |
+          ruff check . --output-format sarif -o results.sarif || true
 
       - name: Upload SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
-        if: always()
-
-      - name: Generate metrics
-        run: |
-          moss metrics . --json > metrics.json
-        continue-on-error: true
-
-      - name: Upload metrics artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: moss-metrics
-          path: metrics.json
         if: always()
