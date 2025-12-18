@@ -1305,6 +1305,106 @@ AI is easier to set up but "you can never be sure if it gets everything."
 - Validate: tests pass before/after
 - Consider: Use rope/libcst for safe refactoring, not raw LLM edits
 
+## Code Translation & Migration
+
+### The Scale of the Problem
+- By 2025, 40% of IT budgets dedicated to technical debt from legacy systems (Gartner)
+- Commonwealth Bank: 5 years, $750M to migrate COBOL → Java
+- 63% of businesses trialing generative AI for code migration (2024)
+
+### Current LLM Performance
+- **Best case**: 47.3% unit test pass rate (C/C++/Go/Java/Python translation)
+- **Worst case**: 2.1% pass rate
+- **Rust translation**: Claude 3-Opus 47% success, drops significantly for >100 lines
+- **No approach guarantees correctness** - at best, unit tests verify equivalence
+
+### Multi-Agent Migration Framework (7Rs of Modernization)
+1. **Analysis Agent**: Interprets and maps legacy code
+2. **Coder Agent**: Generates modern equivalents
+3. **Review Agent**: Validates output
+
+### Verification Approaches
+
+**LLMLift** (Neuro-symbolic):
+- Formal verification of LLM outputs
+- Checks functional equivalence
+
+**TransCoder**:
+- Unit tests for equivalence checking
+- No formal guarantees
+
+### Best Practices
+- Human oversight essential (edge cases, domain logic)
+- Phased/incremental migration
+- Migrate components while maintaining integration
+- Don't attempt full system rewrites
+
+### Moss Implementation Notes
+- Could add `moss migrate <file> --to <lang>` command
+- Use tests as equivalence oracles
+- Incremental: function-by-function, not whole-file
+- Generate type mappings between languages
+- Consider: AST-to-AST translation (more reliable than text-based)
+
+## Automated Code Review
+
+### The Problem
+- Review backlogs: PRs waiting days for attention
+- Inconsistent feedback from different reviewers
+- Complexity grows → thorough review harder
+
+### Current State (2025)
+
+**GitHub Copilot Code Review (CCR):**
+- Integrates CodeQL + linters (ESLint)
+- Combines semantic analysis + rule-based checks
+- Can hand off fixes to Copilot coding agent
+- @copilot mentions apply suggested fixes automatically
+
+**Qodo PR Agent:**
+- Industrial adoption studied (Dec 2024)
+- LLM-based automated code review
+- Evaluated: effectiveness, PR closure speed, review volume changes
+
+**SWR-Bench** (Sept 2025):
+- 1000 manually verified PRs from GitHub
+- PR-centric review with full project context
+- Addresses: existing benchmarks lack real-world complexity
+
+### Tools
+
+| Tool | Features |
+|------|----------|
+| **Codedog** | GPT-powered, GitHub/GitLab, summaries + suggestions |
+| **PR Review Bot** | Open-source, auto-approve or request changes |
+| **Code Llama + Docker** | Local review, pre-commit checks |
+
+### What LLMs Catch
+- Bugs and logic errors
+- Security vulnerabilities
+- Style inconsistencies
+- Before human reviewers see the PR
+
+### Integration Pattern
+```yaml
+# CI/CD pipeline integration
+on: pull_request
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: codedog-ai/codedog@v1
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+### Moss Implementation Notes
+- `moss review` command for PR analysis
+- Integration: GitHub Action / GitLab CI
+- Use skeleton + deps for context
+- Categories: bugs, security, style, performance
+- Consider: Review guidelines from CLAUDE.md as prompt context
+
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness
