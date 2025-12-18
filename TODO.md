@@ -50,12 +50,13 @@ Advanced abstraction discovery:
 
 Analyze PyPI/npm dependencies (not just internal imports):
 
-- [ ] Parse pyproject.toml/requirements.txt/package.json for dependencies
-- [ ] Resolve full dependency tree (transitive dependencies)
-- [ ] Show dependency weight (how many sub-dependencies each brings)
-- [ ] Identify heavy/bloated dependencies
+- [x] Parse pyproject.toml/requirements.txt for dependencies (`moss external-deps`)
+- [x] Resolve full dependency tree (transitive dependencies) (`--resolve` flag)
+- [x] Show dependency weight (how many sub-dependencies each brings)
+- [ ] Identify heavy/bloated dependencies (threshold warnings)
 - [ ] Check for known vulnerabilities (CVE integration)
 - [ ] License compatibility checking
+- [ ] package.json/npm support
 
 ### Enterprise Features
 
