@@ -299,7 +299,7 @@ class DocChecker:
             return True
 
         # Check if it's a file path that exists
-        if "/" in ref or ref.endswith(".py"):
+        if "/" in ref or ref.endswith(".py") or ref.endswith(".md"):
             file_path = self.root / ref
             if file_path.exists():
                 return True

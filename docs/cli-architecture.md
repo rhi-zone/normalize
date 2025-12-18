@@ -64,7 +64,7 @@ def cmd_<name>(args: Namespace) -> int:
 - Return 0 for success, non-zero for errors
 - Errors go to stderr, output to stdout
 - Lazy imports to keep CLI startup fast
-- All commands check `args.json` for output format
+- All commands support `--json` flag for machine-readable output
 
 ## Parser Structure
 

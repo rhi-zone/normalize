@@ -169,7 +169,11 @@ Agents can write ephemeral scripts to solve computational or logic problems.
 Suggested constraints to maximize agent reliability and minimize token waste.
 
 ### Context > Persona
-Avoid "Expert" personas. Use **In-Context Learning** via `StyleGuide.ts` and `Architecture.md` to define behavior.
+Avoid "Expert" personas. Use **In-Context Learning** via project-specific files to define behavior:
+- `StyleGuide.py` (or `.ts`, `.go`, etc.) - Code style examples in the target repository
+- `Architecture.md` - High-level architecture documentation in the target repository
+
+These files live in the repository being operated on, not in moss itself.
 
 ### Concept-First Engineering
 Encourage modularity by breaking features into atomic **Concepts** with decoupled **Synchronizations**. This reduces the complexity of individual edits.
