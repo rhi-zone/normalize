@@ -1,8 +1,10 @@
 # Moss
 
-Headless agent orchestration layer for AI engineering.
+Tooling orchestration with structural awareness.
 
 Moss implements a "Compiled Context" approach that prioritizes architectural awareness (AST-based understanding) over raw text processing, with verification loops ensuring correctness before output.
+
+**[Documentation](https://pterror.github.io/moss/)** | **[GitHub](https://github.com/pterror/moss)**
 
 ## Features
 
@@ -360,20 +362,22 @@ ruff check && ruff format
 
 ## Documentation
 
-Generate API documentation:
+Full documentation is available at **[pterror.github.io/moss](https://pterror.github.io/moss/)**.
+
+To build docs locally:
 
 ```bash
 # Install docs dependencies
-uv add pdoc --optional docs
+uv sync --extra docs
 
-# Generate static HTML docs
-python docs/generate.py
+# Serve docs locally with hot reload
+uv run mkdocs serve
 
-# Or serve docs locally with live reload
-python docs/generate.py --serve
+# Build static site
+uv run mkdocs build
 ```
 
-Documentation is generated from docstrings using [pdoc](https://pdoc.dev/).
+Documentation is built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) with auto-generated API reference from docstrings.
 
 ## Project Structure
 
