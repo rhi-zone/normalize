@@ -64,12 +64,12 @@ class SkeletonAPI:
         source = path.read_text()
         return extract_python_skeleton(source)
 
-    def format(self, file_path: str | Path, show_bodies: bool = False) -> str:
+    def format(self, file_path: str | Path, include_docstrings: bool = True) -> str:
         """Extract and format skeleton as readable text.
 
         Args:
             file_path: Path to the Python file
-            show_bodies: Whether to include function/method bodies
+            include_docstrings: Whether to include docstrings in output
 
         Returns:
             Formatted string representation of the skeleton
@@ -77,7 +77,7 @@ class SkeletonAPI:
         from moss.skeleton import format_skeleton
 
         symbols = self.extract(file_path)
-        return format_skeleton(symbols, show_bodies=show_bodies)
+        return format_skeleton(symbols, include_docstrings=include_docstrings)
 
     def _resolve_path(self, file_path: str | Path) -> Path:
         path = Path(file_path)
@@ -312,7 +312,7 @@ class DependencyAPI:
 
         path = self._resolve_path(file_path)
         source = path.read_text()
-        return extract_dependencies(source, str(path))
+        return extract_dependencies(source)
 
     def analyze(self) -> DependencyAnalysis:
         """Run full dependency analysis on the project.
@@ -355,14 +355,14 @@ class CFGAPI:
 
     root: Path
 
-    def build(self, file_path: str | Path) -> dict[str, ControlFlowGraph]:
+    def build(self, file_path: str | Path) -> list[ControlFlowGraph]:
         """Build CFGs for all functions in a file.
 
         Args:
             file_path: Path to the Python file
 
         Returns:
-            Dict mapping function names to their ControlFlowGraph
+            List of ControlFlowGraph objects for each function
         """
         from moss.cfg import build_cfg
 
@@ -604,6 +604,147 @@ class HealthAPI:
 
 
 @dataclass
+class ToolMatchResult:
+    """Result of matching a query to a tool.
+
+    Attributes:
+        tool: Canonical tool name
+        confidence: Match confidence (0.0 to 1.0)
+        message: Optional explanation of the match
+    """
+
+    tool: str
+    confidence: float
+    message: str | None = None
+
+
+@dataclass
+class ToolInfoResult:
+    """Information about a tool.
+
+    Attributes:
+        name: Tool name
+        description: Human-readable description
+        keywords: Search keywords for this tool
+        parameters: Parameter names
+        aliases: Alternative names that map to this tool
+    """
+
+    name: str
+    description: str
+    keywords: list[str]
+    parameters: list[str]
+    aliases: list[str]
+
+
+@dataclass
+class DWIMAPI:
+    """API for semantic tool routing and discovery.
+
+    Provides fuzzy matching and semantic routing for tool discovery,
+    making Moss interfaces robust against minor variations in how
+    tools are invoked.
+
+    Features:
+    - Semantic aliases: map conceptual names to canonical tools
+    - Fuzzy matching: handle typos and variations
+    - TF-IDF cosine similarity: smarter semantic matching
+    - Confidence scoring: know when to auto-correct vs suggest
+    """
+
+    def resolve_tool(self, tool_name: str) -> ToolMatchResult:
+        """Resolve a tool name to its canonical form.
+
+        Handles exact matches, semantic aliases, and fuzzy matching
+        for typos.
+
+        Args:
+            tool_name: Tool name to resolve (may be misspelled or alias)
+
+        Returns:
+            ToolMatchResult with canonical name and confidence
+        """
+        from moss.dwim import resolve_tool
+
+        match = resolve_tool(tool_name)
+        return ToolMatchResult(
+            tool=match.tool,
+            confidence=match.confidence,
+            message=match.message,
+        )
+
+    def analyze_intent(self, query: str, top_k: int = 3) -> list[ToolMatchResult]:
+        """Analyze a natural language query to find matching tools.
+
+        Uses TF-IDF cosine similarity combined with keyword matching
+        to find the best tools for a given description.
+
+        Args:
+            query: Natural language description of what you want to do
+            top_k: Maximum number of suggestions to return
+
+        Returns:
+            List of ToolMatchResult sorted by confidence (highest first)
+        """
+        from moss.dwim import analyze_intent
+
+        matches = analyze_intent(query)[:top_k]
+        return [
+            ToolMatchResult(
+                tool=m.tool,
+                confidence=m.confidence,
+                message=m.message,
+            )
+            for m in matches
+        ]
+
+    def list_tools(self) -> list[ToolInfoResult]:
+        """List all available tools with their metadata.
+
+        Returns:
+            List of ToolInfoResult with descriptions, keywords, etc.
+        """
+        from moss.dwim import TOOL_ALIASES, TOOL_REGISTRY
+
+        results = []
+        for name, info in TOOL_REGISTRY.items():
+            aliases = [alias for alias, target in TOOL_ALIASES.items() if target == name]
+            results.append(
+                ToolInfoResult(
+                    name=info.name,
+                    description=info.description,
+                    keywords=info.keywords,
+                    parameters=info.parameters,
+                    aliases=aliases,
+                )
+            )
+        return results
+
+    def get_tool_info(self, tool_name: str) -> ToolInfoResult | None:
+        """Get detailed information about a specific tool.
+
+        Args:
+            tool_name: Tool name (can be alias or misspelled)
+
+        Returns:
+            ToolInfoResult or None if tool not found
+        """
+        from moss.dwim import get_tool_info
+
+        info = get_tool_info(tool_name)
+        if info is None:
+            return None
+
+        return ToolInfoResult(
+            name=info["name"],
+            description=info["description"],
+            keywords=info["keywords"],
+            parameters=info["parameters"],
+            aliases=info.get("aliases", []),
+        )
+
+
+@dataclass
 class MossAPI:
     """Unified API for Moss functionality.
 
@@ -636,6 +777,7 @@ class MossAPI:
     _git: GitAPI | None = None
     _context: ContextAPI | None = None
     _health: HealthAPI | None = None
+    _dwim: DWIMAPI | None = None
 
     @classmethod
     def for_project(cls, path: str | Path) -> MossAPI:
@@ -711,6 +853,13 @@ class MossAPI:
         if self._health is None:
             self._health = HealthAPI(root=self.root)
         return self._health
+
+    @property
+    def dwim(self) -> DWIMAPI:
+        """Access semantic tool routing functionality."""
+        if self._dwim is None:
+            self._dwim = DWIMAPI()
+        return self._dwim
 
 
 # Convenience alias

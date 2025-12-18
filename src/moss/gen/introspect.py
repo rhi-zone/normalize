@@ -231,6 +231,7 @@ def introspect_api() -> list[SubAPI]:
     """
     from moss.moss_api import (
         CFGAPI,
+        DWIMAPI,
         AnchorAPI,
         ContextAPI,
         DependencyAPI,
@@ -252,6 +253,7 @@ def introspect_api() -> list[SubAPI]:
         "git": GitAPI,
         "context": ContextAPI,
         "health": HealthAPI,
+        "dwim": DWIMAPI,
     }
 
     results = []

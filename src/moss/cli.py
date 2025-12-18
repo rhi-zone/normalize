@@ -1160,6 +1160,108 @@ def cmd_mcp_server(args: Namespace) -> int:
         return 0
 
 
+def cmd_gen(args: Namespace) -> int:
+    """Generate interface code from MossAPI introspection."""
+    import json as json_mod
+
+    output = setup_output(args)
+    target = getattr(args, "target", "mcp")
+    out_file = getattr(args, "output", None)
+    show_list = getattr(args, "list", False)
+
+    try:
+        if target == "mcp":
+            from moss.gen.mcp import MCPGenerator
+
+            generator = MCPGenerator()
+            if show_list:
+                tools = generator.generate_tools()
+                result = [
+                    {"name": t.name, "description": t.description, "api_path": t.api_path}
+                    for t in tools
+                ]
+                output.data(result)
+            else:
+                definitions = generator.generate_tool_definitions()
+                content = json_mod.dumps(definitions, indent=2)
+                if out_file:
+                    Path(out_file).write_text(content)
+                    output.success(
+                        f"Generated {len(definitions)} MCP tool definitions to {out_file}"
+                    )
+                else:
+                    print(content)
+
+        elif target == "http":
+            from moss.gen.http import HTTPGenerator
+
+            generator = HTTPGenerator()
+            if show_list:
+                routers = generator.generate_routers()
+                result = []
+                for router in routers:
+                    for endpoint in router.endpoints:
+                        result.append(
+                            {
+                                "path": endpoint.path,
+                                "method": endpoint.method,
+                                "description": endpoint.description,
+                            }
+                        )
+                output.data(result)
+            else:
+                spec = generator.generate_openapi_spec()
+                content = json_mod.dumps(spec, indent=2)
+                if out_file:
+                    Path(out_file).write_text(content)
+                    output.success(f"Generated OpenAPI spec to {out_file}")
+                else:
+                    print(content)
+
+        elif target == "cli":
+            from moss.gen.cli import CLIGenerator
+
+            generator = CLIGenerator()
+            if show_list:
+                groups = generator.generate_groups()
+                result = []
+                for group in groups:
+                    for cmd in group.commands:
+                        result.append(
+                            {
+                                "command": f"{group.name} {cmd.name}",
+                                "description": cmd.description,
+                            }
+                        )
+                output.data(result)
+            else:
+                # Generate help text showing all commands
+                parser = generator.generate_parser()
+                parser.print_help()
+
+        elif target == "openapi":
+            from moss.gen.http import HTTPGenerator
+
+            generator = HTTPGenerator()
+            spec = generator.generate_openapi_spec()
+            content = json_mod.dumps(spec, indent=2)
+            if out_file:
+                Path(out_file).write_text(content)
+                output.success(f"Generated OpenAPI spec to {out_file}")
+            else:
+                print(content)
+
+        else:
+            output.error(f"Unknown target: {target}")
+            return 1
+
+        return 0
+    except Exception as e:
+        output.error(f"Generation failed: {e}")
+        output.debug_traceback()
+        return 1
+
+
 def cmd_lsp(args: Namespace) -> int:
     """Start the LSP server for IDE integration."""
     output = setup_output(args)
@@ -3263,6 +3365,31 @@ def create_parser() -> argparse.ArgumentParser:
     # mcp-server command
     mcp_parser = subparsers.add_parser("mcp-server", help="Start MCP server for LLM tool access")
     mcp_parser.set_defaults(func=cmd_mcp_server)
+
+    # gen command
+    gen_parser = subparsers.add_parser(
+        "gen", help="Generate interface code from MossAPI introspection"
+    )
+    gen_parser.add_argument(
+        "--target",
+        "-t",
+        default="mcp",
+        choices=["mcp", "http", "cli", "openapi"],
+        help="Generation target (default: mcp)",
+    )
+    gen_parser.add_argument(
+        "--output",
+        "-o",
+        metavar="FILE",
+        help="Output file (default: stdout)",
+    )
+    gen_parser.add_argument(
+        "--list",
+        "-l",
+        action="store_true",
+        help="List generated items instead of full output",
+    )
+    gen_parser.set_defaults(func=cmd_gen)
 
     # lsp command
     lsp_parser = subparsers.add_parser("lsp", help="Start LSP server for IDE integration")

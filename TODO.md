@@ -25,23 +25,27 @@ Still needed:
 
 **Goal**: Library is the source of truth. Run a generator → server code stays in sync. No manual maintenance of multiple server implementations.
 
-**Already have generators:**
+**Generators available:**
 - `moss.gen.introspect` - Introspect MossAPI structure
 - `moss.gen.http` - Generate FastAPI routes from API
 - `moss.gen.mcp` - Generate MCP tools from API
 - `moss.gen.cli` - Generate CLI commands from API
 
-**But are they actually used?** The servers (`mcp_server.py`, `server/app.py`) look hand-written, not generated. Need to verify:
-- [ ] Are current servers generated or hand-written?
-- [ ] If hand-written, migrate to generated
-- [ ] Add `moss gen --target=mcp` command to regenerate
-- [ ] CI check: generated code matches committed code (no drift)
+**CLI:** `moss gen --target=<mcp|http|cli|openapi> [--output FILE] [--list]`
+
+**Completed:**
+- [x] MCP server now uses generated tools (28 tools from MossAPI introspection)
+- [x] DWIMAPI added to MossAPI (analyze_intent, resolve_tool, list_tools, get_tool_info)
+- [x] `moss gen` CLI command for regenerating interfaces
 
 **Still needed:**
+- [ ] `moss.gen.tui` - Generate TUI (terminal UI) from API
 - [ ] `moss.gen.lsp` - Generate LSP handlers from API
 - [ ] `moss.gen.grpc` - Generate gRPC proto + handlers from API
 - [ ] Unix socket transport option
+- [ ] CI check: generated code matches committed code (no drift)
 - [ ] Documentation: how the generation pipeline works
+- [ ] Migrate HTTP server (`server/app.py`) to use generated routes
 
 ### Non-LLM Code Generators
 
@@ -145,6 +149,32 @@ See `docs/prior-art.md` for research references.
 - [ ] **Investigate OpenHands**: Sandbox/runtime approach, architecture
 
 Key question: Do they do something moss should adopt, or is moss's structural-awareness approach better?
+
+### Agent Learning / Memory
+
+Agents should learn from their mistakes and successes. When moss makes an error, it should record what happened so it (or future sessions) can avoid repeating it.
+
+**Local (per-repo) memory:**
+- [ ] Record mistakes in `.moss/lessons.md` or similar
+- [ ] On error, auto-add entry: what went wrong, what was tried, what worked
+- [ ] Before making changes, check lessons for relevant warnings
+- [ ] Format should be human-readable (markdown) and searchable
+
+**Global (cross-repo) memory:**
+- [ ] Optional `~/.moss/global_lessons.md` for patterns that apply everywhere
+- [ ] Sync mechanism between local and global (promote useful local lessons)
+- [ ] Privacy-aware: user controls what goes global
+
+**Learning triggers:**
+- Validation failures (syntax errors, test failures, lint errors)
+- Rollbacks (shadow git reset)
+- User corrections ("no, do it this way instead")
+- Repeated attempts at the same thing
+
+**Use cases:**
+- "Last time I tried X on this codebase, Y happened"
+- "This codebase prefers pattern A over pattern B"
+- "Don't modify files in vendor/ directory"
 
 ---
 
