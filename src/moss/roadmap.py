@@ -109,17 +109,25 @@ def parse_todo_md(path: Path) -> Roadmap:
             # End of roadmap sections
             break
 
-        # Phase headers (### Phase X: Title or ### Future: Title or ### Title)
-        phase_match = re.match(r"^### (?:Phase )?(\w+):?\s*(.+?)(\s*✅)?$", line)
-        if phase_match:
-            phase_id = phase_match.group(1)
-            title = phase_match.group(2).strip()
-            is_complete = phase_match.group(3) is not None
+        # Phase headers - handle multiple formats:
+        # - "### Phase X: Title" -> id=X, title=Title
+        # - "### Title" -> id="", title=Title
+        # - "### Title ✅" -> id="", title=Title, complete
+        if line.startswith("### "):
+            header_content = line[4:].strip()
+            is_complete = header_content.endswith("✅")
+            if is_complete:
+                header_content = header_content[:-1].strip()
 
-            # Handle "Future: Title" format - title is the full name, no separate ID
-            if phase_id.lower() == "future":
-                phase_id = ""  # Empty ID means show title only
-                # title is already correct
+            # Check for "Phase X:" format
+            phase_id_match = re.match(r"^Phase (\w+):\s*(.+)$", header_content)
+            if phase_id_match:
+                phase_id = phase_id_match.group(1)
+                title = phase_id_match.group(2).strip()
+            else:
+                # No phase ID - use full header as title
+                phase_id = ""
+                title = header_content
 
             if is_complete:
                 status = PhaseStatus.COMPLETE

@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.6.0
+
+### Phase 29: Library-First Architecture
+Hyper-modular refactor with auto-generated interfaces:
+
+**29a: Core Library Refactor**
+- `MossAPI` class as canonical typed API surface
+- Full type hints + docstrings for introspection
+- Library usable without CLI/server dependencies
+- `from moss import MossAPI` as primary entry point
+
+**29b: Plugin Protocol (Everything is a Plugin)**
+- `LinterPlugin` protocol for unified tool integration
+- Native plugins: RuffPlugin, MypyPlugin
+- SARIFAdapter for universal SARIF-outputting tools
+- LinterValidatorAdapter bridging to existing Validator system
+- Version detection and availability checking
+- Entry point discovery (`moss.linters`)
+
+**29c: Interface Generator Layer**
+- `moss.gen.cli` - Generate argparse CLI from API introspection
+- `moss.gen.http` - Generate FastAPI routes from API
+- `moss.gen.mcp` - Generate MCP tool definitions from API
+- `moss.gen.openapi` - Generate OpenAPI spec from API
+- 46 tests for interface generators
+
+**29d: Wrapper Packages**
+- `moss-server` CLI entry point with `--host`, `--port`, `--reload`
+- `moss-mcp` CLI entry point for MCP server
+- `moss[all]` meta-group for full installation
+- All interfaces use optional dependencies for minimal core
+
+**29e: Server Architecture**
+- ServerState with persistent caching (CacheEntry, execute_cached)
+- Cache invalidation by pattern and file mtime
+- FastAPI application with REST endpoints for all MossAPI operations
+- WebSocket endpoint for streaming operations
+- Health check and cache management endpoints
+- 20 tests for server module
+
+### CLI: moss roadmap
+- Parses TODO.md and visualizes project progress
+- TUI mode with box drawing and progress bars
+- Plain text mode for LLMs and piping
+- Auto-detect: TUI at terminal, plain when piped
+- Smart categorization of complete/in-progress/future phases
+
 ## v0.5.0
 
 ### Phase 28: Comprehensive Health Analysis
