@@ -2,9 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Core Rule
+
+**ALWAYS NOTE THINGS DOWN.** The worst thing that can happen is forgetting. When you discover something important - a bug, a design decision, a naming collision, a future improvement - write it down immediately in the appropriate place:
+- Bugs/issues → fix them or add to TODO.md
+- Design decisions → docs/ or code comments
+- Future work → TODO.md
+- Conventions → this file (CLAUDE.md)
+
 ## Project Overview
 
-Moss is a headless agent orchestration layer for AI engineering. It implements a "Compiled Context" approach that prioritizes architectural awareness (AST-based understanding) over raw text processing, with verification loops ensuring correctness before output.
+Moss is tooling orchestration with structural awareness. It implements a "Compiled Context" approach that prioritizes architectural awareness (AST-based understanding) over raw text processing, with verification loops ensuring correctness before output.
 
 ## Development Environment
 

@@ -145,3 +145,14 @@ Use moss to analyze itself and keep documentation current.
 ### Future: Enterprise Features
 - Team collaboration (shared caches)
 - Role-based access control
+
+---
+
+## Notes
+
+### PyPI Naming Collision
+
+There's an existing `moss` package on PyPI (a data science tool requiring numpy/pandas). Before publishing, we need to either:
+- Rename the package (e.g., `moss-tools`, `moss-orchestrate`, `toolmoss`)
+- Check if the existing package is abandoned and claim the name
+- Use a different registry
