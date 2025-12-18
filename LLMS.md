@@ -5,11 +5,18 @@ Quick reference for AI agents working with codebases using Moss.
 ## Quick Start
 
 ```bash
-# Get instant project snapshot (most token-efficient)
+# Get instant project snapshot
 moss --compact overview
 
 # Example output:
-# health: B (82%) | deps: 5 direct, 2 dev | docs: 45% | todos: 3 pending | refs: ok
+# health: B (82%) - 45 files, 12K lines (45% docs)
+#   - docs: Documentation coverage is only 45%
+# deps: 5 direct, 2 dev
+# docs: 45% coverage
+# todos: 3 pending, 8 done
+#   - Add input validation to forms
+#   - Refactor auth module
+# refs: ok
 ```
 
 ## Essential Commands
@@ -26,11 +33,12 @@ moss --compact overview
 ## Output Modes
 
 ```bash
-moss CMD                 # Human-readable (tables, colors)
-moss --compact CMD       # Token-efficient one-liner
-moss --json CMD          # Full structured data
-moss --jq '.field' CMD   # Extract specific fields
+moss CMD                 # Human-readable (full details)
+moss --compact CMD       # Concise but informative (recommended for LLMs)
+moss --json CMD          # Structured data (verbose, not token-efficient)
 ```
+
+Prefer `--compact` over `--json` - JSON has lots of quotes and braces that waste tokens.
 
 ## Presets for CI/Quick Checks
 
@@ -69,8 +77,8 @@ moss external-deps --warn-weight 5  # Heavy dependencies
 
 ## Key Insights
 
-- Use `--compact` for token-efficient output (saves context)
+- Use `--compact` for informative yet concise output (best for LLMs)
+- `overview` shows health, issues, TODOs, and next actions in one command
 - `skeleton` shows structure without reading full files
-- `deps` shows what a file needs and provides
-- `overview` combines health, deps, docs, todos, refs checks
-- `--jq` lets you extract specific fields from JSON output
+- `deps` shows what a file imports and exports
+- Avoid `--json` unless you need structured data - plain text is more token-efficient
