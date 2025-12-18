@@ -2322,6 +2322,7 @@ def cmd_overview(args: Namespace) -> int:
     from moss.external_deps import ExternalDependencyAnalyzer
     from moss.presets import AVAILABLE_CHECKS, get_preset, list_presets
     from moss.status import StatusChecker
+    from moss.summarize import Summarizer
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -2377,12 +2378,27 @@ def cmd_overview(args: Namespace) -> int:
             # Extract top issues by severity for display
             high_issues = [w for w in status.weak_spots if w.severity == "high"]
             med_issues = [w for w in status.weak_spots if w.severity == "medium"]
+            # Get top packages for skeleton summary
+            try:
+                summarizer = Summarizer(include_private=False, include_tests=False)
+                project_summary = summarizer.summarize_project(root)
+                top_packages = [
+                    {"name": p.name, "files": len(p.all_files), "lines": p.total_lines}
+                    for p in sorted(
+                        project_summary.packages, key=lambda x: x.total_lines, reverse=True
+                    )[:5]
+                ]
+            except Exception:
+                top_packages = []
+
             results["health"] = {
                 "grade": status.health_grade,
                 "score": status.health_score,
                 "files": status.total_files,
                 "lines": status.total_lines,
                 "modules": status.total_modules,
+                "classes": status.struct_classes,
+                "functions": status.struct_functions,
                 "doc_coverage": status.doc_coverage,
                 "test_ratio": status.test_ratio,
                 "hotspots": status.struct_hotspots,
@@ -2393,6 +2409,7 @@ def cmd_overview(args: Namespace) -> int:
                     {"cat": w.category, "msg": w.message} for w in (high_issues + med_issues)[:5]
                 ],
                 "next_actions": [a.description for a in status.next_actions[:3]],
+                "top_packages": top_packages,
             }
             if status.weak_spots:
                 has_warnings = True
@@ -2405,10 +2422,19 @@ def cmd_overview(args: Namespace) -> int:
         try:
             analyzer = ExternalDependencyAnalyzer(root)
             deps = analyzer.analyze()
+            # Include top critical/high vulns for inline display
+            critical_vulns = [
+                {"pkg": v.package, "id": v.id, "sev": v.severity} for v in deps.critical_vulns[:3]
+            ]
+            high_vulns = [
+                {"pkg": v.package, "id": v.id, "sev": v.severity} for v in deps.high_vulns[:3]
+            ]
             results["deps"] = {
                 "direct": deps.total_direct,
                 "dev": deps.total_dev,
                 "vulns": len(deps.vulnerabilities),
+                "critical_vulns": critical_vulns,
+                "high_vulns": high_vulns,
                 "license_issues": len(deps.license_issues),
             }
             if deps.vulnerabilities or deps.license_issues:
@@ -2511,7 +2537,16 @@ def _format_overview_compact(results: dict) -> str:
         lines_k = h["lines"] / 1000 if h["lines"] >= 1000 else h["lines"]
         lines_fmt = f"{lines_k:.0f}K" if h["lines"] >= 1000 else str(h["lines"])
 
-        line = f"health: {h['grade']} ({h['score']:.0f}%) - {h['files']} files, {lines_fmt} lines"
+        # Include symbol counts
+        symbols = []
+        if h.get("classes"):
+            symbols.append(f"{h['classes']} classes")
+        if h.get("functions"):
+            symbols.append(f"{h['functions']} funcs")
+        symbols_str = f", {', '.join(symbols)}" if symbols else ""
+
+        base = f"health: {h['grade']} ({h['score']:.0f}%) - {h['files']} files, {lines_fmt} lines"
+        line = f"{base}{symbols_str}"
 
         # Add key metrics that explain the score
         details = []
@@ -2544,6 +2579,12 @@ def _format_overview_compact(results: dict) -> str:
         if d["license_issues"]:
             deps_line += f" - {d['license_issues']} license issues"
         lines.append(deps_line)
+
+        # Show critical/high vulns inline
+        for vuln in d.get("critical_vulns", []):
+            lines.append(f"  [CRITICAL] {vuln['pkg']}: {vuln['id']}")
+        for vuln in d.get("high_vulns", []):
+            lines.append(f"  [HIGH] {vuln['pkg']}: {vuln['id']}")
 
     # Docs
     if "docs" in results and "error" not in results["docs"]:
@@ -2589,6 +2630,11 @@ def _format_overview_markdown(results: dict) -> str:
 
             lines.append(f"Health: {h['grade']} ({h['score']:.0f}/100)")
             lines.append(f"  {h['files']} files, {lines_fmt} lines, {h.get('modules', 0)} modules")
+            # Symbol counts
+            classes = h.get("classes", 0)
+            funcs = h.get("functions", 0)
+            if classes or funcs:
+                lines.append(f"  {classes} classes, {funcs} functions")
             doc_cov = h.get("doc_coverage", 0)
             test_rat = h.get("test_ratio", 0)
             lines.append(f"  Docs: {doc_cov:.0%} | Tests: {test_rat:.1f}x ratio")
@@ -2610,6 +2656,13 @@ def _format_overview_markdown(results: dict) -> str:
                 for action in h["next_actions"]:
                     text = action[:70] + "..." if len(action) > 70 else action
                     lines.append(f"  - {text}")
+
+            # Show top packages (skeleton summary)
+            if h.get("top_packages"):
+                lines.append("")
+                lines.append("Structure:")
+                for pkg in h["top_packages"]:
+                    lines.append(f"  {pkg['name']}/: {pkg['files']} files, {pkg['lines']} lines")
         else:
             lines.append(f"Health: ERROR - {results['health']['error']}")
         lines.append("")
@@ -2621,6 +2674,11 @@ def _format_overview_markdown(results: dict) -> str:
             lines.append(f"Dependencies: {d['direct']} direct, {d['dev']} dev")
             if d["vulns"]:
                 lines.append(f"  [!] {d['vulns']} vulnerabilities")
+                # Show critical/high vulns inline
+                for vuln in d.get("critical_vulns", []):
+                    lines.append(f"      [CRITICAL] {vuln['pkg']}: {vuln['id']}")
+                for vuln in d.get("high_vulns", []):
+                    lines.append(f"      [HIGH] {vuln['pkg']}: {vuln['id']}")
             if d["license_issues"]:
                 lines.append(f"  [!] {d['license_issues']} license issues")
         else:

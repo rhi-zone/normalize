@@ -79,6 +79,8 @@ A fresh session with good documentation beats a stale session with bloated conte
 
 Each commit should be a **unit of work** - a single logical change that could be reverted independently. Not "fixed stuff" but "fix: handle null response in validator loop".
 
+**Move completed TODOs to CHANGELOG.** When finishing features from TODO.md, move them to CHANGELOG.md under the appropriate version. Keep TODO.md focused on future work.
+
 ### Code Quality
 
 Linting: `ruff check` and `ruff format` (enforced once CI exists)
