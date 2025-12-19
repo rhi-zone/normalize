@@ -835,9 +835,9 @@ class LLMToolExecutor:
     async def _execute_llm(
         self, tool_name: str, context: LoopContext, step: LoopStep
     ) -> tuple[Any, int, int]:
-        """Execute an LLM-based tool.
+        """Execute an LLM-based tool via litellm.
 
-        Uses google-genai for Gemini models. Falls back to litellm for others.
+        litellm provides unified access to all providers (Gemini, OpenAI, Anthropic, etc.)
         """
         # Extract the specific LLM operation
         operation = tool_name.split(".", 1)[1] if "." in tool_name else tool_name
@@ -852,66 +852,17 @@ class LLMToolExecutor:
             tokens_out = len(mock_response) // 4
             return mock_response, tokens_in, tokens_out
 
-        # Route based on model prefix
-        if self.config.model.startswith("gemini/"):
-            return await self._call_gemini(prompt)
-        else:
-            return await self._call_litellm(prompt)
-
-    async def _call_gemini(self, prompt: str) -> tuple[str, int, int]:
-        """Call Gemini via google-genai SDK."""
-        import asyncio
-
-        try:
-            from google import genai
-        except ImportError as e:
-            raise ImportError(
-                "google-genai required for Gemini. Install with: pip install 'moss[gemini]'"
-            ) from e
-
-        def _sync_call() -> tuple[str, int, int]:
-            client = genai.Client()  # Uses GOOGLE_API_KEY env var
-
-            # Build config
-            config: dict[str, Any] = {}
-            if self.config.system_prompt:
-                config["system_instruction"] = self.config.system_prompt
-            if self.config.max_tokens:
-                config["max_output_tokens"] = self.config.max_tokens
-            if self.config.temperature > 0:
-                config["temperature"] = self.config.temperature
-
-            # Extract model name (remove "gemini/" prefix)
-            model_name = self.config.model
-            if model_name.startswith("gemini/"):
-                model_name = model_name[7:]
-
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config=config if config else None,
-            )
-
-            text = response.text or ""
-            tokens_in = 0
-            tokens_out = 0
-            if hasattr(response, "usage_metadata") and response.usage_metadata:
-                tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
-                tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
-
-            return text, tokens_in, tokens_out
-
-        return await asyncio.to_thread(_sync_call)
+        return await self._call_litellm(prompt)
 
     async def _call_litellm(self, prompt: str) -> tuple[str, int, int]:
-        """Call LLM via litellm (for non-Gemini models)."""
+        """Call LLM via litellm (unified interface for all providers)."""
         import asyncio
 
         try:
             from litellm import completion
         except ImportError as e:
             raise ImportError(
-                "litellm required for non-Gemini models. Install with: pip install 'moss[llm]'"
+                "litellm required for LLM calls. Install with: pip install 'moss[llm]'"
             ) from e
 
         def _sync_call() -> tuple[str, int, int]:

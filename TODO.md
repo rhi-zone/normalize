@@ -6,31 +6,14 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ## Next Up
 
-**For next session (autonomous, longer):**
+**Session progress:**
 
-1. **Add loop tests with mock LLM** (small) - Ensure loops work
-   - Unit tests for AgentLoopRunner with mock executor
-   - Test LoopContext passing between steps
-   - Test LLM/tool routing in LLMToolExecutor
-   - Test token tracking
-   - File: `tests/test_agent_loop.py`
+1. ~~**Add loop tests with mock LLM**~~ ✅ - 41 tests in `tests/test_agent_loop.py`
+2. ~~**CLI integration for loops**~~ ✅ - `moss loop list/run/benchmark`
+3. ~~**Build a real agentic task**~~ ✅ - analysis + docstring loops working E2E with Gemini
+4. ~~**Fix litellm Nix compatibility**~~ ✅ - Fixed via LD_LIBRARY_PATH in flake.nix
 
-2. **CLI integration for loops** (medium) - Make loops accessible
-   - `moss loop run <loop-name> --file <path>` - run a named loop
-   - `moss loop list` - show available loops (simple_loop, critic_loop, etc.)
-   - `moss loop benchmark` - compare loop performance
-   - Pattern: follow existing CLI structure in `src/moss/cli.py`
-
-3. **Build a real agentic task** (medium) - Prove the loop works E2E
-   - Example: "Add docstrings to all functions in file X"
-   - Loop: skeleton → LLM generate docstrings → patch apply → validate
-   - Test with real Gemini calls, measure tokens used
-
-4. ~~**Fix litellm Nix compatibility**~~ ✅ **FIXED** (Dec 2025)
-   - litellm now works in Nix without issues
-   - See backlog: "Switch LLM executor to litellm"
-
-**Continue autonomously** - After completing the above, keep picking up tasks from Backlog. We can dogfood moss tools indefinitely, but review this log periodically to ensure we're making real progress, not going in circles with "optimizations".
+**Continue autonomously** - Keep picking up tasks from Backlog. Review log periodically to ensure real progress, not circular optimizations.
 
 **Backlog (small):**
 - [ ] **Switch LLM executor to litellm** - Remove Gemini special-casing
