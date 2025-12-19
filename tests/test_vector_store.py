@@ -6,6 +6,7 @@ from moss.vector_store import (
     ChromaVectorStore,
     InMemoryVectorStore,
     SearchResult,
+    SQLiteVectorStore,
     VectorStore,
     create_vector_store,
     document_hash,
@@ -181,12 +182,120 @@ class TestChromaVectorStore:
         assert isinstance(store, VectorStore)
 
 
+class TestSQLiteVectorStore:
+    """Tests for SQLiteVectorStore."""
+
+    @pytest.fixture
+    def store(self, tmp_path) -> SQLiteVectorStore:
+        db_path = tmp_path / "test.db"
+        return SQLiteVectorStore(db_path=str(db_path))
+
+    async def test_add_and_get(self, store: SQLiteVectorStore):
+        await store.add("doc1", "Python function for parsing", {"type": "code"})
+
+        result = await store.get("doc1")
+
+        assert result is not None
+        assert result.id == "doc1"
+        assert result.document == "Python function for parsing"
+        assert result.metadata["type"] == "code"
+
+    async def test_get_nonexistent(self, store: SQLiteVectorStore):
+        result = await store.get("nonexistent")
+        assert result is None
+
+    async def test_search(self, store: SQLiteVectorStore):
+        await store.add("doc1", "Python function for parsing config", {"type": "code"})
+        await store.add("doc2", "JavaScript module for API calls", {"type": "code"})
+
+        results = await store.search("parsing config", limit=5)
+
+        assert len(results) >= 1
+        # Python doc should be most relevant
+        assert results[0].id == "doc1"
+
+    async def test_search_empty_query(self, store: SQLiteVectorStore):
+        await store.add("doc1", "Some content", {})
+        results = await store.search("", limit=5)
+        assert len(results) == 0
+
+    async def test_search_with_filter(self, store: SQLiteVectorStore):
+        await store.add("doc1", "Python code", {"type": "code"})
+        await store.add("doc2", "Python docs", {"type": "doc"})
+
+        results = await store.search("Python", filter={"type": "doc"})
+
+        assert len(results) == 1
+        assert results[0].id == "doc2"
+
+    async def test_delete(self, store: SQLiteVectorStore):
+        await store.add("doc1", "Test document", {})
+
+        assert await store.delete("doc1")
+        assert await store.get("doc1") is None
+        assert not await store.delete("doc1")  # Already deleted
+
+    async def test_count(self, store: SQLiteVectorStore):
+        assert await store.count() == 0
+
+        await store.add("doc1", "First", {})
+        await store.add("doc2", "Second", {})
+
+        assert await store.count() == 2
+
+    async def test_clear(self, store: SQLiteVectorStore):
+        await store.add("doc1", "First", {})
+        await store.add("doc2", "Second", {})
+
+        await store.clear()
+
+        assert await store.count() == 0
+
+    async def test_add_batch(self, store: SQLiteVectorStore):
+        await store.add_batch(
+            ids=["doc1", "doc2"],
+            documents=["First document", "Second document"],
+            metadatas=[{"type": "a"}, {"type": "b"}],
+        )
+
+        assert await store.count() == 2
+        doc1 = await store.get("doc1")
+        assert doc1 is not None
+        assert doc1.metadata["type"] == "a"
+
+    async def test_protocol_compliance(self, store: SQLiteVectorStore):
+        """Verify SQLiteVectorStore satisfies VectorStore protocol."""
+        assert isinstance(store, VectorStore)
+
+    async def test_persistence(self, tmp_path):
+        """Verify data persists across store instances."""
+        db_path = tmp_path / "persist_test.db"
+
+        # Create first store and add data
+        store1 = SQLiteVectorStore(db_path=str(db_path))
+        await store1.add("doc1", "Persistent data", {"version": 1})
+        store1.close()
+
+        # Create second store and verify data
+        store2 = SQLiteVectorStore(db_path=str(db_path))
+        result = await store2.get("doc1")
+
+        assert result is not None
+        assert result.document == "Persistent data"
+        store2.close()
+
+
 class TestCreateVectorStore:
     """Tests for create_vector_store factory."""
 
     def test_create_memory_store(self):
         store = create_vector_store("memory")
         assert isinstance(store, InMemoryVectorStore)
+
+    def test_create_sqlite_store(self, tmp_path):
+        db_path = tmp_path / "factory_test.db"
+        store = create_vector_store("sqlite", db_path=str(db_path))
+        assert isinstance(store, SQLiteVectorStore)
 
     def test_create_chroma_store(self):
         store = create_vector_store("chroma", collection_name="test")

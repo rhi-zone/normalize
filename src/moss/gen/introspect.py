@@ -232,6 +232,7 @@ def introspect_api() -> list[SubAPI]:
     from moss.moss_api import (
         CFGAPI,
         DWIMAPI,
+        RAGAPI,
         AnchorAPI,
         ComplexityAPI,
         ContextAPI,
@@ -265,6 +266,7 @@ def introspect_api() -> list[SubAPI]:
         "ref_check": RefCheckAPI,
         "git_hotspots": GitHotspotsAPI,
         "external_deps": ExternalDepsAPI,
+        "rag": RAGAPI,
     }
 
     results = []

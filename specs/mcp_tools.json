@@ -682,5 +682,73 @@
       "type": "object"
     },
     "name": "external_deps_list_direct"
+  },
+  {
+    "description": "Clear the index. Dict with 'success' boolean",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "rag_clear"
+  },
+  {
+    "description": "Index files for semantic search. Number of chunks indexed",
+    "inputSchema": {
+      "properties": {
+        "force": {
+          "default": false,
+          "description": "Re-index even if content hasn't changed",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Directory to index (defaults to project root)",
+          "type": "string"
+        },
+        "patterns": {
+          "description": "Glob patterns to include (default: code and docs)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "rag_index"
+  },
+  {
+    "description": "Search the index with natural language or code queries. List of SearchResult objects with file paths, scores, and snippets",
+    "inputSchema": {
+      "properties": {
+        "kind": {
+          "description": "Filter by symbol kind (e.g., \"function\", \"class\", \"module\")",
+          "type": "string"
+        },
+        "limit": {
+          "default": 10,
+          "description": "Maximum results to return",
+          "type": "integer"
+        },
+        "mode": {
+          "default": "hybrid",
+          "description": "Search mode - \"hybrid\", \"embedding\", or \"tfidf\"",
+          "type": "string"
+        },
+        "query": {
+          "description": "Natural language or code query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "rag_search"
+  },
+  {
+    "description": "Get index statistics. IndexStats with document count, files indexed, and backend info",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "rag_stats"
   }
 ]

@@ -55,6 +55,14 @@ class SearchResult:
             "snippet": self.snippet[:200] + "..." if len(self.snippet) > 200 else self.snippet,
         }
 
+    def to_compact(self) -> str:
+        """Format for LLM consumption."""
+        symbol = self.symbol_name or self.file_path.split("/")[-1]
+        kind = f" ({self.symbol_kind})" if self.symbol_kind else ""
+        score = f"{self.score:.2f}"
+        snippet_preview = self.snippet.strip().split("\n")[0][:60]
+        return f"{symbol}{kind} [{score}] {self.file_path}:{self.line_start} - {snippet_preview}..."
+
 
 @dataclass
 class IndexStats:
@@ -72,6 +80,13 @@ class IndexStats:
             "index_path": self.index_path,
             "backend": self.backend,
         }
+
+    def to_compact(self) -> str:
+        """Format for LLM consumption."""
+        return (
+            f"RAG Index ({self.backend}): "
+            f"{self.total_documents} chunks from {self.files_indexed} files"
+        )
 
 
 @dataclass
@@ -112,8 +127,13 @@ class RAGIndex:
         # Ensure index directory exists
         self.index_path.mkdir(parents=True, exist_ok=True)
 
-        # Try ChromaDB first, fall back to in-memory
+        # Priority: ChromaDB > SQLite > In-memory
+        # ChromaDB: best embeddings but has binary deps
+        # SQLite: persistent TF-IDF, no binary deps (works in Nix)
+        # In-memory: fallback when nothing else works
         store = None
+
+        # Try ChromaDB first (best quality)
         try:
             import chromadb  # noqa: F401 - check if available
 
@@ -128,14 +148,28 @@ class RAGIndex:
         except ImportError:
             pass
 
+        # Fall back to SQLite (persistent, no binary deps)
+        if store is None:
+            try:
+                from moss.vector_store import SQLiteVectorStore
+
+                store = SQLiteVectorStore(
+                    db_path=str(self.index_path / "vectors.db"),
+                )
+                self._backend = "sqlite"
+                logger.debug("Using SQLite backend for RAG index (persistent)")
+            except Exception as e:
+                logger.warning("SQLite backend failed: %s", e)
+
+        # Last resort: in-memory (non-persistent)
         if store is None:
             from moss.vector_store import InMemoryVectorStore
 
             store = InMemoryVectorStore()
             self._backend = "memory"
             logger.warning(
-                "ChromaDB not installed. Using in-memory backend (index won't persist). "
-                "Install chromadb for persistent search: pip install chromadb"
+                "Using in-memory backend (index won't persist). "
+                "SQLite should normally work - check for errors above."
             )
 
         tfidf = TFIDFIndex()

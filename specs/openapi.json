@@ -987,6 +987,121 @@
         ]
       }
     },
+    "/rag/clear": {
+      "post": {
+        "description": "Clear the index. Dict with 'success' boolean",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Clear the index",
+        "tags": [
+          "rag"
+        ]
+      }
+    },
+    "/rag/index": {
+      "post": {
+        "description": "Index files for semantic search. Number of chunks indexed",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "force": {
+                    "default": false,
+                    "description": "Re-index even if content hasn't changed",
+                    "type": "boolean"
+                  },
+                  "path": {
+                    "description": "Directory to index (defaults to project root)",
+                    "type": "string"
+                  },
+                  "patterns": {
+                    "description": "Glob patterns to include (default: code and docs)",
+                    "type": "array"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Index files for semantic search",
+        "tags": [
+          "rag"
+        ]
+      }
+    },
+    "/rag/search": {
+      "post": {
+        "description": "Search the index with natural language or code queries. List of SearchResult objects with file paths, scores, and snippets",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "kind": {
+                    "description": "Filter by symbol kind (e.g., \"function\", \"class\", \"module\")",
+                    "type": "string"
+                  },
+                  "limit": {
+                    "default": 10,
+                    "description": "Maximum results to return",
+                    "type": "integer"
+                  },
+                  "mode": {
+                    "default": "hybrid",
+                    "description": "Search mode - \"hybrid\", \"embedding\", or \"tfidf\"",
+                    "type": "string"
+                  },
+                  "query": {
+                    "description": "Natural language or code query",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Search the index with natural language or code queries",
+        "tags": [
+          "rag"
+        ]
+      }
+    },
+    "/rag/stats": {
+      "post": {
+        "description": "Get index statistics. IndexStats with document count, files indexed, and backend info",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get index statistics",
+        "tags": [
+          "rag"
+        ]
+      }
+    },
     "/ref_check/check": {
       "get": {
         "description": "Run bidirectional reference check. RefCheckResult with valid, broken, and stale references",
@@ -1301,6 +1416,10 @@
     {
       "description": "API for external dependency analysis. Analyzes PyPI/npm dependencies including transitive dependencies, security vulnerabilities, and license compatibility.",
       "name": "external_deps"
+    },
+    {
+      "description": "API for RAG (Retrieval-Augmented Generation) semantic search. Provides semantic code search capabilities using vector embeddings. Index your codebase once, then search with natural language queries.",
+      "name": "rag"
     }
   ]
 }

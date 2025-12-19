@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from moss.external_deps import DependencyAnalysisResult
     from moss.git_hotspots import GitHotspotAnalysis
     from moss.patches import Patch, PatchResult
+    from moss.rag import IndexStats, RAGIndex, SearchResult
     from moss.shadow_git import CommitHandle, ShadowBranch, ShadowGit
     from moss.skeleton import Symbol
     from moss.status import ProjectStatus
@@ -1066,6 +1067,86 @@ class WeaknessesAPI:
 
 
 @dataclass
+class RAGAPI:
+    """API for RAG (Retrieval-Augmented Generation) semantic search.
+
+    Provides semantic code search capabilities using vector embeddings.
+    Index your codebase once, then search with natural language queries.
+    """
+
+    root: Path
+    _index: RAGIndex | None = None
+
+    def _get_index(self) -> RAGIndex:
+        """Get or create the RAG index."""
+        if self._index is None:
+            from moss.rag import RAGIndex
+
+            self._index = RAGIndex(self.root)
+        return self._index
+
+    async def index(
+        self,
+        path: str | Path | None = None,
+        patterns: list[str] | None = None,
+        force: bool = False,
+    ) -> int:
+        """Index files for semantic search.
+
+        Args:
+            path: Directory to index (defaults to project root)
+            patterns: Glob patterns to include (default: code and docs)
+            force: Re-index even if content hasn't changed
+
+        Returns:
+            Number of chunks indexed
+        """
+        idx = self._get_index()
+        target = Path(path) if path else None
+        return await idx.index(path=target, patterns=patterns, force=force)
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 10,
+        mode: str = "hybrid",
+        kind: str | None = None,
+    ) -> list[SearchResult]:
+        """Search the index with natural language or code queries.
+
+        Args:
+            query: Natural language or code query
+            limit: Maximum results to return
+            mode: Search mode - "hybrid", "embedding", or "tfidf"
+            kind: Filter by symbol kind (e.g., "function", "class", "module")
+
+        Returns:
+            List of SearchResult objects with file paths, scores, and snippets
+        """
+        idx = self._get_index()
+        return await idx.search(query, limit=limit, mode=mode, kind=kind)
+
+    async def stats(self) -> IndexStats:
+        """Get index statistics.
+
+        Returns:
+            IndexStats with document count, files indexed, and backend info
+        """
+        idx = self._get_index()
+        return await idx.stats()
+
+    async def clear(self) -> dict[str, bool]:
+        """Clear the index.
+
+        Returns:
+            Dict with 'success' boolean
+        """
+        idx = self._get_index()
+        await idx.clear()
+        return {"success": True}
+
+
+@dataclass
 class ToolMatchResult:
     """Result of matching a query to a tool.
 
@@ -1294,6 +1375,7 @@ class MossAPI:
     _git_hotspots: GitHotspotsAPI | None = None
     _external_deps: ExternalDepsAPI | None = None
     _weaknesses: WeaknessesAPI | None = None
+    _rag: RAGAPI | None = None
 
     @classmethod
     def for_project(cls, path: str | Path) -> MossAPI:
@@ -1432,6 +1514,13 @@ class MossAPI:
         if self._weaknesses is None:
             self._weaknesses = WeaknessesAPI(root=self.root)
         return self._weaknesses
+
+    @property
+    def rag(self) -> RAGAPI:
+        """Access RAG (semantic search) functionality."""
+        if self._rag is None:
+            self._rag = RAGAPI(root=self.root)
+        return self._rag
 
 
 # Convenience alias

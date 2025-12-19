@@ -416,6 +416,254 @@ class ChromaVectorStore:
         self._collection = self._client.create_collection(**kwargs)
 
 
+class SQLiteVectorStore:
+    """Vector store backed by SQLite for persistent TF-IDF search.
+
+    This provides a lightweight persistent alternative to ChromaDB that works
+    in Nix environments without binary dependencies. Uses TF-IDF for ranking.
+
+    Usage:
+        store = SQLiteVectorStore(db_path=".moss/rag/vectors.db")
+    """
+
+    def __init__(self, db_path: str) -> None:
+        """Initialize SQLite store.
+
+        Args:
+            db_path: Path to SQLite database file
+        """
+        self._db_path = db_path
+        self._conn: Any = None
+
+    def _ensure_initialized(self) -> None:
+        """Lazily initialize SQLite connection and tables."""
+        if self._conn is not None:
+            return
+
+        import json
+        import sqlite3
+        from pathlib import Path
+
+        # Ensure directory exists
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
+
+        self._conn = sqlite3.connect(self._db_path)
+        self._conn.row_factory = sqlite3.Row
+
+        # Create tables
+        self._conn.executescript("""
+            CREATE TABLE IF NOT EXISTS documents (
+                id TEXT PRIMARY KEY,
+                document TEXT NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}'
+            );
+
+            CREATE TABLE IF NOT EXISTS word_index (
+                word TEXT NOT NULL,
+                doc_id TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (word, doc_id),
+                FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_word ON word_index(word);
+        """)
+        self._conn.commit()
+
+        # Store json module reference for later use
+        self._json = json
+
+    def _tokenize(self, text: str) -> dict[str, int]:
+        """Tokenize text into word counts."""
+        import re
+
+        words = re.findall(r"\b\w+\b", text.lower())
+        counts: dict[str, int] = {}
+        for word in words:
+            if len(word) >= 2:  # Skip single chars
+                counts[word] = counts.get(word, 0) + 1
+        return counts
+
+    async def add(
+        self,
+        id: str,
+        document: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a document to SQLite."""
+        self._ensure_initialized()
+
+        metadata = metadata or {}
+        metadata_json = self._json.dumps(metadata)
+
+        # Delete existing if present
+        self._conn.execute("DELETE FROM word_index WHERE doc_id = ?", (id,))
+        self._conn.execute("DELETE FROM documents WHERE id = ?", (id,))
+
+        # Insert document
+        self._conn.execute(
+            "INSERT INTO documents (id, document, metadata) VALUES (?, ?, ?)",
+            (id, document, metadata_json),
+        )
+
+        # Index words
+        word_counts = self._tokenize(document)
+        for word, count in word_counts.items():
+            self._conn.execute(
+                "INSERT INTO word_index (word, doc_id, count) VALUES (?, ?, ?)",
+                (word, id, count),
+            )
+
+        self._conn.commit()
+
+    async def add_batch(
+        self,
+        ids: list[str],
+        documents: list[str],
+        metadatas: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Add multiple documents in a batch."""
+        self._ensure_initialized()
+        metadatas = metadatas or [{} for _ in ids]
+
+        # Process in a transaction for efficiency
+        for id, doc, meta in zip(ids, documents, metadatas, strict=True):
+            metadata_json = self._json.dumps(meta)
+
+            self._conn.execute("DELETE FROM word_index WHERE doc_id = ?", (id,))
+            self._conn.execute("DELETE FROM documents WHERE id = ?", (id,))
+
+            self._conn.execute(
+                "INSERT INTO documents (id, document, metadata) VALUES (?, ?, ?)",
+                (id, doc, metadata_json),
+            )
+
+            word_counts = self._tokenize(doc)
+            for word, count in word_counts.items():
+                self._conn.execute(
+                    "INSERT INTO word_index (word, doc_id, count) VALUES (?, ?, ?)",
+                    (word, id, count),
+                )
+
+        self._conn.commit()
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 10,
+        filter: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
+        """Search using TF-IDF-like scoring."""
+        self._ensure_initialized()
+
+        query_words = list(self._tokenize(query).keys())
+        if not query_words:
+            return []
+
+        # Build query to find documents matching any query word
+        placeholders = ",".join("?" * len(query_words))
+        sql = f"""
+            SELECT doc_id, SUM(count) as score
+            FROM word_index
+            WHERE word IN ({placeholders})
+            GROUP BY doc_id
+            ORDER BY score DESC
+            LIMIT ?
+        """
+
+        cursor = self._conn.execute(sql, [*query_words, limit * 2])  # Fetch extra for filtering
+        doc_scores = [(row["doc_id"], row["score"]) for row in cursor]
+
+        if not doc_scores:
+            return []
+
+        # Normalize scores
+        max_score = max(score for _, score in doc_scores)
+        normalized = [(doc_id, score / max_score) for doc_id, score in doc_scores]
+
+        # Fetch documents and apply filter
+        results = []
+        for doc_id, score in normalized:
+            if len(results) >= limit:
+                break
+
+            row = self._conn.execute(
+                "SELECT document, metadata FROM documents WHERE id = ?",
+                (doc_id,),
+            ).fetchone()
+
+            if row:
+                metadata = self._json.loads(row["metadata"])
+
+                # Apply filter
+                if filter:
+                    if not all(metadata.get(k) == v for k, v in filter.items()):
+                        continue
+
+                results.append(
+                    SearchResult(
+                        id=doc_id,
+                        score=score,
+                        metadata=metadata,
+                        document=row["document"],
+                    )
+                )
+
+        return results
+
+    async def get(self, id: str) -> SearchResult | None:
+        """Get a document by ID."""
+        self._ensure_initialized()
+
+        row = self._conn.execute(
+            "SELECT document, metadata FROM documents WHERE id = ?",
+            (id,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        return SearchResult(
+            id=id,
+            score=1.0,
+            metadata=self._json.loads(row["metadata"]),
+            document=row["document"],
+        )
+
+    async def delete(self, id: str) -> bool:
+        """Delete a document by ID."""
+        self._ensure_initialized()
+
+        # Check if exists
+        existing = await self.get(id)
+        if existing is None:
+            return False
+
+        self._conn.execute("DELETE FROM word_index WHERE doc_id = ?", (id,))
+        self._conn.execute("DELETE FROM documents WHERE id = ?", (id,))
+        self._conn.commit()
+        return True
+
+    async def count(self) -> int:
+        """Get the total number of documents."""
+        self._ensure_initialized()
+        row = self._conn.execute("SELECT COUNT(*) as cnt FROM documents").fetchone()
+        return row["cnt"] if row else 0
+
+    async def clear(self) -> None:
+        """Remove all documents."""
+        self._ensure_initialized()
+        self._conn.execute("DELETE FROM word_index")
+        self._conn.execute("DELETE FROM documents")
+        self._conn.commit()
+
+    def close(self) -> None:
+        """Close the database connection."""
+        if self._conn:
+            self._conn.close()
+            self._conn = None
+
+
 def create_vector_store(
     backend: str = "memory",
     **kwargs: Any,
@@ -423,7 +671,7 @@ def create_vector_store(
     """Factory function to create a vector store.
 
     Args:
-        backend: Store backend ("memory" or "chroma")
+        backend: Store backend ("memory", "sqlite", or "chroma")
         **kwargs: Backend-specific configuration
 
     Returns:
@@ -433,7 +681,10 @@ def create_vector_store(
         # In-memory store
         store = create_vector_store("memory")
 
-        # ChromaDB store
+        # SQLite store (persistent, no binary deps)
+        store = create_vector_store("sqlite", db_path=".moss/rag/vectors.db")
+
+        # ChromaDB store (requires chromadb package)
         store = create_vector_store(
             "chroma",
             collection_name="my_collection",
@@ -442,10 +693,12 @@ def create_vector_store(
     """
     if backend == "memory":
         return InMemoryVectorStore()
+    elif backend == "sqlite":
+        return SQLiteVectorStore(**kwargs)
     elif backend == "chroma":
         return ChromaVectorStore(**kwargs)
     else:
-        raise ValueError(f"Unknown backend: {backend}. Use 'memory' or 'chroma'.")
+        raise ValueError(f"Unknown backend: {backend}. Use 'memory', 'sqlite', or 'chroma'.")
 
 
 def document_hash(content: str) -> str:
