@@ -8,22 +8,20 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session:
 
-- [ ] **Unix socket transport** (small) - Add Unix socket option for local MCP connections
-- [ ] **Generator documentation** (small) - Document how the generation pipeline works
-- [ ] **Drift auto-update hook** (small) - Add pre-commit hook to auto-update specs
-- [ ] **`moss todo` command** (small) - Read/search TODOs, not just count them (dogfooding discovery)
+- [ ] **`moss todo` command** (small) - Read/search TODOs, not just count them (uses existing `roadmap.py`)
 - [ ] **DWIM auto-registration** (medium) - Only 7 tools in DWIM, but 38+ MCP tools; auto-generate from MossAPI
 - [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator; ensures MCP/CLI parity
-- [ ] **Complexity hotspots** (medium) - 60 functions ≥15 complexity, worst: `_generate_candidates` (47), `cmd_query` (46)
+- [ ] **Complexity hotspots** (medium) - 60 functions with complexity ≥15 need refactoring
 
 **Recently completed:**
+- [x] SkeletonAPI plugin routing - MCP `skeleton_format` now uses plugin registry (supports markdown)
+- [x] Unix socket transport - `moss mcp-server --socket /tmp/moss.sock` for local IPC
+- [x] Generator documentation - `docs/architecture/generators.md`
 - [x] RAG to MossAPI/MCP - `rag_index`, `rag_search`, `rag_stats`, `rag_clear` tools exposed
 - [x] SQLite vector store backend - Persistent TF-IDF search for Nix environments (no binary deps)
 - [x] RAG integration tests - 18 comprehensive tests for RAG functionality
 - [x] Live TODO tracking - `moss.live_todos` with session persistence, callbacks, real-time display
 - [x] `moss explore` REPL - Tab completion, history, commands: skeleton, deps, cfg, anchors, query, search, complexity, health, tree
-- [x] RAG / Semantic Search - `moss rag index/search/stats/clear` (in-memory works, chromadb for persistence)
-- [x] CLI/MCP help improvements - `moss help` with categories, examples, and enhanced MCP descriptions
 
 ## Future Work
 
