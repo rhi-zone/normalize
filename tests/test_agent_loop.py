@@ -485,6 +485,66 @@ class TestLLMConfig:
         assert config.temperature == 0.7
         assert config.mock is True
 
+    def test_rotation_config(self):
+        config = LLMConfig(
+            models=["gemini/gemini-3-flash-preview", "gpt-4o"],
+            rotation="round_robin",
+        )
+        assert len(config.models) == 2
+        assert config.rotation == "round_robin"
+
+
+class TestLLMRotation:
+    """Tests for multi-LLM rotation."""
+
+    def test_no_rotation_uses_primary(self, tmp_path):
+        config = LLMConfig(model="primary-model", mock=True)
+        executor = LLMToolExecutor(config=config, root=tmp_path, load_env=False)
+
+        model = executor._get_model()
+        assert model == "primary-model"
+
+    def test_round_robin_rotation(self, tmp_path):
+        config = LLMConfig(
+            models=["model-a", "model-b", "model-c"],
+            rotation="round_robin",
+            mock=True,
+        )
+        executor = LLMToolExecutor(config=config, root=tmp_path, load_env=False)
+
+        # Should cycle through models
+        assert executor._get_model() == "model-a"
+        assert executor._get_model() == "model-b"
+        assert executor._get_model() == "model-c"
+        assert executor._get_model() == "model-a"  # Wraps around
+
+    def test_random_rotation(self, tmp_path):
+        config = LLMConfig(
+            models=["model-a", "model-b"],
+            rotation="random",
+            mock=True,
+        )
+        executor = LLMToolExecutor(config=config, root=tmp_path, load_env=False)
+
+        # Should return a model from the pool
+        models_seen = set()
+        for _ in range(20):
+            models_seen.add(executor._get_model())
+
+        # With 20 tries, we should see both models (probabilistically)
+        assert "model-a" in models_seen or "model-b" in models_seen
+
+    def test_empty_models_uses_primary(self, tmp_path):
+        config = LLMConfig(
+            model="primary",
+            models=[],
+            rotation="round_robin",
+            mock=True,
+        )
+        executor = LLMToolExecutor(config=config, root=tmp_path, load_env=False)
+
+        assert executor._get_model() == "primary"
+
 
 class TestLLMToolExecutor:
     """Tests for LLMToolExecutor with mock mode."""

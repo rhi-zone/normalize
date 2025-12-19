@@ -727,7 +727,9 @@ class LLMConfig:
     litellm conventions (e.g., "gemini/gemini-2.0-flash", "gpt-4o").
 
     Attributes:
-        model: Model name in litellm format (see litellm docs for all options)
+        model: Primary model name (used if models is empty)
+        models: List of models for rotation (reduces single-model bias)
+        rotation: Rotation strategy ("round_robin", "random", or None to disable)
         temperature: Sampling temperature (0.0 = deterministic)
         max_tokens: Maximum tokens in response
         system_prompt: Optional system prompt (prepended to all requests)
@@ -744,9 +746,17 @@ class LLMConfig:
         - GOOGLE_API_KEY for Gemini
         - OPENAI_API_KEY for OpenAI
         - ANTHROPIC_API_KEY for Anthropic
+
+    Example with rotation:
+        config = LLMConfig(
+            models=["gemini/gemini-3-flash-preview", "gpt-4o"],
+            rotation="round_robin"
+        )
     """
 
     model: str = "gemini/gemini-3-flash-preview"  # Default: latest flash model
+    models: list[str] = field(default_factory=list)  # For rotation
+    rotation: str | None = None  # "round_robin", "random", or None
     temperature: float = 0.0
     max_tokens: int | None = None  # Let the model determine output length
     system_prompt: str = (
@@ -819,6 +829,30 @@ class LLMToolExecutor:
 
         self.config = config or LLMConfig()
         self.moss_executor = moss_executor or MossToolExecutor(root)
+        self._call_count = 0  # For round-robin rotation
+
+    def _get_model(self) -> str:
+        """Get the model to use for the next LLM call.
+
+        Implements rotation if configured:
+        - round_robin: Cycles through models in order
+        - random: Picks randomly from the pool
+        - None: Uses the primary model
+        """
+        import random as rand
+
+        # If no rotation pool, use primary model
+        if not self.config.models or not self.config.rotation:
+            return self.config.model
+
+        if self.config.rotation == "round_robin":
+            model = self.config.models[self._call_count % len(self.config.models)]
+            self._call_count += 1
+            return model
+        elif self.config.rotation == "random":
+            return rand.choice(self.config.models)
+        else:
+            return self.config.model
 
     async def execute(
         self, tool_name: str, context: LoopContext, step: LoopStep
@@ -865,6 +899,9 @@ class LLMToolExecutor:
                 "litellm required for LLM calls. Install with: pip install 'moss[llm]'"
             ) from e
 
+        # Get model (may rotate if configured)
+        model = self._get_model()
+
         def _sync_call() -> tuple[str, int, int]:
             messages: list[dict[str, str]] = []
             if self.config.system_prompt:
@@ -872,7 +909,7 @@ class LLMToolExecutor:
             messages.append({"role": "user", "content": prompt})
 
             kwargs: dict[str, Any] = {
-                "model": self.config.model,
+                "model": model,
                 "messages": messages,
                 "temperature": self.config.temperature,
             }
