@@ -133,6 +133,21 @@ def _extract_paths(text: str) -> list[str]:
     return paths
 
 
+# Map DWIM tool names to CLI commands
+_TOOL_TO_CLI: dict[str, str] = {
+    "skeleton": "skeleton",
+    "skeleton_extract": "skeleton",
+    "skeleton_expand": "skeleton",
+    "search_summarize_module": "summarize",
+    "health_summarize": "summarize",
+    "anchors": "anchors",
+    "deps": "deps",
+    "query": "query",
+    "cfg": "cfg",
+    "context": "context",
+}
+
+
 def _dwim_rewrite(command: str) -> str | None:
     """Try to rewrite natural language as a CLI command using DWIM.
 
@@ -164,8 +179,13 @@ def _dwim_rewrite(command: str) -> str | None:
     # Get the best matching tool
     tool = results[0].tool
 
-    # Map tool names to CLI commands (handle underscores -> hyphens)
-    cli_cmd = tool.replace("_", "-").replace(".", " ")
+    # Map tool names to CLI commands
+    cli_cmd = _TOOL_TO_CLI.get(tool)
+    if not cli_cmd:
+        # Fallback: try direct name conversion (underscores -> hyphens)
+        cli_cmd = tool.replace("_", "-").split("-")[0]
+        if cli_cmd not in _CLI_COMMANDS:
+            return None
 
     # Extract paths from the original query
     paths = _extract_paths(command)
