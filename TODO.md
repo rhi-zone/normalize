@@ -23,10 +23,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 2. **Daemon improvements**
    - [x] Basic daemon scaffold with Unix socket IPC
    - [x] SQLite symbol index with file watching
-   - [ ] CLI auto-start daemon on first query if not running
+   - [x] CLI auto-start daemon on first query if not running
+   - [x] Add daemon `status`/`shutdown`/`start` subcommands to CLI
    - [ ] Daemon auto-shutdown after idle timeout (10 min)
    - [ ] Handle large query responses (streaming/chunking)
-   - [ ] Add daemon `status`/`shutdown` subcommands to CLI
 
 3. **Reference tracing** - AST-based callers/callees
    - [ ] Store call graph in SQLite (caller_symbol, callee_name, file, line)

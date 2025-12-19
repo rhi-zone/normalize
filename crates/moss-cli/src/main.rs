@@ -211,6 +211,28 @@ enum Commands {
         #[arg(short, long)]
         function: Option<String>,
     },
+
+    /// Manage the moss daemon
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long, global = true)]
+        root: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum DaemonAction {
+    /// Show daemon status
+    Status,
+
+    /// Shutdown the daemon
+    Shutdown,
+
+    /// Start the daemon
+    Start,
 }
 
 fn main() {
@@ -251,6 +273,7 @@ fn main() {
         Commands::Cfg { file, root, function } => {
             cmd_cfg(&file, root.as_deref(), function.as_deref(), cli.json)
         }
+        Commands::Daemon { action, root } => cmd_daemon(action, root.as_deref(), cli.json),
     };
 
     std::process::exit(exit_code);
@@ -261,8 +284,9 @@ fn cmd_path(query: &str, root: Option<&Path>, json: bool) -> i32 {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Try daemon first
     let client = daemon::DaemonClient::new(&root);
+
+    // Try daemon first if available
     if client.is_available() {
         if let Ok(matches) = client.path_query(query) {
             if matches.is_empty() {
@@ -287,6 +311,12 @@ fn cmd_path(query: &str, root: Option<&Path>, json: bool) -> i32 {
             return 0;
         }
         // Fall through to direct if daemon query failed
+    } else {
+        // Auto-start daemon in background for future queries
+        let client_clone = daemon::DaemonClient::new(&root);
+        std::thread::spawn(move || {
+            let _ = client_clone.ensure_running();
+        });
     }
 
     // Direct path resolution
@@ -1097,4 +1127,129 @@ fn cmd_cfg(file: &str, root: Option<&Path>, function: Option<&str>, json: bool) 
     }
 
     0
+}
+
+fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let client = daemon::DaemonClient::new(&root);
+
+    match action {
+        DaemonAction::Status => {
+            if !client.is_available() {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "running": false,
+                            "socket": root.join(".moss/daemon.sock").to_string_lossy()
+                        })
+                    );
+                } else {
+                    eprintln!("Daemon is not running");
+                    eprintln!("Socket: {}", root.join(".moss/daemon.sock").display());
+                }
+                return 1;
+            }
+
+            match client.status() {
+                Ok(status) => {
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "running": true,
+                                "uptime_secs": status.uptime_secs,
+                                "files_indexed": status.files_indexed,
+                                "symbols_indexed": status.symbols_indexed,
+                                "queries_served": status.queries_served,
+                                "pid": status.pid
+                            })
+                        );
+                    } else {
+                        println!("Daemon Status");
+                        println!("  Running: yes");
+                        if let Some(pid) = status.pid {
+                            println!("  PID: {}", pid);
+                        }
+                        println!("  Uptime: {} seconds", status.uptime_secs);
+                        println!("  Files indexed: {}", status.files_indexed);
+                        println!("  Symbols indexed: {}", status.symbols_indexed);
+                        println!("  Queries served: {}", status.queries_served);
+                    }
+                    0
+                }
+                Err(e) => {
+                    eprintln!("Failed to get daemon status: {}", e);
+                    1
+                }
+            }
+        }
+
+        DaemonAction::Shutdown => {
+            if !client.is_available() {
+                if json {
+                    println!("{}", serde_json::json!({"success": false, "error": "daemon not running"}));
+                } else {
+                    eprintln!("Daemon is not running");
+                }
+                return 1;
+            }
+
+            match client.shutdown() {
+                Ok(()) => {
+                    if json {
+                        println!("{}", serde_json::json!({"success": true}));
+                    } else {
+                        println!("Daemon shutdown requested");
+                    }
+                    0
+                }
+                Err(e) => {
+                    // Connection reset is expected when daemon shuts down
+                    if e.contains("Connection reset") || e.contains("Broken pipe") {
+                        if json {
+                            println!("{}", serde_json::json!({"success": true}));
+                        } else {
+                            println!("Daemon shutdown requested");
+                        }
+                        0
+                    } else {
+                        eprintln!("Failed to shutdown daemon: {}", e);
+                        1
+                    }
+                }
+            }
+        }
+
+        DaemonAction::Start => {
+            if client.is_available() {
+                if json {
+                    println!("{}", serde_json::json!({"success": false, "error": "daemon already running"}));
+                } else {
+                    eprintln!("Daemon is already running");
+                }
+                return 1;
+            }
+
+            // Start the daemon process
+            if client.ensure_running() {
+                if json {
+                    println!("{}", serde_json::json!({"success": true}));
+                } else {
+                    println!("Daemon started");
+                }
+                0
+            } else {
+                if json {
+                    println!("{}", serde_json::json!({"success": false, "error": "failed to start daemon"}));
+                } else {
+                    eprintln!("Failed to start daemon");
+                }
+                1
+            }
+        }
+    }
 }
