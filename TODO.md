@@ -12,6 +12,8 @@ Candidates for the next session:
 - [ ] **Generator documentation** (small) - Document how the generation pipeline works
 - [ ] **Drift auto-update hook** (small) - Add pre-commit hook to auto-update specs
 - [ ] **`moss todo` command** (small) - Read/search TODOs, not just count them (dogfooding discovery)
+- [ ] **DWIM auto-registration** (medium) - Only 7 tools in DWIM, but 38+ MCP tools; auto-generate from MossAPI
+- [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator; ensures MCP/CLI parity
 - [ ] **Complexity hotspots** (medium) - 60 functions ≥15 complexity, worst: `_generate_candidates` (47), `cmd_query` (46)
 
 **Recently completed:**

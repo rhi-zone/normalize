@@ -740,19 +740,136 @@ Look for:
 # =============================================================================
 
 
-async def run_server() -> None:
-    """Run the MCP server."""
+async def run_server(socket_path: str | None = None) -> None:
+    """Run the MCP server.
+
+    Args:
+        socket_path: Optional Unix socket path. If provided, listens on socket
+                     instead of stdio. Useful for local MCP connections without
+                     subprocess overhead.
+    """
     _check_mcp()
     server = create_server()
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+
+    if socket_path:
+        await _run_unix_socket_server(server, socket_path)
+    else:
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(read_stream, write_stream, server.create_initialization_options())
+
+
+async def _run_unix_socket_server(server: Any, socket_path: str) -> None:
+    """Run MCP server over Unix socket.
+
+    Args:
+        server: The MCP server instance
+        socket_path: Path to the Unix socket file
+    """
+    import os
+
+    from anyio import create_unix_listener
+    from mcp.types import JSONRPCMessage
+
+    # Import SessionMessage from the right place
+    try:
+        from mcp.server.stdio import SessionMessage
+    except ImportError:
+        from mcp.shared.session import SessionMessage  # type: ignore
+
+    socket_path_obj = Path(socket_path)
+
+    # Remove existing socket file if present
+    if socket_path_obj.exists():
+        os.unlink(socket_path)
+
+    listener = await create_unix_listener(socket_path)
+    print(f"MCP server listening on Unix socket: {socket_path}")
+
+    try:
+        async with listener:
+            async for client in listener:
+                # Handle each client connection
+                async with client:
+                    await _handle_unix_client(server, client, JSONRPCMessage, SessionMessage)
+    finally:
+        # Clean up socket file
+        if socket_path_obj.exists():
+            os.unlink(socket_path)
+
+
+async def _handle_unix_client(
+    server: Any,
+    client: Any,
+    JSONRPCMessage: type,
+    SessionMessage: type,
+) -> None:
+    """Handle a single Unix socket client connection."""
+    import anyio
+    from anyio import create_memory_object_stream, create_task_group
+
+    read_stream_writer, read_stream = create_memory_object_stream(0)
+    write_stream, write_stream_reader = create_memory_object_stream(0)
+
+    async def socket_reader() -> None:
+        """Read JSON-RPC messages from socket."""
+        buffer = b""
+        try:
+            async with read_stream_writer:
+                while True:
+                    chunk = await client.receive(4096)
+                    if not chunk:
+                        break
+                    buffer += chunk
+                    # Process complete lines
+                    while b"\n" in buffer:
+                        line, buffer = buffer.split(b"\n", 1)
+                        if line:
+                            try:
+                                msg = JSONRPCMessage.model_validate_json(line.decode("utf-8"))
+                                await read_stream_writer.send(SessionMessage(msg))
+                            except Exception as exc:
+                                await read_stream_writer.send(exc)
+        except anyio.ClosedResourceError:
+            pass
+
+    async def socket_writer() -> None:
+        """Write JSON-RPC messages to socket."""
+        try:
+            async with write_stream_reader:
+                async for session_message in write_stream_reader:
+                    json_str = session_message.message.model_dump_json(
+                        by_alias=True, exclude_none=True
+                    )
+                    await client.send((json_str + "\n").encode("utf-8"))
+        except anyio.ClosedResourceError:
+            pass
+
+    async with create_task_group() as tg:
+        tg.start_soon(socket_reader)
+        tg.start_soon(socket_writer)
+        tg.start_soon(
+            server.run,
+            read_stream,
+            write_stream,
+            server.create_initialization_options(),
+        )
 
 
 def main() -> None:
     """Entry point for MCP server."""
+    import argparse
     import asyncio
 
-    asyncio.run(run_server())
+    parser = argparse.ArgumentParser(description="Moss MCP Server")
+    parser.add_argument(
+        "--socket",
+        "-s",
+        type=str,
+        help="Unix socket path (default: use stdio)",
+    )
+    args = parser.parse_args()
+
+    asyncio.run(run_server(socket_path=args.socket))
 
 
 if __name__ == "__main__":
