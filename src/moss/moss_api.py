@@ -1558,6 +1558,375 @@ class RAGAPI:
 
 
 @dataclass
+class SymbolMatch:
+    """A symbol found in the codebase.
+
+    Attributes:
+        name: Symbol name
+        kind: Symbol kind (function, class, method, variable)
+        file_path: Path to the file containing the symbol
+        line: Line number where the symbol is defined
+        signature: Function/method signature if applicable
+    """
+
+    name: str
+    kind: str
+    file_path: str
+    line: int
+    signature: str = ""
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        sig = f" {self.signature}" if self.signature else ""
+        return f"[{self.kind}] {self.name}{sig} ({self.file_path}:{self.line})"
+
+
+@dataclass
+class GrepMatch:
+    """A text match from grep search.
+
+    Attributes:
+        file_path: Path to the file containing the match
+        line_number: Line number of the match
+        line_content: Content of the matching line
+        match_start: Start position of the match within the line
+        match_end: End position of the match within the line
+    """
+
+    file_path: str
+    line_number: int
+    line_content: str
+    match_start: int = 0
+    match_end: int = 0
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        return f"{self.file_path}:{self.line_number}: {self.line_content.strip()}"
+
+
+@dataclass
+class GrepResult:
+    """Result of a grep search.
+
+    Attributes:
+        matches: List of matches found
+        total_matches: Total number of matches
+        files_searched: Number of files searched
+    """
+
+    matches: list[GrepMatch]
+    total_matches: int
+    files_searched: int
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        lines = [f"Found {self.total_matches} matches in {self.files_searched} files:"]
+        for m in self.matches[:20]:
+            lines.append(f"  {m.to_compact()}")
+        if len(self.matches) > 20:
+            lines.append(f"  ... and {len(self.matches) - 20} more")
+        return "\n".join(lines)
+
+
+@dataclass
+class SearchAPI:
+    """API for codebase search operations.
+
+    Provides unified search across the codebase using structural
+    analysis (skeleton/anchors), text patterns (grep), and file
+    patterns (glob). Use this instead of raw grep/glob for better
+    integration with Moss.
+    """
+
+    root: Path
+
+    def find_symbols(
+        self,
+        name: str,
+        kind: str | None = None,
+        fuzzy: bool = True,
+        limit: int = 50,
+    ) -> list[SymbolMatch]:
+        """Find symbols by name across the codebase.
+
+        Searches all Python files for functions, classes, methods,
+        and variables matching the given name.
+
+        Args:
+            name: Symbol name to search for (supports partial matching)
+            kind: Filter by kind: function, class, method, variable
+            fuzzy: If True, match partial names; if False, exact match only
+            limit: Maximum number of results to return
+
+        Returns:
+            List of SymbolMatch objects sorted by relevance
+        """
+        import fnmatch
+
+        from moss.skeleton import extract_python_skeleton
+
+        results: list[SymbolMatch] = []
+        pattern = name.lower()
+
+        # Find all Python files
+        for py_file in self.root.rglob("*.py"):
+            # Skip hidden dirs, venv, etc
+            parts = py_file.parts
+            skip_dirs = ("venv", "node_modules", "__pycache__")
+            if any(p.startswith(".") or p in skip_dirs for p in parts):
+                continue
+
+            try:
+                source = py_file.read_text()
+                symbols = extract_python_skeleton(source)
+            except Exception:
+                continue
+
+            for sym in symbols:
+                sym_name_lower = sym.name.lower()
+
+                # Check match
+                if fuzzy:
+                    in_name = pattern in sym_name_lower
+                    matched = in_name or fnmatch.fnmatch(sym_name_lower, f"*{pattern}*")
+                else:
+                    matched = sym_name_lower == pattern
+
+                if not matched:
+                    continue
+
+                # Filter by kind if specified
+                if kind and sym.kind != kind:
+                    continue
+
+                # Build signature for functions/methods
+                sig = ""
+                if sym.kind in ("function", "method") and sym.signature:
+                    sig = sym.signature
+
+                rel_path = str(py_file.relative_to(self.root))
+                results.append(
+                    SymbolMatch(
+                        name=sym.name,
+                        kind=sym.kind,
+                        file_path=rel_path,
+                        line=sym.lineno,
+                        signature=sig,
+                    )
+                )
+
+                if len(results) >= limit:
+                    return results
+
+        # Sort by relevance: exact matches first, then by name length
+        results.sort(key=lambda m: (m.name.lower() != pattern, len(m.name), m.name))
+        return results
+
+    def grep(
+        self,
+        pattern: str,
+        path: str | None = None,
+        glob: str | None = None,
+        context_lines: int = 0,
+        limit: int = 100,
+        ignore_case: bool = False,
+    ) -> GrepResult:
+        """Search for text patterns in files.
+
+        Uses regex pattern matching to find text in files.
+        Similar to grep/ripgrep but integrated with Moss.
+
+        Args:
+            pattern: Regex pattern to search for
+            path: Directory to search in (defaults to project root)
+            glob: Glob pattern to filter files (e.g., "*.py", "**/*.ts")
+            context_lines: Number of context lines before/after match
+            limit: Maximum number of matches to return
+            ignore_case: If True, perform case-insensitive matching
+
+        Returns:
+            GrepResult with matches and statistics
+        """
+        import re
+
+        search_path = Path(path) if path else self.root
+        if not search_path.is_absolute():
+            search_path = self.root / search_path
+
+        flags = re.IGNORECASE if ignore_case else 0
+        try:
+            regex = re.compile(pattern, flags)
+        except re.error:
+            return GrepResult(matches=[], total_matches=0, files_searched=0)
+
+        matches: list[GrepMatch] = []
+        files_searched = 0
+        total_matches = 0
+
+        # Determine file pattern
+        file_pattern = glob or "**/*"
+
+        for file_path in search_path.glob(file_pattern):
+            if not file_path.is_file():
+                continue
+
+            # Skip binary files and hidden dirs
+            parts = file_path.parts
+            skip_dirs = ("venv", "node_modules", "__pycache__")
+            if any(p.startswith(".") or p in skip_dirs for p in parts):
+                continue
+
+            # Skip common binary extensions
+            binary_exts = (
+                ".pyc",
+                ".pyo",
+                ".so",
+                ".dll",
+                ".exe",
+                ".bin",
+                ".jpg",
+                ".png",
+                ".gif",
+                ".pdf",
+            )
+            if file_path.suffix.lower() in binary_exts:
+                continue
+
+            try:
+                content = file_path.read_text(errors="ignore")
+            except Exception:
+                continue
+
+            files_searched += 1
+            lines = content.split("\n")
+
+            for i, line in enumerate(lines, 1):
+                match = regex.search(line)
+                if match:
+                    total_matches += 1
+                    if len(matches) < limit:
+                        rel_path = str(file_path.relative_to(self.root))
+                        matches.append(
+                            GrepMatch(
+                                file_path=rel_path,
+                                line_number=i,
+                                line_content=line,
+                                match_start=match.start(),
+                                match_end=match.end(),
+                            )
+                        )
+
+        return GrepResult(
+            matches=matches,
+            total_matches=total_matches,
+            files_searched=files_searched,
+        )
+
+    def find_files(
+        self,
+        pattern: str,
+        path: str | None = None,
+        limit: int = 100,
+    ) -> list[str]:
+        """Find files matching a glob pattern.
+
+        Args:
+            pattern: Glob pattern (e.g., "**/*.py", "src/**/*.ts")
+            path: Directory to search in (defaults to project root)
+            limit: Maximum number of results to return
+
+        Returns:
+            List of relative file paths matching the pattern
+        """
+        search_path = Path(path) if path else self.root
+        if not search_path.is_absolute():
+            search_path = self.root / search_path
+
+        results: list[str] = []
+        for file_path in search_path.glob(pattern):
+            if not file_path.is_file():
+                continue
+
+            # Skip hidden dirs
+            parts = file_path.parts
+            if any(p.startswith(".") for p in parts):
+                continue
+
+            rel_path = str(file_path.relative_to(self.root))
+            results.append(rel_path)
+
+            if len(results) >= limit:
+                break
+
+        return sorted(results)
+
+    def find_definitions(
+        self,
+        name: str,
+        kind: str | None = None,
+    ) -> list[SymbolMatch]:
+        """Find where a symbol is defined.
+
+        Shortcut for find_symbols with exact matching.
+
+        Args:
+            name: Exact symbol name to find
+            kind: Filter by kind: function, class, method
+
+        Returns:
+            List of SymbolMatch objects for definitions
+        """
+        return self.find_symbols(name, kind=kind, fuzzy=False)
+
+    def find_usages(
+        self,
+        name: str,
+        exclude_definitions: bool = True,
+        limit: int = 100,
+    ) -> GrepResult:
+        """Find usages of a symbol in the codebase.
+
+        Searches for references to a symbol name, optionally
+        excluding the definition sites.
+
+        Args:
+            name: Symbol name to find usages of
+            exclude_definitions: If True, exclude definition lines
+            limit: Maximum number of results to return
+
+        Returns:
+            GrepResult with usage locations
+        """
+        import re
+
+        # Search for the name as a word boundary match
+        pattern = rf"\b{re.escape(name)}\b"
+        result = self.grep(pattern, glob="**/*.py", limit=limit * 2)
+
+        if not exclude_definitions:
+            return result
+
+        # Filter out definitions (lines with def/class followed by the name)
+        def_pattern = rf"^\s*(def|class|async\s+def)\s+{re.escape(name)}\b"
+        def_regex = re.compile(def_pattern)
+
+        filtered = [m for m in result.matches if not def_regex.match(m.line_content)]
+
+        return GrepResult(
+            matches=filtered[:limit],
+            total_matches=len(filtered),
+            files_searched=result.files_searched,
+        )
+
+    def _resolve_path(self, file_path: str | Path) -> Path:
+        """Resolve a file path relative to the project root."""
+        path = Path(file_path)
+        if not path.is_absolute():
+            path = self.root / path
+        return path
+
+
+@dataclass
 class ToolMatchResult:
     """Result of matching a query to a tool.
 
@@ -1798,6 +2167,7 @@ class MossAPI:
     _weaknesses: WeaknessesAPI | None = None
     _rag: RAGAPI | None = None
     _web: WebAPI | None = None
+    _search: SearchAPI | None = None
 
     @classmethod
     def for_project(cls, path: str | Path) -> MossAPI:
@@ -1957,6 +2327,13 @@ class MossAPI:
         if self._web is None:
             self._web = WebAPI(root=self.root)
         return self._web
+
+    @property
+    def search(self) -> SearchAPI:
+        """Access codebase search functionality."""
+        if self._search is None:
+            self._search = SearchAPI(root=self.root)
+        return self._search
 
 
 # Convenience alias

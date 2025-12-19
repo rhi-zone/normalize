@@ -1013,5 +1013,145 @@
       "type": "object"
     },
     "name": "web_search"
+  },
+  {
+    "description": "Find where a symbol is defined. Shortcut for find_symbols with exact matching. List of SymbolMatch objects for definitions",
+    "inputSchema": {
+      "properties": {
+        "kind": {
+          "description": "Filter by kind: function, class, method",
+          "type": "string"
+        },
+        "name": {
+          "description": "Exact symbol name to find",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "search_find_definitions"
+  },
+  {
+    "description": "Find files matching a glob pattern. List of relative file paths matching the pattern",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 100,
+          "description": "Maximum number of results to return",
+          "type": "integer"
+        },
+        "path": {
+          "description": "Directory to search in (defaults to project root)",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Glob pattern (e.g., \"**/*.py\", \"src/**/*.ts\")",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "type": "object"
+    },
+    "name": "search_find_files"
+  },
+  {
+    "description": "Find symbols by name across the codebase. Searches all Python files for functions, classes, methods, and variables matching the given name. List of SymbolMatch objects sorted by relevance",
+    "inputSchema": {
+      "properties": {
+        "fuzzy": {
+          "default": true,
+          "description": "If True, match partial names; if False, exact match only",
+          "type": "boolean"
+        },
+        "kind": {
+          "description": "Filter by kind: function, class, method, variable",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Maximum number of results to return",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Symbol name to search for (supports partial matching)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "search_find_symbols"
+  },
+  {
+    "description": "Find usages of a symbol in the codebase. Searches for references to a symbol name, optionally excluding the definition sites. GrepResult with usage locations",
+    "inputSchema": {
+      "properties": {
+        "exclude_definitions": {
+          "default": true,
+          "description": "If True, exclude definition lines",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 100,
+          "description": "Maximum number of results to return",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Symbol name to find usages of",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "search_find_usages"
+  },
+  {
+    "description": "Search for text patterns in files. Uses regex pattern matching to find text in files. Similar to grep/ripgrep but integrated with Moss. GrepResult with matches and statistics",
+    "inputSchema": {
+      "properties": {
+        "context_lines": {
+          "default": 0,
+          "description": "Number of context lines before/after match",
+          "type": "integer"
+        },
+        "glob": {
+          "description": "Glob pattern to filter files (e.g., \"*.py\", \"**/*.ts\")",
+          "type": "string"
+        },
+        "ignore_case": {
+          "default": false,
+          "description": "If True, perform case-insensitive matching",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 100,
+          "description": "Maximum number of matches to return",
+          "type": "integer"
+        },
+        "path": {
+          "description": "Directory to search in (defaults to project root)",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Regex pattern to search for",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "type": "object"
+    },
+    "name": "search_grep"
   }
 ]

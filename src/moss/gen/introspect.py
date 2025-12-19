@@ -244,6 +244,7 @@ def introspect_api() -> list[SubAPI]:
         HealthAPI,
         PatchAPI,
         RefCheckAPI,
+        SearchAPI,
         SecurityAPI,
         SkeletonAPI,
         TodoAPI,
@@ -277,6 +278,7 @@ def introspect_api() -> list[SubAPI]:
         "weaknesses": WeaknessesAPI,
         "rag": RAGAPI,
         "web": WebAPI,
+        "search": SearchAPI,
     }
 
     results = []

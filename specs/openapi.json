@@ -1226,6 +1226,231 @@
         ]
       }
     },
+    "/search/find-definitions": {
+      "get": {
+        "description": "Find where a symbol is defined. Shortcut for find_symbols with exact matching. List of SymbolMatch objects for definitions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "kind": {
+                    "description": "Filter by kind: function, class, method",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Exact symbol name to find",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Find where a symbol is defined",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/find-files": {
+      "get": {
+        "description": "Find files matching a glob pattern. List of relative file paths matching the pattern",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "limit": {
+                    "default": 100,
+                    "description": "Maximum number of results to return",
+                    "type": "integer"
+                  },
+                  "path": {
+                    "description": "Directory to search in (defaults to project root)",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "description": "Glob pattern (e.g., \"**/*.py\", \"src/**/*.ts\")",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pattern"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Find files matching a glob pattern",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/find-symbols": {
+      "get": {
+        "description": "Find symbols by name across the codebase. Searches all Python files for functions, classes, methods, and variables matching the given name. List of SymbolMatch objects sorted by relevance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "fuzzy": {
+                    "default": true,
+                    "description": "If True, match partial names; if False, exact match only",
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "description": "Filter by kind: function, class, method, variable",
+                    "type": "string"
+                  },
+                  "limit": {
+                    "default": 50,
+                    "description": "Maximum number of results to return",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "Symbol name to search for (supports partial matching)",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Find symbols by name across the codebase",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/find-usages": {
+      "get": {
+        "description": "Find usages of a symbol in the codebase. Searches for references to a symbol name, optionally excluding the definition sites. GrepResult with usage locations",
+        "parameters": [
+          {
+            "description": "Symbol name to find usages of",
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "If True, exclude definition lines",
+            "in": "query",
+            "name": "exclude_definitions",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of results to return",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Find usages of a symbol in the codebase",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/grep": {
+      "post": {
+        "description": "Search for text patterns in files. Uses regex pattern matching to find text in files. Similar to grep/ripgrep but integrated with Moss. GrepResult with matches and statistics",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "context_lines": {
+                    "default": 0,
+                    "description": "Number of context lines before/after match",
+                    "type": "integer"
+                  },
+                  "glob": {
+                    "description": "Glob pattern to filter files (e.g., \"*.py\", \"**/*.ts\")",
+                    "type": "string"
+                  },
+                  "ignore_case": {
+                    "default": false,
+                    "description": "If True, perform case-insensitive matching",
+                    "type": "boolean"
+                  },
+                  "limit": {
+                    "default": 100,
+                    "description": "Maximum number of matches to return",
+                    "type": "integer"
+                  },
+                  "path": {
+                    "description": "Directory to search in (defaults to project root)",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "description": "Regex pattern to search for",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pattern"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Search for text patterns in files",
+        "tags": [
+          "search"
+        ]
+      }
+    },
     "/security/analyze": {
       "get": {
         "description": "Run security analysis. SecurityAnalysis with findings and summary",
@@ -1927,6 +2152,10 @@
     {
       "description": "API for token-efficient web fetching and search. Provides web content extraction optimized for LLM context. Strips HTML noise, extracts main content, caches results. api = MossAPI.for_project(\".\") content = await api.web.fetch(\"https://docs.python.org/3/\") print(f\"Tokens: ~{content.token_estimate}\") results = await api.web.search(\"python asyncio tutorial\") print(results.to_compact())",
       "name": "web"
+    },
+    {
+      "description": "API for codebase search operations. Provides unified search across the codebase using structural analysis (skeleton/anchors), text patterns (grep), and file patterns (glob). Use this instead of raw grep/glob for better integration with Moss.",
+      "name": "search"
     }
   ]
 }
