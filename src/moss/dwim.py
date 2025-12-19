@@ -759,8 +759,22 @@ class ToolRouter:
         """
         tools = set(available_tools) if available_tools else set(TOOL_REGISTRY.keys())
 
-        # Get TF-IDF similarities
-        tfidf_results = self._index.query(query, top_k=len(self._tool_names))
+        # Expand query with word form variants for better TF-IDF matching
+        # e.g., "summarize" -> "summarize summary summarization summarizing"
+        query_words = query.lower().split()
+        expanded_words = set(query_words)
+        for word in query_words:
+            if word in WORD_FORMS:
+                expanded_words.update(WORD_FORMS[word])
+            if word in _CANONICAL_FORMS:
+                canonical = _CANONICAL_FORMS[word]
+                expanded_words.add(canonical)
+                if canonical in WORD_FORMS:
+                    expanded_words.update(WORD_FORMS[canonical])
+        expanded_query = " ".join(expanded_words)
+
+        # Get TF-IDF similarities using expanded query
+        tfidf_results = self._index.query(expanded_query, top_k=len(self._tool_names))
         tfidf_scores = {
             self._tool_names[idx]: score
             for idx, score in tfidf_results
@@ -785,9 +799,10 @@ class ToolRouter:
             desc_score = string_similarity(query, tool_info.description)
 
             # Combined score (weighted)
-            # TF-IDF is the primary signal, keywords provide domain knowledge
+            # Keywords get higher weight since they use word form normalization
+            # TF-IDF provides broader semantic matching
             confidence = (
-                tfidf_score * 0.4 + keyword_score * 0.35 + desc_score * 0.15 + name_score * 0.1
+                tfidf_score * 0.30 + keyword_score * 0.45 + desc_score * 0.15 + name_score * 0.10
             )
 
             if confidence > 0.1:  # Minimum threshold
