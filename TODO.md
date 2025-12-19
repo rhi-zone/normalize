@@ -13,6 +13,38 @@ Candidates for the next session:
 - [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator; ensures MCP/CLI parity
 - [ ] **Complexity hotspots** (medium) - 60 functions with complexity ≥15 need refactoring
 
+## Bootstrap Priority (Token Savings)
+
+**Goal:** Reach the point where moss can run as an agent itself, using structural awareness to reduce token usage compared to raw file dumps.
+
+- [ ] **Minimal agent loop** - Basic planner → tool call → validator cycle using moss tools
+  - Start with: `skeleton` for context, `apply_patch` for edits, `validation_validate` for checks
+  - Compare token usage vs Claude Code on same task
+- [ ] **Skeleton-first context** - Always provide skeleton before full file (if needed at all)
+  - Measure: How often does the LLM need full file after seeing skeleton?
+- [ ] **Incremental context loading** - Start minimal, expand on request
+  - skeleton → relevant functions → full file (if truly needed)
+- [ ] **Shadow Git for rollback** - Already exists, wire into agent loop
+
+**Why this matters:** Every token saved = cost reduction + faster iteration + longer context for actual work.
+
+## Ecosystem Interoperability
+
+**Goal:** Play nice with other tools; don't fragment the ecosystem unnecessarily.
+
+- [ ] **Log format adapters** - Output logs in formats compatible with:
+  - Claude Code JSONL (for analysis tools that expect it)
+  - Aider's conversation format
+  - OpenHands event stream
+  - SWE-agent trajectories
+- [ ] **Log format abstraction** - Internal format (rich, structured) → adapters for export
+  - Our format optimized for: structural diffs, checkpoint references, tool call details
+  - Export adapters are lossy but compatible
+- [ ] **Import adapters** - Parse other agents' logs for analysis
+  - Already have `analyze-session` for Claude Code JSONL
+  - Extend to Aider, OpenHands, etc.
+- [ ] **Benchmark comparability** - Same log format → apples-to-apples comparison on SWE-bench
+
 **Recently completed:**
 - [x] SkeletonAPI plugin routing - MCP `skeleton_format` now uses plugin registry (supports markdown)
 - [x] Unix socket transport - `moss mcp-server --socket /tmp/moss.sock` for local IPC
