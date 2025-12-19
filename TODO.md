@@ -6,13 +6,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 1. **Rust CLI infrastructure** - Fast startup for hot paths
    - [x] Create `crates/moss-cli/` with Cargo workspace
-   - [x] Implement `moss path` in Rust with fuzzy matching (~27ms, 10x faster than Python)
+   - [x] Implement `moss path` in Rust with fuzzy matching (~6ms with index cache)
    - [x] Add SQLite index for file caching
    - [x] Add `view`, `search-tree`, `reindex` commands
    - [x] Add tree-sitter parsing for Python/Rust
    - [x] Add `symbols`, `expand`, `callers`, `callees` commands
    - [x] Fix `callers` to search all files (not just fuzzy matches)
-2. **Daemon + index architecture**
+   - [x] Fix SQLite TEXT→INTEGER conversions (CAST)
+2. **Daemon + index architecture** - Complete
    - `mossd` daemon: keeps index hot, watches filesystem (inotify)
    - SQLite index: files (path, mtime), symbols (name, kind, line, parent)
    - Smart invalidation: mtime check on query, proactive via watcher
