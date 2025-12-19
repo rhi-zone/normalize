@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 mod anchors;
 mod cfg;
@@ -12,6 +13,43 @@ mod skeleton;
 mod symbols;
 mod tree;
 
+/// Simple profiler for timing breakdown
+struct Profiler {
+    start: Instant,
+    events: Vec<(String, std::time::Duration)>,
+    enabled: bool,
+}
+
+impl Profiler {
+    fn new(enabled: bool) -> Self {
+        Self {
+            start: Instant::now(),
+            events: Vec::new(),
+            enabled,
+        }
+    }
+
+    fn mark(&mut self, name: &str) {
+        if self.enabled {
+            self.events.push((name.to_string(), self.start.elapsed()));
+        }
+    }
+
+    fn print(&self) {
+        if !self.enabled || self.events.is_empty() {
+            return;
+        }
+        eprintln!("\n--- Timing ---");
+        let mut prev = std::time::Duration::ZERO;
+        for (name, elapsed) in &self.events {
+            let delta = *elapsed - prev;
+            eprintln!("  {:20} {:>8.2}ms (+{:.2}ms)", name, elapsed.as_secs_f64() * 1000.0, delta.as_secs_f64() * 1000.0);
+            prev = *elapsed;
+        }
+        eprintln!("  {:20} {:>8.2}ms", "total", self.start.elapsed().as_secs_f64() * 1000.0);
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "moss")]
 #[command(about = "Fast code intelligence CLI")]
@@ -22,6 +60,10 @@ struct Cli {
     /// Output as JSON
     #[arg(long, global = true)]
     json: bool,
+
+    /// Show timing breakdown
+    #[arg(long, global = true)]
+    profile: bool,
 }
 
 #[derive(Subcommand)]
@@ -237,9 +279,11 @@ enum DaemonAction {
 
 fn main() {
     let cli = Cli::parse();
+    let mut profiler = Profiler::new(cli.profile);
+    profiler.mark("parsed_args");
 
     let exit_code = match cli.command {
-        Commands::Path { query, root } => cmd_path(&query, root.as_deref(), cli.json),
+        Commands::Path { query, root } => cmd_path(&query, root.as_deref(), cli.json, &mut profiler),
         Commands::View { target, root, line_numbers } => {
             cmd_view(&target, root.as_deref(), line_numbers, cli.json)
         }
@@ -250,16 +294,16 @@ fn main() {
         Commands::Expand { symbol, file, root } => {
             cmd_expand(&symbol, file.as_deref(), root.as_deref(), cli.json)
         }
-        Commands::Symbols { file, root } => cmd_symbols(&file, root.as_deref(), cli.json),
+        Commands::Symbols { file, root } => cmd_symbols(&file, root.as_deref(), cli.json, &mut profiler),
         Commands::Callees { symbol, file, root } => {
             cmd_callees(&symbol, &file, root.as_deref(), cli.json)
         }
-        Commands::Callers { symbol, root } => cmd_callers(&symbol, root.as_deref(), cli.json),
+        Commands::Callers { symbol, root } => cmd_callers(&symbol, root.as_deref(), cli.json, &mut profiler),
         Commands::Tree { path, root, depth, dirs_only } => {
             cmd_tree(&path, root.as_deref(), depth, dirs_only, cli.json)
         }
         Commands::Skeleton { file, root, docstrings } => {
-            cmd_skeleton(&file, root.as_deref(), docstrings, cli.json)
+            cmd_skeleton(&file, root.as_deref(), docstrings, cli.json, &mut profiler)
         }
         Commands::Anchors { file, root, query } => {
             cmd_anchors(&file, root.as_deref(), query.as_deref(), cli.json)
@@ -276,19 +320,25 @@ fn main() {
         Commands::Daemon { action, root } => cmd_daemon(action, root.as_deref(), cli.json),
     };
 
+    profiler.mark("done");
+    profiler.print();
     std::process::exit(exit_code);
 }
 
-fn cmd_path(query: &str, root: Option<&Path>, json: bool) -> i32 {
+fn cmd_path(query: &str, root: Option<&Path>, json: bool, profiler: &mut Profiler) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    profiler.mark("resolved_root");
 
     let client = daemon::DaemonClient::new(&root);
 
     // Try daemon first if available
     if client.is_available() {
+        profiler.mark("daemon_check");
         if let Ok(matches) = client.path_query(query) {
+            profiler.mark("daemon_query");
             if matches.is_empty() {
                 if json {
                     println!("[]");
@@ -308,10 +358,12 @@ fn cmd_path(query: &str, root: Option<&Path>, json: bool) -> i32 {
                     println!("{} ({})", m.path, m.kind);
                 }
             }
+            profiler.mark("output");
             return 0;
         }
         // Fall through to direct if daemon query failed
     } else {
+        profiler.mark("no_daemon");
         // Auto-start daemon in background for future queries
         let client_clone = daemon::DaemonClient::new(&root);
         std::thread::spawn(move || {
@@ -321,6 +373,7 @@ fn cmd_path(query: &str, root: Option<&Path>, json: bool) -> i32 {
 
     // Direct path resolution
     let matches = path_resolve::resolve(query, &root);
+    profiler.mark("path_resolve");
 
     if matches.is_empty() {
         if json {
@@ -499,13 +552,14 @@ fn cmd_expand(symbol: &str, file: Option<&str>, root: Option<&Path>, json: bool)
     1
 }
 
-fn cmd_symbols(file: &str, root: Option<&Path>, json: bool) -> i32 {
+fn cmd_symbols(file: &str, root: Option<&Path>, json: bool, profiler: &mut Profiler) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Resolve the file
     let matches = path_resolve::resolve(file, &root);
+    profiler.mark("path_resolve");
     let file_match = match matches.iter().find(|m| m.kind == "file") {
         Some(m) => m,
         None => {
@@ -522,9 +576,11 @@ fn cmd_symbols(file: &str, root: Option<&Path>, json: bool) -> i32 {
             return 1;
         }
     };
+    profiler.mark("read_file");
 
     let mut parser = symbols::SymbolParser::new();
     let symbols = parser.parse_file(&file_path, &content);
+    profiler.mark("parse_symbols");
 
     if json {
         let output: Vec<_> = symbols
@@ -606,17 +662,19 @@ fn cmd_callees(symbol: &str, file: &str, root: Option<&Path>, json: bool) -> i32
     0
 }
 
-fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool) -> i32 {
+fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool, profiler: &mut Profiler) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Get all files (not just fuzzy matches)
     let all_paths = path_resolve::all_files(&root);
+    profiler.mark("list_files");
     let files: Vec<_> = all_paths.into_iter().map(|m| (m.path, m.kind == "directory")).collect();
 
     let mut parser = symbols::SymbolParser::new();
     let callers = parser.find_callers(&root, &files, symbol);
+    profiler.mark("find_callers");
 
     if callers.is_empty() {
         eprintln!("No callers found for: {}", symbol);
@@ -687,13 +745,14 @@ fn cmd_tree(path: &str, root: Option<&Path>, depth: Option<usize>, dirs_only: bo
     0
 }
 
-fn cmd_skeleton(file: &str, root: Option<&Path>, include_docstrings: bool, json: bool) -> i32 {
+fn cmd_skeleton(file: &str, root: Option<&Path>, include_docstrings: bool, json: bool, profiler: &mut Profiler) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Resolve the file
     let matches = path_resolve::resolve(file, &root);
+    profiler.mark("path_resolve");
     let file_match = match matches.iter().find(|m| m.kind == "file") {
         Some(m) => m,
         None => {
@@ -710,9 +769,11 @@ fn cmd_skeleton(file: &str, root: Option<&Path>, include_docstrings: bool, json:
             return 1;
         }
     };
+    profiler.mark("read_file");
 
     let mut extractor = skeleton::SkeletonExtractor::new();
     let result = extractor.extract(&file_path, &content);
+    profiler.mark("extract_skeleton");
 
     if json {
         fn symbol_to_json(sym: &skeleton::SkeletonSymbol) -> serde_json::Value {

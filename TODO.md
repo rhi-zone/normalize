@@ -42,7 +42,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 5. **Performance & reliability**
    - [ ] Benchmark suite for CLI commands
-   - [ ] Add `--profile` flag to CLI for timing breakdown
+   - [x] Add `--profile` flag to CLI for timing breakdown
    - [ ] Error recovery when index is corrupted
    - [ ] Graceful degradation when daemon unavailable
 
