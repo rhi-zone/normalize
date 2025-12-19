@@ -628,6 +628,70 @@
     "name": "complexity_get_high_risk"
   },
   {
+    "description": "Detect structural clones in the codebase. Dict with clone groups and statistics",
+    "inputSchema": {
+      "properties": {
+        "level": {
+          "default": 0,
+          "description": "Elision level (0-3) controlling normalization: 0 = names only (exact structural clones) 1 = + literals (same structure, different constants) 2 = + calls (same pattern, different functions) 3 = control flow skeleton only",
+          "type": "integer"
+        },
+        "min_lines": {
+          "default": 3,
+          "description": "Minimum function lines to consider (default: 3)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "clones_detect"
+  },
+  {
+    "description": "Get clone groups with at least min_count members. List of clone group details",
+    "inputSchema": {
+      "properties": {
+        "level": {
+          "default": 0,
+          "description": "Elision level (0-3)",
+          "type": "integer"
+        },
+        "min_count": {
+          "default": 2,
+          "description": "Minimum clones per group (default: 2)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "clones_get_groups"
+  },
+  {
+    "description": "Run security analysis. Dict with findings and summary",
+    "inputSchema": {
+      "properties": {
+        "min_severity": {
+          "default": "low",
+          "description": "Minimum severity to report (\"low\", \"medium\", \"high\", \"critical\")",
+          "type": "string"
+        },
+        "tools": {
+          "description": "List of tools to use (None = all available)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "security_analyze"
+  },
+  {
+    "description": "Get high and critical severity findings. List of high/critical security findings",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "security_get_high_severity"
+  },
+  {
     "description": "Check bidirectional references between code and docs. Example: moss check-refs",
     "inputSchema": {
       "properties": {
@@ -729,6 +793,35 @@
       "type": "object"
     },
     "name": "external_deps_list_direct"
+  },
+  {
+    "description": "Analyze codebase for architectural weaknesses. WeaknessAnalysis with detected weaknesses",
+    "inputSchema": {
+      "properties": {
+        "categories": {
+          "description": "Categories to check (None = all)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "weaknesses_analyze"
+  },
+  {
+    "description": "Format weakness analysis as markdown. Markdown-formatted report",
+    "inputSchema": {
+      "properties": {
+        "analysis": {
+          "description": "WeaknessAnalysis to format",
+          "type": "string"
+        }
+      },
+      "required": [
+        "analysis"
+      ],
+      "type": "object"
+    },
+    "name": "weaknesses_format"
   },
   {
     "description": "Clear the index. Dict with 'success' boolean",

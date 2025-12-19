@@ -125,6 +125,77 @@
         ]
       }
     },
+    "/clones/detect": {
+      "post": {
+        "description": "Detect structural clones in the codebase. Dict with clone groups and statistics",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "level": {
+                    "default": 0,
+                    "description": "Elision level (0-3) controlling normalization: 0 = names only (exact structural clones) 1 = + literals (same structure, different constants) 2 = + calls (same pattern, different functions) 3 = control flow skeleton only",
+                    "type": "integer"
+                  },
+                  "min_lines": {
+                    "default": 3,
+                    "description": "Minimum function lines to consider (default: 3)",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Detect structural clones in the codebase",
+        "tags": [
+          "clones"
+        ]
+      }
+    },
+    "/clones/get-groups": {
+      "get": {
+        "description": "Get clone groups with at least min_count members. List of clone group details",
+        "parameters": [
+          {
+            "description": "Elision level (0-3)",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Minimum clones per group (default: 2)",
+            "in": "query",
+            "name": "min_count",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get clone groups with at least min_count members",
+        "tags": [
+          "clones"
+        ]
+      }
+    },
     "/complexity/analyze": {
       "get": {
         "description": "Analyze cyclomatic complexity of all Python files. ComplexityReport with complexity metrics for all functions",
@@ -1155,6 +1226,56 @@
         ]
       }
     },
+    "/security/analyze": {
+      "get": {
+        "description": "Run security analysis. Dict with findings and summary",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "min_severity": {
+                    "default": "low",
+                    "description": "Minimum severity to report (\"low\", \"medium\", \"high\", \"critical\")",
+                    "type": "string"
+                  },
+                  "tools": {
+                    "description": "List of tools to use (None = all available)",
+                    "type": "array"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Run security analysis",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/security/get-high-severity": {
+      "get": {
+        "description": "Get high and critical severity findings. List of high/critical security findings",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get high and critical severity findings",
+        "tags": [
+          "security"
+        ]
+      }
+    },
     "/skeleton/extract": {
       "post": {
         "description": "Extract skeleton from a Python file. List of Symbol objects representing the code structure Note: For non-Python files, use format() which routes through the plugin system.",
@@ -1442,6 +1563,70 @@
           "validation"
         ]
       }
+    },
+    "/weaknesses/analyze": {
+      "get": {
+        "description": "Analyze codebase for architectural weaknesses. WeaknessAnalysis with detected weaknesses",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "categories": {
+                    "description": "Categories to check (None = all)",
+                    "type": "array"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Analyze codebase for architectural weaknesses",
+        "tags": [
+          "weaknesses"
+        ]
+      }
+    },
+    "/weaknesses/format": {
+      "post": {
+        "description": "Format weakness analysis as markdown. Markdown-formatted report",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "analysis": {
+                    "description": "WeaknessAnalysis to format",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "analysis"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Format weakness analysis as markdown",
+        "tags": [
+          "weaknesses"
+        ]
+      }
     }
   },
   "tags": [
@@ -1498,6 +1683,14 @@
       "name": "complexity"
     },
     {
+      "description": "API for structural clone detection. Detects structurally similar code by normalizing AST subtrees and comparing hashes. Helps identify code that could potentially be abstracted into shared functions.",
+      "name": "clones"
+    },
+    {
+      "description": "API for security analysis. Orchestrates multiple security tools (bandit, semgrep) to detect vulnerabilities and security issues in the codebase.",
+      "name": "security"
+    },
+    {
       "description": "API for bidirectional reference checking. Validates that code files reference their documentation and documentation references implementation files. Detects stale references where targets have been modified after sources.",
       "name": "ref_check"
     },
@@ -1508,6 +1701,10 @@
     {
       "description": "API for external dependency analysis. Analyzes PyPI/npm dependencies including transitive dependencies, security vulnerabilities, and license compatibility.",
       "name": "external_deps"
+    },
+    {
+      "description": "API for architectural weakness analysis. Identifies potential issues in codebase architecture: - Tight coupling between components - Missing abstractions - Inconsistent patterns - Technical debt indicators",
+      "name": "weaknesses"
     },
     {
       "description": "API for RAG (Retrieval-Augmented Generation) semantic search. Provides semantic code search capabilities using vector embeddings. Index your codebase once, then search with natural language queries.",

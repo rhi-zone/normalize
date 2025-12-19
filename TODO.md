@@ -9,16 +9,20 @@ See `~/git/prose/moss/` for full synthesis design documents.
 Candidates for the next session:
 
 - [x] **`moss todo` command** (small) - ✅ TodoAPI added: list(), search(), sections() via MCP (CLI wrapper pending)
-- [x] **DWIM auto-registration** (medium) - ✅ Now 56 tools registered; added word form matching (summarize→summary)
+- [x] **DWIM auto-registration** (medium) - ✅ Now 65 tools registered; added word form matching (summarize→summary)
 - [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator
   - **CAUTION**: Don't lose functionality! Upstream all CLI-only features to MossAPI first
   - Audit each command: does it have an API equivalent? If not, create one
+  - **CLI audit results** (53 commands, 20 sub-APIs):
+    - ✅ Fixed: ClonesAPI, SecurityAPI, WeaknessesAPI were missing from introspect.py
+    - Still missing APIs: lint, metrics, patterns, mutate, report, roadmap, overview, status, pr, diff
+    - CLI-only (OK): servers (mcp/acp/lsp), interactive (shell/explore/tui), config
   - Ensures MCP/CLI parity and single source of truth
 - [ ] **Complexity hotspots** (medium) - 60 functions with complexity ≥15 need refactoring
-- [ ] **DWIM confidence tuning** (small) - Confidence scores still low (~0.25); consider:
-  - Better weighting between TF-IDF, keyword, and fuzzy match
-  - More word form mappings (current list is small)
-  - Extract more keywords from API docstrings
+  - Top offenders: `cli.py` (9 of top 20!), `smt.py` (47), `status.py`, `roadmap.py`
+  - CLI commands doing too much: `cmd_query` (46), `cmd_overview` (43), etc.
+  - Refactoring these supports CLI migration (move logic to API, thin CLI wrapper)
+- [x] **DWIM confidence tuning** (small) - ✅ Improved: query expansion + weight tuning (0.22→0.31)
 
 ## Bootstrap Priority (Token Savings)
 

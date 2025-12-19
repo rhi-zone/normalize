@@ -234,6 +234,7 @@ def introspect_api() -> list[SubAPI]:
         DWIMAPI,
         RAGAPI,
         AnchorAPI,
+        ClonesAPI,
         ComplexityAPI,
         ContextAPI,
         DependencyAPI,
@@ -243,10 +244,12 @@ def introspect_api() -> list[SubAPI]:
         HealthAPI,
         PatchAPI,
         RefCheckAPI,
+        SecurityAPI,
         SkeletonAPI,
         TodoAPI,
         TreeAPI,
         ValidationAPI,
+        WeaknessesAPI,
     )
 
     # Map of property name to API class
@@ -265,9 +268,12 @@ def introspect_api() -> list[SubAPI]:
         "todo": TodoAPI,
         "dwim": DWIMAPI,
         "complexity": ComplexityAPI,
+        "clones": ClonesAPI,
+        "security": SecurityAPI,
         "ref_check": RefCheckAPI,
         "git_hotspots": GitHotspotsAPI,
         "external_deps": ExternalDepsAPI,
+        "weaknesses": WeaknessesAPI,
         "rag": RAGAPI,
     }
 
