@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
-   - Pattern: Replace `from moss.X import Y` with `MossAPI.for_project()`
-   - 22 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim, anchors, cfg, deps, context, query, search, check_docs, check_todos, checkpoint, overview)
+1. **Tune DWIM keywords** - "structure" should → `summarize`, not `skeleton`
+2. **Test MCP dogfooding** - Use moss MCP in real tasks, note friction points
+3. **Skeleton levels** - Consider `--compact` flag or tiered output
+4. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
 
 ## Active Backlog
 
