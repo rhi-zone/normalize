@@ -918,6 +918,131 @@ class MossToolExecutor:
 
 
 # ============================================================================
+# MCP Client Executor
+# ============================================================================
+
+
+@dataclass
+class MCPServerConfig:
+    """Configuration for connecting to an MCP server.
+
+    Supports stdio transport (subprocess) for now.
+    """
+
+    command: str  # e.g., "uv", "npx", "python"
+    args: list[str] = field(default_factory=list)  # e.g., ["run", "moss-mcp"]
+    cwd: str | None = None
+    env: dict[str, str] | None = None
+
+
+class MCPToolExecutor(ToolExecutor):
+    """Execute tools via MCP client connections.
+
+    This executor connects to external MCP servers and calls their tools.
+    Useful for integrating external capabilities (filesystem, git, browser, etc.)
+    into moss loops.
+
+    Example:
+        config = MCPServerConfig(command="npx", args=["@anthropic/mcp-server-filesystem"])
+        executor = MCPToolExecutor(config)
+        result, _, _ = await executor.execute("read_file", context, step)
+    """
+
+    def __init__(self, config: MCPServerConfig):
+        self.config = config
+        self._session: Any | None = None
+        self._read_stream: Any | None = None
+        self._write_stream: Any | None = None
+        self._tools: dict[str, Any] = {}
+
+    async def connect(self) -> None:
+        """Connect to the MCP server and initialize session."""
+        from mcp.client.session import ClientSession
+        from mcp.client.stdio import StdioServerParameters, stdio_client
+
+        server_params = StdioServerParameters(
+            command=self.config.command,
+            args=self.config.args,
+            cwd=self.config.cwd,
+            env=self.config.env,
+        )
+
+        # Store the context managers for cleanup
+        self._stdio_cm = stdio_client(server_params)
+        self._read_stream, self._write_stream = await self._stdio_cm.__aenter__()
+
+        self._session_cm = ClientSession(self._read_stream, self._write_stream)
+        self._session = await self._session_cm.__aenter__()
+
+        # Initialize and cache tools
+        await self._session.initialize()
+        tools_result = await self._session.list_tools()
+        self._tools = {t.name: t for t in tools_result.tools}
+
+    async def disconnect(self) -> None:
+        """Disconnect from the MCP server."""
+        if self._session_cm:
+            await self._session_cm.__aexit__(None, None, None)
+        if self._stdio_cm:
+            await self._stdio_cm.__aexit__(None, None, None)
+        self._session = None
+        self._tools = {}
+
+    def list_tools(self) -> list[str]:
+        """Return list of available tool names."""
+        return list(self._tools.keys())
+
+    async def execute(
+        self, tool_name: str, context: LoopContext, step: LoopStep
+    ) -> tuple[Any, int, int]:
+        """Execute an MCP tool and return (output, tokens_in, tokens_out).
+
+        MCP tools don't use tokens directly.
+        """
+        if not self._session:
+            await self.connect()
+
+        # Get input data from context
+        if step.input_from and step.input_from in context.steps:
+            input_data = context.steps[step.input_from]
+        else:
+            input_data = context.input
+
+        # Convert input to arguments dict
+        if isinstance(input_data, dict):
+            arguments = input_data
+        elif isinstance(input_data, str):
+            arguments = {"input": input_data}
+        else:
+            arguments = {"data": input_data}
+
+        # Call the tool
+        result = await self._session.call_tool(tool_name, arguments)
+
+        # Extract content from result
+        if hasattr(result, "content") and result.content:
+            # MCP returns content as a list of content blocks
+            output = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    output.append(block.text)
+                elif hasattr(block, "data"):
+                    output.append(block.data)
+            output = "\n".join(str(o) for o in output) if output else None
+        else:
+            output = result
+
+        return output, 0, 0
+
+    async def __aenter__(self) -> MCPToolExecutor:
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        await self.disconnect()
+
+
+# ============================================================================
 # LLM Tool Executor
 # ============================================================================
 

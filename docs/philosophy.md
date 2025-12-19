@@ -65,3 +65,28 @@ Every configurable option should have a default that:
 - Works well for the common case (80% of users shouldn't need to configure it)
 - Errs on the side of usefulness over safety-theater
 - Can be discovered and changed when needed
+
+### Low Barrier to Entry
+
+Make it easy to get started:
+- Works out of the box with minimal configuration
+- Sensible defaults for common workflows
+- Progressive disclosure: simple things simple, complex things possible
+- Clear error messages that guide users toward solutions
+
+### Works on Messy Codebases
+
+Real-world code is often messy. Moss should:
+- Handle legacy code without requiring refactoring first
+- Degrade gracefully when AST parsing fails (text fallbacks)
+- Support incremental improvement (clean up as you go, or don't)
+- Not impose architectural opinions unless asked
+
+### Accelerate Vibe Coding
+
+Minimize friction in the creative flow:
+- **Token efficiency**: Never send full code when a skeleton suffices. Compress context. Use structured output parsing instead of free-form text
+- **Minimal LLM calls**: Use structural tools (AST, grep, validation) for deterministic tasks. LLM only for judgment
+- **Parallelism**: Run independent operations concurrently. Batch when possible
+- **Fast feedback loops**: Validation before commit, not after. Catch errors early
+- **Future goal**: Diff-based editing to avoid sending unchanged code

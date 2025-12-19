@@ -14,6 +14,8 @@ from moss.agent_loop import (
     LoopMetrics,
     LoopStatus,
     LoopStep,
+    MCPServerConfig,
+    MCPToolExecutor,
     MossToolExecutor,
     StepType,
     analysis_loop,
@@ -898,3 +900,50 @@ def bar(x, y):
         assert "test_fn" in result["applied"]
         assert tokens_in == 0
         assert tokens_out == 0
+
+
+class TestMCPServerConfig:
+    """Tests for MCPServerConfig dataclass."""
+
+    def test_basic_config(self):
+        config = MCPServerConfig(command="uv", args=["run", "moss-mcp"])
+        assert config.command == "uv"
+        assert config.args == ["run", "moss-mcp"]
+        assert config.cwd is None
+        assert config.env is None
+
+    def test_config_with_all_options(self):
+        config = MCPServerConfig(
+            command="npx",
+            args=["@anthropic/mcp-server-filesystem"],
+            cwd="/tmp",
+            env={"DEBUG": "1"},
+        )
+        assert config.command == "npx"
+        assert config.cwd == "/tmp"
+        assert config.env == {"DEBUG": "1"}
+
+
+class TestMCPToolExecutor:
+    """Tests for MCPToolExecutor."""
+
+    def test_init(self):
+        config = MCPServerConfig(command="test", args=["arg"])
+        executor = MCPToolExecutor(config)
+        assert executor.config == config
+        assert executor._session is None
+        assert executor._tools == {}
+
+    def test_list_tools_empty_before_connect(self):
+        config = MCPServerConfig(command="test", args=["arg"])
+        executor = MCPToolExecutor(config)
+        assert executor.list_tools() == []
+
+    @pytest.mark.asyncio
+    async def test_context_manager_protocol(self):
+        """Test that MCPToolExecutor can be used as async context manager."""
+        config = MCPServerConfig(command="test", args=["arg"])
+        executor = MCPToolExecutor(config)
+        # Just verify the methods exist
+        assert hasattr(executor, "__aenter__")
+        assert hasattr(executor, "__aexit__")
