@@ -14,12 +14,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Model-agnostic naming - don't over-fit to specific LLM conventions
 - [ ] Multiple agents concurrently - no requirement to join back to main stream
 - [ ] Graceful failure - handle errors without crashing, provide useful feedback
-- [ ] Pre-write checks: search for similar files before creating (prevent `prior_art.md` vs `prior-art.md`)
-- [ ] Minimal reads: read only what's needed, use skeleton/grep to locate first
+- [ ] Revisit CLAUDE.md dogfooding section - tools should be self-evident, not need instructions
 
 **Medium:**
-- [ ] Compact tool encoding for moss agent - bypass JSON Schema overhead (~10x reduction)
-  - See `docs/prior-art.md` for references (Cloudflare code mode, etc.)
+- [ ] Single-tool MCP server for LLM efficiency
+  - Rename current `moss-mcp` → `moss-mcp-full` (keep for IDEs, programmatic use)
+  - New `moss-mcp` with single `moss(command: str)` tool
+  - 99% token reduction (~8K → ~50 tokens)
+  - See `docs/prior-art.md` and [Anthropic's code execution approach](https://www.anthropic.com/engineering/code-execution-with-mcp)
+- [ ] Compact tool encoding for moss agent - bypass JSON Schema overhead
   - For moss loop, we control both sides - can use terse function signatures
 - [ ] Study Goose's context revision (`crates/goose/src/`)
 
