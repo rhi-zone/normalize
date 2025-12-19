@@ -6,47 +6,33 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ## Next Up
 
-Candidates for the next session, roughly by size:
+Candidates for the next session:
 
-- [x] **`moss summarize`** (small) - Summarize markdown/text files for LLM consumption
-  - Extract structure (headings, bullet points) into concise overview
-  - Token-efficient output (collapsible sections, key points only)
-  - Useful for TODO.md, README, docs/ - quick context without reading 1000 lines
 - [ ] **CLI/MCP help improvements** (small) - Better discoverability
   - `moss help <command>` with examples
   - MCP tool descriptions with usage examples
   - List available commands grouped by category
   - **Autogenerate from MossAPI** - derive help text from docstrings/type hints
-    - CLI argparse help from API method signatures
-    - MCP tool descriptions from API docstrings
-    - Single source of truth (library)
-- [ ] **Compact output for all commands** (small) - Ensure consistency
-  - Add `to_compact()` to all result types (dependencies, etc.)
-  - Consider a lint rule or test to enforce this convention
-  - Pattern: every result class should have `to_markdown()`, `to_compact()`, `to_dict()`
-- [ ] **Live TODO tracking** (medium) - Like Claude Code's task display
-  - Show agent's task list being processed in real-time
-  - Session persistence (resume where you left off)
-  - Progress indicators, time estimates
-  - Our differentiation: persisted across sessions, context-aware
+- [ ] **Research Goose (Block)** (small) - https://github.com/block/goose
+  - Developer agent from Block (Square)
+  - Compare architecture, tool design, trust model
+  - Add findings to `docs/prior-art.md`
 - [ ] **RAG / Semantic Search** (medium) - Higher priority than other medium items
   - See Future Work section for full design
   - Start with: `moss rag index` + `moss rag search`
   - Immediate value: "what did we decide about X?" queries
-- [ ] **RelationalGenerator** (medium) - miniKanren-style logic programming synthesis
-  - Declarative constraint specification
-  - Bidirectional search
-- [x] **`moss tree`** (small) - Git-aware tree visualization (DONE)
-  - Pure Python implementation, `--tracked`, `--all` flags
-  - MCP: `tree_generate`, `tree_format`
-- [x] **Test PBEGenerator/SketchGenerator** (small) - Add tests for new generators (DONE)
-  - 25 new tests covering PBE, Sketch generators and their internals
 - [ ] **`moss explore` REPL** (medium) - Interactive codebase exploration
   - Tab completions, history
   - Commands: skeleton, calls, callers, deps
-- [ ] **Idiomatic Consistency Oracle** (medium) - Pattern matching for project style
-  - Cluster analysis of existing code patterns
-  - Suggest rewrites to match local idioms
+- [ ] **Live TODO tracking** (medium) - Like Claude Code's task display
+  - Show agent's task list being processed in real-time
+  - Session persistence (resume where you left off)
+
+**Recently completed:**
+- [x] `moss summarize` - markdown/text summarization
+- [x] `moss tree` - git-aware tree visualization
+- [x] Test PBEGenerator/SketchGenerator - 25 new tests
+- [x] MCP compact output - all tools return strings, not JSON (TestAllToolsReturnCompact enforces this)
 
 ## Future Work
 
