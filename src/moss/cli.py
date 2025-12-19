@@ -3304,6 +3304,8 @@ def cmd_loop(args: Namespace) -> int:
         LoopBenchmark,
         analysis_loop,
         critic_loop,
+        docstring_apply_loop,
+        docstring_full_loop,
         docstring_loop,
         incremental_loop,
         simple_loop,
@@ -3319,6 +3321,8 @@ def cmd_loop(args: Namespace) -> int:
         "incremental": incremental_loop,
         "analysis": analysis_loop,
         "docstring": docstring_loop,
+        "docstring_full": docstring_full_loop,
+        "docstring_apply": docstring_apply_loop,
     }
 
     if action == "list":

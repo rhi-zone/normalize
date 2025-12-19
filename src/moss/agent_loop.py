@@ -552,6 +552,78 @@ def docstring_loop(name: str = "docstring") -> AgentLoop:
     )
 
 
+def docstring_full_loop(name: str = "docstring_full") -> AgentLoop:
+    """Full docstring loop: skeleton → LLM identify → parse → done.
+
+    Returns parsed docstring entries ready for patching.
+    Each entry has 'function' and 'docstring' keys.
+
+    Example output:
+        [
+            {"function": "my_func", "docstring": "Does something useful."},
+            {"function": "other_func", "docstring": "Does something else."},
+        ]
+    """
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("skeleton", "skeleton.format", step_type=StepType.TOOL),
+            LoopStep(
+                "identify",
+                "llm.add_docstrings",
+                input_from="skeleton",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "parse",
+                "parse.docstrings",
+                input_from="identify",
+                step_type=StepType.TOOL,
+            ),
+        ],
+        exit_conditions=["parse.success"],
+    )
+
+
+def docstring_apply_loop(name: str = "docstring_apply") -> AgentLoop:
+    """Full docstring workflow: skeleton → LLM identify → parse → apply patches.
+
+    This loop:
+    1. Gets file skeleton (skeleton.format)
+    2. LLM identifies functions needing docstrings (llm.add_docstrings)
+    3. Parses LLM output into structured data (parse.docstrings)
+    4. Applies docstrings to the file (patch.docstrings)
+
+    Input: {file_path: str}
+    Output: {applied: list, skipped: list, errors: list}
+    """
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("skeleton", "skeleton.format", step_type=StepType.TOOL),
+            LoopStep(
+                "identify",
+                "llm.add_docstrings",
+                input_from="skeleton",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "parse",
+                "parse.docstrings",
+                input_from="identify",
+                step_type=StepType.TOOL,
+            ),
+            LoopStep(
+                "apply",
+                "patch.docstrings",
+                input_from="parse",
+                step_type=StepType.TOOL,
+            ),
+        ],
+        exit_conditions=["apply.success"],
+    )
+
+
 def incremental_loop(name: str = "incremental") -> AgentLoop:
     """Incremental context loading: skeleton → targeted → full (if needed)."""
     return AgentLoop(
@@ -632,6 +704,124 @@ class MossToolExecutor:
             return initial
         raise ValueError(f"Cannot extract file_path from context.input: {initial}")
 
+    def _parse_docstring_output(self, llm_output: str) -> list[dict[str, str]]:
+        """Parse LLM output in FUNC:name|docstring format.
+
+        Returns list of dicts with 'function' and 'docstring' keys.
+        """
+        results = []
+        for line in llm_output.strip().split("\n"):
+            line = line.strip()
+            if not line or not line.startswith("FUNC:"):
+                continue
+            # Format: FUNC:function_name|One-line description
+            rest = line[5:]  # Remove "FUNC:" prefix
+            if "|" not in rest:
+                continue
+            name, docstring = rest.split("|", 1)
+            name = name.strip()
+            if not name:  # Skip empty function names
+                continue
+            results.append(
+                {
+                    "function": name,
+                    "docstring": docstring.strip(),
+                }
+            )
+        return results
+
+    def _apply_docstrings(self, file_path: str, docstrings: list[dict[str, str]]) -> dict[str, Any]:
+        """Apply docstrings to functions in a file.
+
+        Args:
+            file_path: Path to the Python file
+            docstrings: List of dicts with 'function' and 'docstring' keys
+
+        Returns:
+            Dict with 'applied', 'skipped', and 'errors' lists
+        """
+        from pathlib import Path as P
+
+        path = P(file_path) if not isinstance(file_path, P) else file_path
+        if not path.is_absolute():
+            path = self.root / path
+
+        if not path.exists():
+            return {"applied": [], "skipped": [], "errors": [f"File not found: {path}"]}
+
+        source = path.read_text()
+        lines = source.splitlines(keepends=True)
+
+        applied = []
+        skipped = []
+        errors = []
+
+        # Find function definitions and their locations
+        import ast
+
+        try:
+            tree = ast.parse(source)
+        except SyntaxError as e:
+            return {"applied": [], "skipped": [], "errors": [f"Syntax error: {e}"]}
+
+        # Build a map of function names to their line numbers
+        func_lines: dict[str, int] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                func_lines[node.name] = node.lineno
+
+        # Process docstrings in reverse order to avoid line number shifts
+        insertions: list[tuple[int, str, str]] = []  # (line_num, func_name, docstring)
+
+        for entry in docstrings:
+            func_name = entry.get("function", "")
+            docstring = entry.get("docstring", "")
+
+            if not func_name or not docstring:
+                skipped.append(func_name or "(empty)")
+                continue
+
+            if func_name not in func_lines:
+                errors.append(f"Function not found: {func_name}")
+                continue
+
+            line_num = func_lines[func_name]
+            insertions.append((line_num, func_name, docstring))
+
+        # Sort by line number in reverse order
+        insertions.sort(key=lambda x: x[0], reverse=True)
+
+        # Apply insertions
+        for line_num, func_name, docstring in insertions:
+            # Find the function's first line and get its indentation
+            func_line = lines[line_num - 1] if line_num <= len(lines) else ""
+            base_indent = len(func_line) - len(func_line.lstrip())
+
+            # The docstring should be indented one level more than the function
+            body_indent = " " * (base_indent + 4)
+
+            # Format the docstring
+            docstring_text = f'{body_indent}"""{docstring}"""\n'
+
+            # Find where to insert (after the function signature)
+            # This is the line after the def line(s)
+            insert_line = line_num
+            # Handle multi-line function signatures
+            while insert_line <= len(lines):
+                if lines[insert_line - 1].rstrip().endswith(":"):
+                    break
+                insert_line += 1
+
+            # Insert after the colon line
+            lines.insert(insert_line, docstring_text)
+            applied.append(func_name)
+
+        # Write the modified file
+        if applied:
+            path.write_text("".join(lines))
+
+        return {"applied": applied, "skipped": skipped, "errors": errors}
+
     async def execute(
         self, tool_name: str, context: LoopContext, step: LoopStep
     ) -> tuple[Any, int, int]:
@@ -702,6 +892,19 @@ class MossToolExecutor:
             if isinstance(input_data, dict):
                 pattern = input_data.get("pattern", pattern)
             result = self.api.complexity.analyze(pattern)
+
+        elif tool_name == "parse.docstrings":
+            # Parse LLM output in FUNC:name|docstring format
+            if not isinstance(input_data, str):
+                input_data = str(input_data)
+            result = self._parse_docstring_output(input_data)
+
+        elif tool_name == "patch.docstrings":
+            # Apply parsed docstrings to functions
+            file_path = self._get_file_path(context, step)
+            if not isinstance(input_data, list):
+                raise ValueError(f"patch.docstrings expects list, got {type(input_data)}")
+            result = self._apply_docstrings(file_path, input_data)
 
         else:
             raise ValueError(f"Unknown tool: {tool_name}")

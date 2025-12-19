@@ -14,9 +14,12 @@ from moss.agent_loop import (
     LoopMetrics,
     LoopStatus,
     LoopStep,
+    MossToolExecutor,
     StepType,
     analysis_loop,
     critic_loop,
+    docstring_apply_loop,
+    docstring_full_loop,
     docstring_loop,
     incremental_loop,
     simple_loop,
@@ -646,3 +649,252 @@ class TestLoopBenchmark:
         markdown = result.to_markdown()
         assert "# Benchmark" in markdown
         assert "Success rate" in markdown
+
+
+class TestDocstringFullLoop:
+    """Tests for docstring_full_loop template."""
+
+    def test_docstring_full_loop_structure(self):
+        loop = docstring_full_loop()
+        assert loop.name == "docstring_full"
+        assert len(loop.steps) == 3
+        assert loop.steps[0].name == "skeleton"
+        assert loop.steps[0].tool == "skeleton.format"
+        assert loop.steps[1].name == "identify"
+        assert loop.steps[1].step_type == StepType.LLM
+        assert loop.steps[2].name == "parse"
+        assert loop.steps[2].tool == "parse.docstrings"
+        assert "parse.success" in loop.exit_conditions
+
+    def test_docstring_full_loop_custom_name(self):
+        loop = docstring_full_loop(name="custom_docstring")
+        assert loop.name == "custom_docstring"
+
+
+class TestMossToolExecutor:
+    """Tests for MossToolExecutor."""
+
+    @pytest.fixture
+    def executor(self, tmp_path):
+        """Create a MossToolExecutor for testing."""
+        return MossToolExecutor(root=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_parse_docstrings_basic(self, executor):
+        """Test parsing basic FUNC:name|docstring format."""
+        llm_output = """FUNC:foo|Does something useful
+FUNC:bar|Processes the data"""
+        context = LoopContext(input=llm_output)
+        step = LoopStep(name="parse", tool="parse.docstrings")
+
+        result, tokens_in, tokens_out = await executor.execute("parse.docstrings", context, step)
+
+        assert len(result) == 2
+        assert result[0]["function"] == "foo"
+        assert result[0]["docstring"] == "Does something useful"
+        assert result[1]["function"] == "bar"
+        assert result[1]["docstring"] == "Processes the data"
+        assert tokens_in == 0
+        assert tokens_out == 0
+
+    @pytest.mark.asyncio
+    async def test_parse_docstrings_with_extra_lines(self, executor):
+        """Test parsing ignores non-FUNC lines."""
+        llm_output = """Here are the functions that need docstrings:
+
+FUNC:calculate|Calculates the result
+
+Some other text
+FUNC:validate|Validates input data"""
+        context = LoopContext(input=llm_output)
+        step = LoopStep(name="parse", tool="parse.docstrings")
+
+        result, _, _ = await executor.execute("parse.docstrings", context, step)
+
+        assert len(result) == 2
+        assert result[0]["function"] == "calculate"
+        assert result[1]["function"] == "validate"
+
+    @pytest.mark.asyncio
+    async def test_parse_docstrings_empty_input(self, executor):
+        """Test parsing empty input returns empty list."""
+        context = LoopContext(input="")
+        step = LoopStep(name="parse", tool="parse.docstrings")
+
+        result, _, _ = await executor.execute("parse.docstrings", context, step)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_parse_docstrings_malformed_lines(self, executor):
+        """Test parsing skips malformed lines."""
+        llm_output = """FUNC:valid|Valid docstring
+FUNC:no_pipe_here
+FUNC:|empty_name
+FUNC:also_valid|Another valid one"""
+        context = LoopContext(input=llm_output)
+        step = LoopStep(name="parse", tool="parse.docstrings")
+
+        result, _, _ = await executor.execute("parse.docstrings", context, step)
+
+        assert len(result) == 2
+        assert result[0]["function"] == "valid"
+        assert result[1]["function"] == "also_valid"
+
+    @pytest.mark.asyncio
+    async def test_parse_docstrings_preserves_pipe_in_docstring(self, executor):
+        """Test that pipes in docstring are preserved."""
+        llm_output = "FUNC:filter|Filters items where x | y is true"
+        context = LoopContext(input=llm_output)
+        step = LoopStep(name="parse", tool="parse.docstrings")
+
+        result, _, _ = await executor.execute("parse.docstrings", context, step)
+
+        assert len(result) == 1
+        assert result[0]["docstring"] == "Filters items where x | y is true"
+
+
+class TestParseDocstringOutput:
+    """Direct tests for _parse_docstring_output method."""
+
+    @pytest.fixture
+    def executor(self, tmp_path):
+        return MossToolExecutor(root=tmp_path)
+
+    def test_parse_basic(self, executor):
+        output = "FUNC:test|A test function"
+        result = executor._parse_docstring_output(output)
+        assert result == [{"function": "test", "docstring": "A test function"}]
+
+    def test_parse_multiple(self, executor):
+        output = "FUNC:a|First\nFUNC:b|Second"
+        result = executor._parse_docstring_output(output)
+        assert len(result) == 2
+
+    def test_parse_strips_whitespace(self, executor):
+        output = "FUNC:  spaced  |  has spaces  "
+        result = executor._parse_docstring_output(output)
+        assert result[0]["function"] == "spaced"
+        assert result[0]["docstring"] == "has spaces"
+
+    def test_parse_ignores_empty_lines(self, executor):
+        output = "\n\nFUNC:test|value\n\n"
+        result = executor._parse_docstring_output(output)
+        assert len(result) == 1
+
+
+class TestDocstringApplyLoop:
+    """Tests for docstring_apply_loop template."""
+
+    def test_docstring_apply_loop_structure(self):
+        loop = docstring_apply_loop()
+        assert loop.name == "docstring_apply"
+        assert len(loop.steps) == 4
+        assert loop.steps[0].name == "skeleton"
+        assert loop.steps[1].name == "identify"
+        assert loop.steps[2].name == "parse"
+        assert loop.steps[3].name == "apply"
+        assert loop.steps[3].tool == "patch.docstrings"
+        assert "apply.success" in loop.exit_conditions
+
+    def test_docstring_apply_loop_custom_name(self):
+        loop = docstring_apply_loop(name="custom_apply")
+        assert loop.name == "custom_apply"
+
+
+class TestApplyDocstrings:
+    """Tests for _apply_docstrings method."""
+
+    @pytest.fixture
+    def executor(self, tmp_path):
+        return MossToolExecutor(root=tmp_path)
+
+    def test_apply_docstrings_to_file(self, executor, tmp_path):
+        """Test applying docstrings to a Python file."""
+        # Create a test file with undocumented functions
+        test_file = tmp_path / "test_module.py"
+        test_file.write_text("""def foo():
+    pass
+
+def bar(x, y):
+    return x + y
+""")
+
+        docstrings = [
+            {"function": "foo", "docstring": "Do foo things."},
+            {"function": "bar", "docstring": "Add two numbers."},
+        ]
+
+        result = executor._apply_docstrings(str(test_file), docstrings)
+
+        assert "foo" in result["applied"]
+        assert "bar" in result["applied"]
+        assert result["errors"] == []
+
+        # Verify the file was modified
+        modified = test_file.read_text()
+        assert '"""Do foo things."""' in modified
+        assert '"""Add two numbers."""' in modified
+
+    def test_apply_docstrings_function_not_found(self, executor, tmp_path):
+        """Test handling of functions that don't exist."""
+        test_file = tmp_path / "test_module.py"
+        test_file.write_text("def foo():\n    pass\n")
+
+        docstrings = [
+            {"function": "nonexistent", "docstring": "Should not apply."},
+        ]
+
+        result = executor._apply_docstrings(str(test_file), docstrings)
+
+        assert result["applied"] == []
+        assert "Function not found: nonexistent" in result["errors"]
+
+    def test_apply_docstrings_file_not_found(self, executor, tmp_path):
+        """Test handling of missing files."""
+        result = executor._apply_docstrings(
+            str(tmp_path / "nonexistent.py"),
+            [{"function": "foo", "docstring": "test"}],
+        )
+
+        assert result["applied"] == []
+        assert any("not found" in e.lower() for e in result["errors"])
+
+    def test_apply_docstrings_preserves_indentation(self, executor, tmp_path):
+        """Test that docstrings are properly indented."""
+        test_file = tmp_path / "test_module.py"
+        test_file.write_text("""class MyClass:
+    def method(self):
+        pass
+""")
+
+        docstrings = [{"function": "method", "docstring": "A method."}]
+
+        result = executor._apply_docstrings(str(test_file), docstrings)
+
+        assert "method" in result["applied"]
+        modified = test_file.read_text()
+        # Verify the docstring is indented correctly (8 spaces for method body)
+        assert '        """A method."""' in modified
+
+    @pytest.mark.asyncio
+    async def test_patch_docstrings_via_execute(self, executor, tmp_path):
+        """Test patch.docstrings tool via executor.execute."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def test_fn():\n    pass\n")
+
+        docstrings = [{"function": "test_fn", "docstring": "Test function."}]
+        context = LoopContext(input={"file_path": str(test_file)})
+        step = LoopStep(
+            name="apply",
+            tool="patch.docstrings",
+            input_from="parse",
+        )
+        # Set up context with parse output
+        context = context.with_step("parse", docstrings)
+
+        result, tokens_in, tokens_out = await executor.execute("patch.docstrings", context, step)
+
+        assert "test_fn" in result["applied"]
+        assert tokens_in == 0
+        assert tokens_out == 0
