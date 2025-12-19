@@ -12,11 +12,7 @@ See `~/git/prose/moss/` for full synthesis design documents.
    - Current approach burns context on search results
    - Consider: summarize in smaller chunks, cache results, extract key facts only
 
-2. **CompositeToolExecutor** (small) - Combine multiple executors
-   - Route tools to appropriate executor (MossAPI, MCP, LLM)
-   - Enable hybrid loops that use both local and external tools
-
-3. **Loop serialization** (small) - Save/load loops as YAML/JSON
+2. **Loop serialization** (small) - Save/load loops as YAML/JSON
    - Enable sharing loop definitions
    - Allow loops to be version controlled
 
@@ -47,7 +43,7 @@ See `~/git/prose/moss/` for full synthesis design documents.
 ---
 
 **Completed this session (Dec 19, 2025):**
-- [x] **Loop tests** - 69 tests in `tests/test_agent_loop.py`
+- [x] **Loop tests** - 78 tests in `tests/test_agent_loop.py`
 - [x] **CLI integration** - `moss loop list/run/benchmark` commands
 - [x] **E2E loops** - analysis + docstring loops working with real Gemini
 - [x] **litellm unified** - All providers now use litellm (removed Gemini special-casing)
@@ -62,6 +58,9 @@ See `~/git/prose/moss/` for full synthesis design documents.
 - [x] **MCPToolExecutor** - Connect to external MCP servers from loops
   - MCPServerConfig for server configuration
   - Tested E2E with moss MCP server
+- [x] **CompositeToolExecutor** - Route tools to different executors
+  - Prefix-based routing (e.g., "moss.", "mcp.", "llm.")
+  - Enables hybrid loops mixing local and external tools
 - [x] **Philosophy updates** - Added new design tenets
   - Low Barrier to Entry
   - Works on Messy Codebases
