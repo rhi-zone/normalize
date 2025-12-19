@@ -96,6 +96,21 @@ class WeaknessAnalysis:
             result[w.severity].append(w)
         return result
 
+    def to_compact(self) -> str:
+        """Format as compact text for LLM consumption."""
+        by_cat = self.by_category
+        cat_summary = ", ".join(f"{len(ws)} {cat.value}" for cat, ws in by_cat.items())
+        lines = [f"Weakness Analysis: {len(self.weaknesses)} issues ({cat_summary or 'none'})"]
+
+        for w in self.weaknesses[:5]:
+            loc = f"{w.file_path}:{w.line_start}" if w.line_start else w.file_path or "global"
+            lines.append(f"  [{w.severity.value}] {loc}: {w.title}")
+
+        if len(self.weaknesses) > 5:
+            lines.append(f"  ... and {len(self.weaknesses) - 5} more")
+
+        return "\n".join(lines)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {

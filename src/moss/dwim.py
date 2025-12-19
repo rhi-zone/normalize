@@ -513,6 +513,14 @@ TOOL_ALIASES: dict[str, str] = {
     "outline": "skeleton",
     "tree": "skeleton",
     "hierarchy": "skeleton",
+    # skeleton_expand
+    "expand": "skeleton_expand",
+    "fullsource": "skeleton_expand",
+    "source": "skeleton_expand",
+    # skeleton_get_enum_values
+    "enum": "skeleton_get_enum_values",
+    "enumvalues": "skeleton_get_enum_values",
+    "values": "skeleton_get_enum_values",
     # anchors
     "functions": "anchors",
     "classes": "anchors",
@@ -545,6 +553,16 @@ TOOL_ALIASES: dict[str, str] = {
     "modify": "apply_patch",
     "patch": "apply_patch",
     "change": "apply_patch",
+    # web_fetch
+    "fetch": "web_fetch",
+    "browse": "web_fetch",
+    "url": "web_fetch",
+    "webpage": "web_fetch",
+    # web_search
+    "websearch": "web_search",
+    "lookup": "web_search",
+    "google": "web_search",
+    "duckduckgo": "web_search",
 }
 
 # Parameter aliases: alternative parameter names that map to canonical ones

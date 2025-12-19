@@ -166,7 +166,20 @@ class TreeSitterParser:
         module_name = self.LANGUAGE_MODULES[self._language_type]
         try:
             lang_module = __import__(module_name)
-            self._language = tree_sitter.Language(lang_module.language())
+            # Handle different naming conventions for language functions
+            # Most use .language(), but some (like typescript) use language_<name>()
+            if hasattr(lang_module, "language"):
+                lang_fn = lang_module.language
+            elif hasattr(lang_module, f"language_{self._language_type.value}"):
+                lang_fn = getattr(lang_module, f"language_{self._language_type.value}")
+            else:
+                # Fallback: find any language_* function
+                lang_fns = [n for n in dir(lang_module) if n.startswith("language_")]
+                if lang_fns:
+                    lang_fn = getattr(lang_module, lang_fns[0])
+                else:
+                    raise AttributeError(f"No language function found in {module_name}")
+            self._language = tree_sitter.Language(lang_fn())
         except ImportError as e:
             raise ImportError(
                 f"Language module {module_name} not installed. "

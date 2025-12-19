@@ -1,5 +1,8 @@
 """Tests for Vector Store abstraction."""
 
+import subprocess
+import sys
+
 import pytest
 
 from moss.vector_store import (
@@ -11,6 +14,28 @@ from moss.vector_store import (
     create_vector_store,
     document_hash,
 )
+
+
+def _check_chromadb_available() -> bool:
+    """Check if ChromaDB can be imported without hanging.
+
+    ChromaDB has native dependencies that may fail in some environments (e.g., Nix).
+    We use a subprocess check with timeout to detect this reliably.
+    """
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", "import chromadb"],
+            timeout=10,
+            capture_output=True,
+        )
+        return result.returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
+    except Exception:
+        return False
+
+
+_chromadb_available = _check_chromadb_available()
 
 
 class TestSearchResult:
@@ -126,6 +151,10 @@ class TestInMemoryVectorStore:
         assert isinstance(store, VectorStore)
 
 
+@pytest.mark.skipif(
+    not _chromadb_available,
+    reason="ChromaDB not available (import check failed or timed out)",
+)
 class TestChromaVectorStore:
     """Tests for ChromaVectorStore."""
 
@@ -297,6 +326,7 @@ class TestCreateVectorStore:
         store = create_vector_store("sqlite", db_path=str(db_path))
         assert isinstance(store, SQLiteVectorStore)
 
+    @pytest.mark.skipif(not _chromadb_available, reason="ChromaDB not available")
     def test_create_chroma_store(self):
         store = create_vector_store("chroma", collection_name="test")
         assert isinstance(store, ChromaVectorStore)

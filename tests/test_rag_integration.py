@@ -2,19 +2,64 @@
 
 These tests verify the complete RAG flow from indexing to searching,
 including the MossAPI integration and MCP tool exposure.
+
+Note: These tests are skipped if RAG dependencies (numpy, chromadb) are not
+properly installed or have C extension issues (common in Nix environments).
 """
+
+import subprocess
+import sys
 
 import pytest
 
-from moss.moss_api import RAGAPI, MossAPI
-from moss.rag import IndexStats, RAGIndex, SearchResult, format_search_results
+
+def _check_rag_available():
+    """Check if RAG dependencies are available.
+
+    ChromaDB requires numpy which may have C extension issues in some
+    environments (e.g., Nix without proper LD_LIBRARY_PATH).
+    """
+    # Check numpy first - it's the common failure point
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", "import numpy"],
+            timeout=5,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            return False
+    except subprocess.TimeoutExpired:
+        return False
+    except Exception:
+        return False
+
+    # numpy works, now try actual imports
+    try:
+        from moss.rag import RAGIndex  # noqa: F401
+
+        return True
+    except Exception:
+        return False
+
+
+_rag_available = _check_rag_available()
+
+# Skip entire module if RAG isn't available
+pytestmark = pytest.mark.skipif(
+    not _rag_available, reason="RAG dependencies not available (import check failed or timed out)"
+)
+
+# Only import if available (tests will be skipped anyway if not)
+if _rag_available:
+    from moss.moss_api import RAGAPI, MossAPI
+    from moss.rag import IndexStats, RAGIndex, SearchResult, format_search_results
 
 
 class TestRAGIndex:
     """Tests for RAGIndex core functionality."""
 
     @pytest.fixture
-    def rag(self, tmp_path) -> RAGIndex:
+    def rag(self, tmp_path):
         return RAGIndex(tmp_path)
 
     @pytest.fixture
@@ -193,7 +238,7 @@ class TestRAGAPI:
     """Tests for RAGAPI (MossAPI sub-API)."""
 
     @pytest.fixture
-    def api(self, tmp_path) -> MossAPI:
+    def api(self, tmp_path):
         return MossAPI.for_project(tmp_path)
 
     @pytest.fixture

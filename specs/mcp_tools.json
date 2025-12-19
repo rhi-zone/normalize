@@ -675,7 +675,7 @@
     "name": "complexity_get_high_risk"
   },
   {
-    "description": "Detect structural clones in the codebase. Dict with clone groups and statistics",
+    "description": "Detect structural clones in the codebase. CloneAnalysis with clone groups and statistics",
     "inputSchema": {
       "properties": {
         "level": {
@@ -713,7 +713,7 @@
     "name": "clones_get_groups"
   },
   {
-    "description": "Run security analysis. Dict with findings and summary",
+    "description": "Run security analysis. SecurityAnalysis with findings and summary",
     "inputSchema": {
       "properties": {
         "min_severity": {

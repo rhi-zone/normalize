@@ -245,6 +245,33 @@ class SecurityAnalysis:
             errors=self.errors,
         )
 
+    def to_compact(self) -> str:
+        """Format as compact text for LLM consumption."""
+        parts = []
+        if self.critical_count:
+            parts.append(f"{self.critical_count} critical")
+        if self.high_count:
+            parts.append(f"{self.high_count} high")
+        if self.medium_count:
+            parts.append(f"{self.medium_count} medium")
+        if self.low_count:
+            parts.append(f"{self.low_count} low")
+
+        summary = ", ".join(parts) if parts else "no issues"
+        lines = [f"Security Analysis: {summary} (tools: {', '.join(self.tools_run)})"]
+
+        # Show top findings
+        high_priority = [f for f in self.findings if f.severity >= Severity.HIGH]
+        for finding in high_priority[:5]:
+            sev = finding.severity.name.lower()
+            loc = f"{finding.file}:{finding.line}" if finding.line else str(finding.file)
+            lines.append(f"  [{sev}] {loc}: {finding.message[:60]}")
+
+        if len(high_priority) > 5:
+            lines.append(f"  ... and {len(high_priority) - 5} more high/critical findings")
+
+        return "\n".join(lines)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {

@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.6.3
+
+### Phase 32: WebAPI, Skeleton Expand, Loops Infrastructure
+
+**WebAPI to MCP** (Dec 2025)
+- `web_fetch`, `web_search`, `web_extract_content`, `web_clear_cache` tools
+- 64 total MCP tools (was 60)
+
+**Skeleton Expand**
+- `skeleton_expand` - get full source of named symbol
+- `skeleton_get_enum_values` - extract enum member names
+
+**Composable Loops**
+- `LoopStep`, `AgentLoop`, `AgentLoopRunner`, `LoopMetrics` dataclasses
+- `LLMConfig` + `LLMToolExecutor` for LLM integration
+- `MCPToolExecutor` for external MCP server connections
+- `CompositeToolExecutor` for prefix-based routing
+- Loop serialization (YAML/JSON)
+- `moss loop list/run/benchmark` CLI commands
+
+**Web Module** (`moss.web`)
+- `WebFetcher` - fetch with HTML extraction, caching
+- `WebSearcher` - DuckDuckGo search with token-efficient results
+- `ContentExtractor` - strip nav/footer/script, extract main content
+
+**Other**
+- litellm unified - all providers use litellm
+- Multi-LLM rotation in LLMConfig
+- Philosophy doc (`docs/philosophy.md`) with design tenets
+
 ## v0.6.2
 
 ### Phase 31: Preference Extraction from Agent Logs

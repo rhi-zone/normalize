@@ -35,6 +35,13 @@ from typing import Any
 from moss.gen.introspect import APIMethod, APIParameter, SubAPI, introspect_api
 from moss.gen.serialize import serialize
 
+# Import Request at module level for type resolution with PEP 563 annotations.
+# FastAPI uses get_type_hints() which looks in module globals.
+try:
+    from starlette.requests import Request
+except ImportError:
+    Request = None  # type: ignore[misc,assignment]
+
 
 @dataclass
 class HTTPEndpoint:
@@ -499,24 +506,18 @@ class HTTPGenerator:
         2. Calls the API method via executor
         3. Returns serialized result or appropriate HTTP error
         """
-        from fastapi import HTTPException, Request
-
-        # Capture endpoint info in closure
-        api_path = endpoint.api_path
+        from fastapi import HTTPException
 
         tag = endpoint.path.split("/")[1]
+        api_path = endpoint.api_path
 
         if endpoint.method == "GET":
 
-            @app.get(endpoint.path, summary=endpoint.description, tags=[tag])
-            async def get_handler(request: Request, _api_path: str = api_path):
-                # Extract query parameters
+            async def get_handler(request: Request) -> Any:  # type: ignore[valid-type]
                 args = dict(request.query_params)
-                # Remove 'root' if present and use it separately
                 root_override = args.pop("root", None)
-
                 try:
-                    return executor.execute(_api_path, args, root=root_override)
+                    return executor.execute(api_path, args, root=root_override)
                 except FileNotFoundError as e:
                     raise HTTPException(status_code=404, detail=str(e)) from None
                 except ValueError as e:
@@ -524,28 +525,26 @@ class HTTPGenerator:
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=str(e)) from None
 
+            app.get(endpoint.path, summary=endpoint.description, tags=[tag])(get_handler)
         else:
 
-            @app.post(endpoint.path, summary=endpoint.description, tags=[tag])
-            async def post_handler(request: Request, _api_path: str = api_path):
-                # Extract JSON body
+            async def post_handler(request: Request) -> Any:  # type: ignore[valid-type]
                 try:
                     body = await request.json()
                 except Exception:
                     body = {}
-
-                # Merge with query params (query params override body)
                 args = {**body, **dict(request.query_params)}
                 root_override = args.pop("root", None)
-
                 try:
-                    return executor.execute(_api_path, args, root=root_override)
+                    return executor.execute(api_path, args, root=root_override)
                 except FileNotFoundError as e:
                     raise HTTPException(status_code=404, detail=str(e)) from None
                 except ValueError as e:
                     raise HTTPException(status_code=400, detail=str(e)) from None
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=str(e)) from None
+
+            app.post(endpoint.path, summary=endpoint.description, tags=[tag])(post_handler)
 
 
 def generate_http() -> list[HTTPRouter]:

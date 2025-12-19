@@ -74,6 +74,12 @@ Keep it slim: If CLAUDE.md grows past ~150 lines, refactor content to docs/ and 
 
 ### Updating TODO.md
 Proactively add features, ideas, patterns, technical debt, integration opportunities.
+Keep TODO.md lean (<100 lines). Move completed items to CHANGELOG.md.
+- Next Up: 3-5 concrete tasks for immediate work
+- Active Backlog: pending items only, no completed
+- Future Work: categories with brief items
+- To Consolidate: new ideas before proper categorization
+- Avoid: verbose descriptions, code examples, duplicate entries
 
 ### Working Style
 

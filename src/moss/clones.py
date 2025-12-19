@@ -77,6 +77,22 @@ class CloneAnalysis:
     def clone_groups_count(self) -> int:
         return len(self.groups)
 
+    def to_compact(self) -> str:
+        """Format as compact text for LLM consumption."""
+        lines = [
+            f"Clone Analysis (level={self.level.name.lower()}): "
+            f"{self.clone_groups_count} groups, {self.total_clones} clones "
+            f"({self.functions_analyzed} functions in {self.files_analyzed} files)"
+        ]
+        for g in self.groups[:5]:  # Limit to top 5 groups
+            files = ", ".join(str(f.name) for f in list(g.files())[:3])
+            if len(g.files()) > 3:
+                files += f" +{len(g.files()) - 3} more"
+            lines.append(f"  - {g.count}x clones in: {files}")
+        if len(self.groups) > 5:
+            lines.append(f"  ... and {len(self.groups) - 5} more groups")
+        return "\n".join(lines)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON output."""
         return {

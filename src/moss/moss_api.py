@@ -1106,7 +1106,7 @@ class ClonesAPI:
 
     root: Path
 
-    def detect(self, level: int = 0, min_lines: int = 3) -> dict[str, Any]:
+    def detect(self, level: int = 0, min_lines: int = 3) -> Any:
         """Detect structural clones in the codebase.
 
         Args:
@@ -1118,12 +1118,11 @@ class ClonesAPI:
             min_lines: Minimum function lines to consider (default: 3)
 
         Returns:
-            Dict with clone groups and statistics
+            CloneAnalysis with clone groups and statistics
         """
         from moss.clones import ElisionLevel, detect_clones
 
-        analysis = detect_clones(self.root, level=ElisionLevel(level), min_lines=min_lines)
-        return analysis.to_dict()
+        return detect_clones(self.root, level=ElisionLevel(level), min_lines=min_lines)
 
     def get_groups(self, level: int = 0, min_count: int = 2) -> list[dict[str, Any]]:
         """Get clone groups with at least min_count members.
@@ -1135,7 +1134,8 @@ class ClonesAPI:
         Returns:
             List of clone group details
         """
-        result = self.detect(level=level)
+        analysis = self.detect(level=level)
+        result = analysis.to_dict()
         return [g for g in result.get("groups", []) if g.get("count", 0) >= min_count]
 
 
@@ -1153,7 +1153,7 @@ class SecurityAPI:
         self,
         tools: list[str] | None = None,
         min_severity: str = "low",
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Run security analysis.
 
         Args:
@@ -1161,12 +1161,11 @@ class SecurityAPI:
             min_severity: Minimum severity to report ("low", "medium", "high", "critical")
 
         Returns:
-            Dict with findings and summary
+            SecurityAnalysis with findings and summary
         """
         from moss.security import analyze_security
 
-        analysis = analyze_security(self.root, tools=tools, min_severity=min_severity)
-        return analysis.to_dict()
+        return analyze_security(self.root, tools=tools, min_severity=min_severity)
 
     def get_high_severity(self) -> list[dict[str, Any]]:
         """Get high and critical severity findings.
@@ -1174,8 +1173,8 @@ class SecurityAPI:
         Returns:
             List of high/critical security findings
         """
-        result = self.analyze(min_severity="high")
-        return result.get("findings", [])
+        analysis = self.analyze(min_severity="high")
+        return [f.to_dict() for f in analysis.findings]
 
 
 @dataclass
