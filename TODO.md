@@ -6,23 +6,36 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ## Next Up
 
-Candidates for the next session:
+**For next session (prioritized):**
 
-- [x] **`moss todo` command** (small) - ✅ TodoAPI added: list(), search(), sections() via MCP (CLI wrapper pending)
-- [x] **DWIM auto-registration** (medium) - ✅ Now 65 tools registered; added word form matching (summarize→summary)
-- [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator
-  - **CAUTION**: Don't lose functionality! Upstream all CLI-only features to MossAPI first
-  - Audit each command: does it have an API equivalent? If not, create one
-  - **CLI audit results** (53 commands, 20 sub-APIs):
-    - ✅ Fixed: ClonesAPI, SecurityAPI, WeaknessesAPI were missing from introspect.py
-    - Still missing APIs: lint, metrics, patterns, mutate, report, roadmap, overview, status, pr, diff
-    - CLI-only (OK): servers (mcp/acp/lsp), interactive (shell/explore/tui), config
-  - Ensures MCP/CLI parity and single source of truth
-- [ ] **Complexity hotspots** (medium) - 60 functions with complexity ≥15 need refactoring
-  - Top offenders: `cli.py` (9 of top 20!), `smt.py` (47), `status.py`, `roadmap.py`
-  - CLI commands doing too much: `cmd_query` (46), `cmd_overview` (43), etc.
-  - Refactoring these supports CLI migration (move logic to API, thin CLI wrapper)
-- [x] **DWIM confidence tuning** (small) - ✅ Improved: query expansion + weight tuning (0.22→0.31)
+1. **Wire minimal agent loop** (medium) - All components exist, just need wiring
+   - Use: skeleton.format(), dwim.analyze_intent(), patch.apply(), validation.validate()
+   - Test on simple task, measure token usage vs Claude Code
+
+2. **Add missing CLI APIs** (medium) - 10 commands without API equivalents
+   - Priority: lint, status, overview, roadmap (most useful)
+   - Pattern: move logic from cmd_* to API, keep CLI as thin wrapper
+
+3. **Refactor cmd_query** (small) - Complexity 46, worst in CLI
+   - Extract logic to QueryAPI, simplify CLI command
+   - Good practice for CLI migration pattern
+
+4. **moss dwim CLI command** (small) - DWIM works via Python but no CLI
+   - Add `moss dwim "query"` to cli.py (or wait for CLI generator)
+
+---
+
+**Completed this session:**
+- [x] **`moss todo` command** - ✅ TodoAPI: list(), search(), sections()
+- [x] **DWIM auto-registration** - ✅ 7→65 tools, word form matching
+- [x] **DWIM confidence tuning** - ✅ Query expansion, 0.22→0.31
+- [x] **CLI audit** - ✅ Found 3 missing APIs, documented gaps
+- [x] **Bootstrap exploration** - ✅ 86.9% token savings with skeleton
+
+**Remaining large tasks:**
+- [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to gen/cli.py
+  - CLI audit results: 53 commands, 20 sub-APIs, 10 missing APIs
+- [ ] **Complexity hotspots** (medium) - 60 functions ≥15 complexity
 
 ## Bootstrap Priority (Token Savings)
 
