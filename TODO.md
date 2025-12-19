@@ -171,6 +171,44 @@ class LoopRunner:
   - Extend to Aider, OpenHands, etc.
 - [ ] **Benchmark comparability** - Same log format → apples-to-apples comparison on SWE-bench
 
+## Online Integrations
+
+**Goal:** Connect moss to external services for task management, code hosting, and collaboration.
+
+**Code Hosting:**
+- [ ] **GitHub** - Issues, PRs, actions, discussions
+- [ ] **GitLab** - Issues, MRs, CI/CD
+- [ ] **Forgejo/Gitea** - Self-hosted Git forge support
+- [ ] **SourceHut** - Mailing lists, issue trackers
+- [ ] **BitBucket** - Issues, PRs, pipelines
+
+**Task Management:**
+- [ ] **Trello** - Cards, boards, lists
+- [ ] **Jira** - Issues, sprints, workflows
+- [ ] **Linear** - Issues, cycles, projects
+- [ ] **GitHub Projects** - Boards, automation
+
+**Agent Integration:**
+- [ ] Agent should pick up TODOs from external systems
+- [ ] Agent should write back task updates and completions
+- [ ] Bidirectional sync with issue trackers
+
+## Agent Interoperability
+
+**Goal:** Communicate with other AI agents via standard protocols.
+
+**Research:**
+- [ ] **A2A Protocol** - Google's Agent-to-Agent protocol
+  - https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/
+  - Study: How does task delegation work?
+  - Study: What's the message format?
+  - Evaluate: Does this fit our ticket-based model?
+
+**Integration:**
+- [ ] **MCP Client** - Call other agents' tools via MCP
+- [ ] **A2A Server** - Expose moss as A2A-compatible agent
+- [ ] **Agent orchestration** - Coordinate multiple agents on complex tasks
+
 **Recently completed:**
 - [x] SkeletonAPI plugin routing - MCP `skeleton_format` now uses plugin registry (supports markdown)
 - [x] Unix socket transport - `moss mcp-server --socket /tmp/moss.sock` for local IPC
