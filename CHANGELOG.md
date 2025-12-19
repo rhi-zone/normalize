@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.6.6
+
+### Phase 36: query/search CLI Migration
+
+**SearchAPI**
+- `search_query` - Query symbols with pattern matching and regex filters
+  - Filters: kind, name regex, signature regex, inheritance, line counts
+  - Returns `QueryMatch` dataclass with full symbol info
+
+**CLI Migration to MossAPI**
+- 18 commands now use MossAPI (was 16)
+- Newly migrated: query, search
+- `cmd_query` now uses `MossAPI.search.query()`
+- `cmd_search` now uses `MossAPI.rag` for semantic search
+
 ## v0.6.5
 
 ### Phase 35: find_related_files, summarize_module, CLI Migration

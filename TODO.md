@@ -4,14 +4,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
-   - Pattern: Replace `from moss.X import Y` with `MossAPI.for_project()`
-   - 16 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim, anchors, cfg, deps, context)
-   - Priority next: query, search
-
-2. **Agent learning** - Record mistakes in `.moss/lessons.md`
+1. **Agent learning** - Record mistakes in `.moss/lessons.md`
    - Capture patterns from session failures
    - Surface relevant lessons during similar operations
+
+2. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
+   - Pattern: Replace `from moss.X import Y` with `MossAPI.for_project()`
+   - 18 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim, anchors, cfg, deps, context, query, search)
 
 ## Active Backlog
 

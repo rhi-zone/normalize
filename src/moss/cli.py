@@ -520,9 +520,7 @@ def cmd_anchors(args: Namespace) -> int:
 
 def cmd_query(args: Namespace) -> int:
     """Query code with pattern matching and filters."""
-    import re
-
-    from moss.skeleton import extract_python_skeleton
+    from moss import MossAPI
 
     output = setup_output(args)
     path = Path(args.path).resolve()
@@ -531,114 +529,51 @@ def cmd_query(args: Namespace) -> int:
         output.error(f"Path {path} does not exist")
         return 1
 
-    if path.is_file():
-        files = [path]
-    else:
-        pattern = args.pattern or "**/*.py"
-        files = list(path.glob(pattern))
+    # Use project root for API, pass path as search path
+    api = MossAPI.for_project(path if path.is_dir() else path.parent)
 
-    # Compile patterns
-    name_pattern = re.compile(args.name) if args.name else None
-    sig_pattern = re.compile(args.signature) if args.signature else None
-
-    results: list[dict] = []
-
-    def matches_filters(sym: Any) -> bool:
-        """Check if a symbol matches all filters."""
-        # Type filter
-        if args.type and args.type != "all":
-            if sym.kind != args.type:
-                return False
-
-        # Name filter
-        if name_pattern and not name_pattern.search(sym.name):
-            return False
-
-        # Signature filter
-        if sig_pattern and sym.signature:
-            if not sig_pattern.search(sym.signature):
-                return False
-
-        # Inheritance filter (for classes)
-        if args.inherits and sym.kind == "class":
-            # Check if class inherits from specified base (look for "(Base" pattern)
-            if f"({args.inherits}" not in sym.signature:
-                return False
-
-        # Line count filters
-        if args.min_lines is not None or args.max_lines is not None:
-            line_count = sym.line_count
-            if line_count is None:
-                return False  # Can't filter if no line count
-            if args.min_lines is not None and line_count < args.min_lines:
-                return False
-            if args.max_lines is not None and line_count > args.max_lines:
-                return False
-
-        return True
-
-    def collect_matches(symbols: list, file_str: str, parent: str | None = None) -> None:
-        """Recursively collect matching symbols."""
-        for sym in symbols:
-            if matches_filters(sym):
-                result = {
-                    "file": file_str,
-                    "name": sym.name,
-                    "kind": sym.kind,
-                    "line": sym.lineno,
-                    "signature": sym.signature,
-                }
-                if sym.end_lineno is not None:
-                    result["end_line"] = sym.end_lineno
-                    result["line_count"] = sym.line_count
-                if sym.docstring:
-                    result["docstring"] = sym.docstring
-                if parent:
-                    result["context"] = parent
-                results.append(result)
-
-            # Always recurse into children to find nested matches
-            if sym.children:
-                collect_matches(sym.children, file_str, sym.name)
-
-    for file_path in files:
-        try:
-            source = file_path.read_text()
-            symbols = extract_python_skeleton(source)
-            collect_matches(symbols, str(file_path))
-        except SyntaxError as e:
-            output.verbose(f"Syntax error in {file_path}: {e}")
+    results = api.search.query(
+        path=path,
+        pattern=args.pattern or "**/*.py",
+        kind=args.type if args.type != "all" else None,
+        name=args.name,
+        signature=args.signature,
+        inherits=args.inherits,
+        min_lines=args.min_lines,
+        max_lines=args.max_lines,
+    )
 
     if getattr(args, "json", False):
+        json_results = [r.to_dict() for r in results]
         if getattr(args, "group_by", None) == "file":
             # Group results by file for JSON output
             grouped: dict[str, list] = {}
-            for r in results:
+            for r in json_results:
                 grouped.setdefault(r["file"], []).append(r)
             output_result(grouped, args)
         else:
-            output_result(results, args)
+            output_result(json_results, args)
     else:
         if getattr(args, "group_by", None) == "file":
             # Group results by file for text output
             grouped_text: dict[str, list] = {}
             for r in results:
-                grouped_text.setdefault(r["file"], []).append(r)
+                grouped_text.setdefault(r.file, []).append(r)
             for file_path_str, file_results in grouped_text.items():
                 output.header(file_path_str)
                 for r in file_results:
-                    ctx = f" (in {r['context']})" if r.get("context") else ""
-                    output.print(f"  :{r['line']} {r['kind']} {r['name']}{ctx}")
-                    if r.get("signature"):
-                        output.print(f"    {r['signature']}")
+                    ctx = f" (in {r.context})" if r.context else ""
+                    output.print(f"  :{r.line} {r.kind} {r.name}{ctx}")
+                    if r.signature:
+                        output.print(f"    {r.signature}")
         else:
             for r in results:
-                ctx = f" (in {r['context']})" if r.get("context") else ""
-                output.print(f"{r['file']}:{r['line']} {r['kind']} {r['name']}{ctx}")
-                if r.get("signature"):
-                    output.print(f"  {r['signature']}")
-                if r.get("docstring"):
-                    output.verbose(f"  {r['docstring'][:50]}...")
+                ctx = f" (in {r.context})" if r.context else ""
+                output.print(f"{r.file}:{r.line} {r.kind} {r.name}{ctx}")
+                if r.signature:
+                    output.print(f"  {r.signature}")
+                if r.docstring:
+                    output.verbose(f"  {r.docstring[:50]}...")
 
     if not results:
         output.warning("No matches found")
@@ -993,7 +928,7 @@ def cmd_context(args: Namespace) -> int:
 
 def cmd_search(args: Namespace) -> int:
     """Semantic search across codebase."""
-    from moss.semantic_search import create_search_system
+    from moss import MossAPI
 
     out = get_output()
     directory = Path(args.directory).resolve()
@@ -1001,21 +936,13 @@ def cmd_search(args: Namespace) -> int:
         out.error(f"Directory {directory} does not exist")
         return 1
 
-    # Create search system
-    backend = "chroma" if args.persist else "memory"
-    kwargs: dict[str, Any] = {}
-    if args.persist:
-        kwargs["collection_name"] = "moss_search"
-        kwargs["persist_directory"] = str(directory / ".moss" / "search_index")
-
-    indexer, search = create_search_system(backend, **kwargs)
+    api = MossAPI.for_project(directory)
 
     async def run_search():
-        # Index if requested or if no index exists
+        # Index if requested
         if args.index:
             patterns = args.patterns.split(",") if args.patterns else None
-            exclude = args.exclude.split(",") if args.exclude else None
-            count = await indexer.index_directory(directory, patterns, exclude)
+            count = await api.rag.index(patterns=patterns, force=False)
             if not args.query:
                 out.success(f"Indexed {count} chunks from {directory}")
                 return None
@@ -1025,12 +952,11 @@ def cmd_search(args: Namespace) -> int:
             return None
 
         # Search
-        results = await search.search(
+        return await api.rag.search(
             args.query,
             limit=args.limit,
             mode=args.mode,
         )
-        return results
 
     results = asyncio.run(run_search())
 
@@ -1042,39 +968,26 @@ def cmd_search(args: Namespace) -> int:
         return 0
 
     if getattr(args, "json", False):
-        json_results = [
-            {
-                "file": r.chunk.file_path,
-                "symbol": r.chunk.symbol_name,
-                "kind": r.chunk.symbol_kind,
-                "line_start": r.chunk.line_start,
-                "line_end": r.chunk.line_end,
-                "score": r.score,
-                "match_type": r.match_type,
-            }
-            for r in results
-        ]
+        json_results = [r.to_dict() for r in results]
         output_result(json_results, args)
     else:
         out.success(f"Found {len(results)} results:")
         out.blank()
-        for i, hit in enumerate(results, 1):
-            chunk = hit.chunk
-            location = f"{chunk.file_path}:{chunk.line_start}"
-            name = chunk.symbol_name or chunk.file_path
-            kind = chunk.symbol_kind or "file"
-            score = f"{hit.score:.2f}"
+        for i, r in enumerate(results, 1):
+            location = f"{r.file_path}:{r.line_start}"
+            name = r.symbol_name or r.file_path
+            kind = r.symbol_kind or "file"
+            score = f"{r.score:.2f}"
 
             out.info(f"{i}. [{kind}] {name}")
             out.print(f"   Location: {location}")
-            out.print(f"   Score: {score} ({hit.match_type})")
+            out.print(f"   Score: {score} ({r.match_type})")
 
             # Show snippet
-            if chunk.content:
-                snippet = chunk.content[:200]
-                if len(chunk.content) > 200:
+            if r.snippet:
+                snippet = r.snippet[:200]
+                if len(r.snippet) > 200:
                     snippet += "..."
-                # Indent snippet
                 snippet_lines = snippet.split("\n")[:3]
                 for line in snippet_lines:
                     out.print(f"   | {line}")

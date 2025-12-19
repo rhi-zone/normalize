@@ -1711,6 +1711,66 @@
         ]
       }
     },
+    "/search/query": {
+      "post": {
+        "description": "Query symbols with pattern matching and filters. Provides flexible querying of codebase symbols with regex matching and structural filters. List of QueryMatch objects matching the filters",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "inherits": {
+                    "description": "Filter classes that inherit from this base",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "description": "Filter by symbol kind (function, class, method, variable)",
+                    "type": "string"
+                  },
+                  "max_lines": {
+                    "description": "Maximum number of lines in symbol",
+                    "type": "string"
+                  },
+                  "min_lines": {
+                    "description": "Minimum number of lines in symbol",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Regex pattern to match symbol names",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Directory or file to search (defaults to project root)",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "default": "**/*.py",
+                    "description": "Glob pattern for files to search (default: **/*.py)",
+                    "type": "string"
+                  },
+                  "signature": {
+                    "description": "Regex pattern to match signatures",
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Query symbols with pattern matching and filters",
+        "tags": [
+          "search"
+        ]
+      }
+    },
     "/search/resolve-file": {
       "get": {
         "description": "Resolve a file name with DWIM (Do What I Mean). Handles typos, missing extensions, and partial paths. FileMatch with resolved path and confidence",

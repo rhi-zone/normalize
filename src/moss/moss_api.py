@@ -2020,6 +2020,59 @@ class ModuleSummary:
 
 
 @dataclass
+class QueryMatch:
+    """A symbol match from structured query.
+
+    Attributes:
+        file: Path to the file containing the symbol
+        name: Symbol name
+        kind: Symbol kind (function, class, method, variable)
+        line: Line number where the symbol is defined
+        end_line: End line number (if known)
+        line_count: Number of lines in the symbol
+        signature: Function/method signature if applicable
+        docstring: First line of docstring if present
+        context: Parent symbol name if nested
+    """
+
+    file: str
+    name: str
+    kind: str
+    line: int
+    end_line: int | None = None
+    line_count: int | None = None
+    signature: str | None = None
+    docstring: str | None = None
+    context: str | None = None
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        ctx = f" (in {self.context})" if self.context else ""
+        sig = f" {self.signature}" if self.signature else ""
+        return f"{self.file}:{self.line} [{self.kind}] {self.name}{sig}{ctx}"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation."""
+        d: dict[str, Any] = {
+            "file": self.file,
+            "name": self.name,
+            "kind": self.kind,
+            "line": self.line,
+        }
+        if self.end_line is not None:
+            d["end_line"] = self.end_line
+        if self.line_count is not None:
+            d["line_count"] = self.line_count
+        if self.signature:
+            d["signature"] = self.signature
+        if self.docstring:
+            d["docstring"] = self.docstring
+        if self.context:
+            d["context"] = self.context
+        return d
+
+
+@dataclass
 class SearchAPI:
     """API for codebase search operations.
 
@@ -2738,6 +2791,118 @@ class SearchAPI:
             lines=line_count,
             imports_count=imports_count,
         )
+
+    def query(
+        self,
+        path: str | Path | None = None,
+        pattern: str = "**/*.py",
+        kind: str | None = None,
+        name: str | None = None,
+        signature: str | None = None,
+        inherits: str | None = None,
+        min_lines: int | None = None,
+        max_lines: int | None = None,
+    ) -> list[QueryMatch]:
+        """Query symbols with pattern matching and filters.
+
+        Provides flexible querying of codebase symbols with regex matching
+        and structural filters.
+
+        Args:
+            path: Directory or file to search (defaults to project root)
+            pattern: Glob pattern for files to search (default: **/*.py)
+            kind: Filter by symbol kind (function, class, method, variable)
+            name: Regex pattern to match symbol names
+            signature: Regex pattern to match signatures
+            inherits: Filter classes that inherit from this base
+            min_lines: Minimum number of lines in symbol
+            max_lines: Maximum number of lines in symbol
+
+        Returns:
+            List of QueryMatch objects matching the filters
+        """
+        import re
+
+        from moss.skeleton import extract_python_skeleton
+
+        search_path = self._resolve_path(path) if path else self.root
+
+        if search_path.is_file():
+            files = [search_path]
+        else:
+            files = list(search_path.glob(pattern))
+
+        # Compile regex patterns
+        name_re = re.compile(name) if name else None
+        sig_re = re.compile(signature) if signature else None
+
+        results: list[QueryMatch] = []
+
+        def matches_filters(sym: Any) -> bool:
+            """Check if a symbol matches all filters."""
+            # Kind filter
+            if kind and kind != "all" and sym.kind != kind:
+                return False
+
+            # Name filter
+            if name_re and not name_re.search(sym.name):
+                return False
+
+            # Signature filter
+            if sig_re and sym.signature:
+                if not sig_re.search(sym.signature):
+                    return False
+
+            # Inheritance filter (for classes)
+            if inherits and sym.kind == "class":
+                if not sym.signature or f"({inherits}" not in sym.signature:
+                    return False
+
+            # Line count filters
+            if min_lines is not None or max_lines is not None:
+                line_count = sym.line_count
+                if line_count is None:
+                    return False
+                if min_lines is not None and line_count < min_lines:
+                    return False
+                if max_lines is not None and line_count > max_lines:
+                    return False
+
+            return True
+
+        def collect_matches(symbols: list[Any], file_str: str, parent: str | None = None) -> None:
+            """Recursively collect matching symbols."""
+            for sym in symbols:
+                if matches_filters(sym):
+                    results.append(
+                        QueryMatch(
+                            file=file_str,
+                            name=sym.name,
+                            kind=sym.kind,
+                            line=sym.lineno,
+                            end_line=sym.end_lineno,
+                            line_count=sym.line_count,
+                            signature=sym.signature,
+                            docstring=sym.docstring,
+                            context=parent,
+                        )
+                    )
+
+                # Always recurse into children
+                if sym.children:
+                    collect_matches(sym.children, file_str, sym.name)
+
+        for file_path in files:
+            try:
+                source = file_path.read_text()
+                symbols = extract_python_skeleton(source)
+                rel_path = file_path.relative_to(self.root)
+                collect_matches(symbols, str(rel_path))
+            except (SyntaxError, ValueError):
+                # Skip files with syntax errors or outside root
+                pass
+
+        return results
 
     def _resolve_path(self, file_path: str | Path) -> Path:
         """Resolve a file path relative to the project root."""
