@@ -492,6 +492,109 @@ def cmd_view(args: Namespace) -> int:
     return 0
 
 
+def cmd_search_tree(args: Namespace) -> int:
+    """Search for nodes in the codebase tree."""
+    from moss.codebase import build_tree
+
+    output = setup_output(args)
+    query = args.query
+    scope = getattr(args, "scope", None)
+    root = Path.cwd()
+
+    tree = build_tree(root)
+    matches = tree.search(query, scope=scope)
+
+    if not matches:
+        output.error(f"No matches for: {query}")
+        return 1
+
+    if wants_json(args):
+        output.data([{"path": m.full_path, "kind": m.kind.value} for m in matches])
+    else:
+        for m in matches[:50]:  # Limit output
+            desc = f" - {m.description}" if m.description else ""
+            output.print(f"{m.full_path} ({m.kind.value}){desc}")
+        if len(matches) > 50:
+            output.print(f"... +{len(matches) - 50} more")
+
+    return 0
+
+
+def cmd_expand(args: Namespace) -> int:
+    """Show full source of a symbol."""
+    from moss.codebase import build_tree
+
+    output = setup_output(args)
+    target = args.target
+    root = Path.cwd()
+
+    tree = build_tree(root)
+    nodes = tree.resolve(target)
+
+    if not nodes:
+        output.error(f"No matches for: {target}")
+        return 1
+
+    if len(nodes) > 1:
+        output.print(f"Multiple matches for '{target}':")
+        for n in nodes:
+            output.print(f"  {n.full_path} ({n.kind.value})")
+        return 0
+
+    node = nodes[0]
+
+    # Can only expand symbols with line numbers
+    if node.lineno == 0:
+        output.error(f"Cannot expand {node.kind.value}: {node.name}")
+        return 1
+
+    # Read the source
+    try:
+        lines = node.path.read_text().splitlines()
+        source_lines = lines[node.lineno - 1 : node.end_lineno]
+        output.print("\n".join(source_lines))
+    except Exception as e:
+        output.error(f"Failed to read source: {e}")
+        return 1
+
+    return 0
+
+
+def cmd_callers(args: Namespace) -> int:
+    """Find callers of a symbol."""
+    from moss.codebase import build_tree
+
+    output = setup_output(args)
+    target = args.target
+    root = Path.cwd()
+
+    tree = build_tree(root)
+
+    # First resolve the symbol to get its name
+    nodes = tree.resolve(target)
+    if not nodes:
+        output.error(f"No matches for: {target}")
+        return 1
+
+    symbol_name = nodes[0].name
+    refs = tree.find_references(symbol_name)
+
+    if not refs:
+        output.print(f"No callers found for: {symbol_name}")
+        return 0
+
+    if wants_json(args):
+        output.data([{"path": r.full_path, "kind": r.kind.value} for r in refs])
+    else:
+        output.print(f"Callers of {symbol_name}:")
+        for r in refs[:30]:
+            output.print(f"  {r.full_path} ({r.kind.value})")
+        if len(refs) > 30:
+            output.print(f"  ... +{len(refs) - 30} more")
+
+    return 0
+
+
 def cmd_tree(args: Namespace) -> int:
     """Show git-aware file tree."""
     from moss import MossAPI
@@ -4240,6 +4343,26 @@ def create_parser() -> argparse.ArgumentParser:
     view_parser = subparsers.add_parser("view", help="View a node in the codebase tree")
     view_parser.add_argument("target", help="Path or symbol to view (fuzzy matching)")
     view_parser.set_defaults(func=cmd_view)
+
+    # search-tree command (new codebase tree, named to avoid conflict with existing search)
+    search_tree_parser = subparsers.add_parser(
+        "search-tree", help="Search for symbols in the codebase tree"
+    )
+    search_tree_parser.add_argument("query", help="Search term")
+    search_tree_parser.add_argument(
+        "scope", nargs="?", help="Scope to search within (file, directory, or symbol)"
+    )
+    search_tree_parser.set_defaults(func=cmd_search_tree)
+
+    # expand command (new codebase tree)
+    expand_parser = subparsers.add_parser("expand", help="Show full source of a symbol")
+    expand_parser.add_argument("target", help="Symbol to expand (fuzzy matching)")
+    expand_parser.set_defaults(func=cmd_expand)
+
+    # callers command (new codebase tree)
+    callers_parser = subparsers.add_parser("callers", help="Find callers of a symbol")
+    callers_parser.add_argument("target", help="Symbol to find callers of (fuzzy matching)")
+    callers_parser.set_defaults(func=cmd_callers)
 
     # skeleton command
     skeleton_parser = subparsers.add_parser(

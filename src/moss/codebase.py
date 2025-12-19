@@ -348,6 +348,95 @@ class CodebaseTree:
 
         return matches
 
+    def search(self, query: str, scope: str | None = None, scan_all: bool = True) -> list[Node]:
+        """Search for nodes matching a query within a scope.
+
+        Args:
+            query: Search term (matches name or description)
+            scope: Optional scope (file, directory, or symbol path)
+            scan_all: Whether to scan all files first
+
+        Returns:
+            List of matching nodes
+        """
+        if scan_all:
+            self._scan_all_files()
+
+        query_lower = query.lower()
+        matches: list[Node] = []
+
+        # Determine search root
+        if scope:
+            scope_nodes = self.resolve(scope, scan_all=False)
+            if not scope_nodes:
+                return []
+            search_roots = scope_nodes
+        else:
+            search_roots = [self._root]
+
+        # Search within each root
+        for root in search_roots:
+            for node in root.walk():
+                # Skip the root itself
+                if node == root and scope:
+                    continue
+                # Match name or description
+                if query_lower in node.name.lower():
+                    matches.append(node)
+                elif query_lower in node.description.lower():
+                    matches.append(node)
+
+        return matches
+
+    def find_references(self, symbol_name: str, scan_all: bool = True) -> list[Node]:
+        """Find nodes that reference a symbol by name.
+
+        Simple implementation: searches for symbol name usage in all files.
+        Returns files/functions that appear to call/use the symbol.
+        """
+        if scan_all:
+            self._scan_all_files()
+
+        refs: list[Node] = []
+
+        for node in self._root.walk():
+            if node.kind != NodeKind.FILE:
+                continue
+
+            # Check if file contains the symbol name
+            try:
+                source = node.path.read_text()
+                if symbol_name in source:
+                    # Find which functions/methods use it
+                    try:
+                        tree = ast.parse(source)
+                        for ast_node in ast.walk(tree):
+                            if isinstance(ast_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                                # Check if this function uses the symbol
+                                func_source = ast.get_source_segment(source, ast_node)
+                                if func_source and symbol_name in func_source:
+                                    # Find the corresponding Node
+                                    func_node = self._find_symbol(node, ast_node.name)
+                                    if func_node and func_node.name != symbol_name:
+                                        refs.append(func_node)
+                            elif isinstance(ast_node, ast.ClassDef):
+                                for item in ast_node.body:
+                                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                                        method_source = ast.get_source_segment(source, item)
+                                        if method_source and symbol_name in method_source:
+                                            method_node = self._find_symbol(
+                                                node, f"{ast_node.name}.{item.name}"
+                                            )
+                                            if method_node and method_node.name != symbol_name:
+                                                refs.append(method_node)
+                    except SyntaxError:
+                        # If we can't parse, just add the file
+                        refs.append(node)
+            except OSError:
+                continue
+
+        return refs
+
 
 def build_tree(root: Path) -> CodebaseTree:
     """Build a codebase tree for a directory."""
