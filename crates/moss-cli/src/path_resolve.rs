@@ -12,6 +12,18 @@ pub struct PathMatch {
     pub score: u32,
 }
 
+/// Get all files in the repository (uses index if available)
+pub fn all_files(root: &Path) -> Vec<PathMatch> {
+    get_all_paths(root)
+        .into_iter()
+        .map(|(path, is_dir)| PathMatch {
+            path,
+            kind: if is_dir { "directory" } else { "file" }.to_string(),
+            score: 0,
+        })
+        .collect()
+}
+
 /// Resolve a fuzzy query to matching paths.
 ///
 /// Handles:

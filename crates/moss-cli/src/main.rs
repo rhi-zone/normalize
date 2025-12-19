@@ -282,8 +282,7 @@ fn cmd_expand(symbol: &str, file: Option<&str>, root: Option<&Path>, json: bool)
             .collect()
     } else {
         // Search all Python/Rust files
-        let all_paths = path_resolve::resolve("", &root);
-        all_paths
+        path_resolve::all_files(&root)
             .into_iter()
             .filter(|m| {
                 m.kind == "file"
@@ -435,8 +434,8 @@ fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool) -> i32 {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Get all files
-    let all_paths = path_resolve::resolve("", &root);
+    // Get all files (not just fuzzy matches)
+    let all_paths = path_resolve::all_files(&root);
     let files: Vec<_> = all_paths.into_iter().map(|m| (m.path, m.kind == "directory")).collect();
 
     let mut parser = symbols::SymbolParser::new();
