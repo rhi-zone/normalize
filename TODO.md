@@ -8,20 +8,20 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 **For next session:**
 
-1. **Test composable loops end-to-end** (medium) - Prove the architecture
-   - Run a real edit task through simple_loop
-   - Measure actual token savings vs baseline
-   - Document findings
-
-2. **Add LLM executor** (medium) - Complete the loop system
+1. **Add LLM executor** (medium) - Complete the loop system
    - LLMToolExecutor that wraps API calls
    - Track tokens from actual LLM responses
    - Wire into critic_loop
 
-3. **Research A2A protocol** (small) - Agent interoperability
-   - Read Google's blog post on A2A
-   - Evaluate fit with our ticket-based model
-   - Notes in docs/prior-art.md
+2. **Research A2A protocol** (small) - ✅ Done
+   - See `docs/prior-art.md` for full notes
+   - Verdict: Good fit with ticket-based model, complements MCP
+   - Priority: Medium (not blocking)
+
+3. **Fix agent_loop bugs** (small) - ✅ Done
+   - Renamed `max_iterations` → `max_steps` with clear docstring
+   - Marked `simple_loop` as requiring LLM executor
+   - Added example of tool-only loop in docstring
 
 **Deferred:**
 - Add missing CLI APIs → after loop work validates architecture
@@ -30,6 +30,21 @@ See `~/git/prose/moss/` for full synthesis design documents.
 ---
 
 **Completed this session:**
+- [x] **Test composable loops E2E** - ✅ Validated architecture, found bugs, documented
+  - Token savings: **90.2% average** (skeleton vs full file)
+  - Bugs found: max_iterations naming, simple_loop data flow
+  - Benchmark system works: 100% success rate on tool-only loops
+- [x] **Research A2A protocol** - ✅ Added to docs/prior-art.md
+  - A2A = agent-to-agent (complements MCP which is agent-to-tools)
+  - Good fit with moss's ticket-based model
+  - 150+ orgs, Linux Foundation governance, Python SDK available
+- [x] **Fix agent_loop bugs** - ✅ Renamed max_iterations→max_steps, documented simple_loop
+- [x] **Research ADK & LangGraph** - ✅ Added to docs/prior-art.md
+  - ADK: Google's "batteries-included" multi-agent framework
+  - LangGraph: Graph-based fine-grained control (LangChain)
+  - Both validate need for structured loops; moss differentiates via structural awareness
+
+**Previously completed:**
 - [x] **Composable Loop primitives** - ✅ LoopStep, AgentLoop, AgentLoopRunner, LoopMetrics
 - [x] **Loop benchmarking** - ✅ BenchmarkTask, BenchmarkResult, LoopBenchmark
 - [x] **MossToolExecutor** - ✅ Wires loops to MossAPI (skeleton, patch, validation, etc.)
@@ -37,8 +52,6 @@ See `~/git/prose/moss/` for full synthesis design documents.
 - [x] **Todo output truncation** - ✅ 180 items → 5 sections × 5 items
 - [x] **Online integrations backlog** - ✅ GitHub, GitLab, Jira, Trello, etc.
 - [x] **Agent interoperability backlog** - ✅ A2A protocol research, MCP client
-
-**Previously completed:**
 - [x] **`moss todo` command** - TodoAPI: list(), search(), sections()
 - [x] **DWIM auto-registration** - 7→65 tools, word form matching
 - [x] **Bootstrap exploration** - 86.9% token savings with skeleton

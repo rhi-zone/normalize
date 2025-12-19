@@ -343,6 +343,89 @@ Configurable mid-session via `/mode` command or settings.
 - [ ] Test with Zed as client
 - Priority: High - gives moss access to Zed's growing user base
 
+### Agent2Agent Protocol (A2A)
+- **Site**: https://a2a-protocol.org
+- **Repo**: https://github.com/google/A2A (now under Linux Foundation)
+- **Blog**: https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/
+- **What it is**: Open protocol for agent-to-agent communication (Google, April 2025)
+
+**Technical Details:**
+- **Transport**: JSON-RPC 2.0 over HTTP(S), SSE for streaming, push notifications for async
+- **Agent Discovery**: "Agent Cards" (JSON) advertise capabilities and connection info
+- **Task Lifecycle**: Tasks have lifecycle with outputs called "artifacts"
+- **Message Format**: "Parts" with content types enabling negotiation between agents
+- **Authentication**: Enterprise-grade auth, parity with OpenAPI auth schemes
+- **SDK**: Python (`pip install a2a-sdk`), with samples at github.com/a2aproject/a2a-samples
+
+**Key Concepts:**
+- **Client agents**: Formulate and communicate tasks
+- **Remote agents**: Act on those tasks
+- **Long-running tasks**: Supports hours/days with human-in-the-loop
+- **Capability negotiation**: Agents discover what each other can do
+
+**A2A vs MCP:**
+- MCP: Provides tools and context TO an agent (agent ↔ tools)
+- A2A: Enables agents to collaborate WITH each other (agent ↔ agent)
+- "If MCP is what enables agents to use tools, then A2A is their conversation while they work"
+
+**Adoption:**
+- 150+ organizations (Dec 2025), Linux Foundation governance
+- Partners: Atlassian, Salesforce, SAP, ServiceNow, PayPal, MongoDB, LangChain, etc.
+- Version 0.3: gRPC support, signed security cards, extended Python SDK
+
+**Moss Evaluation:**
+- **Fit with ticket-based model**: A2A's task-based communication aligns well with moss's ticket-based agent design
+- **Complements MCP**: Moss already has MCP server; A2A would add agent-to-agent capabilities
+- **Use cases**:
+  - Moss as "remote agent" providing structural analysis to other agents
+  - Moss delegating specialized tasks (e.g., security scanning) to external agents
+  - Multi-agent workflows coordinated via A2A
+- **Implementation approach**: A2A server exposing moss tools, A2A client for delegation
+- **Priority**: Medium - valuable for ecosystem interop, but not blocking core functionality
+
+### Agent Frameworks: Google ADK vs LangGraph
+
+**Google ADK (Agent Development Kit):**
+- **Site**: https://google.github.io/adk-docs/
+- **Repo**: https://github.com/google/adk-python
+- **What it is**: Open-source Python framework for multi-agent systems (Google Cloud NEXT 2025)
+
+Key features:
+- Model-agnostic (Gemini, Claude via LiteLLM, etc.)
+- MCP integration for tools
+- Hierarchical agent composition and delegation
+- Built-in evaluation framework
+- Optimized for Vertex AI/Google Cloud
+- Can use other frameworks (LangGraph, CrewAI) as tools
+
+**LangGraph:**
+- **Site**: https://langchain-ai.github.io/langgraph/
+- **Repo**: https://github.com/langchain-ai/langgraph
+- **What it is**: Python framework for graph-based agent control flow (LangChain extension)
+
+Key features:
+- Finite state machine model (nodes = steps, edges = transitions)
+- Fine-grained control over workflows
+- Lower latency via graph-based context passing
+- Better for complex, iterative agents
+- LangChain ecosystem integration (LangSmith for observability)
+
+**Comparison:**
+| Aspect | Google ADK | LangGraph |
+|--------|-----------|-----------|
+| Philosophy | "Batteries-included", higher-level | Fine-grained control |
+| Multi-agent | Built for hierarchical teams | Possible but more manual |
+| Cloud | Google Cloud/Vertex AI optimized | Cloud-agnostic |
+| Observability | OpenTelemetry-first | LangSmith/Langfuse |
+| Control | Abstracted orchestration | Full state machine control |
+
+**Moss Observations:**
+- Both validate need for structured agent loops (like moss's AgentLoop)
+- ADK's MCP integration aligns with moss's approach
+- LangGraph's graph model is similar to moss's step-based loops
+- Moss differentiates via structural awareness (skeleton, AST), not orchestration
+- Could potentially export moss tools as ADK/LangGraph integrations
+
 ### Windsurf (Codeium's Agentic IDE)
 - **Site**: https://windsurf.com (formerly https://codeium.com/windsurf)
 - **What it is**: VS Code fork built around AI-first philosophy

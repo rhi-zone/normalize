@@ -57,6 +57,10 @@ class AgentLoop:
 
     Loops are data - they describe what to do, not how to do it.
     The LoopRunner executes them.
+
+    Note on max_steps: This counts total step executions, not complete
+    passes through the loop. For a 3-step loop, max_steps=10 allows
+    ~3 full passes before terminating.
     """
 
     name: str
@@ -65,7 +69,7 @@ class AgentLoop:
     exit_conditions: list[str] = field(default_factory=list)
 
     # Resource limits
-    max_iterations: int = 10
+    max_steps: int = 10  # Total step executions (not loop passes)
     token_budget: int | None = None
     timeout_seconds: float | None = None
 
@@ -244,7 +248,7 @@ class AgentLoopRunner:
         current_step_name = loop.entry
         iteration = 0
 
-        while iteration < loop.max_iterations:
+        while iteration < loop.max_steps:
             iteration += 1
             metrics.iterations = iteration
 
@@ -346,7 +350,7 @@ class AgentLoopRunner:
             status=LoopStatus.MAX_ITERATIONS,
             step_results=step_results,
             metrics=metrics,
-            error=f"Max iterations ({loop.max_iterations}) reached",
+            error=f"Max steps ({loop.max_steps}) reached",
         )
 
     async def _execute_step(
@@ -402,12 +406,24 @@ class AgentLoopRunner:
 
 
 def simple_loop(name: str = "simple") -> AgentLoop:
-    """Simple linear loop: understand → act → validate."""
+    """Simple linear loop: understand → act → validate.
+
+    NOTE: This loop template requires an LLM executor to work properly.
+    The 'act' step needs to generate a patch from the skeleton context.
+    With MossToolExecutor alone, the data flow breaks because skeleton
+    output (string) doesn't match patch.apply input (dict with file_path, patch).
+
+    For tool-only analysis, use a custom loop without input chaining:
+        AgentLoop(steps=[
+            LoopStep('skeleton', 'skeleton.format'),
+            LoopStep('deps', 'dependencies.format'),
+        ], max_steps=10)
+    """
     return AgentLoop(
         name=name,
         steps=[
             LoopStep("understand", "skeleton.format", step_type=StepType.TOOL),
-            LoopStep("act", "patch.apply", input_from="understand", step_type=StepType.TOOL),
+            LoopStep("act", "patch.apply", input_from="understand", step_type=StepType.LLM),
             LoopStep(
                 "validate",
                 "validation.validate",
