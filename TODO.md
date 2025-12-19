@@ -19,6 +19,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - [x] Add `deps` command to Rust (module dependencies)
    - [x] Add `cfg` command to Rust (control flow graph)
    - [x] Add `complexity` command to Rust
+   - [x] Add `health` command to Rust (codebase health metrics)
 
 2. **Daemon improvements**
    - [x] Basic daemon scaffold with Unix socket IPC
