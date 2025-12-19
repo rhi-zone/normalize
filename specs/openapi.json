@@ -870,7 +870,7 @@
     },
     "/guessability/score": {
       "post": {
-        "description": "Get overall guessability score. Dict with 'score' (0.0-1.0) and 'grade' (A-F)",
+        "description": "Get overall guessability score. GuessabilityScore with 'score' (0.0-1.0) and 'grade' (A-F)",
         "responses": {
           "200": {
             "description": "Successful response"

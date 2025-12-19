@@ -69,6 +69,22 @@ class PredictabilityScore:
 
 
 @dataclass
+class GuessabilityScore:
+    """Summary score for codebase guessability.
+
+    Attributes:
+        score: Overall guessability (0.0-1.0)
+        grade: Letter grade (A-F)
+    """
+
+    score: float
+    grade: str
+
+    def to_compact(self) -> str:
+        return f"Guessability: {self.grade} ({self.score * 100:.0f}%)"
+
+
+@dataclass
 class GuessabilityReport:
     """Complete guessability analysis of a codebase.
 
@@ -281,6 +297,17 @@ class GuessabilityAnalyzer:
         test_files = [
             f for f in test_files if not any(p in skip_dirs or p.startswith(".") for p in f.parts)
         ]
+        # Only consider files that actually contain test functions
+        actual_test_files = []
+        for f in test_files:
+            try:
+                content = f.read_text()
+                if "def test_" in content or "@pytest" in content:
+                    actual_test_files.append(f)
+            except Exception:
+                pass
+        test_files = actual_test_files
+
         tests_in_tests_dir = [f for f in test_files if "tests" in f.parts]
         tests_outside = [f for f in test_files if "tests" not in f.parts]
 
@@ -297,17 +324,28 @@ class GuessabilityAnalyzer:
             )
 
         # Pattern: __init__.py in packages
+        # Only check directories that are likely meant to be packages:
+        # - Under src/ directory
+        # - Have multiple .py files (not just scripts)
+        # - Not documentation/config directories
+        non_package_names = {"docs", "scripts", "examples", "site", "build", "dist"}
         py_dirs = [
             d
             for d in self.root.rglob("*")
-            if d.is_dir() and any(d.glob("*.py")) and not d.name.startswith(".")
+            if d.is_dir()
+            and any(d.glob("*.py"))
+            and not d.name.startswith(".")
+            and d.name not in non_package_names
         ]
-        py_dirs = [d for d in py_dirs if "venv" not in d.parts and "__pycache__" not in d.parts]
+        skip_parts = ("venv", ".venv", "__pycache__", "node_modules", ".git")
+        py_dirs = [d for d in py_dirs if not any(p in skip_parts for p in d.parts)]
+        # Only flag dirs under src/ or with multiple .py files (likely packages)
+        package_dirs = [d for d in py_dirs if "src" in d.parts or len(list(d.glob("*.py"))) > 1]
 
-        if py_dirs:
-            has_init = [d for d in py_dirs if (d / "__init__.py").exists()]
-            missing_init = [d for d in py_dirs if not (d / "__init__.py").exists()]
-            consistency = len(has_init) / len(py_dirs)
+        if package_dirs:
+            has_init = [d for d in package_dirs if (d / "__init__.py").exists()]
+            missing_init = [d for d in package_dirs if not (d / "__init__.py").exists()]
+            consistency = len(has_init) / len(package_dirs) if package_dirs else 1.0
             scores.append(
                 PredictabilityScore(
                     pattern="__init__.py in packages",

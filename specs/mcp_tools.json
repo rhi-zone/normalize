@@ -1171,7 +1171,7 @@
     "name": "guessability_recommendations"
   },
   {
-    "description": "Get overall guessability score. Dict with 'score' (0.0-1.0) and 'grade' (A-F)",
+    "description": "Get overall guessability score. GuessabilityScore with 'score' (0.0-1.0) and 'grade' (A-F)",
     "inputSchema": {
       "properties": {},
       "type": "object"

@@ -1384,17 +1384,16 @@ class GuessabilityAPI:
         analyzer = GuessabilityAnalyzer(self.root)
         return analyzer.analyze()
 
-    def score(self) -> dict[str, float | str]:
+    def score(self) -> Any:
         """Get overall guessability score.
 
         Returns:
-            Dict with 'score' (0.0-1.0) and 'grade' (A-F)
+            GuessabilityScore with 'score' (0.0-1.0) and 'grade' (A-F)
         """
+        from moss.guessability import GuessabilityScore
+
         report = self.analyze()
-        return {
-            "score": report.overall_score,
-            "grade": report.grade,
-        }
+        return GuessabilityScore(score=report.overall_score, grade=report.grade)
 
     def recommendations(self) -> list[str]:
         """Get guessability improvement recommendations.
