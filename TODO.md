@@ -16,6 +16,10 @@ See `~/git/prose/moss/` for full synthesis design documents.
    - Enable sharing loop definitions
    - Allow loops to be version controlled
 
+3. **Hybrid loop example** (small) - Demo using CompositeToolExecutor
+   - Create a loop that uses both MossAPI and external MCP tools
+   - Document the pattern in docs/
+
 **Continue autonomously** - Keep picking up tasks from Backlog.
 
 **Backlog (small):**
