@@ -4,41 +4,32 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Async task documentation** - Document how to manage background tasks
-   - Terminals, shells, agents running in background
-   - Waiting for completion, handling hangs, when to join
+1. **Module name DWIM** - Fuzzy matching for file/module names
+   - Typo tolerance for common patterns
+   - Context-aware suggestions
 
-2. **Recursive self-improvement** - Loops that improve other loops
-   - Critic loop reviewing loop definitions
-   - Start with: optimize a docstring loop
+2. **Complexity hotspots** - Address the 60 functions with complexity ≥15
+   - Prioritize by usage frequency
+   - Refactor or document complex code
 
-3. **Codebase search API** - Dogfood moss search instead of raw grep/glob
-   - Semantic search via RAG, structural via skeleton/anchors
-
-4. **Guessability metrics** - Evaluate codebase structure quality
-   - Can you guess module names from functionality?
+3. **CLI from MossAPI** - Migrate cli.py to generated interface
+   - Use introspection to generate CLI commands
+   - Reduce duplication between CLI and API
 
 ## Active Backlog
 
 **Small:**
-- [ ] Module name DWIM - fuzzy matching for file/module names
 - [ ] Model-agnostic naming - don't over-fit to specific LLM conventions
 - [ ] Multiple agents concurrently - no requirement to join back to main stream
-- [ ] Async task lifecycle - spawn, wait, timeout, cancel patterns
 
 **Medium:**
-- [ ] Complexity hotspots - 60 functions with complexity ≥15
+- [ ] Study Goose's context revision (`crates/goose/src/`)
+- [ ] Agent learning - record mistakes in `.moss/lessons.md`
 
 **Large:**
-- [ ] CLI from MossAPI - migrate cli.py to generated interface
+- [ ] Sessions as first-class - resumable, observable work units
 
 ## Future Work
-
-### Context & Memory
-- [ ] Study Goose's context revision (`crates/goose/src/`)
-- [ ] Extend context_memory.py with active pruning
-- [ ] Agent learning - record mistakes in `.moss/lessons.md`
-- [ ] Sessions as first-class - resumable, observable work units
 
 ### Skills System
 - [ ] `TriggerMode` protocol for plugin-extensible triggers
@@ -57,7 +48,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ### Code Quality
 - [ ] `moss patterns` - detect architectural patterns
-- [ ] `moss clones` - structural similarity via hashing
 - [ ] `moss refactor` - detect opportunities, apply with rope/libcst
 - [ ] `moss review` - PR analysis using rules + LLM
 
@@ -80,18 +70,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Deferred
 
-- CLI from MossAPI (large) - wait for API stability
 - Log format adapters - after loop work validates architecture
-
-## To Consolidate
-
-New ideas captured here before proper categorization:
-- Async task management: terminals, waiting, handling completion
-- Dealing with hanging tasks: heuristics like lack of output
-- Note: not 100% reliable - some tools (servers) are long-running without output
-- Need timeout strategies, progress detection, graceful cancellation
-- Multiple agents can be active simultaneously - don't need to join all back to main stream
-- Completed tasks don't need to block; main work may have moved on
 
 ## Notes
 
@@ -102,8 +81,8 @@ New ideas captured here before proper categorization:
 
 ### Dogfooding Observations (Dec 2025)
 - `skeleton_format` / `skeleton_expand` - very useful
-- Missed: used `ls` instead of `tree_format`, `Grep` instead of RAG
-- Need: `moss search` dogfoodable API, more DWIM aliases
+- New: `search_find_symbols`, `search_grep` - use instead of raw grep/glob
+- New: `guessability_score` - evaluate codebase structure quality
 
 ### Design Principles
 See `docs/philosophy.md` for full tenets. Key goals:

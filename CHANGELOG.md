@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.6.4
+
+### Phase 33: Search, Async Docs, Self-Improvement, Guessability
+
+**SearchAPI** (Dec 2025)
+- `search_find_symbols` - find symbols by name across codebase
+- `search_find_definitions` - find where a symbol is defined
+- `search_find_files` - find files matching glob patterns
+- `search_find_usages` - find references to a symbol
+- `search_grep` - text pattern search with regex support
+- Dogfood moss search instead of raw grep/glob
+
+**Async Task Documentation**
+- `docs/async-tasks.md` - background task management guide
+- Covers: spawning, waiting, hang detection, cancellation
+- Patterns for parallel workers and when to join
+
+**Recursive Self-Improvement**
+- `loop_critic_loop` - meta-loop that critiques loop definitions
+- `loop_optimizer_loop` - optimizes loops for token efficiency
+- `self_improving_docstring_loop` - docstrings with self-critique
+- `docs/recursive-improvement.md` - patterns and best practices
+
+**GuessabilityAPI**
+- `guessability_analyze` - full codebase structure analysis
+- `guessability_score` - overall score (0.0-1.0) and grade (A-F)
+- `guessability_recommendations` - actionable improvements
+- Metrics: name-content alignment, pattern consistency
+
 ## v0.6.3
 
 ### Phase 32: WebAPI, Skeleton Expand, Loops Infrastructure
