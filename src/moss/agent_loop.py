@@ -716,6 +716,174 @@ def incremental_loop(name: str = "incremental") -> AgentLoop:
     )
 
 
+def loop_critic_loop(name: str = "loop_critic") -> AgentLoop:
+    """Meta-loop that critiques and improves loop definitions.
+
+    Takes a loop definition (YAML/JSON) as input and produces
+    suggestions for improvement. This is recursive self-improvement:
+    a loop that improves other loops.
+
+    Steps:
+    1. Analyze the loop structure
+    2. Identify potential issues (missing error handling, inefficiencies)
+    3. Suggest improvements
+    """
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep(
+                "analyze",
+                "llm.analyze_loop",
+                step_type=StepType.LLM,
+                config={
+                    "prompt": (
+                        "Analyze this loop definition. Identify:\n"
+                        "- Missing error handling (steps without on_error)\n"
+                        "- Potential infinite loops (cycles without exit conditions)\n"
+                        "- Inefficient step ordering\n"
+                        "- Missing validation steps\n"
+                        "- Unclear step purposes\n"
+                        "Output as structured analysis."
+                    )
+                },
+            ),
+            LoopStep(
+                "suggest",
+                "llm.suggest_improvements",
+                input_from="analyze",
+                step_type=StepType.LLM,
+                config={
+                    "prompt": (
+                        "Based on this analysis, suggest specific improvements.\n"
+                        "Format as a list of changes with before/after examples.\n"
+                        "Prioritize: safety > efficiency > clarity."
+                    )
+                },
+            ),
+        ],
+        exit_conditions=["suggest.success"],
+    )
+
+
+def loop_optimizer_loop(name: str = "loop_optimizer") -> AgentLoop:
+    """Meta-loop that optimizes loop definitions for token efficiency.
+
+    Analyzes a loop and produces an optimized version that:
+    - Reduces LLM calls where possible
+    - Combines steps that can be merged
+    - Adds caching hints
+    - Removes redundant validation
+
+    This loop outputs a modified loop definition.
+    """
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep(
+                "measure",
+                "llm.estimate_tokens",
+                step_type=StepType.LLM,
+                config={
+                    "prompt": (
+                        "Estimate token usage for each step in this loop.\n"
+                        "Consider: input size, output size, prompt overhead.\n"
+                        "Output as JSON: {step_name: estimated_tokens}"
+                    )
+                },
+            ),
+            LoopStep(
+                "identify_waste",
+                "llm.find_redundancy",
+                input_from="measure",
+                step_type=StepType.LLM,
+                config={
+                    "prompt": (
+                        "Identify token waste:\n"
+                        "- Redundant LLM calls (could be tool calls)\n"
+                        "- Steps that always produce same output\n"
+                        "- Validation that duplicates earlier checks\n"
+                        "- Overly verbose prompts"
+                    )
+                },
+            ),
+            LoopStep(
+                "optimize",
+                "llm.rewrite_loop",
+                input_from="identify_waste",
+                step_type=StepType.LLM,
+                config={
+                    "prompt": (
+                        "Rewrite the loop definition to reduce token usage.\n"
+                        "Apply optimizations identified above.\n"
+                        "Output the complete optimized loop as YAML."
+                    )
+                },
+            ),
+        ],
+        exit_conditions=["optimize.success"],
+    )
+
+
+def self_improving_docstring_loop(name: str = "self_improve_docstring") -> AgentLoop:
+    """Docstring loop that learns from its own performance.
+
+    Combines docstring generation with self-critique:
+    1. Generate docstrings
+    2. Validate quality
+    3. If quality low, analyze what went wrong
+    4. Retry with improved prompt (learning from mistakes)
+
+    This demonstrates recursive improvement within a single run.
+    """
+    return AgentLoop(
+        name=name,
+        steps=[
+            # Initial generation
+            LoopStep("skeleton", "skeleton.format", step_type=StepType.TOOL),
+            LoopStep(
+                "generate",
+                "llm.add_docstrings",
+                input_from="skeleton",
+                step_type=StepType.LLM,
+            ),
+            # Self-critique
+            LoopStep(
+                "critique",
+                "llm.critique_docstrings",
+                input_from="generate",
+                step_type=StepType.LLM,
+                config={
+                    "prompt": (
+                        "Critique these docstrings:\n"
+                        "- Are they accurate?\n"
+                        "- Do they explain the 'why', not just 'what'?\n"
+                        "- Are args/returns documented?\n"
+                        "- Score 1-10 and list issues."
+                    )
+                },
+            ),
+            # Conditional improvement (retry if score < 7)
+            LoopStep(
+                "improve",
+                "llm.improve_docstrings",
+                input_from="critique",
+                step_type=StepType.LLM,
+                on_error=ErrorAction.SKIP,
+                config={
+                    "prompt": (
+                        "Improve the docstrings based on the critique.\n"
+                        "Address each issue listed.\n"
+                        "Output the improved docstrings."
+                    ),
+                    "condition": "critique.score < 7",  # Only run if quality low
+                },
+            ),
+        ],
+        exit_conditions=["improve.success", "critique.score >= 7"],
+        max_steps=10,
+    )
+
+
 # ============================================================================
 # MossAPI Tool Executor
 # ============================================================================
