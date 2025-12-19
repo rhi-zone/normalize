@@ -26,3 +26,10 @@ ignore = "0.4"  # gitignore-aware walking
 
 # Fuzzy matching
 nucleo-matcher = "0.3"
+
+# Parsing
+tree-sitter = "0.24"
+tree-sitter-python = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"

@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 mod index;
 mod path_resolve;
+mod symbols;
 
 #[derive(Parser)]
 #[command(name = "moss")]
@@ -62,6 +63,30 @@ enum Commands {
         #[arg(short, long)]
         root: Option<PathBuf>,
     },
+
+    /// Show full source of a symbol
+    Expand {
+        /// Symbol to expand (function, class, or method name)
+        symbol: String,
+
+        /// File to search in (optional, will search all files if not provided)
+        #[arg(short, long)]
+        file: Option<String>,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+    },
+
+    /// List symbols in a file
+    Symbols {
+        /// File to analyze
+        file: String,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -76,6 +101,10 @@ fn main() {
             cmd_search_tree(&query, root.as_deref(), limit, cli.json)
         }
         Commands::Reindex { root } => cmd_reindex(root.as_deref()),
+        Commands::Expand { symbol, file, root } => {
+            cmd_expand(&symbol, file.as_deref(), root.as_deref(), cli.json)
+        }
+        Commands::Symbols { file, root } => cmd_symbols(&file, root.as_deref(), cli.json),
     };
 
     std::process::exit(exit_code);
@@ -206,4 +235,125 @@ fn cmd_reindex(root: Option<&Path>) -> i32 {
             1
         }
     }
+}
+
+fn cmd_expand(symbol: &str, file: Option<&str>, root: Option<&Path>, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let mut parser = symbols::SymbolParser::new();
+
+    // If file is provided, search only that file
+    let files_to_search: Vec<PathBuf> = if let Some(file_query) = file {
+        let matches = path_resolve::resolve(file_query, &root);
+        matches
+            .into_iter()
+            .filter(|m| m.kind == "file")
+            .map(|m| root.join(&m.path))
+            .collect()
+    } else {
+        // Search all Python/Rust files
+        let all_paths = path_resolve::resolve("", &root);
+        all_paths
+            .into_iter()
+            .filter(|m| {
+                m.kind == "file"
+                    && (m.path.ends_with(".py") || m.path.ends_with(".rs"))
+            })
+            .map(|m| root.join(&m.path))
+            .collect()
+    };
+
+    for file_path in files_to_search {
+        if let Ok(content) = std::fs::read_to_string(&file_path) {
+            if let Some(source) = parser.extract_symbol_source(&file_path, &content, symbol) {
+                let rel_path = file_path
+                    .strip_prefix(&root)
+                    .unwrap_or(&file_path)
+                    .to_string_lossy();
+
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "symbol": symbol,
+                            "file": rel_path,
+                            "source": source
+                        })
+                    );
+                } else {
+                    println!("# {}:{}", rel_path, symbol);
+                    println!("{}", source);
+                }
+                return 0;
+            }
+        }
+    }
+
+    eprintln!("Symbol not found: {}", symbol);
+    1
+}
+
+fn cmd_symbols(file: &str, root: Option<&Path>, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Resolve the file
+    let matches = path_resolve::resolve(file, &root);
+    let file_match = match matches.iter().find(|m| m.kind == "file") {
+        Some(m) => m,
+        None => {
+            eprintln!("File not found: {}", file);
+            return 1;
+        }
+    };
+
+    let file_path = root.join(&file_match.path);
+    let content = match std::fs::read_to_string(&file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading file: {}", e);
+            return 1;
+        }
+    };
+
+    let mut parser = symbols::SymbolParser::new();
+    let symbols = parser.parse_file(&file_path, &content);
+
+    if json {
+        let output: Vec<_> = symbols
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "name": s.name,
+                    "kind": s.kind.as_str(),
+                    "start_line": s.start_line,
+                    "end_line": s.end_line,
+                    "parent": s.parent
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string(&output).unwrap());
+    } else {
+        for s in &symbols {
+            let parent_str = s
+                .parent
+                .as_ref()
+                .map(|p| format!(" (in {})", p))
+                .unwrap_or_default();
+            println!(
+                "{}:{}-{} {} {}{}",
+                file_match.path,
+                s.start_line,
+                s.end_line,
+                s.kind.as_str(),
+                s.name,
+                parent_str
+            );
+        }
+    }
+
+    0
 }
