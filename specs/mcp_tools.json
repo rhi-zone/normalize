@@ -492,13 +492,18 @@
     "name": "health_summarize"
   },
   {
-    "description": "List TODOs, optionally filtered by section. List of TodoSearchResult with matching items",
+    "description": "List TODOs, optionally filtered by section. TodoListResult with items grouped by section",
     "inputSchema": {
       "properties": {
         "include_done": {
           "default": false,
           "description": "Include completed TODOs (default: False)",
           "type": "boolean"
+        },
+        "per_section_limit": {
+          "default": 5,
+          "description": "Max items to show per section (default: 5)",
+          "type": "integer"
         },
         "section": {
           "description": "Filter to specific section (case-insensitive partial match)",

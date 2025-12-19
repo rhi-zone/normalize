@@ -812,6 +812,62 @@ class TodoSearchResult:
     line: int
     source: str  # "todo.md" or file path for code TODOs
 
+    def to_compact(self, include_section: bool = True) -> str:
+        """Format as compact single line."""
+        prefix = "[x]" if self.status == "done" else "- "
+        section = f" ({self.section})" if include_section and self.section else ""
+        return f"{prefix}{self.text}{section}"
+
+
+@dataclass
+class TodoListResult:
+    """Result of listing TODOs with smart formatting."""
+
+    items: list[TodoSearchResult]
+    truncated: bool = False
+    per_section_limit: int | None = None
+    max_sections: int | None = None
+
+    def to_compact(self) -> str:
+        """Format as compact text, auto-truncated by section."""
+        if not self.items:
+            return "(no TODOs found)"
+
+        # Group by section
+        by_section: dict[str | None, list[TodoSearchResult]] = {}
+        for item in self.items:
+            by_section.setdefault(item.section, []).append(item)
+
+        lines = []
+        limit = self.per_section_limit or 5  # Default: 5 per section
+        max_sec = self.max_sections or 5  # Default: 5 sections
+
+        sections_shown = 0
+        for section, items in by_section.items():
+            if sections_shown >= max_sec:
+                break
+            sections_shown += 1
+
+            section_name = section or "Uncategorized"
+            shown = items[:limit]
+            remaining = len(items) - len(shown)
+
+            lines.append(f"## {section_name}")
+            for item in shown:
+                lines.append(item.to_compact(include_section=False))
+            if remaining > 0:
+                lines.append(f"  ... and {remaining} more")
+            lines.append("")
+
+        remaining_sections = len(by_section) - sections_shown
+        if remaining_sections > 0:
+            lines.append(f"... and {remaining_sections} more sections")
+            lines.append("")
+
+        total = len(self.items)
+        lines.append(f"({total} total items)")
+        return "\n".join(lines)
+
 
 @dataclass
 class TodoAPI:
@@ -826,16 +882,20 @@ class TodoAPI:
     root: Path
 
     def list(
-        self, section: str | None = None, include_done: bool = False
-    ) -> list[TodoSearchResult]:
+        self,
+        section: str | None = None,
+        include_done: bool = False,
+        per_section_limit: int = 5,
+    ) -> TodoListResult:
         """List TODOs, optionally filtered by section.
 
         Args:
             section: Filter to specific section (case-insensitive partial match)
             include_done: Include completed TODOs (default: False)
+            per_section_limit: Max items to show per section (default: 5)
 
         Returns:
-            List of TodoSearchResult with matching items
+            TodoListResult with items grouped by section
         """
         from moss.check_todos import TodoChecker, TodoStatus
 
@@ -865,7 +925,7 @@ class TodoAPI:
                 )
             )
 
-        return items
+        return TodoListResult(items=items, per_section_limit=per_section_limit)
 
     def search(self, query: str, include_done: bool = False) -> list[TodoSearchResult]:
         """Search TODOs by keyword.
