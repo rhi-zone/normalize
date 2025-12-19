@@ -16,14 +16,10 @@ See `~/git/prose/moss/` for full synthesis design documents.
 **Continue autonomously** - Keep picking up tasks from Backlog. Review log periodically to ensure real progress, not circular optimizations.
 
 **Backlog (small):**
-- [ ] **Switch LLM executor to litellm** - Remove Gemini special-casing
-  - litellm Nix compatibility is fixed (Dec 2025)
-  - Currently `LLMToolExecutor` routes Gemini to google-genai directly
-  - Simplify to use litellm for all providers
-  - File: `src/moss/agent_loop.py`
-- [ ] **Fix skeleton MCP tool** - tree-sitter plugins not loading in MCP server
-  - `mcp__moss__skeleton_format` returns "No skeleton plugin found for: .py"
-  - Works fine via CLI: `moss skeleton <file>`
+- [x] ~~**Switch LLM executor to litellm**~~ ✅ - Now uses litellm for all providers
+- [x] ~~**Fix skeleton MCP tool**~~ ✅ - Works after MCP reload (Dec 2025)
+  - Was returning "No skeleton plugin found for: .py"
+  - Fixed by MCP server reload - plugins now load correctly
 - [ ] **Token-efficient web search** - Reduce tokens when doing research
   - Current approach burns context on search results
   - Consider: summarize in smaller chunks, cache results, extract key facts only
