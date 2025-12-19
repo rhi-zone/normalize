@@ -166,7 +166,15 @@ class TestToolRouter:
         router = ToolRouter()
         matches = router.analyze_intent("find imports and dependencies")
         assert len(matches) > 0
-        assert matches[0].tool in ("deps", "query")
+        # Should find dependency-related tools in top results
+        tool_names = [m.tool for m in matches[:3]]
+        dep_related = {
+            "deps",
+            "dependencies_extract",
+            "dependencies_format",
+            "dependencies_analyze",
+        }
+        assert any(t in dep_related for t in tool_names)
 
     def test_analyze_intent_query(self):
         """Test analyzing intent for query."""

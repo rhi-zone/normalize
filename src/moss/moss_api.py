@@ -1264,16 +1264,19 @@ class ToolListResult:
 
 @dataclass
 class DWIMAPI:
-    """API for semantic tool routing and discovery.
+    """START HERE - Tool discovery and routing for Moss.
 
-    Provides fuzzy matching and semantic routing for tool discovery,
-    making Moss interfaces robust against minor variations in how
-    tools are invoked.
+    Don't know which Moss tool to use? Ask DWIM! This API helps you find
+    the right tool for any task using natural language queries.
+
+    Example: "summarize the codebase" → health_summarize
+    Example: "check for TODOs" → health_check_todos
+    Example: "find complex functions" → complexity_analyze
 
     Features:
+    - Natural language queries: describe what you want, get tool suggestions
     - Semantic aliases: map conceptual names to canonical tools
     - Fuzzy matching: handle typos and variations
-    - TF-IDF cosine similarity: smarter semantic matching
     - Confidence scoring: know when to auto-correct vs suggest
     """
 
@@ -1299,10 +1302,16 @@ class DWIMAPI:
         )
 
     def analyze_intent(self, query: str, top_k: int = 3) -> list[ToolMatchResult]:
-        """Analyze a natural language query to find matching tools.
+        """Find the right Moss tool for any task using natural language.
 
-        Uses TF-IDF cosine similarity combined with keyword matching
-        to find the best tools for a given description.
+        USE THIS FIRST when you don't know which tool to use! Describe what
+        you want to do and get ranked suggestions.
+
+        Examples:
+        - "summarize the codebase" → health_summarize
+        - "show file structure" → skeleton_format
+        - "find TODOs" → health_check_todos
+        - "check code complexity" → complexity_analyze
 
         Args:
             query: Natural language description of what you want to do

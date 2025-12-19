@@ -308,7 +308,7 @@
     },
     "/dwim/analyze-intent": {
       "get": {
-        "description": "Analyze a natural language query to find matching tools. Uses TF-IDF cosine similarity combined with keyword matching to find the best tools for a given description. List of ToolMatchResult sorted by confidence (highest first)",
+        "description": "Find the right Moss tool for any task using natural language. USE THIS FIRST when you don't know which tool to use! Describe what you want to do and get ranked suggestions. Examples: - \"summarize the codebase\" \u2192 health_summarize - \"show file structure\" \u2192 skeleton_format - \"find TODOs\" \u2192 health_check_todos - \"check code complexity\" \u2192 complexity_analyze List of ToolMatchResult sorted by confidence (highest first)",
         "parameters": [
           {
             "description": "Natural language description of what you want to do",
@@ -334,7 +334,7 @@
             "description": "Successful response"
           }
         },
-        "summary": "Analyze a natural language query to find matching tools",
+        "summary": "Find the right Moss tool for any task using natural language",
         "tags": [
           "dwim"
         ]
@@ -1398,7 +1398,7 @@
       "name": "health"
     },
     {
-      "description": "API for semantic tool routing and discovery. Provides fuzzy matching and semantic routing for tool discovery, making Moss interfaces robust against minor variations in how tools are invoked. Features: - Semantic aliases: map conceptual names to canonical tools - Fuzzy matching: handle typos and variations - TF-IDF cosine similarity: smarter semantic matching - Confidence scoring: know when to auto-correct vs suggest",
+      "description": "START HERE - Tool discovery and routing for Moss. Don't know which Moss tool to use? Ask DWIM! This API helps you find the right tool for any task using natural language queries. Features: - Natural language queries: describe what you want, get tool suggestions - Semantic aliases: map conceptual names to canonical tools - Fuzzy matching: handle typos and variations - Confidence scoring: know when to auto-correct vs suggest",
       "name": "dwim"
     },
     {

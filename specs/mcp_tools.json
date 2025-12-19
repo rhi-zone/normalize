@@ -492,7 +492,7 @@
     "name": "health_summarize"
   },
   {
-    "description": "Analyze a natural language query to find matching tools. Uses TF-IDF cosine similarity combined with keyword matching to find the best tools for a given description. List of ToolMatchResult sorted by confidence (highest first)",
+    "description": "Find the right Moss tool for any task using natural language. USE THIS FIRST when you don't know which tool to use! Describe what you want to do and get ranked suggestions. Examples: - \"summarize the codebase\" \u2192 health_summarize - \"show file structure\" \u2192 skeleton_format - \"find TODOs\" \u2192 health_check_todos - \"check code complexity\" \u2192 complexity_analyze List of ToolMatchResult sorted by confidence (highest first)",
     "inputSchema": {
       "properties": {
         "query": {

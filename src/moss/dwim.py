@@ -38,6 +38,60 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Word form mappings for better semantic matching (handles stemming-like behavior)
+# Maps variant forms to their canonical form for keyword expansion
+WORD_FORMS: dict[str, list[str]] = {
+    "summary": ["summarize", "summarizing", "summarization"],
+    "analyze": ["analysis", "analyzing", "analyzer"],
+    "validate": ["validation", "validating", "validator"],
+    "check": ["checking", "checker"],
+    "create": ["creating", "creation", "creator"],
+    "build": ["building", "builder"],
+    "extract": ["extracting", "extraction", "extractor"],
+    "find": ["finding", "finder"],
+    "search": ["searching", "searcher"],
+    "index": ["indexing", "indexed"],
+    "format": ["formatting", "formatted", "formatter"],
+    "generate": ["generating", "generation", "generator"],
+    "list": ["listing", "lister"],
+    "get": ["getting", "getter"],
+    "resolve": ["resolving", "resolution", "resolver"],
+    "apply": ["applying", "application"],
+    "patch": ["patching", "patcher"],
+    "commit": ["committing", "committed"],
+    "merge": ["merging", "merged"],
+    "diff": ["diffing", "difference"],
+    "tree": ["trees"],
+    "health": ["healthy", "healthcheck"],
+    "complex": ["complexity"],
+    "depend": ["dependency", "dependencies", "dependent"],
+    "import": ["imports", "importing", "imported"],
+    "export": ["exports", "exporting", "exported"],
+    "skeleton": ["skeletons", "skeletal"],
+    "anchor": ["anchors", "anchoring"],
+}
+
+# Build reverse mapping: variant -> canonical
+_CANONICAL_FORMS: dict[str, str] = {}
+for canonical, variants in WORD_FORMS.items():
+    _CANONICAL_FORMS[canonical] = canonical
+    for variant in variants:
+        _CANONICAL_FORMS[variant] = canonical
+
+
+def expand_keywords(keywords: list[str]) -> list[str]:
+    """Expand keywords with word form variants for better matching."""
+    expanded = set(keywords)
+    for kw in keywords:
+        kw_lower = kw.lower()
+        # Add variants of this keyword
+        if kw_lower in WORD_FORMS:
+            expanded.update(WORD_FORMS[kw_lower])
+        # If keyword is a variant, add the canonical form
+        if kw_lower in _CANONICAL_FORMS:
+            expanded.add(_CANONICAL_FORMS[kw_lower])
+    return list(expanded)
+
 
 # =============================================================================
 # TF-IDF Cosine Similarity (pure Python implementation)
@@ -370,8 +424,82 @@ def _register_builtin_tools() -> None:
         register_tool(tool)
 
 
+def _register_from_mossapi() -> None:
+    """Auto-register tools from MossAPI introspection.
+
+    This discovers all public methods from all sub-APIs and registers them
+    as DWIM tools with proper descriptions and keywords extracted from docstrings.
+    """
+    try:
+        from moss.gen.introspect import introspect_api
+    except ImportError:
+        logger.debug("Could not import introspect_api, skipping MossAPI registration")
+        return
+
+    try:
+        sub_apis = introspect_api()
+    except Exception as e:
+        logger.debug("Failed to introspect MossAPI: %s", e)
+        return
+
+    for api in sub_apis:
+        for method in api.methods:
+            # Tool name matches MCP convention: {api}_{method}
+            tool_name = f"{api.name}_{method.name}"
+
+            # Skip if already registered (builtin takes precedence)
+            if tool_name in _TOOLS:
+                continue
+
+            # Extract keywords from method name, API name, and description
+            keywords = []
+
+            # Add API name and method name as keywords
+            keywords.append(api.name)
+            keywords.append(method.name)
+
+            # Split method name on underscores for additional keywords
+            keywords.extend(method.name.split("_"))
+
+            # Extract keywords from description (simple word extraction)
+            if method.description:
+                # Get significant words from description
+                desc_words = re.findall(r"\b\w{4,}\b", method.description.lower())
+                # Filter common words
+                common = {
+                    "this",
+                    "that",
+                    "with",
+                    "from",
+                    "into",
+                    "have",
+                    "been",
+                    "will",
+                    "would",
+                    "could",
+                    "should",
+                }
+                keywords.extend(w for w in desc_words if w not in common)
+
+            # Expand keywords with word form variants
+            keywords = expand_keywords(keywords)
+
+            # Get parameter names
+            params = [p.name for p in method.parameters]
+
+            tool = ToolInfo(
+                name=tool_name,
+                description=method.description or f"{api.name} {method.name}",
+                keywords=list(set(keywords)),  # dedupe
+                parameters=params,
+            )
+            register_tool(tool)
+            logger.debug("Registered MossAPI tool: %s", tool_name)
+
+
 # Auto-register on import
 _register_builtin_tools()
+_register_from_mossapi()  # Register all MossAPI tools
 _discover_entry_points()
 
 # Backwards compatibility alias
@@ -457,20 +585,38 @@ def string_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 
+def normalize_word(word: str) -> str:
+    """Normalize a word to its canonical form using word form mappings."""
+    return _CANONICAL_FORMS.get(word.lower(), word.lower())
+
+
 def keyword_match_score(query: str, keywords: list[str]) -> float:
-    """Score how well a query matches a list of keywords."""
+    """Score how well a query matches a list of keywords.
+
+    Uses word form normalization so "summarize" matches "summary".
+    """
     query_lower = query.lower()
     query_words = set(query_lower.split())
 
-    # Direct word match
-    direct_matches = sum(1 for kw in keywords if kw in query_lower)
+    # Normalize query words to canonical forms
+    query_canonical = {normalize_word(w) for w in query_words}
 
-    # Word overlap
-    keyword_words = set(kw.lower() for kw in keywords)
-    overlap = len(query_words & keyword_words)
+    # Normalize keywords to canonical forms
+    keyword_canonical = {normalize_word(kw) for kw in keywords}
 
-    # Partial matches
-    partial = sum(max(string_similarity(qw, kw) for kw in keywords) for qw in query_words)
+    # Direct word match (using normalized forms)
+    direct_matches = sum(
+        1 for kw in keyword_canonical if kw in query_lower or normalize_word(kw) in query_canonical
+    )
+
+    # Word overlap (using normalized forms)
+    overlap = len(query_canonical & keyword_canonical)
+
+    # Partial matches (fuzzy string matching for typos)
+    if keywords:
+        partial = sum(max(string_similarity(qw, kw) for kw in keywords) for qw in query_words)
+    else:
+        partial = 0
 
     # Combine scores (weighted)
     total_keywords = len(keywords)
