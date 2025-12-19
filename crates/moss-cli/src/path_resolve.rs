@@ -110,9 +110,9 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
     let query_lower = query.to_lowercase();
     let query_normalized = normalize_for_match(query);
 
-    // Try exact match first, then normalized match (no allocation)
+    // Try normalized path match (handles exact match too, no allocation)
     for (path, is_dir) in all_paths {
-        if path == query || eq_normalized(path, query) {
+        if eq_normalized(path, query) {
             return vec![PathMatch {
                 path: path.clone(),
                 kind: if *is_dir { "directory" } else { "file" }.to_string(),
