@@ -135,12 +135,7 @@ def create_server() -> Any:
         return [
             Tool(
                 name="moss",
-                description=(
-                    "Run moss code intelligence commands. "
-                    "Examples: 'skeleton src/main.py', 'search find_symbols Query', "
-                    "'tree src/', 'complexity src/', 'deps src/main.py'. "
-                    "Run 'help' for full command list."
-                ),
+                description="Code intelligence CLI. Run 'help' for commands.",
                 inputSchema={
                     "type": "object",
                     "properties": {"command": {"type": "string"}},
