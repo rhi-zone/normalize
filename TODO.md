@@ -48,6 +48,17 @@ See `~/git/prose/moss/` for full synthesis design documents.
   - Agent already calls moss tools recursively (skeleton, patch, validation)
   - MCP client would add external tools (filesystem, git, browser, etc.)
   - Would enable moss loops to be fully autonomous agents
+- [ ] **Recursive self-improvement for moss agent** - Agent improves its own CLAUDE.md/TODO.md
+  - Periodic review: "What patterns am I repeating? What constraints are missing?"
+  - Propose additions to Negative Constraints, Recipes, Dogfooding table
+  - Requires careful human review to avoid runaway changes
+- [ ] **Multi-LLM rotation to reduce bias** - Switch providers periodically
+  - Model-specific biases accumulate when using one LLM exclusively
+  - Rotate between Claude/Gemini/GPT for different tasks or sessions
+  - Applies at multiple levels: main agent, sub-agents, critic loops
+  - Could be random, round-robin, or task-type based
+  - Option to pin a single model when consistency matters
+  - litellm already supports this - just need rotation logic
   - See MCP client SDK: https://modelcontextprotocol.io/
 
 **Deferred:**
