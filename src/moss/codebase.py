@@ -286,7 +286,107 @@ class CodebaseTree:
                 return node
         return None
 
+    def _scan_all_files(self) -> None:
+        """Scan all Python files in the codebase."""
+        for py_file in self.root_path.rglob("*.py"):
+            # Skip hidden dirs and common excludes
+            parts = py_file.relative_to(self.root_path).parts
+            skip_dirs = ("__pycache__", "node_modules", ".venv", "venv")
+            if any(p.startswith(".") or p in skip_dirs for p in parts):
+                continue
+            self._get_file_node(py_file)
+
+    def resolve(self, query: str, scan_all: bool = True) -> list[Node]:
+        """Resolve a fuzzy query to matching nodes.
+
+        Handles:
+        - Exact paths: src/moss/dwim.py
+        - Partial filenames: dwim.py, dwim
+        - Symbols: ToolRouter, resolve_tool
+        - Scoped: dwim:ToolRouter, dwim.py:ToolRouter
+
+        Returns list of matches (may be empty).
+        """
+        matches: list[Node] = []
+
+        # If contains colon, it's file:symbol
+        if ":" in query:
+            file_part, symbol_part = query.split(":", 1)
+            file_matches = self.resolve(file_part, scan_all=scan_all)
+            for file_node in file_matches:
+                if file_node.kind == NodeKind.FILE:
+                    sym = self._find_symbol(file_node, symbol_part)
+                    if sym:
+                        matches.append(sym)
+            return matches
+
+        # Try exact path first
+        exact = self.get(query)
+        if exact:
+            return [exact]
+
+        # Scan all files if needed for fuzzy matching
+        if scan_all:
+            self._scan_all_files()
+
+        query_lower = query.lower()
+
+        # Match by filename/dirname
+        for node in self._root.walk():
+            if node.kind in (NodeKind.FILE, NodeKind.DIRECTORY):
+                name_lower = node.name.lower()
+                stem_lower = Path(node.name).stem.lower()
+                if name_lower == query_lower or stem_lower == query_lower:
+                    matches.append(node)
+
+        # If no file matches, try symbol names
+        if not matches:
+            for node in self._root.walk():
+                if node.kind in (NodeKind.CLASS, NodeKind.FUNCTION, NodeKind.METHOD):
+                    if node.name.lower() == query_lower:
+                        matches.append(node)
+
+        return matches
+
 
 def build_tree(root: Path) -> CodebaseTree:
     """Build a codebase tree for a directory."""
     return CodebaseTree(root)
+
+
+@dataclass
+class PathMatch:
+    """Result of resolving a path."""
+
+    node: Node
+    full_path: str
+    kind: str
+
+    def __str__(self) -> str:
+        return f"{self.full_path} ({self.kind})"
+
+
+def resolve_path(query: str, root: Path | None = None) -> list[PathMatch]:
+    """Resolve a fuzzy path query to matching nodes.
+
+    Args:
+        query: Path or symbol to find (supports fuzzy matching)
+        root: Root directory (defaults to cwd)
+
+    Returns:
+        List of PathMatch results
+    """
+    if root is None:
+        root = Path.cwd()
+
+    tree = build_tree(root)
+    nodes = tree.resolve(query)
+
+    return [
+        PathMatch(
+            node=n,
+            full_path=n.full_path,
+            kind=n.kind.value,
+        )
+        for n in nodes
+    ]

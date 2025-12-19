@@ -405,6 +405,93 @@ def cmd_skeleton(args: Namespace) -> int:
     return 0
 
 
+# =============================================================================
+# New Codebase Tree Commands (see docs/codebase-tree.md)
+# =============================================================================
+
+
+def cmd_path(args: Namespace) -> int:
+    """Resolve a fuzzy path to exact location(s)."""
+    from moss.codebase import resolve_path
+
+    output = setup_output(args)
+    query = args.query
+
+    matches = resolve_path(query)
+
+    if not matches:
+        output.error(f"No matches for: {query}")
+        return 1
+
+    if wants_json(args):
+        output.data([{"path": m.full_path, "kind": m.kind} for m in matches])
+    else:
+        for m in matches:
+            output.print(f"{m.full_path} ({m.kind})")
+
+    return 0
+
+
+def cmd_view(args: Namespace) -> int:
+    """View a node in the codebase tree."""
+    from moss.codebase import build_tree
+
+    output = setup_output(args)
+    query = args.target
+    root = Path.cwd()
+
+    tree = build_tree(root)
+    nodes = tree.resolve(query)
+
+    if not nodes:
+        output.error(f"No matches for: {query}")
+        return 1
+
+    # If multiple matches, show them as options
+    if len(nodes) > 1:
+        output.print(f"Multiple matches for '{query}':")
+        for n in nodes:
+            output.print(f"  {n.full_path} ({n.kind.value})")
+        return 0
+
+    node = nodes[0]
+
+    # Show context (where this node lives)
+    if node.parent and node.parent.kind.value != "root":
+        output.print(f"in {node.parent.full_path}/")
+        output.print("")
+
+    # Show the node itself
+    output.print(f"{node.name} ({node.kind.value})")
+    if node.description:
+        output.print(f"  {node.description}")
+    if node.signature:
+        output.print(f"  {node.signature}")
+    output.print("")
+
+    # Show children grouped by kind
+    if node.children:
+        from collections import defaultdict
+
+        by_kind: dict[str, list] = defaultdict(list)
+        for child in node.children:
+            by_kind[child.kind.value].append(child)
+
+        for kind in ["class", "function", "method", "constant", "directory", "file"]:
+            children = by_kind.get(kind, [])
+            if children:
+                label = "Classes" if kind == "class" else f"{kind.title()}s"
+                output.print(f"{label}:")
+                for child in children[:20]:  # Limit to 20 per category
+                    desc = f"  {child.description}" if child.description else ""
+                    output.print(f"  {child.name}{desc}")
+                if len(children) > 20:
+                    output.print(f"  ... +{len(children) - 20} more")
+                output.print("")
+
+    return 0
+
+
 def cmd_tree(args: Namespace) -> int:
     """Show git-aware file tree."""
     from moss import MossAPI
@@ -4143,6 +4230,16 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show all files (ignore .gitignore)",
     )
     tree_parser.set_defaults(func=cmd_tree)
+
+    # path command (new codebase tree)
+    path_parser = subparsers.add_parser("path", help="Resolve fuzzy path to exact location(s)")
+    path_parser.add_argument("query", help="Path or symbol to find (fuzzy matching)")
+    path_parser.set_defaults(func=cmd_path)
+
+    # view command (new codebase tree)
+    view_parser = subparsers.add_parser("view", help="View a node in the codebase tree")
+    view_parser.add_argument("target", help="Path or symbol to view (fuzzy matching)")
+    view_parser.set_defaults(func=cmd_view)
 
     # skeleton command
     skeleton_parser = subparsers.add_parser(
