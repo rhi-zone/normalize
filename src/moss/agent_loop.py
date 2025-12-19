@@ -1042,6 +1042,77 @@ class MCPToolExecutor(ToolExecutor):
         await self.disconnect()
 
 
+class CompositeToolExecutor(ToolExecutor):
+    """Route tools to different executors based on prefix.
+
+    Enables hybrid loops that use both local tools (MossAPI) and
+    external tools (MCP servers, LLM).
+
+    Example:
+        executor = CompositeToolExecutor({
+            "moss.": MossToolExecutor(root=Path(".")),
+            "mcp.": MCPToolExecutor(config),
+            "llm.": LLMToolExecutor(llm_config),
+        })
+
+        # Routes to MossToolExecutor
+        await executor.execute("moss.skeleton.format", context, step)
+
+        # Routes to MCPToolExecutor
+        await executor.execute("mcp.read_file", context, step)
+
+    The first matching prefix wins. If no prefix matches, raises ValueError.
+    """
+
+    def __init__(self, executors: dict[str, ToolExecutor], default: ToolExecutor | None = None):
+        """Initialize with prefix-to-executor mapping.
+
+        Args:
+            executors: Dict mapping prefixes to executors (e.g., {"moss.": moss_exec})
+            default: Optional fallback executor for tools with no matching prefix
+        """
+        self.executors = executors
+        self.default = default
+
+    def _get_executor(self, tool_name: str) -> tuple[ToolExecutor, str]:
+        """Find the executor and stripped tool name for a tool.
+
+        Returns:
+            Tuple of (executor, stripped_tool_name)
+
+        Raises:
+            ValueError: If no matching executor found
+        """
+        for prefix, executor in self.executors.items():
+            if tool_name.startswith(prefix):
+                return executor, tool_name[len(prefix) :]
+        if self.default:
+            return self.default, tool_name
+        raise ValueError(
+            f"No executor found for tool: {tool_name}. "
+            f"Available prefixes: {list(self.executors.keys())}"
+        )
+
+    async def execute(
+        self, tool_name: str, context: LoopContext, step: LoopStep
+    ) -> tuple[Any, int, int]:
+        """Route to appropriate executor and execute."""
+        executor, stripped_name = self._get_executor(tool_name)
+
+        # Create a modified step with the stripped tool name
+        modified_step = LoopStep(
+            name=step.name,
+            tool=stripped_name,
+            step_type=step.step_type,
+            input_from=step.input_from,
+            on_error=step.on_error,
+            goto_target=step.goto_target,
+            max_retries=step.max_retries,
+        )
+
+        return await executor.execute(stripped_name, context, modified_step)
+
+
 # ============================================================================
 # LLM Tool Executor
 # ============================================================================

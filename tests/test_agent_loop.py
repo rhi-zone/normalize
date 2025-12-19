@@ -6,6 +6,7 @@ from moss.agent_loop import (
     AgentLoop,
     AgentLoopRunner,
     BenchmarkTask,
+    CompositeToolExecutor,
     ErrorAction,
     LLMConfig,
     LLMToolExecutor,
@@ -947,3 +948,107 @@ class TestMCPToolExecutor:
         # Just verify the methods exist
         assert hasattr(executor, "__aenter__")
         assert hasattr(executor, "__aexit__")
+
+
+class TestCompositeToolExecutor:
+    """Tests for CompositeToolExecutor."""
+
+    @pytest.fixture
+    def mock_executor(self):
+        """Create a mock executor for testing."""
+
+        class MockExecutor:
+            async def execute(self, tool_name, context, step):
+                return f"mock:{tool_name}", 0, 0
+
+        return MockExecutor()
+
+    def test_init(self, mock_executor):
+        composite = CompositeToolExecutor({"test.": mock_executor})
+        assert "test." in composite.executors
+        assert composite.default is None
+
+    def test_init_with_default(self, mock_executor):
+        composite = CompositeToolExecutor({}, default=mock_executor)
+        assert composite.default == mock_executor
+
+    def test_get_executor_matches_prefix(self, mock_executor):
+        composite = CompositeToolExecutor({"foo.": mock_executor})
+        executor, stripped = composite._get_executor("foo.bar")
+        assert executor == mock_executor
+        assert stripped == "bar"
+
+    def test_get_executor_first_match_wins(self, mock_executor):
+        class OtherExecutor:
+            pass
+
+        other = OtherExecutor()
+        # "foo.bar" matches both "foo." and "foo.b"
+        # First matching prefix in dict order wins
+        composite = CompositeToolExecutor({"foo.": mock_executor, "foo.b": other})
+        executor, stripped = composite._get_executor("foo.bar")
+        # "foo." matches first
+        assert executor == mock_executor
+        assert stripped == "bar"
+
+    def test_get_executor_uses_default(self, mock_executor):
+        composite = CompositeToolExecutor({}, default=mock_executor)
+        executor, stripped = composite._get_executor("unknown.tool")
+        assert executor == mock_executor
+        assert stripped == "unknown.tool"
+
+    def test_get_executor_no_match_raises(self):
+        composite = CompositeToolExecutor({"foo.": None})
+        with pytest.raises(ValueError, match="No executor found"):
+            composite._get_executor("bar.tool")
+
+    @pytest.mark.asyncio
+    async def test_execute_routes_correctly(self, mock_executor):
+        composite = CompositeToolExecutor({"test.": mock_executor})
+        context = LoopContext()
+        step = LoopStep(name="s", tool="test.hello")
+
+        result, tokens_in, tokens_out = await composite.execute("test.hello", context, step)
+
+        assert result == "mock:hello"
+        assert tokens_in == 0
+        assert tokens_out == 0
+
+    @pytest.mark.asyncio
+    async def test_execute_with_default(self, mock_executor):
+        composite = CompositeToolExecutor({}, default=mock_executor)
+        context = LoopContext()
+        step = LoopStep(name="s", tool="any.tool")
+
+        result, _, _ = await composite.execute("any.tool", context, step)
+
+        assert result == "mock:any.tool"
+
+    @pytest.mark.asyncio
+    async def test_execute_with_multiple_executors(self, tmp_path):
+        """Test routing to different executors."""
+
+        class ExecutorA:
+            async def execute(self, tool_name, context, step):
+                return f"A:{tool_name}", 0, 0
+
+        class ExecutorB:
+            async def execute(self, tool_name, context, step):
+                return f"B:{tool_name}", 0, 0
+
+        composite = CompositeToolExecutor(
+            {
+                "a.": ExecutorA(),
+                "b.": ExecutorB(),
+            }
+        )
+
+        context = LoopContext()
+        step_a = LoopStep(name="s", tool="a.foo")
+        step_b = LoopStep(name="s", tool="b.bar")
+
+        result_a, _, _ = await composite.execute("a.foo", context, step_a)
+        result_b, _, _ = await composite.execute("b.bar", context, step_b)
+
+        assert result_a == "A:foo"
+        assert result_b == "B:bar"
