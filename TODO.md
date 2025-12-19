@@ -4,11 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Agent learning** - Record mistakes in `.moss/lessons.md`
-   - Capture patterns from session failures
-   - Surface relevant lessons during similar operations
-
-2. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
+1. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
    - Pattern: Replace `from moss.X import Y` with `MossAPI.for_project()`
    - 18 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim, anchors, cfg, deps, context, query, search)
 
@@ -17,10 +13,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 **Small:**
 - [ ] Model-agnostic naming - don't over-fit to specific LLM conventions
 - [ ] Multiple agents concurrently - no requirement to join back to main stream
+- [ ] Graceful failure - handle errors without crashing, provide useful feedback
 
 **Medium:**
 - [ ] Study Goose's context revision (`crates/goose/src/`)
-- [ ] Agent learning - record mistakes in `.moss/lessons.md`
 
 **Large:**
 - [ ] Sessions as first-class - resumable, observable work units

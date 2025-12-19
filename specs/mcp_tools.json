@@ -1375,5 +1375,98 @@
       "type": "object"
     },
     "name": "guessability_score"
+  },
+  {
+    "description": "Add a new lesson. Dict with 'success' boolean and 'lesson' data",
+    "inputSchema": {
+      "properties": {
+        "category": {
+          "default": "",
+          "description": "Category (e.g., \"pattern\", \"mistake\", \"insight\")",
+          "type": "string"
+        },
+        "keywords": {
+          "description": "Keywords for matching (auto-extracted if not provided)",
+          "type": "string"
+        },
+        "text": {
+          "description": "The lesson text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "name": "lessons_add"
+  },
+  {
+    "description": "Clear all lessons. Dict with 'success' boolean",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "lessons_clear"
+  },
+  {
+    "description": "Find lessons relevant to the given context. List of relevant Lesson objects",
+    "inputSchema": {
+      "properties": {
+        "context": {
+          "description": "Current context (e.g., error message, task description)",
+          "type": "string"
+        },
+        "limit": {
+          "default": 3,
+          "description": "Maximum number of lessons to return",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "type": "object"
+    },
+    "name": "lessons_find_relevant"
+  },
+  {
+    "description": "List lessons, optionally filtered by category. List of Lesson objects",
+    "inputSchema": {
+      "properties": {
+        "category": {
+          "description": "Filter by category (case-insensitive)",
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Maximum number of lessons to return",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "lessons_list"
+  },
+  {
+    "description": "Search lessons by keyword. List of matching Lesson objects",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 5,
+          "description": "Maximum number of results",
+          "type": "integer"
+        },
+        "query": {
+          "description": "Search query (matches text, category, and keywords)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "lessons_search"
   }
 ]

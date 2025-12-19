@@ -1109,6 +1109,170 @@
         ]
       }
     },
+    "/lessons/add": {
+      "post": {
+        "description": "Add a new lesson. Dict with 'success' boolean and 'lesson' data",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "category": {
+                    "default": "",
+                    "description": "Category (e.g., \"pattern\", \"mistake\", \"insight\")",
+                    "type": "string"
+                  },
+                  "keywords": {
+                    "description": "Keywords for matching (auto-extracted if not provided)",
+                    "type": "array"
+                  },
+                  "text": {
+                    "description": "The lesson text",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Add a new lesson",
+        "tags": [
+          "lessons"
+        ]
+      }
+    },
+    "/lessons/clear": {
+      "post": {
+        "description": "Clear all lessons. Dict with 'success' boolean",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Clear all lessons",
+        "tags": [
+          "lessons"
+        ]
+      }
+    },
+    "/lessons/find-relevant": {
+      "get": {
+        "description": "Find lessons relevant to the given context. List of relevant Lesson objects",
+        "parameters": [
+          {
+            "description": "Current context (e.g., error message, task description)",
+            "in": "query",
+            "name": "context",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of lessons to return",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Find lessons relevant to the given context",
+        "tags": [
+          "lessons"
+        ]
+      }
+    },
+    "/lessons/list": {
+      "get": {
+        "description": "List lessons, optionally filtered by category. List of Lesson objects",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "category": {
+                    "description": "Filter by category (case-insensitive)",
+                    "type": "string"
+                  },
+                  "limit": {
+                    "default": 20,
+                    "description": "Maximum number of lessons to return",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "List lessons, optionally filtered by category",
+        "tags": [
+          "lessons"
+        ]
+      }
+    },
+    "/lessons/search": {
+      "post": {
+        "description": "Search lessons by keyword. List of matching Lesson objects",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "limit": {
+                    "default": 5,
+                    "description": "Maximum number of results",
+                    "type": "integer"
+                  },
+                  "query": {
+                    "description": "Search query (matches text, category, and keywords)",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Search lessons by keyword",
+        "tags": [
+          "lessons"
+        ]
+      }
+    },
     "/patch/apply": {
       "post": {
         "description": "Apply a patch to a file. PatchResult with success status and modified content",
@@ -2550,6 +2714,10 @@
     {
       "description": "API for evaluating codebase structure quality. Measures how intuitive and predictable the codebase structure is. Can you guess where to find functionality based on its name?",
       "name": "guessability"
+    },
+    {
+      "description": "API for agent learning and lessons management. Records and surfaces lessons learned from session failures and mistakes. Lessons are stored in .moss/lessons.md.",
+      "name": "lessons"
     }
   ]
 }

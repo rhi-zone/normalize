@@ -243,6 +243,7 @@ def introspect_api() -> list[SubAPI]:
         GitHotspotsAPI,
         GuessabilityAPI,
         HealthAPI,
+        LessonsAPI,
         PatchAPI,
         RefCheckAPI,
         SearchAPI,
@@ -281,6 +282,7 @@ def introspect_api() -> list[SubAPI]:
         "web": WebAPI,
         "search": SearchAPI,
         "guessability": GuessabilityAPI,
+        "lessons": LessonsAPI,
     }
 
     results = []

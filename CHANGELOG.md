@@ -2,12 +2,19 @@
 
 ## v0.6.6
 
-### Phase 36: query/search CLI Migration
+### Phase 36: query/search CLI Migration, Agent Learning
 
 **SearchAPI**
 - `search_query` - Query symbols with pattern matching and regex filters
   - Filters: kind, name regex, signature regex, inheritance, line counts
   - Returns `QueryMatch` dataclass with full symbol info
+
+**LessonsAPI** (Agent Learning)
+- `lessons_add` - Record a lesson with auto-extracted keywords
+- `lessons_list` - List lessons, optionally filtered by category
+- `lessons_search` - Search lessons by keyword
+- `lessons_find_relevant` - Find lessons relevant to current context
+- Stored in `.moss/lessons.md` with categories and timestamps
 
 **CLI Migration to MossAPI**
 - 18 commands now use MossAPI (was 16)

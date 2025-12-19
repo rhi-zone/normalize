@@ -1154,6 +1154,355 @@ class TodoAPI:
 
 
 @dataclass
+class Lesson:
+    """A lesson learned from a session failure or mistake.
+
+    Attributes:
+        text: The lesson content
+        category: Category (e.g., "pattern", "mistake", "insight")
+        keywords: Keywords for matching
+        added: When the lesson was added (ISO format)
+    """
+
+    text: str
+    category: str = ""
+    keywords: list[str] = field(default_factory=list)
+    added: str = ""
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        cat = f"[{self.category}] " if self.category else ""
+        return f"{cat}{self.text}"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return as dictionary."""
+        return {
+            "text": self.text,
+            "category": self.category,
+            "keywords": self.keywords,
+            "added": self.added,
+        }
+
+
+@dataclass
+class LessonsAPI:
+    """API for agent learning and lessons management.
+
+    Records and surfaces lessons learned from session failures
+    and mistakes. Lessons are stored in .moss/lessons.md.
+    """
+
+    root: Path
+    _lessons_path: Path = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Initialize lessons path."""
+        self._lessons_path = self.root / ".moss" / "lessons.md"
+
+    def add(
+        self,
+        text: str,
+        category: str = "",
+        keywords: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Add a new lesson.
+
+        Args:
+            text: The lesson text
+            category: Category (e.g., "pattern", "mistake", "insight")
+            keywords: Keywords for matching (auto-extracted if not provided)
+
+        Returns:
+            Dict with 'success' boolean and 'lesson' data
+        """
+        from datetime import datetime
+
+        # Auto-extract keywords if not provided
+        if keywords is None:
+            keywords = self._extract_keywords(text)
+
+        # Ensure .moss directory exists
+        self._lessons_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Read existing content
+        if self._lessons_path.exists():
+            content = self._lessons_path.read_text()
+        else:
+            content = "# Lessons Learned\n\nLessons from agent sessions.\n\n"
+
+        # Add new lesson
+        timestamp = datetime.now().isoformat()
+        keywords_str = ", ".join(keywords) if keywords else ""
+        category_marker = f"[{category}] " if category else ""
+
+        entry = f"- {category_marker}{text}"
+        if keywords_str:
+            entry += f" <!-- keywords: {keywords_str} -->"
+        entry += f" <!-- added: {timestamp} -->\n"
+
+        # Append to content
+        content += entry
+
+        # Write back
+        self._lessons_path.write_text(content)
+
+        return {
+            "success": True,
+            "lesson": {
+                "text": text,
+                "category": category,
+                "keywords": keywords,
+                "added": timestamp,
+            },
+        }
+
+    def list(self, category: str | None = None, limit: int = 20) -> list[Lesson]:
+        """List lessons, optionally filtered by category.
+
+        Args:
+            category: Filter by category (case-insensitive)
+            limit: Maximum number of lessons to return
+
+        Returns:
+            List of Lesson objects
+        """
+        if not self._lessons_path.exists():
+            return []
+
+        lessons = self._parse_lessons()
+
+        # Filter by category if specified
+        if category:
+            cat_lower = category.lower()
+            lessons = [ls for ls in lessons if ls.category.lower() == cat_lower]
+
+        return lessons[:limit]
+
+    def search(self, query: str, limit: int = 5) -> list[Lesson]:
+        """Search lessons by keyword.
+
+        Args:
+            query: Search query (matches text, category, and keywords)
+            limit: Maximum number of results
+
+        Returns:
+            List of matching Lesson objects
+        """
+        if not self._lessons_path.exists():
+            return []
+
+        lessons = self._parse_lessons()
+        query_lower = query.lower()
+        query_words = set(query_lower.split())
+
+        # Score each lesson
+        scored: list[tuple[float, Lesson]] = []
+        for lesson in lessons:
+            score = 0.0
+
+            # Match in text
+            if query_lower in lesson.text.lower():
+                score += 2.0
+
+            # Match in category
+            if query_lower in lesson.category.lower():
+                score += 1.5
+
+            # Match in keywords
+            for kw in lesson.keywords:
+                if query_lower in kw.lower():
+                    score += 1.0
+                if kw.lower() in query_words:
+                    score += 0.5
+
+            if score > 0:
+                scored.append((score, lesson))
+
+        # Sort by score descending
+        scored.sort(key=lambda x: -x[0])
+        return [lesson for _, lesson in scored[:limit]]
+
+    def find_relevant(self, context: str, limit: int = 3) -> list[Lesson]:
+        """Find lessons relevant to the given context.
+
+        Args:
+            context: Current context (e.g., error message, task description)
+            limit: Maximum number of lessons to return
+
+        Returns:
+            List of relevant Lesson objects
+        """
+        # Extract keywords from context and search
+        keywords = self._extract_keywords(context)
+        query = " ".join(keywords[:5])  # Use top 5 keywords
+        return self.search(query, limit=limit)
+
+    def clear(self) -> dict[str, bool]:
+        """Clear all lessons.
+
+        Returns:
+            Dict with 'success' boolean
+        """
+        if self._lessons_path.exists():
+            self._lessons_path.unlink()
+        return {"success": True}
+
+    def _parse_lessons(self) -> list[Lesson]:
+        """Parse lessons from the markdown file."""
+        import re
+
+        content = self._lessons_path.read_text()
+        lessons: list[Lesson] = []
+
+        # Match lines starting with -
+        pattern = re.compile(
+            r"^- (?:\[([^\]]+)\] )?"  # Optional category
+            r"(.+?)"  # Text
+            r"(?: <!-- keywords: ([^>]+) -->)?"  # Optional keywords
+            r"(?: <!-- added: ([^>]+) -->)?$",  # Optional timestamp
+            re.MULTILINE,
+        )
+
+        for match in pattern.finditer(content):
+            category = match.group(1) or ""
+            text = match.group(2).strip()
+            keywords_str = match.group(3) or ""
+            added = match.group(4) or ""
+
+            keywords = [k.strip() for k in keywords_str.split(",") if k.strip()]
+
+            lessons.append(
+                Lesson(
+                    text=text,
+                    category=category,
+                    keywords=keywords,
+                    added=added,
+                )
+            )
+
+        return lessons
+
+    def _extract_keywords(self, text: str) -> list[str]:
+        """Extract keywords from text."""
+        import re
+
+        # Common stop words
+        stop_words = {
+            "a",
+            "an",
+            "the",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "here",
+            "there",
+            "when",
+            "where",
+            "why",
+            "how",
+            "all",
+            "each",
+            "few",
+            "more",
+            "most",
+            "other",
+            "some",
+            "such",
+            "no",
+            "nor",
+            "not",
+            "only",
+            "own",
+            "same",
+            "so",
+            "than",
+            "too",
+            "very",
+            "just",
+            "and",
+            "but",
+            "if",
+            "or",
+            "because",
+            "until",
+            "while",
+            "although",
+            "this",
+            "that",
+            "these",
+            "those",
+            "it",
+            "its",
+            "you",
+            "your",
+            "i",
+            "me",
+            "my",
+            "we",
+            "us",
+            "our",
+            "they",
+            "them",
+            "their",
+        }
+
+        # Extract words
+        words = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", text.lower())
+
+        # Filter and count
+        word_counts: dict[str, int] = {}
+        for word in words:
+            if word not in stop_words and len(word) > 2:
+                word_counts[word] = word_counts.get(word, 0) + 1
+
+        # Return top keywords by frequency
+        sorted_words = sorted(word_counts.items(), key=lambda x: -x[1])
+        return [word for word, _ in sorted_words[:10]]
+
+
+@dataclass
 class ComplexityAPI:
     """API for cyclomatic complexity analysis.
 
@@ -3155,6 +3504,7 @@ class MossAPI:
     _web: WebAPI | None = None
     _search: SearchAPI | None = None
     _guessability: GuessabilityAPI | None = None
+    _lessons: LessonsAPI | None = None
 
     @classmethod
     def for_project(cls, path: str | Path) -> MossAPI:
@@ -3328,6 +3678,13 @@ class MossAPI:
         if self._guessability is None:
             self._guessability = GuessabilityAPI(root=self.root)
         return self._guessability
+
+    @property
+    def lessons(self) -> LessonsAPI:
+        """Access agent lessons and learning."""
+        if self._lessons is None:
+            self._lessons = LessonsAPI(root=self.root)
+        return self._lessons
 
 
 # Convenience alias
