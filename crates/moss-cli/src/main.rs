@@ -7,6 +7,7 @@ mod cfg;
 mod complexity;
 mod daemon;
 mod deps;
+mod health;
 mod index;
 mod path_resolve;
 mod skeleton;
@@ -263,6 +264,13 @@ enum Commands {
         #[arg(short, long, global = true)]
         root: Option<PathBuf>,
     },
+
+    /// Show codebase health metrics
+    Health {
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -318,6 +326,7 @@ fn main() {
             cmd_cfg(&file, root.as_deref(), function.as_deref(), cli.json)
         }
         Commands::Daemon { action, root } => cmd_daemon(action, root.as_deref(), cli.json),
+        Commands::Health { root } => cmd_health(root.as_deref(), cli.json, &mut profiler),
     };
 
     profiler.mark("done");
@@ -1313,4 +1322,36 @@ fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 {
             }
         }
     }
+}
+
+fn cmd_health(root: Option<&Path>, json: bool, profiler: &mut Profiler) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    profiler.mark("resolved_root");
+
+    let report = health::analyze_health(&root);
+    profiler.mark("analyzed");
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "total_files": report.total_files,
+                "python_files": report.python_files,
+                "rust_files": report.rust_files,
+                "other_files": report.other_files,
+                "total_lines": report.total_lines,
+                "total_functions": report.total_functions,
+                "avg_complexity": (report.avg_complexity * 10.0).round() / 10.0,
+                "max_complexity": report.max_complexity,
+                "high_risk_functions": report.high_risk_functions,
+            })
+        );
+    } else {
+        println!("{}", report.format());
+    }
+
+    0
 }
