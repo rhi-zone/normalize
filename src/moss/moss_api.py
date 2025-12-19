@@ -895,15 +895,18 @@ class HealthAPI:
         summarizer = Summarizer(include_private=False, include_tests=False)
         return summarizer.summarize_project(self.root)
 
-    def check_docs(self) -> DocCheckResult:
+    def check_docs(self, check_links: bool = False) -> DocCheckResult:
         """Check documentation health.
+
+        Args:
+            check_links: If True, verify that links in docs are valid
 
         Returns:
             DocCheckResult with coverage and issues
         """
         from moss.check_docs import DocChecker
 
-        checker = DocChecker(self.root, check_links=True)
+        checker = DocChecker(self.root, check_links=check_links)
         return checker.check()
 
     def check_todos(self) -> TodoCheckResult:

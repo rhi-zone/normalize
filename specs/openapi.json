@@ -1070,6 +1070,17 @@
     "/health/check-docs": {
       "get": {
         "description": "Check documentation health. DocCheckResult with coverage and issues",
+        "parameters": [
+          {
+            "description": "If True, verify that links in docs are valid",
+            "in": "query",
+            "name": "check_links",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response"

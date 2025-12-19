@@ -906,6 +906,42 @@ Moss uses structural anchors (AST nodes) rather than line numbers:
 - Consider: Hybrid approach (masking + summarization)
 - Priority: Critical for long sessions (see `docs/log-analysis.md`)
 
+## Tool Encoding & Schema Efficiency
+
+### The Problem
+MCP tool definitions use JSON Schema, which is verbose:
+- 85 tools → ~8K tokens of passive context every turn
+- 72% of overhead is in schemas (type definitions, descriptions per param)
+- Complex tools like `search_query` (10 params) cost ~1K chars each
+
+### Cloudflare Code Mode (Dec 2024)
+- **Site**: https://blog.cloudflare.com/code-mode/
+- **Approach**: Sidestep tool-calling entirely
+- Convert MCP tools to TypeScript APIs with doc comments
+- LLM writes code that calls APIs directly in sandbox
+- Avoids: tool-call tokens, intermediate result round-trips
+- Key quote: "The output of each tool call must feed into the LLM's neural network, just to be copied over to the inputs of the next call, wasting time, energy, and tokens"
+
+**Moss implications:**
+- For moss loop (where we control both sides), could use terse function signatures
+- `grep(pattern, path?, glob?, limit=100)` = ~70 chars vs ~900 chars JSON Schema
+- Potential 10x reduction in tool definition overhead
+
+### CASS Memory System
+- **Repo**: https://github.com/Dicklesworthstone/cass_memory_system
+- Context-Aware Semantic Splitter for long-term memory
+- Research for session/memory management approaches
+
+### Beads (Steve Yegge)
+- **Repo**: https://github.com/steveyegge/beads
+- Chunking/context approach for managing LLM context windows
+- Research for context window optimization
+
+### Moss Implementation Notes
+- [ ] Design compact tool encoding for moss agent (bypass JSON Schema)
+- [ ] Investigate code-mode approach (LLM writes Python, not tool calls)
+- [ ] Benchmark token savings vs MCP overhead
+
 ## Program Repair vs Program Synthesis
 
 ### Key Differences

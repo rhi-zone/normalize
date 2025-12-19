@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 1. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
    - Pattern: Replace `from moss.X import Y` with `MossAPI.for_project()`
-   - 18 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim, anchors, cfg, deps, context, query, search)
+   - 22 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim, anchors, cfg, deps, context, query, search, check_docs, check_todos, checkpoint, overview)
 
 ## Active Backlog
 
@@ -14,8 +14,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Model-agnostic naming - don't over-fit to specific LLM conventions
 - [ ] Multiple agents concurrently - no requirement to join back to main stream
 - [ ] Graceful failure - handle errors without crashing, provide useful feedback
+- [ ] Pre-write checks: search for similar files before creating (prevent `prior_art.md` vs `prior-art.md`)
+- [ ] Minimal reads: read only what's needed, use skeleton/grep to locate first
 
 **Medium:**
+- [ ] Compact tool encoding for moss agent - bypass JSON Schema overhead (~10x reduction)
+  - See `docs/prior-art.md` for references (Cloudflare code mode, etc.)
+  - For moss loop, we control both sides - can use terse function signatures
 - [ ] Study Goose's context revision (`crates/goose/src/`)
 
 **Large:**
@@ -94,6 +99,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - Don't assume files exist based on class names - `SearchAPI` is in `moss_api.py`, not `search.py`
 - Tools aren't perfect - when an error seems wrong, question your inputs before assuming the tool is broken
 - Tool design: return specific error messages ("File not found: X") not generic ones ("No plugin for .py")
+- **Check before creating**: Always search for existing files before creating new ones (e.g., `prior_art.md` vs `prior-art.md`)
+- **Don't read entire large files**: Use grep/skeleton to find relevant section first, then read only what's needed
 
 ### Design Principles
 See `docs/philosophy.md` for full tenets. Key goals:

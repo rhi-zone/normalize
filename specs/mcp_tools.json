@@ -591,7 +591,13 @@
   {
     "description": "Check documentation freshness against codebase. Example: moss check-docs",
     "inputSchema": {
-      "properties": {},
+      "properties": {
+        "check_links": {
+          "default": false,
+          "description": "If True, verify that links in docs are valid",
+          "type": "boolean"
+        }
+      },
       "type": "object"
     },
     "name": "health_check_docs"

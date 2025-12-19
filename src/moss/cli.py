@@ -2016,7 +2016,7 @@ def cmd_summarize(args: Namespace) -> int:
 
 def cmd_check_docs(args: Namespace) -> int:
     """Check documentation freshness against codebase."""
-    from moss.check_docs import DocChecker
+    from moss import MossAPI
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -2027,10 +2027,10 @@ def cmd_check_docs(args: Namespace) -> int:
 
     output.info(f"Checking docs in {root.name}...")
 
-    checker = DocChecker(root, check_links=getattr(args, "check_links", False))
+    api = MossAPI.for_project(root)
 
     try:
-        result = checker.check()
+        result = api.health.check_docs(check_links=getattr(args, "check_links", False))
     except Exception as e:
         output.error(f"Failed to check docs: {e}")
         return 1
@@ -2055,7 +2055,7 @@ def cmd_check_docs(args: Namespace) -> int:
 
 def cmd_check_todos(args: Namespace) -> int:
     """Check TODOs against implementation status."""
-    from moss.check_todos import TodoChecker
+    from moss import MossAPI
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -2066,10 +2066,10 @@ def cmd_check_todos(args: Namespace) -> int:
 
     output.info(f"Checking TODOs in {root.name}...")
 
-    checker = TodoChecker(root)
+    api = MossAPI.for_project(root)
 
     try:
-        result = checker.check()
+        result = api.health.check_todos()
     except Exception as e:
         output.error(f"Failed to check TODOs: {e}")
         return 1
@@ -2697,7 +2697,7 @@ def cmd_checkpoint(args: Namespace) -> int:
     """
     import asyncio
 
-    from moss.shadow_git import ShadowGit
+    from moss import MossAPI
 
     output = setup_output(args)
     root = Path(".").resolve()
@@ -2710,42 +2710,39 @@ def cmd_checkpoint(args: Namespace) -> int:
         output.error("Not a git repository")
         return 1
 
-    git = ShadowGit(root)
+    api = MossAPI.for_project(root)
 
     async def run_action() -> int:
         if action == "create":
-            branch_name = name or f"checkpoint/{asyncio.get_event_loop().time():.0f}"
             try:
-                branch = await git.create_shadow_branch(branch_name)
-                commit_msg = message or f"Checkpoint: {branch_name}"
-                handle = await git.commit(branch, commit_msg, allow_empty=True)
-                output.success(f"Created checkpoint: {branch.name}")
-                output.info(f"Commit: {handle.sha[:8]}")
+                result = await api.git.create_checkpoint(name=name, message=message)
+                output.success(f"Created checkpoint: {result['branch']}")
+                output.info(f"Commit: {result['commit'][:8]}")
             except Exception as e:
                 output.error(f"Failed to create checkpoint: {e}")
                 return 1
 
         elif action == "list":
-            # List shadow branches from git
-            result = await git._run_git("branch", "--list", "shadow/*", "checkpoint/*")
-            branches = [b.strip() for b in result.stdout.strip().split("\n") if b.strip()]
-            if not branches:
-                output.info("No active checkpoints")
-            else:
-                output.header("Active Checkpoints")
-                for branch in branches:
-                    current = "*" if branch.startswith("*") else " "
-                    branch = branch.lstrip("* ")
-                    output.print(f"  {current} {branch}")
+            try:
+                checkpoints = await api.git.list_checkpoints()
+                if not checkpoints:
+                    output.info("No active checkpoints")
+                else:
+                    output.header("Active Checkpoints")
+                    for cp in checkpoints:
+                        output.print(f"    {cp['name']} ({cp['type']})")
+            except Exception as e:
+                output.error(f"Failed to list checkpoints: {e}")
+                return 1
 
         elif action == "diff":
             if not name:
                 output.error("Checkpoint name required for diff")
                 return 1
             try:
-                result = await git._run_git("diff", f"HEAD...{name}", check=False)
-                if result.stdout:
-                    output.print(result.stdout)
+                result = await api.git.diff_checkpoint(name)
+                if result["diff"]:
+                    output.print(result["diff"])
                 else:
                     output.info("No differences")
             except Exception as e:
@@ -2757,23 +2754,9 @@ def cmd_checkpoint(args: Namespace) -> int:
                 output.error("Checkpoint name required for merge")
                 return 1
             try:
-                # Get current branch as base
-                base_result = await git._run_git("rev-parse", "--abbrev-ref", "HEAD")
-                base_branch = base_result.stdout.strip()
-
-                # Create a temporary ShadowBranch object
-                from moss.shadow_git import ShadowBranch
-
-                branch = ShadowBranch(name=name, base_branch=base_branch, repo_path=root)
-                git._branches[name] = branch
-
-                merge_msg = message or f"Merge checkpoint {name}"
-                handle = await git.squash_merge(branch, merge_msg)
+                result = await api.git.merge_checkpoint(name, message=message)
                 output.success(f"Merged checkpoint {name}")
-                output.info(f"Commit: {handle.sha[:8]}")
-
-                # Clean up the branch
-                await git._run_git("branch", "-D", name, check=False)
+                output.info(f"Commit: {result['commit'][:8]}")
             except Exception as e:
                 output.error(f"Failed to merge: {e}")
                 return 1
@@ -2783,17 +2766,7 @@ def cmd_checkpoint(args: Namespace) -> int:
                 output.error("Checkpoint name required for abort")
                 return 1
             try:
-                # Get current branch
-                base_result = await git._run_git("rev-parse", "--abbrev-ref", "HEAD")
-                current = base_result.stdout.strip()
-
-                # If we're on the checkpoint branch, switch away first
-                if current == name:
-                    # Get base branch from the branch name if possible
-                    await git._run_git("checkout", "-", check=False)
-
-                # Delete the branch
-                await git._run_git("branch", "-D", name)
+                await api.git.abort_checkpoint(name)
                 output.success(f"Aborted checkpoint: {name}")
             except Exception as e:
                 output.error(f"Failed to abort: {e}")
@@ -3490,13 +3463,8 @@ def cmd_overview(args: Namespace) -> int:
     Runs configurable checks (health, deps, docs, todos, refs).
     Supports presets for common configurations.
     """
-    from moss.check_docs import DocChecker
-    from moss.check_refs import RefChecker
-    from moss.check_todos import TodoChecker
-    from moss.external_deps import ExternalDependencyAnalyzer
+    from moss import MossAPI
     from moss.presets import AVAILABLE_CHECKS, get_preset, list_presets
-    from moss.status import StatusChecker
-    from moss.summarize import Summarizer
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -3516,6 +3484,8 @@ def cmd_overview(args: Namespace) -> int:
     if not root.exists():
         output.error(f"Directory not found: {root}")
         return 1
+
+    api = MossAPI.for_project(root)
 
     # Load preset if specified
     preset_name = getattr(args, "preset", None)
@@ -3547,15 +3517,13 @@ def cmd_overview(args: Namespace) -> int:
     # Health check
     if "health" in checks_to_run:
         try:
-            checker = StatusChecker(root)
-            status = checker.check()
+            status = api.health.check()
             # Extract top issues by severity for display
             high_issues = [w for w in status.weak_spots if w.severity == "high"]
             med_issues = [w for w in status.weak_spots if w.severity == "medium"]
             # Get top packages for skeleton summary
             try:
-                summarizer = Summarizer(include_private=False, include_tests=False)
-                project_summary = summarizer.summarize_project(root)
+                project_summary = api.health.summarize()
                 top_packages = [
                     {"name": p.name, "files": len(p.all_files), "lines": p.total_lines}
                     for p in sorted(
@@ -3594,8 +3562,7 @@ def cmd_overview(args: Namespace) -> int:
     # External deps
     if "deps" in checks_to_run:
         try:
-            analyzer = ExternalDependencyAnalyzer(root)
-            deps = analyzer.analyze()
+            deps = api.external_deps.analyze()
             # Include top critical/high vulns for inline display
             critical_vulns = [
                 {"pkg": v.package, "id": v.id, "sev": v.severity} for v in deps.critical_vulns[:3]
@@ -3619,8 +3586,7 @@ def cmd_overview(args: Namespace) -> int:
     # Check docs
     if "docs" in checks_to_run:
         try:
-            checker = DocChecker(root)
-            docs = checker.check()
+            docs = api.health.check_docs()
             results["docs"] = {
                 "coverage": docs.coverage,
                 "errors": docs.error_count,
@@ -3636,8 +3602,7 @@ def cmd_overview(args: Namespace) -> int:
     # Check TODOs
     if "todos" in checks_to_run:
         try:
-            checker = TodoChecker(root)
-            todos = checker.check()
+            todos = api.health.check_todos()
             # Get top pending items for display
             pending_items = [
                 item.text for item in todos.tracked_items if item.status.name == "PENDING"
@@ -3656,8 +3621,7 @@ def cmd_overview(args: Namespace) -> int:
     # Check refs
     if "refs" in checks_to_run:
         try:
-            checker = RefChecker(root)
-            refs = checker.check()
+            refs = api.ref_check.check()
             results["refs"] = {
                 "valid": len(refs.code_to_docs) + len(refs.docs_to_code),
                 "broken": refs.error_count,
