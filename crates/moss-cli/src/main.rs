@@ -148,9 +148,9 @@ enum Commands {
         /// Symbol name to analyze
         symbol: String,
 
-        /// File containing the symbol
+        /// File containing the symbol (optional - will search if not provided)
         #[arg(short, long)]
-        file: String,
+        file: Option<String>,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long)]
@@ -300,6 +300,32 @@ enum DaemonAction {
     Start,
 }
 
+/// Parse file:symbol, file::symbol, or file#symbol syntax
+/// Returns (file, symbol) where file is Some if separator found
+fn parse_file_symbol(input: &str, explicit_file: Option<String>) -> (Option<String>, String) {
+    // If explicit file provided, use it
+    if explicit_file.is_some() {
+        return (explicit_file, input.to_string());
+    }
+
+    // Try various separators: #, ::, :
+    for sep in &['#', ':'] {
+        if let Some(idx) = input.find(*sep) {
+            let (file_part, sym_part) = input.split_at(idx);
+            if !file_part.is_empty() {
+                // Handle :: (skip first char)
+                let sym = sym_part.trim_start_matches(*sep);
+                if !sym.is_empty() {
+                    return (Some(file_part.to_string()), sym.to_string());
+                }
+            }
+        }
+    }
+
+    // No separator - just symbol
+    (None, input.to_string())
+}
+
 fn main() {
     let cli = Cli::parse();
     let mut profiler = Profiler::new(cli.profile);
@@ -319,7 +345,9 @@ fn main() {
         }
         Commands::Symbols { file, root } => cmd_symbols(&file, root.as_deref(), cli.json, &mut profiler),
         Commands::Callees { symbol, file, root } => {
-            cmd_callees(&symbol, &file, root.as_deref(), cli.json)
+            // Support file:symbol, file::symbol, or file#symbol syntax
+            let (actual_file, actual_symbol) = parse_file_symbol(&symbol, file);
+            cmd_callees(&actual_symbol, actual_file.as_deref(), root.as_deref(), cli.json)
         }
         Commands::Callers { symbol, root } => cmd_callers(&symbol, root.as_deref(), cli.json, &mut profiler),
         Commands::Tree { path, root, depth, dirs_only } => {
@@ -656,22 +684,48 @@ fn cmd_symbols(file: &str, root: Option<&Path>, json: bool, profiler: &mut Profi
     0
 }
 
-fn cmd_callees(symbol: &str, file: &str, root: Option<&Path>, json: bool) -> i32 {
+fn cmd_callees(symbol: &str, file: Option<&str>, root: Option<&Path>, json: bool) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
+    // Find the file containing the symbol
+    let file_path = if let Some(file) = file {
+        // File provided - resolve it
+        let matches = path_resolve::resolve(file, &root);
+        match matches.iter().find(|m| m.kind == "file") {
+            Some(m) => root.join(&m.path),
+            None => {
+                eprintln!("File not found: {}", file);
+                return 1;
+            }
+        }
+    } else {
+        // No file - search for symbol in index
+        if let Ok(idx) = index::FileIndex::open(&root) {
+            if let Ok(symbols) = idx.find_symbol(symbol) {
+                if let Some((file, _, _, _)) = symbols.first() {
+                    root.join(file)
+                } else {
+                    // Try fuzzy search
+                    let matches = path_resolve::resolve(symbol, &root);
+                    if let Some(m) = matches.iter().find(|m| m.kind == "symbol") {
+                        root.join(&m.path)
+                    } else {
+                        eprintln!("Symbol not found: {}. Specify --file or use file:symbol syntax.", symbol);
+                        return 1;
+                    }
+                }
+            } else {
+                eprintln!("Failed to search index. Run: moss reindex --call-graph");
+                return 1;
+            }
+        } else {
+            eprintln!("No file specified. Use --file or file:symbol syntax.");
             return 1;
         }
     };
 
-    let file_path = root.join(&file_match.path);
     let content = match std::fs::read_to_string(&file_path) {
         Ok(c) => c,
         Err(e) => {
