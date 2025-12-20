@@ -4,30 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Fix CI test failures (Symbol.to_dict, ControlFlowGraph.entry, Export.export_type)
-2. Fix RAGAPI constructor signature mismatch
-3. Fix vector store metadata validation errors
-4. Review/refactor vector store API for consistency
+1. Study Goose's context revision (`crates/goose/src/`)
+2. Port `context` command to Rust (if context extraction becomes hot path)
+3. Port `overview` command to Rust (fast codebase overview)
 
 ## Active Backlog
-
-**CI Failures (Dec 2025):**
-- [ ] `Symbol.to_dict` missing in CLI JSON output (test_cli.py skeleton/context)
-- [ ] `ControlFlowGraph.entry` attribute missing (test_cli.py cfg)
-- [ ] `Export.export_type` attribute missing (test_cli.py deps)
-- [ ] `RAGAPI()` constructor signature mismatch (test_rag_integration.py)
-- [ ] Vector store metadata validation errors (test_vector_store.py)
 
 **Small:**
 - [ ] Multiple agents concurrently - no requirement to join back to main stream
 - [ ] Graceful failure - handle errors without crashing, provide useful feedback
 - [ ] MCP response ephemeral handling - large responses should stream/page instead of filling context
 - [ ] Agent sandboxing - restrict bash/shell access, security-conscious CLI wrappers
-
-**Medium:**
-- [ ] Study Goose's context revision (`crates/goose/src/`)
-- [ ] Port `context` command to Rust (if context extraction becomes hot path)
-- [ ] Port `overview` command to Rust (fast codebase overview)
 
 **Large:**
 - [ ] Sessions as first-class - resumable, observable work units

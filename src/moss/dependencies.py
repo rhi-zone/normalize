@@ -32,6 +32,11 @@ class Export:
     kind: str  # function, class, variable
     lineno: int
 
+    @property
+    def export_type(self) -> str:
+        """Alias for kind for API compatibility."""
+        return self.kind
+
 
 @dataclass
 class DependencyInfo:

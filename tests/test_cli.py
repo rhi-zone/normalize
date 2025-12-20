@@ -338,8 +338,8 @@ def baz():
 
         assert result == 0
         captured = capsys.readouterr()
-        # Format is "class: Foo" or "class: Foo (L...)"
-        assert "class:" in captured.out and "Foo" in captured.out
+        # Format uses Python signature syntax: "class Foo:"
+        assert "class Foo" in captured.out
         assert "def bar" in captured.out
         assert "def baz" in captured.out
 

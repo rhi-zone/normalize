@@ -31,6 +31,24 @@ class Symbol:
             return None
         return self.end_lineno - self.lineno + 1
 
+    def to_dict(self) -> dict:
+        """Convert to a serializable dictionary."""
+        result = {
+            "name": self.name,
+            "kind": self.kind,
+            "line": self.lineno,
+        }
+        if self.end_lineno is not None:
+            result["end_line"] = self.end_lineno
+            result["line_count"] = self.line_count
+        if self.signature:
+            result["signature"] = self.signature
+        if self.docstring:
+            result["docstring"] = self.docstring
+        if self.children:
+            result["children"] = [c.to_dict() for c in self.children]
+        return result
+
 
 class PythonSkeletonExtractor(ast.NodeVisitor):
     """Extract skeleton from Python AST."""

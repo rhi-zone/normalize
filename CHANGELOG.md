@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- Add `Symbol.to_dict()` method for JSON serialization in skeleton/context commands
+- Add `ControlFlowGraph.entry/exit` properties for API compatibility
+- Add `CFGNode.label/lineno` properties for JSON output
+- Add `Export.export_type` property as alias for `kind`
+- Add `@dataclass` decorator to `RAGAPI` to fix constructor signature
+
 ## v0.6.10
 
 ### Performance Improvements

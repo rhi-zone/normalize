@@ -77,6 +77,18 @@ class CFGNode:
             return NotImplemented
         return self.id == other.id
 
+    @property
+    def label(self) -> str:
+        """Label for display (first statement or node type)."""
+        if self.statements:
+            return self.statements[0]
+        return self.node_type.name
+
+    @property
+    def lineno(self) -> int | None:
+        """Alias for line_start for API compatibility."""
+        return self.line_start
+
 
 @dataclass
 class CFGEdge:
@@ -156,6 +168,16 @@ class ControlFlowGraph:
         Higher values indicate more complex control flow.
         """
         return self.edge_count - self.node_count + 2
+
+    @property
+    def entry(self) -> str | None:
+        """Alias for entry_node for API compatibility."""
+        return self.entry_node
+
+    @property
+    def exit(self) -> str | None:
+        """Alias for exit_node for API compatibility."""
+        return self.exit_node
 
     def to_dot(self) -> str:
         """Convert CFG to DOT format for visualization."""

@@ -1971,6 +1971,7 @@ class WebAPI:
         return fetcher.cache.clear()
 
 
+@dataclass
 class RAGAPI:
     """API for RAG (Retrieval-Augmented Generation) semantic search.
 
@@ -1979,7 +1980,7 @@ class RAGAPI:
     """
 
     root: Path
-    _index: RAGIndex | None = None
+    _index: RAGIndex | None = field(default=None, repr=False)
 
     def _get_index(self) -> RAGIndex:
         """Get or create the RAG index."""
