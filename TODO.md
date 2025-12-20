@@ -4,13 +4,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Revisit CLAUDE.md dogfooding section** - tools should be self-evident, not need instructions
-2. **Model-agnostic naming** - don't over-fit to specific LLM conventions
+1. Fix CI test failures (Symbol.to_dict, RAGAPI constructor, vector store metadata)
+2. Review/refactor vector store API for consistency
 
 ## Active Backlog
 
+**CI Failures (Dec 2025):**
+- [ ] `Symbol.to_dict` missing in CLI JSON output (test_cli.py skeleton/context)
+- [ ] `ControlFlowGraph.entry` attribute missing (test_cli.py cfg)
+- [ ] `Export.export_type` attribute missing (test_cli.py deps)
+- [ ] `RAGAPI()` constructor signature mismatch (test_rag_integration.py)
+- [ ] Vector store metadata validation errors (test_vector_store.py)
+
 **Small:**
-- [ ] Model-agnostic naming - don't over-fit to specific LLM conventions
 - [ ] Multiple agents concurrently - no requirement to join back to main stream
 - [ ] Graceful failure - handle errors without crashing, provide useful feedback
 - [ ] MCP response ephemeral handling - large responses should stream/page instead of filling context
