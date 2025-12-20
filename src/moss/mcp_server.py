@@ -32,11 +32,14 @@ stdio_server: Any = None
 try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
-    from mcp.types import TextContent, Tool
+    from mcp.types import ResourceLink, TextContent, TextResourceContents, Tool
+    from pydantic import AnyUrl
 
     _mcp_available = True
 except ImportError:
-    pass
+    ResourceLink = type(None)  # type: ignore
+    TextResourceContents = type(None)  # type: ignore
+    AnyUrl = type(None)  # type: ignore
 
 
 def _check_mcp() -> None:
@@ -45,8 +48,10 @@ def _check_mcp() -> None:
         raise ImportError("MCP SDK not installed. Install with: pip install 'moss[mcp]'")
 
 
-# Maximum output size in characters
-MAX_OUTPUT_CHARS = 200_000
+# Threshold for inline responses - only errors and empty results stay inline
+# Everything else uses ResourceLink + ephemeral storage (auto-expires, no persistence)
+MAX_INLINE_CHARS = 500  # Only short errors/messages inline
+MAX_OUTPUT_CHARS = 200_000  # Hard limit for ephemeral content truncation
 
 
 def _truncate_output(text: str) -> str:
@@ -57,6 +62,11 @@ def _truncate_output(text: str) -> str:
     tail_size = int(MAX_OUTPUT_CHARS * 0.1)
     omitted = len(text) - head_size - tail_size
     return text[:head_size] + f"\n\n... [{omitted:,} chars truncated] ...\n\n" + text[-tail_size:]
+
+
+def _should_use_ephemeral(text: str) -> bool:
+    """Check if response should use ephemeral storage."""
+    return len(text) > MAX_INLINE_CHARS
 
 
 # Known CLI subcommands for detecting natural language vs CLI syntax
@@ -310,8 +320,14 @@ def create_server() -> Any:
         ]
 
     @server.call_tool()
-    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
-        """Handle tool calls."""
+    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent | ResourceLink]:
+        """Handle tool calls.
+
+        For small responses: returns inline TextContent
+        For large responses: stores in ephemeral cache, returns ResourceLink + preview
+        """
+        from moss.cache import get_ephemeral_cache
+
         if name != "moss":
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -321,7 +337,7 @@ def create_server() -> Any:
 
         result = _execute_command(command)
 
-        # Always return plain strings
+        # Build response text
         output = result.get("output", "")
         error = result.get("error", "")
 
@@ -334,7 +350,54 @@ def create_server() -> Any:
         else:
             text = "(no output)"
 
+        # For large responses, use ephemeral storage + ResourceLink
+        if _should_use_ephemeral(text):
+            cache = get_ephemeral_cache()
+            entry_id = cache.store(text, mime_type="text/plain")
+            preview = cache.generate_preview(text, max_chars=2000)
+
+            return [
+                TextContent(
+                    type="text",
+                    text=f"[Preview - full result available via resource link]\n\n{preview}",
+                ),
+                ResourceLink(
+                    type="resource_link",
+                    name="moss_result",
+                    uri=AnyUrl(f"moss://ephemeral/{entry_id}"),
+                    description=f"Full moss result ({len(text):,} chars)",
+                    mimeType="text/plain",
+                    size=len(text),
+                ),
+            ]
+
         return [TextContent(type="text", text=_truncate_output(text))]
+
+    @server.list_resources()
+    async def list_resources() -> list:
+        """List available resources (none static, ephemeral only)."""
+        return []
+
+    @server.read_resource()
+    async def read_resource(uri: Any) -> list[TextResourceContents]:
+        """Read ephemeral resources."""
+        from moss.cache import get_ephemeral_cache
+
+        uri_str = str(uri)
+
+        if uri_str.startswith("moss://ephemeral/"):
+            entry_id = uri_str[len("moss://ephemeral/") :]
+            cache = get_ephemeral_cache()
+            content = cache.get_content(entry_id)
+            if content is None:
+                content = f"Ephemeral content not found or expired: {entry_id}"
+            return [TextResourceContents(uri=uri_str, mimeType="text/plain", text=content)]
+
+        return [
+            TextResourceContents(
+                uri=uri_str, mimeType="text/plain", text=f"Unknown resource: {uri_str}"
+            )
+        ]
 
     return server
 

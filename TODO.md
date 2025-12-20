@@ -4,22 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. MCP response ephemeral handling - large responses should stream/page instead of filling context
-2. Multiple agents concurrently - allow parallel agent execution without requiring join
-3. Graceful failure - handle errors without crashing, provide useful feedback
+1. Agent sandboxing - restrict bash/shell access, security-conscious CLI wrappers
+2. Sessions as first-class - resumable, observable work units
+3. Signal-only diagnostics - parse structured errors, not raw output
 
 ## Active Backlog
 
-**Small:**
-- [ ] Agent sandboxing - restrict bash/shell access, security-conscious CLI wrappers
-
 **Large:**
-- [ ] Sessions as first-class - resumable, observable work units
 - [ ] Memory system - layered memory for cross-session learning (see `docs/memory-system.md`)
 
 ### Strict Harness (guardrails for all agents)
 
-**Signal-Only Diagnostics:**
+**Signal-Only Diagnostics:** (see Next Up #3)
 - [ ] Parse `cargo check --message-format=json` instead of raw stderr
 - [ ] Extract: error code, message, file/line, suggestion - discard ASCII art
 - [ ] "Syntax Repair Engine" system prompt when errors present

@@ -4,6 +4,25 @@
 
 ### Features
 
+**MCP ephemeral response handling** (new)
+- Large responses (>500 chars) now use ResourceLink + ephemeral cache
+- Preserves LLM context by storing full content separately (5 min TTL)
+- Only preview (~2KB) goes inline, full content available via resources/read
+- `EphemeralCache` class in `cache.py` with TTL-based expiration
+
+**Concurrent agent execution** (new)
+- `Manager.spawn_async()` - fire-and-forget agent execution
+- `Manager.spawn_many_async()` - spawn multiple agents without blocking
+- `Manager.wait_any()` - wait for first agent to complete
+- `Manager.wait_all()` - wait for all agents with optional timeout
+- Callback support via `on_complete` parameter
+
+**Graceful error handling** (new)
+- New `moss.errors` module with categorized error types
+- `handle_error()` classifies exceptions and provides suggestions
+- `ErrorCollector` for batch operations with aggregated reporting
+- MCP servers now return structured error responses with suggestions
+
 **Structured LLM summarization in agent loops**
 - New `_build_structured_context()` method in `AgentLoopRunner`
 - Goose-inspired sections: User Intent, Completed Steps, Current Work

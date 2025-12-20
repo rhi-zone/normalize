@@ -338,6 +338,9 @@ class Manager:
 
     The Manager acts as the orchestrator, delegating tasks to workers
     and handling merge conflicts.
+
+    Supports both synchronous (delegate) and asynchronous (spawn_async)
+    execution patterns.
     """
 
     def __init__(
@@ -353,6 +356,9 @@ class Manager:
         self._tickets: dict[str, Ticket] = {}
         self._workers: dict[str, Worker] = {}
         self._results: dict[str, TicketResult] = {}
+        # Background tasks for fire-and-forget execution
+        self._background_tasks: dict[str, asyncio.Task[TicketResult]] = {}
+        self._callbacks: dict[str, list] = {}  # ticket_id -> [callbacks]
 
     async def _emit(self, event_type: EventType, payload: dict[str, Any]) -> None:
         """Emit an event if event bus is configured."""
@@ -414,7 +420,7 @@ class Manager:
         tickets: list[Ticket],
         worker_factory: Any,  # Callable[[], Worker]
     ) -> list[TicketResult]:
-        """Delegate multiple tickets to workers in parallel."""
+        """Delegate multiple tickets to workers in parallel (waits for all)."""
         tasks = []
         for ticket in tickets:
             worker = worker_factory()
@@ -422,6 +428,181 @@ class Manager:
             tasks.append(self.delegate(ticket, worker))
 
         return await asyncio.gather(*tasks)
+
+    def spawn_async(
+        self,
+        ticket: Ticket,
+        worker: Worker,
+        on_complete: Any | None = None,  # Callable[[TicketResult], None]
+    ) -> str:
+        """Spawn an agent in the background without waiting.
+
+        Returns the ticket ID for later result retrieval.
+        Fire-and-forget execution - agent runs independently.
+        """
+        self._workers[worker.id] = worker
+
+        async def run_and_callback() -> TicketResult:
+            result = await worker.run(ticket)
+            self._results[ticket.id] = result
+
+            # Run callbacks
+            for callback in self._callbacks.get(ticket.id, []):
+                try:
+                    callback(result)
+                except Exception:
+                    pass  # Don't let callback errors break the flow
+
+            await self._emit(
+                EventType.TOOL_CALL,
+                {
+                    "action": "async_worker_complete",
+                    "ticket_id": ticket.id,
+                    "worker_id": worker.id,
+                    "success": result.success,
+                },
+            )
+            return result
+
+        task = asyncio.create_task(run_and_callback())
+        self._background_tasks[ticket.id] = task
+
+        if on_complete:
+            self._callbacks.setdefault(ticket.id, []).append(on_complete)
+
+        return ticket.id
+
+    def spawn_many_async(
+        self,
+        tickets: list[Ticket],
+        worker_factory: Any,  # Callable[[], Worker]
+        on_complete: Any | None = None,  # Callable[[TicketResult], None]
+    ) -> list[str]:
+        """Spawn multiple agents in background without waiting.
+
+        Returns list of ticket IDs for later result retrieval.
+        """
+        ticket_ids = []
+        for ticket in tickets:
+            worker = worker_factory()
+            ticket_id = self.spawn_async(ticket, worker, on_complete)
+            ticket_ids.append(ticket_id)
+        return ticket_ids
+
+    def get_result(self, ticket_id: str) -> TicketResult | None:
+        """Get result for a completed ticket (non-blocking)."""
+        return self._results.get(ticket_id)
+
+    def is_running(self, ticket_id: str) -> bool:
+        """Check if a background task is still running."""
+        task = self._background_tasks.get(ticket_id)
+        if task is None:
+            return False
+        return not task.done()
+
+    async def wait_for(self, ticket_id: str, timeout: float | None = None) -> TicketResult | None:
+        """Wait for a specific background task to complete."""
+        task = self._background_tasks.get(ticket_id)
+        if task is None:
+            return self._results.get(ticket_id)
+
+        try:
+            return await asyncio.wait_for(task, timeout=timeout)
+        except TimeoutError:
+            return None
+
+    async def wait_any(
+        self,
+        ticket_ids: list[str] | None = None,
+        timeout: float | None = None,
+    ) -> tuple[str, TicketResult] | None:
+        """Wait for any of the specified tasks to complete.
+
+        Returns (ticket_id, result) of first completed task.
+        If ticket_ids is None, waits for any running task.
+        """
+        if ticket_ids is None:
+            tasks_to_wait = dict(self._background_tasks)
+        else:
+            tasks_to_wait = {
+                tid: self._background_tasks[tid]
+                for tid in ticket_ids
+                if tid in self._background_tasks
+            }
+
+        if not tasks_to_wait:
+            return None
+
+        # Reverse lookup: task -> ticket_id
+        task_to_id = {v: k for k, v in tasks_to_wait.items()}
+
+        try:
+            done, _ = await asyncio.wait(
+                tasks_to_wait.values(),
+                timeout=timeout,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if done:
+                task = next(iter(done))
+                ticket_id = task_to_id[task]
+                return (ticket_id, task.result())
+        except TimeoutError:
+            pass
+
+        return None
+
+    async def wait_all(
+        self,
+        ticket_ids: list[str] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, TicketResult]:
+        """Wait for all specified tasks to complete.
+
+        If ticket_ids is None, waits for all running tasks.
+        """
+        if ticket_ids is None:
+            tasks_to_wait = dict(self._background_tasks)
+        else:
+            tasks_to_wait = {
+                tid: self._background_tasks[tid]
+                for tid in ticket_ids
+                if tid in self._background_tasks
+            }
+
+        if not tasks_to_wait:
+            return {}
+
+        try:
+            await asyncio.wait(
+                tasks_to_wait.values(),
+                timeout=timeout,
+                return_when=asyncio.ALL_COMPLETED,
+            )
+        except TimeoutError:
+            pass
+
+        # Return whatever completed
+        results = {}
+        for ticket_id, task in tasks_to_wait.items():
+            if task.done() and not task.cancelled():
+                try:
+                    results[ticket_id] = task.result()
+                except Exception:
+                    pass
+        return results
+
+    def cancel(self, ticket_id: str) -> bool:
+        """Cancel a running background task."""
+        task = self._background_tasks.get(ticket_id)
+        if task is None or task.done():
+            return False
+
+        task.cancel()
+        return True
+
+    def running_count(self) -> int:
+        """Count of currently running background tasks."""
+        return sum(1 for t in self._background_tasks.values() if not t.done())
 
     async def merge(
         self,

@@ -35,12 +35,14 @@ Server: type = type(None)  # Placeholder
 Tool: type = type(None)  # Placeholder
 TextContent: type = type(None)  # Placeholder
 Resource: type = type(None)  # Placeholder
+ResourceLink: type = type(None)  # Placeholder
 Prompt: type = type(None)  # Placeholder
 PromptArgument: type = type(None)  # Placeholder
 GetPromptResult: type = type(None)  # Placeholder
 PromptMessage: type = type(None)  # Placeholder
 TextResourceContents: type = type(None)  # Placeholder
 stdio_server: Any = None  # Placeholder
+AnyUrl: type = type(None)  # Placeholder
 
 try:
     from mcp.server import Server
@@ -51,10 +53,12 @@ try:
         PromptArgument,
         PromptMessage,
         Resource,
+        ResourceLink,
         TextContent,
         TextResourceContents,
         Tool,
     )
+    from pydantic import AnyUrl
 
     _mcp_available = True
 except ImportError:
@@ -187,8 +191,10 @@ def _serialize_result(result: Any) -> str | dict[str, Any]:
     return {"result": serialized}
 
 
-# Maximum output size in characters (roughly ~50K tokens)
-MAX_OUTPUT_CHARS = 200_000
+# Threshold for inline responses - only errors and empty results stay inline
+# Everything else uses ResourceLink + ephemeral storage to preserve context
+MAX_INLINE_CHARS = 500  # Only short errors/messages inline
+MAX_OUTPUT_CHARS = 200_000  # Hard limit for ephemeral content truncation
 
 
 def _truncate_output(text: str) -> str:
@@ -203,6 +209,11 @@ def _truncate_output(text: str) -> str:
     truncation_msg = f"\n\n... [TRUNCATED: {omitted:,} chars omitted] ...\n\n"
 
     return text[:head_size] + truncation_msg + text[-tail_size:]
+
+
+def _should_use_ephemeral(text: str) -> bool:
+    """Check if response should use ephemeral storage."""
+    return len(text) > MAX_INLINE_CHARS
 
 
 # =============================================================================
@@ -237,8 +248,14 @@ def create_server() -> Any:
         ]
 
     @server.call_tool()
-    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
-        """Handle tool calls."""
+    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent | ResourceLink]:
+        """Handle tool calls.
+
+        For small responses: returns inline TextContent
+        For large responses: stores in ephemeral cache, returns ResourceLink + preview
+        """
+        from moss.cache import get_ephemeral_cache
+
         try:
             result = await _execute_tool(name, arguments, tools)
             serialized = _serialize_result(result)
@@ -247,21 +264,40 @@ def create_server() -> Any:
                 text = serialized
             else:
                 text = json.dumps(serialized, separators=(",", ":"))
-            # Truncate if output is too large for LLM consumption
+
+            # For large responses, use ephemeral storage + ResourceLink
+            if _should_use_ephemeral(text):
+                cache = get_ephemeral_cache()
+                entry_id = cache.store(text, mime_type="text/plain")
+                preview = cache.generate_preview(text, max_chars=2000)
+
+                preview_text = f"[Preview - full result via resource link]\n\n{preview}"
+                return [
+                    TextContent(type="text", text=preview_text),
+                    ResourceLink(
+                        type="resource_link",
+                        name=f"{name}_result",
+                        uri=AnyUrl(f"moss://ephemeral/{entry_id}"),
+                        description=f"Full {name} result ({len(text):,} chars)",
+                        mimeType="text/plain",
+                        size=len(text),
+                    ),
+                ]
+
+            # Small responses: return inline
             return [TextContent(type="text", text=_truncate_output(text))]
-        except FileNotFoundError as e:
-            return [
-                TextContent(
-                    type="text",
-                    text=json.dumps({"error": f"File not found: {e}", "type": "not_found"}),
-                )
-            ]
         except Exception as e:
+            from moss.errors import handle_error
+
+            result = handle_error(e, context={"tool": name, "arguments": arguments})
+            error_response = {
+                "error": result.message,
+                "category": result.category.name,
+            }
+            if result.suggestion:
+                error_response["suggestion"] = result.suggestion
             return [
-                TextContent(
-                    type="text",
-                    text=json.dumps({"error": str(e), "type": type(e).__name__}),
-                )
+                TextContent(type="text", text=json.dumps(error_response, separators=(",", ":")))
             ]
 
     # -------------------------------------------------------------------------
@@ -439,8 +475,10 @@ def _get_resource_content(uri: str) -> str:
     - moss://overview - Codebase overview
     - moss://structure - Directory structure
     - moss://skeleton/<path> - File skeleton
+    - moss://ephemeral/<id> - Ephemeral cached content
     """
     from moss import MossAPI
+    from moss.cache import get_ephemeral_cache
 
     cwd = Path.cwd()
 
@@ -458,6 +496,14 @@ def _get_resource_content(uri: str) -> str:
         api = MossAPI.for_project(cwd)
         result = api.skeleton.extract(file_path)
         return result.content if hasattr(result, "content") else str(result)
+
+    if uri.startswith("moss://ephemeral/"):
+        entry_id = uri[len("moss://ephemeral/") :]
+        cache = get_ephemeral_cache()
+        content = cache.get_content(entry_id)
+        if content is None:
+            return f"Ephemeral content not found or expired: {entry_id}"
+        return content
 
     return f"Unknown resource: {uri}"
 

@@ -376,3 +376,181 @@ def clear_cache() -> None:
 def cache_stats() -> CacheStats:
     """Get statistics from the global cache."""
     return get_cache().stats
+
+
+# =============================================================================
+# Ephemeral Response Cache (for MCP large responses)
+# =============================================================================
+
+
+@dataclass
+class EphemeralEntry:
+    """An ephemeral cached response with TTL."""
+
+    content: str
+    created_at: float = field(default_factory=time.time)
+    ttl_seconds: float = 300.0  # 5 minutes default
+    access_count: int = 0
+    mime_type: str = "text/plain"
+
+    def is_expired(self) -> bool:
+        """Check if entry has expired."""
+        return time.time() - self.created_at > self.ttl_seconds
+
+    def touch(self) -> None:
+        """Record an access."""
+        self.access_count += 1
+
+
+class EphemeralCache:
+    """Cache for large MCP responses that should be accessed via ResourceLink.
+
+    Stores large tool outputs temporarily so they can be retrieved via
+    resources/read without filling up the LLM context window.
+
+    Features:
+    - Automatic TTL-based expiration (default 5 minutes)
+    - Size-based eviction when max entries exceeded
+    - Preview generation for inline context
+    """
+
+    def __init__(
+        self,
+        max_entries: int = 100,
+        default_ttl: float = 300.0,
+        preview_lines: int = 50,
+    ) -> None:
+        self.max_entries = max_entries
+        self.default_ttl = default_ttl
+        self.preview_lines = preview_lines
+        self._cache: dict[str, EphemeralEntry] = {}
+        self._counter = 0
+
+    def _generate_id(self) -> str:
+        """Generate a unique ID for an ephemeral entry."""
+        import secrets
+
+        self._counter += 1
+        return f"{self._counter:04d}_{secrets.token_hex(8)}"
+
+    def _cleanup_expired(self) -> None:
+        """Remove expired entries."""
+        expired = [k for k, v in self._cache.items() if v.is_expired()]
+        for key in expired:
+            del self._cache[key]
+
+    def _evict_oldest(self) -> None:
+        """Evict oldest entries if cache is full."""
+        if len(self._cache) < self.max_entries:
+            return
+
+        # Sort by creation time, remove oldest 20%
+        entries = sorted(self._cache.items(), key=lambda x: x[1].created_at)
+        to_remove = max(1, len(entries) // 5)
+
+        for key, _ in entries[:to_remove]:
+            del self._cache[key]
+
+    def store(
+        self,
+        content: str,
+        ttl: float | None = None,
+        mime_type: str = "text/plain",
+    ) -> str:
+        """Store content and return its ID.
+
+        Args:
+            content: The full content to store
+            ttl: Time-to-live in seconds (None = use default)
+            mime_type: MIME type of the content
+
+        Returns:
+            Unique ID that can be used to retrieve the content
+        """
+        self._cleanup_expired()
+        self._evict_oldest()
+
+        entry_id = self._generate_id()
+        self._cache[entry_id] = EphemeralEntry(
+            content=content,
+            ttl_seconds=ttl or self.default_ttl,
+            mime_type=mime_type,
+        )
+        return entry_id
+
+    def get(self, entry_id: str) -> EphemeralEntry | None:
+        """Retrieve an entry by ID.
+
+        Returns None if not found or expired.
+        """
+        entry = self._cache.get(entry_id)
+        if entry is None:
+            return None
+
+        if entry.is_expired():
+            del self._cache[entry_id]
+            return None
+
+        entry.touch()
+        return entry
+
+    def get_content(self, entry_id: str) -> str | None:
+        """Get just the content for an entry."""
+        entry = self.get(entry_id)
+        return entry.content if entry else None
+
+    def generate_preview(self, content: str, max_chars: int = 2000) -> str:
+        """Generate a preview of content for inline display.
+
+        Takes first N lines up to max_chars, adds truncation message.
+        """
+        lines = content.split("\n")
+        preview_lines = []
+        char_count = 0
+
+        for line in lines[: self.preview_lines]:
+            if char_count + len(line) + 1 > max_chars:
+                break
+            preview_lines.append(line)
+            char_count += len(line) + 1
+
+        preview = "\n".join(preview_lines)
+        remaining = len(content) - len(preview)
+
+        if remaining > 0:
+            preview += f"\n\n... [{remaining:,} more chars available via resource link]"
+
+        return preview
+
+    def delete(self, entry_id: str) -> bool:
+        """Delete an entry by ID. Returns True if found and deleted."""
+        if entry_id in self._cache:
+            del self._cache[entry_id]
+            return True
+        return False
+
+    def clear(self) -> None:
+        """Clear all entries."""
+        self._cache.clear()
+
+    def stats(self) -> dict[str, Any]:
+        """Get cache statistics."""
+        self._cleanup_expired()
+        total_size = sum(len(e.content) for e in self._cache.values())
+        return {
+            "entries": len(self._cache),
+            "total_size_bytes": total_size,
+            "total_size_human": f"{total_size / 1024:.1f}KB",
+        }
+
+
+# Global ephemeral cache instance
+_ephemeral_cache: EphemeralCache | None = None
+
+
+def get_ephemeral_cache() -> EphemeralCache:
+    """Get the global ephemeral cache instance."""
+    global _ephemeral_cache
+    if _ephemeral_cache is None:
+        _ephemeral_cache = EphemeralCache()
+    return _ephemeral_cache
