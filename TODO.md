@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Improve DWIMLoop: better "done" detection for read-only tasks
-2. Multi-file expand support: "expand TaskNode src/moss/task_tree.py"
-3. Test DWIMLoop on more complex multi-step tasks
+1. CLI `moss expand` - support flexible arg syntax: `file symbol` or `symbol file` or `file:symbol`
+2. DWIM terse command parsing - "expand Patch" should not match patch tools
+3. Add `moss agent --dry-run` to show what commands would be executed
 
 ## Recently Completed
+
+- **DWIMLoop improvements** (Dec 2025):
+  - Task classification (read-only vs write) with completion hints
+  - Multi-file expand: `expand Symbol` searches codebase, `expand Symbol file1.py file2.py` searches multiple
+  - Integration tests with mocked LLM responses
 
 - **DWIMLoop evaluation and fixes** (Dec 2025):
   - Fixed parameter mapping (file_path vs path vs symbol)

@@ -15,6 +15,7 @@ See: docs/agentic-loop.md
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum, auto
@@ -86,6 +87,60 @@ class LoopResult:
     final_output: Any
     error: str | None = None
     total_duration_ms: int = 0
+
+
+class TaskType(Enum):
+    """Classification of task intent."""
+
+    READ_ONLY = auto()  # show, explain, find, search - answer a question
+    WRITE = auto()  # fix, edit, patch - modify code
+    UNKNOWN = auto()  # unclear, needs more context
+
+
+# Patterns that indicate read-only tasks
+READ_ONLY_PATTERNS = [
+    r"\b(show|display|print|list)\b",
+    r"\b(what|where|which|who|how|why)\b.*\?",
+    r"\b(find|search|look\s*for|locate)\b",
+    r"\b(explain|describe|summarize)\b",
+    r"\b(count|how\s*many)\b",
+    r"\b(check|verify|confirm)\b.*\?",
+    r"\b(is|are|does|do|has|have|can|will)\b.*\?",
+]
+
+# Patterns that indicate write tasks
+WRITE_PATTERNS = [
+    r"\b(fix|repair|correct)\b",
+    r"\b(add|insert|create|implement)\b",
+    r"\b(remove|delete|drop)\b",
+    r"\b(change|modify|update|edit|patch)\b",
+    r"\b(refactor|rewrite|restructure)\b",
+    r"\b(rename|move)\b",
+]
+
+
+def classify_task(task: str) -> TaskType:
+    """Classify a task as read-only or write.
+
+    Args:
+        task: Task description
+
+    Returns:
+        TaskType indicating the nature of the task
+    """
+    task_lower = task.lower()
+
+    # Check write patterns first (more specific)
+    for pattern in WRITE_PATTERNS:
+        if re.search(pattern, task_lower):
+            return TaskType.WRITE
+
+    # Check read-only patterns
+    for pattern in READ_ONLY_PATTERNS:
+        if re.search(pattern, task_lower):
+            return TaskType.READ_ONLY
+
+    return TaskType.UNKNOWN
 
 
 # Common action verbs and their canonical forms
@@ -233,20 +288,26 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
 
         if tool_name == "skeleton.expand":
             # expand needs both file_path and symbol_name
-            # Accept: "Symbol file.py" or "file.py Symbol" or just "Symbol" (error)
-            file_part = None
+            # Accept: "Symbol file.py" or "file.py Symbol" or just "Symbol"
+            file_parts = []
             symbol_part = None
             for p in parts:
                 if "/" in p or p.endswith(".py"):
-                    file_part = p
+                    file_parts.append(p)
                 else:
                     symbol_part = p
-            if file_part:
-                params["file_path"] = file_part
-            if symbol_part:
+
+            if file_parts and symbol_part:
+                # Standard case: symbol + file(s)
+                if len(file_parts) == 1:
+                    params["file_path"] = file_parts[0]
+                else:
+                    # Multi-file: search in specified files
+                    params["file_paths"] = file_parts
                 params["symbol_name"] = symbol_part
-            # If only symbol given, we can't help - will error
-            if not file_part and symbol_part:
+            elif symbol_part and not file_parts:
+                # Only symbol given: search across codebase
+                tool_name = "skeleton.expand_search"
                 params["symbol_name"] = symbol_part
         elif tool_name == "skeleton.format" or tool_name == "dependencies.format":
             # These take file_path
@@ -300,6 +361,8 @@ class DWIMLoop:
         self._turns: list[TurnResult] = []
         self._task_tree: TaskTree | None = None
         self._last_result: str | None = None
+        self._task_type: TaskType = TaskType.UNKNOWN
+        self._successful_results: int = 0  # Count of successful tool results
         self._ephemeral_cache = EphemeralCache(
             max_entries=50,
             default_ttl=600.0,  # 10 minutes for agent session
@@ -355,6 +418,7 @@ Do NOT repeat the same command. Never output prose."""
         """Build context for current turn from TaskTree.
 
         Returns minimal context: path + notes + last result preview.
+        For read-only tasks with results, adds completion hint.
         """
         parts = []
 
@@ -365,6 +429,12 @@ Do NOT repeat the same command. Never output prose."""
         # Last result
         if self._last_result:
             parts.append(f"\nLast result:\n{self._last_result}")
+
+        # Add completion hint for read-only tasks with successful results
+        if self._task_type == TaskType.READ_ONLY and self._successful_results > 0:
+            parts.append(
+                "\n[READ-ONLY TASK: You have the answer above. Say 'done <brief summary>' now.]"
+            )
 
         return "\n".join(parts) if parts else "(no context)"
 
@@ -414,6 +484,16 @@ Do NOT repeat the same command. Never output prose."""
         if tool_name == "done":
             return None
 
+        # Handle multi-file/search expand
+        if tool_name == "skeleton.expand_search":
+            return self._expand_search(params.get("symbol_name", ""))
+
+        if tool_name == "skeleton.expand" and "file_paths" in params:
+            return self._expand_multi_file(
+                params.get("symbol_name", ""),
+                params.get("file_paths", []),
+            )
+
         # Route through MossAPI
         parts = tool_name.split(".")
         if len(parts) == 2:
@@ -436,6 +516,66 @@ Do NOT repeat the same command. Never output prose."""
                 return await self._execute_tool(best.tool, params, _depth + 1)
 
         return f"Unknown tool: {tool_name}"
+
+    def _expand_search(self, symbol_name: str) -> str:
+        """Search for symbol across codebase and expand all matches.
+
+        Args:
+            symbol_name: Name of the symbol to find and expand
+
+        Returns:
+            Formatted string with all matching expansions
+        """
+        if not symbol_name:
+            return "Error: No symbol name provided"
+
+        # Use search API to find definitions
+        matches = self.api.search.find_definitions(symbol_name)
+        if not matches:
+            return f"No definitions found for: {symbol_name}"
+
+        results = []
+        for match in matches[:5]:  # Limit to 5 matches
+            try:
+                content = self.api.skeleton.expand(match.file_path, symbol_name)
+                if content:
+                    results.append(f"# {match.file_path}\n{content}")
+            except Exception as e:
+                results.append(f"# {match.file_path}\nError: {e}")
+
+        if not results:
+            return f"Symbol found but could not expand: {symbol_name}"
+
+        return "\n\n".join(results)
+
+    def _expand_multi_file(self, symbol_name: str, file_paths: list[str]) -> str:
+        """Expand symbol in multiple specified files.
+
+        Args:
+            symbol_name: Name of the symbol to expand
+            file_paths: List of file paths to search in
+
+        Returns:
+            Formatted string with expansions from each file
+        """
+        if not symbol_name:
+            return "Error: No symbol name provided"
+
+        results = []
+        for file_path in file_paths:
+            try:
+                content = self.api.skeleton.expand(file_path, symbol_name)
+                if content:
+                    results.append(f"# {file_path}\n{content}")
+                else:
+                    results.append(f"# {file_path}\nNot found: {symbol_name}")
+            except Exception as e:
+                results.append(f"# {file_path}\nError: {e}")
+
+        if not results:
+            return f"Could not expand {symbol_name} in any file"
+
+        return "\n\n".join(results)
 
     def _handle_meta_command(self, intent: ParsedIntent) -> str | None:
         """Handle meta-commands that modify TaskTree state.
@@ -508,8 +648,12 @@ Do NOT repeat the same command. Never output prose."""
         self._turns = []
         self._task_tree = TaskTree(task)
         self._last_result = None
+        self._task_type = classify_task(task)
+        self._successful_results = 0
         self._ephemeral_cache.clear()  # Fresh cache for new run
         start_time = datetime.now(UTC)
+
+        logger.debug(f"Task classified as: {self._task_type.name}")
 
         try:
             for _turn_num in range(self.config.max_turns):
@@ -584,6 +728,7 @@ Do NOT repeat the same command. Never output prose."""
                 if output:
                     result_str = str(output) if not isinstance(output, str) else output
                     self._last_result, _ = self._preview_result(result_str)
+                    self._successful_results += 1
                 elif error:
                     self._last_result = f"Error: {error}"
                 else:
@@ -628,6 +773,8 @@ __all__ = [
     "LoopResult",
     "LoopState",
     "ParsedIntent",
+    "TaskType",
     "TurnResult",
+    "classify_task",
     "parse_intent",
 ]
