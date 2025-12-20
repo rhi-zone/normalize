@@ -182,6 +182,15 @@ def select_match(
             output.error(f"Invalid selection: {select_arg} (use 1-{len(ranked)} or 'best')")
             return None
 
+    # Auto-select when all matches have the same symbol name
+    # (path specificity already handled by rank_matches)
+    symbol_names = {n.name for n in nodes}
+    if len(symbol_names) == 1:
+        output.verbose(
+            f"Auto-selected best match (all {len(nodes)} matches have same name: {nodes[0].name})"
+        )
+        return ranked[0]
+
     # Show numbered list
     output.print(f"Multiple matches for '{query}':")
     for i, node in enumerate(ranked, 1):
@@ -3851,6 +3860,78 @@ def cmd_workflow(args: Namespace) -> int:
         return 1
 
 
+def cmd_toml(args: Namespace) -> int:
+    """Navigate TOML files with jq-like queries.
+
+    Examples:
+        moss toml pyproject.toml                    # Show summary
+        moss toml pyproject.toml .project.name      # Get specific value
+        moss toml Cargo.toml ".dependencies | keys" # List dependency names
+        moss toml moss.toml --keys                  # List all keys
+    """
+    from moss.toml_nav import (
+        format_result,
+        list_keys,
+        parse_toml,
+        query,
+        summarize_toml,
+    )
+
+    output = setup_output(args)
+    file_path = Path(args.file).resolve()
+    query_path = getattr(args, "query", None) or "."
+    show_keys = getattr(args, "keys", False)
+    show_summary = getattr(args, "summary", False)
+
+    if not file_path.exists():
+        output.error(f"File not found: {file_path}")
+        return 1
+
+    try:
+        data = parse_toml(file_path)
+    except Exception as e:
+        output.error(f"Failed to parse TOML: {e}")
+        return 1
+
+    # Show keys mode
+    if show_keys:
+        keys = list_keys(data)
+        if wants_json(args):
+            output.data(keys)
+        else:
+            for key in keys:
+                output.print(key)
+        return 0
+
+    # Summary mode (default when no query)
+    if show_summary or query_path == ".":
+        summary = summarize_toml(data)
+        if wants_json(args):
+            output.data(summary)
+        else:
+            output.header(f"TOML Summary: {file_path.name}")
+            output.print(f"Sections: {', '.join(summary['sections'])}")
+            output.print(f"Total keys: {summary['key_count']}")
+            output.print(f"Max depth: {summary['nested_depth']}")
+            types_str = ", ".join(f"{k}: {v}" for k, v in summary["types"].items())
+            output.print(f"Types: {types_str}")
+        return 0
+
+    # Query mode
+    try:
+        result = query(data, query_path)
+    except (KeyError, TypeError, IndexError, ValueError) as e:
+        output.error(f"Query error: {e}")
+        return 1
+
+    if wants_json(args):
+        output.data(result)
+    else:
+        output.print(format_result(result))
+
+    return 0
+
+
 def cmd_health(args: Namespace) -> int:
     """Show project health and what needs attention."""
     from moss import MossAPI
@@ -6076,6 +6157,32 @@ def create_parser() -> argparse.ArgumentParser:
         help="Use mock LLM responses (for testing)",
     )
     workflow_parser.set_defaults(func=cmd_workflow)
+
+    # toml navigation command
+    toml_parser = subparsers.add_parser("toml", help="Navigate TOML files with jq-like queries")
+    toml_parser.add_argument(
+        "file",
+        help="TOML file to parse (e.g., pyproject.toml, Cargo.toml)",
+    )
+    toml_parser.add_argument(
+        "query",
+        nargs="?",
+        default=".",
+        help="jq-like query path (e.g., .project.name, '.dependencies | keys')",
+    )
+    toml_parser.add_argument(
+        "--keys",
+        "-k",
+        action="store_true",
+        help="List all key paths in the file",
+    )
+    toml_parser.add_argument(
+        "--summary",
+        "-s",
+        action="store_true",
+        help="Show file structure summary",
+    )
+    toml_parser.set_defaults(func=cmd_toml)
 
     # security command
     security_parser = subparsers.add_parser(

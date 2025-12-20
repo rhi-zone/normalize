@@ -4,11 +4,25 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Custom tool semantics - plugin architecture for user-defined intent→tool mappings
-- Smart TOML navigation - parse to JSON, use jq-like filtering for config exploration
-- `moss expand` multiple matches: when all have same name, pick by path specificity
+(Queue empty - add tasks from Active Backlog or Future Work)
 
 ## Recently Completed
+
+- **Expand auto-select** (Dec 2025):
+  - Auto-selects best match when all matches have same symbol name
+  - Path specificity already handled by ranking (shorter path = higher score)
+  - List shown only when symbol names differ (needs user disambiguation)
+
+- **Smart TOML navigation** (Dec 2025):
+  - `moss toml` CLI command with jq-like queries
+  - TomlAPI for MCP integration (parse, query, keys, summary)
+  - Supports hyphenated keys, array indexing, pipe functions
+
+- **Custom tool semantics** (Dec 2025):
+  - `.moss/dwim.toml` config for project-specific tool mappings
+  - Custom aliases, keyword boosts, intent patterns (regex→tool)
+  - User-level config in `~/.config/moss/dwim.toml`
+  - Custom tool definitions with keywords and parameters
 
 - **DWIM & CLI enhancements** (Dec 2025):
   - Multi-match handling: numbered list + `--select N/best` for expand/callers/callees
@@ -123,13 +137,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Terse command parsing - "expand Patch" → cli_expand, not patch tools (done Dec 2025)
 - [x] Confidence thresholds - three zones: auto-correct (>=85%), execute (60-85%), clarify (<60%) (done Dec 2025)
 - [x] MCP tool discovery - auto-register MCP server tools into DWIM registry (done Dec 2025)
-- [ ] Custom tool semantics - plugin architecture for user-defined intent→tool mappings
+- [x] Custom tool semantics - `.moss/dwim.toml` for user-defined intent→tool mappings (done Dec 2025)
 
 ### CLI UX Improvements
 - [x] `moss expand` - flexible arg syntax: `symbol`, `file:symbol`, `file symbol` (done Dec 2025)
 - [x] `moss agent --dry-run` - show task classification and tool suggestions (done Dec 2025)
 - [x] `moss expand/callers/callees` - numbered list + `--select N/best` for multiple matches (done Dec 2025)
-- [ ] Smart TOML navigation - parse to JSON, use jq-like filtering for config exploration
+- [x] Smart TOML navigation - `moss toml` with jq-like filtering (done Dec 2025)
 
 ### Workflow Collaboration
 - [ ] Pattern detection - heuristic (frequency, similarity, rapid re-runs) + LLM for judgment

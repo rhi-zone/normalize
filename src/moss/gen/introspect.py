@@ -250,6 +250,7 @@ def introspect_api() -> list[SubAPI]:
         SecurityAPI,
         SkeletonAPI,
         TodoAPI,
+        TomlAPI,
         TreeAPI,
         ValidationAPI,
         WeaknessesAPI,
@@ -283,6 +284,7 @@ def introspect_api() -> list[SubAPI]:
         "search": SearchAPI,
         "guessability": GuessabilityAPI,
         "lessons": LessonsAPI,
+        "toml": TomlAPI,
     }
 
     results = []

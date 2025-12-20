@@ -1490,5 +1490,74 @@
       "type": "object"
     },
     "name": "lessons_search"
+  },
+  {
+    "description": "List all key paths in a TOML file. List of dotted key paths",
+    "inputSchema": {
+      "properties": {
+        "path": {
+          "description": "Path to TOML file",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "toml_keys"
+  },
+  {
+    "description": "Parse a TOML file to dict. Parsed TOML as dict",
+    "inputSchema": {
+      "properties": {
+        "path": {
+          "description": "Path to TOML file (relative to project root)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "toml_parse"
+  },
+  {
+    "description": "Query a TOML file with jq-like syntax. Supported syntax: .key          - Access object key .key.subkey   - Nested access .[0]          - Array index .*            - All values .key|keys     - Get keys of object .key|length   - Get length .key?         - Optional access Query result",
+    "inputSchema": {
+      "properties": {
+        "path": {
+          "description": "Path to TOML file",
+          "type": "string"
+        },
+        "query_path": {
+          "description": "jq-like query (e.g., \".project.name\")",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "query_path"
+      ],
+      "type": "object"
+    },
+    "name": "toml_query"
+  },
+  {
+    "description": "Get summary of TOML file structure. Dict with sections, key_count, nested_depth, types",
+    "inputSchema": {
+      "properties": {
+        "path": {
+          "description": "Path to TOML file",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "toml_summary"
   }
 ]

@@ -1871,6 +1871,98 @@ class GuessabilityAPI:
 
 
 @dataclass
+class TomlAPI:
+    """API for navigating TOML configuration files.
+
+    Provides jq-like querying for exploring config files
+    (pyproject.toml, Cargo.toml, etc.) efficiently.
+
+    Example:
+        api = MossAPI.for_project(".")
+        name = api.toml.query("pyproject.toml", ".project.name")
+        deps = api.toml.query("Cargo.toml", ".dependencies|keys")
+    """
+
+    root: Path
+
+    def parse(self, path: str | Path) -> dict:
+        """Parse a TOML file to dict.
+
+        Args:
+            path: Path to TOML file (relative to project root)
+
+        Returns:
+            Parsed TOML as dict
+        """
+        from moss.toml_nav import parse_toml
+
+        file_path = self._resolve_path(path)
+        return parse_toml(file_path)
+
+    def query(self, path: str | Path, query_path: str) -> Any:
+        """Query a TOML file with jq-like syntax.
+
+        Supported syntax:
+            .key          - Access object key
+            .key.subkey   - Nested access
+            .[0]          - Array index
+            .*            - All values
+            .key|keys     - Get keys of object
+            .key|length   - Get length
+            .key?         - Optional access
+
+        Args:
+            path: Path to TOML file
+            query_path: jq-like query (e.g., ".project.name")
+
+        Returns:
+            Query result
+        """
+        from moss.toml_nav import parse_toml, query
+
+        file_path = self._resolve_path(path)
+        data = parse_toml(file_path)
+        return query(data, query_path)
+
+    def keys(self, path: str | Path) -> list[str]:
+        """List all key paths in a TOML file.
+
+        Args:
+            path: Path to TOML file
+
+        Returns:
+            List of dotted key paths
+        """
+        from moss.toml_nav import list_keys, parse_toml
+
+        file_path = self._resolve_path(path)
+        data = parse_toml(file_path)
+        return list_keys(data)
+
+    def summary(self, path: str | Path) -> dict:
+        """Get summary of TOML file structure.
+
+        Args:
+            path: Path to TOML file
+
+        Returns:
+            Dict with sections, key_count, nested_depth, types
+        """
+        from moss.toml_nav import parse_toml, summarize_toml
+
+        file_path = self._resolve_path(path)
+        data = parse_toml(file_path)
+        return summarize_toml(data)
+
+    def _resolve_path(self, path: str | Path) -> Path:
+        """Resolve path relative to project root."""
+        p = Path(path)
+        if p.is_absolute():
+            return p
+        return self.root / p
+
+
+@dataclass
 class WebAPI:
     """API for token-efficient web fetching and search.
 
@@ -3491,6 +3583,7 @@ class MossAPI:
     _search: SearchAPI | None = None
     _guessability: GuessabilityAPI | None = None
     _lessons: LessonsAPI | None = None
+    _toml: TomlAPI | None = None
 
     @classmethod
     def for_project(cls, path: str | Path) -> MossAPI:
@@ -3671,6 +3764,13 @@ class MossAPI:
         if self._lessons is None:
             self._lessons = LessonsAPI(root=self.root)
         return self._lessons
+
+    @property
+    def toml(self) -> TomlAPI:
+        """Access TOML file navigation."""
+        if self._toml is None:
+            self._toml = TomlAPI(root=self.root)
+        return self._toml
 
 
 # Convenience alias

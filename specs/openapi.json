@@ -2339,6 +2339,143 @@
         ]
       }
     },
+    "/toml/keys": {
+      "post": {
+        "description": "List all key paths in a TOML file. List of dotted key paths",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "path": {
+                    "description": "Path to TOML file",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "List all key paths in a TOML file",
+        "tags": [
+          "toml"
+        ]
+      }
+    },
+    "/toml/parse": {
+      "post": {
+        "description": "Parse a TOML file to dict. Parsed TOML as dict",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "path": {
+                    "description": "Path to TOML file (relative to project root)",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Parse a TOML file to dict",
+        "tags": [
+          "toml"
+        ]
+      }
+    },
+    "/toml/query": {
+      "post": {
+        "description": "Query a TOML file with jq-like syntax. Supported syntax: .key          - Access object key .key.subkey   - Nested access .[0]          - Array index .*            - All values .key|keys     - Get keys of object .key|length   - Get length .key?         - Optional access Query result",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "path": {
+                    "description": "Path to TOML file",
+                    "type": "string"
+                  },
+                  "query_path": {
+                    "description": "jq-like query (e.g., \".project.name\")",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "query_path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Query a TOML file with jq-like syntax",
+        "tags": [
+          "toml"
+        ]
+      }
+    },
+    "/toml/summary": {
+      "post": {
+        "description": "Get summary of TOML file structure. Dict with sections, key_count, nested_depth, types",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "path": {
+                    "description": "Path to TOML file",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get summary of TOML file structure",
+        "tags": [
+          "toml"
+        ]
+      }
+    },
     "/tree/format": {
       "post": {
         "description": "Generate and format tree as readable text. Formatted tree visualization",
@@ -2762,6 +2899,10 @@
     {
       "description": "API for agent learning and lessons management. Records and surfaces lessons learned from session failures and mistakes. Lessons are stored in .moss/lessons.md.",
       "name": "lessons"
+    },
+    {
+      "description": "API for navigating TOML configuration files. Provides jq-like querying for exploring config files (pyproject.toml, Cargo.toml, etc.) efficiently. api = MossAPI.for_project(\".\") name = api.toml.query(\"pyproject.toml\", \".project.name\") deps = api.toml.query(\"Cargo.toml\", \".dependencies|keys\")",
+      "name": "toml"
     }
   ]
 }

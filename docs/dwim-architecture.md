@@ -154,6 +154,57 @@ Tests in `tests/test_dwim.py` cover:
 - Router behavior (various intent queries)
 - Edge cases (empty, long, special characters)
 
+## Custom Configuration
+
+Users can customize DWIM behavior via `.moss/dwim.toml` (project-level) or `~/.config/moss/dwim.toml` (user-level).
+
+**Location**: `src/moss/dwim_config.py`
+
+### Configuration Sections
+
+```toml
+# Custom aliases (shortcut → tool)
+[aliases]
+ll = "skeleton"
+cat = "cli_expand"
+refs = "callers"
+
+# Additional keywords for existing tools
+[keywords.skeleton]
+extra = ["structure", "layout"]
+boost = 0.15  # Additive boost when these keywords match
+
+# Custom tool definitions
+[[tools]]
+name = "my_linter"
+description = "Run custom project linter"
+keywords = ["lint", "check", "style"]
+parameters = ["path"]
+
+# Intent patterns (regex → tool, higher priority first)
+[[intents]]
+pattern = "show.*code"
+tool = "cli_expand"
+priority = 10
+
+[[intents]]
+pattern = "who calls"
+tool = "callers"
+priority = 5
+```
+
+### Priority Order
+
+1. Intent patterns (checked first, highest priority pattern wins)
+2. Exact tool name or alias match
+3. TF-IDF + keyword scoring with custom boosts applied
+
+### Loading Order
+
+Later sources override earlier ones:
+1. `~/.config/moss/dwim.toml` (user-level defaults)
+2. `.moss/dwim.toml` (project-specific overrides)
+
 ## Future Improvements
 
 1. **Embedding support**: Replace TF-IDF with neural embeddings for better semantic matching

@@ -682,6 +682,42 @@ _register_builtin_tools()
 _register_from_mossapi()  # Register all MossAPI tools
 _discover_entry_points()
 
+
+def _register_custom_config() -> None:
+    """Register custom tools and aliases from user configuration."""
+    try:
+        from moss.dwim_config import get_config
+    except ImportError:
+        return
+
+    try:
+        config = get_config()
+    except Exception as e:
+        logger.debug("Failed to load DWIM config: %s", e)
+        return
+
+    # Register custom aliases
+    for alias, target in config.aliases.items():
+        if alias not in TOOL_ALIASES:
+            TOOL_ALIASES[alias] = target
+            logger.debug("Registered custom alias: %s -> %s", alias, target)
+
+    # Register custom tools
+    for tool in config.tools:
+        if tool.name not in _TOOLS:
+            register_tool(
+                ToolInfo(
+                    name=tool.name,
+                    description=tool.description,
+                    keywords=expand_keywords(tool.keywords),
+                    parameters=tool.parameters,
+                )
+            )
+            logger.debug("Registered custom tool: %s", tool.name)
+
+
+_register_custom_config()
+
 # Backwards compatibility alias
 TOOL_REGISTRY = _TOOLS
 
@@ -972,6 +1008,24 @@ class ToolRouter:
         """
         tools = set(available_tools) if available_tools else set(TOOL_REGISTRY.keys())
 
+        # Check custom intent patterns first (highest priority)
+        try:
+            from moss.dwim_config import get_config, match_intent_patterns
+
+            config = get_config()
+            if config.intents:
+                matched_tool = match_intent_patterns(query, config.intents)
+                if matched_tool and matched_tool in tools:
+                    return [
+                        ToolMatch(
+                            tool=matched_tool,
+                            confidence=1.0,
+                            message="Matched custom intent pattern",
+                        )
+                    ]
+        except ImportError:
+            config = None
+
         # Fast path: if first word is a recognized tool name or alias, use it directly
         # This prevents "expand Patch" from matching patch tools due to the second word
         # But skip this for natural language queries (detected by common words)
@@ -1053,6 +1107,19 @@ class ToolRouter:
             # Keyword matching (includes first-word bonus)
             keyword_score = keyword_match_score(query, tool_info.keywords)
 
+            # Apply custom keyword boosts if configured
+            custom_boost = 0.0
+            if config is not None and tool_name in config.keyword_boosts:
+                boost_config = config.keyword_boosts[tool_name]
+                # Check if any custom keywords match
+                query_words_set = set(query.lower().split())
+                extra_keywords_set = set(kw.lower() for kw in boost_config.keywords)
+                if query_words_set & extra_keywords_set:
+                    custom_boost = boost_config.boost
+                    # Also boost keyword score with extra keywords
+                    combined_keywords = tool_info.keywords + boost_config.keywords
+                    keyword_score = keyword_match_score(query, combined_keywords)
+
             # Fuzzy string matching (for typos)
             name_score = string_similarity(query, tool_name)
             desc_score = string_similarity(query, tool_info.description)
@@ -1076,6 +1143,7 @@ class ToolRouter:
                 + desc_score * 0.10
                 + name_score * 0.10
                 + exact_name_boost
+                + custom_boost
             )
 
             if confidence > 0.1:  # Minimum threshold
