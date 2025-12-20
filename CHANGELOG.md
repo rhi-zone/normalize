@@ -4,6 +4,14 @@
 
 ### Performance Improvements
 
+**Rust CLI find-symbols command** (new)
+- `moss find-symbols <name>` - fast symbol search using indexed SQLite database
+- ~1ms for symbol queries (was 723ms with full Python codebase scan)
+- Supports fuzzy matching (`-f true`), kind filtering (`-k function`), result limits (`-l`)
+- JSON output mode with `--json` for programmatic use
+- Python API `SearchAPI.find_symbols()` now calls Rust CLI when available
+- Falls back to Python implementation when Rust CLI not found
+
 **Rust CLI grep command** (new)
 - `moss grep <pattern>` - fast text search using ripgrep's grep crate
 - JSON output mode with `--json` for programmatic use

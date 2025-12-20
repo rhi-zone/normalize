@@ -608,6 +608,116 @@ impl FileIndex {
         Ok(symbols)
     }
 
+    /// Find symbols by name with fuzzy matching, optional kind filter, and limit
+    /// Returns: (name, kind, file, start_line, end_line, parent)
+    pub fn find_symbols(
+        &self,
+        query: &str,
+        kind: Option<&str>,
+        fuzzy: bool,
+        limit: usize,
+    ) -> rusqlite::Result<Vec<(String, String, String, usize, usize, Option<String>)>> {
+        let query_lower = query.to_lowercase();
+
+        // Build SQL based on fuzzy/exact mode
+        let (sql, params_vec): (String, Vec<Box<dyn rusqlite::ToSql>>) = if fuzzy {
+            let pattern = format!("%{}%", query_lower);
+            let sql = if let Some(k) = kind {
+                "SELECT name, kind, file, start_line, end_line, parent FROM symbols
+                 WHERE LOWER(name) LIKE ?1 AND kind = ?2
+                 ORDER BY
+                   CASE WHEN LOWER(name) = ?3 THEN 0
+                        WHEN LOWER(name) LIKE ?4 THEN 1
+                        ELSE 2 END,
+                   LENGTH(name), name
+                 LIMIT ?5".to_string()
+            } else {
+                "SELECT name, kind, file, start_line, end_line, parent FROM symbols
+                 WHERE LOWER(name) LIKE ?1
+                 ORDER BY
+                   CASE WHEN LOWER(name) = ?2 THEN 0
+                        WHEN LOWER(name) LIKE ?3 THEN 1
+                        ELSE 2 END,
+                   LENGTH(name), name
+                 LIMIT ?4".to_string()
+            };
+
+            if let Some(k) = kind {
+                let prefix_pattern = format!("{}%", query_lower);
+                (
+                    sql,
+                    vec![
+                        Box::new(pattern) as Box<dyn rusqlite::ToSql>,
+                        Box::new(k.to_string()),
+                        Box::new(query_lower.clone()),
+                        Box::new(prefix_pattern),
+                        Box::new(limit as i64),
+                    ],
+                )
+            } else {
+                let prefix_pattern = format!("{}%", query_lower);
+                (
+                    sql,
+                    vec![
+                        Box::new(pattern) as Box<dyn rusqlite::ToSql>,
+                        Box::new(query_lower.clone()),
+                        Box::new(prefix_pattern),
+                        Box::new(limit as i64),
+                    ],
+                )
+            }
+        } else {
+            // Exact match
+            let sql = if let Some(k) = kind {
+                "SELECT name, kind, file, start_line, end_line, parent FROM symbols
+                 WHERE LOWER(name) = LOWER(?1) AND kind = ?2
+                 LIMIT ?3".to_string()
+            } else {
+                "SELECT name, kind, file, start_line, end_line, parent FROM symbols
+                 WHERE LOWER(name) = LOWER(?1)
+                 LIMIT ?2".to_string()
+            };
+
+            if let Some(k) = kind {
+                (
+                    sql,
+                    vec![
+                        Box::new(query.to_string()) as Box<dyn rusqlite::ToSql>,
+                        Box::new(k.to_string()),
+                        Box::new(limit as i64),
+                    ],
+                )
+            } else {
+                (
+                    sql,
+                    vec![
+                        Box::new(query.to_string()) as Box<dyn rusqlite::ToSql>,
+                        Box::new(limit as i64),
+                    ],
+                )
+            }
+        };
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+
+        let symbols = stmt
+            .query_map(params_refs.as_slice(), |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(symbols)
+    }
+
     /// Get call graph stats
     pub fn call_graph_stats(&self) -> rusqlite::Result<(usize, usize, usize)> {
         let symbol_count: usize =

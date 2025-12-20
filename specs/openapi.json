@@ -1742,7 +1742,7 @@
     },
     "/search/find-symbols": {
       "get": {
-        "description": "Find symbols by name across the codebase. Searches all Python files for functions, classes, methods, and variables matching the given name. List of SymbolMatch objects sorted by relevance",
+        "description": "Find symbols by name across the codebase using Rust CLI. Searches all Python/Rust files for functions, classes, methods matching the given name. Uses the indexed symbol database for fast lookups (~1ms vs ~700ms for full codebase scan). List of SymbolMatch objects sorted by relevance",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1754,7 +1754,7 @@
                     "type": "boolean"
                   },
                   "kind": {
-                    "description": "Filter by kind: function, class, method, variable",
+                    "description": "Filter by kind: function, class, method",
                     "type": "string"
                   },
                   "limit": {
@@ -1781,7 +1781,7 @@
             "description": "Successful response"
           }
         },
-        "summary": "Find symbols by name across the codebase",
+        "summary": "Find symbols by name across the codebase using Rust CLI",
         "tags": [
           "search"
         ]

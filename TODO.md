@@ -4,9 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Python find_symbols → Rust CLI** - use daemon index instead of rebuilding per call (723ms → ~10ms expected)
-2. **Revisit CLAUDE.md dogfooding section** - tools should be self-evident, not need instructions
-3. **Model-agnostic naming** - don't over-fit to specific LLM conventions
+1. **Revisit CLAUDE.md dogfooding section** - tools should be self-evident, not need instructions
+2. **Model-agnostic naming** - don't over-fit to specific LLM conventions
 
 ## Active Backlog
 
@@ -91,17 +90,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - Slow (66ms): summarize (tree-sitter full parse)
 - Slowest (95ms): health (parallel codebase scan, 3561 files)
 
-**Python API (unindexed):**
+**Python API (with Rust CLI):**
 - skeleton: 53ms (single file tree-sitter)
-- find_symbols: 723ms (scans all Python files)
-- grep: ~4ms with Rust CLI, 9.7s fallback (pure Python)
+- find_symbols: ~1ms via Rust CLI (was 723ms with Python scan)
+- grep: ~4ms with Rust CLI
 
 **Completed Optimizations:**
 1. ✅ Rust CLI grep with ripgrep - 9.7s → 4ms (2400x speedup)
 2. ✅ Rust health with rayon - 500ms → 95ms (5x speedup)
-
-**Remaining Opportunities:**
-- Python find_symbols: use Rust index via daemon - expected 50x speedup
+3. ✅ Rust CLI find-symbols with indexed SQLite - 723ms → 1ms (720x speedup)
 
 ### Dogfooding Observations (Dec 2025)
 - `skeleton_format` / `skeleton_expand` - very useful, genuinely saves tokens

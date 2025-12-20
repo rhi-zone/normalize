@@ -112,3 +112,65 @@ def rust_view(target: str, line_numbers: bool = False) -> dict | None:
         return None
 
     return json.loads(output)
+
+
+def rust_find_symbols(
+    name: str,
+    kind: str | None = None,
+    fuzzy: bool = True,
+    limit: int = 50,
+    root: str | None = None,
+) -> list[dict] | None:
+    """Find symbols by name using Rust CLI.
+
+    Returns list of symbol matches or None if Rust not available.
+    Each match: {"name", "kind", "file", "line", "end_line", "parent"}
+    """
+    if not rust_available():
+        return None
+
+    args = ["find-symbols", "-l", str(limit)]
+    if kind:
+        args.extend(["-k", kind])
+    if not fuzzy:
+        args.extend(["-f", "false"])
+    if root:
+        args.extend(["-r", root])
+    args.append(name)
+
+    code, output = call_rust(args, json_output=True)
+    if code != 0:
+        return []
+
+    return json.loads(output)
+
+
+def rust_grep(
+    pattern: str,
+    glob_pattern: str | None = None,
+    limit: int = 100,
+    ignore_case: bool = False,
+    root: str | None = None,
+) -> dict | None:
+    """Search for text patterns using Rust CLI.
+
+    Returns {"matches": [...], "total_matches": int, "files_searched": int}
+    or None if Rust not available.
+    """
+    if not rust_available():
+        return None
+
+    args = ["grep", "-l", str(limit)]
+    if ignore_case:
+        args.append("-i")
+    if glob_pattern:
+        args.extend(["--glob", glob_pattern])
+    if root:
+        args.extend(["-r", root])
+    args.append(pattern)
+
+    code, output = call_rust(args, json_output=True)
+    if code != 0:
+        return {"matches": [], "total_matches": 0, "files_searched": 0}
+
+    return json.loads(output)

@@ -2443,20 +2443,47 @@ class SearchAPI:
         fuzzy: bool = True,
         limit: int = 50,
     ) -> list[SymbolMatch]:
-        """Find symbols by name across the codebase.
+        """Find symbols by name across the codebase using Rust CLI.
 
-        Searches all Python files for functions, classes, methods,
-        and variables matching the given name.
+        Searches all Python/Rust files for functions, classes, methods
+        matching the given name. Uses the indexed symbol database for
+        fast lookups (~1ms vs ~700ms for full codebase scan).
 
         Args:
             name: Symbol name to search for (supports partial matching)
-            kind: Filter by kind: function, class, method, variable
+            kind: Filter by kind: function, class, method
             fuzzy: If True, match partial names; if False, exact match only
             limit: Maximum number of results to return
 
         Returns:
             List of SymbolMatch objects sorted by relevance
         """
+        from moss.rust_shim import rust_find_symbols
+
+        data = rust_find_symbols(name, kind, fuzzy, limit, str(self.root))
+        if data is None:
+            # Rust CLI not available - fall back to Python implementation
+            return self._find_symbols_python(name, kind, fuzzy, limit)
+
+        return [
+            SymbolMatch(
+                name=m["name"],
+                kind=m["kind"],
+                file_path=m["file"],
+                line=m["line"],
+                signature="",  # CLI doesn't return signatures yet
+            )
+            for m in data
+        ]
+
+    def _find_symbols_python(
+        self,
+        name: str,
+        kind: str | None = None,
+        fuzzy: bool = True,
+        limit: int = 50,
+    ) -> list[SymbolMatch]:
+        """Fallback Python implementation for find_symbols (slower)."""
         import fnmatch
 
         from moss.skeleton import extract_python_skeleton
@@ -2465,10 +2492,7 @@ class SearchAPI:
         pattern = name.lower()
 
         def check_symbol(sym: Any, rel_path: str) -> bool:
-            """Check if symbol matches and add to results. Returns True if limit reached."""
             sym_name_lower = sym.name.lower()
-
-            # Check match
             if fuzzy:
                 in_name = pattern in sym_name_lower
                 matched = in_name or fnmatch.fnmatch(sym_name_lower, f"*{pattern}*")
@@ -2476,12 +2500,10 @@ class SearchAPI:
                 matched = sym_name_lower == pattern
 
             if matched:
-                # Filter by kind if specified
                 if not kind or sym.kind == kind:
                     sig = ""
                     if sym.kind in ("function", "method") and sym.signature:
                         sig = sym.signature
-
                     results.append(
                         SymbolMatch(
                             name=sym.name,
@@ -2491,32 +2513,25 @@ class SearchAPI:
                             signature=sig,
                         )
                     )
-
                     if len(results) >= limit:
                         return True
 
-            # Recurse into children (methods in classes, nested functions)
             if sym.children:
                 for child in sym.children:
                     if check_symbol(child, rel_path):
                         return True
-
             return False
 
-        # Find all Python files
         for py_file in self.root.rglob("*.py"):
-            # Skip hidden dirs, venv, etc
             parts = py_file.parts
             skip_dirs = ("venv", "node_modules", "__pycache__")
             if any(p.startswith(".") or p in skip_dirs for p in parts):
                 continue
-
             try:
                 source = py_file.read_text()
                 symbols = extract_python_skeleton(source)
             except Exception:
                 continue
-
             rel_path = str(py_file.relative_to(self.root))
             for sym in symbols:
                 if check_symbol(sym, rel_path):
@@ -2524,7 +2539,6 @@ class SearchAPI:
             if len(results) >= limit:
                 break
 
-        # Sort by relevance: exact matches first, then by name length
         results.sort(key=lambda m: (m.name.lower() != pattern, len(m.name), m.name))
         return results
 
@@ -2550,26 +2564,16 @@ class SearchAPI:
         Returns:
             GrepResult with matches and statistics
         """
-        import json
-        import subprocess
+        from moss.rust_shim import rust_grep
 
         search_path = Path(path) if path else self.root
         if not search_path.is_absolute():
             search_path = self.root / search_path
 
-        cmd = ["moss", "grep", "--json", "-l", str(limit)]
-        if ignore_case:
-            cmd.append("-i")
-        if glob:
-            cmd.extend(["--glob", glob])
-        cmd.extend([pattern, "-r", str(search_path)])
-
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-        if result.returncode != 0 or not result.stdout.strip():
+        data = rust_grep(pattern, glob, limit, ignore_case, str(search_path))
+        if data is None:
             return GrepResult(matches=[], total_matches=0, files_searched=0)
 
-        data = json.loads(result.stdout)
         matches = [
             GrepMatch(
                 file_path=m["file"],
