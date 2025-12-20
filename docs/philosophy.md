@@ -52,6 +52,8 @@ Hierarchy implies trees. Code (AST), files (directories), tasks (subtasks), agen
 
 Few orthogonal primitives beat many overlapping features. Lua got this right with tables. Find the smallest set of operations that compose well, not the largest set of features that cover cases.
 
+Nothing good appears from scratch. Iterate. CLAUDE.md grew through 20+ commits, not upfront investment. Features emerge from use, not design documents. Start minimal, capture what you learn, repeat.
+
 ### Hyper-Modular Architecture
 
 Prefer many small, focused modules over fewer large ones:
