@@ -226,6 +226,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] `moss agent --dry-run` - show task classification and tool suggestions (done Dec 2025)
 - [x] `moss expand/callers/callees` - numbered list + `--select N/best` for multiple matches (done Dec 2025)
 - [x] Smart TOML navigation - `moss toml` with jq-like filtering (done Dec 2025)
+- [ ] **Agentic TUI UX**:
+  - Fluid mode switching (inspired by shift-tab in Claude Code)
+  - Avoid fixed modes; allow dynamic transitions between Plan/Read/Write states
 
 ### Workflow Collaboration
 - [ ] Pattern detection - heuristic (frequency, similarity, rapid re-runs) + LLM for judgment
