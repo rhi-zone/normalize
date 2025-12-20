@@ -4,8 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Fix CI test failures (Symbol.to_dict, RAGAPI constructor, vector store metadata)
-2. Review/refactor vector store API for consistency
+1. Fix CI test failures (Symbol.to_dict, ControlFlowGraph.entry, Export.export_type)
+2. Fix RAGAPI constructor signature mismatch
+3. Fix vector store metadata validation errors
+4. Review/refactor vector store API for consistency
 
 ## Active Backlog
 
