@@ -4,13 +4,23 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Implement TaskTree - recursive breakdown, path-based context, notes with TTL
-2. Refactor DWIMLoop to context-excluded model (use TaskTree, no conversation history)
-3. Wire DWIMLoop into CLI (`moss agent` command)
-4. Evaluate DWIMLoop on test tasks
+1. Evaluate DWIMLoop/TaskTree on test tasks
+2. Add ephemeral cache integration (reuse `src/moss/cache.py:EphemeralCache`)
+3. Stall detection - identify when agent is not making progress
 
 ## Recently Completed
 
+- **TaskTree implementation** (`src/moss/task_tree.py`):
+  - Hierarchical task state with arbitrary depth
+  - Path-based context (chain from root to current leaf)
+  - Notes with TTL (on_done, manual, turns_remaining)
+  - Serialization for persistence
+- **DWIMLoop refactored to context-excluded model**:
+  - No conversation history - each turn: system + path + notes + last result
+  - ~300 tokens/turn instead of unbounded growth
+  - Meta-commands: breakdown, note, fetch, done
+  - Result caching with preview + ID
+- **`moss agent` CLI command**: Run agent loop on tasks
 - **Hierarchical context model** (see `docs/agentic-loop.md`):
   - Context-excluded by default - no conversation history accumulation
   - Path-based state: Task → Subtask → Current step (arbitrary depth)

@@ -3874,6 +3874,78 @@ def cmd_dwim(args: Namespace) -> int:
     return 0
 
 
+def cmd_agent(args: Namespace) -> int:
+    """Run DWIM-driven agent loop on a task.
+
+    Uses context-excluded model: each turn gets path + notes + last result,
+    not conversation history. Supports task breakdown, notes with TTL.
+    """
+    import asyncio
+
+    from moss import MossAPI
+    from moss.dwim_loop import DWIMLoop, LoopConfig, LoopState
+
+    output = setup_output(args)
+    task = getattr(args, "task", None)
+    model = getattr(args, "model", None)
+    max_turns = getattr(args, "max_turns", 50)
+    verbose = getattr(args, "verbose", False)
+
+    if not task:
+        output.error("Usage: moss agent <task>")
+        output.info('Example: moss agent "Fix the type error in Patch.apply"')
+        return 1
+
+    api = MossAPI.for_project(Path.cwd())
+
+    config = LoopConfig(max_turns=max_turns)
+    if model:
+        config.model = model
+
+    loop = DWIMLoop(api, config)
+
+    output.info(f"Starting agent: {task}")
+    if verbose:
+        output.info(f"Model: {config.model}")
+        output.info(f"Max turns: {max_turns}")
+    output.info("")
+
+    try:
+        result = asyncio.run(loop.run(task))
+    except ImportError as e:
+        output.error(f"Missing dependency: {e}")
+        output.info("Install with: pip install moss[llm]")
+        return 1
+    except Exception as e:
+        output.error(f"Agent failed: {e}")
+        return 1
+
+    # Show results
+    if verbose:
+        output.info(f"\nTurns: {len(result.turns)}")
+        output.info(f"Duration: {result.total_duration_ms}ms")
+        for i, turn in enumerate(result.turns, 1):
+            output.info(f"\n--- Turn {i} ---")
+            output.info(f"Intent: {turn.intent.verb} {turn.intent.target or ''}")
+            if turn.error:
+                output.warning(f"Error: {turn.error}")
+            elif turn.tool_output:
+                out_str = str(turn.tool_output)[:200]
+                output.info(f"Output: {out_str}...")
+
+    if result.state == LoopState.DONE:
+        output.success(f"\nCompleted in {len(result.turns)} turns")
+        if result.final_output:
+            output.info(f"Final: {str(result.final_output)[:500]}")
+        return 0
+    elif result.state == LoopState.MAX_TURNS:
+        output.warning(f"\nMax turns ({max_turns}) reached")
+        return 1
+    else:
+        output.error(f"\nFailed: {result.error}")
+        return 1
+
+
 def cmd_report(args: Namespace) -> int:
     """Generate comprehensive project report (verbose health)."""
     from moss.status import StatusChecker
@@ -5954,6 +6026,33 @@ def create_parser() -> argparse.ArgumentParser:
         help="Number of results to show (default: 5)",
     )
     dwim_parser.set_defaults(func=cmd_dwim)
+
+    # agent command - DWIM-driven agent loop
+    agent_parser = subparsers.add_parser("agent", help="Run DWIM-driven agent loop on a task")
+    agent_parser.add_argument(
+        "task",
+        nargs="?",
+        help="Task description in natural language",
+    )
+    agent_parser.add_argument(
+        "--model",
+        "-m",
+        help="LLM model to use (default: gemini/gemini-2.5-flash-preview-05-20)",
+    )
+    agent_parser.add_argument(
+        "--max-turns",
+        "-n",
+        type=int,
+        default=50,
+        help="Maximum turns before stopping (default: 50)",
+    )
+    agent_parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Show detailed turn-by-turn output",
+    )
+    agent_parser.set_defaults(func=cmd_agent)
 
     # help command (with examples and categories)
     help_parser = subparsers.add_parser(
