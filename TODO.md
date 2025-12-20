@@ -4,7 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-(Queue empty - add tasks from Active Backlog or Future Work)
+- Memory system plugin loading from `.moss/memory/`
+- Ephemeral output caching for agent loop - large outputs → preview + ID
+- `moss patterns` - detect architectural patterns in codebase
 
 ## Recently Completed
 
