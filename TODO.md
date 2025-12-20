@@ -19,6 +19,25 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Future Work
 
+### Codebase Tree Consolidation (see `docs/codebase-tree.md`)
+
+**Phase 1: Python CLI delegates to Rust (remove Python implementations)**
+- [ ] `skeleton` → delegate to Rust `view`
+- [ ] `summarize` → delegate to Rust `view`
+- [ ] `anchors` → delegate to Rust `search` with type filter
+- [ ] `query` → delegate to Rust `search`
+- [ ] `tree` → delegate to Rust `view` (directory-level)
+- [x] `context` → delegate to Rust `context` (done)
+
+**Phase 2: Unified tree model**
+- [ ] Merge filesystem + AST into single tree data structure
+- [ ] Implement zoom levels (directory → file → class → method → params)
+- [ ] Consistent "context + node + children" view format
+
+**Phase 3: DWIM integration**
+- [ ] Natural language → tree operation mapping
+- [ ] "what's in X" → view, "show me Y" → view, "full code of Z" → expand
+
 ### Skills System
 - [ ] `TriggerMode` protocol for plugin-extensible triggers
 - [ ] `.moss/skills/` directory for user-defined skills
