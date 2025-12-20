@@ -3,6 +3,9 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use ignore::WalkBuilder;
 
+use crate::symbols::{Symbol, SymbolParser};
+
+// Not yet public - just delete .moss/index.sqlite on schema changes
 const SCHEMA_VERSION: i64 = 1;
 
 #[derive(Debug, Clone)]
@@ -39,6 +42,28 @@ impl FileIndex {
                 mtime INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_files_name ON files(path);
+
+            -- Call graph for fast caller/callee lookups
+            CREATE TABLE IF NOT EXISTS calls (
+                caller_file TEXT NOT NULL,
+                caller_symbol TEXT NOT NULL,
+                callee_name TEXT NOT NULL,
+                line INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name);
+            CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_file, caller_symbol);
+
+            -- Symbol definitions for fast symbol lookups
+            CREATE TABLE IF NOT EXISTS symbols (
+                file TEXT NOT NULL,
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                start_line INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                parent TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
+            CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file);
             "
         )?;
 
@@ -54,6 +79,8 @@ impl FileIndex {
         if version != SCHEMA_VERSION {
             // Reset on schema change
             conn.execute("DELETE FROM files", [])?;
+            conn.execute("DELETE FROM calls", []).ok();
+            conn.execute("DELETE FROM symbols", []).ok();
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
@@ -221,6 +248,141 @@ impl FileIndex {
     /// Count indexed files
     pub fn count(&self) -> rusqlite::Result<usize> {
         self.conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
+    }
+
+    /// Index symbols and call graph for a file
+    pub fn index_file_symbols(&self, path: &str, symbols: &[Symbol], calls: &[(String, String, usize)]) -> rusqlite::Result<()> {
+        // Insert symbols
+        for sym in symbols {
+            self.conn.execute(
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
+            )?;
+        }
+
+        // Insert calls (caller_symbol, callee_name, line)
+        for (caller_symbol, callee_name, line) in calls {
+            self.conn.execute(
+                "INSERT INTO calls (caller_file, caller_symbol, callee_name, line) VALUES (?1, ?2, ?3, ?4)",
+                params![path, caller_symbol, callee_name, line],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Find callers of a symbol by name (from call graph)
+    pub fn find_callers(&self, symbol_name: &str) -> rusqlite::Result<Vec<(String, String, usize)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT caller_file, caller_symbol, line FROM calls WHERE callee_name = ?1"
+        )?;
+        let callers = stmt
+            .query_map(params![symbol_name], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(callers)
+    }
+
+    /// Find callees of a symbol (what it calls)
+    pub fn find_callees(&self, file: &str, symbol_name: &str) -> rusqlite::Result<Vec<(String, usize)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT callee_name, line FROM calls WHERE caller_file = ?1 AND caller_symbol = ?2"
+        )?;
+        let callees = stmt
+            .query_map(params![file, symbol_name], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(callees)
+    }
+
+    /// Find a symbol by name
+    pub fn find_symbol(&self, name: &str) -> rusqlite::Result<Vec<(String, String, usize, usize)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT file, kind, start_line, end_line FROM symbols WHERE name = ?1"
+        )?;
+        let symbols = stmt
+            .query_map(params![name], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(symbols)
+    }
+
+    /// Get call graph stats
+    pub fn call_graph_stats(&self) -> rusqlite::Result<(usize, usize)> {
+        let symbol_count: usize = self.conn.query_row(
+            "SELECT COUNT(*) FROM symbols", [], |row| row.get(0)
+        )?;
+        let call_count: usize = self.conn.query_row(
+            "SELECT COUNT(*) FROM calls", [], |row| row.get(0)
+        )?;
+        Ok((symbol_count, call_count))
+    }
+
+    /// Refresh the call graph by parsing all Python/Rust files
+    /// This is more expensive than file refresh since it parses every file
+    pub fn refresh_call_graph(&mut self) -> rusqlite::Result<(usize, usize)> {
+        // Get all indexed Python/Rust files BEFORE starting transaction
+        let files: Vec<String> = {
+            let mut stmt = self.conn.prepare(
+                "SELECT path FROM files WHERE is_dir = 0 AND (path LIKE '%.py' OR path LIKE '%.rs')"
+            )?;
+            let mut files = Vec::new();
+            let mut rows = stmt.query([])?;
+            while let Some(row) = rows.next()? {
+                let path: String = row.get(0)?;
+                files.push(path);
+            }
+            files
+        };
+
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM symbols", [])?;
+        tx.execute("DELETE FROM calls", [])?;
+
+        let mut parser = SymbolParser::new();
+        let mut symbol_count = 0;
+        let mut call_count = 0;
+
+        for file_path in files {
+            let full_path = self.root.join(&file_path);
+            let content = match std::fs::read_to_string(&full_path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let symbols = parser.parse_file(&full_path, &content);
+
+            // Insert symbols
+            for sym in &symbols {
+                tx.execute(
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![file_path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
+                )?;
+                symbol_count += 1;
+
+                // Get calls for this symbol
+                let calls = parser.find_callees_with_lines(&full_path, &content, &sym.name);
+                for (callee_name, line) in calls {
+                    tx.execute(
+                        "INSERT INTO calls (caller_file, caller_symbol, callee_name, line) VALUES (?1, ?2, ?3, ?4)",
+                        params![file_path, sym.name, callee_name, line],
+                    )?;
+                    call_count += 1;
+                }
+            }
+        }
+
+        tx.commit()?;
+        Ok((symbol_count, call_count))
+    }
+
+    /// Check if call graph needs refresh
+    pub fn needs_call_graph_refresh(&self) -> bool {
+        let (symbols, _) = self.call_graph_stats().unwrap_or((0, 0));
+        symbols == 0
     }
 
     /// Find files matching a query using LIKE (fast pre-filter)

@@ -31,8 +31,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - [x] Handle large query responses (streaming/chunking)
 
 3. **Reference tracing** - AST-based callers/callees
-   - [ ] Store call graph in SQLite (caller_symbol, callee_name, file, line)
-   - [ ] Query call graph from daemon for fast lookups
+   - [x] Store call graph in SQLite (caller_symbol, callee_name, file, line)
+   - [x] Query call graph from daemon for fast lookups (0.6ms vs 17.5s = 29,000x faster)
    - [ ] Cross-file reference resolution (import tracking)
    - [ ] Handle method calls (obj.method() → Class.method)
    - [ ] Handle qualified names (module.func vs func)
@@ -64,6 +64,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Compact tool encoding for moss agent - bypass JSON Schema overhead
   - For moss loop, we control both sides - can use terse function signatures
 - [ ] Study Goose's context revision (`crates/goose/src/`)
+- [ ] Port `context` command to Rust (if context extraction becomes hot path)
+- [ ] Port `overview` command to Rust (fast codebase overview)
 
 **Large:**
 - [ ] Sessions as first-class - resumable, observable work units

@@ -113,6 +113,10 @@ enum Commands {
         /// Root directory (defaults to current directory)
         #[arg(short, long)]
         root: Option<PathBuf>,
+
+        /// Also rebuild the call graph (slower, parses all files)
+        #[arg(short, long)]
+        call_graph: bool,
     },
 
     /// Show full source of a symbol
@@ -309,7 +313,7 @@ fn main() {
         Commands::SearchTree { query, root, limit } => {
             cmd_search_tree(&query, root.as_deref(), limit, cli.json)
         }
-        Commands::Reindex { root } => cmd_reindex(root.as_deref()),
+        Commands::Reindex { root, call_graph } => cmd_reindex(root.as_deref(), call_graph),
         Commands::Expand { symbol, file, root } => {
             cmd_expand(&symbol, file.as_deref(), root.as_deref(), cli.json)
         }
@@ -491,7 +495,7 @@ fn cmd_search_tree(query: &str, root: Option<&Path>, limit: usize, json: bool) -
     0
 }
 
-fn cmd_reindex(root: Option<&Path>) -> i32 {
+fn cmd_reindex(root: Option<&Path>, call_graph: bool) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -501,6 +505,19 @@ fn cmd_reindex(root: Option<&Path>) -> i32 {
             match idx.refresh() {
                 Ok(count) => {
                     println!("Indexed {} files", count);
+
+                    // Optionally rebuild call graph
+                    if call_graph {
+                        match idx.refresh_call_graph() {
+                            Ok((symbols, calls)) => {
+                                println!("Indexed {} symbols, {} calls", symbols, calls);
+                            }
+                            Err(e) => {
+                                eprintln!("Error indexing call graph: {}", e);
+                                return 1;
+                            }
+                        }
+                    }
                     0
                 }
                 Err(e) => {
@@ -688,7 +705,31 @@ fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool, profiler: &mut Pro
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Get all files (not just fuzzy matches)
+    // Try index first (fast path)
+    if let Ok(idx) = index::FileIndex::open(&root) {
+        profiler.mark("open_index");
+        if let Ok(callers) = idx.find_callers(symbol) {
+            profiler.mark("index_query");
+            if !callers.is_empty() {
+                if json {
+                    let output: Vec<_> = callers
+                        .iter()
+                        .map(|(file, sym, line)| serde_json::json!({"file": file, "symbol": sym, "line": line}))
+                        .collect();
+                    println!("{}", serde_json::to_string(&output).unwrap());
+                } else {
+                    println!("Callers of {}:", symbol);
+                    for (file, sym, line) in &callers {
+                        println!("  {}:{}:{}", file, line, sym);
+                    }
+                }
+                return 0;
+            }
+        }
+    }
+    profiler.mark("index_miss");
+
+    // Fall back to file scan (slow path)
     let all_paths = path_resolve::all_files(&root);
     profiler.mark("list_files");
     let files: Vec<_> = all_paths.into_iter().map(|m| (m.path, m.kind == "directory")).collect();

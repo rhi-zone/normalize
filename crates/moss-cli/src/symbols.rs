@@ -316,6 +316,116 @@ impl SymbolParser {
         }
     }
 
+    /// Find callees with line numbers (for call graph indexing)
+    pub fn find_callees_with_lines(&mut self, path: &Path, content: &str, symbol_name: &str) -> Vec<(String, usize)> {
+        let symbol = match self.find_symbol(path, content, symbol_name) {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+
+        let lines: Vec<&str> = content.lines().collect();
+        let start = symbol.start_line.saturating_sub(1);
+        let end = symbol.end_line.min(lines.len());
+        let source = lines[start..end].join("\n");
+
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        match ext {
+            "py" => self.find_python_calls_with_lines(&source, symbol.start_line),
+            "rs" => self.find_rust_calls_with_lines(&source, symbol.start_line),
+            _ => Vec::new(),
+        }
+    }
+
+    fn find_python_calls_with_lines(&mut self, source: &str, base_line: usize) -> Vec<(String, usize)> {
+        let tree = match self.python_parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_python_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        calls
+    }
+
+    fn collect_python_calls_with_lines(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        base_line: usize,
+        calls: &mut Vec<(String, usize)>,
+    ) {
+        loop {
+            let node = cursor.node();
+
+            if node.kind() == "call" {
+                if let Some(func_node) = node.child_by_field_name("function") {
+                    let func_text = &content[func_node.byte_range()];
+                    let name = func_text.split('.').last().unwrap_or(func_text);
+                    let line = node.start_position().row + base_line;
+                    calls.push((name.to_string(), line));
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_python_calls_with_lines(cursor, content, base_line, calls);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn find_rust_calls_with_lines(&mut self, source: &str, base_line: usize) -> Vec<(String, usize)> {
+        let tree = match self.rust_parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_rust_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        calls
+    }
+
+    fn collect_rust_calls_with_lines(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        base_line: usize,
+        calls: &mut Vec<(String, usize)>,
+    ) {
+        loop {
+            let node = cursor.node();
+
+            if node.kind() == "call_expression" {
+                if let Some(func_node) = node.child_by_field_name("function") {
+                    let func_text = &content[func_node.byte_range()];
+                    let name = func_text
+                        .split("::")
+                        .last()
+                        .unwrap_or(func_text)
+                        .split('.')
+                        .last()
+                        .unwrap_or(func_text);
+                    let line = node.start_position().row + base_line;
+                    calls.push((name.to_string(), line));
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_rust_calls_with_lines(cursor, content, base_line, calls);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
     fn find_rust_calls(&mut self, source: &str) -> Vec<String> {
         let tree = match self.rust_parser.parse(source, None) {
             Some(t) => t,
