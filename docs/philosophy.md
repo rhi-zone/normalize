@@ -90,6 +90,16 @@ Real-world code is often messy. Moss should:
 - Support incremental improvement (clean up as you go, or don't)
 - Not impose architectural opinions unless asked
 
+### Workflows Become Presets
+
+If you have a workflow, the intuitive way to proceed should be to codify it. Custom presets are first-class citizens:
+- **Capture patterns**: Repeated sequences of actions should become single commands
+- **User-defined skills**: `.moss/skills/` for domain-specific behaviors
+- **Progressive formalization**: Start ad-hoc, graduate to preset when patterns emerge
+- **Shareable**: Presets should be easy to share, version, and compose
+
+The goal: reduce the distance between "I do this often" and "now it's a command."
+
 ### Accelerate Vibe Coding
 
 Maximize useful work per token. Minimize friction in the creative flow:
