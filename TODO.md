@@ -4,9 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-(Session complete - see Recently Completed for work done)
+- Custom tool semantics - plugin architecture for user-defined intent→tool mappings
+- Smart TOML navigation - parse to JSON, use jq-like filtering for config exploration
+- `moss expand` multiple matches: when all have same name, pick by path specificity
 
 ## Recently Completed
+
+- **DWIM & CLI enhancements** (Dec 2025):
+  - Multi-match handling: numbered list + `--select N/best` for expand/callers/callees
+  - Confidence thresholds: auto-correct (>=85%), execute (60-85%), clarify (<60%)
+  - MCP tool discovery: auto-register external MCP tools into DWIM registry
 
 - **CLI UX improvements** (Dec 2025):
   - Flexible arg syntax for expand/callers/callees: `symbol`, `file:symbol`, `file symbol`, `symbol file`
