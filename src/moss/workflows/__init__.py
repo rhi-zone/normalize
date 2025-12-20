@@ -11,17 +11,85 @@ Reference syntax:
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from moss.agent_loop import AgentLoop, LLMConfig, LoopResult
+
+
+@dataclass
+class WorkflowContext:
+    """Runtime context passed to workflow for dynamic step generation.
+
+    Provides information about the current environment, enabling
+    workflows to adapt their steps based on project characteristics.
+    """
+
+    project_root: Path | None = None
+    file_path: str | None = None
+    has_tests: bool = False
+    has_type_hints: bool = False
+    language: str = "python"
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_file(
+        cls, file_path: str | Path, project_root: Path | None = None
+    ) -> "WorkflowContext":
+        """Create context from a file path, detecting project characteristics."""
+        from pathlib import Path as P
+
+        path = P(file_path) if isinstance(file_path, str) else file_path
+        if project_root is None:
+            project_root = path.parent
+
+        # Detect language from extension
+        ext = path.suffix.lower()
+        lang_map = {
+            ".py": "python",
+            ".rs": "rust",
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".js": "javascript",
+            ".go": "go",
+        }
+        language = lang_map.get(ext, "unknown")
+
+        # Check for tests directory
+        has_tests = (project_root / "tests").exists() or (project_root / "test").exists()
+
+        return cls(
+            project_root=project_root,
+            file_path=str(path),
+            has_tests=has_tests,
+            language=language,
+        )
+
+
+@runtime_checkable
+class WorkflowProtocol(Protocol):
+    """Protocol for workflow implementations.
+
+    Both TOML-loaded workflows and Python workflows implement this protocol.
+    The key method is build_steps() which can return static or dynamic steps.
+    """
+
+    name: str
+    description: str
+    limits: "WorkflowLimits"
+    llm: "WorkflowLLMConfig"
+
+    def build_steps(self, context: WorkflowContext | None = None) -> list["WorkflowStep"]:
+        """Build workflow steps, optionally using context for dynamic generation."""
+        ...
+
 
 try:
     import tomllib
 except ImportError:
     import tomli as tomllib  # type: ignore[import-not-found]
 
-from moss.prompts import load_prompt
+from moss.prompts import load_prompt  # noqa: E402
 
 # Package directory for built-in workflows
 _BUILTIN_DIR = Path(__file__).parent
@@ -88,7 +156,11 @@ class WorkflowLLMConfig:
 
 @dataclass
 class Workflow:
-    """Composable workflow definition loaded from TOML."""
+    """Composable workflow definition loaded from TOML.
+
+    Implements WorkflowProtocol. For static TOML workflows, steps are fixed.
+    Subclass and override build_steps() for dynamic Python workflows.
+    """
 
     name: str
     description: str = ""
@@ -96,6 +168,20 @@ class Workflow:
     limits: WorkflowLimits = field(default_factory=WorkflowLimits)
     llm: WorkflowLLMConfig = field(default_factory=WorkflowLLMConfig)
     steps: list[WorkflowStep] = field(default_factory=list)
+
+    def build_steps(self, context: WorkflowContext | None = None) -> list[WorkflowStep]:
+        """Build workflow steps.
+
+        Default implementation returns static steps. Override in subclasses
+        for dynamic step generation based on context.
+
+        Args:
+            context: Optional runtime context for dynamic workflows
+
+        Returns:
+            List of workflow steps to execute
+        """
+        return self.steps
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -423,21 +509,29 @@ def list_agents(project_root: Path | None = None) -> list[str]:
 # ============================================================================
 
 
-def workflow_to_agent_loop(workflow: Workflow) -> "AgentLoop":
-    """Convert a TOML Workflow to an executable AgentLoop.
+def workflow_to_agent_loop(
+    workflow: Workflow,
+    context: WorkflowContext | None = None,
+) -> "AgentLoop":
+    """Convert a Workflow to an executable AgentLoop.
 
-    This bridges the declarative TOML format with the executable agent loop.
+    This bridges the declarative workflow format with the executable agent loop.
+    For dynamic Python workflows, pass a context to enable conditional step generation.
 
     Args:
-        workflow: Workflow loaded from TOML
+        workflow: Workflow (TOML or Python)
+        context: Optional runtime context for dynamic step generation
 
     Returns:
         AgentLoop ready for execution with AgentLoopRunner
     """
     from moss.agent_loop import AgentLoop, ErrorAction, LoopStep, StepType
 
+    # Use build_steps() to support both static and dynamic workflows
+    workflow_steps = workflow.build_steps(context)
+
     steps = []
-    for wf_step in workflow.steps:
+    for wf_step in workflow_steps:
         # Convert step type
         if wf_step.type == "llm":
             step_type = StepType.LLM
@@ -522,8 +616,13 @@ async def run_workflow(
     # Load workflow
     workflow = load_workflow(name, project_root)
 
-    # Convert to executable loop
-    loop = workflow_to_agent_loop(workflow)
+    # Create context from initial_input if file_path provided
+    context = None
+    if isinstance(initial_input, dict) and "file_path" in initial_input:
+        context = WorkflowContext.from_file(initial_input["file_path"], project_root)
+
+    # Convert to executable loop (uses build_steps for dynamic workflows)
+    loop = workflow_to_agent_loop(workflow, context)
     llm_config = workflow_to_llm_config(workflow)
 
     # Create executor and run

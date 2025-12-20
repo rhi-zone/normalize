@@ -287,3 +287,108 @@ class TestWorkflowToLLMConfig:
         assert config.model == "gemini/gemini-3-flash-preview"
         assert config.temperature == 0.0
         assert config.system_prompt is not None
+
+
+class TestWorkflowContext:
+    """Tests for WorkflowContext."""
+
+    def test_from_file(self, tmp_path: Path):
+        """Create context from file path."""
+        from moss.workflows import WorkflowContext
+
+        # Create test file and tests directory
+        test_file = tmp_path / "src" / "main.py"
+        test_file.parent.mkdir(parents=True)
+        test_file.write_text("print('hello')")
+        (tmp_path / "tests").mkdir()
+
+        ctx = WorkflowContext.from_file(test_file, tmp_path)
+
+        assert ctx.file_path == str(test_file)
+        assert ctx.language == "python"
+        assert ctx.has_tests is True
+
+    def test_language_detection(self, tmp_path: Path):
+        """Different extensions map to correct languages."""
+        from moss.workflows import WorkflowContext
+
+        cases = [
+            ("file.py", "python"),
+            ("file.rs", "rust"),
+            ("file.ts", "typescript"),
+            ("file.tsx", "typescript"),
+            ("file.go", "go"),
+            ("file.js", "javascript"),
+            ("file.xyz", "unknown"),
+        ]
+        for filename, expected_lang in cases:
+            path = tmp_path / filename
+            path.write_text("")
+            ctx = WorkflowContext.from_file(path)
+            assert ctx.language == expected_lang, f"Failed for {filename}"
+
+
+class TestPythonWorkflowProtocol:
+    """Tests for Python workflow dynamic step generation."""
+
+    def test_static_workflow_build_steps(self):
+        """Static workflow returns its steps unchanged."""
+        wf = load_workflow("validate-fix")
+        steps = wf.build_steps()
+
+        assert len(steps) == 3
+        assert steps[0].name == "validate"
+        assert steps[1].name == "analyze"
+        assert steps[2].name == "fix"
+
+    def test_dynamic_workflow_with_context(self):
+        """Dynamic workflow adapts steps based on context."""
+        from moss.workflows import WorkflowContext
+        from moss.workflows.examples import ConditionalTestWorkflow
+
+        wf = ConditionalTestWorkflow()
+
+        # Without tests
+        ctx_no_tests = WorkflowContext(has_tests=False)
+        steps = wf.build_steps(ctx_no_tests)
+        assert len(steps) == 3
+        assert all(s.name != "test" for s in steps)
+
+        # With tests
+        ctx_with_tests = WorkflowContext(has_tests=True)
+        steps = wf.build_steps(ctx_with_tests)
+        assert len(steps) == 4
+        assert steps[-1].name == "test"
+
+    def test_language_aware_workflow(self):
+        """Language-aware workflow uses correct validator."""
+        from moss.workflows import WorkflowContext
+        from moss.workflows.examples import LanguageAwareWorkflow
+
+        wf = LanguageAwareWorkflow()
+
+        # Python
+        py_ctx = WorkflowContext(language="python")
+        steps = wf.build_steps(py_ctx)
+        assert steps[0].tool == "ruff.check"
+
+        # Rust
+        rs_ctx = WorkflowContext(language="rust")
+        steps = wf.build_steps(rs_ctx)
+        assert steps[0].tool == "cargo.check"
+
+        # Unknown (fallback)
+        unknown_ctx = WorkflowContext(language="cobol")
+        steps = wf.build_steps(unknown_ctx)
+        assert steps[0].tool == "validator.run"
+
+    def test_workflow_protocol_compliance(self):
+        """Both static and dynamic workflows implement WorkflowProtocol."""
+        from moss.workflows import WorkflowProtocol
+        from moss.workflows.examples import ConditionalTestWorkflow
+
+        static_wf = load_workflow("validate-fix")
+        dynamic_wf = ConditionalTestWorkflow()
+
+        assert isinstance(static_wf, WorkflowProtocol)
+        assert isinstance(dynamic_wf, WorkflowProtocol)

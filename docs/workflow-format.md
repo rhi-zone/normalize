@@ -187,24 +187,38 @@ Completed:
 5. ✅ Implement workflow loader with TOML parsing and @reference resolution
 
 6. ✅ Add CLI commands (`moss workflow list/show/run`)
-
-Remaining:
-- Implement Python workflow protocol for complex logic
+7. ✅ Python workflow protocol (`WorkflowProtocol`, `WorkflowContext`, `build_steps()`)
 
 ## Complex Workflows
 
 For logic that can't be expressed in TOML (conditionals, dynamic steps), use Python:
 
 ```python
-# workflows/complex.py
-from moss.workflows import Workflow, Step
+# From moss.workflows.examples
+from dataclasses import dataclass, field
+from moss.workflows import Workflow, WorkflowContext, WorkflowStep, WorkflowLimits, WorkflowLLMConfig
 
-class ComplexWorkflow(Workflow):
-    def build_steps(self, context):
-        steps = [Step("validate", "validator.run")]
-        if context.has_tests:
-            steps.append(Step("test", "pytest.run"))
+@dataclass
+class ConditionalTestWorkflow(Workflow):
+    """Adds test step only if project has tests."""
+
+    name: str = "conditional-test"
+    description: str = "Validate and optionally run tests"
+
+    def build_steps(self, context: WorkflowContext | None = None) -> list[WorkflowStep]:
+        steps = [
+            WorkflowStep(name="validate", tool="validator.run"),
+            WorkflowStep(name="fix", tool="patch.apply", input_from="validate"),
+        ]
+        if context and context.has_tests:
+            steps.append(WorkflowStep(name="test", tool="pytest.run"))
         return steps
 ```
+
+`WorkflowContext` provides runtime information:
+- `project_root`, `file_path` - location info
+- `has_tests` - whether project has tests directory
+- `language` - detected from file extension
+- `extra` - dict for custom context
 
 Python workflows implement the same `Workflow` protocol and are loaded via entry points.

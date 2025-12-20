@@ -24,6 +24,10 @@
 - `moss workflow list` - list available workflows
 - `moss workflow show <name>` - show workflow details (human or JSON)
 - `moss workflow run <name> --file <path>` - execute a workflow
+- `WorkflowProtocol` - protocol for static and dynamic workflows
+- `WorkflowContext` - runtime context for dynamic step generation
+- `build_steps(context)` method - enables Python workflows with conditional logic
+- Example workflows: `ConditionalTestWorkflow`, `LanguageAwareWorkflow`
 
 **Memory integration in agent loops** (new)
 - `LLMToolExecutor` now accepts `memory: MemoryManager` parameter

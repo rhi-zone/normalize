@@ -4,7 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Implement Python workflow protocol for complex logic
+1. **Evaluate agentic loop readiness** - how close to usable? what's missing?
+   - Validate current workflow execution end-to-end
+   - Identify blocking gaps (tool routing, error handling, etc.)
+   - Switching to agentic loop ASAP = major improvement
 2. Investigate MCP resource reading failure (ReadMcpResourceTool returns attribute error)
 3. Wire validate-fix workflow tools to executors
 
