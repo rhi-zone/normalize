@@ -92,11 +92,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ### Memory System
 - [x] Wire `MemoryLayer` into `LLMToolExecutor` (automatic layer) - done
 - [x] Add `check_triggers()` before risky steps (triggered layer) - done
-- [ ] Expose `memory.recall()` as agent tool (on-demand layer)
+- [x] Expose `memory.recall()` as agent tool (on-demand layer) - done
 - [ ] Plugin loading from `.moss/memory/`
 - [ ] Config schema in `.moss/config.toml`
 
 ### Agent Infrastructure
+- [ ] Ephemeral output caching for agent loop - apply MCP pattern to prevent context blowup
+  - Large tool outputs → EphemeralCache → preview + ID
+  - Agent can "expand" to fetch full content on demand
+  - Reuse `src/moss/cache.py:EphemeralCache`
 - [ ] Architect/Editor split - separate reasoning from editing
 - [ ] Configurable agent roles in `.moss/agents/`
 - [ ] Multi-subtree parallelism for independent work
