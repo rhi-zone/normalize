@@ -4,7 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-(See CHANGELOG.md v0.6.10 for recent completions)
+1. **Python find_symbols → Rust CLI** - use daemon index instead of rebuilding per call (723ms → ~10ms expected)
+2. **Revisit CLAUDE.md dogfooding section** - tools should be self-evident, not need instructions
+3. **Model-agnostic naming** - don't over-fit to specific LLM conventions
 
 ## Active Backlog
 
