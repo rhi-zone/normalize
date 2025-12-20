@@ -1,13 +1,72 @@
-"""Memory Layer: Episodic store and semantic rules."""
+"""Memory Layer: Episodic store, semantic rules, and plugin system.
+
+Layers:
+- automatic: Always loaded into system prompt
+- triggered: Pattern-activated, injected when relevant
+- on_demand: Explicit recall via memory.recall()
+
+Plugins are loaded from:
+- Built-in plugins (preferences, episodic, semantic)
+- .moss/memory/*.py (project-specific)
+- ~/.config/moss/memory/*.py (user-level)
+"""
 
 from __future__ import annotations
 
 import hashlib
+import importlib.util
+import logging
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum, auto
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Plugin Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class MemoryPlugin(Protocol):
+    """Protocol for memory sources.
+
+    Plugins provide context for different layers:
+    - automatic: Always included in system prompt
+    - triggered: Injected when pattern matches current state
+    - on_demand: Called explicitly via memory.recall()
+    """
+
+    @property
+    def name(self) -> str:
+        """Unique plugin identifier."""
+        ...
+
+    @property
+    def layer(self) -> Literal["automatic", "triggered", "on_demand"]:
+        """Which layer this plugin serves."""
+        ...
+
+    async def get_context(self, state: StateSnapshot) -> str | None:
+        """Return context if relevant, None otherwise.
+
+        For automatic: always returns context (or empty string)
+        For triggered: returns context only if pattern matches
+        For on_demand: called with query in state metadata
+        """
+        ...
+
+    def configure(self, config: dict[str, Any]) -> None:
+        """Apply configuration from .moss/config.toml."""
+        ...
 
 
 class Outcome(Enum):
@@ -684,3 +743,262 @@ class MemoryManager:
 def create_memory_manager() -> MemoryManager:
     """Create a memory manager with default stores."""
     return MemoryManager()
+
+
+# =============================================================================
+# Plugin Loading
+# =============================================================================
+
+
+def _load_plugin_module(path: Path) -> list[MemoryPlugin]:
+    """Load memory plugins from a Python file.
+
+    Scans the module for classes implementing MemoryPlugin protocol.
+
+    Args:
+        path: Path to Python file
+
+    Returns:
+        List of plugin instances found in the module
+    """
+    plugins: list[MemoryPlugin] = []
+
+    try:
+        # Create unique module name
+        module_name = f"moss_memory_plugin_{path.stem}_{hash(str(path))}"
+
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            logger.warning("Failed to create module spec for %s", path)
+            return plugins
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+
+        try:
+            spec.loader.exec_module(module)
+        except Exception as e:
+            logger.warning("Failed to load plugin module %s: %s", path, e)
+            del sys.modules[module_name]
+            return plugins
+
+        # Find plugin classes
+        for attr_name in dir(module):
+            if attr_name.startswith("_"):
+                continue
+            attr = getattr(module, attr_name)
+            if isinstance(attr, type) and attr is not MemoryPlugin:
+                # Check if it implements the protocol
+                if (
+                    hasattr(attr, "name")
+                    and hasattr(attr, "layer")
+                    and hasattr(attr, "get_context")
+                    and hasattr(attr, "configure")
+                ):
+                    try:
+                        instance = attr()
+                        if isinstance(instance, MemoryPlugin):
+                            plugins.append(instance)
+                            logger.debug("Loaded memory plugin: %s", instance.name)
+                    except Exception as e:
+                        logger.warning("Failed to instantiate plugin %s: %s", attr_name, e)
+
+    except Exception as e:
+        logger.warning("Error loading plugin from %s: %s", path, e)
+
+    return plugins
+
+
+def discover_plugins(project_dir: Path | None = None) -> list[MemoryPlugin]:
+    """Discover memory plugins from filesystem.
+
+    Scans:
+    - <project>/.moss/memory/*.py
+    - ~/.config/moss/memory/*.py
+
+    Args:
+        project_dir: Project directory (defaults to cwd)
+
+    Returns:
+        List of discovered plugin instances
+    """
+    plugins: list[MemoryPlugin] = []
+    search_dirs: list[Path] = []
+
+    # User-level plugins
+    user_dir = Path.home() / ".config" / "moss" / "memory"
+    if user_dir.exists():
+        search_dirs.append(user_dir)
+
+    # Project-level plugins (higher priority, loaded second)
+    if project_dir is None:
+        project_dir = Path.cwd()
+    project_plugin_dir = project_dir / ".moss" / "memory"
+    if project_plugin_dir.exists():
+        search_dirs.append(project_plugin_dir)
+
+    for search_dir in search_dirs:
+        for py_file in sorted(search_dir.glob("*.py")):
+            if py_file.name.startswith("_"):
+                continue
+            loaded = _load_plugin_module(py_file)
+            plugins.extend(loaded)
+
+    return plugins
+
+
+class MemoryLayer:
+    """Unified memory layer that aggregates plugins.
+
+    Provides:
+    - get_automatic(): Context from automatic-layer plugins
+    - check_triggers(state): Warnings from triggered-layer plugins
+    - recall(query): Results from on-demand-layer plugins
+    """
+
+    def __init__(
+        self,
+        plugins: Sequence[MemoryPlugin] | None = None,
+        memory_manager: MemoryManager | None = None,
+    ):
+        """Initialize the memory layer.
+
+        Args:
+            plugins: Pre-loaded plugins (if None, discovery is run)
+            memory_manager: MemoryManager for built-in episodic/semantic stores
+        """
+        self._plugins: list[MemoryPlugin] = list(plugins) if plugins else []
+        self._by_layer: dict[str, list[MemoryPlugin]] = {
+            "automatic": [],
+            "triggered": [],
+            "on_demand": [],
+        }
+        self._manager = memory_manager or MemoryManager()
+        self._config: dict[str, dict[str, Any]] = {}
+
+        for plugin in self._plugins:
+            self._by_layer[plugin.layer].append(plugin)
+
+    @classmethod
+    def default(cls, project_dir: Path | None = None) -> MemoryLayer:
+        """Create a MemoryLayer with discovered plugins and defaults."""
+        plugins = discover_plugins(project_dir)
+        return cls(plugins=plugins)
+
+    def add_plugin(self, plugin: MemoryPlugin) -> None:
+        """Add a plugin to the layer."""
+        self._plugins.append(plugin)
+        self._by_layer[plugin.layer].append(plugin)
+        if plugin.name in self._config:
+            plugin.configure(self._config[plugin.name])
+
+    def configure(self, config: dict[str, dict[str, Any]]) -> None:
+        """Apply configuration to all plugins.
+
+        Config format:
+        {
+            "plugin_name": {"key": "value", ...},
+            ...
+        }
+        """
+        self._config = config
+        for plugin in self._plugins:
+            if plugin.name in config:
+                plugin.configure(config[plugin.name])
+
+    async def get_automatic(self, state: StateSnapshot | None = None) -> str:
+        """Get context from automatic-layer plugins.
+
+        Returns combined context from all automatic plugins.
+        """
+        if state is None:
+            state = StateSnapshot.create(files=[], context="")
+
+        parts: list[str] = []
+        for plugin in self._by_layer["automatic"]:
+            try:
+                ctx = await plugin.get_context(state)
+                if ctx:
+                    parts.append(ctx)
+            except Exception as e:
+                logger.warning("Plugin %s failed in get_automatic: %s", plugin.name, e)
+
+        return "\n\n".join(parts)
+
+    async def check_triggers(self, state: StateSnapshot) -> list[str]:
+        """Check triggered-layer plugins for warnings.
+
+        Returns list of warning strings from plugins whose patterns match.
+        """
+        warnings: list[str] = []
+        for plugin in self._by_layer["triggered"]:
+            try:
+                ctx = await plugin.get_context(state)
+                if ctx:
+                    warnings.append(ctx)
+            except Exception as e:
+                logger.warning("Plugin %s failed in check_triggers: %s", plugin.name, e)
+
+        return warnings
+
+    async def recall(self, query: str, limit: int = 5) -> str:
+        """Query on-demand plugins plus built-in memory.
+
+        Args:
+            query: Natural language query
+            limit: Maximum results per source
+
+        Returns:
+            Combined results from all sources
+        """
+        parts: list[str] = []
+
+        # Query built-in memory manager first
+        manager_result = await self._manager.recall(query, limit=limit)
+        if manager_result and manager_result != "No relevant memories found.":
+            parts.append(manager_result)
+
+        # Query on-demand plugins
+        state = StateSnapshot.create(files=[], context=query, metadata={"query": query})
+        for plugin in self._by_layer["on_demand"]:
+            try:
+                ctx = await plugin.get_context(state)
+                if ctx:
+                    parts.append(ctx)
+            except Exception as e:
+                logger.warning("Plugin %s failed in recall: %s", plugin.name, e)
+
+        if not parts:
+            return "No relevant memories found."
+
+        return "\n\n".join(parts)
+
+    @property
+    def manager(self) -> MemoryManager:
+        """Get the underlying MemoryManager for direct access."""
+        return self._manager
+
+    @property
+    def plugins(self) -> list[MemoryPlugin]:
+        """Get all registered plugins."""
+        return list(self._plugins)
+
+
+__all__ = [
+    "Action",
+    "Episode",
+    "EpisodicStore",
+    "MemoryContext",
+    "MemoryLayer",
+    "MemoryManager",
+    "MemoryPlugin",
+    "Outcome",
+    "PatternMatcher",
+    "SemanticRule",
+    "SemanticStore",
+    "SimpleVectorIndex",
+    "StateSnapshot",
+    "VectorIndex",
+    "create_memory_manager",
+    "discover_plugins",
+]

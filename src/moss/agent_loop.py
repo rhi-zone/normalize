@@ -1668,6 +1668,8 @@ class LLMToolExecutor:
         root: Any = None,
         load_env: bool = True,
         memory: Any = None,  # MemoryManager, typed as Any to avoid circular import
+        cache_large_outputs: bool = True,
+        large_output_threshold: int = 4000,
     ):
         """Initialize the executor.
 
@@ -1677,6 +1679,8 @@ class LLMToolExecutor:
             root: Project root for MossToolExecutor
             load_env: Whether to load .env file (default: True)
             memory: Optional MemoryManager for cross-session learning
+            cache_large_outputs: Whether to cache large outputs (default: True)
+            large_output_threshold: Character threshold for caching (default: 4000)
         """
         # Load .env once per process
         if load_env and not LLMToolExecutor._dotenv_loaded:
@@ -1686,6 +1690,63 @@ class LLMToolExecutor:
         self.moss_executor = moss_executor or MossToolExecutor(root)
         self.memory = memory
         self._call_count = 0  # For round-robin rotation
+
+        # Ephemeral output caching
+        self.cache_large_outputs = cache_large_outputs
+        self.large_output_threshold = large_output_threshold
+        self._ephemeral_cache: Any = None  # Lazy-loaded
+
+    def _get_ephemeral_cache(self) -> Any:
+        """Get the ephemeral cache instance (lazy-loaded)."""
+        if self._ephemeral_cache is None:
+            from moss.cache import get_ephemeral_cache
+
+            self._ephemeral_cache = get_ephemeral_cache()
+        return self._ephemeral_cache
+
+    def _maybe_cache_output(self, result: tuple[Any, int, int]) -> tuple[Any, int, int]:
+        """Cache large outputs and return preview with cache ID.
+
+        If the output is large (>threshold characters), stores the full content
+        in the ephemeral cache and returns a preview with a cache ID.
+        Agent can use "cache.get <id>" to retrieve the full content.
+
+        Args:
+            result: Tuple of (output, tokens_in, tokens_out)
+
+        Returns:
+            Original tuple if small, or (preview_with_id, tokens_in, tokens_out) if cached
+        """
+        if not self.cache_large_outputs:
+            return result
+
+        output, tokens_in, tokens_out = result
+
+        # Only cache string outputs
+        if not isinstance(output, str):
+            # Try converting dicts/lists to string for size check
+            if isinstance(output, (dict, list)):
+                output_str = str(output)
+            else:
+                return result
+        else:
+            output_str = output
+
+        # Check size
+        if len(output_str) <= self.large_output_threshold:
+            return result
+
+        # Cache the full output
+        cache = self._get_ephemeral_cache()
+        cache_id = cache.store(output_str)
+        preview = cache.generate_preview(output_str, max_chars=2000)
+
+        # Return preview with cache ID
+        cached_output = (
+            f"{preview}\n\n"
+            f"[Cache ID: {cache_id}] Use 'cache.get {cache_id}' to retrieve full content."
+        )
+        return (cached_output, tokens_in, tokens_out)
 
     def _get_model(self) -> str:
         """Get the model to use for the next LLM call.
@@ -1735,6 +1796,8 @@ class LLMToolExecutor:
                 result = await self._execute_llm(tool_name, context, step)
             elif tool_name.startswith("memory."):
                 result = await self._execute_memory(tool_name, context, step)
+            elif tool_name.startswith("cache."):
+                result = await self._execute_cache(tool_name, context, step)
             else:
                 result = await self.moss_executor.execute(tool_name, context, step)
         except Exception as e:
@@ -1751,6 +1814,10 @@ class LLMToolExecutor:
         await self._record_episode(
             tool_name, context, step, success=True, error=None, duration_ms=duration
         )
+
+        # Cache large outputs (not for cache.get operations to avoid recursion)
+        if not tool_name.startswith("cache."):
+            result = self._maybe_cache_output(result)
 
         return result
 
@@ -1874,6 +1941,43 @@ class LLMToolExecutor:
             return result, 0, 0
         else:
             return f"Unknown memory operation: {operation}", 0, 0
+
+    async def _execute_cache(
+        self, tool_name: str, context: LoopContext, step: LoopStep
+    ) -> tuple[Any, int, int]:
+        """Execute a cache operation.
+
+        Cache tools are non-LLM, so tokens are always (0, 0).
+
+        Supported operations:
+        - cache.get <id>: Retrieve cached content by ID
+        - cache.stats: Get cache statistics
+        """
+        operation = tool_name.split(".", 1)[1] if "." in tool_name else tool_name
+
+        if operation == "get":
+            # Extract cache ID from step input or context
+            cache_id = ""
+            if step.input_from and context.get(step.input_from):
+                cache_id = str(context.get(step.input_from))
+            elif context.last:
+                cache_id = str(context.last)
+            else:
+                cache_id = step.name
+
+            cache = self._get_ephemeral_cache()
+            content = cache.get_content(cache_id.strip())
+            if content is None:
+                return f"Cache entry not found or expired: {cache_id}", 0, 0
+            return content, 0, 0
+
+        elif operation == "stats":
+            cache = self._get_ephemeral_cache()
+            stats = cache.stats()
+            return str(stats), 0, 0
+
+        else:
+            return f"Unknown cache operation: {operation}", 0, 0
 
     async def _get_memory_context(self) -> str:
         """Get automatic memory context to inject into system prompt."""

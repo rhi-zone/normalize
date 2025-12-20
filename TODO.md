@@ -4,11 +4,31 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Memory system plugin loading from `.moss/memory/`
-- Ephemeral output caching for agent loop - large outputs → preview + ID
-- `moss patterns` - detect architectural patterns in codebase
+- Investigate `moss clones` output format
+  - Level 0: same-named clones are real copy-paste (working correctly)
+  - Level 2: shows different-named functions with same body (property getters, etc.)
+  - Question: improve output to show WHY code matches (diff-style highlighting?)
+- Architect/Editor split - separate reasoning from editing in agent loop
+- Terminal subagent with persistent shell session
 
 ## Recently Completed
+
+- **Memory plugin system** (Dec 2025):
+  - `MemoryPlugin` protocol for extensible memory sources
+  - Plugin discovery from `.moss/memory/` and `~/.config/moss/memory/`
+  - `MemoryLayer` aggregates automatic/triggered/on-demand plugins
+  - Full test coverage for plugin loading and layer operations
+
+- **Ephemeral output caching** (Dec 2025):
+  - `LLMToolExecutor` auto-caches large outputs (>4K chars)
+  - Returns preview + cache ID instead of full content
+  - `cache.get` tool to retrieve full content on demand
+  - Prevents context blowup from large tool results
+
+- **Pattern detection** (Dec 2025):
+  - `moss patterns` CLI command to detect architectural patterns
+  - Detects: plugin systems, factories, strategies, singletons, coupling
+  - JSON output with `--json`, compact summary with `--compact`
 
 - **Expand auto-select** (Dec 2025):
   - Auto-selects best match when all matches have same symbol name
@@ -170,7 +190,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Bidirectional sync with issue trackers
 
 ### Code Quality
-- [ ] `moss patterns` - detect architectural patterns
+- [x] `moss patterns` - detect architectural patterns - done (Dec 2025)
 - [ ] `moss refactor` - detect opportunities, apply with rope/libcst
 - [ ] `moss review` - PR analysis using rules + LLM
 
@@ -193,14 +213,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Wire `MemoryLayer` into `LLMToolExecutor` (automatic layer) - done
 - [x] Add `check_triggers()` before risky steps (triggered layer) - done
 - [x] Expose `memory.recall()` as agent tool (on-demand layer) - done
-- [ ] Plugin loading from `.moss/memory/`
+- [x] Plugin loading from `.moss/memory/` - done (Dec 2025)
 - [ ] Config schema in `.moss/config.toml`
 
 ### Agent Infrastructure
-- [ ] Ephemeral output caching for agent loop - apply MCP pattern to prevent context blowup
+- [x] Ephemeral output caching for agent loop - done (Dec 2025)
   - Large tool outputs → EphemeralCache → preview + ID
-  - Agent can "expand" to fetch full content on demand
-  - Reuse `src/moss/cache.py:EphemeralCache`
+  - `cache.get` tool to fetch full content on demand
 - [ ] Architect/Editor split - separate reasoning from editing
 - [ ] Configurable agent roles in `.moss/agents/`
 - [ ] Multi-subtree parallelism for independent work

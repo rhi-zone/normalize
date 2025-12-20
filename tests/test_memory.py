@@ -1,12 +1,16 @@
 """Tests for Memory Layer."""
 
+from typing import Any, Literal
+
 import pytest
 
 from moss.memory import (
     Action,
     Episode,
     EpisodicStore,
+    MemoryLayer,
     MemoryManager,
+    MemoryPlugin,
     Outcome,
     PatternMatcher,
     SemanticRule,
@@ -14,6 +18,7 @@ from moss.memory import (
     SimpleVectorIndex,
     StateSnapshot,
     create_memory_manager,
+    discover_plugins,
 )
 
 
@@ -474,3 +479,222 @@ class TestCreateMemoryManager:
         assert manager is not None
         assert manager.episodic is not None
         assert manager.semantic is not None
+
+
+# =============================================================================
+# Plugin System Tests
+# =============================================================================
+
+
+class MockAutomaticPlugin:
+    """Mock plugin for automatic layer."""
+
+    name = "mock_automatic"
+    layer: Literal["automatic"] = "automatic"
+
+    async def get_context(self, state: StateSnapshot) -> str | None:
+        return "Automatic context from mock"
+
+    def configure(self, config: dict[str, Any]) -> None:
+        self.config = config
+
+
+class MockTriggeredPlugin:
+    """Mock plugin for triggered layer."""
+
+    name = "mock_triggered"
+    layer: Literal["triggered"] = "triggered"
+
+    def __init__(self):
+        self.trigger_pattern = "dangerous"
+
+    async def get_context(self, state: StateSnapshot) -> str | None:
+        context_str = " ".join(state.files)
+        if self.trigger_pattern in context_str:
+            return f"Warning: {self.trigger_pattern} detected"
+        return None
+
+    def configure(self, config: dict[str, Any]) -> None:
+        if "pattern" in config:
+            self.trigger_pattern = config["pattern"]
+
+
+class MockOnDemandPlugin:
+    """Mock plugin for on-demand layer."""
+
+    name = "mock_on_demand"
+    layer: Literal["on_demand"] = "on_demand"
+
+    async def get_context(self, state: StateSnapshot) -> str | None:
+        query = dict(state.metadata).get("query", "")
+        if "history" in query:
+            return "On-demand history: some past events"
+        return None
+
+    def configure(self, config: dict[str, Any]) -> None:
+        pass
+
+
+class TestMemoryPlugin:
+    """Tests for MemoryPlugin protocol."""
+
+    def test_mock_plugins_implement_protocol(self):
+        auto = MockAutomaticPlugin()
+        trig = MockTriggeredPlugin()
+        demand = MockOnDemandPlugin()
+
+        assert isinstance(auto, MemoryPlugin)
+        assert isinstance(trig, MemoryPlugin)
+        assert isinstance(demand, MemoryPlugin)
+
+    def test_plugin_properties(self):
+        plugin = MockAutomaticPlugin()
+
+        assert plugin.name == "mock_automatic"
+        assert plugin.layer == "automatic"
+
+
+class TestMemoryLayer:
+    """Tests for MemoryLayer."""
+
+    @pytest.fixture
+    def layer_with_plugins(self):
+        plugins = [
+            MockAutomaticPlugin(),
+            MockTriggeredPlugin(),
+            MockOnDemandPlugin(),
+        ]
+        return MemoryLayer(plugins=plugins)
+
+    def test_init_with_plugins(self, layer_with_plugins: MemoryLayer):
+        assert len(layer_with_plugins.plugins) == 3
+        assert layer_with_plugins.manager is not None
+
+    def test_add_plugin(self):
+        layer = MemoryLayer()
+        plugin = MockAutomaticPlugin()
+
+        layer.add_plugin(plugin)
+
+        assert plugin in layer.plugins
+
+    async def test_get_automatic(self, layer_with_plugins: MemoryLayer):
+        result = await layer_with_plugins.get_automatic()
+
+        assert "Automatic context from mock" in result
+
+    async def test_check_triggers_match(self, layer_with_plugins: MemoryLayer):
+        state = StateSnapshot.create(files=["dangerous_file.py"], context="code")
+
+        warnings = await layer_with_plugins.check_triggers(state)
+
+        assert len(warnings) == 1
+        assert "dangerous" in warnings[0]
+
+    async def test_check_triggers_no_match(self, layer_with_plugins: MemoryLayer):
+        state = StateSnapshot.create(files=["safe_file.py"], context="code")
+
+        warnings = await layer_with_plugins.check_triggers(state)
+
+        assert len(warnings) == 0
+
+    async def test_recall_on_demand(self, layer_with_plugins: MemoryLayer):
+        result = await layer_with_plugins.recall("show me history")
+
+        assert "On-demand history" in result
+
+    async def test_recall_no_match(self, layer_with_plugins: MemoryLayer):
+        result = await layer_with_plugins.recall("unrelated query xyz")
+
+        assert result == "No relevant memories found."
+
+    def test_configure_plugins(self):
+        plugin = MockTriggeredPlugin()
+        layer = MemoryLayer(plugins=[plugin])
+
+        layer.configure({"mock_triggered": {"pattern": "critical"}})
+
+        assert plugin.trigger_pattern == "critical"
+
+    @pytest.fixture
+    def layer_default(self):
+        # Create layer without any plugins to test defaults
+        return MemoryLayer(plugins=[])
+
+    async def test_empty_layer(self, layer_default: MemoryLayer):
+        result = await layer_default.get_automatic()
+        assert result == ""
+
+        state = StateSnapshot.create(files=["a.py"], context="")
+        warnings = await layer_default.check_triggers(state)
+        assert warnings == []
+
+
+class TestDiscoverPlugins:
+    """Tests for discover_plugins function."""
+
+    def test_discover_from_nonexistent_dir(self, tmp_path):
+        # Should not fail when directories don't exist
+        plugins = discover_plugins(tmp_path)
+        assert plugins == []
+
+    def test_discover_from_empty_dir(self, tmp_path):
+        (tmp_path / ".moss" / "memory").mkdir(parents=True)
+        plugins = discover_plugins(tmp_path)
+        assert plugins == []
+
+    def test_discover_skips_underscore_files(self, tmp_path):
+        memory_dir = tmp_path / ".moss" / "memory"
+        memory_dir.mkdir(parents=True)
+
+        # Create a file starting with underscore
+        (memory_dir / "_private.py").write_text("# should be skipped")
+
+        plugins = discover_plugins(tmp_path)
+        assert plugins == []
+
+    def test_discover_loads_valid_plugin(self, tmp_path):
+        memory_dir = tmp_path / ".moss" / "memory"
+        memory_dir.mkdir(parents=True)
+
+        # Create a valid plugin file
+        plugin_code = """
+from typing import Any, Literal
+
+class TestDiscoveryPlugin:
+    name = "test_discovery"
+    layer: Literal["automatic"] = "automatic"
+
+    async def get_context(self, state):
+        return "discovered!"
+
+    def configure(self, config: dict[str, Any]) -> None:
+        pass
+"""
+        (memory_dir / "test_plugin.py").write_text(plugin_code)
+
+        plugins = discover_plugins(tmp_path)
+
+        assert len(plugins) == 1
+        assert plugins[0].name == "test_discovery"
+
+    def test_discover_handles_invalid_plugin(self, tmp_path):
+        memory_dir = tmp_path / ".moss" / "memory"
+        memory_dir.mkdir(parents=True)
+
+        # Create a file with syntax error
+        (memory_dir / "bad.py").write_text("this is not valid python {{{")
+
+        # Should not raise, just skip the bad file
+        plugins = discover_plugins(tmp_path)
+        assert plugins == []
+
+
+class TestMemoryLayerDefault:
+    """Tests for MemoryLayer.default() factory."""
+
+    def test_default_creates_layer(self, tmp_path):
+        layer = MemoryLayer.default(tmp_path)
+
+        assert layer is not None
+        assert layer.manager is not None

@@ -1247,3 +1247,120 @@ class TestConfigSerialization:
         assert original.args == loaded.args
         assert original.cwd == loaded.cwd
         assert original.env == loaded.env
+
+
+class TestEphemeralOutputCaching:
+    """Tests for ephemeral output caching in LLMToolExecutor."""
+
+    @pytest.fixture
+    def executor(self):
+        """Create an LLMToolExecutor with caching enabled."""
+        return LLMToolExecutor(
+            config=LLMConfig(mock=True),
+            cache_large_outputs=True,
+            large_output_threshold=100,  # Low threshold for testing
+        )
+
+    @pytest.fixture
+    def executor_no_cache(self):
+        """Create an LLMToolExecutor with caching disabled."""
+        return LLMToolExecutor(
+            config=LLMConfig(mock=True),
+            cache_large_outputs=False,
+        )
+
+    def test_small_output_not_cached(self, executor):
+        """Small outputs should pass through unchanged."""
+        result = ("small output", 10, 5)
+        cached = executor._maybe_cache_output(result)
+
+        assert cached == result
+        assert cached[0] == "small output"
+
+    def test_large_output_cached(self, executor):
+        """Large outputs should be cached with preview."""
+        large_output = "x" * 200  # Above 100 char threshold
+        result = (large_output, 10, 5)
+        cached = executor._maybe_cache_output(result)
+
+        # Output should contain preview + cache ID
+        assert "Cache ID:" in cached[0]
+        assert "x" in cached[0]  # Preview should contain some content
+        assert cached[1] == 10  # tokens preserved
+        assert cached[2] == 5
+
+    def test_caching_disabled(self, executor_no_cache):
+        """When caching disabled, large outputs pass through."""
+        large_output = "x" * 200
+        result = (large_output, 10, 5)
+        cached = executor_no_cache._maybe_cache_output(result)
+
+        assert cached == result
+        assert "Cache ID:" not in cached[0]
+
+    def test_dict_output_cached(self, executor):
+        """Dict outputs should be cached based on string representation."""
+        large_dict = {"data": "x" * 200}
+        result = (large_dict, 10, 5)
+        cached = executor._maybe_cache_output(result)
+
+        # Dict gets converted to string for caching
+        assert "Cache ID:" in cached[0]
+
+    def test_non_string_non_dict_passes_through(self, executor):
+        """Non-string, non-dict outputs should pass through."""
+        result = (123, 10, 5)
+        cached = executor._maybe_cache_output(result)
+
+        assert cached == result
+
+    @pytest.mark.asyncio
+    async def test_cache_get_operation(self, executor):
+        """Test cache.get retrieves cached content."""
+        # First, manually cache something
+        cache = executor._get_ephemeral_cache()
+        cache_id = cache.store("full cached content")
+
+        context = LoopContext(last=cache_id)
+        step = LoopStep(name="retrieve", tool="cache.get")
+
+        result, tokens_in, tokens_out = await executor._execute_cache("cache.get", context, step)
+
+        assert result == "full cached content"
+        assert tokens_in == 0
+        assert tokens_out == 0
+
+    @pytest.mark.asyncio
+    async def test_cache_get_not_found(self, executor):
+        """Test cache.get with invalid ID."""
+        context = LoopContext(last="nonexistent_id")
+        step = LoopStep(name="retrieve", tool="cache.get")
+
+        result, _, _ = await executor._execute_cache("cache.get", context, step)
+
+        assert "not found" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_cache_stats_operation(self, executor):
+        """Test cache.stats returns statistics."""
+        # Add something to cache
+        cache = executor._get_ephemeral_cache()
+        cache.store("test content")
+
+        context = LoopContext()
+        step = LoopStep(name="stats", tool="cache.stats")
+
+        result, _, _ = await executor._execute_cache("cache.stats", context, step)
+
+        assert "entries" in result
+        assert "total_size" in result  # Stats include size info
+
+    @pytest.mark.asyncio
+    async def test_unknown_cache_operation(self, executor):
+        """Test unknown cache operation returns error."""
+        context = LoopContext()
+        step = LoopStep(name="unknown", tool="cache.unknown")
+
+        result, _, _ = await executor._execute_cache("cache.unknown", context, step)
+
+        assert "Unknown cache operation" in result
