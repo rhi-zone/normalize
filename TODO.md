@@ -46,10 +46,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Full test coverage in `tests/test_edit.py`
 
 - **Vanilla Agent Loop** (Dec 2025):
-  - Minimal agent loop implementation with `TaskTree`, LLM, and Tools
-  - Uses token-efficient terse intents (DWIM-style) for communication
-  - Integrated into `MossAPI` via `AgentAPI`
-  - Unit tests in `tests/test_vanilla_loop.py`
+  - Refactored to data-driven workflow at `src/workflows/vanilla.toml`
+  - Uses `agent.step` tool mapping to `LLMToolExecutor`
+  - Integrated into `AgentAPI` and `moss agent --vanilla` CLI
+  - Uses token-efficient terse intents (DWIM-style)
 
 - **Docs Site Styling** (Dec 2025):
   - Added glassmorphism effects with backdrop-filter

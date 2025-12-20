@@ -4272,21 +4272,16 @@ def cmd_agent(args: Namespace) -> int:
         return 0
 
     if use_vanilla:
-        from moss.agent_loop import LLMConfig, LLMToolExecutor
-        from moss.vanilla_loop import VanillaAgentLoop, VanillaLoopState
+        from moss.workflows import run_workflow
 
-        llm_config = LLMConfig(model=model or "gemini/gemini-2.0-flash")
-        executor = LLMToolExecutor(config=llm_config, root=api.root)
-        loop = VanillaAgentLoop(api, llm_config, executor, max_turns=max_turns)
-
-        output.info(f"Starting Vanilla agent: {task}")
+        output.info(f"Starting Vanilla agent workflow: {task}")
         if verbose:
-            output.info(f"Model: {llm_config.model}")
             output.info(f"Max turns: {max_turns}")
         output.info("")
 
         try:
-            result = asyncio.run(loop.run(task))
+            initial_input = {"task": task}
+            result = asyncio.run(run_workflow("vanilla", initial_input, project_root=api.root))
         except ImportError as e:
             output.error(f"Missing dependency: {e}")
             output.info("Install with: pip install 'moss[llm]'")
@@ -4297,25 +4292,21 @@ def cmd_agent(args: Namespace) -> int:
 
         # Show Vanilla results
         if verbose:
-            output.info(f"\nTurns: {len(result.turns)}")
-            output.info(f"Duration: {result.total_duration_ms}ms")
-            for i, turn in enumerate(result.turns, 1):
-                output.info(f"\n--- Turn {i} ---")
-                output.info(f"Prompt: {turn.prompt[:100]}...")
-                output.info(f"Response: {turn.response[:200]}...")
-                if turn.tool_name:
-                    output.info(f"Tool: {turn.tool_name}")
-                if turn.error:
-                    output.warning(f"Error: {turn.error}")
+            output.info(f"\nSteps: {len(result.step_results)}")
+            output.info(f"LLM Calls: {result.metrics.llm_calls}")
+            for i, step in enumerate(result.step_results, 1):
+                output.info(f"\n--- Step {i}: {step.step_name} ---")
+                if step.error:
+                    output.warning(f"Error: {step.error}")
+                elif step.output:
+                    out_str = str(step.output)[:200]
+                    output.info(f"Output: {out_str}...")
 
-        if result.state == VanillaLoopState.DONE:
-            output.success(f"\nCompleted in {len(result.turns)} turns")
+        if result.success:
+            output.success(f"\nCompleted in {len(result.step_results)} steps")
             if result.final_output:
                 output.info(f"Final: {str(result.final_output)[:500]}")
             return 0
-        elif result.state == VanillaLoopState.MAX_TURNS:
-            output.warning(f"\nMax turns ({max_turns}) reached")
-            return 1
         else:
             output.error(f"\nFailed: {result.error}")
             return 1

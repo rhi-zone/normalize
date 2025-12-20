@@ -1829,7 +1829,7 @@ class LLMToolExecutor:
             pass
 
         try:
-            if tool_name.startswith("llm."):
+            if tool_name.startswith("llm.") or tool_name == "agent.step":
                 result = await self._execute_llm(tool_name, context, step)
             elif tool_name.startswith("memory."):
                 result = await self._execute_memory(tool_name, context, step)

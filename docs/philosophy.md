@@ -35,6 +35,13 @@ LLM calls are expensive (cost) and slow (latency). Design everything to reduce t
 
 This is why we have skeleton views (understand code without LLM), validation loops (catch errors without LLM), and DWIM (find tools without LLM). The goal: an agent that calls the LLM 10x less than naive approaches.
 
+### Minimizing Error Rates
+
+Validation and heuristics are primary citizens in Moss. Because LLMs are not 100% reliable, we must never trust their output implicitly:
+- **Verification First**: Every change must pass through a domain-specific validator (compiler, linter, test suite)
+- **Heuristic Guardrails**: Use structural rules to detect obvious mistakes before they reach the validator
+- **Correction over perfection**: Focus on fast feedback loops that allow the agent to correct itself based on deterministic error signals
+
 ### Prompt Engineering for Token Efficiency
 
 When you do call an LLM, minimize output tokens. Our system prompt in `src/moss/agent_loop.py` explicitly forbids:

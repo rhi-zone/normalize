@@ -3557,6 +3557,7 @@ class AgentAPI:
         """Run a minimal vanilla agent loop on a task.
 
         Uses TaskTree for state and terse intents for communication.
+        Refactored to use the data-driven workflow system.
 
         Args:
             task: Task description
@@ -3564,17 +3565,13 @@ class AgentAPI:
             max_turns: Maximum number of agent turns
 
         Returns:
-            VanillaLoopResult with execution history and final output
+            LoopResult with execution history and final output
         """
-        from moss.agent_loop import LLMConfig, LLMToolExecutor
-        from moss.vanilla_loop import VanillaAgentLoop
+        from moss.workflows import run_workflow
 
-        api = MossAPI.for_project(self.root)
-        llm_config = LLMConfig(model=model)
-        executor = LLMToolExecutor(config=llm_config, root=self.root)
-        loop = VanillaAgentLoop(api, llm_config, executor, max_turns=max_turns)
-
-        return await loop.run(task)
+        # initial_input needs to be what the loop expects
+        initial_input = {"task": task}
+        return await run_workflow("vanilla", initial_input, project_root=self.root)
 
 
 @dataclass
