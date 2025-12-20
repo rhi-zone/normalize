@@ -260,6 +260,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ### Plugin Simplification
 - [x] LLM providers: consolidated to litellm-only (Dec 2025)
 - [x] Linter plugins: existing SARIFAdapter + per-tool plugins is correct design
+- [ ] **Plugin Management**:
+  - Mechanism to disable default plugins per feature (e.g. `enabled = false` in config)
 
 ### Dependency Introspection
 - [ ] `moss external-deps` improvements - filtering, show which features include a dep
