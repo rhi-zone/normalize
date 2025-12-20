@@ -4,11 +4,19 @@
 
 ### Features
 
-**Workflow externalization** (new)
+**Workflow externalization** (expanded)
 - Design doc for TOML-based workflow/prompt format (`docs/workflow-format.md`)
 - Prompt loader with user override support (`src/moss/prompts/`)
 - `load_prompt(name)` checks `.moss/prompts/` then built-ins
 - `REPAIR_ENGINE_PROMPT` externalized as proof of concept
+- `LLMConfig.system_prompt` now loads from `prompts/terse.txt` by default
+- `get_system_prompt()` method for lazy loading with explicit override support
+- Workflow loader (`src/moss/workflows/`) with TOML parsing
+- `@prompts/name` and `@workflows/name` reference resolution
+- `Workflow`, `WorkflowStep`, `WorkflowLimits`, `AgentDefinition` dataclasses
+- Built-in `validate-fix.toml` workflow example
+- User override examples in docs (`docs/workflow-format.md`)
+- 19 tests for workflow loading
 - Integration test for hunk-level rollback with verification failure
 
 **Memory integration in agent loops** (new)

@@ -125,6 +125,45 @@ peek_first = true  # Enforce expand-before-edit
 - `@workflows/name` → loads workflow definition
 - Searches: `.moss/` first, then `src/moss/` for built-ins
 
+## User Override Example
+
+Override the default terse system prompt with a project-specific version:
+
+```bash
+# Create project override directory
+mkdir -p .moss/prompts
+
+# Create custom terse prompt
+cat > .moss/prompts/terse.txt << 'EOF'
+You are working on a safety-critical system.
+Be extremely precise. Double-check all changes.
+Never make assumptions about undefined behavior.
+When in doubt, ask for clarification.
+EOF
+```
+
+This prompt will now be used instead of the built-in terse prompt for all LLM calls in this project.
+
+Override the repair-engine prompt for stricter error handling:
+
+```bash
+cat > .moss/prompts/repair-engine.txt << 'EOF'
+STRICT REPAIR MODE: Fix errors with zero tolerance for regressions.
+
+Rules:
+- Fix ONLY the exact error reported
+- Do not touch any other code
+- If the fix is ambiguous, leave a TODO comment instead
+- Preserve all existing tests and behavior
+
+Process:
+1. Read the error message carefully
+2. Locate the exact line causing the error
+3. Apply the minimal fix
+4. Verify the fix doesn't break related code
+EOF
+```
+
 ## Loader API
 
 ```python
@@ -140,10 +179,17 @@ workflow = load_workflow(Path(".moss/workflows/custom.toml"))
 
 ## Migration Path
 
-1. Extract `REPAIR_ENGINE_PROMPT` to `src/moss/prompts/repair-engine.txt`
-2. Add `load_prompt()` function that checks `.moss/prompts/` first
-3. Update `agent_loop.py` to use `load_prompt("repair-engine")`
-4. Later: extract full workflow definitions
+Completed:
+1. ✅ Extract `REPAIR_ENGINE_PROMPT` to `src/moss/prompts/repair-engine.txt`
+2. ✅ Add `load_prompt()` function that checks `.moss/prompts/` first
+3. ✅ Update `agent_loop.py` to use `load_prompt("repair-engine")`
+4. ✅ Extract `LLMConfig.system_prompt` to `src/moss/prompts/terse.txt`
+5. ✅ Implement workflow loader with TOML parsing and @reference resolution
+
+Remaining:
+- Wire workflow loader into agent loop runner
+- Add CLI commands for workflow management
+- Implement Python workflow protocol for complex logic
 
 ## Complex Workflows
 

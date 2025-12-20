@@ -63,6 +63,8 @@ cache/
 
 # debugging text files
 *.txt
+# but keep prompt files
+!src/moss/prompts/*.txt
 
 *.cpuprofile
 .moss/lessons.md

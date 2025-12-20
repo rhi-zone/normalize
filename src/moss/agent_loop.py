@@ -13,9 +13,10 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-# Lazy-loaded prompt for syntax repair engine.
-# Loaded from src/moss/prompts/repair-engine.txt (or user override in .moss/prompts/)
+# Lazy-loaded prompts.
+# Loaded from src/moss/prompts/ (or user override in .moss/prompts/)
 _repair_engine_prompt: str | None = None
+_terse_prompt: str | None = None
 
 
 def get_repair_engine_prompt() -> str:
@@ -26,6 +27,16 @@ def get_repair_engine_prompt() -> str:
 
         _repair_engine_prompt = load_prompt("repair-engine")
     return _repair_engine_prompt
+
+
+def get_terse_prompt() -> str:
+    """Load terse system prompt with caching."""
+    global _terse_prompt
+    if _terse_prompt is None:
+        from moss.prompts import load_prompt
+
+        _terse_prompt = load_prompt("terse")
+    return _terse_prompt
 
 
 class StepType(Enum):
@@ -1476,12 +1487,14 @@ class LLMConfig:
     rotation: str | None = None  # "round_robin", "random", or None
     temperature: float = 0.0
     max_tokens: int | None = None  # Let the model determine output length
-    system_prompt: str = (
-        "Be terse. No preamble, no summary, no markdown formatting. "
-        "Plain text only - no bold, no headers, no code blocks unless asked. "
-        "For analysis: short bullet points, max 5 items, no code."
-    )
+    system_prompt: str | None = None  # None = load from prompts/terse.txt
     mock: bool = False  # Set True for testing without API calls
+
+    def get_system_prompt(self) -> str:
+        """Get system prompt, loading from file if not explicitly set."""
+        if self.system_prompt is not None:
+            return self.system_prompt
+        return get_terse_prompt()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -1491,7 +1504,7 @@ class LLMConfig:
             "rotation": self.rotation,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
-            "system_prompt": self.system_prompt,
+            "system_prompt": self.get_system_prompt(),
             "mock": self.mock,
         }
 
@@ -1504,12 +1517,7 @@ class LLMConfig:
             rotation=data.get("rotation"),
             temperature=data.get("temperature", 0.0),
             max_tokens=data.get("max_tokens"),
-            system_prompt=data.get(
-                "system_prompt",
-                "Be terse. No preamble, no summary, no markdown formatting. "
-                "Plain text only - no bold, no headers, no code blocks unless asked. "
-                "For analysis: short bullet points, max 5 items, no code.",
-            ),
+            system_prompt=data.get("system_prompt"),  # None = use default from file
             mock=data.get("mock", False),
         )
 
@@ -1872,7 +1880,7 @@ class LLMToolExecutor:
             messages: list[dict[str, str]] = []
 
             # Build system prompt with memory context and repair engine
-            system_prompt = self.config.system_prompt
+            system_prompt = self.config.get_system_prompt()
             if memory_context:
                 system_prompt = f"{system_prompt}\n\n{memory_context}"
             if repair_context:

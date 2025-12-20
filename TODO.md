@@ -4,9 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Implement workflow loader (parse TOML, resolve @references)
-2. Extract LLMConfig.system_prompt to external file
-3. Add `.moss/prompts/` user override example to docs
+1. Wire workflow loader into agent loop runner
+2. Add CLI commands for workflow management (`moss workflow list/run`)
+3. Implement Python workflow protocol for complex logic
 
 ## Active Backlog
 
