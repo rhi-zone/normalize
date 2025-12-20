@@ -4,13 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- **Sandbox Scoping**: Subtasks should have their own 'sandbox' scope (default: inherited from parent)
 - **Docs Site Styling**: Modernize docs with glassmorphism, rounded borders, and new theme colors
 - **Vanilla Agent Loop**: Minimal agent loop option (LLM + Tools + TaskTree only) for testing/baseline
 - **Editing Tools**: Add native editing tools to Moss (essential for agentic loops)
 - **TUI Interface**: Interactive TUI for Moss (needs careful UX planning)
 
 ## Recently Completed
+
+- **Sandbox Scoping** (Dec 2025):
+  - Added `sandbox_scope` to `TaskNode` with parent inheritance
+  - Implemented scope validation in `DWIMLoop` to restrict tool access
+  - Added serialization support for sandbox scopes in `TaskTree`
+  - Full test coverage in `tests/test_sandbox_scoping.py`
 
 - **Triggered memory configuration** (Dec 2025):
   - Added `patterns` to `MemoryConfig` and `[memory.patterns]` support in TOML
