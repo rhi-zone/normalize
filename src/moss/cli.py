@@ -3797,6 +3797,34 @@ def cmd_workflow(args: Namespace) -> int:
                 output.print(f"  {name}: (error loading: {e})")
         return 0
 
+    elif action == "new":
+        from moss.workflows.templates import TEMPLATES
+
+        name = getattr(args, "workflow_name", None)
+        if not name:
+            output.error("Workflow name required for 'new' action")
+            return 1
+
+        template_name = getattr(args, "template", "standard")
+        template_content = TEMPLATES.get(template_name)
+        if not template_content:
+            output.error(f"Unknown template: {template_name}")
+            return 1
+
+        workflow_dir = project_root / ".moss" / "workflows"
+        workflow_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = workflow_dir / f"{name}.toml"
+        if file_path.exists() and not getattr(args, "force", False):
+            output.error(f"Workflow '{name}' already exists at {file_path}")
+            output.info("Use --force to overwrite")
+            return 1
+
+        content = template_content.format(name=name)
+        file_path.write_text(content)
+        output.success(f"Created workflow '{name}' at {file_path}")
+        return 0
+
     elif action == "generate":
         from moss.workflows.generator import WorkflowGenerator
 
@@ -6213,13 +6241,13 @@ def create_parser() -> argparse.ArgumentParser:
         "action",
         nargs="?",
         default="list",
-        choices=["list", "show", "run", "generate"],
-        help="Action: list (show workflows), show (details), run (execute), generate (auto-create)",
+        choices=["list", "show", "run", "generate", "new"],
+        help="Action: list, show, run, generate (auto-create), new (scaffold)",
     )
     workflow_parser.add_argument(
         "workflow_name",
         nargs="?",
-        help="Workflow to show/run (e.g., validate-fix)",
+        help="Workflow name (e.g., validate-fix)",
     )
     workflow_parser.add_argument(
         "--file",
@@ -6240,7 +6268,14 @@ def create_parser() -> argparse.ArgumentParser:
     workflow_parser.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite existing workflows (for generate)",
+        help="Overwrite existing workflows",
+    )
+    workflow_parser.add_argument(
+        "--template",
+        "-t",
+        default="standard",
+        choices=["minimal", "standard"],
+        help="Template for new workflow (default: standard)",
     )
     workflow_parser.set_defaults(func=cmd_workflow)
 

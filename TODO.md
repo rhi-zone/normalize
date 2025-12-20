@@ -5,13 +5,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 - Triggered memory configuration (patterns in toml)
-- `moss workflow new` scaffold command
 - Workflow argument passing improvement
 - **Mistake Detection**: Detect when an LLM *maybe* made a mistake (Critic loop enhancement)
 - **Shadow Git Access**: Give LLM first-class access to 'Shadow Git' (diffs, rollback, "what did I break?")
 - **User Feedback Story**: Improve interruptibility and feedback loops (client-side interrupts, agent "check mail" steps) to handle mid-task corrections.
 
 ## Recently Completed
+
+- **Workflow scaffolding** (Dec 2025):
+  - `moss workflow new <name>` command
+  - Templates for minimal and standard workflows
+  - Integration with CLI
 
 - **Workflow self-creation** (Dec 2025):
   - `moss workflow generate` command to auto-create workflows
