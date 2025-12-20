@@ -71,7 +71,7 @@ class LoopConfig:
     max_turns: int = 50
     stall_threshold: int = 5  # Max turns without progress
     confidence_threshold: float = 0.3  # Below this, ask for clarification
-    model: str = "gemini/gemini-2.5-flash-preview-05-20"
+    model: str = "gemini/gemini-2.0-flash"
     temperature: float = 0.0
     system_prompt: str = ""
 
@@ -227,11 +227,46 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
     params: dict[str, Any] = {}
 
     if target:
-        # Determine if target is a file path or symbol
-        if "/" in target or target.endswith(".py"):
-            params["path"] = target
+        # Parse target - could be "file", "symbol", or "file symbol" / "symbol file"
+        parts = target.split()
+
+        if tool_name == "skeleton.expand":
+            # expand needs both file_path and symbol_name
+            # Accept: "Symbol file.py" or "file.py Symbol" or just "Symbol" (error)
+            file_part = None
+            symbol_part = None
+            for p in parts:
+                if "/" in p or p.endswith(".py"):
+                    file_part = p
+                else:
+                    symbol_part = p
+            if file_part:
+                params["file_path"] = file_part
+            if symbol_part:
+                params["symbol_name"] = symbol_part
+            # If only symbol given, we can't help - will error
+            if not file_part and symbol_part:
+                params["symbol_name"] = symbol_part
+        elif tool_name == "skeleton.format" or tool_name == "dependencies.format":
+            # These take file_path
+            for p in parts:
+                if "/" in p or p.endswith(".py"):
+                    params["file_path"] = p
+                    break
+            if not params:
+                params["file_path"] = target
+        elif tool_name == "search.grep":
+            # grep <pattern> [path]
+            if len(parts) >= 2:
+                params["pattern"] = parts[0]
+                params["path"] = parts[1]
+            else:
+                params["pattern"] = target
         else:
-            params["symbol"] = target
+            # Generic handling
+            is_file_path = "/" in target or target.endswith(".py")
+            param_name = "path" if is_file_path else "symbol"
+            params[param_name] = target
 
     return (tool_name, params)
 
@@ -272,7 +307,7 @@ class DWIMLoop:
         if self.config.system_prompt:
             return self.config.system_prompt
 
-        return """You are a code assistant. Output terse commands, one per line.
+        return """You are a code assistant. Output ONE terse command per response.
 
 Commands:
 - skeleton <file> - show file structure
@@ -285,9 +320,11 @@ Commands:
 - fix: <description> - describe fix
 - breakdown: <step1>, <step2>, ... - split current task
 - note: <content> - remember for this task
-- done [summary] - complete current task
+- done [summary] - task complete, include brief summary
 
-Be terse. No prose. Just commands."""
+IMPORTANT: When the requested info is in "Last result", say "done <summary>".
+For read-only tasks (show, explain, find), say "done" after getting the answer.
+Do NOT repeat the same command. Never output prose."""
 
     def _preview_result(self, result: str) -> tuple[str, str | None]:
         """Create preview of result, cache full if large.
@@ -350,16 +387,21 @@ Be terse. No prose. Just commands."""
 
         return (response.choices[0].message.content or "").strip()
 
-    async def _execute_tool(self, tool_name: str, params: dict[str, Any]) -> Any:
+    async def _execute_tool(self, tool_name: str, params: dict[str, Any], _depth: int = 0) -> Any:
         """Execute a tool and return result.
 
         Args:
             tool_name: Name of tool to execute
             params: Tool parameters
+            _depth: Recursion depth (internal)
 
         Returns:
             Tool output (string or structured data)
         """
+        # Prevent infinite recursion
+        if _depth > 3:
+            return f"Unknown tool: {tool_name}"
+
         # Handle termination
         if tool_name == "done":
             return None
@@ -378,12 +420,12 @@ Be terse. No prose. Just commands."""
                         result = await result
                     return result
 
-        # Fallback: try DWIM routing
+        # Fallback: try DWIM routing (with depth limit)
         matches = analyze_intent(tool_name)
         if matches and matches[0].confidence > self.config.confidence_threshold:
             best = matches[0]
-            # Recursively try the matched tool
-            return await self._execute_tool(best.tool, params)
+            if best.tool != tool_name:  # Avoid infinite loop
+                return await self._execute_tool(best.tool, params, _depth + 1)
 
         return f"Unknown tool: {tool_name}"
 
@@ -427,6 +469,24 @@ Be terse. No prose. Just commands."""
 
         return None
 
+    def _detect_stall(self, intent: ParsedIntent) -> bool:
+        """Detect if agent is stalled (repeating same command).
+
+        Returns True if we should force exit due to stall.
+        """
+        if len(self._turns) < self.config.stall_threshold:
+            return False
+
+        # Check last N intents for repetition
+        recent = self._turns[-self.config.stall_threshold :]
+        raw_intents = [t.intent.raw for t in recent]
+
+        # If all recent intents are identical, we're stalled
+        if len(set(raw_intents)) == 1 and raw_intents[0] == intent.raw:
+            return True
+
+        return False
+
     async def run(self, task: str) -> LoopResult:
         """Run the DWIM loop on a task.
 
@@ -455,6 +515,17 @@ Be terse. No prose. Just commands."""
 
                 # Parse intent
                 intent = parse_intent(llm_response)
+
+                # Stall detection - repeated identical commands
+                if self._detect_stall(intent):
+                    total_duration = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
+                    return LoopResult(
+                        state=LoopState.STALLED,
+                        turns=self._turns,
+                        final_output=self._turns[-1].tool_output if self._turns else None,
+                        error=f"Stalled: repeated '{intent.raw}' {self.config.stall_threshold}x",
+                        total_duration_ms=total_duration,
+                    )
 
                 # Handle meta-commands first
                 meta_output = self._handle_meta_command(intent)
