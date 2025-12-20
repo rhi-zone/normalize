@@ -1,0 +1,84 @@
+
+:root {
+  --md-primary-fg-color: #00796b; /* Deeper teal */
+  --md-accent-fg-color: #ffb300;
+  
+  /* Glassmorphism variables */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg-dark: rgba(30, 33, 41, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-border-dark: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  --blur-amount: 12px;
+}
+
+[data-md-color-scheme="slate"] {
+  --glass-bg: var(--glass-bg-dark);
+  --glass-border: var(--glass-border-dark);
+}
+
+/* Rounded borders for everything */
+.md-content__inner, 
+.md-sidebar__inner,
+.md-nav--primary .md-nav__link,
+.md-tabs__link,
+.md-header,
+.md-footer,
+.md-main__inner,
+.md-card,
+.admonition,
+pre,
+code,
+.md-search__form,
+.md-search__output {
+  border-radius: 12px !important;
+}
+
+/* Glassmorphism for the header */
+.md-header {
+  background-color: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  color: var(--md-typeset-color) !important;
+}
+
+/* Fix header text colors since background is now transparent/light */
+.md-header__button, .md-header__topic, .md-header__title {
+  color: inherit !important;
+}
+
+/* Glassmorphism for cards and blocks */
+.admonition, .md-content__inner, .md-sidebar__inner {
+  background-color: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* Modern search bar */
+.md-search__form {
+  background-color: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border: 1px solid var(--glass-border) !important;
+}
+
+/* Code block refinements */
+pre {
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Tabbed content */
+.tabbed-set {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(0, 121, 107, 0.3);
+}
