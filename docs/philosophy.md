@@ -44,6 +44,14 @@ When you do call an LLM, minimize output tokens. Our system prompt in `src/moss/
 
 Result: 12x reduction in output tokens (1421 → 112) with same quality insights.
 
+### Structure Over Text
+
+Return structure, not prose. Structured data composes; text requires parsing.
+
+Hierarchy implies trees. Code (AST), files (directories), tasks (subtasks), agents (sub-agents)—all trees. Design operations that work on trees: prune, query, navigate, transform. When something isn't a tree (call graphs, dependencies), it's a tree with cross-links.
+
+Few orthogonal primitives beat many overlapping features. Lua got this right with tables. Find the smallest set of operations that compose well, not the largest set of features that cover cases.
+
 ### Hyper-Modular Architecture
 
 Prefer many small, focused modules over fewer large ones:
