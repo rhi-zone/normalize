@@ -236,6 +236,30 @@ enum Commands {
         #[arg(long)]
         move_after: Option<String>,
 
+        /// Copy the target node before another node
+        #[arg(long)]
+        copy_before: Option<String>,
+
+        /// Copy the target node after another node
+        #[arg(long)]
+        copy_after: Option<String>,
+
+        /// Move the target node to the beginning of a container
+        #[arg(long)]
+        move_prepend: Option<String>,
+
+        /// Move the target node to the end of a container
+        #[arg(long)]
+        move_append: Option<String>,
+
+        /// Copy the target node to the beginning of a container
+        #[arg(long)]
+        copy_prepend: Option<String>,
+
+        /// Copy the target node to the end of a container
+        #[arg(long)]
+        copy_append: Option<String>,
+
         /// Swap the target node with another node
         #[arg(long)]
         swap: Option<String>,
@@ -568,6 +592,12 @@ fn main() {
             append,
             move_before,
             move_after,
+            copy_before,
+            copy_after,
+            move_prepend,
+            move_append,
+            copy_prepend,
+            copy_append,
             swap,
             dry_run,
         } => cmd_edit(
@@ -581,6 +611,12 @@ fn main() {
             append.as_deref(),
             move_before.as_deref(),
             move_after.as_deref(),
+            copy_before.as_deref(),
+            copy_after.as_deref(),
+            move_prepend.as_deref(),
+            move_append.as_deref(),
+            copy_prepend.as_deref(),
+            copy_append.as_deref(),
             swap.as_deref(),
             dry_run,
             cli.json,
@@ -960,6 +996,12 @@ fn cmd_edit(
     append: Option<&str>,
     move_before: Option<&str>,
     move_after: Option<&str>,
+    copy_before: Option<&str>,
+    copy_after: Option<&str>,
+    move_prepend: Option<&str>,
+    move_append: Option<&str>,
+    copy_prepend: Option<&str>,
+    copy_append: Option<&str>,
     swap: Option<&str>,
     dry_run: bool,
     json: bool,
@@ -978,12 +1020,18 @@ fn cmd_edit(
         append.is_some(),
         move_before.is_some(),
         move_after.is_some(),
+        copy_before.is_some(),
+        copy_after.is_some(),
+        move_prepend.is_some(),
+        move_append.is_some(),
+        copy_prepend.is_some(),
+        copy_append.is_some(),
         swap.is_some(),
     ];
     let op_count = ops.iter().filter(|&&x| x).count();
 
     if op_count == 0 {
-        eprintln!("Error: No operation specified. Use --delete, --replace, --before, --after, --prepend, --append, --move-before, --move-after, or --swap");
+        eprintln!("Error: No operation specified. Use --delete, --replace, --before, --after, --prepend, --append, --move-*, --copy-*, or --swap");
         return 1;
     }
     if op_count > 1 {
@@ -1091,16 +1139,27 @@ fn cmd_edit(
     } else if let Some(code) = after {
         ("insert_after", editor.insert_after(&content, &loc, code))
     } else if let Some(code) = prepend {
-        // Prepend inside a symbol (container) - needs special handling
-        // For now, just insert after the symbol's first line
-        eprintln!("Error: --prepend inside a symbol not yet implemented");
-        eprintln!("Hint: Use file path for file-level prepend");
-        return 1;
+        // Prepend inside a container (class/impl)
+        let body = match editor.find_container_body(&file_path, &content, symbol_name) {
+            Some(b) => b,
+            None => {
+                eprintln!("Error: '{}' is not a container (class/impl)", symbol_name);
+                eprintln!("Hint: --prepend works on classes and impl blocks");
+                return 1;
+            }
+        };
+        ("prepend", editor.prepend_to_container(&content, &body, code))
     } else if let Some(code) = append {
-        // Append inside a symbol (container) - needs special handling
-        eprintln!("Error: --append inside a symbol not yet implemented");
-        eprintln!("Hint: Use file path for file-level append");
-        return 1;
+        // Append inside a container (class/impl)
+        let body = match editor.find_container_body(&file_path, &content, symbol_name) {
+            Some(b) => b,
+            None => {
+                eprintln!("Error: '{}' is not a container (class/impl)", symbol_name);
+                eprintln!("Hint: --append works on classes and impl blocks");
+                return 1;
+            }
+        };
+        ("append", editor.append_to_container(&content, &body, code))
     } else if let Some(dest) = move_before {
         // Move operation: delete from source, insert before destination
         let dest_loc = match editor.find_symbol(&file_path, &content, dest) {
@@ -1139,6 +1198,90 @@ fn cmd_edit(
             }
         };
         ("move_after", editor.insert_after(&without_source, &dest_loc_adjusted, source_content))
+    } else if let Some(dest) = copy_before {
+        // Copy operation: insert copy before destination (keep original)
+        let dest_loc = match editor.find_symbol(&file_path, &content, dest) {
+            Some(l) => l,
+            None => {
+                eprintln!("Destination symbol not found: {}", dest);
+                return 1;
+            }
+        };
+        let source_content = &content[loc.start_byte..loc.end_byte];
+        ("copy_before", editor.insert_before(&content, &dest_loc, source_content))
+    } else if let Some(dest) = copy_after {
+        // Copy operation: insert copy after destination (keep original)
+        let dest_loc = match editor.find_symbol(&file_path, &content, dest) {
+            Some(l) => l,
+            None => {
+                eprintln!("Destination symbol not found: {}", dest);
+                return 1;
+            }
+        };
+        let source_content = &content[loc.start_byte..loc.end_byte];
+        ("copy_after", editor.insert_after(&content, &dest_loc, source_content))
+    } else if let Some(container) = move_prepend {
+        // Move to beginning of container
+        let body = match editor.find_container_body(&file_path, &content, container) {
+            Some(b) => b,
+            None => {
+                eprintln!("Container not found: {}", container);
+                return 1;
+            }
+        };
+        let source_content = content[loc.start_byte..loc.end_byte].to_string();
+        let without_source = editor.delete_symbol(&content, &loc);
+        // Re-find container body after deletion
+        let body = match editor.find_container_body(&file_path, &without_source, container) {
+            Some(b) => b,
+            None => {
+                eprintln!("Container not found after deletion: {}", container);
+                return 1;
+            }
+        };
+        ("move_prepend", editor.prepend_to_container(&without_source, &body, &source_content))
+    } else if let Some(container) = move_append {
+        // Move to end of container
+        let body = match editor.find_container_body(&file_path, &content, container) {
+            Some(b) => b,
+            None => {
+                eprintln!("Container not found: {}", container);
+                return 1;
+            }
+        };
+        let source_content = content[loc.start_byte..loc.end_byte].to_string();
+        let without_source = editor.delete_symbol(&content, &loc);
+        // Re-find container body after deletion
+        let body = match editor.find_container_body(&file_path, &without_source, container) {
+            Some(b) => b,
+            None => {
+                eprintln!("Container not found after deletion: {}", container);
+                return 1;
+            }
+        };
+        ("move_append", editor.append_to_container(&without_source, &body, &source_content))
+    } else if let Some(container) = copy_prepend {
+        // Copy to beginning of container
+        let body = match editor.find_container_body(&file_path, &content, container) {
+            Some(b) => b,
+            None => {
+                eprintln!("Container not found: {}", container);
+                return 1;
+            }
+        };
+        let source_content = &content[loc.start_byte..loc.end_byte];
+        ("copy_prepend", editor.prepend_to_container(&content, &body, source_content))
+    } else if let Some(container) = copy_append {
+        // Copy to end of container
+        let body = match editor.find_container_body(&file_path, &content, container) {
+            Some(b) => b,
+            None => {
+                eprintln!("Container not found: {}", container);
+                return 1;
+            }
+        };
+        let source_content = &content[loc.start_byte..loc.end_byte];
+        ("copy_append", editor.append_to_container(&content, &body, source_content))
     } else if let Some(other) = swap {
         let other_loc = match editor.find_symbol(&file_path, &content, other) {
             Some(l) => l,

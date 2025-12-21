@@ -4,14 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] Implement `--prepend`/`--append` inside symbols (containers)
-  - Currently only works at file level; need to support adding methods to classes
-  - Requires finding the body node and inserting at start/end
 - [ ] Fix unicode path resolution in Rust CLI
   - `view /tmp/日本語/テスト.py` returns "No matches" despite file existing
   - Likely issue with path normalization or index lookup
-- [ ] Add `--copy-before`/`--copy-after`/`--move-prepend`/`--move-append` to edit
-  - Basic move/swap implemented, but copy and container-relative moves missing
 - [ ] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
 - [ ] Clean up broken Python tests (test_cli.py, test_synthesis.py import errors)
 

@@ -13,8 +13,11 @@
   - `--delete`: Remove a symbol entirely
   - `--replace "code"`: Replace symbol with new code
   - `--before "code"` / `--after "code"`: Insert sibling before/after
-  - `--prepend "code"` / `--append "code"`: File-level insert at top/bottom
-  - `--move-before X` / `--move-after X`: Relocate symbol
+  - `--prepend "code"` / `--append "code"`: Insert at start/end of container (class/impl) or file
+  - `--move-before X` / `--move-after X`: Relocate symbol as sibling
+  - `--move-prepend C` / `--move-append C`: Move symbol into container C
+  - `--copy-before X` / `--copy-after X`: Duplicate symbol as sibling
+  - `--copy-prepend C` / `--copy-append C`: Duplicate symbol into container C
   - `--swap X`: Exchange two symbols
   - `--dry-run`: Preview changes without applying
 - Find functionality unified into view (no separate find command needed)

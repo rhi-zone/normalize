@@ -13,6 +13,19 @@ pub struct SymbolLocation {
     pub indent: String,
 }
 
+/// Location of a container's body (for prepend/append operations)
+#[derive(Debug)]
+pub struct ContainerBody {
+    /// Byte offset where body content starts (after opening, any docstring)
+    pub content_start: usize,
+    /// Byte offset where body content ends (before closing brace/dedent)
+    pub content_end: usize,
+    /// Indentation for items inside this container
+    pub inner_indent: String,
+    /// Whether the body is currently empty (or just has a docstring/pass)
+    pub is_empty: bool,
+}
+
 /// Editor for structural code modifications
 pub struct Editor {
     python_parser: Parser,
@@ -294,6 +307,313 @@ impl Editor {
         result
     }
 
+    /// Find the body of a container symbol (class, impl block) for prepend/append
+    pub fn find_container_body(
+        &mut self,
+        path: &Path,
+        content: &str,
+        name: &str,
+    ) -> Option<ContainerBody> {
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let tree = match ext {
+            "py" => self.python_parser.parse(content, None)?,
+            "rs" => self.rust_parser.parse(content, None)?,
+            _ => return None,
+        };
+
+        let root = tree.root_node();
+        self.find_container_body_in_node(root, content, name, ext)
+    }
+
+    fn find_container_body_in_node(
+        &self,
+        node: tree_sitter::Node,
+        content: &str,
+        name: &str,
+        ext: &str,
+    ) -> Option<ContainerBody> {
+        // Check if this is our target container
+        if let Some(body) = self.check_node_is_container(&node, content, name, ext) {
+            return Some(body);
+        }
+
+        // Recurse into children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(body) = self.find_container_body_in_node(child, content, name, ext) {
+                return Some(body);
+            }
+        }
+
+        None
+    }
+
+    fn check_node_is_container(
+        &self,
+        node: &tree_sitter::Node,
+        content: &str,
+        name: &str,
+        ext: &str,
+    ) -> Option<ContainerBody> {
+        let kind = node.kind();
+
+        // Only handle container types (can contain methods/functions)
+        let is_container = match ext {
+            "py" => kind == "class_definition",
+            "rs" => kind == "impl_item", // Only impl blocks for prepend/append
+            _ => false,
+        };
+
+        if !is_container {
+            return None;
+        }
+
+        // Get the name of this container (impl blocks may use "type" field)
+        let name_node = node
+            .child_by_field_name("name")
+            .or_else(|| node.child_by_field_name("type"))?;
+        let container_name = &content[name_node.byte_range()];
+
+        if container_name != name {
+            return None;
+        }
+
+        // Get the body node
+        let body_node = node.child_by_field_name("body")?;
+
+        // Calculate inner indentation (container indent + one level)
+        let start_byte = node.start_byte();
+        let line_start = content[..start_byte]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let container_indent: String = content[line_start..start_byte]
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .collect();
+
+        // Determine inner indent based on language
+        let inner_indent = match ext {
+            "py" => format!("{}    ", container_indent), // Python: 4 spaces
+            "rs" => format!("{}    ", container_indent), // Rust: 4 spaces
+            _ => format!("{}    ", container_indent),
+        };
+
+        match ext {
+            "py" => self.analyze_python_class_body(&body_node, content, &inner_indent),
+            "rs" => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
+            _ => None,
+        }
+    }
+
+    fn analyze_python_class_body(
+        &self,
+        body_node: &tree_sitter::Node,
+        content: &str,
+        inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        // Python class body is a "block" node
+        // Children can include: docstring (expression_statement with string), pass, methods, etc.
+        let mut cursor = body_node.walk();
+        let children: Vec<_> = body_node.children(&mut cursor).collect();
+
+        if children.is_empty() {
+            // Empty body - insert at start
+            return Some(ContainerBody {
+                content_start: body_node.start_byte(),
+                content_end: body_node.end_byte(),
+                inner_indent: inner_indent.to_string(),
+                is_empty: true,
+            });
+        }
+
+        // Find first "real" content (skip docstrings)
+        let mut first_real_idx = 0;
+        for (i, child) in children.iter().enumerate() {
+            if child.kind() == "expression_statement" {
+                // Could be a docstring - check if it's a string
+                let mut child_cursor = child.walk();
+                let first_child = child.children(&mut child_cursor).next();
+                if let Some(fc) = first_child {
+                    if fc.kind() == "string" && i == 0 {
+                        first_real_idx = i + 1;
+                        continue;
+                    }
+                }
+            }
+            break;
+        }
+
+        // Check if body is effectively empty (just docstring and/or pass)
+        let is_empty = children.iter().skip(first_real_idx).all(|c| {
+            if c.kind() == "pass_statement" {
+                return true;
+            }
+            if c.kind() == "expression_statement" {
+                // Check if it's a string (docstring)
+                if let Some(first_child) = c.child(0) {
+                    return first_child.kind() == "string";
+                }
+            }
+            false
+        });
+
+        // For prepend: insert after docstring (if any), at start of first_real_idx position
+        // For append: insert at end of body
+        let content_start = if first_real_idx < children.len() {
+            // Find the line start of the first real child
+            let child_start = children[first_real_idx].start_byte();
+            content[..child_start]
+                .rfind('\n')
+                .map(|i| i + 1)
+                .unwrap_or(child_start)
+        } else if !children.is_empty() {
+            // Only docstring exists - insert after it
+            let last = children.last().unwrap();
+            // Find end of last child's line
+            let last_end = last.end_byte();
+            if last_end < content.len() && content.as_bytes()[last_end] == b'\n' {
+                last_end + 1
+            } else {
+                last_end
+            }
+        } else {
+            body_node.start_byte()
+        };
+
+        let content_end = body_node.end_byte();
+
+        Some(ContainerBody {
+            content_start,
+            content_end,
+            inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
+    }
+
+    fn analyze_rust_impl_body(
+        &self,
+        body_node: &tree_sitter::Node,
+        content: &str,
+        inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        // Rust impl body is a "declaration_list" node: { ... }
+        // We need to insert after the opening { and before the closing }
+        let body_start = body_node.start_byte();
+        let body_end = body_node.end_byte();
+
+        // Find the opening brace
+        let mut content_start = body_start;
+        for (i, byte) in content[body_start..body_end].bytes().enumerate() {
+            if byte == b'{' {
+                content_start = body_start + i + 1;
+                // Skip whitespace/newline after brace
+                while content_start < body_end {
+                    let b = content.as_bytes()[content_start];
+                    if b == b'\n' {
+                        content_start += 1;
+                        break;
+                    } else if b.is_ascii_whitespace() {
+                        content_start += 1;
+                    } else {
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        // Find the closing brace
+        let mut content_end = body_end;
+        for (i, byte) in content[body_start..body_end].bytes().rev().enumerate() {
+            if byte == b'}' {
+                content_end = body_end - i - 1;
+                // Go back to include the newline before the brace
+                while content_end > content_start && content.as_bytes()[content_end - 1] == b' ' {
+                    content_end -= 1;
+                }
+                break;
+            }
+        }
+
+        // Check if body is empty
+        let body_content = content[content_start..content_end].trim();
+        let is_empty = body_content.is_empty();
+
+        Some(ContainerBody {
+            content_start,
+            content_end,
+            inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
+    }
+
+    /// Prepend content inside a container (class/impl body)
+    pub fn prepend_to_container(
+        &self,
+        content: &str,
+        body: &ContainerBody,
+        new_content: &str,
+    ) -> String {
+        let mut result = String::new();
+
+        // Apply indentation to new content
+        let indented = self.apply_indent(new_content, &body.inner_indent);
+
+        result.push_str(&content[..body.content_start]);
+
+        // Add the new content
+        result.push_str(&indented);
+        result.push('\n');
+
+        // Add spacing if there's existing content
+        if !body.is_empty {
+            result.push('\n');
+        }
+
+        result.push_str(&content[body.content_start..]);
+
+        result
+    }
+
+    /// Append content inside a container (class/impl body)
+    pub fn append_to_container(
+        &self,
+        content: &str,
+        body: &ContainerBody,
+        new_content: &str,
+    ) -> String {
+        let mut result = String::new();
+
+        // Apply indentation to new content
+        let indented = self.apply_indent(new_content, &body.inner_indent);
+
+        // Trim trailing whitespace/newlines from existing content
+        let mut end_pos = body.content_end;
+        while end_pos > 0
+            && content.as_bytes().get(end_pos - 1).map(|&b| b == b'\n' || b == b' ') == Some(true)
+        {
+            end_pos -= 1;
+        }
+
+        result.push_str(&content[..end_pos]);
+
+        // Add blank line before new content (Python/Rust convention for methods)
+        if !body.is_empty {
+            result.push_str("\n\n");
+        } else {
+            result.push('\n');
+        }
+
+        // Add the new content
+        result.push_str(&indented);
+        result.push('\n');
+
+        result.push_str(&content[body.content_end..]);
+
+        result
+    }
+
     /// Apply indentation to content
     fn apply_indent(&self, content: &str, indent: &str) -> String {
         content
@@ -353,5 +673,88 @@ def bar():
         let result = editor.insert_before(content, &loc, "def baz():\n    pass");
         assert!(result.contains("baz"));
         assert!(result.find("baz").unwrap() < result.find("bar").unwrap());
+    }
+
+    #[test]
+    fn test_prepend_to_python_class() {
+        let mut editor = Editor::new();
+        let content = r#"class Foo:
+    """Docstring."""
+
+    def first(self):
+        pass
+"#;
+        let body = editor
+            .find_container_body(&PathBuf::from("test.py"), content, "Foo")
+            .unwrap();
+        let result = editor.prepend_to_container(content, &body, "def new_method(self):\n    return 1");
+        // New method should appear after docstring but before first
+        assert!(result.contains("new_method"));
+        let docstring_pos = result.find("Docstring").unwrap();
+        let new_method_pos = result.find("new_method").unwrap();
+        let first_pos = result.find("first").unwrap();
+        assert!(docstring_pos < new_method_pos);
+        assert!(new_method_pos < first_pos);
+    }
+
+    #[test]
+    fn test_append_to_python_class() {
+        let mut editor = Editor::new();
+        let content = r#"class Foo:
+    def first(self):
+        pass
+
+    def second(self):
+        return 42
+"#;
+        let body = editor
+            .find_container_body(&PathBuf::from("test.py"), content, "Foo")
+            .unwrap();
+        let result = editor.append_to_container(content, &body, "def last(self):\n    return 99");
+        // New method should appear after second
+        assert!(result.contains("last"));
+        let second_pos = result.find("second").unwrap();
+        let last_pos = result.find("last").unwrap();
+        assert!(second_pos < last_pos);
+    }
+
+    #[test]
+    fn test_prepend_to_rust_impl() {
+        let mut editor = Editor::new();
+        let content = r#"impl Foo {
+    fn first(&self) -> i32 {
+        1
+    }
+}
+"#;
+        let body = editor
+            .find_container_body(&PathBuf::from("test.rs"), content, "Foo")
+            .unwrap();
+        let result = editor.prepend_to_container(content, &body, "fn new() -> Self {\n    Self {}\n}");
+        assert!(result.contains("new"));
+        let new_pos = result.find("new").unwrap();
+        let first_pos = result.find("first").unwrap();
+        assert!(new_pos < first_pos);
+    }
+
+    #[test]
+    fn test_append_to_rust_impl() {
+        let mut editor = Editor::new();
+        let content = r#"impl Foo {
+    fn first(&self) -> i32 {
+        1
+    }
+}
+"#;
+        let body = editor
+            .find_container_body(&PathBuf::from("test.rs"), content, "Foo")
+            .unwrap();
+        let result = editor.append_to_container(content, &body, "fn last(&self) -> i32 {\n    99\n}");
+        assert!(result.contains("last"));
+        let first_pos = result.find("first").unwrap();
+        let last_pos = result.find("last").unwrap();
+        assert!(first_pos < last_pos);
+        // Should still have closing brace
+        assert!(result.contains("}"));
     }
 }
