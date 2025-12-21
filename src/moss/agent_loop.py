@@ -2663,6 +2663,17 @@ class LLMToolExecutor:
                 f"Context: {structured_context}\n\n"
                 f"Output ONLY the integer score."
             ),
+            "localize_test_failure": (
+                f"{structured_context}\n\n"
+                f"Analyze the following failing test output and identify the likely "
+                f"source of the bug.\n"
+                f"Consider:\n"
+                f"- The failing assertion or exception\n"
+                f"- Stack trace entries in the implementation code\n"
+                f"- Input/output values reported in the failure\n\n"
+                f"Test Output:\n{focus_str}\n\n"
+                f"Output the file path and line number of the likely bug, with brief justification."
+            ),
             "analyze_policy_violations": (
                 f"{structured_context}\n\n"
                 f"Analyze the following policy rejections from agent sessions.\n"

@@ -166,6 +166,33 @@ class DiagnosticSet:
             "diagnostics": [d.to_dict() for d in self.diagnostics],
         }
 
+    def localize_bug(self) -> list[Path]:
+        """Heuristically identify potential bug locations from diagnostics.
+
+        Analyzes diagnostic messages and stack traces to find relevant
+        source files, prioritizing direct error locations.
+        """
+        locations = []
+        for diag in self.diagnostics:
+            if diag.severity == Severity.ERROR and diag.location:
+                locations.append(diag.location.file)
+
+            # Extract paths from message/raw text (e.g. stack traces)
+            text = f"{diag.message} {diag.raw or ''}"
+            # Pattern for common file paths in stack traces
+            path_pattern = r"(?:/|\\|[a-zA-Z]:)[^:\s\"']+\.(?:py|rs|ts|js|go|c|cpp|h)"
+            matches = re.findall(path_pattern, text)
+            for m in matches:
+                try:
+                    path = Path(m)
+                    if path.exists():
+                        locations.append(path)
+                except Exception:
+                    pass
+
+        # Deduplicate and return
+        return sorted(list(set(locations)))
+
 
 # ============================================================================
 # ANSI/Noise Stripping

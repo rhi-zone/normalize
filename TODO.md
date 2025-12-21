@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Heuristic Error Localization**: Automatically find buggy code from failing test output
 - [ ] **TUI Session Resume**: Ability to select and resume past sessions from TUI
 - [ ] **Adaptive Loop Depth**: Dynamically adjust max steps based on progress rate
+- [ ] **Recursive Self-Optimization**: Loop that refines its own heuristics based on telemetry
 
 ## Recently Completed
+
+- **Heuristic Error Localization** (Dec 2025):
+  - Added `localize_bug` to `DiagnosticSet` for trace-based bug identification
+  - Implemented `localize_test_failure` LLM operation for precise error root-causing
+  - Automatically extracts potential implementation locations from stack traces
 
 - **Adaptive Workspace Expansion** (Dec 2025):
   - Added `expand_to_include` to `SafeShell` for dynamic sandbox growth
