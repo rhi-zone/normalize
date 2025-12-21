@@ -71,6 +71,7 @@ class LoopStep:
     parameters: dict[str, Any] = field(default_factory=dict)  # Static parameters
     on_error: ErrorAction = ErrorAction.ABORT
     goto_target: str | None = None  # For GOTO action
+    is_high_risk: bool = False  # Triggers pre-execution verification
     max_retries: int = 3
     timeout_seconds: float | None = None
 
@@ -427,6 +428,23 @@ class AgentLoopRunner:
                     metrics=metrics,
                     error=f"Step '{current_step_name}' not found",
                 )
+
+            # Pre-execution verification for high-risk steps
+            if step.is_high_risk:
+                verify_step = LoopStep("verify", "llm.verify_action", step_type=StepType.LLM)
+                v_output, t_in, t_out = await self.executor.execute(
+                    "llm.verify_action", context, verify_step
+                )
+                metrics.record_step("verify", StepType.LLM, 0, t_in, t_out)
+
+                v_text = str(v_output).strip().upper()
+                if "REJECTED" in v_text:
+                    return LoopResult(
+                        status=LoopStatus.FAILED,
+                        step_results=step_results,
+                        metrics=metrics,
+                        error=f"High-risk action rejected by critic: {v_text}",
+                    )
 
             # Execute step with the full context
             step_result = await self._execute_step(step, context, metrics)
@@ -2619,6 +2637,16 @@ class LLMToolExecutor:
                 f"Task: {focus_str}\n\n"
                 f"Context: {structured_context}\n\n"
                 f"Output a single directory path relative to project root."
+            ),
+            "verify_action": (
+                f"{structured_context}\n\n"
+                f"VERIFY BEFORE EXECUTION: You are about to perform a high-risk action.\n"
+                f"Action: {focus_str}\n\n"
+                f"Critically evaluate this action for:\n"
+                f"- Logical flaws or regressions\n"
+                f"- Potential side effects on unrelated components\n"
+                f"- Violation of established project conventions\n\n"
+                f"Output APPROVED or a detailed explanation of why it should be REJECTED."
             ),
             "extract_long_term_preferences": (
                 f"{structured_context}\n\n"

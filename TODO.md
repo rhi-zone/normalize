@@ -4,11 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **LLM Reliability Guardrails**: Implement 'critic-first' execution for high-risk operations
 - [ ] **Dynamic Turn Budgeting**: Adjust per-turn budget based on remaining task complexity
 - [ ] **Cross-file Symbol Jump**: Command-click support in TUI for quick navigation
+- [ ] **Agentic Policy Optimization**: Automatically refine safety rules based on rejected actions
 
 ## Recently Completed
+
+- **LLM Reliability Guardrails** (Dec 2025):
+  - Implemented 'critic-first' execution for high-risk loop steps
+  - Added `is_high_risk` property to `LoopStep`
+  - Integrated `llm.verify_action` pre-execution check in `AgentLoopRunner`
+  - Minimizes catastrophic failures by forcing explicit reasoning before risky edits
 
 - **Adaptive Workspace Scoping** (Dec 2025):
   - Added `shrink_to_fit` to `SafeShell` for dynamic workspace restriction
