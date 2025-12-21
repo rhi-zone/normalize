@@ -25,6 +25,18 @@ See `docs/spec.md` for the full specification.
 
 ## Design Tenets
 
+### Generalize, Don't Multiply
+
+When facing N use cases, prefer one flexible solution over N specialized ones. Composability reduces cognitive load, maintenance burden, and token cost.
+
+Examples:
+- Three primitives (view, edit, analyze) with rich options, not 100 specialized tools
+- Log formats as plugins, not N hardcoded parsers
+- `--json` + `--jq` + `--compact` flags, not `--format=X` for every format
+- Distros that compose, not fork
+
+Complexity grows linearly with primitives, exponentially with combinations. A system with 3 composable primitives is simpler than one with 30 specialized tools, even if the 30-tool system has less code per tool.
+
 ### Minimize LLM Usage
 
 LLM calls are expensive (cost) and slow (latency). Design everything to reduce them:
@@ -33,7 +45,7 @@ LLM calls are expensive (cost) and slow (latency). Design everything to reduce t
 - Measure separately: Track LLM calls vs tool calls in benchmarks
 - Cache aggressively: Same query → same answer (where applicable)
 
-This is why we have skeleton views (understand code without LLM), validation loops (catch errors without LLM), and DWIM (find tools without LLM). The goal: an agent that calls the LLM 10x less than naive approaches.
+This is why we have skeleton views (understand code without LLM) and validation loops (catch errors without LLM). The goal: an agent that calls the LLM 10x less than naive approaches.
 
 ### Resource Efficiency
 
@@ -91,22 +103,21 @@ Uniform addressing with `/` everywhere:
 
 Same primitives work at every level.
 
-**Four primitives, not 100 tools:**
+**Three primitives, not 100 tools:**
 
 | Primitive | Purpose | Composable options |
 |-----------|---------|-------------------|
-| `view` | See a node | `--depth`, `--deps`, `--summary` |
-| `find` | Search nodes | `--type`, `--in`, `--calls`, `--called-by`, `--size` |
-| `edit` | Modify a node | `--insert`, `--replace`, `--delete` |
+| `view` | See/find nodes | `--depth`, `--deps`, `--type`, `--calls`, `--called-by` |
+| `edit` | Modify a node | `--insert`, `--replace`, `--delete`, `--move` |
 | `analyze` | Compute properties | `--health`, `--complexity`, `--security` |
 
-Depth controls expansion: `view src/ --depth 2` shows files and their top-level symbols. Filters compose: `find --type function --calls "db.*"` finds functions that call database code.
+Depth controls expansion: `view src/ --depth 2` shows files and their top-level symbols. Filters compose: `view --type function --calls "db.*"` finds functions that call database code.
 
-Discoverability through simplicity. With 100+ tools, users can't find what they need. With 4 primitives and composable filters, the entire interface fits in working memory.
+Discoverability through simplicity. With 100+ tools, users can't find what they need. With 3 primitives and composable filters, the entire interface fits in working memory.
 
 Nothing good appears from scratch. Iterate. CLAUDE.md grew through 20+ commits, not upfront investment. Features emerge from use, not design documents. Start minimal, capture what you learn, repeat.
 
-Put smarts in the tool, not the schema. Tool definitions cost context. One DWIM tool with runtime intent parsing beats N specialized tools with N schema definitions. The grammar lives in moss, not the protocol layer.
+Put smarts in the tool, not the schema. Tool definitions cost context. With only 3 primitives, there's no ambiguity about which tool to use—the cognitive load disappears entirely.
 
 ### Hyper-Modular Architecture
 
@@ -148,13 +159,14 @@ Make it easy to get started:
 - Progressive disclosure: simple things simple, complex things possible
 - Clear error messages that guide users toward solutions
 
-### DWIM (Do What I Mean)
+### Forgiving Lookups
 
-Agents make mistakes - typos, wrong conventions, forgotten paths. Every lookup should be forgiving:
+Agents make mistakes—typos, wrong conventions, forgotten paths. Every lookup should be forgiving:
 - Fuzzy file resolution: `prior_art` finds `prior-art.md`
 - Symbol search tolerates partial names and typos
-- Tool selection handles aliases and misspellings
 - Pattern: try exact → try fuzzy → try corrections → ask for clarification
+
+Note: With only 3 primitives, tool selection ambiguity is eliminated. This section applies to path and symbol resolution, not tool choice.
 
 ### Works on Messy Codebases
 
