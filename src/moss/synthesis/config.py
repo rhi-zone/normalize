@@ -118,6 +118,56 @@ class LearningConfig:
 
 
 @dataclass
+class BruteForceConfig:
+    """Configuration for brute-force mode with fast/small models.
+
+    Uses higher sample counts and voting to compensate for lower model quality.
+    Optimized for local inference with models like Phi-3, Qwen2.5-Coder, etc.
+
+    Example in moss.toml:
+        [synthesis.brute_force]
+        enabled = true
+        n_samples = 5
+        temperature = 0.7
+        voting_strategy = "majority"  # or "first_valid", "consensus"
+        parallel = true
+    """
+
+    enabled: bool = False
+    n_samples: int = 5  # Number of samples per generation
+    temperature: float = 0.7  # Higher temp for diversity
+    voting_strategy: str = "majority"  # How to pick winner
+    parallel: bool = True  # Generate samples in parallel
+    require_consensus: float = 0.6  # For "consensus" strategy: min agreement ratio
+    fallback_to_best: bool = True  # If no majority, use highest-scored
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "enabled": self.enabled,
+            "n_samples": self.n_samples,
+            "temperature": self.temperature,
+            "voting_strategy": self.voting_strategy,
+            "parallel": self.parallel,
+            "require_consensus": self.require_consensus,
+            "fallback_to_best": self.fallback_to_best,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> BruteForceConfig:
+        """Create from dictionary."""
+        return cls(
+            enabled=data.get("enabled", False),
+            n_samples=data.get("n_samples", 5),
+            temperature=data.get("temperature", 0.7),
+            voting_strategy=data.get("voting_strategy", "majority"),
+            parallel=data.get("parallel", True),
+            require_consensus=data.get("require_consensus", 0.6),
+            fallback_to_best=data.get("fallback_to_best", True),
+        )
+
+
+@dataclass
 class SynthesisConfigWrapper:
     """Complete synthesis configuration.
 
@@ -136,6 +186,7 @@ class SynthesisConfigWrapper:
     validators: ValidatorConfig = field(default_factory=ValidatorConfig)
     strategies: StrategyConfig = field(default_factory=StrategyConfig)
     learning: LearningConfig = field(default_factory=LearningConfig)
+    brute_force: BruteForceConfig = field(default_factory=BruteForceConfig)
 
     def build_framework_config(self) -> SynthesisConfig:
         """Build a SynthesisConfig for the framework."""
@@ -161,6 +212,7 @@ class SynthesisConfigWrapper:
             "validators": self.validators.to_dict(),
             "strategies": self.strategies.to_dict(),
             "learning": self.learning.to_dict(),
+            "brute_force": self.brute_force.to_dict(),
         }
 
     @classmethod
@@ -219,6 +271,10 @@ class SynthesisConfigWrapper:
                 config.learning.max_history = learn_data["max_history"]
             if "learning_rate" in learn_data:
                 config.learning.learning_rate = learn_data["learning_rate"]
+
+        # Brute force config
+        if "brute_force" in data:
+            config.brute_force = BruteForceConfig.from_dict(data["brute_force"])
 
         return config
 
@@ -370,6 +426,7 @@ def list_available_presets() -> list[str]:
 
 
 __all__ = [
+    "BruteForceConfig",
     "GeneratorConfig",
     "LearningConfig",
     "StrategyConfig",

@@ -173,29 +173,109 @@ class CommitMode:
 
 
 class ModeRegistry:
-    """Registry for extensible TUI modes."""
+    """Registry for extensible TUI modes.
 
-    def __init__(self):
-        self._modes: dict[str, TUIMode] = {
-            "PLAN": PlanMode(),
-            "READ": ReadMode(),
-            "WRITE": WriteMode(),
-            "DIFF": DiffMode(),
-            "SESSION": SessionMode(),
-            "BRANCH": BranchMode(),
-            "SWARM": SwarmMode(),
-            "COMMIT": CommitMode(),
-        }
-        self._order: list[str] = [
-            "PLAN",
-            "READ",
-            "WRITE",
-            "DIFF",
-            "SESSION",
-            "BRANCH",
-            "SWARM",
-            "COMMIT",
-        ]
+    Supports multiple discovery mechanisms:
+    1. Built-in modes (PLAN, READ, WRITE, etc.)
+    2. Entry points: packages can register via 'moss.tui.modes' entry point
+    3. Project modes: .moss/modes/*.py files in project root
+
+    Example entry point in pyproject.toml:
+        [project.entry-points."moss.tui.modes"]
+        my_mode = "my_package:MyMode"
+
+    Example project mode (.moss/modes/custom.py):
+        class CustomMode:
+            name = "CUSTOM"
+            color = "orange"
+            placeholder = "Custom mode..."
+            async def on_enter(self, app): pass
+    """
+
+    _BUILTIN_MODES: ClassVar[list[type]] = [
+        PlanMode,
+        ReadMode,
+        WriteMode,
+        DiffMode,
+        SessionMode,
+        BranchMode,
+        SwarmMode,
+        CommitMode,
+    ]
+
+    def __init__(self, discover: bool = True, project_root: Path | None = None):
+        self._modes: dict[str, TUIMode] = {}
+        self._order: list[str] = []
+        self._project_root = project_root
+
+        # Register built-in modes
+        for mode_cls in self._BUILTIN_MODES:
+            self._register(mode_cls())
+
+        if discover:
+            self._discover_entry_points()
+            self._discover_project_modes()
+
+    def _register(self, mode: TUIMode) -> None:
+        """Internal registration without order modification check."""
+        self._modes[mode.name] = mode
+        if mode.name not in self._order:
+            self._order.append(mode.name)
+
+    def _discover_entry_points(self) -> None:
+        """Discover modes from installed packages via entry points."""
+        try:
+            from importlib.metadata import entry_points
+
+            eps = entry_points()
+            # Python 3.10+ returns SelectableGroups, 3.9 returns dict
+            if hasattr(eps, "select"):
+                mode_eps = eps.select(group="moss.tui.modes")
+            else:
+                mode_eps = eps.get("moss.tui.modes", [])
+
+            for ep in mode_eps:
+                try:
+                    mode_cls = ep.load()
+                    mode = mode_cls() if callable(mode_cls) else mode_cls
+                    if isinstance(mode, TUIMode):
+                        self._register(mode)
+                except (ImportError, AttributeError, TypeError):
+                    pass  # Skip invalid entry points
+        except ImportError:
+            pass
+
+    def _discover_project_modes(self) -> None:
+        """Discover modes from .moss/modes/ directory."""
+        if self._project_root is None:
+            return
+
+        modes_dir = self._project_root / ".moss" / "modes"
+        if not modes_dir.is_dir():
+            return
+
+        import importlib.util
+
+        for py_file in modes_dir.glob("*.py"):
+            if py_file.name.startswith("_"):
+                continue
+            try:
+                spec = importlib.util.spec_from_file_location(f"moss_modes_{py_file.stem}", py_file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+
+                    # Find all TUIMode implementations in module
+                    for attr_name in dir(module):
+                        if attr_name.startswith("_"):
+                            continue
+                        attr = getattr(module, attr_name)
+                        if isinstance(attr, type) and isinstance(attr, TUIMode):
+                            self._register(attr())
+                        elif isinstance(attr, TUIMode):
+                            self._register(attr)
+            except (ImportError, SyntaxError, AttributeError):
+                pass  # Skip invalid mode files
 
     def get_mode(self, name: str) -> TUIMode | None:
         return self._modes.get(name)
@@ -205,10 +285,38 @@ class ModeRegistry:
         next_idx = (idx + 1) % len(self._order)
         return self._modes[self._order[next_idx]]
 
-    def register_mode(self, mode: TUIMode) -> None:
+    def register_mode(self, mode: TUIMode, position: int | None = None) -> None:
+        """Register a mode, optionally at a specific position in cycle order."""
         self._modes[mode.name] = mode
-        if mode.name not in self._order:
+        if mode.name in self._order:
+            return
+        if position is not None:
+            self._order.insert(position, mode.name)
+        else:
             self._order.append(mode.name)
+
+    def unregister_mode(self, name: str) -> bool:
+        """Remove a mode from the registry."""
+        if name in self._modes:
+            del self._modes[name]
+            self._order = [n for n in self._order if n != name]
+            return True
+        return False
+
+    def set_order(self, order: list[str]) -> None:
+        """Set custom mode cycling order. Modes not in order are appended."""
+        valid = [n for n in order if n in self._modes]
+        missing = [n for n in self._order if n not in valid]
+        self._order = valid + missing
+
+    def list_modes(self) -> list[str]:
+        """Return mode names in cycle order."""
+        return list(self._order)
+
+    def __iter__(self):
+        """Iterate over modes in order."""
+        for name in self._order:
+            yield self._modes[name]
 
 
 class ModeIndicator(Static):

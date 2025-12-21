@@ -4,12 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **LLM Editing Performance Comparison**: Investigate Gemini vs Claude edit quality issues
-- [ ] **Memory Usage Optimization**: Ensure Moss keeps RAM extremely low
-- [ ] **Extensible Agent Modes**: Refactor TUI modes into plugin-based system
-- [ ] **Small/Local Model Brute Force**: Fast models with higher iteration/voting counts
+- [ ] **Runtime Memory Bounds**: Ensure long context doesn't exhaust RAM (streaming, eviction)
+- [ ] **Brute Force Voting Implementation**: Wire BruteForceConfig to synthesis generator
+- [ ] **Session Log Comparison Tool**: Compare Claude Code vs Gemini CLI edit quality empirically
+- [ ] **Codebase Tree Phase 1**: Delegate skeleton/summarize to Rust `view`
 
 ## Recently Completed
+
+- **Session Dec 21 2025 (continued)**:
+  - Claude vs Gemini CLI edit paradigm analysis (see `docs/edit-paradigm-comparison.md`)
+  - Lazy imports for reduced baseline memory
+  - Extensible TUI modes with plugin discovery
+  - BruteForceConfig for small model voting
 
 - **Session Dec 21 2025**:
   - Symbol hover info in TUI with signatures/docstrings

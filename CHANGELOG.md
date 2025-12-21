@@ -4,6 +4,12 @@
 
 ### Features
 
+**Session Dec 21 2025 (continued)**
+- `Claude vs Gemini CLI Analysis`: Documented edit paradigm differences (strict matching vs self-correction)
+- `Lazy Imports`: Converted moss.__init__.py to lazy imports for reduced baseline memory
+- `Extensible TUI Modes`: ModeRegistry with entry point + .moss/modes/ plugin discovery
+- `Brute Force Mode`: BruteForceConfig for n_samples + voting with small/local models
+
 **Session Dec 21 2025**
 - `Symbol Hover in TUI`: Tree view shows symbol children with hover displaying signatures/docstrings
 - `Context Elision Heuristics`: Anchor-preserving elision when token budget exceeded

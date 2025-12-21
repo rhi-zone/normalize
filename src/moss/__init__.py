@@ -8,247 +8,523 @@ Primary entry point:
     skeleton = api.skeleton.extract("src/main.py")
 
 All individual components are also available as direct imports.
+
+Memory optimization: Uses lazy imports to reduce baseline memory usage.
+Only MossAPI is eagerly loaded; other imports happen on first access.
 """
 
-from moss.agents import (
-    Constraint,
-    Manager,
-    MergeResult,
-    MergeStrategy,
-    SimpleWorker,
-    Ticket,
-    TicketPriority,
-    TicketResult,
-    TicketStatus,
-    Worker,
-    WorkerState,
-    WorkerStatus,
-    create_manager,
-)
-from moss.anchors import (
-    AmbiguousAnchorError,
-    Anchor,
-    AnchorMatch,
-    AnchorNotFoundError,
-    AnchorResolver,
-    AnchorType,
-    find_anchors,
-    resolve_anchor,
-)
-from moss.api import (
-    APIHandler,
-    CheckpointRequest,
-    CheckpointResponse,
-    EventStreamManager,
-    RequestStatus,
-    RequestTracker,
-    SSEEvent,
-    SSEEventType,
-    TaskRequest,
-    TaskResponse,
-    TaskStatusResponse,
-    create_api_handler,
-)
-from moss.architect_editor import (
-    Architect,
-    ArchitectEditorLoop,
-    Editor,
-    EditPlan,
-    EditResult,
-    EditStatus,
-    EditStep,
-    EditType,
-    LLMArchitect,
-    StructuredEditor,
-    run_architect_editor,
-)
-from moss.cfg import (
-    CFGBuilder,
-    CFGEdge,
-    CFGNode,
-    CFGViewProvider,
-    ControlFlowGraph,
-    EdgeType,
-    NodeType,
-    build_cfg,
-)
-from moss.cli import main as cli_main
-from moss.config import (
-    Distro,
-    LoopConfigWrapper,
-    MossConfig,
-    PolicyConfig,
-    ValidatorConfig,
-    create_config,
-    get_distro,
-    list_distros,
-    load_config_file,
-    register_distro,
-)
-from moss.context import CompiledContext, ContextHost, StaticContext
-from moss.dependencies import (
-    DependencyInfo,
-    Export,
-    Import,
-    PythonDependencyProvider,
-    extract_dependencies,
-    format_dependencies,
-)
-from moss.elided_literals import (
-    ElidedLiteralsProvider,
-    ElisionConfig,
-    ElisionStats,
-    elide_literals,
-    elide_literals_regex,
-)
-from moss.events import Event, EventBus, EventType
-from moss.handles import (
-    BinaryFileHandle,
-    DeferredHandle,
-    FileHandle,
-    Handle,
-    HandleMetadata,
-    HandleRef,
-    HandleRegistry,
-    MemoryHandle,
-)
-from moss.logging import (
-    LogContext,
-    LogFormat,
-    MossLogger,
-    configure_logging,
-    get_logger,
-    log_event,
-)
-from moss.loop import (
-    LoopConfig,
-    LoopIteration,
-    LoopResult,
-    LoopStatus,
-    SilentLoop,
-    VelocityMetrics,
-)
-from moss.memory import (
-    Action,
-    Episode,
-    EpisodicStore,
-    MemoryContext,
-    MemoryManager,
-    Outcome,
-    PatternMatcher,
-    SemanticRule,
-    SemanticStore,
-    SimpleVectorIndex,
-    StateSnapshot,
-    VectorIndex,
-    create_memory_manager,
-)
-from moss.moss_api import (
-    API,
-    CFGAPI,
-    AnchorAPI,
-    ContextAPI,
-    DependencyAPI,
-    GitAPI,
-    HealthAPI,
-    MossAPI,
-    PatchAPI,
-    SkeletonAPI,
-    ValidationAPI,
-)
-from moss.observability import (
-    MetricsCollector,
-    MetricType,
-    MetricValue,
-    Span,
-    Tracer,
-    get_metrics,
-    get_tracer,
-    reset_observability,
-    timed,
-    traced,
-)
-from moss.patches import (
-    Patch,
-    PatchResult,
-    PatchType,
-    apply_patch,
-    apply_patch_with_fallback,
-    apply_text_patch,
-)
-from moss.policy import (
-    PathPolicy,
-    Policy,
-    PolicyDecision,
-    PolicyEngine,
-    PolicyEngineResult,
-    PolicyResult,
-    QuarantinePolicy,
-    RateLimitPolicy,
-    ToolCallContext,
-    VelocityPolicy,
-    create_default_policy_engine,
-)
-from moss.profiling import (
-    BenchmarkSuite,
-    Profiler,
-    ProfileResult,
-    Timer,
-    TimingResult,
-    measure_time,
-    profile,
-    profile_function,
-    timed_function,
-)
-from moss.shadow_git import CommitHandle, GitError, ShadowBranch, ShadowGit
-from moss.skeleton import (
-    PythonSkeletonProvider,
-    Symbol,
-    extract_python_skeleton,
-    format_skeleton,
-)
-from moss.tree_sitter import (
-    LanguageType,
-    QueryMatch,
-    TreeNode,
-    TreeSitterParser,
-    TreeSitterSkeletonProvider,
-    TSSymbol,
-    get_language_for_extension,
-    is_supported_extension,
-)
-from moss.validators import (
-    CommandValidator,
-    LinterValidatorAdapter,
-    PytestValidator,
-    RuffValidator,
-    SyntaxValidator,
-    ValidationIssue,
-    ValidationResult,
-    ValidationSeverity,
-    Validator,
-    ValidatorChain,
-    create_python_validator_chain,
-)
-from moss.vector_store import (
-    ChromaVectorStore,
-    InMemoryVectorStore,
-    SearchResult,
-    VectorStore,
-    create_vector_store,
-    document_hash,
-)
-from moss.views import (
-    Intent,
-    RawViewProvider,
-    View,
-    ViewOptions,
-    ViewProvider,
-    ViewRegistry,
-    ViewTarget,
-    ViewType,
-    create_default_registry,
-)
+from __future__ import annotations
+
+import importlib
+from typing import TYPE_CHECKING
+
+# Eager import: Only the main entry point
+from moss.moss_api import MossAPI
+
+# Module mapping for lazy imports
+_LAZY_IMPORTS: dict[str, tuple[str, ...]] = {
+    "moss.agents": (
+        "Constraint",
+        "Manager",
+        "MergeResult",
+        "MergeStrategy",
+        "SimpleWorker",
+        "Ticket",
+        "TicketPriority",
+        "TicketResult",
+        "TicketStatus",
+        "Worker",
+        "WorkerState",
+        "WorkerStatus",
+        "create_manager",
+    ),
+    "moss.anchors": (
+        "AmbiguousAnchorError",
+        "Anchor",
+        "AnchorMatch",
+        "AnchorNotFoundError",
+        "AnchorResolver",
+        "AnchorType",
+        "find_anchors",
+        "resolve_anchor",
+    ),
+    "moss.api": (
+        "APIHandler",
+        "CheckpointRequest",
+        "CheckpointResponse",
+        "EventStreamManager",
+        "RequestStatus",
+        "RequestTracker",
+        "SSEEvent",
+        "SSEEventType",
+        "TaskRequest",
+        "TaskResponse",
+        "TaskStatusResponse",
+        "create_api_handler",
+    ),
+    "moss.architect_editor": (
+        "Architect",
+        "ArchitectEditorLoop",
+        "Editor",
+        "EditPlan",
+        "EditResult",
+        "EditStatus",
+        "EditStep",
+        "EditType",
+        "LLMArchitect",
+        "StructuredEditor",
+        "run_architect_editor",
+    ),
+    "moss.cfg": (
+        "CFGBuilder",
+        "CFGEdge",
+        "CFGNode",
+        "CFGViewProvider",
+        "ControlFlowGraph",
+        "EdgeType",
+        "NodeType",
+        "build_cfg",
+    ),
+    "moss.cli": ("cli_main:main",),
+    "moss.config": (
+        "Distro",
+        "LoopConfigWrapper",
+        "MossConfig",
+        "PolicyConfig",
+        "ValidatorConfig",
+        "create_config",
+        "get_distro",
+        "list_distros",
+        "load_config_file",
+        "register_distro",
+    ),
+    "moss.context": ("CompiledContext", "ContextHost", "StaticContext"),
+    "moss.dependencies": (
+        "DependencyInfo",
+        "Export",
+        "Import",
+        "PythonDependencyProvider",
+        "extract_dependencies",
+        "format_dependencies",
+    ),
+    "moss.elided_literals": (
+        "ElidedLiteralsProvider",
+        "ElisionConfig",
+        "ElisionStats",
+        "elide_literals",
+        "elide_literals_regex",
+    ),
+    "moss.events": ("Event", "EventBus", "EventType"),
+    "moss.handles": (
+        "BinaryFileHandle",
+        "DeferredHandle",
+        "FileHandle",
+        "Handle",
+        "HandleMetadata",
+        "HandleRef",
+        "HandleRegistry",
+        "MemoryHandle",
+    ),
+    "moss.logging": (
+        "LogContext",
+        "LogFormat",
+        "MossLogger",
+        "configure_logging",
+        "get_logger",
+        "log_event",
+    ),
+    "moss.loop": (
+        "LoopConfig",
+        "LoopIteration",
+        "LoopResult",
+        "LoopStatus",
+        "SilentLoop",
+        "VelocityMetrics",
+    ),
+    "moss.memory": (
+        "Action",
+        "Episode",
+        "EpisodicStore",
+        "MemoryContext",
+        "MemoryManager",
+        "Outcome",
+        "PatternMatcher",
+        "SemanticRule",
+        "SemanticStore",
+        "SimpleVectorIndex",
+        "StateSnapshot",
+        "VectorIndex",
+        "create_memory_manager",
+    ),
+    "moss.moss_api": (
+        "API",
+        "CFGAPI",
+        "AnchorAPI",
+        "ContextAPI",
+        "DependencyAPI",
+        "GitAPI",
+        "HealthAPI",
+        "PatchAPI",
+        "SkeletonAPI",
+        "ValidationAPI",
+    ),
+    "moss.observability": (
+        "MetricsCollector",
+        "MetricType",
+        "MetricValue",
+        "Span",
+        "Tracer",
+        "get_metrics",
+        "get_tracer",
+        "reset_observability",
+        "timed",
+        "traced",
+    ),
+    "moss.patches": (
+        "Patch",
+        "PatchResult",
+        "PatchType",
+        "apply_patch",
+        "apply_patch_with_fallback",
+        "apply_text_patch",
+    ),
+    "moss.policy": (
+        "PathPolicy",
+        "Policy",
+        "PolicyDecision",
+        "PolicyEngine",
+        "PolicyEngineResult",
+        "PolicyResult",
+        "QuarantinePolicy",
+        "RateLimitPolicy",
+        "ToolCallContext",
+        "VelocityPolicy",
+        "create_default_policy_engine",
+    ),
+    "moss.profiling": (
+        "BenchmarkSuite",
+        "Profiler",
+        "ProfileResult",
+        "Timer",
+        "TimingResult",
+        "measure_time",
+        "profile",
+        "profile_function",
+        "timed_function",
+    ),
+    "moss.shadow_git": ("CommitHandle", "GitError", "ShadowBranch", "ShadowGit"),
+    "moss.skeleton": (
+        "PythonSkeletonProvider",
+        "Symbol",
+        "extract_python_skeleton",
+        "format_skeleton",
+    ),
+    "moss.tree_sitter": (
+        "LanguageType",
+        "QueryMatch",
+        "TreeNode",
+        "TreeSitterParser",
+        "TreeSitterSkeletonProvider",
+        "TSSymbol",
+        "get_language_for_extension",
+        "is_supported_extension",
+    ),
+    "moss.validators": (
+        "CommandValidator",
+        "LinterValidatorAdapter",
+        "PytestValidator",
+        "RuffValidator",
+        "SyntaxValidator",
+        "ValidationIssue",
+        "ValidationResult",
+        "ValidationSeverity",
+        "Validator",
+        "ValidatorChain",
+        "create_python_validator_chain",
+    ),
+    "moss.vector_store": (
+        "ChromaVectorStore",
+        "InMemoryVectorStore",
+        "SearchResult",
+        "VectorStore",
+        "create_vector_store",
+        "document_hash",
+    ),
+    "moss.views": (
+        "Intent",
+        "RawViewProvider",
+        "View",
+        "ViewOptions",
+        "ViewProvider",
+        "ViewRegistry",
+        "ViewTarget",
+        "ViewType",
+        "create_default_registry",
+    ),
+}
+
+# Build reverse lookup: name -> module
+_NAME_TO_MODULE: dict[str, str] = {}
+_RENAMES: dict[str, str] = {}  # For "cli_main:main" style renames
+for _module, _names in _LAZY_IMPORTS.items():
+    for _name in _names:
+        if ":" in _name:
+            _public, _internal = _name.split(":")
+            _NAME_TO_MODULE[_public] = _module
+            _RENAMES[_public] = _internal
+        else:
+            _NAME_TO_MODULE[_name] = _module
+
+
+def __getattr__(name: str) -> object:
+    """Lazy import handler."""
+    if name in _NAME_TO_MODULE:
+        module = importlib.import_module(_NAME_TO_MODULE[name])
+        actual_name = _RENAMES.get(name, name)
+        return getattr(module, actual_name)
+    raise AttributeError(f"module 'moss' has no attribute {name!r}")
+
+
+# Type checking support - provide hints without runtime imports
+if TYPE_CHECKING:
+    from moss.agents import (
+        Constraint,
+        Manager,
+        MergeResult,
+        MergeStrategy,
+        SimpleWorker,
+        Ticket,
+        TicketPriority,
+        TicketResult,
+        TicketStatus,
+        Worker,
+        WorkerState,
+        WorkerStatus,
+        create_manager,
+    )
+    from moss.anchors import (
+        AmbiguousAnchorError,
+        Anchor,
+        AnchorMatch,
+        AnchorNotFoundError,
+        AnchorResolver,
+        AnchorType,
+        find_anchors,
+        resolve_anchor,
+    )
+    from moss.api import (
+        APIHandler,
+        CheckpointRequest,
+        CheckpointResponse,
+        EventStreamManager,
+        RequestStatus,
+        RequestTracker,
+        SSEEvent,
+        SSEEventType,
+        TaskRequest,
+        TaskResponse,
+        TaskStatusResponse,
+        create_api_handler,
+    )
+    from moss.architect_editor import (
+        Architect,
+        ArchitectEditorLoop,
+        Editor,
+        EditPlan,
+        EditResult,
+        EditStatus,
+        EditStep,
+        EditType,
+        LLMArchitect,
+        StructuredEditor,
+        run_architect_editor,
+    )
+    from moss.cfg import (
+        CFGBuilder,
+        CFGEdge,
+        CFGNode,
+        CFGViewProvider,
+        ControlFlowGraph,
+        EdgeType,
+        NodeType,
+        build_cfg,
+    )
+    from moss.cli import main as cli_main
+    from moss.config import (
+        Distro,
+        LoopConfigWrapper,
+        MossConfig,
+        PolicyConfig,
+        ValidatorConfig,
+        create_config,
+        get_distro,
+        list_distros,
+        load_config_file,
+        register_distro,
+    )
+    from moss.context import CompiledContext, ContextHost, StaticContext
+    from moss.dependencies import (
+        DependencyInfo,
+        Export,
+        Import,
+        PythonDependencyProvider,
+        extract_dependencies,
+        format_dependencies,
+    )
+    from moss.elided_literals import (
+        ElidedLiteralsProvider,
+        ElisionConfig,
+        ElisionStats,
+        elide_literals,
+        elide_literals_regex,
+    )
+    from moss.events import Event, EventBus, EventType
+    from moss.handles import (
+        BinaryFileHandle,
+        DeferredHandle,
+        FileHandle,
+        Handle,
+        HandleMetadata,
+        HandleRef,
+        HandleRegistry,
+        MemoryHandle,
+    )
+    from moss.logging import (
+        LogContext,
+        LogFormat,
+        MossLogger,
+        configure_logging,
+        get_logger,
+        log_event,
+    )
+    from moss.loop import (
+        LoopConfig,
+        LoopIteration,
+        LoopResult,
+        LoopStatus,
+        SilentLoop,
+        VelocityMetrics,
+    )
+    from moss.memory import (
+        Action,
+        Episode,
+        EpisodicStore,
+        MemoryContext,
+        MemoryManager,
+        Outcome,
+        PatternMatcher,
+        SemanticRule,
+        SemanticStore,
+        SimpleVectorIndex,
+        StateSnapshot,
+        VectorIndex,
+        create_memory_manager,
+    )
+    from moss.moss_api import (
+        API,
+        CFGAPI,
+        AnchorAPI,
+        ContextAPI,
+        DependencyAPI,
+        GitAPI,
+        HealthAPI,
+        PatchAPI,
+        SkeletonAPI,
+        ValidationAPI,
+    )
+    from moss.observability import (
+        MetricsCollector,
+        MetricType,
+        MetricValue,
+        Span,
+        Tracer,
+        get_metrics,
+        get_tracer,
+        reset_observability,
+        timed,
+        traced,
+    )
+    from moss.patches import (
+        Patch,
+        PatchResult,
+        PatchType,
+        apply_patch,
+        apply_patch_with_fallback,
+        apply_text_patch,
+    )
+    from moss.policy import (
+        PathPolicy,
+        Policy,
+        PolicyDecision,
+        PolicyEngine,
+        PolicyEngineResult,
+        PolicyResult,
+        QuarantinePolicy,
+        RateLimitPolicy,
+        ToolCallContext,
+        VelocityPolicy,
+        create_default_policy_engine,
+    )
+    from moss.profiling import (
+        BenchmarkSuite,
+        Profiler,
+        ProfileResult,
+        Timer,
+        TimingResult,
+        measure_time,
+        profile,
+        profile_function,
+        timed_function,
+    )
+    from moss.shadow_git import CommitHandle, GitError, ShadowBranch, ShadowGit
+    from moss.skeleton import (
+        PythonSkeletonProvider,
+        Symbol,
+        extract_python_skeleton,
+        format_skeleton,
+    )
+    from moss.tree_sitter import (
+        LanguageType,
+        QueryMatch,
+        TreeNode,
+        TreeSitterParser,
+        TreeSitterSkeletonProvider,
+        TSSymbol,
+        get_language_for_extension,
+        is_supported_extension,
+    )
+    from moss.validators import (
+        CommandValidator,
+        LinterValidatorAdapter,
+        PytestValidator,
+        RuffValidator,
+        SyntaxValidator,
+        ValidationIssue,
+        ValidationResult,
+        ValidationSeverity,
+        Validator,
+        ValidatorChain,
+        create_python_validator_chain,
+    )
+    from moss.vector_store import (
+        ChromaVectorStore,
+        InMemoryVectorStore,
+        SearchResult,
+        VectorStore,
+        create_vector_store,
+        document_hash,
+    )
+    from moss.views import (
+        Intent,
+        RawViewProvider,
+        View,
+        ViewOptions,
+        ViewProvider,
+        ViewRegistry,
+        ViewTarget,
+        ViewType,
+        create_default_registry,
+    )
 
 __version__ = "0.1.0"
 
