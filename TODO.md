@@ -4,11 +4,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Agentic Memory Search**: Semantic search over past session episodes
 - [ ] **Parallel Multi-Agent Refactor**: Implement 'diffusion-like' parallel implementation
 - [ ] **Adaptive Context Pruning**: Intelligently elide low-value content from context
 
 ## Recently Completed
+
+- **Agentic Memory Search** (Dec 2025):
+  - Implemented `memory_search_loop` for explicit past experience retrieval
+  - Added `analyze_memory` LLM operation to synthesize episodic insights
+  - Integrated with `memory.recall` tool for semantic search over past turns
 
 - **Self-Correcting Edit Harness** (Dec 2025):
   - Implemented `autofix_loop` for automated syntax error repair

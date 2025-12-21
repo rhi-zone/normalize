@@ -986,6 +986,23 @@ def autofix_loop(name: str = "autofix") -> AgentLoop:
     )
 
 
+def memory_search_loop(name: str = "memory_search") -> AgentLoop:
+    """Loop that explicitly queries past experience before acting."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("recall", "memory.recall", step_type=StepType.TOOL),
+            LoopStep(
+                "analyze",
+                "llm.analyze_memory",
+                input_from="recall",
+                step_type=StepType.LLM,
+            ),
+        ],
+        exit_conditions=["analyze.success"],
+    )
+
+
 def self_improving_docstring_loop(name: str = "self_improve_docstring") -> AgentLoop:
     """Docstring loop that learns from its own performance.
 
@@ -2423,6 +2440,17 @@ class LLMToolExecutor:
                 f"Focus ONLY on fixing the syntax errors while preserving logic.\n\n"
                 f"Errors:\n{focus_str}\n\n"
                 f"Output the repaired code block."
+            ),
+            "analyze_memory": (
+                f"{structured_context}\n\n"
+                f"Analyze the following past experiences (episodes and rules) "
+                f"retrieved from memory.\n"
+                f"Identify:\n"
+                f"- Successful strategies used in similar situations\n"
+                f"- Common failure modes or anti-patterns to avoid\n"
+                f"- Relevant constraints or preferences previously established\n\n"
+                f"Memory Content:\n{focus_str}\n\n"
+                f"Output actionable advice for the current task based on this experience."
             ),
         }
 
