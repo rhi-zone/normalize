@@ -1,221 +1,89 @@
 # DWIM Architecture
 
-This document describes the internals of the DWIM (Do What I Mean) module for maintainers.
+This document describes the DWIM (Do What I Mean) module internals.
 
 ## Overview
 
-`moss.dwim` provides semantic tool routing - matching user intent to the right tool even when the request is imprecise. It's designed for LLM robustness, handling typos, aliases, and natural language descriptions.
+With the consolidation to 3 core primitives (view, edit, analyze), DWIM has been greatly simplified. The complex TF-IDF and embedding-based routing has been removed in favor of simple exact/alias matching with typo correction.
 
-## Components
-
-### 1. TF-IDF Index (`TFIDFIndex`)
-
-Pure Python implementation of TF-IDF (Term Frequency-Inverse Document Frequency) for semantic similarity.
-
-**Location**: `src/moss/dwim.py:87-126`
+## Core Primitives
 
 ```python
-class TFIDFIndex:
-    documents: list[str]      # Original text
-    doc_tokens: list[list[str]]  # Tokenized
-    idf: dict[str, float]     # Inverse document frequency
-    doc_vectors: list[dict[str, float]]  # TF-IDF vectors
+CORE_PRIMITIVES = {"view", "edit", "analyze"}
 ```
 
-**Key functions**:
-- `tokenize(text)` - Splits on word boundaries (`\b\w+\b`)
-- `compute_tf(tokens)` - Term frequency (count / total)
-- `compute_idf(documents)` - IDF with smoothing: `log((N+1)/(df+1)) + 1`
-- `cosine_similarity(vec1, vec2)` - Sparse vector cosine similarity
+These 3 tools are the primary CLI/MCP interface:
+- `view` - Show tree, file skeleton, or symbol source (fuzzy path resolution)
+- `edit` - Structural code modifications
+- `analyze` - Health, complexity, and security analysis
 
-**Design decisions**:
-- No external dependencies (pure Python)
-- Sparse vectors as dicts for memory efficiency
-- Recomputes IDF on each add (small corpus, negligible cost)
+## Aliases
 
-### 2. Tool Registry (`TOOL_REGISTRY`)
-
-Static registry mapping tool names to metadata.
-
-**Location**: `src/moss/dwim.py:134-233`
+Common terms map directly to primitives:
 
 ```python
-TOOL_REGISTRY: dict[str, ToolInfo] = {
-    "skeleton": ToolInfo(
-        name="skeleton",
-        description="Extract code structure showing classes, functions, methods",
-        keywords=["structure", "outline", "hierarchy", ...],
-        parameters=["path", "pattern"],
-    ),
-    ...
+CORE_ALIASES = {
+    # view aliases
+    "show": "view", "look": "view", "skeleton": "view", "tree": "view",
+    "expand": "view", "search": "view", "find": "view", "grep": "view",
+
+    # edit aliases
+    "modify": "edit", "change": "edit", "patch": "edit", "fix": "edit",
+
+    # analyze aliases
+    "check": "analyze", "health": "analyze", "complexity": "analyze",
+    "security": "analyze", "lint": "analyze",
 }
 ```
 
-**Adding a new tool**:
-1. Add entry to `TOOL_REGISTRY` with description, keywords, and parameters
-2. Add any semantic aliases to `TOOL_ALIASES`
-3. The router automatically indexes the new tool
+## Resolution Logic
 
-### 3. Alias Maps
+`resolve_core_primitive(name: str) -> tuple[str | None, float]`
 
-**Tool aliases** (`TOOL_ALIASES`): Alternative names for tools
-```python
-"structure" → "skeleton"
-"imports" → "deps"
-"search" → "query"
-```
+1. **Exact match**: Check if name is in `CORE_PRIMITIVES` → confidence 1.0
+2. **Alias match**: Check if name is in `CORE_ALIASES` → confidence 1.0
+3. **Typo correction**: Use Levenshtein distance (SequenceMatcher)
+   - Threshold 0.7 for auto-correct (e.g., "veiw" → "view")
+   - Returns best match with confidence score
 
-**Parameter aliases** (`PARAM_ALIASES`): Alternative parameter names
-```python
-"file" → "path"
-"glob" → "pattern"
-"base" → "inherits"
-```
+## Path Resolution
 
-### 4. Tool Router (`ToolRouter`)
-
-Main routing class that combines multiple signals.
-
-**Location**: `src/moss/dwim.py:441-529`
-
-**Signal weights** (in `analyze_intent`):
-- TF-IDF cosine similarity: 40%
-- Keyword matching: 35%
-- Description similarity: 15%
-- Name similarity: 10%
-
-**Why these weights**:
-- TF-IDF captures semantic meaning across the full description
-- Keywords are curated for domain knowledge
-- Description/name similarity handles exact matches and typos
-
-### 5. Confidence Thresholds
-
-```python
-AUTO_CORRECT_THRESHOLD = 0.85  # Auto-correct if >= 0.85
-SUGGEST_THRESHOLD = 0.50       # Suggest if >= 0.50
-```
-
-**Behavior**:
-- `>= 0.85`: Return resolved tool with message "(auto-corrected)"
-- `0.50 - 0.84`: Return suggestion "Did you mean X?"
-- `< 0.50`: Return no match
-
-## Data Flow
+Handled by Rust CLI, not DWIM. The `view` and `analyze` commands accept fuzzy paths:
 
 ```
-User Input
-    │
-    ▼
-┌───────────────────┐
-│ Exact Match?      │──yes──► Return tool (confidence=1.0)
-└───────────────────┘
-    │ no
-    ▼
-┌───────────────────┐
-│ Alias Match?      │──yes──► Return canonical tool (confidence=1.0)
-└───────────────────┘
-    │ no
-    ▼
-┌───────────────────┐
-│ Fuzzy Match       │
-│ (TF-IDF + keywords│
-│  + string sim)    │
-└───────────────────┘
-    │
-    ▼
-┌───────────────────┐
-│ Confidence Check  │
-│ >= 0.85: auto     │
-│ >= 0.50: suggest  │
-│ < 0.50: no match  │
-└───────────────────┘
+dwim.py       → src/moss/dwim.py
+ToolRouter    → src/moss/dwim.py/ToolRouter
+src/foo       → src/foo.py or src/foo/
 ```
 
-## MCP Integration
+Resolution order:
+1. Exact path match
+2. Filename match (stem.py)
+3. Stem match (no extension)
+4. Symbol search
 
-Three MCP tools expose DWIM functionality:
+## Legacy Support
 
-| Tool | Function | Use Case |
-|------|----------|----------|
-| `analyze_intent` | `dwim.analyze_intent()` | "What tool should I use for X?" |
-| `resolve_tool` | `dwim.resolve_tool()` | "Did I spell this tool name right?" |
-| `list_capabilities` | `dwim.list_tools()` | "What tools exist?" |
-
-**Location**: `src/moss/mcp_server.py:611-688`
+The old TOOL_REGISTRY with ~30 tools still exists for backwards compatibility but is no longer the primary routing mechanism. New code should use the 3 primitives directly.
 
 ## Testing
 
-Tests in `tests/test_dwim.py` cover:
-- TF-IDF correctness (tokenization, cosine similarity, index queries)
-- Fuzzy matching (exact, similar, different strings)
-- Tool resolution (exact, alias, typo, unknown)
-- Parameter normalization
-- Router behavior (various intent queries)
-- Edge cases (empty, long, special characters)
+Tests in `tests/test_dwim.py`:
+- Core primitive resolution
+- Alias resolution
+- Typo correction thresholds
+- Edge cases (empty, unknown)
 
-## Custom Configuration
+## Configuration
 
-Users can customize DWIM behavior via `.moss/dwim.toml` (project-level) or `~/.config/moss/dwim.toml` (user-level).
-
-**Location**: `src/moss/dwim_config.py`
-
-### Configuration Sections
+Users can add custom aliases via `.moss/dwim.toml`:
 
 ```toml
-# Custom aliases (shortcut → tool)
 [aliases]
-ll = "skeleton"
-cat = "cli_expand"
-refs = "callers"
-
-# Additional keywords for existing tools
-[keywords.skeleton]
-extra = ["structure", "layout"]
-boost = 0.15  # Additive boost when these keywords match
-
-# Custom tool definitions
-[[tools]]
-name = "my_linter"
-description = "Run custom project linter"
-keywords = ["lint", "check", "style"]
-parameters = ["path"]
-
-# Intent patterns (regex → tool, higher priority first)
-[[intents]]
-pattern = "show.*code"
-tool = "cli_expand"
-priority = 10
-
-[[intents]]
-pattern = "who calls"
-tool = "callers"
-priority = 5
+ll = "view"      # shortcut
+refs = "view"    # semantic alias
 ```
-
-### Priority Order
-
-1. Intent patterns (checked first, highest priority pattern wins)
-2. Exact tool name or alias match
-3. TF-IDF + keyword scoring with custom boosts applied
-
-### Loading Order
-
-Later sources override earlier ones:
-1. `~/.config/moss/dwim.toml` (user-level defaults)
-2. `.moss/dwim.toml` (project-specific overrides)
-
-## Future Improvements
-
-1. **Embedding support**: Replace TF-IDF with neural embeddings for better semantic matching
-2. **Learning from usage**: Track which tools users actually want and adjust weights
-3. **Context-aware routing**: Consider previous tools used in session
-4. **Parameter inference**: Suggest parameter values based on context
 
 ## Performance
 
-- Index build: O(n * m) where n=tools, m=avg description length
-- Query: O(n) comparisons per query
-- Memory: ~10KB for current tool set
-
-For the current ~7 tools, routing is effectively instant (<1ms).
+With only 3 primitives + aliases, routing is O(1) lookup. Typo correction is O(n) where n = number of aliases (~30), negligible.

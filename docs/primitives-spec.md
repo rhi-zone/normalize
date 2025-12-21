@@ -1,6 +1,6 @@
-# Primitives Spec: view + edit
+# Primitives Spec: view, edit, analyze
 
-Two-tool interface for codebase navigation and modification.
+Three-tool interface for codebase navigation, modification, and analysis.
 
 ## view
 
@@ -133,6 +133,44 @@ Content is provided as a string. The tool:
 - Validates syntax before applying
 - Preserves or adapts indentation to context
 - Fails if content is syntactically invalid
+
+## analyze
+
+Unified analysis operation. Computes properties of codebase nodes.
+
+```
+moss analyze [target] [options]
+```
+
+### Target Resolution
+
+Same as `view` - fuzzy, forgiving paths.
+
+### Analysis Types
+
+| Flag | Purpose |
+|------|---------|
+| `--health` | Codebase health metrics (files, lines, avg complexity) |
+| `--complexity` | Cyclomatic complexity per function |
+| `--security` | Security vulnerability scanning |
+
+Running with no flags runs all analyses.
+
+### Examples
+
+```
+moss analyze                       # full codebase analysis
+moss analyze src/                  # analyze src directory
+moss analyze --complexity          # just complexity
+moss analyze src/foo.py --security # security scan of one file
+```
+
+### Output
+
+Returns structured results suitable for LLM consumption:
+- Health: file count, line count, avg complexity score
+- Complexity: list of functions with their complexity scores
+- Security: list of findings with severity, location, description
 
 ## Open Questions
 

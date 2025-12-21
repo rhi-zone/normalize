@@ -13,8 +13,14 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 4. Repeat
 
 **Known Issues:**
-- [ ] Agent path resolution fails without full paths (`foo.py` → should find `src/moss/foo.py`)
+- [x] Agent path resolution - FIXED: now routes through Rust CLI with fuzzy resolution
 - [ ] Agent stuck in retry loop (3x same intent) - needs fallback strategy
+- [ ] Agent behavior inconsistent (some runs hit max turns for same query)
+
+**Docs Alignment:**
+- [x] `docs/dwim-architecture.md` - rewritten for 3 primitives
+- [x] `docs/primitives-spec.md` - added `analyze` section
+- [ ] Check all docs align with `docs/philosophy.md` tenets
 
 **CLI Cleanup:**
 - [ ] `dwim` - may no longer be necessary with 3 primitives
