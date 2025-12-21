@@ -3643,15 +3643,76 @@ def cmd_dwim(args: Namespace) -> int:
     DWIM = Do What I Mean. Describe what you want to do and get tool suggestions.
     """
     from moss import MossAPI
+    from moss.dwim import get_embedding_matcher
 
     output = setup_output(args)
     query_parts = getattr(args, "query", None) or []
     query = " ".join(query_parts) if query_parts else None
     tool_name = getattr(args, "tool", None)
     top_k = getattr(args, "top", 5)
+    analyze = getattr(args, "analyze", False)
+    similar_to = getattr(args, "similar", None)
 
     # DWIMAPI doesn't need a project root, but MossAPI requires one
     api = MossAPI.for_project(Path.cwd())
+
+    # Analyze mode: show embedding similarity between tools
+    if analyze:
+        matcher = get_embedding_matcher()
+        if not matcher.is_available():
+            output.error("Embeddings not available (fastembed not installed)")
+            return 1
+
+        print("Computing pairwise embedding similarity...")
+        similarities = matcher.analyze_similarity()
+
+        if not similarities:
+            output.error("No tool embeddings found")
+            return 1
+
+        print(f"\nTop {top_k} most similar tool pairs:")
+        print("-" * 60)
+        for t1, t2, sim in similarities[:top_k]:
+            print(f"{sim:.3f}  {t1} <-> {t2}")
+
+        # Show potential confusion pairs (> 0.8 similarity)
+        confusion = [(t1, t2, s) for t1, t2, s in similarities if s > 0.8]
+        if confusion:
+            print(f"\nPotential confusion pairs (similarity > 0.8): {len(confusion)}")
+            print("-" * 60)
+            for t1, t2, sim in confusion[:20]:
+                print(f"{sim:.3f}  {t1} <-> {t2}")
+
+        # Show base tools vs their variants
+        print("\nBase tool vs variant similarity:")
+        print("-" * 60)
+        base_tools = {"skeleton", "todo", "deps", "cfg", "anchors", "query", "context"}
+        for base in base_tools:
+            variants = matcher.find_similar_to(base, top_k=5)
+            matching_variants = [(t, s) for t, s in variants if t.startswith(f"{base}_")]
+            if matching_variants:
+                print(f"{base}:")
+                for t, s in matching_variants[:3]:
+                    print(f"  {s:.3f}  {t}")
+        return 0
+
+    # Similar-to mode: show tools similar to a specific tool
+    if similar_to:
+        matcher = get_embedding_matcher()
+        if not matcher.is_available():
+            output.error("Embeddings not available (fastembed not installed)")
+            return 1
+
+        results = matcher.find_similar_to(similar_to, top_k=top_k)
+        if not results:
+            output.error(f"Tool not found: {similar_to}")
+            return 1
+
+        print(f"Tools most similar to '{similar_to}':")
+        print("-" * 40)
+        for tool_name_result, sim in results:
+            print(f"{sim:.3f}  {tool_name_result}")
+        return 0
 
     # Info mode: show details about a specific tool
     if tool_name:
@@ -5898,6 +5959,16 @@ def create_parser() -> argparse.ArgumentParser:
         type=int,
         default=5,
         help="Number of results to show (default: 5)",
+    )
+    dwim_parser.add_argument(
+        "--analyze",
+        action="store_true",
+        help="Analyze embedding similarity between tools",
+    )
+    dwim_parser.add_argument(
+        "--similar",
+        "-s",
+        help="Show tools most similar to the given tool",
     )
     dwim_parser.set_defaults(func=cmd_dwim)
 

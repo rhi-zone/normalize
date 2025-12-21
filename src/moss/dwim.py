@@ -217,6 +217,75 @@ class EmbeddingMatcher:
         """Check if embedding model is available."""
         return self._ensure_model()
 
+    def get_all_embeddings(self) -> dict[str, Any]:
+        """Get all tool embeddings. Returns empty dict if unavailable."""
+        if not self._ensure_tool_embeddings():
+            return {}
+        return dict(self._tool_embeddings)
+
+    def get_tool_text(self, tool_name: str) -> str | None:
+        """Get the text that was embedded for a tool."""
+        return self._tool_texts.get(tool_name)
+
+    def analyze_similarity(self) -> list[tuple[str, str, float]]:
+        """Compute pairwise similarity between all tool embeddings.
+
+        Returns:
+            List of (tool1, tool2, similarity) sorted by similarity descending.
+        """
+        if not self._ensure_tool_embeddings():
+            return []
+
+        import numpy as np
+
+        tools = list(self._tool_embeddings.keys())
+        results = []
+
+        for i, t1 in enumerate(tools):
+            emb1 = self._tool_embeddings[t1]
+            for t2 in tools[i + 1 :]:
+                emb2 = self._tool_embeddings[t2]
+                sim = float(np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2)))
+                results.append((t1, t2, sim))
+
+        results.sort(key=lambda x: x[2], reverse=True)
+        return results
+
+    def find_similar_to(self, tool_name: str, top_k: int = 10) -> list[tuple[str, float]]:
+        """Find tools most similar to the given tool.
+
+        Args:
+            tool_name: Tool to find similarities for
+            top_k: Maximum results
+
+        Returns:
+            List of (tool_name, similarity) tuples.
+        """
+        if not self._ensure_tool_embeddings():
+            return []
+        if tool_name not in self._tool_embeddings:
+            return []
+
+        import numpy as np
+
+        emb = self._tool_embeddings[tool_name]
+        results = []
+
+        for other, other_emb in self._tool_embeddings.items():
+            if other == tool_name:
+                continue
+            sim = float(np.dot(emb, other_emb) / (np.linalg.norm(emb) * np.linalg.norm(other_emb)))
+            results.append((other, sim))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:top_k]
+
+    def embed_query(self, query: str) -> Any | None:
+        """Embed a single query. Returns None if unavailable."""
+        if not self._ensure_model():
+            return None
+        return next(iter(self._model.embed([query])))
+
 
 def get_embedding_matcher() -> EmbeddingMatcher:
     """Get the global embedding matcher instance."""
@@ -753,11 +822,13 @@ TOOL_REGISTRY = _TOOLS
 
 # Semantic aliases: alternative names that map to canonical tools
 TOOL_ALIASES: dict[str, str] = {
-    # skeleton
+    # skeleton (most common terms for code structure)
     "symbols": "skeleton",
     "outline": "skeleton",
     "tree": "skeleton",
     "hierarchy": "skeleton",
+    "structure": "skeleton",  # Code structure = skeleton
+    "overview": "skeleton",  # Code overview = skeleton
     # cli_expand (show full source of a symbol)
     "expand": "cli_expand",
     "fullsource": "cli_expand",
@@ -791,10 +862,8 @@ TOOL_ALIASES: dict[str, str] = {
     "paths": "cfg",
     # context
     "summary": "context",
-    "overview": "context",
     "info": "context",
     # search_summarize_module
-    "structure": "search_summarize_module",
     "module": "search_summarize_module",
     # apply_patch
     "edit": "apply_patch",
@@ -967,6 +1036,10 @@ class ToolRouter:
     ) -> list[ToolMatch]:
         """Analyze a natural language query to find the best matching tools.
 
+        Matching strategy:
+        1. Tool-like queries (1-2 words, no articles): exact → typo → alias
+        2. Natural language queries: straight to semantic embedding matching
+
         Args:
             query: Natural language description of what the user wants
             available_tools: Limit search to these tools (default: all)
@@ -976,104 +1049,142 @@ class ToolRouter:
         """
         tools = set(available_tools) if available_tools else set(TOOL_REGISTRY.keys())
 
-        # Check custom intent patterns first (highest priority)
-        try:
-            from moss.dwim_config import get_config, match_intent_patterns
+        # Normalize: hyphens to underscores, lowercase
+        normalized = query.replace("-", "_").lower()
+        words = normalized.split()
 
-            config = get_config()
-            if config.intents:
-                matched_tool = match_intent_patterns(query, config.intents)
-                if matched_tool and matched_tool in tools:
-                    return [
-                        ToolMatch(
-                            tool=matched_tool,
-                            confidence=1.0,
-                            message="Matched custom intent pattern",
-                        )
-                    ]
-        except ImportError:
-            pass
+        if not words:
+            return []
 
-        # Normalize hyphens to underscores for tool name matching
-        normalized_query = query.replace("-", "_")
-        query_words = normalized_query.lower().split()
+        # === STEP 1: Try exact matching first (works for any query) ===
+        joined = "_".join(words)
 
-        if query_words:
-            first_word = query_words[0]
-            joined_query = "_".join(query_words)
+        # 1a. Exact tool name match
+        if joined in tools:
+            return [ToolMatch(tool=joined, confidence=1.0)]
 
-            # Fast path 1: Exact tool name match (always wins)
-            if joined_query in tools:
-                return [ToolMatch(tool=joined_query, confidence=1.0)]
+        # 1b. Exact alias match
+        if joined in TOOL_ALIASES:
+            target = TOOL_ALIASES[joined]
+            if target in tools:
+                return [ToolMatch(tool=target, confidence=1.0)]
 
-            # Detect natural language queries
-            # Only skip fast path if query contains connectors/articles
-            natural_lang_connectors = {
-                "and",
-                "or",
-                "but",
-                "the",
-                "a",
-                "an",
-                "for",
-                "to",
-                "in",
-                "of",
-                "with",
-                "what",
-                "how",
-                "where",
-                "why",
-                "which",
-                "that",
-                "this",
-                "is",
-                "are",
-                "my",
-                "all",
-            }
-            is_natural_language = len(query_words) > 1 and any(
-                w in natural_lang_connectors for w in query_words[1:]
-            )
+        # 1c. First word is exact tool name (e.g., "skeleton src/main.py")
+        if words[0] in tools:
+            return [ToolMatch(tool=words[0], confidence=1.0)]
 
-            # Fast path 2: Alias or base name match (skip for natural language)
-            if not is_natural_language:
-                # Alias match
-                if first_word in TOOL_ALIASES:
-                    tool = TOOL_ALIASES[first_word]
-                    if tool in tools:
-                        return [ToolMatch(tool=tool, confidence=1.0)]
+        # 1d. First word is exact alias
+        if words[0] in TOOL_ALIASES:
+            target = TOOL_ALIASES[words[0]]
+            if target in tools:
+                return [ToolMatch(tool=target, confidence=1.0)]
 
-                # Single matching tool by base name
-                matching_tools = [
-                    t
-                    for t in tools
-                    if t in TOOL_REGISTRY and (first_word == t.split("_")[0] or first_word == t)
-                ]
-                if len(matching_tools) == 1:
-                    return [ToolMatch(tool=matching_tools[0], confidence=1.0)]
+        # === STEP 2: Typo correction for tool-like queries ===
+        # Tool-like = short query without many NL markers
+        nl_markers = {
+            "and",
+            "or",
+            "but",
+            "the",
+            "a",
+            "an",
+            "for",
+            "to",
+            "in",
+            "of",
+            "with",
+            "what",
+            "how",
+            "where",
+            "why",
+            "which",
+            "that",
+            "this",
+            "is",
+            "are",
+            "my",
+            "all",
+            "show",
+            "find",
+            "get",
+        }
+        nl_word_count = sum(1 for w in words if w in nl_markers)
+        is_tool_like = len(words) <= 3 and nl_word_count <= 1
 
-        # Semantic matching via embeddings
+        if is_tool_like:
+            typo_matches = []
+
+            # Check full query as tool name typo
+            for tool_name in tools:
+                if tool_name not in TOOL_REGISTRY:
+                    continue
+                sim = string_similarity(joined, tool_name)
+                if sim >= 0.7:
+                    typo_matches.append((tool_name, sim))
+
+            # Check reversed word order (e.g., "list todo" -> "todo_list")
+            if len(words) >= 2:
+                reversed_joined = "_".join(reversed(words[:2]))
+                for tool_name in tools:
+                    if tool_name not in TOOL_REGISTRY:
+                        continue
+                    sim = string_similarity(reversed_joined, tool_name)
+                    if sim >= 0.8:  # Higher threshold for reversed
+                        typo_matches.append((tool_name, sim * 0.95))
+
+            # Check first word as tool base typo
+            for tool_name in tools:
+                if tool_name not in TOOL_REGISTRY:
+                    continue
+                base = tool_name.split("_")[0]
+                sim = string_similarity(words[0], base)
+                if sim >= 0.75 and sim < 1.0:  # Typo, not exact
+                    typo_matches.append((tool_name, sim * 0.9))
+
+            # Check aliases for typos
+            for alias, target in TOOL_ALIASES.items():
+                if target not in tools:
+                    continue
+                sim = string_similarity(joined, alias)
+                if sim >= 0.7:
+                    typo_matches.append((target, sim))
+
+            if typo_matches:
+                typo_matches.sort(key=lambda x: (-x[1], len(x[0])))
+                seen = set()
+                results = []
+                for tool, score in typo_matches:
+                    if tool not in seen:
+                        seen.add(tool)
+                        results.append(ToolMatch(tool=tool, confidence=score))
+                return results[:10]
+
+        # === NATURAL LANGUAGE QUERIES ===
+        # Use semantic embedding matching
         embedding_results = self._matcher.match(query, tools)
 
         if embedding_results:
-            # Convert to ToolMatch with scaled confidence
-            # Embedding similarity is typically 0.5-0.9, scale to 0.3-0.95
             matches = []
             for tool_name, sim in embedding_results:
-                # Scale: 0.5 sim -> 0.3 conf, 0.9 sim -> 0.95 conf
-                confidence = max(0.1, min(0.95, (sim - 0.5) * 1.625 + 0.3))
+                # Scale: sim 0.65 → conf 0.30, sim 0.9 → conf 0.95
+                # Below 0.65: very low confidence
+                if sim < 0.5:
+                    confidence = 0.1
+                elif sim < 0.65:
+                    confidence = 0.1 + (sim - 0.5) * 1.33  # 0.5→0.1, 0.65→0.3
+                else:
+                    confidence = min(0.95, 0.3 + (sim - 0.65) * 2.6)  # 0.65→0.3, 0.9→0.95
                 matches.append(ToolMatch(tool=tool_name, confidence=confidence))
             return matches
 
-        # Fallback: fuzzy string matching (for typos, no embeddings available)
+        # Fallback: fuzzy string matching (if embeddings unavailable)
         matches = []
         for tool_name in tools:
             if tool_name not in TOOL_REGISTRY:
                 continue
-            name_score = string_similarity(normalized_query, tool_name)
-            if name_score > 0.5:
-                matches.append(ToolMatch(tool=tool_name, confidence=name_score * 0.8))
+            sim = string_similarity(normalized, tool_name)
+            if sim > 0.5:
+                matches.append(ToolMatch(tool=tool_name, confidence=sim * 0.8))
 
         matches.sort(key=lambda m: m.confidence, reverse=True)
         return matches

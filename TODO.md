@@ -47,7 +47,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 **Phase 3: DWIM integration**
 - [x] Replace TF-IDF with embedding-based matching (fastembed/bge-small-en)
-- [ ] Tune embedding confidence thresholds (18 matching tests still failing)
+- [x] Simplify matching logic (tool-like vs NL detection)
+- [x] Add `moss dwim --analyze` for embedding similarity debugging
+- [ ] Weighted example phrases per tool (reduce 47 confusion pairs)
+  - Add distinguishing words (e.g., "begin" vs "finish") at low weight
+  - Use max-pooling or weighted avg for multi-phrase tools
+- [ ] Tune remaining 10 failing tests (mostly NL → tool confidence thresholds)
 - [ ] Natural language → tree operation mapping
 
 ### Distribution & Installation
