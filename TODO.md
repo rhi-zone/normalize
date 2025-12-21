@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Adaptive Model Selection**: Automatically switch models based on step task type
 - [ ] **Heuristic Error Localization**: Automatically find buggy code from failing test output
 - [ ] **TUI Multi-Agent View**: Visualize swarm activity and worker status in TUI
+- [ ] **Shadow Git Multi-Commit**: Support for multi-commit shadow experiments
 
 ## Recently Completed
+
+- **Adaptive Model Selection** (Dec 2025):
+  - Added `task_models` mapping to `LLMConfig` for specialized model routing
+  - Implemented automatic model switching in `LLMToolExecutor` based on task type
+  - Supports separate models for analysis, generation, and fixing
 
 - **Recursive Policy Learning** (Dec 2025):
   - Implemented `policy_learning_loop` to distill rules from successful sessions

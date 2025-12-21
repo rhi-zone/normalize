@@ -1979,6 +1979,7 @@ class LLMConfig:
 
     model: str = "gemini/gemini-3-flash-preview"  # Default: latest flash model
     models: list[str] = field(default_factory=list)  # For rotation
+    task_models: dict[str, str] = field(default_factory=dict)  # task_type -> model
     rotation: str | None = None  # "round_robin", "random", or None
     temperature: float = 0.0
     max_tokens: int | None = None  # Let the model determine output length
@@ -2153,28 +2154,31 @@ class LLMToolExecutor:
         )
         return (cached_output, tokens_in, tokens_out)
 
-    def _get_model(self) -> str:
+    def _get_model(self, task_type: str | None = None) -> str:
         """Get the model to use for the next LLM call.
 
-        Implements rotation if configured:
-        - round_robin: Cycles through models in order
-        - random: Picks randomly from the pool
-        - None: Uses the primary model
+        Implements task-based selection and rotation:
+        1. Task models: if task_type in task_models, use that
+        2. Rotation: if models/rotation configured, use rotation
+        3. Default: use primary model
         """
         import random as rand
 
-        # If no rotation pool, use primary model
-        if not self.config.models or not self.config.rotation:
-            return self.config.model
+        # 1. Check for specialized task model
+        if task_type and task_type in self.config.task_models:
+            return self.config.task_models[task_type]
 
-        if self.config.rotation == "round_robin":
-            model = self.config.models[self._call_count % len(self.config.models)]
-            self._call_count += 1
-            return model
-        elif self.config.rotation == "random":
-            return rand.choice(self.config.models)
-        else:
-            return self.config.model
+        # 2. Check for rotation pool
+        if self.config.models and self.config.rotation:
+            if self.config.rotation == "round_robin":
+                model = self.config.models[self._call_count % len(self.config.models)]
+                self._call_count += 1
+                return model
+            elif self.config.rotation == "random":
+                return rand.choice(self.config.models)
+
+        # 3. Fallback to primary model
+        return self.config.model
 
     async def execute(
         self, tool_name: str, context: LoopContext, step: LoopStep
@@ -2317,7 +2321,9 @@ class LLMToolExecutor:
             tokens_out = len(mock_response) // 4
             return mock_response, tokens_in, tokens_out
 
-        return await self._call_litellm(prompt, repair_context, max_tokens=max_tokens)
+        return await self._call_litellm(
+            prompt, repair_context, max_tokens=max_tokens, task_type=operation
+        )
 
     async def _execute_memory(
         self, tool_name: str, context: LoopContext, step: LoopStep
@@ -2462,7 +2468,11 @@ class LLMToolExecutor:
         return f"Errors to fix:\n{error_list}"
 
     async def _call_litellm(
-        self, prompt: str, repair_context: str = "", max_tokens: int | None = None
+        self,
+        prompt: str,
+        repair_context: str = "",
+        max_tokens: int | None = None,
+        task_type: str | None = None,
     ) -> tuple[str, int, int]:
         """Call LLM via litellm (unified interface for all providers)."""
         import asyncio
@@ -2474,8 +2484,8 @@ class LLMToolExecutor:
                 "litellm required for LLM calls. Install with: pip install 'moss[llm]'"
             ) from e
 
-        # Get model (may rotate if configured)
-        model = self._get_model()
+        # Get model (may rotate or use task-specific model)
+        model = self._get_model(task_type)
 
         # Get memory context (async, so do before sync call)
         memory_context = await self._get_memory_context()
