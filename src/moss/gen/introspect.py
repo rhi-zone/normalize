@@ -229,67 +229,97 @@ def introspect_api() -> list[SubAPI]:
     Returns:
         List of SubAPI objects describing each sub-API
     """
-    from moss.moss_api import (
-        CFGAPI,
-        RAGAPI,
-        AnchorAPI,
-        ClonesAPI,
-        ContextAPI,
-        DependencyAPI,
-        ExternalDepsAPI,
-        GitAPI,
-        GitHotspotsAPI,
-        GuessabilityAPI,
-        HealthAPI,
-        LessonsAPI,
-        PatchAPI,
-        RefCheckAPI,
-        SearchAPI,
-        SecurityAPI,
-        SkeletonAPI,
-        TomlAPI,
-        TreeAPI,
-        ValidationAPI,
-        WeaknessesAPI,
-        WebAPI,
-    )
+    from moss.moss_api import MossAPI
 
-    # Map of property name to API class
-    # NOTE: When adding a new sub-API, add it here AND to the import above
-    sub_apis = {
-        "skeleton": SkeletonAPI,
-        "tree": TreeAPI,
-        "anchor": AnchorAPI,
-        "patch": PatchAPI,
-        "dependencies": DependencyAPI,
-        "cfg": CFGAPI,
-        "validation": ValidationAPI,
-        "git": GitAPI,
-        "context": ContextAPI,
-        "health": HealthAPI,
-        "todo": ("TodoAPI", "API for TODO management and search"),
-        "dwim": ("DWIMAPI", "Tool discovery and routing for Moss"),
-        "agent": ("AgentAPI", "API for agent orchestration and loops"),
-        "edit": ("EditAPI", "API for direct file modifications"),
-        "tui": ("Any", "Launch the interactive TUI"),
-        "complexity": ("ComplexityAPI", "API for cyclomatic complexity analysis"),
-        "clones": ClonesAPI,
-        "security": SecurityAPI,
-        "ref_check": RefCheckAPI,
-        "git_hotspots": GitHotspotsAPI,
-        "external_deps": ExternalDepsAPI,
-        "weaknesses": WeaknessesAPI,
-        "rag": RAGAPI,
-        "web": WebAPI,
-        "search": SearchAPI,
-        "guessability": GuessabilityAPI,
-        "lessons": LessonsAPI,
-        "toml": TomlAPI,
-    }
-
+    # Auto-discover sub-APIs from MossAPI properties
     results = []
-    for name, cls in sub_apis.items():
-        results.append(introspect_subapi(cls, name))
+
+    # We look for public properties that return a class with 'API' in the name
+    # or are explicitly listed in our sub_apis map.
+    for name, member in inspect.getmembers(MossAPI):
+        if name.startswith("_"):
+            continue
+
+        if isinstance(member, property):
+            # Try to get the return type from type hints
+            try:
+                hints = get_type_hints(member.fget)
+                return_type = hints.get("return")
+                if (
+                    return_type
+                    and hasattr(return_type, "__name__")
+                    and "API" in return_type.__name__
+                ):
+                    results.append(introspect_subapi(return_type, name))
+            except Exception:
+                # Fallback: if we can't get hints, we skip it
+                # For now, keep the manual list for robustness if needed
+                pass
+
+    if not results:
+        # Fallback to manual list if auto-discovery fails or is incomplete
+        from moss.moss_api import (
+            CFGAPI,
+            DWIMAPI,
+            RAGAPI,
+            AgentAPI,
+            AnchorAPI,
+            ClonesAPI,
+            ComplexityAPI,
+            ContextAPI,
+            DependencyAPI,
+            EditAPI,
+            ExternalDepsAPI,
+            GitAPI,
+            GitHotspotsAPI,
+            GuessabilityAPI,
+            HealthAPI,
+            LessonsAPI,
+            PatchAPI,
+            RefCheckAPI,
+            SearchAPI,
+            SecurityAPI,
+            SkeletonAPI,
+            TodoAPI,
+            TomlAPI,
+            TreeAPI,
+            ValidationAPI,
+            WeaknessesAPI,
+            WebAPI,
+        )
+
+        sub_apis = {
+            "skeleton": SkeletonAPI,
+            "tree": TreeAPI,
+            "anchor": AnchorAPI,
+            "patch": PatchAPI,
+            "dependencies": DependencyAPI,
+            "cfg": CFGAPI,
+            "validation": ValidationAPI,
+            "git": GitAPI,
+            "context": ContextAPI,
+            "health": HealthAPI,
+            "todo": TodoAPI,
+            "dwim": DWIMAPI,
+            "agent": AgentAPI,
+            "edit": EditAPI,
+            "complexity": ComplexityAPI,
+            "clones": ClonesAPI,
+            "security": SecurityAPI,
+            "ref_check": RefCheckAPI,
+            "git_hotspots": GitHotspotsAPI,
+            "external_deps": ExternalDepsAPI,
+            "weaknesses": WeaknessesAPI,
+            "rag": RAGAPI,
+            "web": WebAPI,
+            "search": SearchAPI,
+            "guessability": GuessabilityAPI,
+            "lessons": LessonsAPI,
+            "toml": TomlAPI,
+        }
+
+        for name, cls in sub_apis.items():
+            results.append(introspect_subapi(cls, name))
 
     return results
 

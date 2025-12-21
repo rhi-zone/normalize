@@ -6,6 +6,92 @@
   },
   "openapi": "3.0.3",
   "paths": {
+    "/agent/benchmark-models": {
+      "post": {
+        "description": "Benchmark multiple models on a set of standard tasks. MultiModelBenchmarkResult with comparison data",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "models": {
+                    "description": "List of model names to evaluate",
+                    "type": "array"
+                  },
+                  "tasks": {
+                    "description": "List of task definitions (name, input_data)",
+                    "type": "array"
+                  },
+                  "workflow_name": {
+                    "description": "Name of the workflow to use",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "workflow_name",
+                  "models",
+                  "tasks"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Benchmark multiple models on a set of standard tasks",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/agent/run-vanilla": {
+      "post": {
+        "description": "Run a minimal vanilla agent loop on a task. Uses TaskTree for state and terse intents for communication. Refactored to use the data-driven workflow system. LoopResult with execution history and final output",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "max_turns": {
+                    "default": 20,
+                    "description": "Maximum number of agent turns",
+                    "type": "integer"
+                  },
+                  "model": {
+                    "default": "gemini/gemini-2.0-flash",
+                    "description": "LLM model to use",
+                    "type": "string"
+                  },
+                  "task": {
+                    "description": "Task description",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Run a minimal vanilla agent loop on a task",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
     "/anchor/find": {
       "get": {
         "description": "Find anchors matching a name in a file. List of AnchorMatch objects with locations and confidence scores",
@@ -593,6 +679,138 @@
         "summary": "Resolve a tool name to its canonical form",
         "tags": [
           "dwim"
+        ]
+      }
+    },
+    "/edit/insert-line": {
+      "post": {
+        "description": "Insert a line into a file at a specific position.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "after_pattern": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "at_line": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "file_path": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "line_content": {
+                    "description": "",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_path",
+                  "line_content"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Insert a line into a file at a specific position",
+        "tags": [
+          "edit"
+        ]
+      }
+    },
+    "/edit/replace-text": {
+      "post": {
+        "description": "Replace text in a file.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file_path": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "occurrence": {
+                    "default": 0,
+                    "description": "",
+                    "type": "integer"
+                  },
+                  "replace": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "search": {
+                    "description": "",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_path",
+                  "search",
+                  "replace"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Replace text in a file",
+        "tags": [
+          "edit"
+        ]
+      }
+    },
+    "/edit/write-file": {
+      "post": {
+        "description": "Overwrite or create a file with new content.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "content": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "file_path": {
+                    "description": "",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_path",
+                  "content"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Overwrite or create a file with new content",
+        "tags": [
+          "edit"
         ]
       }
     },
@@ -2099,6 +2317,99 @@
         ]
       }
     },
+    "/shadow_git/get-diff": {
+      "get": {
+        "description": "Get the full diff for a shadow branch.",
+        "parameters": [
+          {
+            "description": "",
+            "in": "query",
+            "name": "branch_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get the full diff for a shadow branch",
+        "tags": [
+          "shadow_git"
+        ]
+      }
+    },
+    "/shadow_git/get-hunks": {
+      "get": {
+        "description": "Get parsed diff hunks for a branch.",
+        "parameters": [
+          {
+            "description": "",
+            "in": "query",
+            "name": "branch_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get parsed diff hunks for a branch",
+        "tags": [
+          "shadow_git"
+        ]
+      }
+    },
+    "/shadow_git/rollback-hunk": {
+      "post": {
+        "description": "Surgically rollback a specific hunk by file and line number.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "branch_name": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "file_path": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "line": {
+                    "description": "",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "branch_name",
+                  "file_path",
+                  "line"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Surgically rollback a specific hunk by file and line number",
+        "tags": [
+          "shadow_git"
+        ]
+      }
+    },
     "/skeleton/expand": {
       "post": {
         "description": "Get the full source code of a named symbol. Useful for getting complete enum definitions, class bodies, or function implementations when the skeleton isn't enough. Full source code of the symbol, or None if not found # Get full enum definition content = api.skeleton.expand(\"src/agent_loop.py\", \"StepType\") # Returns complete enum with all values",
@@ -2243,6 +2554,45 @@
         "summary": "Extract enum member names from an Enum class",
         "tags": [
           "skeleton"
+        ]
+      }
+    },
+    "/telemetry/analyze-all-sessions": {
+      "get": {
+        "description": "Analyze patterns across all recorded sessions.",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Analyze patterns across all recorded sessions",
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/telemetry/get-session-stats": {
+      "get": {
+        "description": "Get comprehensive statistics for a session.",
+        "parameters": [
+          {
+            "description": "",
+            "in": "query",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get comprehensive statistics for a session",
+        "tags": [
+          "telemetry"
         ]
       }
     },
@@ -2805,104 +3155,120 @@
   },
   "tags": [
     {
-      "description": "API for code skeleton extraction. Extracts structural summaries of code (classes, functions, signatures) without implementation details. Supports multiple languages via plugin system.",
-      "name": "skeleton"
-    },
-    {
-      "description": "API for git-aware file tree visualization. Shows project structure with awareness of git tracking status.",
-      "name": "tree"
+      "description": "API for agent orchestration and loops. Provides access to various agent loop implementations for autonomous task execution.",
+      "name": "agent"
     },
     {
       "description": "API for finding code locations using fuzzy anchors. Anchors identify code elements (functions, classes, variables) by name and type, with fuzzy matching support.",
       "name": "anchor"
     },
     {
-      "description": "API for applying code patches. Supports AST-aware patching with automatic fallback to text-based patching when AST parsing fails.",
-      "name": "patch"
-    },
-    {
-      "description": "API for dependency analysis. Analyzes import/export relationships, detects circular dependencies, and provides coupling metrics.",
-      "name": "dependencies"
-    },
-    {
       "description": "API for control flow graph analysis. Builds control flow graphs showing execution paths through functions.",
       "name": "cfg"
-    },
-    {
-      "description": "API for code validation. Runs validators (syntax, linting, tests) and reports issues.",
-      "name": "validation"
-    },
-    {
-      "description": "API for shadow git operations. Provides atomic commit/rollback operations for safe code modifications.",
-      "name": "git"
-    },
-    {
-      "description": "API for context compilation. Compiles code views (skeletons, CFGs, dependencies) into structured context for AI consumption.",
-      "name": "context"
-    },
-    {
-      "description": "API for project health analysis. Provides comprehensive project health metrics and reports.",
-      "name": "health"
-    },
-    {
-      "description": "API for TODO management and search. Search and browse TODOs from TODO.md. Useful for finding relevant work items and understanding project priorities.",
-      "name": "todo"
-    },
-    {
-      "description": "START HERE - Tool discovery and routing for Moss. Don't know which Moss tool to use? Ask DWIM! This API helps you find the right tool for any task using natural language queries. Features: - Natural language queries: describe what you want, get tool suggestions - Semantic aliases: map conceptual names to canonical tools - Fuzzy matching: handle typos and variations - Confidence scoring: know when to auto-correct vs suggest",
-      "name": "dwim"
-    },
-    {
-      "description": "API for cyclomatic complexity analysis. Calculates McCabe cyclomatic complexity for Python functions, helping identify code that may be difficult to test or maintain.",
-      "name": "complexity"
     },
     {
       "description": "API for structural clone detection. Detects structurally similar code by normalizing AST subtrees and comparing hashes. Helps identify code that could potentially be abstracted into shared functions.",
       "name": "clones"
     },
     {
-      "description": "API for security analysis. Orchestrates multiple security tools (bandit, semgrep) to detect vulnerabilities and security issues in the codebase.",
-      "name": "security"
+      "description": "API for cyclomatic complexity analysis. Calculates McCabe cyclomatic complexity for Python functions, helping identify code that may be difficult to test or maintain.",
+      "name": "complexity"
     },
     {
-      "description": "API for bidirectional reference checking. Validates that code files reference their documentation and documentation references implementation files. Detects stale references where targets have been modified after sources.",
-      "name": "ref_check"
+      "description": "API for context compilation. Compiles code views (skeletons, CFGs, dependencies) into structured context for AI consumption.",
+      "name": "context"
     },
     {
-      "description": "API for git hotspot analysis. Identifies frequently changed files in the git repository. High churn areas may indicate code that needs refactoring.",
-      "name": "git_hotspots"
+      "description": "API for dependency analysis. Analyzes import/export relationships, detects circular dependencies, and provides coupling metrics.",
+      "name": "dependencies"
+    },
+    {
+      "description": "START HERE - Tool discovery and routing for Moss. Don't know which Moss tool to use? Ask DWIM! This API helps you find the right tool for any task using natural language queries. Features: - Natural language queries: describe what you want, get tool suggestions - Semantic aliases: map conceptual names to canonical tools - Fuzzy matching: handle typos and variations - Confidence scoring: know when to auto-correct vs suggest",
+      "name": "dwim"
+    },
+    {
+      "description": "API for direct file modifications. Provides tools for writing files, replacing text, and inserting lines. Useful for simple edits that don't require AST awareness.",
+      "name": "edit"
     },
     {
       "description": "API for external dependency analysis. Analyzes PyPI/npm dependencies including transitive dependencies, security vulnerabilities, and license compatibility.",
       "name": "external_deps"
     },
     {
-      "description": "API for architectural weakness analysis. Identifies potential issues in codebase architecture: - Tight coupling between components - Missing abstractions - Inconsistent patterns - Technical debt indicators",
-      "name": "weaknesses"
+      "description": "API for shadow git operations. Provides atomic commit/rollback operations for safe code modifications.",
+      "name": "git"
     },
     {
-      "description": "API for RAG (Retrieval-Augmented Generation) semantic search. Provides semantic code search capabilities using vector embeddings. Index your codebase once, then search with natural language queries.",
-      "name": "rag"
-    },
-    {
-      "description": "API for token-efficient web fetching and search. Provides web content extraction optimized for LLM context. Strips HTML noise, extracts main content, caches results. api = MossAPI.for_project(\".\") content = await api.web.fetch(\"https://docs.python.org/3/\") print(f\"Tokens: ~{content.token_estimate}\") results = await api.web.search(\"python asyncio tutorial\") print(results.to_compact())",
-      "name": "web"
-    },
-    {
-      "description": "API for codebase search operations. Provides unified search across the codebase using structural analysis (skeleton/anchors), text patterns (grep), and file patterns (glob). Use this instead of raw grep/glob for better integration with Moss.",
-      "name": "search"
+      "description": "API for git hotspot analysis. Identifies frequently changed files in the git repository. High churn areas may indicate code that needs refactoring.",
+      "name": "git_hotspots"
     },
     {
       "description": "API for evaluating codebase structure quality. Measures how intuitive and predictable the codebase structure is. Can you guess where to find functionality based on its name?",
       "name": "guessability"
     },
     {
+      "description": "API for project health analysis. Provides comprehensive project health metrics and reports.",
+      "name": "health"
+    },
+    {
       "description": "API for agent learning and lessons management. Records and surfaces lessons learned from session failures and mistakes. Lessons are stored in .moss/lessons.md.",
       "name": "lessons"
     },
     {
+      "description": "API for applying code patches. Supports AST-aware patching with automatic fallback to text-based patching when AST parsing fails.",
+      "name": "patch"
+    },
+    {
+      "description": "API for RAG (Retrieval-Augmented Generation) semantic search. Provides semantic code search capabilities using vector embeddings. Index your codebase once, then search with natural language queries.",
+      "name": "rag"
+    },
+    {
+      "description": "API for bidirectional reference checking. Validates that code files reference their documentation and documentation references implementation files. Detects stale references where targets have been modified after sources.",
+      "name": "ref_check"
+    },
+    {
+      "description": "API for codebase search operations. Provides unified search across the codebase using structural analysis (skeleton/anchors), text patterns (grep), and file patterns (glob). Use this instead of raw grep/glob for better integration with Moss.",
+      "name": "search"
+    },
+    {
+      "description": "API for security analysis. Orchestrates multiple security tools (bandit, semgrep) to detect vulnerabilities and security issues in the codebase.",
+      "name": "security"
+    },
+    {
+      "description": "API for advanced shadow git operations. Provides first-class access to 'Shadow Git' features: diffs, surgical hunk-level rollback, and branch management.",
+      "name": "shadow_git"
+    },
+    {
+      "description": "API for code skeleton extraction. Extracts structural summaries of code (classes, functions, signatures) without implementation details. Supports multiple languages via plugin system.",
+      "name": "skeleton"
+    },
+    {
+      "description": "API for session telemetry and analysis. Provides tools for analyzing token usage, tool patterns, and codebase access patterns across sessions.",
+      "name": "telemetry"
+    },
+    {
+      "description": "API for TODO management and search. Search and browse TODOs from TODO.md. Useful for finding relevant work items and understanding project priorities.",
+      "name": "todo"
+    },
+    {
       "description": "API for navigating TOML configuration files. Provides jq-like querying for exploring config files (pyproject.toml, Cargo.toml, etc.) efficiently. api = MossAPI.for_project(\".\") name = api.toml.query(\"pyproject.toml\", \".project.name\") deps = api.toml.query(\"Cargo.toml\", \".dependencies|keys\")",
       "name": "toml"
+    },
+    {
+      "description": "API for git-aware file tree visualization. Shows project structure with awareness of git tracking status.",
+      "name": "tree"
+    },
+    {
+      "description": "API for code validation. Runs validators (syntax, linting, tests) and reports issues.",
+      "name": "validation"
+    },
+    {
+      "description": "API for architectural weakness analysis. Identifies potential issues in codebase architecture: - Tight coupling between components - Missing abstractions - Inconsistent patterns - Technical debt indicators",
+      "name": "weaknesses"
+    },
+    {
+      "description": "API for token-efficient web fetching and search. Provides web content extraction optimized for LLM context. Strips HTML noise, extracts main content, caches results. api = MossAPI.for_project(\".\") content = await api.web.fetch(\"https://docs.python.org/3/\") print(f\"Tokens: ~{content.token_estimate}\") results = await api.web.search(\"python asyncio tutorial\") print(results.to_compact())",
+      "name": "web"
     }
   ]
 }

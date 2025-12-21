@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Agentic Workflow Synthesis**: Loop that creates new workflows based on telemetry
 - [ ] **Extensible Agent Modes**: Refactor TUI modes (PLAN, READ, WRITE, DIFF) into a plugin-based system
 - [ ] **Dynamic Token Budgeting**: Adjust per-turn budget based on remaining task complexity
+- [ ] **Cross-file Symbol Navigation**: Clickable references in TUI to jump between files
 
 ## Recently Completed
+
+- **Agentic Workflow Synthesis** (Dec 2025):
+  - Implemented `workflow_synthesis_loop` to auto-create workflows from telemetry
+  - Added `synthesize_workflow` LLM operation for TOML workflow generation
+  - Automated sub-API discovery in `introspect_api` for better metadata coverage
 
 - **Adaptive Context Pruning** (Dec 2025):
   - Implemented heuristic importance scoring in `EphemeralCache`

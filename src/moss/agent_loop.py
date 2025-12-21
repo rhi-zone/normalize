@@ -956,6 +956,36 @@ def telemetry_optimizer_loop(name: str = "telemetry_optimizer") -> AgentLoop:
     )
 
 
+def workflow_synthesis_loop(name: str = "workflow_synthesis") -> AgentLoop:
+    """Meta-loop that creates new workflows based on telemetry patterns."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
+            LoopStep(
+                "analyze",
+                "llm.analyze_telemetry",
+                input_from="fetch_data",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "synthesize",
+                "llm.synthesize_workflow",
+                input_from="analyze",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "save",
+                "edit.write_file",
+                input_from="synthesize",
+                step_type=StepType.TOOL,
+                parameters={"file_path": ".moss/workflows/synthesized.toml"},
+            ),
+        ],
+        exit_conditions=["save.success"],
+    )
+
+
 def autofix_loop(name: str = "autofix") -> AgentLoop:
     """Loop that automatically fixes syntax errors in a file."""
     return AgentLoop(
@@ -2511,6 +2541,17 @@ class LLMToolExecutor:
                 f"Task: {structured_context}\n\n"
                 f"Content:\n{focus_str}\n\n"
                 f"Output a single float from 0.0 (irrelevant) to 1.0 (critical)."
+            ),
+            "synthesize_workflow": (
+                f"{structured_context}\n\n"
+                f"Based on the following telemetry analysis and optimization proposals, "
+                f"synthesize a new agent workflow in TOML format.\n\n"
+                f"Analysis & Proposals:\n{focus_str}\n\n"
+                f"Requirements:\n"
+                f"- Use standard [[workflow.steps]] format\n"
+                f"- Include appropriate limits and LLM configuration\n"
+                f"- Ensure steps are logically ordered and use available tools\n\n"
+                f"Output the complete TOML workflow definition."
             ),
         }
 

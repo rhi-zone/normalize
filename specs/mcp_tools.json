@@ -1,128 +1,61 @@
 [
   {
-    "description": "Get the full source code of a named symbol. Useful for getting complete enum definitions, class bodies, or function implementations when the skeleton isn't enough. Full source code of the symbol, or None if not found # Get full enum definition content = api.skeleton.expand(\"src/agent_loop.py\", \"StepType\") # Returns complete enum with all values",
+    "description": "Benchmark multiple models on a set of standard tasks. MultiModelBenchmarkResult with comparison data",
     "inputSchema": {
       "properties": {
-        "file_path": {
-          "description": "Path to the Python file",
-          "type": "string"
+        "models": {
+          "description": "List of model names to evaluate",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
-        "symbol_name": {
-          "description": "Name of the symbol to expand (e.g., \"StepType\", \"my_function\")",
+        "tasks": {
+          "description": "List of task definitions (name, input_data)",
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "workflow_name": {
+          "description": "Name of the workflow to use",
           "type": "string"
         }
       },
       "required": [
-        "file_path",
-        "symbol_name"
+        "workflow_name",
+        "models",
+        "tasks"
       ],
       "type": "object"
     },
-    "name": "skeleton_expand"
+    "name": "agent_benchmark_models"
   },
   {
-    "description": "Extract code skeleton (functions, classes, methods). Example: moss skeleton src/main.py",
+    "description": "Run a minimal vanilla agent loop on a task. Uses TaskTree for state and terse intents for communication. Refactored to use the data-driven workflow system. LoopResult with execution history and final output",
     "inputSchema": {
       "properties": {
-        "file_path": {
-          "description": "Path to the Python file (relative to root or absolute)",
+        "max_turns": {
+          "default": 20,
+          "description": "Maximum number of agent turns",
+          "type": "integer"
+        },
+        "model": {
+          "default": "gemini/gemini-2.0-flash",
+          "description": "LLM model to use",
+          "type": "string"
+        },
+        "task": {
+          "description": "Task description",
           "type": "string"
         }
       },
       "required": [
-        "file_path"
+        "task"
       ],
       "type": "object"
     },
-    "name": "skeleton_extract"
-  },
-  {
-    "description": "Extract code skeleton (functions, classes, methods). Example: moss skeleton src/main.py",
-    "inputSchema": {
-      "properties": {
-        "file_path": {
-          "description": "Path to the file",
-          "type": "string"
-        },
-        "include_docstrings": {
-          "default": true,
-          "description": "Whether to include docstrings in output (Python only)",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "file_path"
-      ],
-      "type": "object"
-    },
-    "name": "skeleton_format"
-  },
-  {
-    "description": "Extract enum member names from an Enum class. List of enum member names, or None if not found values = api.skeleton.get_enum_values(\"src/agent_loop.py\", \"StepType\") # Returns: [\"TOOL\", \"LLM\", \"HYBRID\"]",
-    "inputSchema": {
-      "properties": {
-        "enum_name": {
-          "description": "Name of the Enum class",
-          "type": "string"
-        },
-        "file_path": {
-          "description": "Path to the Python file",
-          "type": "string"
-        }
-      },
-      "required": [
-        "file_path",
-        "enum_name"
-      ],
-      "type": "object"
-    },
-    "name": "skeleton_get_enum_values"
-  },
-  {
-    "description": "Show git-aware file tree. Example: moss tree",
-    "inputSchema": {
-      "properties": {
-        "compact": {
-          "default": false,
-          "description": "If True, use token-efficient format",
-          "type": "boolean"
-        },
-        "path": {
-          "description": "Directory to visualize (default: project root)",
-          "type": "string"
-        },
-        "tracked_only": {
-          "default": false,
-          "description": "If True, only show git-tracked files",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "name": "tree_format"
-  },
-  {
-    "description": "Show git-aware file tree. Example: moss tree",
-    "inputSchema": {
-      "properties": {
-        "gitignore": {
-          "default": true,
-          "description": "If True, respect .gitignore when showing all files",
-          "type": "boolean"
-        },
-        "path": {
-          "description": "Directory to visualize (default: project root)",
-          "type": "string"
-        },
-        "tracked_only": {
-          "default": false,
-          "description": "If True, only show git-tracked files",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "name": "tree_generate"
+    "name": "agent_run_vanilla"
   },
   {
     "description": "Find anchors (functions, classes, methods) in code. Example: moss anchors src/api.py",
@@ -177,86 +110,114 @@
     "name": "anchor_resolve"
   },
   {
-    "description": "Apply a patch to a file. PatchResult with success status and modified content",
+    "description": "Build and display control flow graph. Example: moss cfg src/main.py",
     "inputSchema": {
       "properties": {
         "file_path": {
-          "description": "Path to the file to patch",
+          "description": "Path to the Python file",
           "type": "string"
-        },
-        "patch": {
-          "description": "Patch object describing the change",
-          "type": "string"
-        },
-        "write": {
-          "default": true,
-          "description": "Whether to write changes to disk",
-          "type": "boolean"
         }
       },
       "required": [
-        "file_path",
-        "patch"
+        "file_path"
       ],
       "type": "object"
     },
-    "name": "patch_apply"
+    "name": "cfg_build"
   },
   {
-    "description": "Apply a patch with automatic text fallback. First tries AST-aware patching, falls back to text-based if that fails. PatchResult with success status and modified content",
+    "description": "Detect structural clones in the codebase. CloneAnalysis with clone groups and statistics",
     "inputSchema": {
       "properties": {
-        "file_path": {
-          "description": "Path to the file to patch",
-          "type": "string"
+        "level": {
+          "default": 0,
+          "description": "Elision level (0-3) controlling normalization: 0 = names only (exact structural clones) 1 = + literals (same structure, different constants) 2 = + calls (same pattern, different functions) 3 = control flow skeleton only",
+          "type": "integer"
         },
-        "patch": {
-          "description": "Patch object describing the change",
-          "type": "string"
-        },
-        "write": {
-          "default": true,
-          "description": "Whether to write changes to disk",
-          "type": "boolean"
+        "min_lines": {
+          "default": 3,
+          "description": "Minimum function lines to consider (default: 3)",
+          "type": "integer"
         }
       },
-      "required": [
-        "file_path",
-        "patch"
-      ],
       "type": "object"
     },
-    "name": "patch_apply_with_fallback"
+    "name": "clones_detect"
   },
   {
-    "description": "Create a Patch object. Patch object ready for application",
+    "description": "Get clone groups with at least min_count members. List of clone group details",
     "inputSchema": {
       "properties": {
-        "anchor_name": {
-          "description": "Name of the anchor to target",
+        "level": {
+          "default": 0,
+          "description": "Elision level (0-3)",
+          "type": "integer"
+        },
+        "min_count": {
+          "default": 2,
+          "description": "Minimum clones per group (default: 2)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "clones_get_groups"
+  },
+  {
+    "description": "Analyze cyclomatic complexity of functions. Example: moss complexity src/",
+    "inputSchema": {
+      "properties": {
+        "pattern": {
+          "default": "**/*.py",
+          "description": "Glob pattern for files to analyze (default: all Python files)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "complexity_analyze"
+  },
+  {
+    "description": "Analyze cyclomatic complexity of functions. Example: moss complexity src/",
+    "inputSchema": {
+      "properties": {
+        "threshold": {
+          "default": 10,
+          "description": "Complexity threshold (default: 10)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "complexity_get_high_risk"
+  },
+  {
+    "description": "Compile context for the given files. CompiledContext with rendered views",
+    "inputSchema": {
+      "properties": {
+        "file_paths": {
+          "description": "Files to include in context",
           "type": "string"
         },
-        "content": {
-          "description": "New content for the patch",
-          "type": "string"
-        },
-        "kwargs": {
-          "type": "string"
-        },
-        "patch_type": {
-          "description": "Type of patch - \"insert_before\", \"insert_after\", \"replace\", \"delete\"",
+        "view_types": {
+          "description": "View types to generate (default: skeleton, dependency)",
           "type": "string"
         }
       },
       "required": [
-        "patch_type",
-        "anchor_name",
-        "content",
-        "kwargs"
+        "file_paths"
       ],
       "type": "object"
     },
-    "name": "patch_create"
+    "name": "context_compile"
+  },
+  {
+    "description": "Initialize the context host with default view providers. ContextHost instance",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "context_init"
   },
   {
     "description": "Extract dependencies (imports and exports). Example: moss deps src/api.py",
@@ -368,44 +329,176 @@
     "name": "dependencies_graph_to_dot"
   },
   {
-    "description": "Build and display control flow graph. Example: moss cfg src/main.py",
+    "description": "Find the right Moss tool for any task using natural language. USE THIS FIRST when you don't know which tool to use! Describe what you want to do and get ranked suggestions. Examples: - \"summarize the codebase\" \u2192 health_summarize - \"show file structure\" \u2192 skeleton_format - \"find TODOs\" \u2192 health_check_todos - \"check code complexity\" \u2192 complexity_analyze List of ToolMatchResult sorted by confidence (highest first)",
     "inputSchema": {
       "properties": {
-        "file_path": {
-          "description": "Path to the Python file",
+        "query": {
+          "description": "Natural language description of what you want to do",
+          "type": "string"
+        },
+        "top_k": {
+          "default": 3,
+          "description": "Maximum number of suggestions to return",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "dwim_analyze_intent"
+  },
+  {
+    "description": "Get detailed information about a specific tool. ToolInfoResult or None if tool not found",
+    "inputSchema": {
+      "properties": {
+        "tool_name": {
+          "description": "Tool name (can be alias or misspelled)",
           "type": "string"
         }
       },
       "required": [
-        "file_path"
+        "tool_name"
       ],
       "type": "object"
     },
-    "name": "cfg_build"
+    "name": "dwim_get_tool_info"
   },
   {
-    "description": "Create a standard Python validator chain. ValidatorChain configured for Python (syntax + ruff + pytest)",
+    "description": "List all available tools with their metadata. ToolListResult with descriptions, keywords, etc.",
     "inputSchema": {
       "properties": {},
       "type": "object"
     },
-    "name": "validation_create_chain"
+    "name": "dwim_list_tools"
   },
   {
-    "description": "Validate a Python file with the default chain. ValidationResult with any issues found",
+    "description": "Resolve a tool name to its canonical form. Handles exact matches, semantic aliases, and fuzzy matching for typos. ToolMatchResult with canonical name and confidence",
     "inputSchema": {
       "properties": {
-        "file_path": {
-          "description": "Path to validate",
+        "tool_name": {
+          "description": "Tool name to resolve (may be misspelled or alias)",
           "type": "string"
         }
       },
       "required": [
-        "file_path"
+        "tool_name"
       ],
       "type": "object"
     },
-    "name": "validation_validate"
+    "name": "dwim_resolve_tool"
+  },
+  {
+    "description": "Insert a line into a file at a specific position.",
+    "inputSchema": {
+      "properties": {
+        "after_pattern": {
+          "type": "string"
+        },
+        "at_line": {
+          "type": "string"
+        },
+        "file_path": {
+          "type": "string"
+        },
+        "line_content": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "line_content"
+      ],
+      "type": "object"
+    },
+    "name": "edit_insert_line"
+  },
+  {
+    "description": "Replace text in a file.",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "type": "string"
+        },
+        "occurrence": {
+          "default": 0,
+          "type": "integer"
+        },
+        "replace": {
+          "type": "string"
+        },
+        "search": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "search",
+        "replace"
+      ],
+      "type": "object"
+    },
+    "name": "edit_replace_text"
+  },
+  {
+    "description": "Overwrite or create a file with new content.",
+    "inputSchema": {
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "file_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "content"
+      ],
+      "type": "object"
+    },
+    "name": "edit_write_file"
+  },
+  {
+    "description": "Analyze external dependencies. Example: moss external-deps",
+    "inputSchema": {
+      "properties": {
+        "check_licenses": {
+          "default": false,
+          "description": "If True, check license compatibility",
+          "type": "boolean"
+        },
+        "check_vulns": {
+          "default": false,
+          "description": "If True, check for known vulnerabilities via OSV API",
+          "type": "boolean"
+        },
+        "resolve": {
+          "default": false,
+          "description": "If True, resolve full transitive dependency tree",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "name": "external_deps_analyze"
+  },
+  {
+    "description": "Analyze external dependencies. Example: moss external-deps",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "external_deps_check_security"
+  },
+  {
+    "description": "Analyze external dependencies. Example: moss external-deps",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "external_deps_list_direct"
   },
   {
     "description": "Abandon a checkpoint and delete its branch. Dict with 'success' boolean",
@@ -543,32 +636,61 @@
     "name": "git_restore_checkpoint"
   },
   {
-    "description": "Compile context for the given files. CompiledContext with rendered views",
+    "description": "Find frequently changed files in git history. Example: moss git-hotspots",
     "inputSchema": {
       "properties": {
-        "file_paths": {
-          "description": "Files to include in context",
-          "type": "string"
-        },
-        "view_types": {
-          "description": "View types to generate (default: skeleton, dependency)",
-          "type": "string"
+        "days": {
+          "default": 90,
+          "description": "Number of days to analyze (default: 90)",
+          "type": "integer"
         }
       },
-      "required": [
-        "file_paths"
-      ],
       "type": "object"
     },
-    "name": "context_compile"
+    "name": "git_hotspots_analyze"
   },
   {
-    "description": "Initialize the context host with default view providers. ContextHost instance",
+    "description": "Find frequently changed files in git history. Example: moss git-hotspots",
+    "inputSchema": {
+      "properties": {
+        "days": {
+          "default": 90,
+          "description": "Number of days to analyze",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 10,
+          "description": "Maximum number of files to return",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "git_hotspots_get_top_hotspots"
+  },
+  {
+    "description": "Analyze codebase guessability. Evaluates: - Name-content alignment: Do module names reflect their contents? - Predictability: Are similar things in similar places? - Pattern consistency: Are conventions followed? GuessabilityReport with scores and recommendations",
     "inputSchema": {
       "properties": {},
       "type": "object"
     },
-    "name": "context_init"
+    "name": "guessability_analyze"
+  },
+  {
+    "description": "Get guessability improvement recommendations. List of actionable recommendations",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "guessability_recommendations"
+  },
+  {
+    "description": "Get overall guessability score. GuessabilityScore with 'score' (0.0-1.0) and 'grade' (A-F)",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "guessability_score"
   },
   {
     "description": "Analyze structural code quality. StructuralAnalysis with hotspots and metrics",
@@ -635,341 +757,179 @@
     "name": "health_summarize"
   },
   {
-    "description": "List TODOs, optionally filtered by section. TodoListResult with items grouped by section",
+    "description": "Add a new lesson. Dict with 'success' boolean and 'lesson' data",
     "inputSchema": {
       "properties": {
-        "include_done": {
-          "default": false,
-          "description": "Include completed TODOs (default: False)",
-          "type": "boolean"
-        },
-        "per_section_limit": {
-          "default": 5,
-          "description": "Max items to show per section (default: 5)",
-          "type": "integer"
-        },
-        "section": {
-          "description": "Filter to specific section (case-insensitive partial match)",
+        "category": {
+          "default": "",
+          "description": "Category (e.g., \"pattern\", \"mistake\", \"insight\")",
           "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "name": "todo_list"
-  },
-  {
-    "description": "Search TODOs by keyword. List of TodoSearchResult with matching items, sorted by relevance",
-    "inputSchema": {
-      "properties": {
-        "include_done": {
-          "default": false,
-          "description": "Include completed TODOs (default: False)",
-          "type": "boolean"
         },
-        "query": {
-          "description": "Search query (case-insensitive, matches text and section)",
+        "keywords": {
+          "description": "Keywords for matching (auto-extracted if not provided)",
+          "type": "string"
+        },
+        "text": {
+          "description": "The lesson text",
           "type": "string"
         }
       },
       "required": [
-        "query"
+        "text"
       ],
       "type": "object"
     },
-    "name": "todo_search"
+    "name": "lessons_add"
   },
   {
-    "description": "List all TODO sections with counts. List of dicts with section name, pending count, and done count",
+    "description": "Clear all lessons. Dict with 'success' boolean",
     "inputSchema": {
       "properties": {},
       "type": "object"
     },
-    "name": "todo_sections"
+    "name": "lessons_clear"
   },
   {
-    "description": "Find the right Moss tool for any task using natural language. USE THIS FIRST when you don't know which tool to use! Describe what you want to do and get ranked suggestions. Examples: - \"summarize the codebase\" \u2192 health_summarize - \"show file structure\" \u2192 skeleton_format - \"find TODOs\" \u2192 health_check_todos - \"check code complexity\" \u2192 complexity_analyze List of ToolMatchResult sorted by confidence (highest first)",
+    "description": "Find lessons relevant to the given context. List of relevant Lesson objects",
     "inputSchema": {
       "properties": {
-        "query": {
-          "description": "Natural language description of what you want to do",
+        "context": {
+          "description": "Current context (e.g., error message, task description)",
           "type": "string"
-        },
-        "top_k": {
-          "default": 3,
-          "description": "Maximum number of suggestions to return",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "query"
-      ],
-      "type": "object"
-    },
-    "name": "dwim_analyze_intent"
-  },
-  {
-    "description": "Get detailed information about a specific tool. ToolInfoResult or None if tool not found",
-    "inputSchema": {
-      "properties": {
-        "tool_name": {
-          "description": "Tool name (can be alias or misspelled)",
-          "type": "string"
-        }
-      },
-      "required": [
-        "tool_name"
-      ],
-      "type": "object"
-    },
-    "name": "dwim_get_tool_info"
-  },
-  {
-    "description": "List all available tools with their metadata. ToolListResult with descriptions, keywords, etc.",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "dwim_list_tools"
-  },
-  {
-    "description": "Resolve a tool name to its canonical form. Handles exact matches, semantic aliases, and fuzzy matching for typos. ToolMatchResult with canonical name and confidence",
-    "inputSchema": {
-      "properties": {
-        "tool_name": {
-          "description": "Tool name to resolve (may be misspelled or alias)",
-          "type": "string"
-        }
-      },
-      "required": [
-        "tool_name"
-      ],
-      "type": "object"
-    },
-    "name": "dwim_resolve_tool"
-  },
-  {
-    "description": "Analyze cyclomatic complexity of functions. Example: moss complexity src/",
-    "inputSchema": {
-      "properties": {
-        "pattern": {
-          "default": "**/*.py",
-          "description": "Glob pattern for files to analyze (default: all Python files)",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "name": "complexity_analyze"
-  },
-  {
-    "description": "Analyze cyclomatic complexity of functions. Example: moss complexity src/",
-    "inputSchema": {
-      "properties": {
-        "threshold": {
-          "default": 10,
-          "description": "Complexity threshold (default: 10)",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "name": "complexity_get_high_risk"
-  },
-  {
-    "description": "Detect structural clones in the codebase. CloneAnalysis with clone groups and statistics",
-    "inputSchema": {
-      "properties": {
-        "level": {
-          "default": 0,
-          "description": "Elision level (0-3) controlling normalization: 0 = names only (exact structural clones) 1 = + literals (same structure, different constants) 2 = + calls (same pattern, different functions) 3 = control flow skeleton only",
-          "type": "integer"
-        },
-        "min_lines": {
-          "default": 3,
-          "description": "Minimum function lines to consider (default: 3)",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "name": "clones_detect"
-  },
-  {
-    "description": "Get clone groups with at least min_count members. List of clone group details",
-    "inputSchema": {
-      "properties": {
-        "level": {
-          "default": 0,
-          "description": "Elision level (0-3)",
-          "type": "integer"
-        },
-        "min_count": {
-          "default": 2,
-          "description": "Minimum clones per group (default: 2)",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "name": "clones_get_groups"
-  },
-  {
-    "description": "Run security analysis. SecurityAnalysis with findings and summary",
-    "inputSchema": {
-      "properties": {
-        "min_severity": {
-          "default": "low",
-          "description": "Minimum severity to report (\"low\", \"medium\", \"high\", \"critical\")",
-          "type": "string"
-        },
-        "tools": {
-          "description": "List of tools to use (None = all available)",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "name": "security_analyze"
-  },
-  {
-    "description": "Get high and critical severity findings. List of high/critical security findings",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "security_get_high_severity"
-  },
-  {
-    "description": "Check bidirectional references between code and docs. Example: moss check-refs",
-    "inputSchema": {
-      "properties": {
-        "staleness_days": {
-          "default": 30,
-          "description": "Warn if target modified more than N days after source",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "name": "ref_check_check"
-  },
-  {
-    "description": "Check only code-to-documentation references. List of broken code->doc references",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "ref_check_check_code_to_docs"
-  },
-  {
-    "description": "Check only documentation-to-code references. List of broken doc->code references",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "ref_check_check_docs_to_code"
-  },
-  {
-    "description": "Find frequently changed files in git history. Example: moss git-hotspots",
-    "inputSchema": {
-      "properties": {
-        "days": {
-          "default": 90,
-          "description": "Number of days to analyze (default: 90)",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "name": "git_hotspots_analyze"
-  },
-  {
-    "description": "Find frequently changed files in git history. Example: moss git-hotspots",
-    "inputSchema": {
-      "properties": {
-        "days": {
-          "default": 90,
-          "description": "Number of days to analyze",
-          "type": "integer"
         },
         "limit": {
-          "default": 10,
-          "description": "Maximum number of files to return",
+          "default": 3,
+          "description": "Maximum number of lessons to return",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "type": "object"
+    },
+    "name": "lessons_find_relevant"
+  },
+  {
+    "description": "List lessons, optionally filtered by category. List of Lesson objects",
+    "inputSchema": {
+      "properties": {
+        "category": {
+          "description": "Filter by category (case-insensitive)",
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Maximum number of lessons to return",
           "type": "integer"
         }
       },
       "type": "object"
     },
-    "name": "git_hotspots_get_top_hotspots"
+    "name": "lessons_list"
   },
   {
-    "description": "Analyze external dependencies. Example: moss external-deps",
+    "description": "Search lessons by keyword. List of matching Lesson objects",
     "inputSchema": {
       "properties": {
-        "check_licenses": {
-          "default": false,
-          "description": "If True, check license compatibility",
-          "type": "boolean"
+        "limit": {
+          "default": 5,
+          "description": "Maximum number of results",
+          "type": "integer"
         },
-        "check_vulns": {
-          "default": false,
-          "description": "If True, check for known vulnerabilities via OSV API",
-          "type": "boolean"
-        },
-        "resolve": {
-          "default": false,
-          "description": "If True, resolve full transitive dependency tree",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "name": "external_deps_analyze"
-  },
-  {
-    "description": "Analyze external dependencies. Example: moss external-deps",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "external_deps_check_security"
-  },
-  {
-    "description": "Analyze external dependencies. Example: moss external-deps",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "external_deps_list_direct"
-  },
-  {
-    "description": "Analyze codebase for architectural weaknesses. WeaknessAnalysis with detected weaknesses",
-    "inputSchema": {
-      "properties": {
-        "categories": {
-          "description": "Categories to check (None = all)",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "name": "weaknesses_analyze"
-  },
-  {
-    "description": "Format weakness analysis as markdown. Markdown-formatted report",
-    "inputSchema": {
-      "properties": {
-        "analysis": {
-          "description": "WeaknessAnalysis to format",
+        "query": {
+          "description": "Search query (matches text, category, and keywords)",
           "type": "string"
         }
       },
       "required": [
-        "analysis"
+        "query"
       ],
       "type": "object"
     },
-    "name": "weaknesses_format"
+    "name": "lessons_search"
+  },
+  {
+    "description": "Apply a patch to a file. PatchResult with success status and modified content",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the file to patch",
+          "type": "string"
+        },
+        "patch": {
+          "description": "Patch object describing the change",
+          "type": "string"
+        },
+        "write": {
+          "default": true,
+          "description": "Whether to write changes to disk",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file_path",
+        "patch"
+      ],
+      "type": "object"
+    },
+    "name": "patch_apply"
+  },
+  {
+    "description": "Apply a patch with automatic text fallback. First tries AST-aware patching, falls back to text-based if that fails. PatchResult with success status and modified content",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the file to patch",
+          "type": "string"
+        },
+        "patch": {
+          "description": "Patch object describing the change",
+          "type": "string"
+        },
+        "write": {
+          "default": true,
+          "description": "Whether to write changes to disk",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file_path",
+        "patch"
+      ],
+      "type": "object"
+    },
+    "name": "patch_apply_with_fallback"
+  },
+  {
+    "description": "Create a Patch object. Patch object ready for application",
+    "inputSchema": {
+      "properties": {
+        "anchor_name": {
+          "description": "Name of the anchor to target",
+          "type": "string"
+        },
+        "content": {
+          "description": "New content for the patch",
+          "type": "string"
+        },
+        "kwargs": {
+          "type": "string"
+        },
+        "patch_type": {
+          "description": "Type of patch - \"insert_before\", \"insert_after\", \"replace\", \"delete\"",
+          "type": "string"
+        }
+      },
+      "required": [
+        "patch_type",
+        "anchor_name",
+        "content",
+        "kwargs"
+      ],
+      "type": "object"
+    },
+    "name": "patch_create"
   },
   {
     "description": "Clear the index. Dict with 'success' boolean",
@@ -1040,80 +1000,34 @@
     "name": "rag_stats"
   },
   {
-    "description": "Clear the web content cache. Number of cached items cleared",
+    "description": "Check bidirectional references between code and docs. Example: moss check-refs",
+    "inputSchema": {
+      "properties": {
+        "staleness_days": {
+          "default": 30,
+          "description": "Warn if target modified more than N days after source",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "ref_check_check"
+  },
+  {
+    "description": "Check only code-to-documentation references. List of broken code->doc references",
     "inputSchema": {
       "properties": {},
       "type": "object"
     },
-    "name": "web_clear_cache"
+    "name": "ref_check_check_code_to_docs"
   },
   {
-    "description": "Extract clean content from HTML string. Dict with title, text, token_estimate, metadata",
+    "description": "Check only documentation-to-code references. List of broken doc->code references",
     "inputSchema": {
-      "properties": {
-        "html": {
-          "description": "Raw HTML content",
-          "type": "string"
-        },
-        "url": {
-          "default": "",
-          "description": "Optional URL for metadata",
-          "type": "string"
-        }
-      },
-      "required": [
-        "html"
-      ],
+      "properties": {},
       "type": "object"
     },
-    "name": "web_extract_content"
-  },
-  {
-    "description": "Fetch and extract content from URL. Dict with url, title, text, token_estimate, metadata",
-    "inputSchema": {
-      "properties": {
-        "extract_main": {
-          "default": true,
-          "description": "Extract main content vs full page (default: True)",
-          "type": "boolean"
-        },
-        "url": {
-          "description": "URL to fetch",
-          "type": "string"
-        },
-        "use_cache": {
-          "default": true,
-          "description": "Check cache first (default: True)",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "url"
-      ],
-      "type": "object"
-    },
-    "name": "web_fetch"
-  },
-  {
-    "description": "Search the web with token-efficient results. Dict with query, results list, and compact string representation",
-    "inputSchema": {
-      "properties": {
-        "max_results": {
-          "default": 5,
-          "description": "Maximum number of results (default: 5)",
-          "type": "integer"
-        },
-        "query": {
-          "description": "Search query",
-          "type": "string"
-        }
-      },
-      "required": [
-        "query"
-      ],
-      "type": "object"
-    },
-    "name": "web_search"
+    "name": "ref_check_check_docs_to_code"
   },
   {
     "description": "Explain a symbol: show its definition, callers, and callees. Finds where a symbol is defined, what calls it, and what it calls. Useful for understanding code relationships and impact of changes. SymbolExplanation with callers and callees, or None if not found explanation = api.search.explain_symbol(\"process_request\") print(f\"Called by: {len(explanation.callers)} functions\") print(f\"Calls: {len(explanation.callees)} functions\")",
@@ -1375,112 +1289,220 @@
     "name": "search_summarize_module"
   },
   {
-    "description": "Analyze codebase guessability. Evaluates: - Name-content alignment: Do module names reflect their contents? - Predictability: Are similar things in similar places? - Pattern consistency: Are conventions followed? GuessabilityReport with scores and recommendations",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "guessability_analyze"
-  },
-  {
-    "description": "Get guessability improvement recommendations. List of actionable recommendations",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "guessability_recommendations"
-  },
-  {
-    "description": "Get overall guessability score. GuessabilityScore with 'score' (0.0-1.0) and 'grade' (A-F)",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "guessability_score"
-  },
-  {
-    "description": "Add a new lesson. Dict with 'success' boolean and 'lesson' data",
+    "description": "Run security analysis. SecurityAnalysis with findings and summary",
     "inputSchema": {
       "properties": {
-        "category": {
-          "default": "",
-          "description": "Category (e.g., \"pattern\", \"mistake\", \"insight\")",
+        "min_severity": {
+          "default": "low",
+          "description": "Minimum severity to report (\"low\", \"medium\", \"high\", \"critical\")",
           "type": "string"
         },
-        "keywords": {
-          "description": "Keywords for matching (auto-extracted if not provided)",
+        "tools": {
+          "description": "List of tools to use (None = all available)",
           "type": "string"
-        },
-        "text": {
-          "description": "The lesson text",
+        }
+      },
+      "type": "object"
+    },
+    "name": "security_analyze"
+  },
+  {
+    "description": "Get high and critical severity findings. List of high/critical security findings",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "security_get_high_severity"
+  },
+  {
+    "description": "Get the full diff for a shadow branch.",
+    "inputSchema": {
+      "properties": {
+        "branch_name": {
           "type": "string"
         }
       },
       "required": [
-        "text"
+        "branch_name"
       ],
       "type": "object"
     },
-    "name": "lessons_add"
+    "name": "shadow_git_get_diff"
   },
   {
-    "description": "Clear all lessons. Dict with 'success' boolean",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    },
-    "name": "lessons_clear"
-  },
-  {
-    "description": "Find lessons relevant to the given context. List of relevant Lesson objects",
+    "description": "Get parsed diff hunks for a branch.",
     "inputSchema": {
       "properties": {
-        "context": {
-          "description": "Current context (e.g., error message, task description)",
+        "branch_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch_name"
+      ],
+      "type": "object"
+    },
+    "name": "shadow_git_get_hunks"
+  },
+  {
+    "description": "Surgically rollback a specific hunk by file and line number.",
+    "inputSchema": {
+      "properties": {
+        "branch_name": {
           "type": "string"
         },
-        "limit": {
-          "default": 3,
-          "description": "Maximum number of lessons to return",
+        "file_path": {
+          "type": "string"
+        },
+        "line": {
           "type": "integer"
         }
       },
       "required": [
-        "context"
+        "branch_name",
+        "file_path",
+        "line"
       ],
       "type": "object"
     },
-    "name": "lessons_find_relevant"
+    "name": "shadow_git_rollback_hunk"
   },
   {
-    "description": "List lessons, optionally filtered by category. List of Lesson objects",
+    "description": "Get the full source code of a named symbol. Useful for getting complete enum definitions, class bodies, or function implementations when the skeleton isn't enough. Full source code of the symbol, or None if not found # Get full enum definition content = api.skeleton.expand(\"src/agent_loop.py\", \"StepType\") # Returns complete enum with all values",
     "inputSchema": {
       "properties": {
-        "category": {
-          "description": "Filter by category (case-insensitive)",
+        "file_path": {
+          "description": "Path to the Python file",
           "type": "string"
         },
-        "limit": {
-          "default": 20,
-          "description": "Maximum number of lessons to return",
-          "type": "integer"
+        "symbol_name": {
+          "description": "Name of the symbol to expand (e.g., \"StepType\", \"my_function\")",
+          "type": "string"
         }
       },
+      "required": [
+        "file_path",
+        "symbol_name"
+      ],
       "type": "object"
     },
-    "name": "lessons_list"
+    "name": "skeleton_expand"
   },
   {
-    "description": "Search lessons by keyword. List of matching Lesson objects",
+    "description": "Extract code skeleton (functions, classes, methods). Example: moss skeleton src/main.py",
     "inputSchema": {
       "properties": {
-        "limit": {
+        "file_path": {
+          "description": "Path to the Python file (relative to root or absolute)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "skeleton_extract"
+  },
+  {
+    "description": "Extract code skeleton (functions, classes, methods). Example: moss skeleton src/main.py",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the file",
+          "type": "string"
+        },
+        "include_docstrings": {
+          "default": true,
+          "description": "Whether to include docstrings in output (Python only)",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "skeleton_format"
+  },
+  {
+    "description": "Extract enum member names from an Enum class. List of enum member names, or None if not found values = api.skeleton.get_enum_values(\"src/agent_loop.py\", \"StepType\") # Returns: [\"TOOL\", \"LLM\", \"HYBRID\"]",
+    "inputSchema": {
+      "properties": {
+        "enum_name": {
+          "description": "Name of the Enum class",
+          "type": "string"
+        },
+        "file_path": {
+          "description": "Path to the Python file",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "enum_name"
+      ],
+      "type": "object"
+    },
+    "name": "skeleton_get_enum_values"
+  },
+  {
+    "description": "Analyze patterns across all recorded sessions.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "telemetry_analyze_all_sessions"
+  },
+  {
+    "description": "Get comprehensive statistics for a session.",
+    "inputSchema": {
+      "properties": {
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "type": "object"
+    },
+    "name": "telemetry_get_session_stats"
+  },
+  {
+    "description": "List TODOs, optionally filtered by section. TodoListResult with items grouped by section",
+    "inputSchema": {
+      "properties": {
+        "include_done": {
+          "default": false,
+          "description": "Include completed TODOs (default: False)",
+          "type": "boolean"
+        },
+        "per_section_limit": {
           "default": 5,
-          "description": "Maximum number of results",
+          "description": "Max items to show per section (default: 5)",
           "type": "integer"
+        },
+        "section": {
+          "description": "Filter to specific section (case-insensitive partial match)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "todo_list"
+  },
+  {
+    "description": "Search TODOs by keyword. List of TodoSearchResult with matching items, sorted by relevance",
+    "inputSchema": {
+      "properties": {
+        "include_done": {
+          "default": false,
+          "description": "Include completed TODOs (default: False)",
+          "type": "boolean"
         },
         "query": {
-          "description": "Search query (matches text, category, and keywords)",
+          "description": "Search query (case-insensitive, matches text and section)",
           "type": "string"
         }
       },
@@ -1489,7 +1511,15 @@
       ],
       "type": "object"
     },
-    "name": "lessons_search"
+    "name": "todo_search"
+  },
+  {
+    "description": "List all TODO sections with counts. List of dicts with section name, pending count, and done count",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "todo_sections"
   },
   {
     "description": "List all key paths in a TOML file. List of dotted key paths",
@@ -1559,5 +1589,180 @@
       "type": "object"
     },
     "name": "toml_summary"
+  },
+  {
+    "description": "Show git-aware file tree. Example: moss tree",
+    "inputSchema": {
+      "properties": {
+        "compact": {
+          "default": false,
+          "description": "If True, use token-efficient format",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Directory to visualize (default: project root)",
+          "type": "string"
+        },
+        "tracked_only": {
+          "default": false,
+          "description": "If True, only show git-tracked files",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "name": "tree_format"
+  },
+  {
+    "description": "Show git-aware file tree. Example: moss tree",
+    "inputSchema": {
+      "properties": {
+        "gitignore": {
+          "default": true,
+          "description": "If True, respect .gitignore when showing all files",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Directory to visualize (default: project root)",
+          "type": "string"
+        },
+        "tracked_only": {
+          "default": false,
+          "description": "If True, only show git-tracked files",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "name": "tree_generate"
+  },
+  {
+    "description": "Create a standard Python validator chain. ValidatorChain configured for Python (syntax + ruff + pytest)",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "validation_create_chain"
+  },
+  {
+    "description": "Validate a Python file with the default chain. ValidationResult with any issues found",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to validate",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "validation_validate"
+  },
+  {
+    "description": "Analyze codebase for architectural weaknesses. WeaknessAnalysis with detected weaknesses",
+    "inputSchema": {
+      "properties": {
+        "categories": {
+          "description": "Categories to check (None = all)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "weaknesses_analyze"
+  },
+  {
+    "description": "Format weakness analysis as markdown. Markdown-formatted report",
+    "inputSchema": {
+      "properties": {
+        "analysis": {
+          "description": "WeaknessAnalysis to format",
+          "type": "string"
+        }
+      },
+      "required": [
+        "analysis"
+      ],
+      "type": "object"
+    },
+    "name": "weaknesses_format"
+  },
+  {
+    "description": "Clear the web content cache. Number of cached items cleared",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "web_clear_cache"
+  },
+  {
+    "description": "Extract clean content from HTML string. Dict with title, text, token_estimate, metadata",
+    "inputSchema": {
+      "properties": {
+        "html": {
+          "description": "Raw HTML content",
+          "type": "string"
+        },
+        "url": {
+          "default": "",
+          "description": "Optional URL for metadata",
+          "type": "string"
+        }
+      },
+      "required": [
+        "html"
+      ],
+      "type": "object"
+    },
+    "name": "web_extract_content"
+  },
+  {
+    "description": "Fetch and extract content from URL. Dict with url, title, text, token_estimate, metadata",
+    "inputSchema": {
+      "properties": {
+        "extract_main": {
+          "default": true,
+          "description": "Extract main content vs full page (default: True)",
+          "type": "boolean"
+        },
+        "url": {
+          "description": "URL to fetch",
+          "type": "string"
+        },
+        "use_cache": {
+          "default": true,
+          "description": "Check cache first (default: True)",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "name": "web_fetch"
+  },
+  {
+    "description": "Search the web with token-efficient results. Dict with query, results list, and compact string representation",
+    "inputSchema": {
+      "properties": {
+        "max_results": {
+          "default": 5,
+          "description": "Maximum number of results (default: 5)",
+          "type": "integer"
+        },
+        "query": {
+          "description": "Search query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "web_search"
   }
 ]
