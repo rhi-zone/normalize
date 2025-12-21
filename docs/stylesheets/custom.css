@@ -4,11 +4,12 @@
   --md-accent-fg-color: #ffb300;
   
   /* Glassmorphism variables */
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-bg-dark: rgba(30, 33, 41, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.3);
+  /* Preferred style: dark background on light theme, light on dark theme */
+  --glass-bg: rgba(30, 33, 41, 0.1); /* Dark background at low opacity on light theme */
+  --glass-bg-dark: rgba(255, 255, 255, 0.15); /* Light background at low opacity on dark theme */
+  --glass-border: rgba(0, 0, 0, 0.1);
   --glass-border-dark: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
   --blur-amount: 12px;
 }
 

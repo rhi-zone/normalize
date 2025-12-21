@@ -360,7 +360,7 @@ class MossTUI(App):
     """
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
-        ("q", "quit", "Quit"),
+        ("ctrl+c", "handle_ctrl_c", "Quit"),
         ("d", "toggle_dark", "Toggle Dark Mode"),
         ("shift+tab", "next_mode", "Next Mode"),
         ("h", "toggle_tooltip", "Toggle Tooltip"),
@@ -373,6 +373,18 @@ class MossTUI(App):
         self.api = api
         self._task_tree: TaskTree | None = None
         self._registry = ModeRegistry()
+        self._last_ctrl_c: float = 0
+
+    def action_handle_ctrl_c(self) -> None:
+        """Handle Ctrl+C with double-tap to exit."""
+        import time
+
+        now = time.time()
+        if now - self._last_ctrl_c < 0.5:
+            self.exit()
+        else:
+            self._last_ctrl_c = now
+            self._log("Press Ctrl+C again to exit")
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""

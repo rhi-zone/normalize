@@ -226,15 +226,15 @@ class RefChecker:
     # Liberal patterns for docs -> code references
     DOC_TO_CODE_PATTERNS: ClassVar[list[str]] = [
         # HTML comments: <!-- Implementation: src/*.py -->
-        r"<!--\s*[Ii]mplementation:?\s*(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)\s*-->",
-        r"<!--\s*[Cc]ode:?\s*(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)\s*-->",
-        r"<!--\s*[Ss]ource:?\s*(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)\s*-->",
+        r"<!--\s*[Ii]mplementation:?\s*((?:src|crates)/\S+\.\w+|Cargo\.toml|pyproject\.toml)\s*-->",
+        r"<!--\s*[Cc]ode:?\s*((?:src|crates)/\S+\.\w+|Cargo\.toml|pyproject\.toml)\s*-->",
+        r"<!--\s*[Ss]ource:?\s*((?:src|crates)/\S+\.\w+|Cargo\.toml|pyproject\.toml)\s*-->",
         # Backtick code references: `src/*.py`
-        r"`(src/[^`]+\.(?:py|rs)|crates/[^`]+\.(?:py|rs)|Cargo\.toml)`",
+        r"`((?:src|crates)/[^`]+\.\w+|Cargo\.toml|pyproject\.toml)`",
         # Markdown links to source
-        r"\]\((src/[^)]+\.(?:py|rs)|crates/[^)]+\.(?:py|rs)|Cargo\.toml)\)",
+        r"\]\(((?:src|crates)/[^)]+\.\w+|Cargo\.toml|pyproject\.toml)\)",
         # Bare paths
-        r"(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)",
+        r"((?:src|crates)/\S+\.\w+|Cargo\.toml|pyproject\.toml)",
     ]
 
     def __init__(

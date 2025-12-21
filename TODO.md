@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Agentic Prompt Versioning**: Automatically track and compare system prompt evolutions
-- [ ] **Recursive Workflow Learning**: Propose new workflows based on recurrent session patterns
-- [ ] **Adaptive Model Rotation**: Dynamically switch LLM providers based on task latency
+- [ ] **TUI Exit Refinement**: Change exit shortcut to double `Ctrl+C` to avoid conflicts
+- [ ] **Memory & Resource Metrics**: Show context and RAM usage (with breakdown) for every command
+- [ ] **Local Model Constrained Inference**: Implement GBNF (GGML BNF) for structured output from local models
+- [ ] **TUI Syntax Highlighting**: High-quality code highlighting in file previews (on par with Gemini CLI)
 
 ## Recently Completed
 
@@ -363,16 +364,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ### Agent Research & Optimization
 - [ ] **LLM Editing Performance Comparison**:
-  - Investigate Gemini 3 Flash's significant issues with code editing
+  - Investigate Gemini 3 Flash and Gemini 3 Pro issues with invalid code edits
   - Compare with Claude Code and Opus to identify architectural differences
   - Evaluate if specialized prompting or different edit formats (e.g. diffs) help
+- [ ] **YOLO Mode Evaluation**: Evaluate if a "YOLO mode" (like Gemini CLI's Ctrl+Y) aligns with Moss architectural principles
+- [ ] **Memory Usage Optimization**: Ensure Moss keeps RAM usage extremely low, even for large codebases
 - [ ] **Extensible Agent Modes**:
-  - Refactor TUI modes (PLAN, READ, WRITE) into a plugin-based system
+  - Refactor TUI modes (PLAN, READ, WRITE, DIFF, SESSION, BRANCH, SWARM, COMMIT) into a plugin-based system
   - Allow user-defined modes via `.moss/modes/`
-- [ ] **'Diffusion-like' methods for large-scale refactors**:
-  - Generate contracts/signatures at high levels first
-  - Parallelize implementation of components
-  - Explore reconciliation strategies for independent components
+- [ ] **'Diffusion-like' methods for large-scale refactors':
 - [ ] **Small/Local Model Brute Force**: Explore using smaller, faster local models with higher iteration/voting counts
 - [ ] **Fine-tuned Tiny Models**:
   - Explore extreme optimization with models like 100M RWKV

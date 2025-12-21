@@ -35,6 +35,13 @@ LLM calls are expensive (cost) and slow (latency). Design everything to reduce t
 
 This is why we have skeleton views (understand code without LLM), validation loops (catch errors without LLM), and DWIM (find tools without LLM). The goal: an agent that calls the LLM 10x less than naive approaches.
 
+### Resource Efficiency
+
+Moss should be extremely lightweight. High memory usage is a bug:
+- **Low RAM footprint**: Favor streaming and lazy loading over large in-memory caches
+- **Minimal context**: Never send full code when a skeleton or snippet suffices
+- **Transparent metrics**: Every command should optionally show context and RAM usage breakdowns
+
 ### Minimizing Error Rates
 
 Validation and heuristics are primary citizens in Moss. Because LLMs are not 100% reliable, we must never trust their output implicitly:
