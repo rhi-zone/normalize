@@ -1038,14 +1038,18 @@ def resolve_tool(tool_name: str) -> ToolMatch:
 
     Handles:
     - Exact matches
+    - Hyphen-to-underscore normalization
     - Semantic aliases
     - Fuzzy matching for typos
     """
-    # Exact match
-    if tool_name in TOOL_REGISTRY:
-        return ToolMatch(tool=tool_name, confidence=1.0)
+    # Normalize: hyphens to underscores, lowercase
+    normalized = tool_name.replace("-", "_").lower()
 
-    name_lower = tool_name.lower()
+    # Exact match
+    if normalized in TOOL_REGISTRY:
+        return ToolMatch(tool=normalized, confidence=1.0)
+
+    name_lower = normalized
 
     # Alias match
     if name_lower in TOOL_ALIASES:

@@ -251,11 +251,11 @@ class TestToolResolution:
         """Test that hyphens are converted to underscores."""
         match = resolve_tool("web-search")
         assert match.tool == "web_search"
-        assert match.confidence > 0.85  # High confidence typo correction
+        assert match.confidence == 1.0
 
         match = resolve_tool("todo-list")
         assert match.tool == "todo_list"
-        assert match.confidence > 0.85
+        assert match.confidence == 1.0
 
     # === Case handling ===
 
@@ -1298,3 +1298,67 @@ class TestHyphenUnderscore:
             assert len(matches) > 0
             assert matches[0].tool == expected
             assert matches[0].confidence == 1.0
+
+
+# =============================================================================
+# XFAIL TESTS: Known gaps in semantic matching
+# =============================================================================
+# These document queries that SHOULD work but don't yet.
+# Fix the underlying matching, then remove the xfail marker.
+
+
+class TestKnownGaps:
+    """Tests for queries that should work but don't yet.
+
+    These are marked xfail to document expected behavior.
+    When fixing DWIM matching, use these as targets.
+    """
+
+    @pytest.mark.xfail(reason="'module' dominates, finds search_summarize_module not deps")
+    def test_module_dependencies_finds_deps(self):
+        """'module dependencies' should find deps tools."""
+        matches = analyze_intent("module dependencies")
+        tool_names = [m.tool for m in matches[:5]]
+        dep_tools = {"deps", "dependencies_extract", "dependencies_analyze"}
+        assert any(t in dep_tools for t in tool_names), f"Got: {tool_names}"
+
+    @pytest.mark.xfail(reason="'module imports' matches search_summarize_module")
+    def test_module_imports_finds_deps(self):
+        """'module imports' should find deps tools."""
+        matches = analyze_intent("module imports")
+        tool_names = [m.tool for m in matches[:5]]
+        dep_tools = {"deps", "dependencies_extract"}
+        assert any(t in dep_tools for t in tool_names), f"Got: {tool_names}"
+
+    @pytest.mark.xfail(reason="Vague query, matches anchors instead of query")
+    def test_classes_inherit_finds_query(self):
+        """'classes that inherit from Base' should find query tool."""
+        matches = analyze_intent("classes that inherit from Base")
+        tool_names = [m.tool for m in matches[:3]]
+        assert "query" in tool_names, f"Got: {tool_names}"
+
+    def test_what_packages_finds_deps(self):
+        """'what packages are used' should find deps tools."""
+        matches = analyze_intent("what packages are used")
+        tool_names = [m.tool for m in matches[:5]]
+        dep_tools = {"deps", "dependencies_extract", "external_deps_list_direct"}
+        assert any(t in dep_tools for t in tool_names), f"Got: {tool_names}"
+
+    @pytest.mark.xfail(reason="'subprocess' not in any tool embeddings")
+    def test_methods_call_subprocess_finds_query(self):
+        """'methods that call subprocess' should find query tool."""
+        matches = analyze_intent("methods that call subprocess")
+        tool_names = [m.tool for m in matches[:5]]
+        assert "query" in tool_names, f"Got: {tool_names}"
+
+    def test_hyphen_full_confidence(self):
+        """Hyphen-to-underscore should give full confidence."""
+        match = analyze_intent("todo-list")[0]
+        assert match.tool == "todo_list"
+        assert match.confidence == 1.0, f"Got {match.confidence}"
+
+    @pytest.mark.xfail(reason="Empty available_tools still searches all tools")
+    def test_empty_available_tools_returns_empty(self):
+        """Empty available_tools filter should return no results."""
+        matches = analyze_intent("find code", available_tools=[])
+        assert len(matches) == 0, f"Got {len(matches)} matches"
