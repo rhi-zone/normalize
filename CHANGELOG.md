@@ -4,10 +4,24 @@
 
 ### Features
 
+**Telemetry Command & Design Philosophy Update** (Dec 22 2025)
+- New `moss telemetry` command for session analysis:
+  - Default: aggregate stats across all moss sessions
+  - `--session ID`: specific moss session stats
+  - `--logs *.jsonl`: analyze Claude Code session logs (supports multiple)
+  - `--html`: HTML dashboard output
+- New design tenet: "Generalize, Don't Multiply"
+  - Prefer one flexible solution over N specialized ones
+  - Composability reduces cognitive load, maintenance burden, token cost
+- Updated philosophy.md: 4 primitives → 3 (find folded into view)
+- DWIM tool selection no longer needed with only 3 primitives
+- Session modes: Fresh (default) vs Marathon (overnight runs)
+- New design doc: `docs/telemetry.md`
+
 **Core Primitive Tool Resolution** (Dec 22 2025)
 - Added `analyze` to CLI passthrough commands (routes to Rust)
 - New `resolve_core_primitive()` function for simple tool resolution
-- CORE_PRIMITIVES: `view`, `edit`, `analyze`, `search` with aliases
+- CORE_PRIMITIVES: `view`, `edit`, `analyze` with aliases
 - Basic typo correction using Levenshtein distance (threshold 0.7)
 - NL-dependent tests marked xfail since embeddings were removed
 - Phase 3 (Simplify tool interface) now complete
@@ -19,11 +33,10 @@
   - `--security`: Security vulnerability scanning (shells out to bandit)
   - Runs all analyses by default if no flags specified
   - JSON output with `--json`
-- Consolidated MossAPI from 30 sub-APIs to 4 core primitives:
-  - `api.view` - ViewAPI wrapping Rust `view` command
+- Consolidated MossAPI from 30 sub-APIs to 3 core primitives:
+  - `api.view` - ViewAPI wrapping Rust `view` command (includes find/search)
   - `api.structural_edit` - EditAPI wrapping Rust `edit` command
   - `api.analyze` - AnalyzeAPI wrapping Rust `analyze` command
-  - `api.search` - SearchAPI (existing, already consolidated)
 - New `rust_shim` functions: `rust_view()`, `rust_edit()`, `rust_analyze()`
 - New `core_api.py` module with ViewResult, EditResult, AnalyzeResult dataclasses
 

@@ -4,17 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] Add `moss telemetry` CLI command with aggregate analysis across sessions
-- [ ] Integrate SessionAnalyzer with TelemetryAPI for unified interface
-- [ ] HTML dashboard output for `moss telemetry --html`
+- [ ] Tokens per symbol path in telemetry (leverage codebase tree)
+- [ ] Log format plugins (SessionAnalyzer becomes one of many)
+- [ ] Real-time telemetry mode (`moss telemetry --watch`)
 
 ## Active Backlog
 
 **Large:**
-- [ ] **Comprehensive Telemetry & Analysis**: (Partially Complete - see TelemetryAPI)
-  - Track all token usage, patterns, and codebase access patterns by default
-  - Store maximal metadata for every session
-  - Built-in high-quality analysis tools (CLI & visual)
+- [ ] **Comprehensive Telemetry & Analysis**: (In Progress - see `docs/telemetry.md`)
+  - [x] `moss telemetry` CLI with aggregate analysis
+  - [x] HTML dashboard output
+  - [ ] Tokens per function/file/module
+  - [ ] Plugin architecture for log formats
 - [ ] Memory system - layered memory for cross-session learning (see `docs/memory-system.md`)
 
 ## Future Work
@@ -54,9 +55,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 **Phase 3: Simplify tool interface** (complete)
 - [x] Remove DWIM embedding system (fastembed/bge-small-en dependency removed)
-- [x] Simple tool resolution: exact match + basic typo correction for 4 names
+- [x] Simple tool resolution: exact match + basic typo correction for 3 names
 - [x] Keep path fuzzy resolution (already in Rust): `view dwim` → `src/moss/dwim.py`
-- [x] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
+- [x] Consolidate MossAPI: 30 sub-APIs → 3 primitive APIs matching CLI/MCP
 
 ### Distribution & Installation
 - [ ] Auto-updates: check for new versions, prompt user
@@ -73,8 +74,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ### Design Principles
 See `docs/philosophy.md` for full tenets. Key goals:
+- **Generalize, Don't Multiply**: One flexible solution over N specialized ones
+- **Three Primitives**: view, edit, analyze (composable, not specialized)
 - Minimize LLM usage (structural tools first)
 - Maximize useful work per token
 - Low barrier to entry, works on messy codebases
-- **Heuristic Guardrails**: Mitigate LLM unreliability with verification loops and deterministic rules
-- **Resource Efficiency**: High memory usage is a bug; favor streaming and lazy loading
