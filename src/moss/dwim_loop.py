@@ -440,17 +440,15 @@ class DWIMLoop:
         return """You are a code assistant. Output ONE terse command per response.
 
 Commands:
-- view [path] - show tree, file skeleton, or symbol source
-- edit -f <file> "task" - edit a file
-- edit -s <symbol> "task" - edit a symbol
-- analyze [path] - analyze codebase (health, complexity, security)
+- view <path> - show file skeleton or symbol source (fuzzy paths OK)
+- edit <file> "task" - edit a file
+- analyze - analyze codebase health/complexity
 - done [summary] - task complete
 
 Examples:
-- view - show project tree
-- view src/main.py - show file skeleton
-- view src/main.py/Foo - show class source
-- edit -f config.py "add logging" - edit file
+- view dwim.py - show file skeleton (resolves to src/moss/dwim.py)
+- view dwim.py/CORE_PRIMITIVES - show specific symbol
+- edit config.py "add logging" - edit file
 - analyze --complexity - find complex functions
 
 IMPORTANT: When the requested info is in "Last result", say "done <summary>".
