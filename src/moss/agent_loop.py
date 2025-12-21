@@ -138,6 +138,8 @@ class AgentLoop:
     token_budget: int | None = None
     adaptive_token_budget: bool = False  # Enable dynamic budget adjustment
     timeout_seconds: float | None = None
+    memory_budget_mb: int | None = None  # Max memory usage (MB) before eviction
+    max_context_steps: int = 10  # Max steps to keep in context history
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -300,10 +302,25 @@ class LoopContext:
         """Get a specific step's output."""
         return self.steps.get(step_name, default)
 
-    def with_step(self, step_name: str, output: Any) -> LoopContext:
-        """Return new context with step output added."""
+    def with_step(self, step_name: str, output: Any, max_steps: int | None = None) -> LoopContext:
+        """Return new context with step output added.
+
+        Args:
+            step_name: Name of the step to add
+            output: Step output to store
+            max_steps: If provided, evict oldest steps to stay under limit
+        """
         new_steps = dict(self.steps)
         new_steps[step_name] = output
+
+        # Evict oldest steps if over limit (keep most recent)
+        if max_steps is not None and len(new_steps) > max_steps:
+            # Get step keys in insertion order (dict preserves order in Python 3.7+)
+            keys = list(new_steps.keys())
+            # Remove oldest steps to get under limit
+            for key in keys[: len(keys) - max_steps]:
+                del new_steps[key]
+
         return LoopContext(
             input=self.input,
             steps=new_steps,
@@ -441,6 +458,20 @@ class AgentLoopRunner:
                 if loop.adaptive_max_steps:
                     await self._rebalance_steps(loop, context, metrics)
 
+            # Memory budget enforcement
+            if loop.memory_budget_mb:
+                try:
+                    import psutil
+
+                    process = psutil.Process()
+                    mem_mb = process.memory_info().rss / (1024 * 1024)
+                    if mem_mb > loop.memory_budget_mb:
+                        # Evict oldest step results to reduce memory
+                        if len(step_results) > 2:
+                            step_results = step_results[-2:]
+                except ImportError:
+                    pass  # psutil not available
+
             step = step_map.get(current_step_name)
             if not step:
                 return LoopResult(
@@ -504,7 +535,9 @@ class AgentLoopRunner:
                 pass
 
             if step_result.status == StepStatus.SUCCESS:
-                context = context.with_step(step.name, step_result.output)
+                context = context.with_step(
+                    step.name, step_result.output, max_steps=loop.max_context_steps
+                )
 
                 # Peek-First Policy: Track expanded symbols
                 output = step_result.output
@@ -1986,6 +2019,7 @@ class LLMConfig:
     max_tokens_per_turn: int | None = None  # Dynamic turn limit
     system_prompt: str | None = None  # None = load from prompts/terse.txt
     mock: bool = False  # Set True for testing without API calls
+    streaming: bool = False  # Stream responses to reduce peak memory
 
     def get_system_prompt(self) -> str:
         """Get system prompt, loading from file if not explicitly set."""
@@ -2477,7 +2511,11 @@ class LLMToolExecutor:
         max_tokens: int | None = None,
         task_type: str | None = None,
     ) -> tuple[str, int, int]:
-        """Call LLM via litellm (unified interface for all providers)."""
+        """Call LLM via litellm (unified interface for all providers).
+
+        When streaming is enabled, collects chunks incrementally to reduce
+        peak memory usage for large responses.
+        """
         import asyncio
 
         try:
@@ -2520,8 +2558,28 @@ class LLMToolExecutor:
             if effective_max_tokens is not None:
                 kwargs["max_tokens"] = effective_max_tokens
 
-            response = completion(**kwargs)
+            # Streaming mode: collect chunks incrementally
+            if self.config.streaming:
+                kwargs["stream"] = True
+                response = completion(**kwargs)
+                chunks: list[str] = []
+                tokens_in = 0
+                tokens_out = 0
+                for chunk in response:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        chunks.append(chunk.choices[0].delta.content)
+                    # Token counts from final chunk (some providers)
+                    if hasattr(chunk, "usage") and chunk.usage:
+                        tokens_in = chunk.usage.prompt_tokens or 0
+                        tokens_out = chunk.usage.completion_tokens or 0
+                text = "".join(chunks)
+                # Estimate tokens if not provided
+                if tokens_out == 0:
+                    tokens_out = len(text) // 4  # rough approximation
+                return text, tokens_in, tokens_out
 
+            # Non-streaming mode: standard call
+            response = completion(**kwargs)
             text = response.choices[0].message.content or ""
             tokens_in = response.usage.prompt_tokens if response.usage else 0
             tokens_out = response.usage.completion_tokens if response.usage else 0

@@ -4,12 +4,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Runtime Memory Bounds**: Ensure long context doesn't exhaust RAM (streaming, eviction)
-- [ ] **Brute Force Voting Implementation**: Wire BruteForceConfig to synthesis generator
-- [ ] **Session Log Comparison Tool**: Compare Claude Code vs Gemini CLI edit quality empirically
 - [ ] **Codebase Tree Phase 1**: Delegate skeleton/summarize to Rust `view`
 
 ## Recently Completed
+
+- **Session Dec 21 2025 (late)**:
+  - Runtime Memory Bounds: streaming LLM responses, context eviction (max_context_steps)
+  - Brute Force Voting: wired to LLMGenerator with majority/consensus/first_valid strategies
+  - Session Log Comparison Tool: compare_sessions() for Claude vs Gemini CLI edit analysis
 
 - **Session Dec 21 2025 (continued)**:
   - Claude vs Gemini CLI edit paradigm analysis (see `docs/edit-paradigm-comparison.md`)

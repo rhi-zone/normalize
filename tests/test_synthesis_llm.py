@@ -535,6 +535,113 @@ class TestLLMGenerator:
 
 
 # =============================================================================
+# Brute Force Voting Tests
+# =============================================================================
+
+
+class TestBruteForceVoting:
+    """Tests for brute-force voting mode."""
+
+    @pytest.fixture
+    def brute_force_config(self):
+        """Create a BruteForceConfig for testing."""
+        from moss.synthesis.config import BruteForceConfig
+
+        return BruteForceConfig(
+            enabled=True,
+            n_samples=3,
+            temperature=0.7,
+            voting_strategy="majority",
+            parallel=True,
+        )
+
+    def test_vote_on_samples_majority(self) -> None:
+        """Test majority voting selects most common."""
+        generator = LLMGenerator(provider=MockLLMProvider())
+        samples = ["code_a", "code_b", "code_a", "code_a", "code_b"]
+
+        result = generator._vote_on_samples(samples, "majority")
+        assert result == "code_a"
+
+    def test_vote_on_samples_first_valid(self) -> None:
+        """Test first_valid returns first sample."""
+        generator = LLMGenerator(provider=MockLLMProvider())
+        samples = ["code_a", "code_b", "code_c"]
+
+        result = generator._vote_on_samples(samples, "first_valid")
+        assert result == "code_a"
+
+    def test_vote_on_samples_consensus_success(self) -> None:
+        """Test consensus voting with sufficient agreement."""
+        generator = LLMGenerator(provider=MockLLMProvider())
+        samples = ["code_a", "code_a", "code_a", "code_b", "code_c"]
+
+        result = generator._vote_on_samples(samples, "consensus", require_consensus=0.6)
+        assert result == "code_a"
+
+    def test_vote_on_samples_consensus_failure(self) -> None:
+        """Test consensus voting fails without sufficient agreement."""
+        generator = LLMGenerator(provider=MockLLMProvider())
+        samples = ["code_a", "code_b", "code_c", "code_d", "code_e"]
+
+        result = generator._vote_on_samples(samples, "consensus", require_consensus=0.6)
+        assert result is None
+
+    def test_vote_on_samples_empty(self) -> None:
+        """Test voting with empty samples returns None."""
+        generator = LLMGenerator(provider=MockLLMProvider())
+
+        result = generator._vote_on_samples([], "majority")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_generate_with_brute_force(
+        self,
+        brute_force_config,
+        simple_spec: Specification,
+        context: Context,
+    ) -> None:
+        """Test brute force generation mode."""
+        # Create mock provider that returns consistent responses
+        provider = MockLLMProvider(responses=["def add(a, b): return a + b"] * 3)
+        config = LLMGeneratorConfig(brute_force=brute_force_config)
+        generator = LLMGenerator(provider=provider, config=config)
+
+        result = await generator.generate(simple_spec, context)
+
+        assert result.success
+        assert "add" in result.code
+        assert result.metadata.get("mode") == "brute_force"
+        assert result.metadata.get("n_samples") == 3
+
+    @pytest.mark.asyncio
+    async def test_generate_with_brute_force_varied_responses(
+        self,
+        brute_force_config,
+        simple_spec: Specification,
+        context: Context,
+    ) -> None:
+        """Test brute force with varied responses picks majority."""
+        # Two samples return same code, one different
+        provider = MockLLMProvider(
+            responses=[
+                "def add(a, b): return a + b",
+                "def add(x, y): return x + y",  # different but still valid
+                "def add(a, b): return a + b",
+            ]
+        )
+        config = LLMGeneratorConfig(brute_force=brute_force_config)
+        generator = LLMGenerator(provider=provider, config=config)
+
+        result = await generator.generate(simple_spec, context)
+
+        assert result.success
+        # Should pick the majority (first and third)
+        assert result.code == "def add(a, b): return a + b"
+        assert result.metadata.get("agreement") >= 0.66
+
+
+# =============================================================================
 # Factory Function Tests
 # =============================================================================
 

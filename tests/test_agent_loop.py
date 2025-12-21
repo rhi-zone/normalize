@@ -145,6 +145,32 @@ class TestLoopContext:
         assert ctx.get("c") is None
         assert ctx.get("c", "default") == "default"
 
+    def test_with_step_eviction(self):
+        """Test that max_steps limits context history."""
+        ctx = LoopContext(input="initial")
+        # Add 5 steps
+        for i in range(5):
+            ctx = ctx.with_step(f"step{i}", f"out{i}")
+
+        assert len(ctx.steps) == 5
+
+        # Add another step with max_steps=3 - should evict oldest
+        ctx = ctx.with_step("step5", "out5", max_steps=3)
+        assert len(ctx.steps) == 3
+        # Should keep most recent 3: step3, step4, step5
+        assert "step0" not in ctx.steps
+        assert "step1" not in ctx.steps
+        assert "step2" not in ctx.steps
+        assert ctx.steps == {"step3": "out3", "step4": "out4", "step5": "out5"}
+
+    def test_with_step_no_eviction_when_under_limit(self):
+        """Test that max_steps doesn't evict when under limit."""
+        ctx = LoopContext(input="initial")
+        ctx = ctx.with_step("step1", "out1", max_steps=10)
+        ctx = ctx.with_step("step2", "out2", max_steps=10)
+        assert len(ctx.steps) == 2
+        assert ctx.steps == {"step1": "out1", "step2": "out2"}
+
 
 class TestLoopMetrics:
     """Tests for LoopMetrics dataclass."""

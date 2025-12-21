@@ -13,7 +13,7 @@ import json
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 
 @dataclass
@@ -461,3 +461,329 @@ def analyze_session(path: str | Path) -> SessionAnalysis:
     """
     analyzer = SessionAnalyzer(Path(path))
     return analyzer.analyze()
+
+
+# =============================================================================
+# Session Log Comparison Tool
+# =============================================================================
+
+
+@dataclass
+class EditStats:
+    """Statistics for edit tool usage."""
+
+    tool_name: str
+    total_attempts: int = 0
+    successes: int = 0
+    failures: int = 0
+    retries: int = 0
+    avg_old_string_len: float = 0.0
+    avg_new_string_len: float = 0.0
+
+    @property
+    def success_rate(self) -> float:
+        if self.total_attempts == 0:
+            return 0.0
+        return self.successes / self.total_attempts
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool_name": self.tool_name,
+            "total_attempts": self.total_attempts,
+            "successes": self.successes,
+            "failures": self.failures,
+            "retries": self.retries,
+            "success_rate": round(self.success_rate * 100, 1),
+            "avg_old_string_len": round(self.avg_old_string_len, 1),
+            "avg_new_string_len": round(self.avg_new_string_len, 1),
+        }
+
+
+@dataclass
+class SessionComparison:
+    """Comparison between two agent session logs."""
+
+    agent_a: str
+    agent_b: str
+    edit_stats_a: EditStats
+    edit_stats_b: EditStats
+    tool_usage_a: dict[str, int] = field(default_factory=dict)
+    tool_usage_b: dict[str, int] = field(default_factory=dict)
+    total_tokens_a: int = 0
+    total_tokens_b: int = 0
+    total_turns_a: int = 0
+    total_turns_b: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "agents": {
+                "a": self.agent_a,
+                "b": self.agent_b,
+            },
+            "edit_stats": {
+                self.agent_a: self.edit_stats_a.to_dict(),
+                self.agent_b: self.edit_stats_b.to_dict(),
+            },
+            "tool_usage": {
+                self.agent_a: self.tool_usage_a,
+                self.agent_b: self.tool_usage_b,
+            },
+            "tokens": {
+                self.agent_a: self.total_tokens_a,
+                self.agent_b: self.total_tokens_b,
+            },
+            "turns": {
+                self.agent_a: self.total_turns_a,
+                self.agent_b: self.total_turns_b,
+            },
+        }
+
+    def to_markdown(self) -> str:
+        """Format as markdown comparison report."""
+        lines = [
+            "# Session Comparison Report",
+            "",
+            f"Comparing **{self.agent_a}** vs **{self.agent_b}**",
+            "",
+            "## Edit Tool Performance",
+            "",
+            "| Metric | " + self.agent_a + " | " + self.agent_b + " |",
+            "|--------|" + "-" * len(self.agent_a) + "--|" + "-" * len(self.agent_b) + "--|",
+        ]
+
+        # Edit stats comparison
+        stats_a = self.edit_stats_a
+        stats_b = self.edit_stats_b
+        lines.append(f"| Attempts | {stats_a.total_attempts} | {stats_b.total_attempts} |")
+        lines.append(f"| Successes | {stats_a.successes} | {stats_b.successes} |")
+        lines.append(f"| Failures | {stats_a.failures} | {stats_b.failures} |")
+        lines.append(f"| Success Rate | {stats_a.success_rate:.0%} | {stats_b.success_rate:.0%} |")
+        lines.append(f"| Retries | {stats_a.retries} | {stats_b.retries} |")
+        avg_a = f"{stats_a.avg_old_string_len:.0f}"
+        avg_b = f"{stats_b.avg_old_string_len:.0f}"
+        lines.append(f"| Avg old_string len | {avg_a} | {avg_b} |")
+
+        # Overall stats
+        lines.extend(
+            [
+                "",
+                "## Overall Statistics",
+                "",
+                "| Metric | " + self.agent_a + " | " + self.agent_b + " |",
+                "|--------|" + "-" * len(self.agent_a) + "--|" + "-" * len(self.agent_b) + "--|",
+                f"| Total Turns | {self.total_turns_a} | {self.total_turns_b} |",
+                f"| Total Tokens | {self.total_tokens_a:,} | {self.total_tokens_b:,} |",
+            ]
+        )
+
+        # Top tools
+        lines.extend(["", "## Top Tools Used", ""])
+        all_tools = set(self.tool_usage_a.keys()) | set(self.tool_usage_b.keys())
+        sorted_tools = sorted(all_tools, key=lambda t: self.tool_usage_a.get(t, 0), reverse=True)[
+            :10
+        ]
+
+        lines.append("| Tool | " + self.agent_a + " | " + self.agent_b + " |")
+        lines.append("|------|" + "-" * len(self.agent_a) + "--|" + "-" * len(self.agent_b) + "--|")
+        for tool in sorted_tools:
+            count_a = self.tool_usage_a.get(tool, 0)
+            count_b = self.tool_usage_b.get(tool, 0)
+            lines.append(f"| {tool} | {count_a} | {count_b} |")
+
+        return "\n".join(lines)
+
+
+class SessionComparer:
+    """Compare session logs from different agents."""
+
+    # Edit tool names for each agent
+    EDIT_TOOLS: ClassVar[dict[str, list[str]]] = {
+        "claude_code": ["Edit", "MultiEdit", "str_replace_editor"],
+        "gemini_cli": ["edit", "edit_file", "replace_in_file"],
+    }
+
+    def __init__(self, log_a: Path, log_b: Path, agent_a: str = "Claude", agent_b: str = "Gemini"):
+        self.log_a = log_a
+        self.log_b = log_b
+        self.agent_a = agent_a
+        self.agent_b = agent_b
+
+    def compare(self) -> SessionComparison:
+        """Compare two session logs."""
+        entries_a = self._read_entries(self.log_a)
+        entries_b = self._read_entries(self.log_b)
+
+        # Detect agent type from entries
+        agent_type_a = self._detect_agent_type(entries_a)
+        agent_type_b = self._detect_agent_type(entries_b)
+
+        return SessionComparison(
+            agent_a=self.agent_a,
+            agent_b=self.agent_b,
+            edit_stats_a=self._analyze_edits(entries_a, agent_type_a),
+            edit_stats_b=self._analyze_edits(entries_b, agent_type_b),
+            tool_usage_a=self._count_tool_usage(entries_a),
+            tool_usage_b=self._count_tool_usage(entries_b),
+            total_tokens_a=self._count_tokens(entries_a),
+            total_tokens_b=self._count_tokens(entries_b),
+            total_turns_a=self._count_turns(entries_a),
+            total_turns_b=self._count_turns(entries_b),
+        )
+
+    def _read_entries(self, path: Path) -> list[dict[str, Any]]:
+        """Read JSONL entries from a session log."""
+        entries = []
+        try:
+            with path.open() as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            entries.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+        except FileNotFoundError:
+            pass
+        return entries
+
+    def _detect_agent_type(self, entries: list[dict[str, Any]]) -> str:
+        """Detect agent type from log entries."""
+        for entry in entries:
+            # Check for tool usage patterns
+            content = entry.get("content", [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict):
+                        tool_name = block.get("name", "")
+                        if tool_name in ["Edit", "MultiEdit", "str_replace_editor"]:
+                            return "claude_code"
+                        if tool_name in ["edit", "edit_file", "replace_in_file"]:
+                            return "gemini_cli"
+        return "unknown"
+
+    def _analyze_edits(self, entries: list[dict[str, Any]], agent_type: str) -> EditStats:
+        """Analyze edit tool usage from log entries."""
+        edit_tools = self.EDIT_TOOLS.get(agent_type, [])
+        stats = EditStats(tool_name=agent_type)
+
+        old_string_lens: list[int] = []
+        new_string_lens: list[int] = []
+        last_edit_file: str | None = None
+        last_edit_failed = False
+
+        for entry in entries:
+            content = entry.get("content", [])
+            if not isinstance(content, list):
+                continue
+
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+
+                # Check for tool use
+                if block.get("type") == "tool_use":
+                    tool_name = block.get("name", "")
+                    if tool_name not in edit_tools:
+                        continue
+
+                    stats.total_attempts += 1
+                    tool_input = block.get("input", {})
+
+                    # Track string lengths
+                    old_str = tool_input.get("old_string", "")
+                    new_str = tool_input.get("new_string", "")
+                    if old_str:
+                        old_string_lens.append(len(old_str))
+                    if new_str:
+                        new_string_lens.append(len(new_str))
+
+                    # Track retry pattern
+                    file_path = tool_input.get("file_path", "")
+                    if last_edit_failed and file_path == last_edit_file:
+                        stats.retries += 1
+
+                    last_edit_file = file_path
+
+                # Check for tool result (success/failure)
+                if block.get("type") == "tool_result":
+                    is_error = block.get("is_error", False)
+                    if is_error:
+                        stats.failures += 1
+                        last_edit_failed = True
+                    else:
+                        stats.successes += 1
+                        last_edit_failed = False
+
+        # Calculate averages
+        if old_string_lens:
+            stats.avg_old_string_len = sum(old_string_lens) / len(old_string_lens)
+        if new_string_lens:
+            stats.avg_new_string_len = sum(new_string_lens) / len(new_string_lens)
+
+        return stats
+
+    def _count_tool_usage(self, entries: list[dict[str, Any]]) -> dict[str, int]:
+        """Count tool usage from log entries."""
+        tool_counts: Counter[str] = Counter()
+
+        for entry in entries:
+            content = entry.get("content", [])
+            if not isinstance(content, list):
+                continue
+
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    tool_name = block.get("name", "unknown")
+                    tool_counts[tool_name] += 1
+
+        return dict(tool_counts)
+
+    def _count_tokens(self, entries: list[dict[str, Any]]) -> int:
+        """Count total tokens from log entries."""
+        total = 0
+        for entry in entries:
+            usage = entry.get("usage", {})
+            total += usage.get("input_tokens", 0)
+            total += usage.get("output_tokens", 0)
+        return total
+
+    def _count_turns(self, entries: list[dict[str, Any]]) -> int:
+        """Count conversation turns."""
+        turns = 0
+        for entry in entries:
+            if entry.get("role") == "assistant":
+                turns += 1
+        return turns
+
+
+def compare_sessions(
+    log_a: str | Path,
+    log_b: str | Path,
+    agent_a: str = "Claude Code",
+    agent_b: str = "Gemini CLI",
+) -> SessionComparison:
+    """Compare two session logs from different agents.
+
+    Args:
+        log_a: Path to first session log (JSONL)
+        log_b: Path to second session log (JSONL)
+        agent_a: Name of first agent
+        agent_b: Name of second agent
+
+    Returns:
+        SessionComparison with comparison metrics
+
+    Example:
+        >>> comparison = compare_sessions(
+        ...     "claude_session.jsonl",
+        ...     "gemini_session.jsonl"
+        ... )
+        >>> print(comparison.to_markdown())
+    """
+    comparer = SessionComparer(
+        Path(log_a),
+        Path(log_b),
+        agent_a=agent_a,
+        agent_b=agent_b,
+    )
+    return comparer.compare()

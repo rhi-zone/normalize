@@ -80,6 +80,8 @@ class LoopConfig:
     temperature: float = 0.0
     system_prompt: str = ""
     mock: bool = False
+    memory_budget_mb: int | None = None  # Max memory usage (MB) before eviction
+    max_turn_history: int = 20  # Max turns to keep in history
 
 
 @dataclass
@@ -978,6 +980,24 @@ Do NOT repeat the same command. Never output prose."""
                         duration_ms=duration,
                     )
                 )
+
+                # Evict old turns to bound memory
+                if len(self._turns) > self.config.max_turn_history:
+                    self._turns = self._turns[-self.config.max_turn_history :]
+
+                # Memory budget enforcement
+                if self.config.memory_budget_mb:
+                    try:
+                        import psutil
+
+                        process = psutil.Process()
+                        mem_mb = process.memory_info().rss / (1024 * 1024)
+                        if mem_mb > self.config.memory_budget_mb:
+                            # Aggressively evict: keep only last 5 turns
+                            if len(self._turns) > 5:
+                                self._turns = self._turns[-5:]
+                    except ImportError:
+                        pass
 
             # Max turns reached
             total_duration = int((datetime.now(UTC) - start_time).total_seconds() * 1000)

@@ -42,6 +42,7 @@ from moss.synthesis.plugins.protocols import (
 )
 
 if TYPE_CHECKING:
+    from moss.synthesis.config import BruteForceConfig
     from moss.synthesis.types import Context, Specification
 
 
@@ -533,6 +534,7 @@ class LLMGeneratorConfig:
     stop_sequences: list[str] = field(default_factory=list)
     max_retries: int = 2
     budget_usd: float | None = None  # Maximum spend per generation
+    brute_force: BruteForceConfig | None = None  # Voting mode for small models
 
 
 class LLMGenerator:
@@ -686,6 +688,180 @@ class LLMGenerator:
         # Return as-is if no extraction worked
         return content.strip()
 
+    async def _generate_single_sample(
+        self,
+        messages: list[dict[str, str]],
+        timeout: float,
+        stop: list[str] | None,
+        temperature: float,
+    ) -> tuple[str | None, LLMResponse | None, str | None]:
+        """Generate a single sample. Returns (code, response, error)."""
+        try:
+            response = await asyncio.wait_for(
+                self._provider.generate(
+                    messages,
+                    max_tokens=self._config.max_tokens,
+                    temperature=temperature,
+                    stop=stop if stop else None,
+                ),
+                timeout=timeout,
+            )
+            code = self._extract_code(response.content)
+            return code, response, None
+        except TimeoutError:
+            return None, None, f"Timed out after {timeout}s"
+        except Exception as e:
+            return None, None, str(e)
+
+    def _vote_on_samples(
+        self,
+        samples: list[str],
+        strategy: str,
+        require_consensus: float = 0.6,
+    ) -> str | None:
+        """Vote on multiple samples to select the best one.
+
+        Args:
+            samples: List of generated code samples
+            strategy: "majority", "first_valid", or "consensus"
+            require_consensus: Minimum agreement ratio for consensus strategy
+
+        Returns:
+            Selected code or None if no agreement
+        """
+        if not samples:
+            return None
+
+        if strategy == "first_valid":
+            return samples[0]
+
+        # Count occurrences of each unique sample
+        from collections import Counter
+
+        counts = Counter(samples)
+        most_common = counts.most_common()
+
+        if strategy == "majority":
+            # Return most common, even with just 1 vote
+            return most_common[0][0]
+
+        if strategy == "consensus":
+            # Require minimum agreement
+            top_sample, top_count = most_common[0]
+            if top_count / len(samples) >= require_consensus:
+                return top_sample
+            return None
+
+        # Fallback: return most common
+        return most_common[0][0]
+
+    async def _generate_with_voting(
+        self,
+        spec: Specification,
+        context: Context,
+        hints: GenerationHints | None,
+    ) -> GenerationResult:
+        """Generate code using brute-force voting mode.
+
+        Generates multiple samples in parallel and votes on the best one.
+        """
+        bf = self._config.brute_force
+        if bf is None:
+            raise ValueError("Brute force config not set")
+
+        messages = self._build_prompt(spec, context, hints)
+        stop = self._config.stop_sequences.copy()
+        timeout = hints.timeout_ms / 1000 if hints and hints.timeout_ms else 30.0
+
+        # Generate samples
+        if bf.parallel:
+            # Parallel generation
+            tasks = [
+                self._generate_single_sample(messages, timeout, stop, bf.temperature)
+                for _ in range(bf.n_samples)
+            ]
+            results = await asyncio.gather(*tasks)
+        else:
+            # Sequential generation
+            results = []
+            for _ in range(bf.n_samples):
+                result = await self._generate_single_sample(messages, timeout, stop, bf.temperature)
+                results.append(result)
+
+        # Collect successful samples and responses
+        samples = []
+        responses = []
+        errors = []
+        for code, response, error in results:
+            if code is not None and response is not None:
+                samples.append(code)
+                responses.append(response)
+            elif error:
+                errors.append(error)
+
+        if not samples:
+            return GenerationResult(
+                success=False,
+                error=f"All {bf.n_samples} samples failed: {errors[:3]}",
+                metadata={"attempts": bf.n_samples, "mode": "brute_force"},
+            )
+
+        # Vote on samples
+        selected = self._vote_on_samples(samples, bf.voting_strategy, bf.require_consensus)
+
+        if selected is None and bf.fallback_to_best:
+            # Fallback: use first sample
+            selected = samples[0]
+
+        if selected is None:
+            return GenerationResult(
+                success=False,
+                error=f"No consensus reached (strategy={bf.voting_strategy})",
+                metadata={
+                    "samples": len(samples),
+                    "unique": len(set(samples)),
+                    "mode": "brute_force",
+                },
+            )
+
+        # Calculate total cost from all responses
+        total_cost = 0.0
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        for resp in responses:
+            cost = LLMCostEstimate.from_model(
+                resp.model, resp.usage.prompt_tokens, resp.usage.completion_tokens
+            )
+            total_cost += cost.estimated_cost_usd
+            total_prompt_tokens += resp.usage.prompt_tokens
+            total_completion_tokens += resp.usage.completion_tokens
+
+        self._total_cost_usd += total_cost
+
+        # Count how many samples matched the selected code
+        agreement = samples.count(selected) / len(samples)
+
+        return GenerationResult(
+            success=True,
+            code=selected,
+            confidence=min(0.9, 0.5 + agreement * 0.4),  # Higher agreement = higher confidence
+            metadata={
+                "source": "llm",
+                "mode": "brute_force",
+                "model": responses[0].model if responses else "unknown",
+                "n_samples": bf.n_samples,
+                "successful_samples": len(samples),
+                "unique_samples": len(set(samples)),
+                "agreement": agreement,
+                "voting_strategy": bf.voting_strategy,
+                "usage": {
+                    "prompt_tokens": total_prompt_tokens,
+                    "completion_tokens": total_completion_tokens,
+                },
+                "cost_usd": total_cost,
+            },
+        )
+
     async def generate(
         self,
         spec: Specification,
@@ -702,6 +878,10 @@ class LLMGenerator:
         Returns:
             GenerationResult with generated code
         """
+        # Use brute-force voting mode if enabled
+        if self._config.brute_force and self._config.brute_force.enabled:
+            return await self._generate_with_voting(spec, context, hints)
+
         # Build prompt
         messages = self._build_prompt(spec, context, hints)
 
