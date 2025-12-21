@@ -11,7 +11,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Fix unicode path resolution in Rust CLI
   - `view /tmp/日本語/テスト.py` returns "No matches" despite file existing
   - Likely issue with path normalization or index lookup
-- [ ] Implement `find` and `edit` primitives to complete the 4-tool set
+- [x] Implement `find` and `edit` primitives to complete the 4-tool set
+  - `view` now has `--type`, `--calls`, `--called-by` filters (find unified into view)
+  - `edit` command with `--delete`, `--replace`, `--before`, `--after`, `--prepend`, `--append`, `--move-*`, `--swap`
 - [ ] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
 - [ ] Clean up broken Python tests (test_cli.py, test_synthesis.py import errors)
 
@@ -55,10 +57,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Normalize all to canonical `/` form internally
 - [x] Depth-based expansion: `--depth 1` (default), `--depth 2`, `--all`
 - [x] `view [path]` - see node (skeleton, source, tree) with `--deps`
-- [ ] Remaining primitives:
-  - `find [query]` - search with composable filters `--type`, `--calls`, `--called-by`
-  - `edit <path>` - modify node with `--insert`, `--replace`, `--delete`
-  - `analyze [path]` - compute properties with `--health`, `--complexity`, `--security`
+- [x] `view` with filters: `--type`, `--calls`, `--called-by` (find unified into view)
+- [x] `edit <path>` - modify node with `--delete`, `--replace`, `--before`, `--after`, `--prepend`, `--append`, `--move-*`, `--swap`
+- [ ] `analyze [path]` - compute properties with `--health`, `--complexity`, `--security`
 
 **Phase 3: Simplify tool interface** (partially complete)
 - [x] Remove DWIM embedding system (fastembed/bge-small-en dependency removed)

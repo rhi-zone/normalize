@@ -4,6 +4,20 @@
 
 ### Features
 
+**View Filters & Edit Command** (Dec 21 2025)
+- Extended `view` command with filtering: `--type class`, `--type function`, `--type method`
+- Caller/callee integration: `view resolve_tool --calls`, `view resolve_tool --called-by`
+- New `edit` command for structural code modification:
+  - `--delete`: Remove a symbol entirely
+  - `--replace "code"`: Replace symbol with new code
+  - `--before "code"` / `--after "code"`: Insert sibling before/after
+  - `--prepend "code"` / `--append "code"`: File-level insert at top/bottom
+  - `--move-before X` / `--move-after X`: Relocate symbol
+  - `--swap X`: Exchange two symbols
+  - `--dry-run`: Preview changes without applying
+- Find functionality unified into view (no separate find command needed)
+- See `docs/primitives-spec.md` for full specification
+
 **Unified Tree Model & Simplified DWIM** (Dec 21 2025)
 - `Unified path addressing`: `src/main.py/Foo/bar` resolves file + symbol
 - Multiple separator support: `/`, `::`, `#`, `:` all normalize to canonical `/`
