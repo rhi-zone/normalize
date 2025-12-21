@@ -83,7 +83,11 @@ Uniform addressing with `/` everywhere:
 - `src/main.py/Foo/bar` - method `bar` in class `Foo` in file `main.py`
 - Resolution uses filesystem as source of truth: check if each segment is file or directory
 - No ambiguity: can't have file and directory with same name in same location
-- Also accept `::` syntax for familiarity: `src/main.py::Foo.bar` normalizes to the same path
+- Accept multiple separators for familiarity, normalize internally:
+  - `/` (canonical): `src/main.py/Foo/bar`
+  - `::` (Rust-style): `src/main.py::Foo::bar`
+  - `:` (compact): `src/main.py:Foo.bar`
+  - `#` (URL fragment): `src/main.py#Foo.bar`
 
 Same primitives work at every level.
 

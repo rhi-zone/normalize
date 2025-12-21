@@ -48,7 +48,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Merge filesystem + AST into single tree data structure
 - [ ] Uniform node addressing with `/`: `src/main.py/Foo/bar`
   - Filesystem is source of truth for file vs directory boundary
-  - Also accept `::` syntax, normalize internally
+  - Accept multiple separators (already in Rust): `/`, `::`, `:`, `#`
+  - Normalize all to canonical `/` form internally
 - [ ] Depth-based expansion: `--depth 1` (default), `--depth 2`, `--all`
 - [ ] Four primitives replacing 100+ tools:
   - `view [path]` - see node (skeleton, source, tree) with `--deps`, `--summary`
