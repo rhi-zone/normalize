@@ -4,11 +4,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] Fix unicode path resolution in Rust CLI
-  - `view /tmp/日本語/テスト.py` returns "No matches" despite file existing
-  - Likely issue with path normalization or index lookup
 - [ ] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
-- [ ] Clean up broken Python tests (test_cli.py, test_synthesis.py import errors)
+  - ViewAPI (wraps Rust view command)
+  - EditAPI (existing, enhance to match Rust edit)
+  - AnalyzeAPI (combines health, complexity, security)
+  - SearchAPI (existing)
+- [ ] Add `analyze [path]` command to Rust CLI (--health, --complexity, --security)
 
 ## Active Backlog
 

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixes
+
+**Path Resolution & Test Fixes** (Dec 21 2025)
+- Fixed unicode and absolute path resolution in Rust CLI (`moss view /tmp/日本語/test.py` now works)
+- Updated `test_cli.py` to use subprocess for Rust passthrough commands (skeleton, anchors)
+- Fixed `test_synthesis.py` import: TFIDFIndex moved to moss.semantic_search
+- Updated synthesis router to use new TFIDFIndex interface
+
 ### Features
 
 **View Filters & Edit Command** (Dec 21 2025)
