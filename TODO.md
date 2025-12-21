@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Adaptive Loop Depth**: Dynamically adjust max steps based on progress rate
 - [ ] **Recursive Self-Optimization**: Loop that refines its own heuristics based on telemetry
 - [ ] **Context Elision Policies**: User-definable rules for eliding specific content types
+- [ ] **Shadow Git Merging**: Automatically resolve simple conflicts when merging experiments
 
 ## Recently Completed
+
+- **Adaptive Loop Depth** (Dec 2025):
+  - Added `adaptive_max_steps` option to `AgentLoop`
+  - Implemented dynamic step limit adjustment in `AgentLoopRunner`
+  - Extends loop length when task complexity remains high but progress is steady
 
 - **TUI Session Resume** (Dec 2025):
   - Added `SESSION` mode to TUI for managing past work units

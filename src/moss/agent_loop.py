@@ -130,6 +130,7 @@ class AgentLoop:
 
     # Resource limits
     max_steps: int = 10  # Total step executions (not loop passes)
+    adaptive_max_steps: bool = False  # Enable dynamic step limit adjustment
     token_budget: int | None = None
     adaptive_token_budget: bool = False  # Enable dynamic budget adjustment
     timeout_seconds: float | None = None
@@ -416,9 +417,12 @@ class AgentLoopRunner:
             iteration += 1
             metrics.iterations = iteration
 
-            # Adaptive Token Budgeting
-            if loop.adaptive_token_budget and loop.token_budget and iteration % 3 == 0:
-                await self._rebalance_budget(loop, context, metrics)
+            # Adaptive Resource Balancing
+            if iteration % 3 == 0:
+                if loop.adaptive_token_budget and loop.token_budget:
+                    await self._rebalance_budget(loop, context, metrics)
+                if loop.adaptive_max_steps:
+                    await self._rebalance_steps(loop, context, metrics)
 
             step = step_map.get(current_step_name)
             if not step:
@@ -606,11 +610,36 @@ class AgentLoopRunner:
             # If complexity low (< 3), decrease budget by 10%
             if complexity > 7 and loop.token_budget:
                 loop.token_budget = int(loop.token_budget * 1.2)
-            elif complexity < 3 and loop.token_budget:
+            if complexity < 3 and loop.token_budget:
                 loop.token_budget = int(loop.token_budget * 0.9)
 
         except Exception:
             # Fallback: do nothing if estimation fails
+            pass
+
+    async def _rebalance_steps(
+        self, loop: AgentLoop, context: LoopContext, metrics: LoopMetrics
+    ) -> None:
+        """Dynamically adjust max_steps based on progress and complexity."""
+        try:
+            # Re-use complexity estimation if available in context
+            # Or make a new call
+            comp_step = LoopStep("estimate", "llm.estimate_complexity", step_type=StepType.LLM)
+            output, t_in, t_out = await self.executor.execute(
+                "llm.estimate_complexity", context, comp_step
+            )
+            metrics.record_step("rebalance_steps", StepType.LLM, 0, t_in, t_out)
+
+            complexity = int(str(output).strip())
+
+            # If complexity still high (> 5) and progress is being made, extend max_steps
+            if complexity > 5:
+                loop.max_steps += 5  # Give it 5 more steps
+            elif complexity <= 1:
+                # Almost done, no need to extend
+                pass
+
+        except Exception:
             pass
 
 
