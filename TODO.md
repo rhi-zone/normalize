@@ -4,13 +4,26 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Agentic TUI UX**:
-  - Fluid mode switching (inspired by shift-tab in Claude Code)
-  - Avoid fixed modes; allow dynamic transitions between Plan/Read/Write states
-- [ ] **Workflow Loader Abstraction**: Extract `WorkflowLoader` protocol for Python workflows
-- [ ] **Adaptive Context Control**: Dynamically adjust context window based on task complexity
+- [ ] **Recursive Self-Improvement**: Implement loop that optimizes itself based on telemetry
+- [ ] **Cross-Language Reference Tracking**: Resolve references between Python and Rust components
+- [ ] **LLM Benchmarking Harness**: Automate model evaluation across standard tasks
 
 ## Recently Completed
+
+- **Adaptive Context Control** (Dec 2025):
+  - Implemented dynamic result preview limits in `DWIMLoop`
+  - Context size now adapts based on `TaskType` (larger for WRITE tasks)
+  - Improves token efficiency for exploratory tasks while providing depth for edits
+
+- **Agentic TUI UX** (Dec 2025):
+  - Implemented `AgentMode` (PLAN, READ, WRITE) with fluid mode switching
+  - Added `ModeIndicator` widget and `Tab` binding for cycling modes
+  - Dynamic input placeholders based on current mode
+
+- **Workflow Loader Abstraction** (Dec 2025):
+  - Extracted `WorkflowLoader` protocol for pluggable format support
+  - Refactored TOML loading into `TOMLWorkflowLoader`
+  - Implemented loader registry in `moss.workflows`
 
 - **Comprehensive Telemetry & Analysis** (Dec 2025):
   - Added `TelemetryAPI` for multi-session data analysis

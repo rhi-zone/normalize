@@ -9,6 +9,8 @@ Reference syntax:
 - @workflows/name -> loads workflow definition
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
@@ -34,8 +36,10 @@ class WorkflowContext:
 
     @classmethod
     def from_file(
-        cls, file_path: str | Path, project_root: Path | None = None
-    ) -> "WorkflowContext":
+        cls,
+        file_path: str | Path,
+        project_root: Path | None = None,
+    ) -> WorkflowContext:
         """Create context from a file path, detecting project characteristics."""
         from pathlib import Path as P
 
@@ -64,35 +68,6 @@ class WorkflowContext:
             has_tests=has_tests,
             language=language,
         )
-
-
-@runtime_checkable
-class WorkflowProtocol(Protocol):
-    """Protocol for workflow implementations.
-
-    Both TOML-loaded workflows and Python workflows implement this protocol.
-    The key method is build_steps() which can return static or dynamic steps.
-    """
-
-    name: str
-    description: str
-    limits: "WorkflowLimits"
-    llm: "WorkflowLLMConfig"
-
-    def build_steps(self, context: WorkflowContext | None = None) -> list["WorkflowStep"]:
-        """Build workflow steps, optionally using context for dynamic generation."""
-        ...
-
-
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib  # type: ignore[import-not-found]
-
-from moss.prompts import load_prompt  # noqa: E402
-
-# Package directory for built-in workflows
-_BUILTIN_DIR = Path(__file__).parent
 
 
 @dataclass
@@ -197,6 +172,144 @@ class Workflow:
         }
 
 
+@runtime_checkable
+class WorkflowProtocol(Protocol):
+    """Protocol for workflow implementations.
+
+    Both TOML-loaded workflows and Python workflows implement this protocol.
+    The key method is build_steps() which can return static or dynamic steps.
+    """
+
+    name: str
+    description: str
+    limits: WorkflowLimits
+    llm: WorkflowLLMConfig
+
+    def build_steps(self, context: WorkflowContext | None = None) -> list[WorkflowStep]:
+        """Build workflow steps, optionally using context for dynamic generation."""
+        ...
+
+
+@runtime_checkable
+class WorkflowLoader(Protocol):
+    """Protocol for loading workflows from different formats."""
+
+    def can_load(self, path: Path) -> bool:
+        """Check if this loader can handle the given path."""
+        ...
+
+    def load(
+        self,
+        name: str | Path,
+        project_root: Path,
+        loading_stack: set[str],
+    ) -> Workflow:
+        """Load a workflow from a name or path."""
+        ...
+
+
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore[import-not-found]
+
+from moss.prompts import load_prompt  # noqa: E402
+
+# Package directory for built-in workflows
+_BUILTIN_DIR = Path(__file__).parent
+
+
+class TOMLWorkflowLoader:
+    """Loader for TOML-based workflow definitions."""
+
+    def can_load(self, path: Path) -> bool:
+        return path.suffix == ".toml"
+
+    def load(
+        self,
+        name: str | Path,
+        project_root: Path,
+        loading_stack: set[str],
+    ) -> Workflow:
+        # Find workflow file
+        if isinstance(name, Path):
+            workflow_path = name
+        else:
+            # Check user override first
+            user_path = project_root / ".moss" / "workflows" / f"{name}.toml"
+            if user_path.exists():
+                workflow_path = user_path
+            else:
+                # Fall back to built-in
+                builtin_path = _BUILTIN_DIR / f"{name}.toml"
+                if builtin_path.exists():
+                    workflow_path = builtin_path
+                else:
+                    msg = (
+                        f"Workflow '{name}' not found. Searched:\n"
+                        f"  - {user_path}\n"
+                        f"  - {builtin_path}"
+                    )
+                    raise FileNotFoundError(msg)
+
+        # Parse TOML
+        content = workflow_path.read_text()
+        data = tomllib.loads(content)
+
+        # Resolve @references
+        data = _resolve_value(data, project_root, loading_stack)
+
+        # Extract workflow section
+        if "workflow" not in data:
+            raise ValueError(f"Workflow file missing [workflow] section: {workflow_path}")
+
+        wf_data = data["workflow"]
+
+        # Parse limits
+        limits = WorkflowLimits()
+        if "limits" in wf_data:
+            lim = wf_data["limits"]
+            limits = WorkflowLimits(
+                max_steps=lim.get("max_steps", 10),
+                token_budget=lim.get("token_budget", 50000),
+                timeout_seconds=lim.get("timeout_seconds", 300),
+            )
+
+        # Parse LLM config
+        llm = WorkflowLLMConfig()
+        if "llm" in wf_data:
+            llm_data = wf_data["llm"]
+            llm = WorkflowLLMConfig(
+                model=llm_data.get("model", "gemini/gemini-3-flash-preview"),
+                temperature=llm_data.get("temperature", 0.0),
+                system_prompt=llm_data.get("system_prompt"),
+            )
+
+        # Parse steps
+        steps = []
+        for step_data in wf_data.get("steps", []):
+            step = WorkflowStep(
+                name=step_data["name"],
+                tool=step_data["tool"],
+                type=step_data.get("type", "tool"),
+                input_from=step_data.get("input_from"),
+                parameters=step_data.get("parameters", {}),
+                prompt=step_data.get("prompt"),
+                on_error=step_data.get("on_error"),
+                max_retries=step_data.get("max_retries", 0),
+            )
+            steps.append(step)
+
+        return Workflow(
+            name=wf_data.get("name", workflow_path.stem),
+            description=wf_data.get("description", ""),
+            version=wf_data.get("version", "1.0"),
+            limits=limits,
+            llm=llm,
+            steps=steps,
+        )
+
+
 @dataclass
 class AgentDefinition:
     """Agent definition composing workflow with tools."""
@@ -287,6 +400,10 @@ def _resolve_value(value: Any, project_root: Path, loading_stack: set[str] | Non
     return value
 
 
+# Loader registry
+_LOADERS: list[WorkflowLoader] = [TOMLWorkflowLoader()]
+
+
 def load_workflow(
     name: str | Path,
     project_root: Path | None = None,
@@ -312,80 +429,21 @@ def load_workflow(
     if loading_stack is None:
         loading_stack = set()
 
-    # Find workflow file
-    if isinstance(name, Path):
-        workflow_path = name
-    else:
-        # Check user override first
-        user_path = project_root / ".moss" / "workflows" / f"{name}.toml"
-        if user_path.exists():
-            workflow_path = user_path
-        else:
-            # Fall back to built-in
-            builtin_path = _BUILTIN_DIR / f"{name}.toml"
-            if builtin_path.exists():
-                workflow_path = builtin_path
-            else:
-                raise FileNotFoundError(
-                    f"Workflow '{name}' not found. Searched:\n  - {user_path}\n  - {builtin_path}"
-                )
+    # Try each loader
+    # For now we only have TOML, but this allows for other formats
+    for loader in _LOADERS:
+        try:
+            # If name is a Path, check if loader can handle it
+            if isinstance(name, Path) and not loader.can_load(name):
+                continue
+            return loader.load(name, project_root, loading_stack)
+        except (FileNotFoundError, ValueError):
+            # Continue to next loader if not found or invalid for this loader
+            if len(_LOADERS) == 1:
+                raise
+            continue
 
-    # Parse TOML
-    content = workflow_path.read_text()
-    data = tomllib.loads(content)
-
-    # Resolve @references
-    data = _resolve_value(data, project_root, loading_stack)
-
-    # Extract workflow section
-    if "workflow" not in data:
-        raise ValueError(f"Workflow file missing [workflow] section: {workflow_path}")
-
-    wf_data = data["workflow"]
-
-    # Parse limits
-    limits = WorkflowLimits()
-    if "limits" in wf_data:
-        lim = wf_data["limits"]
-        limits = WorkflowLimits(
-            max_steps=lim.get("max_steps", 10),
-            token_budget=lim.get("token_budget", 50000),
-            timeout_seconds=lim.get("timeout_seconds", 300),
-        )
-
-    # Parse LLM config
-    llm = WorkflowLLMConfig()
-    if "llm" in wf_data:
-        llm_data = wf_data["llm"]
-        llm = WorkflowLLMConfig(
-            model=llm_data.get("model", "gemini/gemini-3-flash-preview"),
-            temperature=llm_data.get("temperature", 0.0),
-            system_prompt=llm_data.get("system_prompt"),
-        )
-
-    # Parse steps
-    steps = []
-    for step_data in wf_data.get("steps", []):
-        step = WorkflowStep(
-            name=step_data["name"],
-            tool=step_data["tool"],
-            type=step_data.get("type", "tool"),
-            input_from=step_data.get("input_from"),
-            parameters=step_data.get("parameters", {}),
-            prompt=step_data.get("prompt"),
-            on_error=step_data.get("on_error"),
-            max_retries=step_data.get("max_retries", 0),
-        )
-        steps.append(step)
-
-    return Workflow(
-        name=wf_data.get("name", workflow_path.stem),
-        description=wf_data.get("description", ""),
-        version=wf_data.get("version", "1.0"),
-        limits=limits,
-        llm=llm,
-        steps=steps,
-    )
+    raise FileNotFoundError(f"No loader found for workflow: {name}")
 
 
 def load_agent(name: str | Path, project_root: Path | None = None) -> AgentDefinition:
@@ -443,12 +501,12 @@ def load_agent(name: str | Path, project_root: Path | None = None) -> AgentDefin
             workflow = load_workflow(workflow_ref, project_root)
 
     # Parse tools config
-    tools = ag_data.get("tools", {})
+    tools = ag_data.get("tools", {{}})
     enabled = tools.get("enabled", [])
     disabled = tools.get("disabled", [])
 
     # Parse context config
-    context = ag_data.get("context", {})
+    context = ag_data.get("context", {{}})
 
     return AgentDefinition(
         name=ag_data.get("name", agent_path.stem),
@@ -515,7 +573,7 @@ def list_agents(project_root: Path | None = None) -> list[str]:
 def workflow_to_agent_loop(
     workflow: Workflow,
     context: WorkflowContext | None = None,
-) -> "AgentLoop":
+) -> AgentLoop:
     """Convert a Workflow to an executable AgentLoop.
 
     This bridges the declarative workflow format with the executable agent loop.
@@ -576,7 +634,7 @@ def workflow_to_agent_loop(
     )
 
 
-def workflow_to_llm_config(workflow: Workflow) -> "LLMConfig":
+def workflow_to_llm_config(workflow: Workflow) -> LLMConfig:
     """Convert workflow LLM config to LLMConfig for executor.
 
     Args:
@@ -598,7 +656,7 @@ async def run_workflow(
     name: str | Path,
     initial_input: Any = None,
     project_root: Path | None = None,
-) -> "LoopResult":
+) -> LoopResult:
     """Load and run a workflow by name.
 
     Convenience function that:

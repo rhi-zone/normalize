@@ -5,11 +5,13 @@ Uses Textual for a modern, reactive terminal experience.
 
 from __future__ import annotations
 
+from enum import Enum, auto
 from typing import TYPE_CHECKING, ClassVar
 
 try:
     from textual.app import App, ComposeResult
     from textual.containers import Container, Horizontal, Vertical
+    from textual.reactive import reactive
     from textual.widgets import Footer, Header, Input, Static, Tree
     from textual.widgets.tree import TreeNode
 except ImportError:
@@ -24,6 +26,29 @@ except ImportError:
 if TYPE_CHECKING:
     from moss.moss_api import MossAPI
     from moss.task_tree import TaskNode, TaskTree
+
+
+class AgentMode(Enum):
+    """Current operating mode of the agent UI."""
+
+    PLAN = auto()  # Planning next steps
+    READ = auto()  # Code exploration and search
+    WRITE = auto()  # Applying changes and refactoring
+
+
+class ModeIndicator(Static):
+    """Widget to display the current agent mode."""
+
+    mode = reactive(AgentMode.PLAN)
+
+    def render(self) -> str:
+        colors = {
+            AgentMode.PLAN: "blue",
+            AgentMode.READ: "green",
+            AgentMode.WRITE: "red",
+        }
+        color = colors.get(self.mode, "white")
+        return f"Mode: [{color} b]{self.mode.name}[/]"
 
 
 class TaskTreeWidget(Tree[str]):
@@ -84,12 +109,23 @@ class MossTUI(App):
         padding: 0 1;
         border-left: solid $accent;
     }
+
+    ModeIndicator {
+        background: $surface-lighten-1;
+        padding: 0 1;
+        text-align: center;
+        border: round $primary;
+        margin: 0 1;
+    }
     """
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("q", "quit", "Quit"),
         ("d", "toggle_dark", "Toggle Dark Mode"),
+        ("tab", "next_mode", "Next Mode"),
     ]
+
+    mode = reactive(AgentMode.PLAN)
 
     def __init__(self, api: MossAPI):
         super().__init__()
@@ -99,6 +135,7 @@ class MossTUI(App):
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Header(show_clock=True)
+        yield Horizontal(ModeIndicator(id="mode-indicator"), id="header-bar", height="auto")
         yield Container(
             Horizontal(
                 Vertical(
@@ -123,6 +160,25 @@ class MossTUI(App):
         self.sub_title = f"Project: {self.api.root.name}"
         self.query_one("#command-input").focus()
 
+    def watch_mode(self, mode: AgentMode) -> None:
+        """React to mode changes."""
+        self.query_one("#mode-indicator").mode = mode
+        # Update input placeholder based on mode
+        placeholders = {
+            AgentMode.PLAN: "What is the plan? (e.g. breakdown...)",
+            AgentMode.READ: "Explore codebase... (e.g. skeleton, grep, expand)",
+            AgentMode.WRITE: "Modify code... (e.g. write, replace, insert)",
+        }
+        self.query_one("#command-input").placeholder = placeholders.get(mode, "Enter command...")
+
+    def action_next_mode(self) -> None:
+        """Switch to the next mode."""
+        modes = list(AgentMode)
+        current_idx = modes.index(self.mode)
+        next_idx = (current_idx + 1) % len(modes)
+        self.mode = modes[next_idx]
+        self._log(f"Switched to {self.mode.name} mode")
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle command input."""
         command = event.value.strip()
@@ -130,7 +186,7 @@ class MossTUI(App):
             return
 
         self.query_one("#command-input").value = ""
-        self._log(f"Executing: {command}")
+        self._log(f"[{self.mode.name}] {command}")
 
         # TODO: Integrate with AgentLoop or DWIM
         if command == "exit":

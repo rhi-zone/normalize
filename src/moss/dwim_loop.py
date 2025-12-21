@@ -33,7 +33,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Max chars for result preview in context
-RESULT_PREVIEW_LIMIT = 500
+DEFAULT_RESULT_PREVIEW_LIMIT = 500
+MAX_RESULT_PREVIEW_LIMIT = 2000
 
 
 class LoopState(Enum):
@@ -449,6 +450,12 @@ IMPORTANT: When the requested info is in "Last result", say "done <summary>".
 For read-only tasks (show, explain, find), say "done" after getting the answer.
 Do NOT repeat the same command. Never output prose."""
 
+    def _get_adaptive_preview_limit(self) -> int:
+        """Determine preview limit based on task complexity/type."""
+        if self._task_type == TaskType.WRITE:
+            return MAX_RESULT_PREVIEW_LIMIT
+        return DEFAULT_RESULT_PREVIEW_LIMIT
+
     def _preview_result(self, result: str) -> tuple[str, str | None]:
         """Create preview of result, cache full if large.
 
@@ -457,12 +464,13 @@ Do NOT repeat the same command. Never output prose."""
         Returns:
             (preview_text, result_id or None)
         """
-        if len(result) <= RESULT_PREVIEW_LIMIT:
+        limit = self._get_adaptive_preview_limit()
+        if len(result) <= limit:
             return result, None
 
         # Store in ephemeral cache, get preview
         result_id = self._ephemeral_cache.store(result)
-        preview = self._ephemeral_cache.generate_preview(result, RESULT_PREVIEW_LIMIT)
+        preview = self._ephemeral_cache.generate_preview(result, limit)
         # Add result ID reference
         preview = preview.replace(
             "available via resource link",
