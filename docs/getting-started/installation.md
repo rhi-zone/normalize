@@ -4,24 +4,18 @@
 
 - Python 3.13+
 - Git
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-## Using Nix (Recommended)
-
-Moss uses Nix flakes for reproducible development environments:
+## Using uv (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/pterror/moss
 cd moss
 
-# Enter the development shell (automatic with direnv)
-nix develop
-
-# Or if using direnv
-direnv allow
+# Install dependencies
+uv sync --extra all --extra dev
 ```
-
-The Nix shell provides: Python 3.13, uv, ruff, ripgrep, and all dependencies.
 
 ## Using pip
 

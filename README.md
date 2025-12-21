@@ -427,11 +427,8 @@ generator = create_mock_generator()
 ## Development
 
 ```bash
-# Enter dev shell
-nix develop
-
-# Install dependencies
-uv sync --all-extras
+# Install dependencies (includes all extras)
+uv sync --extra all --extra dev
 
 # Run tests
 uv run pytest

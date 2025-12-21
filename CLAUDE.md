@@ -30,7 +30,6 @@ Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_promp
 Run `uv sync --extra all --extra dev` first. Many features require optional dependencies.
 
 ```bash
-nix develop                      # Enter dev shell
 uv sync --extra all --extra dev  # Install dependencies
 ```
 
