@@ -160,18 +160,26 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
-    /// View a file or symbol (shows content)
+    /// View a node in the codebase tree (directory, file, or symbol)
     View {
-        /// Target to view (file path or symbol name)
+        /// Target to view (path like src/main.py/Foo/bar)
         target: String,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long)]
         root: Option<PathBuf>,
 
+        /// Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
+        #[arg(short, long, default_value = "1")]
+        depth: i32,
+
         /// Show line numbers
         #[arg(short = 'n', long)]
         line_numbers: bool,
+
+        /// Show dependencies (imports/exports)
+        #[arg(long)]
+        deps: bool,
     },
 
     /// Search for files/symbols matching a pattern
@@ -466,8 +474,10 @@ fn main() {
         Commands::View {
             target,
             root,
+            depth,
             line_numbers,
-        } => cmd_view(&target, root.as_deref(), line_numbers, cli.json),
+            deps,
+        } => cmd_view(&target, root.as_deref(), depth, line_numbers, deps, cli.json),
         Commands::SearchTree { query, root, limit } => {
             cmd_search_tree(&query, root.as_deref(), limit, cli.json)
         }
@@ -641,48 +651,304 @@ fn cmd_path(query: &str, root: Option<&Path>, json: bool, profiler: &mut Profile
     0
 }
 
-fn cmd_view(target: &str, root: Option<&Path>, line_numbers: bool, json: bool) -> i32 {
+fn cmd_view(
+    target: &str,
+    root: Option<&Path>,
+    depth: i32,
+    line_numbers: bool,
+    show_deps: bool,
+    json: bool,
+) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Resolve the target to a file
-    let matches = path_resolve::resolve(target, &root);
-
-    if matches.is_empty() {
-        eprintln!("No matches for: {}", target);
-        return 1;
+    // Handle "." as current directory
+    if target == "." {
+        return cmd_view_directory(&root, &root, depth, json);
     }
 
-    // Take the first file match
-    let file_match = matches
-        .iter()
-        .find(|m| m.kind == "file")
-        .unwrap_or(&matches[0]);
+    // Use unified path resolution
+    let unified = match path_resolve::resolve_unified(target, &root) {
+        Some(u) => u,
+        None => {
+            eprintln!("No matches for: {}", target);
+            return 1;
+        }
+    };
 
-    let file_path = root.join(&file_match.path);
+    if unified.is_directory {
+        // View directory
+        cmd_view_directory(&root.join(&unified.file_path), &root, depth, json)
+    } else if unified.symbol_path.is_empty() {
+        // View file
+        cmd_view_file(&unified.file_path, &root, depth, line_numbers, show_deps, json)
+    } else {
+        // View symbol within file
+        cmd_view_symbol(
+            &unified.file_path,
+            &unified.symbol_path,
+            &root,
+            depth,
+            line_numbers,
+            json,
+        )
+    }
+}
 
-    match std::fs::read_to_string(&file_path) {
-        Ok(content) => {
+fn cmd_view_directory(dir: &Path, root: &Path, depth: i32, json: bool) -> i32 {
+    let effective_depth = if depth < 0 { None } else { Some(depth as usize) };
+    let result = tree::generate_tree(dir, effective_depth, false);
+
+    let rel_path = dir
+        .strip_prefix(root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| dir.to_string_lossy().to_string());
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "type": "directory",
+                "path": rel_path,
+                "file_count": result.file_count,
+                "dir_count": result.dir_count,
+                "tree": result.lines
+            })
+        );
+    } else {
+        for line in &result.lines {
+            println!("{}", line);
+        }
+        println!();
+        println!(
+            "{} directories, {} files",
+            result.dir_count, result.file_count
+        );
+    }
+    0
+}
+
+fn cmd_view_file(
+    file_path: &str,
+    root: &Path,
+    depth: i32,
+    line_numbers: bool,
+    show_deps: bool,
+    json: bool,
+) -> i32 {
+    let full_path = root.join(file_path);
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading {}: {}", file_path, e);
+            return 1;
+        }
+    };
+
+    // depth -1 or very high: show full content
+    // depth 0: just file info
+    // depth 1: skeleton (signatures)
+    // depth 2+: skeleton with more detail
+
+    if depth < 0 || depth > 2 {
+        // Full content view
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "type": "file",
+                    "path": file_path,
+                    "content": content
+                })
+            );
+        } else if line_numbers {
+            for (i, line) in content.lines().enumerate() {
+                println!("{:4} {}", i + 1, line);
+            }
+        } else {
+            print!("{}", content);
+        }
+        return 0;
+    }
+
+    // Skeleton view
+    let mut extractor = skeleton::SkeletonExtractor::new();
+    let skeleton_result = extractor.extract(&full_path, &content);
+
+    // Optionally get deps
+    let deps_result = if show_deps {
+        let mut deps_extractor = deps::DepsExtractor::new();
+        Some(deps_extractor.extract(&full_path, &content))
+    } else {
+        None
+    };
+
+    if json {
+        fn symbol_to_json(sym: &skeleton::SkeletonSymbol, include_children: bool) -> serde_json::Value {
+            let children = if include_children {
+                sym.children
+                    .iter()
+                    .map(|c| symbol_to_json(c, include_children))
+                    .collect::<Vec<_>>()
+            } else {
+                vec![]
+            };
+            serde_json::json!({
+                "name": sym.name,
+                "kind": sym.kind,
+                "signature": sym.signature,
+                "docstring": sym.docstring,
+                "start_line": sym.start_line,
+                "end_line": sym.end_line,
+                "children": children
+            })
+        }
+
+        let include_children = depth >= 2;
+        let symbols: Vec<_> = skeleton_result
+            .symbols
+            .iter()
+            .map(|s| symbol_to_json(s, include_children))
+            .collect();
+
+        let mut output = serde_json::json!({
+            "type": "file",
+            "path": file_path,
+            "line_count": content.lines().count(),
+            "symbols": symbols
+        });
+
+        if let Some(deps) = deps_result {
+            output["imports"] = serde_json::json!(deps.imports.iter().map(|i| {
+                serde_json::json!({
+                    "module": i.module,
+                    "names": i.names,
+                    "line": i.line
+                })
+            }).collect::<Vec<_>>());
+        }
+
+        println!("{}", output);
+    } else {
+        println!("# {}", file_path);
+        println!("Lines: {}", content.lines().count());
+
+        if let Some(deps) = deps_result {
+            if !deps.imports.is_empty() {
+                println!("\n## Imports");
+                for imp in &deps.imports {
+                    if imp.names.is_empty() {
+                        println!("  import {}", imp.module);
+                    } else {
+                        println!("  from {} import {}", imp.module, imp.names.join(", "));
+                    }
+                }
+            }
+        }
+
+        if depth >= 1 {
+            let formatted = skeleton_result.format(depth >= 2);
+            if !formatted.is_empty() {
+                println!("\n## Symbols");
+                println!("{}", formatted);
+            }
+        }
+    }
+    0
+}
+
+fn cmd_view_symbol(
+    file_path: &str,
+    symbol_path: &[String],
+    root: &Path,
+    depth: i32,
+    _line_numbers: bool,
+    json: bool,
+) -> i32 {
+    let full_path = root.join(file_path);
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading {}: {}", file_path, e);
+            return 1;
+        }
+    };
+
+    let mut parser = symbols::SymbolParser::new();
+    let symbol_name = symbol_path.last().unwrap();
+
+    // Try to find and extract the symbol
+    if let Some(source) = parser.extract_symbol_source(&full_path, &content, symbol_name) {
+        let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
+
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "type": "symbol",
+                    "path": full_symbol_path,
+                    "file": file_path,
+                    "symbol": symbol_name,
+                    "source": source
+                })
+            );
+        } else {
+            if depth >= 0 {
+                println!("# {}", full_symbol_path);
+            }
+            println!("{}", source);
+        }
+        0
+    } else {
+        // Try skeleton extraction for more context
+        let mut extractor = skeleton::SkeletonExtractor::new();
+        let skeleton_result = extractor.extract(&full_path, &content);
+
+        // Search for symbol in skeleton
+        fn find_symbol<'a>(
+            symbols: &'a [skeleton::SkeletonSymbol],
+            name: &str,
+        ) -> Option<&'a skeleton::SkeletonSymbol> {
+            for sym in symbols {
+                if sym.name == name {
+                    return Some(sym);
+                }
+                if let Some(found) = find_symbol(&sym.children, name) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        if let Some(sym) = find_symbol(&skeleton_result.symbols, symbol_name) {
+            let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
             if json {
                 println!(
                     "{}",
                     serde_json::json!({
-                        "path": file_match.path,
-                        "content": content
+                        "type": "symbol",
+                        "path": full_symbol_path,
+                        "name": sym.name,
+                        "kind": sym.kind,
+                        "signature": sym.signature,
+                        "docstring": sym.docstring,
+                        "start_line": sym.start_line,
+                        "end_line": sym.end_line
                     })
                 );
-            } else if line_numbers {
-                for (i, line) in content.lines().enumerate() {
-                    println!("{:4} {}", i + 1, line);
-                }
             } else {
-                print!("{}", content);
+                println!("# {} ({})", full_symbol_path, sym.kind);
+                if !sym.signature.is_empty() {
+                    println!("{}", sym.signature);
+                }
+                if let Some(doc) = &sym.docstring {
+                    println!("\n{}", doc);
+                }
             }
             0
-        }
-        Err(e) => {
-            eprintln!("Error reading {}: {}", file_match.path, e);
+        } else {
+            eprintln!("Symbol not found: {}", symbol_name);
             1
         }
     }
