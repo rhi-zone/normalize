@@ -141,6 +141,16 @@ class MemoryConfig:
 
 
 @dataclass
+class ContextConfig:
+    """Configuration for context elision and pruning."""
+
+    elision_patterns: list[str] = field(default_factory=list)
+    snippet_threshold: int = 1000  # Chars before snippet mode kicks in
+    max_snippet_lines: int = 50
+    preserve_anchors: bool = True
+
+
+@dataclass
 class MossConfig:
     """Main configuration for Moss.
 
@@ -157,6 +167,7 @@ class MossConfig:
     policies: PolicyConfig = field(default_factory=PolicyConfig)
     loop: LoopConfigWrapper = field(default_factory=LoopConfigWrapper)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
+    context: ContextConfig = field(default_factory=ContextConfig)
 
     # View providers
     view_providers: list[ViewProvider] = field(default_factory=list)

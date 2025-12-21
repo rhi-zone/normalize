@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Context Elision Policies**: User-definable rules for eliding specific content types
 - [ ] **Shadow Git Merging**: Automatically resolve simple conflicts when merging experiments
 - [ ] **Agentic Prompt Evolution**: Automatically refine turn-level system prompts based on feedback
+- [ ] **TUI Git Dashboard**: Integrated view for all shadow branches and their diffs
 
 ## Recently Completed
+
+- **Context Elision Policies** (Dec 2025):
+  - Added `ContextConfig` to `MossConfig` for user-definable elision rules
+  - Supported `elision_patterns` and `snippet_threshold` in `moss.toml`
+  - Integrated TOML parsing and generation for the `[context]` section
 
 - **Recursive Self-Optimization** (Dec 2025):
   - Implemented `heuristic_optimizer_loop` to refine structural guardrails

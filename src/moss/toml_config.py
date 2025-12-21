@@ -213,6 +213,18 @@ def _build_config_from_dict(data: dict[str, Any], project_root: Path) -> MossCon
         if "patterns" in memory:
             config.memory.patterns = memory["patterns"]
 
+    # Context settings
+    if "context" in data:
+        context = data["context"]
+        if "elision_patterns" in context:
+            config.context.elision_patterns = context["elision_patterns"]
+        if "snippet_threshold" in context:
+            config.context.snippet_threshold = context["snippet_threshold"]
+        if "max_snippet_lines" in context:
+            config.context.max_snippet_lines = context["max_snippet_lines"]
+        if "preserve_anchors" in context:
+            config.context.preserve_anchors = context["preserve_anchors"]
+
     # Static context paths
     if "static_context" in data:
         for path_str in data["static_context"]:
@@ -411,6 +423,16 @@ def config_to_toml(config: MossConfig) -> str:
                 lines.append(f'"{pattern}" = [{actions_str}]')
             else:
                 lines.append(f'"{pattern}" = "{action}"')
+    lines.append("")
+
+    # Context section
+    lines.append("[context]")
+    if config.context.elision_patterns:
+        patterns_str = ", ".join(f'"{p}"' for p in config.context.elision_patterns)
+        lines.append(f"elision_patterns = [{patterns_str}]")
+    lines.append(f"snippet_threshold = {config.context.snippet_threshold}")
+    lines.append(f"max_snippet_lines = {config.context.max_snippet_lines}")
+    lines.append(f"preserve_anchors = {str(config.context.preserve_anchors).lower()}")
     lines.append("")
 
     # Static context
