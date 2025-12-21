@@ -62,20 +62,104 @@ moss synthesize "Add numbers" --json | jq .code
 moss synthesize "Complex task" --preset research
 ```
 
-## moss edit
-
-Apply structural edits to code (coming soon).
-
-```bash
-moss edit <file> <instruction>
-```
-
 ## moss view
 
-Extract structural views from code (coming soon).
+View codebase nodes: directories, files, or symbols.
 
 ```bash
-moss view <file> [--skeleton|--cfg|--deps]
+moss view [target] [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--depth`, `-d` | Expansion depth (0=names, 1=signatures, 2=children) |
+| `--deps` | Show dependencies (imports/exports) |
+| `--calls` | Show callers of target |
+| `--called-by` | Show what target calls |
+| `--type` | Filter by symbol type (class, function, method) |
+| `--all` | Full depth expansion |
+
+### Examples
+
+```bash
+# Show project tree
+moss view
+
+# View file skeleton (fuzzy paths work)
+moss view dwim.py
+
+# View specific symbol
+moss view dwim.py/resolve_core_primitive
+
+# View with dependencies
+moss view src/moss/cli.py --deps
+
+# Find callers
+moss view --calls my_function
+```
+
+## moss edit
+
+Structural code modifications.
+
+```bash
+moss edit <target> [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--delete` | Remove the target node |
+| `--replace` | Replace with new content |
+| `--before` | Insert before target |
+| `--after` | Insert after target |
+| `--prepend` | Add to start of container |
+| `--append` | Add to end of container |
+| `--dry-run` | Preview without applying |
+
+### Examples
+
+```bash
+# Delete a function
+moss edit src/foo.py/old_func --delete
+
+# Replace a class
+moss edit src/foo.py/MyClass --replace "class MyClass: pass"
+
+# Add import at top
+moss edit src/foo.py --prepend "import logging"
+```
+
+## moss analyze
+
+Analyze codebase health, complexity, and security.
+
+```bash
+moss analyze [target] [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--health` | Codebase health metrics |
+| `--complexity` | Cyclomatic complexity per function |
+| `--security` | Security vulnerability scanning |
+
+### Examples
+
+```bash
+# Full analysis
+moss analyze
+
+# Just complexity
+moss analyze --complexity
+
+# Analyze specific file
+moss analyze src/moss/cli.py --security
 ```
 
 ## moss summarize
@@ -190,37 +274,16 @@ moss check-todos --json | jq .stats
 
 ## moss health
 
+**Deprecated**: Use `moss analyze --health` instead.
+
 Show project health and what needs attention.
 
 ```bash
 moss health [directory] [options]
 ```
 
-### What it shows
-
-- **Health score**: Overall project health (0-100) with letter grade
-- **Overview stats**: Code size, documentation coverage, TODO completion
-- **Next actions**: Pending TODOs prioritized from TODO.md
-- **Weak spots**: Areas needing attention (low doc coverage, orphaned TODOs)
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--json`, `-j` | Output as JSON |
-
-### Examples
-
-```bash
-# Check current project health
-moss health
-
-# Check specific project
-moss health ~/projects/myapp
-
-# Get JSON for scripting
-moss health --json | jq .health.grade
-```
+Note: This command is deprecated. Prefer `moss analyze --health` for consistency
+with the 3 primitives (view, edit, analyze).
 
 ## Environment Variables
 
