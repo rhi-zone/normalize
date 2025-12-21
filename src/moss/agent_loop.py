@@ -1980,7 +1980,7 @@ class LLMConfig:
     """Configuration for LLM calls via litellm.
 
     Uses litellm's unified interface for all providers. Model names follow
-    litellm conventions (e.g., "gemini/gemini-2.0-flash", "gpt-4o").
+    litellm conventions (e.g., "gemini/gemini-3-flash-preview", "gpt-4o").
 
     Attributes:
         model: Primary model name (used if models is empty)
@@ -2089,7 +2089,7 @@ class LLMToolExecutor:
         - Record episodes for future learning
 
     Example:
-        config = LLMConfig(model="gemini/gemini-2.0-flash")
+        config = LLMConfig(model="gemini/gemini-3-flash-preview")
         memory = create_memory_manager()
         executor = LLMToolExecutor(config, memory=memory)
 

@@ -9,7 +9,7 @@ token_budget = 50000
 timeout_seconds = 300
 
 [workflow.llm]
-model = "gemini/gemini-2.5-flash-preview-05-20"
+model = "gemini/gemini-3-flash-preview"
 temperature = 0.0
 system_prompt = "@prompts/vanilla"
 

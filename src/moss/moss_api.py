@@ -3621,7 +3621,7 @@ class AgentAPI:
     async def run_vanilla(
         self,
         task: str,
-        model: str = "gemini/gemini-2.0-flash",
+        model: str = "gemini/gemini-3-flash-preview",
         max_turns: int = 20,
     ) -> Any:
         """Run a minimal vanilla agent loop on a task.

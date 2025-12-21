@@ -63,7 +63,7 @@
                     "type": "integer"
                   },
                   "model": {
-                    "default": "gemini/gemini-2.0-flash",
+                    "default": "gemini/gemini-3-flash-preview",
                     "description": "LLM model to use",
                     "type": "string"
                   },

@@ -4095,7 +4095,7 @@ def cmd_agent(args: Namespace) -> int:
                 output.info("No specific tools matched. Agent would use LLM guidance.")
 
         output.info("")
-        output.info(f"Would run with model: {model or 'gemini/gemini-2.0-flash'}")
+        output.info(f"Would run with model: {model or 'gemini/gemini-3-flash-preview'}")
         output.info(f"Max turns: {max_turns}")
         return 0
 
@@ -6290,7 +6290,7 @@ def create_parser() -> argparse.ArgumentParser:
     agent_parser.add_argument(
         "--model",
         "-m",
-        help="LLM model to use (default: gemini/gemini-2.5-flash-preview-05-20)",
+        help="LLM model to use (default: gemini/gemini-3-flash-preview)",
     )
     agent_parser.add_argument(
         "--max-turns",

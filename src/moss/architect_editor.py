@@ -236,7 +236,7 @@ class LLMArchitect:
 
     def __init__(
         self,
-        model: str = "gemini/gemini-2.0-flash",
+        model: str = "gemini/gemini-3-flash-preview",
         temperature: float = 0.0,
         mock: bool = False,
     ):
@@ -815,7 +815,7 @@ class ArchitectEditorLoop:
 async def run_architect_editor(
     task: str,
     file_path: str,
-    model: str = "gemini/gemini-2.0-flash",
+    model: str = "gemini/gemini-3-flash-preview",
     mock: bool = False,
 ) -> LoopResult:
     """Convenience function to run the Architect/Editor loop.

@@ -4,6 +4,14 @@
 
 ### Features
 
+**CLI Consolidation & Model Update** (Dec 22 2025)
+- Updated default model to `gemini-3-flash-preview` across all components
+- Expanded Rust CLI passthrough: cfg, complexity, context, deps, grep, health, overview
+- Fixed CORE_PRIMITIVES: 4 → 3 (search folded into view via aliases)
+- Updated vanilla prompt to use 3 primitives (view, edit, analyze)
+- Redesigned TODO.md: merged dogfooding + CLI cleanup into single focus area
+- Added --verbose flag to workflow runs for debugging LLM outputs
+
 **Telemetry Command & Design Philosophy Update** (Dec 22 2025)
 - New `moss telemetry` command for session analysis:
   - Default: aggregate stats across all moss sessions
