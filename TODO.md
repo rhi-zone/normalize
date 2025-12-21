@@ -7,9 +7,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Add failure mode tests: Rust binary missing, invalid paths, malformed files
 - [ ] Ensure all failure modes have informative error messages
 - [ ] Phase 2: Start unified tree model design (merge filesystem + AST)
-- [ ] Clean up unused Python fallback code in other commands
 
 ## Recently Completed
+
+- **Session Dec 21 2025 (cleanup)**:
+  - Removed ~900 lines of dead Python code from cli.py and rust_shim.py
+  - Added `passthrough()` to bypass Python argparse for Rust-delegated commands
+  - Passthrough commands: tree, view, search-tree, expand, callers, callees, anchors, skeleton, path
+  - No more double-parsing: CLI args go directly to Rust CLI
+  - Moved heuristic-based symbol args to Rust (normalize_symbol_args)
+  - Supports flexible formats: `symbol`, `file:symbol`, `file::symbol`, `file#symbol`, `file symbol`, `symbol file`
 
 - **Session Dec 21 2025 (later)**:
   - Completed Rust delegation for anchors/tree commands

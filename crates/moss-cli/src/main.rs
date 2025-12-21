@@ -63,6 +63,75 @@ impl Profiler {
     }
 }
 
+/// Detect if a string looks like a file path
+fn looks_like_file(s: &str) -> bool {
+    // Contains path separator
+    if s.contains('/') {
+        return true;
+    }
+    // Has file extension (dot followed by 1-10 alphanumeric chars at end)
+    if let Some(idx) = s.rfind('.') {
+        let ext = &s[idx + 1..];
+        if !ext.is_empty() && ext.len() <= 10 && ext.chars().all(|c| c.is_alphanumeric()) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Try to parse file and symbol from a single string
+/// Supports separators: :, ::, #
+fn parse_file_symbol_string(s: &str) -> Option<(String, String)> {
+    // Try various separators: #, ::, :
+    for sep in ["#", "::", ":"] {
+        if let Some(idx) = s.find(sep) {
+            let (file, rest) = s.split_at(idx);
+            let symbol = &rest[sep.len()..];
+            if !file.is_empty() && !symbol.is_empty() && looks_like_file(file) {
+                return Some((symbol.to_string(), file.to_string()));
+            }
+        }
+    }
+    None
+}
+
+/// Normalize flexible symbol arguments to (symbol, optional_file)
+/// Supports:
+/// - ["symbol"] -> ("symbol", None)
+/// - ["file:symbol"], ["file::symbol"], ["file#symbol"] -> ("symbol", Some("file"))
+/// - ["file", "symbol"] -> ("symbol", Some("file"))
+/// - ["symbol", "file"] -> ("symbol", Some("file"))
+fn normalize_symbol_args(args: &[String]) -> (String, Option<String>) {
+    match args.len() {
+        0 => (String::new(), None),
+        1 => {
+            let arg = &args[0];
+            // Try to parse file:symbol, file::symbol, or file#symbol
+            if let Some((symbol, file)) = parse_file_symbol_string(arg) {
+                return (symbol, Some(file));
+            }
+            (arg.clone(), None)
+        }
+        _ => {
+            let (a, b) = (&args[0], &args[1]);
+            let a_is_file = looks_like_file(a);
+            let b_is_file = looks_like_file(b);
+
+            if a_is_file && !b_is_file {
+                (b.clone(), Some(a.clone()))
+            } else if b_is_file && !a_is_file {
+                (a.clone(), Some(b.clone()))
+            } else if a_is_file && b_is_file {
+                // Both look like files, use first as file, second as symbol
+                (b.clone(), Some(a.clone()))
+            } else {
+                // Neither looks like file, first is symbol, second is scope hint
+                (a.clone(), Some(b.clone()))
+            }
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "moss")]
 #[command(about = "Fast code intelligence CLI")]
@@ -132,12 +201,9 @@ enum Commands {
 
     /// Show full source of a symbol
     Expand {
-        /// Symbol to expand (function, class, or method name)
-        symbol: String,
-
-        /// File to search in (optional, will search all files if not provided)
-        #[arg(short, long)]
-        file: Option<String>,
+        /// Symbol and optional file (supports: "symbol", "file:symbol", "file symbol", "symbol file")
+        #[arg(required = true)]
+        args: Vec<String>,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long)]
@@ -156,12 +222,9 @@ enum Commands {
 
     /// Find what a symbol calls
     Callees {
-        /// Symbol name to analyze
-        symbol: String,
-
-        /// File containing the symbol (optional - will search if not provided)
-        #[arg(short, long)]
-        file: Option<String>,
+        /// Symbol and optional file (supports: "symbol", "file:symbol", "file symbol", "symbol file")
+        #[arg(required = true)]
+        args: Vec<String>,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long)]
@@ -170,8 +233,9 @@ enum Commands {
 
     /// Find symbols that call a given symbol
     Callers {
-        /// Symbol name to find callers for
-        symbol: String,
+        /// Symbol and optional file (supports: "symbol", "file:symbol", "file symbol", "symbol file")
+        #[arg(required = true)]
+        args: Vec<String>,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long)]
@@ -390,32 +454,6 @@ enum DaemonAction {
     Start,
 }
 
-/// Parse file:symbol, file::symbol, or file#symbol syntax
-/// Returns (file, symbol) where file is Some if separator found
-fn parse_file_symbol(input: &str, explicit_file: Option<String>) -> (Option<String>, String) {
-    // If explicit file provided, use it
-    if explicit_file.is_some() {
-        return (explicit_file, input.to_string());
-    }
-
-    // Try various separators: #, ::, :
-    for sep in &['#', ':'] {
-        if let Some(idx) = input.find(*sep) {
-            let (file_part, sym_part) = input.split_at(idx);
-            if !file_part.is_empty() {
-                // Handle :: (skip first char)
-                let sym = sym_part.trim_start_matches(*sep);
-                if !sym.is_empty() {
-                    return (Some(file_part.to_string()), sym.to_string());
-                }
-            }
-        }
-    }
-
-    // No separator - just symbol
-    (None, input.to_string())
-}
-
 fn main() {
     let cli = Cli::parse();
     let mut profiler = Profiler::new(cli.profile);
@@ -434,23 +472,19 @@ fn main() {
             cmd_search_tree(&query, root.as_deref(), limit, cli.json)
         }
         Commands::Reindex { root, call_graph } => cmd_reindex(root.as_deref(), call_graph),
-        Commands::Expand { symbol, file, root } => {
+        Commands::Expand { args, root } => {
+            let (symbol, file) = normalize_symbol_args(&args);
             cmd_expand(&symbol, file.as_deref(), root.as_deref(), cli.json)
         }
         Commands::Symbols { file, root } => {
             cmd_symbols(&file, root.as_deref(), cli.json, &mut profiler)
         }
-        Commands::Callees { symbol, file, root } => {
-            // Support file:symbol, file::symbol, or file#symbol syntax
-            let (actual_file, actual_symbol) = parse_file_symbol(&symbol, file);
-            cmd_callees(
-                &actual_symbol,
-                actual_file.as_deref(),
-                root.as_deref(),
-                cli.json,
-            )
+        Commands::Callees { args, root } => {
+            let (symbol, file) = normalize_symbol_args(&args);
+            cmd_callees(&symbol, file.as_deref(), root.as_deref(), cli.json)
         }
-        Commands::Callers { symbol, root } => {
+        Commands::Callers { args, root } => {
+            let (symbol, _file) = normalize_symbol_args(&args);
             cmd_callers(&symbol, root.as_deref(), cli.json, &mut profiler)
         }
         Commands::Tree {

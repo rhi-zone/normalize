@@ -65,53 +65,29 @@ def call_rust(args: list[str], json_output: bool = False) -> tuple[int, str]:
     return result.returncode, output
 
 
-def rust_path(query: str) -> list[dict] | None:
-    """Resolve path using Rust CLI.
+def passthrough(subcommand: str, argv: list[str]) -> int:
+    """Pass CLI args directly to Rust subcommand, streaming output.
 
-    Returns list of matches or None if Rust not available.
+    Args:
+        subcommand: The Rust CLI subcommand (e.g., "expand", "callers")
+        argv: Raw CLI arguments to pass through (after the subcommand)
+
+    Returns:
+        Exit code from Rust CLI.
     """
-    if not rust_available():
-        return None
+    binary = get_rust_binary()
+    if binary is None:
+        import sys
 
-    code, output = call_rust(["path", query], json_output=True)
-    if code != 0:
-        return []
+        print(
+            f"Rust CLI required for {subcommand}. Build with: cargo build --release",
+            file=sys.stderr,
+        )
+        return 1
 
-    return json.loads(output)
-
-
-def rust_search_tree(query: str, limit: int = 20) -> list[dict] | None:
-    """Search tree using Rust CLI.
-
-    Returns list of matches or None if Rust not available.
-    """
-    if not rust_available():
-        return None
-
-    code, output = call_rust(["search-tree", query, "-l", str(limit)], json_output=True)
-    if code != 0:
-        return []
-
-    return json.loads(output)
-
-
-def rust_view(target: str, line_numbers: bool = False) -> dict | None:
-    """View file using Rust CLI.
-
-    Returns {"path": str, "content": str} or None if Rust not available.
-    """
-    if not rust_available():
-        return None
-
-    args = ["view", target]
-    if line_numbers:
-        args.append("-n")
-
-    code, output = call_rust(args, json_output=True)
-    if code != 0:
-        return None
-
-    return json.loads(output)
+    cmd = [str(binary), subcommand, *argv]
+    result = subprocess.run(cmd)
+    return result.returncode
 
 
 def rust_find_symbols(
@@ -202,27 +178,6 @@ def rust_context(file: str, root: str | None = None) -> dict | None:
     return json.loads(output)
 
 
-def rust_overview(root: str | None = None, compact: bool = False) -> dict | None:
-    """Get codebase overview using Rust CLI.
-
-    Returns comprehensive codebase metrics or None if Rust not available.
-    """
-    if not rust_available():
-        return None
-
-    args = ["overview"]
-    if root:
-        args.extend(["-r", root])
-    if compact:
-        args.append("--compact")
-
-    code, output = call_rust(args, json_output=True)
-    if code != 0:
-        return None
-
-    return json.loads(output)
-
-
 def rust_skeleton(file_path: str, root: str | None = None) -> str | None:
     """Extract code skeleton using Rust CLI.
 
@@ -261,124 +216,3 @@ def rust_summarize(file_path: str, root: str | None = None) -> str | None:
         return None
 
     return output
-
-
-def rust_expand(symbol: str, file: str | None = None, root: str | None = None) -> str | None:
-    """Expand a symbol to its full source using Rust CLI.
-
-    Returns source string or None if Rust not available.
-    """
-    if not rust_available():
-        return None
-
-    args = ["expand"]
-    if file:
-        args.extend(["-f", file])
-    if root:
-        args.extend(["-r", root])
-    args.append(symbol)
-
-    code, output = call_rust(args, json_output=False)
-    if code != 0:
-        return None
-
-    return output
-
-
-def rust_callers(symbol: str, root: str | None = None) -> list[dict] | None:
-    """Find callers of a symbol using Rust CLI.
-
-    Returns list of caller info or None if Rust not available.
-    Each item: {"file", "line", "caller", "context"}
-    """
-    if not rust_available():
-        return None
-
-    args = ["callers"]
-    if root:
-        args.extend(["-r", root])
-    args.append(symbol)
-
-    code, output = call_rust(args, json_output=True)
-    if code != 0:
-        return []
-
-    return json.loads(output)
-
-
-def rust_callees(
-    symbol: str, file: str | None = None, root: str | None = None
-) -> list[dict] | None:
-    """Find what a symbol calls using Rust CLI.
-
-    Returns list of callee info or None if Rust not available.
-    Each item: {"name", "line", "column"}
-    """
-    if not rust_available():
-        return None
-
-    args = ["callees"]
-    if file:
-        args.extend(["-f", file])
-    if root:
-        args.extend(["-r", root])
-    args.append(symbol)
-
-    code, output = call_rust(args, json_output=True)
-    if code != 0:
-        return []
-
-    return json.loads(output)
-
-
-def rust_anchors(file: str, query: str | None = None, root: str | None = None) -> list[dict] | None:
-    """List code anchors from a file using Rust CLI.
-
-    Returns list of anchor info or None if Rust not available.
-    Each item: {"name", "type", "start_line", "end_line", "signature", "context", "reference"}
-    """
-    if not rust_available():
-        return None
-
-    args = ["anchors"]
-    if root:
-        args.extend(["-r", root])
-    if query:
-        args.extend(["-q", query])
-    args.append(file)
-
-    code, output = call_rust(args, json_output=True)
-    if code != 0:
-        return None
-
-    result = json.loads(output)
-    return result.get("anchors", [])
-
-
-def rust_tree(
-    path: str = ".",
-    depth: int | None = None,
-    dirs_only: bool = False,
-    root: str | None = None,
-) -> dict | None:
-    """Show directory tree using Rust CLI.
-
-    Returns {"root", "tree", "file_count", "dir_count"} or None if Rust not available.
-    """
-    if not rust_available():
-        return None
-
-    args = ["tree"]
-    if root:
-        args.extend(["-r", root])
-    if depth is not None:
-        args.extend(["-d", str(depth)])
-    if dirs_only:
-        args.append("-D")
-    args.append(path)
-
-    code, output = call_rust(args, json_output=True)
-    if code != 0:
-        return None
-
-    return json.loads(output)
