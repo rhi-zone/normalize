@@ -668,7 +668,7 @@ class ArchitectEditorLoop:
         # Get skeleton for context
         try:
             skeleton = self.api.skeleton.format(file_path)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             return LoopResult(
                 success=False,
                 error=f"Failed to get skeleton: {e}",
@@ -693,7 +693,7 @@ class ArchitectEditorLoop:
                     expanded = self.api.skeleton.expand(file_path, symbol)
                     if expanded:
                         expanded_context[symbol] = expanded
-                except Exception:
+                except (OSError, ValueError):
                     pass  # Continue without this context
 
             # Re-plan with expanded context
@@ -739,7 +739,7 @@ class ArchitectEditorLoop:
             # Validate the result
             try:
                 validation_output = self.api.validation.validate(file_path)
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 return LoopResult(
                     success=False,
                     plan=plan,
