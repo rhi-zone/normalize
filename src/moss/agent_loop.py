@@ -2614,6 +2614,12 @@ class LLMToolExecutor:
                 f"Context: {structured_context}\n\n"
                 f"Output ONLY the integer score."
             ),
+            "predict_workspace_scope": (
+                f"Predict the minimal directory subset required to perform the following task.\n"
+                f"Task: {focus_str}\n\n"
+                f"Context: {structured_context}\n\n"
+                f"Output a single directory path relative to project root."
+            ),
             "extract_long_term_preferences": (
                 f"{structured_context}\n\n"
                 f"Analyze the following session telemetry and access patterns to extract "

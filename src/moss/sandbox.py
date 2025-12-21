@@ -194,6 +194,25 @@ class SafeShell:
                 block_reason=str(e),
             )
 
+    def shrink_to_fit(self, accessed_paths: list[Path]) -> None:
+        """Proactively restrict workspace to the common parent of accessed paths.
+
+        Adaptive Workspace Scoping: Automatically shrink the sandbox based
+        on detected access patterns to minimize blast radius.
+        """
+        if not accessed_paths:
+            return
+
+        if len(accessed_paths) == 1:
+            self.config.workspace = accessed_paths[0].parent
+            return
+
+        # Find common parent
+        import os
+
+        common = os.path.commonpath([str(p.resolve()) for p in accessed_paths])
+        self.config.workspace = Path(common)
+
     def safe_curl(
         self,
         url: str,

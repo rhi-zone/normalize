@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Adaptive Workspace Scoping**: Automatically shrink/expand sandbox based on detected drift
 - [ ] **LLM Reliability Guardrails**: Implement 'critic-first' execution for high-risk operations
+- [ ] **Dynamic Turn Budgeting**: Adjust per-turn budget based on remaining task complexity
 - [ ] **Cross-file Symbol Jump**: Command-click support in TUI for quick navigation
 
 ## Recently Completed
+
+- **Adaptive Workspace Scoping** (Dec 2025):
+  - Added `shrink_to_fit` to `SafeShell` for dynamic workspace restriction
+  - Implemented `predict_workspace_scope` LLM operation for proactive scoping
+  - Minimizes blast radius by automatically narrowing sandbox to accessed files
 
 - **Shadow Git Branching** (Dec 2025):
   - Added `list_branches` and `switch_branch` to `ShadowGitAPI`
