@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Recursive Self-Improvement**: Implement loop that optimizes itself based on telemetry
 - [ ] **Cross-Language Reference Tracking**: Resolve references between Python and Rust components
 - [ ] **LLM Benchmarking Harness**: Automate model evaluation across standard tasks
+- [ ] **Shadow Git Visualization**: Visual diff and history in TUI
 
 ## Recently Completed
+
+- **Recursive Self-Improvement** (Dec 2025):
+  - Implemented `telemetry_optimizer_loop` to optimize loops based on session data
+  - Added `analyze_telemetry` and `propose_optimizations` LLM operations
+  - Supports data-driven performance tuning across multiple sessions
 
 - **Adaptive Context Control** (Dec 2025):
   - Implemented dynamic result preview limits in `DWIMLoop`

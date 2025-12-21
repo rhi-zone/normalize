@@ -900,6 +900,29 @@ def loop_optimizer_loop(name: str = "loop_optimizer") -> AgentLoop:
     )
 
 
+def telemetry_optimizer_loop(name: str = "telemetry_optimizer") -> AgentLoop:
+    """Meta-loop that optimizes agent performance based on real session telemetry."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
+            LoopStep(
+                "analyze",
+                "llm.analyze_telemetry",
+                input_from="fetch_data",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "propose",
+                "llm.propose_optimizations",
+                input_from="analyze",
+                step_type=StepType.LLM,
+            ),
+        ],
+        exit_conditions=["propose.success"],
+    )
+
+
 def self_improving_docstring_loop(name: str = "self_improve_docstring") -> AgentLoop:
     """Docstring loop that learns from its own performance.
 
@@ -2299,6 +2322,28 @@ class LLMToolExecutor:
                 f"Previous action & result:\n{focus_str}\n\n"
                 f"Output a bulleted list of concerns, or 'No mistakes detected' "
                 f"if it looks correct."
+            ),
+            "analyze_telemetry": (
+                f"{structured_context}\n\n"
+                f"Analyze the following telemetry data from agent sessions.\n"
+                f"Identify patterns of:\n"
+                f"- High token waste (large inputs/outputs that could be elided)\n"
+                f"- Frequent failures or retries in specific steps\n"
+                f"- Redundant tool calls\n"
+                f"- Suboptimal model choices for specific tasks\n\n"
+                f"Telemetry Data:\n{focus_str}\n\n"
+                f"Output a structured analysis of bottlenecks and inefficiencies."
+            ),
+            "propose_optimizations": (
+                f"{structured_context}\n\n"
+                f"Based on the telemetry analysis, propose specific optimizations.\n"
+                f"Consider:\n"
+                f"- Merging or splitting steps\n"
+                f"- Changing tool parameters (e.g. better filters)\n"
+                f"- Switching models for specific operations\n"
+                f"- Adding new heuristics or validators to catch early mistakes\n\n"
+                f"Analysis:\n{focus_str}\n\n"
+                f"Output a prioritized list of actionable optimizations."
             ),
         }
 
