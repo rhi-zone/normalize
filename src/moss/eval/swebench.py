@@ -557,7 +557,7 @@ When ready, output your patch between ```diff and ``` markers.
                 timeout=30,
             )
             context["skeleton"] = result.stdout
-        except Exception:
+        except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             context["skeleton"] = None
 
         return context
@@ -650,7 +650,7 @@ You can run bash commands to explore further if needed.
 
             return True
 
-        except Exception:
+        except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             return False
         finally:
             # Reset the repo

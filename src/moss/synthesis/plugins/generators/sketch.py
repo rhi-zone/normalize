@@ -279,7 +279,7 @@ class SketchSynthesizer:
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     return node.name
-        except Exception:
+        except SyntaxError:
             pass
         return None
 
