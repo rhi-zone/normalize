@@ -265,7 +265,7 @@ class TemplateGenerator:
             try:
                 content = template_file.read_text()
                 self._loaded_templates[name] = content
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass  # Skip unreadable templates
 
     def can_generate(self, spec: Specification, context: Context) -> bool:

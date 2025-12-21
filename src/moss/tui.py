@@ -274,7 +274,7 @@ class ProjectTree(Tree[Any]):
                         add_dir(node, full_path)
                     else:
                         tree_node.add_leaf(f"📄 {entry}", data={"type": "file", "path": full_path})
-            except Exception:
+            except OSError:
                 pass
 
         add_dir(root, api.root)
@@ -540,7 +540,7 @@ class MossTUI(App):
                 if len(skeleton.split("\n")) > 15:
                     summary += "\n..."
                 tooltip.content = summary
-            except Exception:
+            except (OSError, ValueError):
                 tooltip.content = f"File: {path.name}"
         elif data["type"] == "task":
             node = data["node"]

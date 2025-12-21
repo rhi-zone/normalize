@@ -866,7 +866,7 @@ async def _handle_unix_client(
                             try:
                                 msg = JSONRPCMessage.model_validate_json(line.decode("utf-8"))
                                 await read_stream_writer.send(SessionMessage(msg))
-                            except Exception as exc:
+                            except (ValueError, UnicodeDecodeError) as exc:
                                 await read_stream_writer.send(exc)
         except anyio.ClosedResourceError:
             pass
