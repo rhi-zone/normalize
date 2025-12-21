@@ -4,18 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] Start Phase 2: Unified tree model implementation
-  - Prototype unified node addressing (`src/main.py/Foo/bar`)
-  - Implement `view` primitive with `--depth` option
-- [ ] Start Phase 3: Remove DWIM embedding system
-  - Remove fastembed dependency, TF-IDF, 119-tool registry
-  - Simple 4-tool matching (view/find/edit/analyze)
 - [ ] UX for "scratch that" / correction in hierarchical agent model
   - LLM reviews recent changes, recognizes accidental deletions/errors
   - Not mechanical undo - thoughtful self-correction
   - Example: "I replaced the block and accidentally dropped existing items"
-- [ ] Add failure mode tests: Rust binary missing, invalid paths, malformed files
-- [ ] Ensure all failure modes have informative error messages
+- [ ] Fix unicode path resolution in Rust CLI
+  - `view /tmp/日本語/テスト.py` returns "No matches" despite file existing
+  - Likely issue with path normalization or index lookup
+- [ ] Implement `find` and `edit` primitives to complete the 4-tool set
+- [ ] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
+- [ ] Clean up broken Python tests (test_cli.py, test_synthesis.py import errors)
 
 ## Active Backlog
 
@@ -50,26 +48,22 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] `tree` → Rust `tree`
 - `query` - Python-only (rich filtering Rust lacks, no delegation needed)
 
-**Phase 2: Unified tree model** (see `docs/philosophy.md` - Unified Codebase Tree)
-- [ ] Merge filesystem + AST into single tree data structure
-- [ ] Uniform node addressing with `/`: `src/main.py/Foo/bar`
+**Phase 2: Unified tree model** (partially complete)
+- [x] Uniform node addressing with `/`: `src/main.py/Foo/bar`
   - Filesystem is source of truth for file vs directory boundary
-  - Accept multiple separators (already in Rust): `/`, `::`, `:`, `#`
+  - Accept multiple separators: `/`, `::`, `:`, `#`
   - Normalize all to canonical `/` form internally
-- [ ] Depth-based expansion: `--depth 1` (default), `--depth 2`, `--all`
-- [ ] Four primitives replacing 100+ tools:
-  - `view [path]` - see node (skeleton, source, tree) with `--deps`, `--summary`
+- [x] Depth-based expansion: `--depth 1` (default), `--depth 2`, `--all`
+- [x] `view [path]` - see node (skeleton, source, tree) with `--deps`
+- [ ] Remaining primitives:
   - `find [query]` - search with composable filters `--type`, `--calls`, `--called-by`
   - `edit <path>` - modify node with `--insert`, `--replace`, `--delete`
   - `analyze [path]` - compute properties with `--health`, `--complexity`, `--security`
 
-**Phase 3: Simplify tool interface**
-- [ ] Remove DWIM embedding system (no longer needed with 4 primitives)
-  - Remove fastembed/bge-small-en dependency
-  - Remove TF-IDF matching, intent analysis, tool registry (119 tools)
-  - Remove weighted example phrases
+**Phase 3: Simplify tool interface** (partially complete)
+- [x] Remove DWIM embedding system (fastembed/bge-small-en dependency removed)
 - [ ] Simple tool resolution: exact match + basic typo correction for 4 names
-- [ ] Keep path fuzzy resolution (already in Rust): `view dwim` → `src/moss/dwim.py`
+- [x] Keep path fuzzy resolution (already in Rust): `view dwim` → `src/moss/dwim.py`
 - [ ] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
 
 ### Distribution & Installation

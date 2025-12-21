@@ -4,6 +4,18 @@
 
 ### Features
 
+**Unified Tree Model & Simplified DWIM** (Dec 21 2025)
+- `Unified path addressing`: `src/main.py/Foo/bar` resolves file + symbol
+- Multiple separator support: `/`, `::`, `#`, `:` all normalize to canonical `/`
+- Enhanced `view` command with `--depth` control:
+  - Directories: show tree with depth limit
+  - Files: skeleton at depth 1-2, full content at depth 3+
+  - Symbols: show source code for specific symbol
+- `--deps` flag shows imports in file view
+- Removed fastembed/bge-small-en embedding dependency from DWIM
+- DWIM now uses simpler TF-IDF + fuzzy string matching (no ML model)
+- Added 16 failure mode tests for error handling robustness
+
 **Rust Delegation & CLI Cleanup** (Dec 21 2025)
 - Removed ~900 lines of dead Python code from cli.py and rust_shim.py
 - Added `passthrough()` to bypass Python argparse for Rust-delegated commands
