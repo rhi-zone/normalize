@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Adaptive Workspace Expansion**: Proactively grow sandbox when cross-file dependencies detected
 - [ ] **Heuristic Error Localization**: Automatically find buggy code from failing test output
 - [ ] **TUI Session Resume**: Ability to select and resume past sessions from TUI
+- [ ] **Adaptive Loop Depth**: Dynamically adjust max steps based on progress rate
 
 ## Recently Completed
+
+- **Adaptive Workspace Expansion** (Dec 2025):
+  - Added `expand_to_include` to `SafeShell` for dynamic sandbox growth
+  - Implemented `predict_dependency_scope` LLM operation for dependency-aware scoping
+  - Proactively grows workspace to include related components and dependencies
 
 - **Agentic Policy Optimization** (Dec 2025):
   - Implemented `policy_optimizer_loop` to refine safety rules based on rejections

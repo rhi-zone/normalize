@@ -213,6 +213,23 @@ class SafeShell:
         common = os.path.commonpath([str(p.resolve()) for p in accessed_paths])
         self.config.workspace = Path(common)
 
+    def expand_to_include(self, additional_paths: list[Path]) -> None:
+        """Proactively expand workspace to include additional paths.
+
+        Adaptive Workspace Expansion: Proactively grow the sandbox when
+        cross-file dependencies or related components are detected.
+        """
+        if not additional_paths or self.config.workspace is None:
+            return
+
+        current_paths = [self.config.workspace]
+        all_paths = current_paths + additional_paths
+
+        import os
+
+        common = os.path.commonpath([str(p.resolve()) for p in all_paths])
+        self.config.workspace = Path(common)
+
     def safe_curl(
         self,
         url: str,

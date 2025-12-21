@@ -2690,6 +2690,12 @@ class LLMToolExecutor:
                 f"Context: {structured_context}\n\n"
                 f"Output a single directory path relative to project root."
             ),
+            "predict_dependency_scope": (
+                f"Based on the following code and its dependencies, identify related files "
+                f"or directories that might need to be accessed or modified.\n"
+                f"Context: {structured_context}\n\n"
+                f"Output a comma-separated list of paths relative to project root."
+            ),
             "verify_action": (
                 f"{structured_context}\n\n"
                 f"VERIFY BEFORE EXECUTION: You are about to perform a high-risk action.\n"
