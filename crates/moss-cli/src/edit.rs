@@ -134,6 +134,22 @@ impl Editor {
             end_byte += 1;
         }
 
+        // Smart whitespace: consume trailing blank lines to avoid double-blanks
+        // But only if there's already a blank line before the symbol
+        let has_blank_before = line_start >= 2
+            && &content[line_start.saturating_sub(2)..line_start] == "\n\n";
+
+        if has_blank_before {
+            // Consume trailing blank lines (up to one full blank line)
+            while end_byte < content.len() && content.as_bytes()[end_byte] == b'\n' {
+                end_byte += 1;
+                // Only consume one blank line worth
+                if end_byte < content.len() && content.as_bytes()[end_byte] != b'\n' {
+                    break;
+                }
+            }
+        }
+
         result.push_str(&content[..line_start]);
         result.push_str(&content[end_byte..]);
 
@@ -154,6 +170,42 @@ impl Editor {
         result
     }
 
+    /// Count blank lines before a position
+    fn count_blank_lines_before(&self, content: &str, pos: usize) -> usize {
+        let mut count: usize = 0;
+        let mut i = pos;
+        while i > 0 {
+            i -= 1;
+            if content.as_bytes()[i] == b'\n' {
+                count += 1;
+            } else if !content.as_bytes()[i].is_ascii_whitespace() {
+                break;
+            }
+        }
+        count.saturating_sub(1) // Don't count the newline ending the previous line
+    }
+
+    /// Count blank lines after a position (after any trailing newline)
+    fn count_blank_lines_after(&self, content: &str, pos: usize) -> usize {
+        let mut count = 0;
+        let mut i = pos;
+        // Skip past the first newline (end of current symbol)
+        if i < content.len() && content.as_bytes()[i] == b'\n' {
+            i += 1;
+        }
+        while i < content.len() {
+            if content.as_bytes()[i] == b'\n' {
+                count += 1;
+                i += 1;
+            } else if content.as_bytes()[i].is_ascii_whitespace() {
+                i += 1;
+            } else {
+                break;
+            }
+        }
+        count
+    }
+
     /// Insert content before a symbol
     pub fn insert_before(&mut self, content: &str, loc: &SymbolLocation, new_content: &str) -> String {
         let mut result = String::new();
@@ -161,12 +213,17 @@ impl Editor {
         // Find the start of the line containing the symbol
         let line_start = content[..loc.start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
 
+        // Detect spacing convention: how many blank lines before this symbol?
+        let blank_lines = self.count_blank_lines_before(content, line_start);
+        // +1 for the newline ending the content, +N for N blank lines
+        let spacing = "\n".repeat(blank_lines.max(1) + 1);
+
         // Apply indentation to new content
         let indented = self.apply_indent(new_content, &loc.indent);
 
         result.push_str(&content[..line_start]);
         result.push_str(&indented);
-        result.push('\n');
+        result.push_str(&spacing);
         result.push_str(&content[line_start..]);
 
         result
@@ -179,20 +236,35 @@ impl Editor {
         // Apply indentation to new content
         let indented = self.apply_indent(new_content, &loc.indent);
 
-        // Find the end of the line after the symbol
+        // Find the end of the symbol (include trailing newline)
         let end_pos = if loc.end_byte < content.len() && content.as_bytes()[loc.end_byte] == b'\n' {
             loc.end_byte + 1
         } else {
             loc.end_byte
         };
 
+        // Detect spacing convention: how many blank lines after this symbol?
+        let blank_lines = self.count_blank_lines_after(content, loc.end_byte);
+        // end_pos already includes trailing newline, so just add N newlines for N blank lines
+        let spacing = "\n".repeat(blank_lines.max(1));
+
+        // Find where the next non-blank content starts
+        let mut next_content_pos = end_pos;
+        while next_content_pos < content.len() && content.as_bytes()[next_content_pos] == b'\n' {
+            next_content_pos += 1;
+        }
+
         result.push_str(&content[..end_pos]);
-        if !content[..end_pos].ends_with('\n') {
+        result.push_str(&spacing);
+        result.push_str(&indented);
+
+        if next_content_pos < content.len() {
+            // +1 for the newline ending the inserted content
+            result.push_str(&"\n".repeat(blank_lines.max(1) + 1));
+            result.push_str(&content[next_content_pos..]);
+        } else {
             result.push('\n');
         }
-        result.push_str(&indented);
-        result.push('\n');
-        result.push_str(&content[end_pos..]);
 
         result
     }
