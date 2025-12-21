@@ -57,13 +57,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - `edit <path>` - modify node with `--insert`, `--replace`, `--delete`
   - `analyze [path]` - compute properties with `--health`, `--complexity`, `--security`
 
-**Phase 3: DWIM integration**
-- [x] Replace TF-IDF with embedding-based matching (fastembed/bge-small-en)
-- [x] Simplify matching logic (tool-like vs NL detection)
-- [x] Add `moss dwim --analyze` for embedding similarity debugging
-- [x] Weighted example phrases per tool (ToolInfo.examples field)
-- [x] Fix all DWIM tests
-- [ ] Natural language → tree primitive mapping (view/find/edit/analyze)
+**Phase 3: Simplify tool interface**
+- [ ] Remove DWIM embedding system (no longer needed with 4 primitives)
+  - Remove fastembed/bge-small-en dependency
+  - Remove TF-IDF matching, intent analysis, tool registry (119 tools)
+  - Remove weighted example phrases
+- [ ] Simple tool resolution: exact match + basic typo correction for 4 names
+- [ ] Keep path fuzzy resolution (already in Rust, still useful)
 - [ ] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
 
 ### Distribution & Installation
