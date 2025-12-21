@@ -1057,6 +1057,29 @@ def policy_optimizer_loop(name: str = "policy_optimizer") -> AgentLoop:
     )
 
 
+def heuristic_optimizer_loop(name: str = "heuristic_optimizer") -> AgentLoop:
+    """Meta-loop that refines structural heuristics based on session performance."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
+            LoopStep(
+                "analyze",
+                "llm.analyze_heuristics",
+                input_from="fetch_data",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "propose",
+                "llm.propose_heuristic_updates",
+                input_from="analyze",
+                step_type=StepType.LLM,
+            ),
+        ],
+        exit_conditions=["propose.success"],
+    )
+
+
 def workflow_synthesis_loop(name: str = "workflow_synthesis") -> AgentLoop:
     """Meta-loop that creates new workflows based on telemetry patterns."""
     return AgentLoop(
@@ -2723,6 +2746,29 @@ class LLMToolExecutor:
                 f"- Adding new exceptions for common safe patterns\n\n"
                 f"Analysis:\n{focus_str}\n\n"
                 f"Output a prioritized list of rule updates."
+            ),
+            "analyze_heuristics": (
+                f"{structured_context}\n\n"
+                f"Analyze the following session telemetry to evaluate the effectiveness "
+                f"of current heuristic guardrails.\n"
+                f"Identify:\n"
+                f"- Frequent 'false alarms' (heuristics that triggered but were ignored)\n"
+                f"- Missed mistakes (errors that reached full validation but could have "
+                f"been caught earlier)\n"
+                f"- Recurrent anti-patterns not currently covered by heuristics\n\n"
+                f"Telemetry Data:\n{focus_str}\n\n"
+                f"Output a summary of heuristic performance."
+            ),
+            "propose_heuristic_updates": (
+                f"{structured_context}\n\n"
+                f"Based on the heuristic analysis, propose specific refinements to the "
+                f"HeuristicEngine.\n"
+                f"Consider:\n"
+                f"- Adjusting thresholds for existing rules (e.g. max function size)\n"
+                f"- Removing rules with high false-positive rates\n"
+                f"- Implementing new structural rules for frequently missed mistakes\n\n"
+                f"Analysis:\n{focus_str}\n\n"
+                f"Output a prioritized list of engine updates."
             ),
             "predict_workspace_scope": (
                 f"Predict the minimal directory subset required to perform the following task.\n"

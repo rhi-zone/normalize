@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Recursive Self-Optimization**: Loop that refines its own heuristics based on telemetry
 - [ ] **Context Elision Policies**: User-definable rules for eliding specific content types
 - [ ] **Shadow Git Merging**: Automatically resolve simple conflicts when merging experiments
+- [ ] **Agentic Prompt Evolution**: Automatically refine turn-level system prompts based on feedback
 
 ## Recently Completed
+
+- **Recursive Self-Optimization** (Dec 2025):
+  - Implemented `heuristic_optimizer_loop` to refine structural guardrails
+  - Added `analyze_heuristics` and `propose_heuristic_updates` LLM operations
+  - Supports data-driven tuning of the `HeuristicEngine` based on session outcomes
 
 - **Adaptive Loop Depth** (Dec 2025):
   - Added `adaptive_max_steps` option to `AgentLoop`
