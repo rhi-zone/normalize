@@ -136,7 +136,7 @@ class GitHotspotAnalyzer:
 
             result.hotspots = hotspots
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             result.error = str(e)
 
         return result

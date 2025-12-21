@@ -210,7 +210,7 @@ def introspect_subapi(api_class: type, api_name: str) -> SubAPI:
 
         try:
             type_hints = get_type_hints(member)
-        except Exception:
+        except (NameError, AttributeError, TypeError):
             type_hints = {}
 
         methods.append(introspect_method(member, type_hints))
@@ -251,7 +251,7 @@ def introspect_api() -> list[SubAPI]:
                     and "API" in return_type.__name__
                 ):
                     results.append(introspect_subapi(return_type, name))
-            except Exception:
+            except (NameError, AttributeError, TypeError):
                 # Fallback: if we can't get hints, we skip it
                 # For now, keep the manual list for robustness if needed
                 pass

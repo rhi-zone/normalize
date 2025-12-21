@@ -278,7 +278,7 @@ class RuffPlugin:
             if result.returncode == 0:
                 # Output: "ruff 0.x.x"
                 return result.stdout.strip().split()[-1]
-        except Exception:
+        except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             pass
         return None
 
@@ -374,7 +374,7 @@ class MypyPlugin:
                 parts = result.stdout.strip().split()
                 if len(parts) >= 2:
                     return parts[1]
-        except Exception:
+        except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             pass
         return None
 
@@ -437,7 +437,7 @@ class MypyPlugin:
                             source="mypy",
                         )
                     )
-            except Exception:
+            except (ValueError, IndexError):
                 continue
 
         return LinterResult(
@@ -708,7 +708,7 @@ class LinterRegistry:
                         self.register(plugin)
                         count += 1
                         logger.info("Discovered linter: %s", ep.name)
-                except Exception as e:
+                except (ImportError, AttributeError, TypeError) as e:
                     logger.warning("Failed to load linter '%s': %s", ep.name, e)
 
         except ImportError:
@@ -797,7 +797,7 @@ async def lint(
             try:
                 result = await plugin.run(path, fix=fix)
                 results.append(result)
-            except Exception as e:
+            except (OSError, asyncio.SubprocessError) as e:
                 logger.warning("Linter %s failed: %s", plugin.metadata.name, e)
 
     return results

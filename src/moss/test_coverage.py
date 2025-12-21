@@ -166,7 +166,7 @@ class CoverageAnalyzer:
             else:
                 report.error = "No coverage data found. Run pytest --cov first."
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as e:
             report.error = str(e)
 
         return report
@@ -195,7 +195,7 @@ class CoverageAnalyzer:
         try:
             with open(path) as f:
                 data = json.load(f)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             report.error = f"Failed to parse coverage.json: {e}"
             return report
 

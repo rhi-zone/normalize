@@ -28,6 +28,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -514,7 +515,7 @@ class HTTPGenerator:
             async def post_handler(request: Request) -> Any:  # type: ignore[valid-type]
                 try:
                     body = await request.json()
-                except Exception:
+                except json.JSONDecodeError:
                     body = {}
                 args = {**body, **dict(request.query_params)}
                 root_override = args.pop("root", None)
