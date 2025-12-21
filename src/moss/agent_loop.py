@@ -1064,6 +1064,30 @@ def memory_search_loop(name: str = "memory_search") -> AgentLoop:
     )
 
 
+def memory_analysis_loop(name: str = "memory_analysis") -> AgentLoop:
+    """Meta-loop that extracts long-term preferences from session logs."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
+            LoopStep(
+                "extract",
+                "llm.extract_long_term_preferences",
+                input_from="fetch_data",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "save",
+                "edit.write_file",
+                input_from="extract",
+                step_type=StepType.TOOL,
+                parameters={"file_path": ".moss/preferences/extracted.md"},
+            ),
+        ],
+        exit_conditions=["save.success"],
+    )
+
+
 def contract_diffusion_loop(name: str = "contract_diffusion") -> AgentLoop:
     """Parallel refactor loop: contracts → implementation (parallel) → reconcile."""
     return AgentLoop(
@@ -2589,6 +2613,17 @@ class LLMToolExecutor:
                 f"1 = Trivial, 10 = extremely complex.\n\n"
                 f"Context: {structured_context}\n\n"
                 f"Output ONLY the integer score."
+            ),
+            "extract_long_term_preferences": (
+                f"{structured_context}\n\n"
+                f"Analyze the following session telemetry and access patterns to extract "
+                f"long-term preferences and conventions.\n"
+                f"Identify:\n"
+                f"- Preferred naming conventions or architectural patterns\n"
+                f"- Recurrent file structures or project layouts\n"
+                f"- Implicit safety constraints or coding styles\n\n"
+                f"Telemetry Data:\n{focus_str}\n\n"
+                f"Output a set of distilled rules for future agent sessions."
             ),
         }
 

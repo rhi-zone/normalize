@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Agentic Memory Analysis**: Loop that extracts long-term preferences from session logs
 - [ ] **Verification Loops & Heuristics**: Formalize heuristic guardrails before validation (LLM unreliability mitigation)
 - [ ] **Symbol Hover Info**: Show signatures/docstrings on hover in TUI
+- [ ] **Context Elision Heuristics**: Prune large files while preserving semantic anchors
 
 ## Recently Completed
+
+- **Agentic Memory Analysis** (Dec 2025):
+  - Implemented `memory_analysis_loop` to extract preferences from session logs
+  - Added `extract_long_term_preferences` LLM operation for rule distillation
+  - Integrated with `telemetry.analyze_all_sessions` for data-driven insights
 
 - **Cross-file Symbol Navigation** (Dec 2025):
   - Implemented clickable `ProjectTree` in TUI with task and file modes
