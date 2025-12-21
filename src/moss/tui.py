@@ -124,6 +124,7 @@ class AgentMode(Enum):
     DIFF = auto()  # Reviewing shadow git changes
     SESSION = auto()  # Managing and resuming sessions
     BRANCH = auto()  # Managing multiple experiment branches
+    SWARM = auto()  # Visualizing multi-agent swarm activity
 
 
 class BranchMode:
@@ -139,6 +140,20 @@ class BranchMode:
         await app._update_branch_view()
 
 
+class SwarmMode:
+    name = "SWARM"
+    color = "white"
+    placeholder = "Manage swarm... (wait for workers to complete)"
+
+    async def on_enter(self, app: MossTUI) -> None:
+        app.query_one("#log-view").display = False
+        app.query_one("#git-view").display = False
+        app.query_one("#session-view").display = False
+        app.query_one("#swarm-view").display = True
+        app.query_one("#content-header").update("Swarm Dashboard")
+        await app._update_swarm_view()
+
+
 class ModeRegistry:
     """Registry for extensible TUI modes."""
 
@@ -150,8 +165,9 @@ class ModeRegistry:
             "DIFF": DiffMode(),
             "SESSION": SessionMode(),
             "BRANCH": BranchMode(),
+            "SWARM": SwarmMode(),
         }
-        self._order: list[str] = ["PLAN", "READ", "WRITE", "DIFF", "SESSION", "BRANCH"]
+        self._order: list[str] = ["PLAN", "READ", "WRITE", "DIFF", "SESSION", "BRANCH", "SWARM"]
 
     def get_mode(self, name: str) -> TUIMode | None:
         return self._modes.get(name)
@@ -284,6 +300,10 @@ class MossTUI(App):
         display: none;
     }
 
+    #swarm-view {
+        display: none;
+    }
+
     #diff-view {
         height: 1fr;
         border: solid $secondary;
@@ -357,6 +377,11 @@ class MossTUI(App):
                         Tree("Sessions", id="session-tree"),
                         id="session-view",
                     ),
+                    Container(
+                        Static("Active Swarm", classes="sidebar-header"),
+                        Tree("Workers", id="swarm-tree"),
+                        id="swarm-view",
+                    ),
                     id="content-area",
                 ),
                 id="main-container",
@@ -390,6 +415,7 @@ class MossTUI(App):
         self.query_one("#log-view").display = False
         self.query_one("#git-view").display = False
         self.query_one("#session-view").display = False
+        self.query_one("#swarm-view").display = False
 
         await mode.on_enter(self)
 
@@ -528,6 +554,29 @@ class MossTUI(App):
             root.expand()
         except Exception as e:
             self._log(f"Failed to fetch session data: {e}")
+
+    async def _update_swarm_view(self) -> None:
+        """Fetch and display multi-agent swarm status."""
+        try:
+            # For this TUI we'll mock some swarm status if API doesn't provide it yet
+            # In a real implementation, we'd query the Agent Manager
+            tree = self.query_one("#swarm-tree")
+            tree.clear()
+            root = tree.root
+            root.label = "Agent Swarm"
+
+            # Placeholder for worker data
+            workers = [
+                {"id": "worker-1", "status": "IDLE", "task": "None"},
+                {"id": "worker-2", "status": "WORKING", "task": "Analyze src/moss/api.py"},
+            ]
+
+            for w in workers:
+                label = f"{w['id']}: [{w['status']}] {w['task']}"
+                root.add_leaf(label)
+            root.expand()
+        except Exception as e:
+            self._log(f"Failed to fetch swarm data: {e}")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle command input."""

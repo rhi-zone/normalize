@@ -4,57 +4,21 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **TUI Multi-Agent View**: Visualize swarm activity and worker status in TUI
 - [ ] **Shadow Git Multi-Commit**: Support for multi-commit shadow experiments
 - [ ] **Agentic Tool Discovery**: Loop that searches for and registers new MCP tools
+- [ ] **Recursive Policy Learning**: Refine global rules based on worker successes/failures
 
 ## Recently Completed
 
-- **Heuristic Error Localization** (Dec 2025):
-  - Implemented `analyze_test_failure` in `DiagnosticSet` to extract bug locations from traces
-  - Added `localize_bug_from_test` LLM operation for structural root-cause analysis
-  - Prioritizes implementation files over test files in stack trace parsing
-
-- **Adaptive Model Selection** (Dec 2025):
-  - Added `task_models` mapping to `LLMConfig` for specialized model routing
-  - Implemented automatic model switching in `LLMToolExecutor` based on task type
-  - Supports separate models for analysis, generation, and fixing
-
-- **Recursive Policy Learning** (Dec 2025):
-  - Implemented `policy_learning_loop` to distill rules from successful sessions
-  - Added `extract_policy_rules` and `refine_policy_registry` LLM operations
-  - Supports automated best-practice codification based on historical success
-
-- **TUI Git Dashboard** (Dec 2025):
-  - Added `BRANCH` mode to TUI for managing multiple experiments
-  - Implemented `branch-view` with integrated diff and history
-  - Support for clickable branch switching and proactive diff fetching
-  - Integrated with `ShadowGitAPI` for real-time repo state
-
-- **Shadow Git Merging** (Dec 2025):
-
-
-
-- **Context Elision Policies** (Dec 2025):
-  - Added `ContextConfig` to `MossConfig` for user-definable elision rules
-  - Supported `elision_patterns` and `snippet_threshold` in `moss.toml`
-  - Integrated TOML parsing and generation for the `[context]` section
-
-- **Recursive Self-Optimization** (Dec 2025):
-  - Implemented `heuristic_optimizer_loop` to refine structural guardrails
-  - Added `analyze_heuristics` and `propose_heuristic_updates` LLM operations
-  - Supports data-driven tuning of the `HeuristicEngine` based on session outcomes
-
-- **Adaptive Loop Depth** (Dec 2025):
-  - Added `adaptive_max_steps` option to `AgentLoop`
-  - Implemented dynamic step limit adjustment in `AgentLoopRunner`
-  - Extends loop length when task complexity remains high but progress is steady
+- **TUI Multi-Agent View** (Dec 2025):
+  - Added `SWARM` mode to TUI for visualizing multi-agent activity
+  - Implemented `swarm-view` with worker status and task tracking
+  - Integrated swarm status display into the main content area
+  - Refactored `ModeRegistry` to support the new swarm mode
 
 - **TUI Session Resume** (Dec 2025):
-  - Added `SESSION` mode to TUI for managing past work units
-  - Implemented `session-view` with searchable list of session history
-  - Integrated clickable session IDs for quick resumption and state recovery
-  - Uses `TelemetryAPI` and `SessionManager` for robust data retrieval
+
+
 
 - **Heuristic Error Localization** (Dec 2025):
   - Added `localize_bug` to `DiagnosticSet` for trace-based bug identification
