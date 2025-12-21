@@ -16,6 +16,7 @@ class ViewType(Enum):
     CFG = auto()  # Control flow graph
     DEPENDENCY = auto()  # Import/export relationships
     ELIDED = auto()  # Literals replaced with placeholders
+    SNIPPET = auto()  # Intelligently elided snippets
     RAW = auto()  # Full source text
 
 
@@ -144,6 +145,83 @@ class RawViewProvider(ViewProvider):
         )
 
 
+class SnippetViewProvider(ViewProvider):
+    """Provider that returns intelligently elided snippets.
+
+    Preserves lines matching 'anchors' (definitions, search hits)
+    and elides large unimportant blocks.
+    """
+
+    @property
+    def view_type(self) -> ViewType:
+        return ViewType.SNIPPET
+
+    @property
+    def supported_languages(self) -> set[str]:
+        return set()  # All languages
+
+    async def render(self, target: ViewTarget, options: ViewOptions | None = None) -> View:
+        import re
+
+        opts = options or ViewOptions()
+        content = target.path.read_text()
+        lines = content.splitlines()
+
+        # Determine anchor lines to preserve
+        anchor_patterns = [
+            r"^(class|def|async\s+def)\s+\w+",  # Python definitions
+            r"^(export\s+)?(function|class|interface|type|enum)\s+\w+",  # JS/TS
+            r"^fn\s+\w+",  # Rust
+        ]
+
+        # Add search pattern if provided in extra
+        search_pattern = opts.extra.get("search_pattern")
+        if search_pattern:
+            anchor_patterns.append(search_pattern)
+
+        preserved_indices = set()
+        context_lines = opts.extra.get("context_lines", 2)
+
+        for i, line in enumerate(lines):
+            if any(re.search(p, line) for p in anchor_patterns):
+                # Preserve line plus context
+                start = max(0, i - context_lines)
+                end = min(len(lines), i + context_lines + 1)
+                for j in range(start, end):
+                    preserved_indices.add(j)
+
+        # Construct snippet with elision markers
+        result_lines = []
+        last_idx = -1
+        elided_count = 0
+
+        for i in range(len(lines)):
+            if i in preserved_indices:
+                if last_idx != -1 and i > last_idx + 1:
+                    skip = i - last_idx - 1
+                    result_lines.append(f"... [{skip} lines elided] ...")
+                    elided_count += skip
+                result_lines.append(lines[i])
+                last_idx = i
+
+        # If no anchors found, fallback to raw or top of file
+        if not result_lines:
+            content = "\n".join(lines[:50]) + "\n... [truncated] ..."
+        else:
+            content = "\n".join(result_lines)
+
+        return View(
+            target=target,
+            view_type=ViewType.SNIPPET,
+            content=content,
+            metadata={
+                "original_lines": len(lines),
+                "elided_lines": elided_count,
+                "preserved_lines": len(result_lines),
+            },
+        )
+
+
 # Intent -> ViewType heuristics
 INTENT_DEFAULTS: dict[Intent, list[ViewType]] = {
     Intent.EXPLORE: [ViewType.SKELETON, ViewType.DEPENDENCY],
@@ -212,4 +290,5 @@ def create_default_registry() -> ViewRegistry:
     """Create a registry with default providers."""
     registry = ViewRegistry()
     registry.register(RawViewProvider())
+    registry.register(SnippetViewProvider())
     return registry

@@ -4,17 +4,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Context Elision Heuristics**: Prune large files while preserving semantic anchors
 - [ ] **Shadow Git Branching**: Support for multiple concurrent experiment branches
 - [ ] **Adaptive Workspace Scoping**: Automatically shrink/expand sandbox based on detected drift
+- [ ] **LLM Reliability Guardrails**: Implement 'critic-first' execution for high-risk operations
 
 ## Recently Completed
 
+- **Context Elision Heuristics** (Dec 2025):
+  - Implemented `SnippetViewProvider` for intelligent file pruning
+  - Preserves semantic anchors (definitions, search hits) while eliding unimportant blocks
+  - Added `SNIPPET` view type to `ViewRegistry`
+  - Integrated with `ViewOptions` for configurable context depth
+
 - **Symbol Hover Info** (Dec 2025):
-  - Implemented `HoverTooltip` widget in TUI for metadata preview
-  - Added node highlight tracking in `ProjectTree`
-  - Shows file skeletons and task summaries on hover/selection
-  - Added 'h' keybinding to toggle tooltip visibility
 
 - **Cross-file Symbol Navigation** (Dec 2025):
   - Implemented clickable `ProjectTree` in TUI with task and file modes
