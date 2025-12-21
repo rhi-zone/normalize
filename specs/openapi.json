@@ -2317,6 +2317,57 @@
         ]
       }
     },
+    "/shadow_git/begin-multi-commit": {
+      "post": {
+        "description": "Begin grouping multiple changes into one commit.",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Begin grouping multiple changes into one commit",
+        "tags": [
+          "shadow_git"
+        ]
+      }
+    },
+    "/shadow_git/finish-multi-commit": {
+      "post": {
+        "description": "Finish grouping changes and create the commit.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "branch_name": {
+                    "description": "",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "branch_name"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Finish grouping changes and create the commit",
+        "tags": [
+          "shadow_git"
+        ]
+      }
+    },
     "/shadow_git/get-diff": {
       "get": {
         "description": "Get the full diff for a shadow branch.",

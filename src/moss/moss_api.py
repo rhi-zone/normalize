@@ -180,6 +180,22 @@ class ShadowGitAPI:
         except Exception:
             return False
 
+    async def begin_multi_commit(self) -> None:
+        """Begin grouping multiple changes into one commit."""
+        git = self._get_git()
+        await git.begin_multi_commit()
+
+    async def finish_multi_commit(
+        self, branch_name: str, message: str | None = None
+    ) -> dict[str, str]:
+        """Finish grouping changes and create the commit."""
+        git = self._get_git()
+        from moss.shadow_git import ShadowBranch
+
+        branch = ShadowBranch(branch_name, "main", self.root)
+        handle = await git.finish_multi_commit(branch, message)
+        return {"commit": handle.sha, "branch": handle.branch}
+
     async def smart_merge(self, branch_name: str, message: str | None = None) -> dict[str, str]:
         """Merge a shadow branch with automated conflict resolution."""
         git = self._get_git()

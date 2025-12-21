@@ -173,6 +173,8 @@ ACTION_VERBS = {
     "diff": "diff",
     "branch": "branch",
     "merge": "merge",
+    "checkpoint": "checkpoint",
+    "commit": "commit",
     "analyze": "analyze",
     # Validation
     "validate": "validate",
@@ -295,6 +297,8 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
         "diff": "shadow_git.get_diff",
         "branch": "shadow_git.switch_branch",
         "merge": "shadow_git.smart_merge",
+        "checkpoint": "shadow_git.begin_multi_commit",
+        "commit": "shadow_git.finish_multi_commit",
         "analyze": "telemetry.analyze_all_sessions",
     }
 
@@ -445,6 +449,8 @@ Commands:
 - diff [branch] - show changes
 - branch [name] - list or switch branch
 - merge <branch> - merge changes with auto-fix
+- checkpoint - group multiple changes
+- commit [message] - finish grouped changes
 - revert <file> <line> - undo change at line
 - analyze [session] - show telemetry
 - fix: <description> - describe fix

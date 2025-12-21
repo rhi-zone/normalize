@@ -4,11 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Shadow Git Multi-Commit**: Support for multi-commit shadow experiments
 - [ ] **Agentic Tool Discovery**: Loop that searches for and registers new MCP tools
-- [ ] **Recursive Policy Learning**: Refine global rules based on worker successes/failures
+- [ ] **Adaptive Loop Strategy Refinement**: Fine-tune loop switching based on success patterns
+- [ ] **Cross-file Symbol Jump**: Clickable references in TUI to jump between files
 
 ## Recently Completed
+
+- **Shadow Git Multi-Commit** (Dec 2025):
+  - Added `begin_multi_commit` and `finish_multi_commit` to `ShadowGit`
+  - Enabled grouping of multiple agent actions into single atomic commits
+  - Exposed `checkpoint` and `commit` commands in `DWIMLoop`
+  - Integrated multi-commit lifecycle into `ShadowGitAPI`
 
 - **TUI Multi-Agent View** (Dec 2025):
   - Added `SWARM` mode to TUI for visualizing multi-agent activity

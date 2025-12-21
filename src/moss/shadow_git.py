@@ -164,6 +164,8 @@ class ShadowGit:
     def __init__(self, repo_path: Path | str):
         self.repo_path = Path(repo_path).resolve()
         self._branches: dict[str, ShadowBranch] = {}
+        self._multi_commit_mode: bool = False
+        self._staged_messages: list[str] = []
 
     async def _run_git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         """Run a git command asynchronously."""
@@ -221,6 +223,21 @@ class ShadowGit:
         """Switch to a shadow branch."""
         await self._run_git("checkout", branch.name)
 
+    async def begin_multi_commit(self) -> None:
+        """Enter multi-commit mode where multiple actions are grouped."""
+        self._multi_commit_mode = True
+        self._staged_messages = []
+
+    async def finish_multi_commit(
+        self, branch: ShadowBranch, message: str | None = None
+    ) -> CommitHandle:
+        """Commit all changes staged during multi-commit mode."""
+        self._multi_commit_mode = False
+        final_message = message or " / ".join(self._staged_messages) or "Multi-action commit"
+        handle = await self.commit(branch, final_message)
+        self._staged_messages = []
+        return handle
+
     async def commit(
         self,
         branch: ShadowBranch,
@@ -229,6 +246,15 @@ class ShadowGit:
         allow_empty: bool = False,
     ) -> CommitHandle:
         """Create an atomic commit on the shadow branch."""
+        # If in multi-commit mode, just stage the message and return placeholder
+        if self._multi_commit_mode:
+            self._staged_messages.append(message)
+            # We still add to git index
+            await self._run_git("add", "-A")
+            return CommitHandle(
+                sha="staged", message=message, timestamp=datetime.now(UTC), branch=branch.name
+            )
+
         # Ensure we're on the right branch
         current = await self._get_current_branch()
         if current != branch.name:

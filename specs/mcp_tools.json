@@ -1315,6 +1315,32 @@
     "name": "security_get_high_severity"
   },
   {
+    "description": "Begin grouping multiple changes into one commit.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "shadow_git_begin_multi_commit"
+  },
+  {
+    "description": "Finish grouping changes and create the commit.",
+    "inputSchema": {
+      "properties": {
+        "branch_name": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch_name"
+      ],
+      "type": "object"
+    },
+    "name": "shadow_git_finish_multi_commit"
+  },
+  {
     "description": "Get the full diff for a shadow branch.",
     "inputSchema": {
       "properties": {
