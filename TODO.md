@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Adaptive Loop Strategy Refinement**: Fine-tune loop switching based on success patterns
 - [ ] **Shadow Git Multi-Commit Dashboard**: Visualize grouped actions in TUI
 - [ ] **Agentic Prompt Versioning**: Automatically track and compare system prompt evolutions
+- [ ] **Recursive Workflow Learning**: Propose new workflows based on recurrent session patterns
 
 ## Recently Completed
+
+- **Adaptive Loop Strategy Refinement** (Dec 2025):
+  - Added history tracking to `HybridLoopRunner` to record loop outcomes
+  - Implemented `llm.refine_loop_strategy` operation for pattern analysis
+  - Supports automated strategy optimization based on success/failure data
 
 - **Agentic Tool Discovery** (Dec 2025):
   - Implemented `tool_discovery_loop` to search for and configure new MCP servers

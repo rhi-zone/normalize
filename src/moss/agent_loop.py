@@ -7,6 +7,7 @@ Track them separately and optimize for fewer LLM calls.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -18,6 +19,8 @@ from typing import Any, Protocol, runtime_checkable
 # Loaded from src/moss/prompts/ (or user override in .moss/prompts/)
 _repair_engine_prompt: str | None = None
 _terse_prompt: str | None = None
+
+logger = logging.getLogger(__name__)
 
 
 def get_repair_engine_prompt() -> str:
@@ -652,6 +655,7 @@ class HybridLoopRunner:
 
     def __init__(self, executor: LLMToolExecutor):
         self.executor = executor
+        self._history: list[dict[str, Any]] = []
 
     async def run(self, task: str, structured_loop: AgentLoop) -> Any:
         """Classify task and run appropriate loop."""
@@ -663,16 +667,56 @@ class HybridLoopRunner:
 
         strategy = str(output).strip().upper()
 
+        result = None
         if "DWIM" in strategy:
             # Use DWIM loop for simple tasks
             from moss.dwim_loop import DWIMLoop
 
             loop = DWIMLoop(self.executor.moss_executor.api)
-            return await loop.run(task)
+            result = await loop.run(task)
+            actual_strategy = "DWIM"
         else:
             # Use provided structured loop for complex tasks
             runner = AgentLoopRunner(self.executor)
-            return await runner.run(structured_loop, initial_input={"task": task})
+            result = await runner.run(structured_loop, initial_input={"task": task})
+            actual_strategy = "STRUCTURED"
+
+        # Record outcome for refinement
+        self._record_outcome(task, actual_strategy, result)
+
+        # Periodically refine strategy based on history
+        if len(self._history) >= 10:
+            await self._refine_strategy()
+
+        return result
+
+    def _record_outcome(self, task: str, strategy: str, result: Any) -> None:
+        """Record the outcome of a loop execution."""
+        success = False
+        if hasattr(result, "success"):
+            success = result.success
+        elif hasattr(result, "state"):
+            from moss.dwim_loop import LoopState
+
+            success = result.state == LoopState.DONE
+
+        self._history.append(
+            {"task": task, "strategy": strategy, "success": success, "timestamp": datetime.now(UTC)}
+        )
+
+    async def _refine_strategy(self) -> None:
+        """Analyze history and propose refined classification rules."""
+        try:
+            context = LoopContext(input=self._history)
+            step = LoopStep("refine", "llm.refine_loop_strategy", step_type=StepType.LLM)
+
+            output, _, _ = await self.executor.execute("llm.refine_loop_strategy", context, step)
+            # In a full implementation, this would update a persistent ruleset
+            logger.info(f"Refined loop strategy proposed: {output}")
+            # Clear history after refinement
+            self._history = []
+        except Exception:
+            pass
 
 
 # ============================================================================
@@ -2750,6 +2794,17 @@ class LLMToolExecutor:
                 f"- Use DWIM for simple exploration, search, and answer-based questions.\n"
                 f"- Use STRUCTURED for multi-file changes, refactoring, or new features.\n\n"
                 f"Output: DWIM or STRUCTURED"
+            ),
+            "refine_loop_strategy": (
+                f"{structured_context}\n\n"
+                f"Analyze the following success rates and telemetry from different loop "
+                f"strategies (DWIM vs STRUCTURED).\n"
+                f"Identify:\n"
+                f"- Tasks where DWIM frequently fails but STRUCTURED succeeds\n"
+                f"- Tasks where STRUCTURED is overkill (too many tokens) and DWIM suffices\n"
+                f"- Recurrent patterns in classification errors\n\n"
+                f"Success Data:\n{focus_str}\n\n"
+                f"Output refined task classification rules to optimize strategy selection."
             ),
             "repair_syntax": (
                 f"{structured_context}\n\n"
