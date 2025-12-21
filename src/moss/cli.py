@@ -3927,6 +3927,7 @@ def cmd_workflow(args: Namespace) -> int:
         name = getattr(args, "workflow_name", None)
         file_path_arg = getattr(args, "file", None)
         mock = getattr(args, "mock", False)
+        workflow_args = getattr(args, "workflow_args", None) or []
 
         if not name:
             output.error("Workflow name required")
@@ -3954,6 +3955,14 @@ def cmd_workflow(args: Namespace) -> int:
             output.info(f"Running workflow '{name}' on codebase: {project_root.name}...")
             initial_input = {"directory": str(project_root)}
             executor_root = project_root
+
+        # Parse and merge additional arguments
+        for arg in workflow_args:
+            if "=" not in arg:
+                output.error(f"Invalid argument format: {arg} (expected KEY=VALUE)")
+                return 1
+            key, value = arg.split("=", 1)
+            initial_input[key] = value
 
         # Convert and run
         from moss.agent_loop import AgentLoopRunner, LLMConfig, LLMToolExecutor
@@ -6363,6 +6372,14 @@ def create_parser() -> argparse.ArgumentParser:
         default="standard",
         choices=["minimal", "standard"],
         help="Template for new workflow (default: standard)",
+    )
+    workflow_parser.add_argument(
+        "--arg",
+        "-a",
+        action="append",
+        dest="workflow_args",
+        metavar="KEY=VALUE",
+        help="Pass argument to workflow (repeatable, e.g., --arg model=gpt-4)",
     )
     workflow_parser.set_defaults(func=cmd_workflow)
 
