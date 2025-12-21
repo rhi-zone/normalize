@@ -89,7 +89,13 @@ Agentic by default - continue through tasks unless:
 
 Bail out early if stuck in a loop rather than burning tokens.
 
-Session modes: Fresh (default) or Marathon. See `docs/session-modes.md`.
+Marathon mode: Work continuously through TODO.md until empty or blocked.
+- Commit after each logical unit (creates resume points)
+- Bail out if stuck in a loop (3+ retries on same error)
+- Re-reading files repeatedly = context degrading, wrap up soon
+- If genuinely blocked, document state in TODO.md and stop
+
+See `docs/session-modes.md` for Fresh mode (default for normal sessions).
 
 Write while researching, not after. Queue review items in TODO.md, don't block for them.
 
