@@ -145,7 +145,12 @@ class EmbeddingMatcher:
             return False
 
     def _ensure_tool_embeddings(self) -> bool:
-        """Compute embeddings for all registered tools."""
+        """Compute embeddings for all registered tools.
+
+        Each tool can have multiple weighted phrases. The main text
+        (name + description + keywords) gets weight 1.0. Example phrases
+        get their specified weights.
+        """
         if not self._ensure_model():
             return False
 
@@ -156,27 +161,54 @@ class EmbeddingMatcher:
         if current_tools == cached_tools:
             return True
 
-        # Build text for each tool
-        self._tool_texts = {}
+        # Build phrases for each tool: list of (text, weight)
+        tool_phrases: dict[str, list[tuple[str, float]]] = {}
+        all_texts: list[str] = []
+        text_to_tool: list[tuple[str, int]] = []  # (tool_name, phrase_index)
+
         for name, info in TOOL_REGISTRY.items():
-            # Combine name, description, and keywords for richer matching
-            text = f"{info.name} {info.description} {' '.join(info.keywords)}"
-            self._tool_texts[name] = text
+            phrases = []
 
-        # Batch embed all tools
-        tool_names = list(self._tool_texts.keys())
-        texts = [self._tool_texts[name] for name in tool_names]
+            # Main text: name + description + keywords (weight 1.0)
+            main_text = f"{info.name} {info.description} {' '.join(info.keywords)}"
+            phrases.append((main_text, 1.0))
+            all_texts.append(main_text)
+            text_to_tool.append((name, 0))
 
-        embeddings = list(self._model.embed(texts))
-        self._tool_embeddings = dict(zip(tool_names, embeddings, strict=True))
+            # Example phrases with their weights
+            if info.examples:
+                for i, (phrase, weight) in enumerate(info.examples):
+                    phrases.append((phrase, weight))
+                    all_texts.append(phrase)
+                    text_to_tool.append((name, i + 1))
 
-        logger.debug("Computed embeddings for %d tools", len(tool_names))
+            tool_phrases[name] = phrases
+            self._tool_texts[name] = main_text
+
+        # Batch embed all texts
+        embeddings = list(self._model.embed(all_texts))
+
+        # Organize embeddings by tool
+        self._tool_embeddings = {}
+        for (tool_name, phrase_idx), emb in zip(text_to_tool, embeddings, strict=True):
+            if tool_name not in self._tool_embeddings:
+                self._tool_embeddings[tool_name] = []
+            weight = tool_phrases[tool_name][phrase_idx][1]
+            self._tool_embeddings[tool_name].append((emb, weight))
+
+        logger.debug(
+            "Computed embeddings for %d tools (%d total phrases)",
+            len(tool_phrases),
+            len(all_texts),
+        )
         return True
 
     def match(
         self, query: str, available_tools: set[str] | None = None, top_k: int = 10
     ) -> list[tuple[str, float]]:
-        """Match query against tools using embedding similarity.
+        """Match query against tools using weighted embedding similarity.
+
+        For tools with multiple phrases, computes weighted average similarity.
 
         Args:
             query: Natural language query
@@ -194,6 +226,7 @@ class EmbeddingMatcher:
 
         # Embed query
         query_emb = next(iter(self._model.embed([query])))
+        query_norm = np.linalg.norm(query_emb)
 
         # Compute similarities
         results = []
@@ -202,12 +235,20 @@ class EmbeddingMatcher:
         for tool_name in tools:
             if tool_name not in self._tool_embeddings:
                 continue
-            tool_emb = self._tool_embeddings[tool_name]
-            # Cosine similarity
-            sim = float(
-                np.dot(query_emb, tool_emb) / (np.linalg.norm(query_emb) * np.linalg.norm(tool_emb))
-            )
-            results.append((tool_name, sim))
+
+            phrase_embeddings = self._tool_embeddings[tool_name]
+
+            # Weighted average similarity across all phrases
+            weighted_sum = 0.0
+            weight_total = 0.0
+
+            for emb, weight in phrase_embeddings:
+                sim = float(np.dot(query_emb, emb) / (query_norm * np.linalg.norm(emb)))
+                weighted_sum += sim * weight
+                weight_total += weight
+
+            avg_sim = weighted_sum / weight_total if weight_total > 0 else 0.0
+            results.append((tool_name, avg_sim))
 
         # Sort by similarity descending
         results.sort(key=lambda x: x[1], reverse=True)
@@ -227,8 +268,20 @@ class EmbeddingMatcher:
         """Get the text that was embedded for a tool."""
         return self._tool_texts.get(tool_name)
 
+    def _get_primary_embedding(self, tool_name: str) -> Any | None:
+        """Get the primary (highest weight) embedding for a tool."""
+        if tool_name not in self._tool_embeddings:
+            return None
+        embeddings = self._tool_embeddings[tool_name]
+        if not embeddings:
+            return None
+        # Return the embedding with highest weight (usually the first one at 1.0)
+        return max(embeddings, key=lambda x: x[1])[0]
+
     def analyze_similarity(self) -> list[tuple[str, str, float]]:
         """Compute pairwise similarity between all tool embeddings.
+
+        Uses the primary (highest weight) embedding for each tool.
 
         Returns:
             List of (tool1, tool2, similarity) sorted by similarity descending.
@@ -242,9 +295,13 @@ class EmbeddingMatcher:
         results = []
 
         for i, t1 in enumerate(tools):
-            emb1 = self._tool_embeddings[t1]
+            emb1 = self._get_primary_embedding(t1)
+            if emb1 is None:
+                continue
             for t2 in tools[i + 1 :]:
-                emb2 = self._tool_embeddings[t2]
+                emb2 = self._get_primary_embedding(t2)
+                if emb2 is None:
+                    continue
                 sim = float(np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2)))
                 results.append((t1, t2, sim))
 
@@ -253,6 +310,8 @@ class EmbeddingMatcher:
 
     def find_similar_to(self, tool_name: str, top_k: int = 10) -> list[tuple[str, float]]:
         """Find tools most similar to the given tool.
+
+        Uses the primary (highest weight) embedding for comparison.
 
         Args:
             tool_name: Tool to find similarities for
@@ -263,16 +322,20 @@ class EmbeddingMatcher:
         """
         if not self._ensure_tool_embeddings():
             return []
-        if tool_name not in self._tool_embeddings:
+
+        emb = self._get_primary_embedding(tool_name)
+        if emb is None:
             return []
 
         import numpy as np
 
-        emb = self._tool_embeddings[tool_name]
         results = []
 
-        for other, other_emb in self._tool_embeddings.items():
+        for other in self._tool_embeddings:
             if other == tool_name:
+                continue
+            other_emb = self._get_primary_embedding(other)
+            if other_emb is None:
                 continue
             sim = float(np.dot(emb, other_emb) / (np.linalg.norm(emb) * np.linalg.norm(other_emb)))
             results.append((other, sim))
@@ -305,6 +368,9 @@ class ToolInfo:
     description: str
     keywords: list[str]
     parameters: list[str]
+    # Weighted example phrases: (phrase, weight). Higher weight = more important.
+    # These help distinguish similar tools and improve NL matching.
+    examples: list[tuple[str, float]] | None = None
 
 
 # =============================================================================
@@ -541,6 +607,12 @@ def _register_builtin_tools() -> None:
                 "public",
             ],
             parameters=["path", "pattern"],
+            examples=[
+                ("show code structure", 0.5),
+                ("what functions are in this file", 0.4),
+                ("list all classes and methods", 0.4),
+                ("code outline", 0.3),
+            ],
         ),
         ToolInfo(
             name="anchors",
@@ -559,6 +631,11 @@ def _register_builtin_tools() -> None:
                 "named",
             ],
             parameters=["path", "type", "name", "pattern"],
+            examples=[
+                ("find all classes", 0.5),
+                ("locate function definitions", 0.4),
+                ("where is this method defined", 0.4),
+            ],
         ),
         ToolInfo(
             name="query",
@@ -595,6 +672,11 @@ def _register_builtin_tools() -> None:
                 "methods",
             ],
             parameters=["path", "name", "signature", "type", "inherits", "pattern"],
+            examples=[
+                ("classes that inherit from Base", 0.5),
+                ("find large functions over 100 lines", 0.4),
+                ("search for pattern in code", 0.3),
+            ],
         ),
         ToolInfo(
             name="cfg",
@@ -615,6 +697,11 @@ def _register_builtin_tools() -> None:
                 "while",
             ],
             parameters=["path", "function"],
+            examples=[
+                ("control flow graph", 0.5),
+                ("show execution paths", 0.4),
+                ("analyze branches", 0.3),
+            ],
         ),
         ToolInfo(
             name="deps",
@@ -635,6 +722,12 @@ def _register_builtin_tools() -> None:
                 "reverse",
             ],
             parameters=["path", "pattern"],
+            examples=[
+                ("show dependencies", 0.5),
+                ("import graph", 0.5),
+                ("what does this module import", 0.4),
+                ("module dependencies", 0.4),
+            ],
         ),
         ToolInfo(
             name="context",
@@ -654,6 +747,11 @@ def _register_builtin_tools() -> None:
                 "describe",
             ],
             parameters=["path"],
+            examples=[
+                ("explain this file", 0.5),
+                ("what does this code do", 0.4),
+                ("summarize the module", 0.4),
+            ],
         ),
         ToolInfo(
             name="apply_patch",
