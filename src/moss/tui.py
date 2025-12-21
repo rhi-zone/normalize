@@ -34,6 +34,7 @@ class AgentMode(Enum):
     PLAN = auto()  # Planning next steps
     READ = auto()  # Code exploration and search
     WRITE = auto()  # Applying changes and refactoring
+    DIFF = auto()  # Reviewing shadow git changes
 
 
 class ModeIndicator(Static):
@@ -46,6 +47,7 @@ class ModeIndicator(Static):
             AgentMode.PLAN: "blue",
             AgentMode.READ: "green",
             AgentMode.WRITE: "red",
+            AgentMode.DIFF: "magenta",
         }
         color = colors.get(self.mode, "white")
         return f"Mode: [{color} b]{self.mode.name}[/]"
@@ -110,6 +112,20 @@ class MossTUI(App):
         border-left: solid $accent;
     }
 
+    #git-view {
+        display: none;
+    }
+
+    #diff-view {
+        height: 1fr;
+        border: solid $secondary;
+    }
+
+    #history-tree {
+        height: 30%;
+        border: solid $secondary;
+    }
+
     ModeIndicator {
         background: $surface-lighten-1;
         padding: 0 1;
@@ -134,6 +150,8 @@ class MossTUI(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
+        from textual.widgets import RichLog
+
         yield Header(show_clock=True)
         yield Horizontal(ModeIndicator(id="mode-indicator"), id="header-bar", height="auto")
         yield Container(
@@ -144,8 +162,15 @@ class MossTUI(App):
                     id="sidebar",
                 ),
                 Vertical(
-                    Static("Agent Log", classes="content-header"),
+                    Static("Agent Log", id="content-header"),
                     Container(id="log-view"),
+                    Container(
+                        Static("Shadow Git History", classes="sidebar-header"),
+                        Tree("Commits", id="history-tree"),
+                        Static("Diff", classes="sidebar-header"),
+                        RichLog(id="diff-view", highlight=True, markup=True),
+                        id="git-view",
+                    ),
                     id="content-area",
                 ),
                 id="main-container",
@@ -168,8 +193,47 @@ class MossTUI(App):
             AgentMode.PLAN: "What is the plan? (e.g. breakdown...)",
             AgentMode.READ: "Explore codebase... (e.g. skeleton, grep, expand)",
             AgentMode.WRITE: "Modify code... (e.g. write, replace, insert)",
+            AgentMode.DIFF: "Review changes... (revert <file> <line> to undo)",
         }
         self.query_one("#command-input").placeholder = placeholders.get(mode, "Enter command...")
+
+        # Toggle views
+        log_view = self.query_one("#log-view")
+        git_view = self.query_one("#git-view")
+        header = self.query_one("#content-header")
+
+        if mode == AgentMode.DIFF:
+            log_view.display = False
+            git_view.display = True
+            header.update("Shadow Git")
+            self._update_git_view()
+        else:
+            log_view.display = True
+            git_view.display = False
+            header.update("Agent Log")
+
+    async def _update_git_view(self) -> None:
+        """Fetch and display shadow git data."""
+        try:
+            # Get current shadow branch diff
+            # In a real TUI we'd track the current branch
+            diff = await self.api.shadow_git.get_diff("shadow/current")
+            diff_view = self.query_one("#diff-view")
+            diff_view.clear()
+            diff_view.write(diff)
+
+            # Update history (hunks)
+            hunks = await self.api.shadow_git.get_hunks("shadow/current")
+            history = self.query_one("#history-tree")
+            history.clear()
+            root = history.root
+            root.label = "Current Hunks"
+            for hunk in hunks:
+                label = f"{hunk['file_path']}:{hunk['new_start']} ({hunk['symbol'] or 'no symbol'})"
+                root.add_leaf(label)
+            root.expand()
+        except Exception as e:
+            self._log(f"Failed to fetch git data: {e}")
 
     def action_next_mode(self) -> None:
         """Switch to the next mode."""

@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Shadow Git Visualization**: Visual diff and history in TUI
 - [ ] **Adaptive Loop Strategy**: Automatically switch between DWIM and Structured loops
 - [ ] **Self-Correcting Edit Harness**: Implement loop that auto-fixes its own syntax errors
+- [ ] **Extensible Agent Modes**: Refactor TUI modes (PLAN, READ, WRITE, DIFF) into a plugin-based system
 
 ## Recently Completed
+
+- **Shadow Git Visualization** (Dec 2025):
+  - Added `DIFF` mode to TUI for reviewing changes
+  - Implemented `DiffView` and `HistoryView` (hunks) in TUI
+  - Integrated git data fetching via `ShadowGitAPI`
 
 - **LLM Benchmarking Harness** (Dec 2025):
   - Implemented `AutomatedBenchmark` for cross-model evaluation
