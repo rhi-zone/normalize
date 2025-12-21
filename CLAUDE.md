@@ -89,11 +89,11 @@ Agentic by default - continue through tasks unless:
 
 Bail out early if stuck in a loop rather than burning tokens.
 
-Keep sessions fresh. Consider wrapping up when:
-- Major feature complete
-- 50+ tool calls
-- Re-reading files (sign of forgetting)
-- Conversation drifted across unrelated topics
+Marathon mode: Work continuously through TODO.md until empty or blocked.
+- Commit after each logical unit (creates resume points)
+- Bail out if stuck in a loop (3+ retries on same error)
+- Re-reading files repeatedly = context degrading, wrap up soon
+- If genuinely blocked, document state in TODO.md and stop
 
 Write while researching, not after. Queue review items in TODO.md, don't block for them.
 
