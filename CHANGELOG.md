@@ -4,12 +4,44 @@
 
 ### Features
 
-**Sandbox Scoping** (new)
-- `TaskNode` now supports optional `sandbox_scope` attribute
-- Scopes are inherited from parent tasks by default
-- `TaskTree` serialization/deserialization includes scope
-- `DWIMLoop` validates tool access against the current task's scope
-- Blocks access to files outside the specified sandbox directory
+**Adaptive model and context control** (new)
+- `Adaptive Model Selection`: Added `task_models` mapping to `LLMConfig` for task-specific routing
+- `Adaptive Context Control`: Dynamic result preview limits in `DWIMLoop` based on task type
+- `Adaptive Context Pruning`: Heuristic and LLM-driven importance scoring in `EphemeralCache`
+- `LLM Benchmarking Harness`: `AutomatedBenchmark` for cross-model evaluation with markdown reports
+
+**Recursive self-improvement** (new)
+- `TelemetryAPI`: Multi-session analysis of token usage, tool patterns, and hotspots
+- `Mistake Detection`: `detect_mistakes` operation for turn-level critical analysis
+- `Recursive Self-Optimization`: `heuristic_optimizer_loop` to refine structural guardrails
+- `Agentic Workflow Synthesis`: `workflow_synthesis_loop` to auto-create workflows from telemetry
+- `Agentic Prompt Evolution`: `prompt_optimizer_loop` for automated prompt refinement
+- `Recursive Policy Learning`: `policy_learning_loop` to distill safety rules from successes
+
+**Shadow Git enhancements** (new)
+- `Shadow Git Branching`: `ShadowGitAPI` support for listing and switching experiment branches
+- `Shadow Git Merging`: `smart_merge` with automated 'favor-theirs' conflict resolution
+- `Shadow Git Multi-Commit`: `begin_multi_commit` and `finish_multi_commit` for grouped actions
+- `ShadowGitAPI`: First-class access to diffs, hunks, and surgical rollback
+
+**Advanced TUI capabilities** (new)
+- `AgentMode`: PLAN, READ, WRITE, DIFF, SESSION, BRANCH, SWARM, COMMIT modes
+- `ModeRegistry`: Extensible, plugin-based mode system with fluid switching (Shift+Tab)
+- `ProjectTree`: Clickable task and file navigation with auto-command pre-filling
+- `HoverTooltip`: Dynamic metadata preview (skeletons, summaries) on highlight
+- `Git Dashboard`: Integrated view for branches, commits, hunks, and diffs
+- `Session Resume`: Visual list of past work units with one-click resumption
+- `Cross-file Navigation`: Regex-based clickable links in Agent Log and History
+
+**Core architecture & UX** (new)
+- `Workflow Loader Abstraction`: `WorkflowLoader` protocol and registry for pluggable formats
+- `Sandbox Scoping`: `TaskNode` level workspace restriction with parent inheritance
+- `Adaptive Workspace Scoping`: `shrink_to_fit` and `expand_to_include` for dynamic sandbox control
+- `LLM Reliability Guardrails`: 'critic-first' execution for high-risk operations
+- `Editing Tools`: `EditAPI` for direct file manipulation (write, replace, insert)
+- `Vanilla Workflow`: Baseline agent loop refactored into data-driven workflow
+- `RefCheck`: Cross-language tracking for Rust and `Cargo.toml` with deduplication
+- `Docs Styling`: Glassmorphism and rounded borders at `docs/stylesheets/custom.css`
 
 **Workflow externalization** (expanded)
 - Design doc for TOML-based workflow/prompt format (`docs/workflow-format.md`)
