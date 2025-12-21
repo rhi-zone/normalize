@@ -97,26 +97,21 @@ def expand_keywords(keywords: list[str]) -> list[str]:
 
 
 class EmbeddingMatcher:
-    """Semantic matcher using sentence embeddings.
+    """Stub for removed embedding matcher.
 
-    Lazy-loads the embedding model on first use to avoid startup cost.
-    Pre-computes tool embeddings for fast query matching.
+    Embedding-based matching has been removed in favor of simpler TF-IDF
+    and fuzzy matching. This class remains for backward compatibility
+    but always reports as unavailable.
     """
 
     _instance: EmbeddingMatcher | None = None
-    _model: Any | None = None
-    _tool_embeddings: dict[str, Any]
-    _tool_texts: dict[str, str]
 
     def __new__(cls) -> EmbeddingMatcher:
-        """Create new instance with fresh dictionaries."""
-        instance = super().__new__(cls)
-        instance._tool_embeddings = {}
-        instance._tool_texts = {}
-        return instance
+        """Create new instance."""
+        return super().__new__(cls)
 
     def __init__(self) -> None:
-        """Initialize matcher (model loaded lazily)."""
+        """Initialize stub matcher."""
         pass
 
     @classmethod
@@ -126,232 +121,39 @@ class EmbeddingMatcher:
             cls._instance = cls()
         return cls._instance
 
-    def _ensure_model(self) -> bool:
-        """Lazy-load the embedding model. Returns True if available."""
-        if self._model is not None:
-            return True
-
-        try:
-            from fastembed import TextEmbedding
-
-            self._model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-            logger.debug("Loaded embedding model: BAAI/bge-small-en-v1.5")
-            return True
-        except ImportError:
-            logger.debug("fastembed not available, embeddings disabled")
-            return False
-        except Exception as e:
-            logger.warning("Failed to load embedding model: %s", e)
-            return False
-
-    def _ensure_tool_embeddings(self) -> bool:
-        """Compute embeddings for all registered tools.
-
-        Each tool can have multiple weighted phrases. The main text
-        (name + description + keywords) gets weight 1.0. Example phrases
-        get their specified weights.
-        """
-        if not self._ensure_model():
-            return False
-
-        # Check if we need to rebuild
-        current_tools = set(TOOL_REGISTRY.keys())
-        cached_tools = set(self._tool_embeddings.keys())
-
-        if current_tools == cached_tools:
-            return True
-
-        # Build phrases for each tool: list of (text, weight)
-        tool_phrases: dict[str, list[tuple[str, float]]] = {}
-        all_texts: list[str] = []
-        text_to_tool: list[tuple[str, int]] = []  # (tool_name, phrase_index)
-
-        for name, info in TOOL_REGISTRY.items():
-            phrases = []
-
-            # Main text: name + description + keywords (weight 1.0)
-            main_text = f"{info.name} {info.description} {' '.join(info.keywords)}"
-            phrases.append((main_text, 1.0))
-            all_texts.append(main_text)
-            text_to_tool.append((name, 0))
-
-            # Example phrases with their weights
-            if info.examples:
-                for i, (phrase, weight) in enumerate(info.examples):
-                    phrases.append((phrase, weight))
-                    all_texts.append(phrase)
-                    text_to_tool.append((name, i + 1))
-
-            tool_phrases[name] = phrases
-            self._tool_texts[name] = main_text
-
-        # Batch embed all texts
-        embeddings = list(self._model.embed(all_texts))
-
-        # Organize embeddings by tool
-        self._tool_embeddings = {}
-        for (tool_name, phrase_idx), emb in zip(text_to_tool, embeddings, strict=True):
-            if tool_name not in self._tool_embeddings:
-                self._tool_embeddings[tool_name] = []
-            weight = tool_phrases[tool_name][phrase_idx][1]
-            self._tool_embeddings[tool_name].append((emb, weight))
-
-        logger.debug(
-            "Computed embeddings for %d tools (%d total phrases)",
-            len(tool_phrases),
-            len(all_texts),
-        )
-        return True
-
     def match(
         self, query: str, available_tools: set[str] | None = None, top_k: int = 10
     ) -> list[tuple[str, float]]:
-        """Match query against tools using weighted embedding similarity.
-
-        For tools with multiple phrases, computes weighted average similarity.
-
-        Args:
-            query: Natural language query
-            available_tools: Limit to these tools (default: all)
-            top_k: Maximum results to return
-
-        Returns:
-            List of (tool_name, similarity) tuples, sorted by similarity descending.
-            Empty list if embeddings unavailable.
-        """
-        if not self._ensure_tool_embeddings():
-            return []
-
-        import numpy as np
-
-        # Embed query
-        query_emb = next(iter(self._model.embed([query])))
-        query_norm = np.linalg.norm(query_emb)
-
-        # Compute similarities
-        results = []
-        tools = available_tools or set(self._tool_embeddings.keys())
-
-        for tool_name in tools:
-            if tool_name not in self._tool_embeddings:
-                continue
-
-            phrase_embeddings = self._tool_embeddings[tool_name]
-
-            # Weighted average similarity across all phrases
-            weighted_sum = 0.0
-            weight_total = 0.0
-
-            for emb, weight in phrase_embeddings:
-                sim = float(np.dot(query_emb, emb) / (query_norm * np.linalg.norm(emb)))
-                weighted_sum += sim * weight
-                weight_total += weight
-
-            avg_sim = weighted_sum / weight_total if weight_total > 0 else 0.0
-            results.append((tool_name, avg_sim))
-
-        # Sort by similarity descending
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:top_k]
+        """Stub: always returns empty list (embeddings removed)."""
+        return []
 
     def is_available(self) -> bool:
-        """Check if embedding model is available."""
-        return self._ensure_model()
+        """Stub: embeddings are no longer available."""
+        return False
 
     def get_all_embeddings(self) -> dict[str, Any]:
-        """Get all tool embeddings. Returns empty dict if unavailable."""
-        if not self._ensure_tool_embeddings():
-            return {}
-        return dict(self._tool_embeddings)
+        """Stub: returns empty dict."""
+        return {}
 
     def get_tool_text(self, tool_name: str) -> str | None:
-        """Get the text that was embedded for a tool."""
-        return self._tool_texts.get(tool_name)
-
-    def _get_primary_embedding(self, tool_name: str) -> Any | None:
-        """Get the primary (highest weight) embedding for a tool."""
-        if tool_name not in self._tool_embeddings:
-            return None
-        embeddings = self._tool_embeddings[tool_name]
-        if not embeddings:
-            return None
-        # Return the embedding with highest weight (usually the first one at 1.0)
-        return max(embeddings, key=lambda x: x[1])[0]
+        """Stub: returns None."""
+        return None
 
     def analyze_similarity(self) -> list[tuple[str, str, float]]:
-        """Compute pairwise similarity between all tool embeddings.
-
-        Uses the primary (highest weight) embedding for each tool.
-
-        Returns:
-            List of (tool1, tool2, similarity) sorted by similarity descending.
-        """
-        if not self._ensure_tool_embeddings():
-            return []
-
-        import numpy as np
-
-        tools = list(self._tool_embeddings.keys())
-        results = []
-
-        for i, t1 in enumerate(tools):
-            emb1 = self._get_primary_embedding(t1)
-            if emb1 is None:
-                continue
-            for t2 in tools[i + 1 :]:
-                emb2 = self._get_primary_embedding(t2)
-                if emb2 is None:
-                    continue
-                sim = float(np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2)))
-                results.append((t1, t2, sim))
-
-        results.sort(key=lambda x: x[2], reverse=True)
-        return results
+        """Stub: returns empty list."""
+        return []
 
     def find_similar_to(self, tool_name: str, top_k: int = 10) -> list[tuple[str, float]]:
-        """Find tools most similar to the given tool.
-
-        Uses the primary (highest weight) embedding for comparison.
-
-        Args:
-            tool_name: Tool to find similarities for
-            top_k: Maximum results
-
-        Returns:
-            List of (tool_name, similarity) tuples.
-        """
-        if not self._ensure_tool_embeddings():
-            return []
-
-        emb = self._get_primary_embedding(tool_name)
-        if emb is None:
-            return []
-
-        import numpy as np
-
-        results = []
-
-        for other in self._tool_embeddings:
-            if other == tool_name:
-                continue
-            other_emb = self._get_primary_embedding(other)
-            if other_emb is None:
-                continue
-            sim = float(np.dot(emb, other_emb) / (np.linalg.norm(emb) * np.linalg.norm(other_emb)))
-            results.append((other, sim))
-
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:top_k]
+        """Stub: returns empty list."""
+        return []
 
     def embed_query(self, query: str) -> Any | None:
-        """Embed a single query. Returns None if unavailable."""
-        if not self._ensure_model():
-            return None
-        return next(iter(self._model.embed([query])))
+        """Stub: returns None."""
+        return None
 
 
 def get_embedding_matcher() -> EmbeddingMatcher:
-    """Get the global embedding matcher instance."""
+    """Get the global embedding matcher instance (stub, embeddings removed)."""
     return EmbeddingMatcher.get()
 
 
