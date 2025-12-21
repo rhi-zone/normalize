@@ -211,12 +211,12 @@ class RefChecker:
     # Liberal patterns for code -> docs references
     # These match comments/docstrings with doc paths
     CODE_TO_DOC_PATTERNS: ClassVar[list[str]] = [
-        # Explicit markers: # See: docs/*.md
-        r"#\s*[Ss]ee:?\s*(docs/\S+\.md)",
-        r"#\s*[Rr]ef:?\s*(docs/\S+\.md)",
-        r"#\s*[Dd]ocs?:?\s*(docs/\S+\.md)",
-        r"#\s*[Dd]ocumentation:?\s*(docs/\S+\.md)",
-        r"#\s*[Rr]elated:?\s*(docs/\S+\.md)",
+        # Explicit markers: # See: docs/*.md or // See: docs/*.md
+        r"(?:#|//)\s*[Ss]ee:?\s*(docs/\S+\.md)",
+        r"(?:#|//)\s*[Rr]ef:?\s*(docs/\S+\.md)",
+        r"(?:#|//)\s*[Dd]ocs?:?\s*(docs/\S+\.md)",
+        r"(?:#|//)\s*[Dd]ocumentation:?\s*(docs/\S+\.md)",
+        r"(?:#|//)\s*[Rr]elated:?\s*(docs/\S+\.md)",
         # Informal: "see docs/*.md"
         r"[Ss]ee\s+(docs/\S+\.md)",
         # Any docs/*.md path in a string or comment
@@ -226,15 +226,15 @@ class RefChecker:
     # Liberal patterns for docs -> code references
     DOC_TO_CODE_PATTERNS: ClassVar[list[str]] = [
         # HTML comments: <!-- Implementation: src/*.py -->
-        r"<!--\s*[Ii]mplementation:?\s*(src/\S+\.py)\s*-->",
-        r"<!--\s*[Cc]ode:?\s*(src/\S+\.py)\s*-->",
-        r"<!--\s*[Ss]ource:?\s*(src/\S+\.py)\s*-->",
+        r"<!--\s*[Ii]mplementation:?\s*(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)\s*-->",
+        r"<!--\s*[Cc]ode:?\s*(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)\s*-->",
+        r"<!--\s*[Ss]ource:?\s*(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)\s*-->",
         # Backtick code references: `src/*.py`
-        r"`(src/[^`]+\.py)`",
+        r"`(src/[^`]+\.(?:py|rs)|crates/[^`]+\.(?:py|rs)|Cargo\.toml)`",
         # Markdown links to source
-        r"\]\((src/[^)]+\.py)\)",
-        # Bare src/ paths
-        r"(src/\S+\.py)",
+        r"\]\((src/[^)]+\.(?:py|rs)|crates/[^)]+\.(?:py|rs)|Cargo\.toml)\)",
+        # Bare paths
+        r"(src/\S+\.(?:py|rs)|crates/\S+\.(?:py|rs)|Cargo\.toml)",
     ]
 
     def __init__(
@@ -303,14 +303,30 @@ class RefChecker:
         return result
 
     def _find_code_files(self) -> list[Path]:
-        """Find Python source files."""
+        """Find source files (Python, Rust)."""
         files = []
+        # Python source
         src_dir = self.root / "src"
         if src_dir.exists():
             files.extend(src_dir.rglob("*.py"))
-        # Also check root level .py files
+            files.extend(src_dir.rglob("*.rs"))
+
+        # Rust crates
+        crates_dir = self.root / "crates"
+        if crates_dir.exists():
+            files.extend(crates_dir.rglob("*.rs"))
+
+        # Config files
+        for name in ["Cargo.toml", "pyproject.toml"]:
+            path = self.root / name
+            if path.exists():
+                files.append(path)
+
+        # Root level .py/.rs files
         files.extend(self.root.glob("*.py"))
-        return sorted(files)
+        files.extend(self.root.glob("*.rs"))
+
+        return sorted(set(files))
 
     def _find_doc_files(self) -> list[Path]:
         """Find documentation files."""
@@ -351,6 +367,7 @@ class RefChecker:
     def _extract_doc_to_code_refs(self, doc_file: Path) -> list[DocReference]:
         """Extract code references from a doc file."""
         refs = []
+        seen = set()
         try:
             content = doc_file.read_text()
             for i, line in enumerate(content.splitlines(), 1):
@@ -359,14 +376,17 @@ class RefChecker:
                         code_path = match.group(1)
                         # Skip if it looks like a false positive
                         if self._is_valid_code_path(code_path):
-                            refs.append(
-                                DocReference(
-                                    source_doc=doc_file.relative_to(self.root),
-                                    source_line=i,
-                                    target_file=Path(code_path),
-                                    raw_text=match.group(0),
-                                )
+                            ref = DocReference(
+                                source_doc=doc_file.relative_to(self.root),
+                                source_line=i,
+                                target_file=Path(code_path),
+                                raw_text=match.group(0),
                             )
+                            # Simple deduplication per line/pattern
+                            key = (i, code_path)
+                            if key not in seen:
+                                refs.append(ref)
+                                seen.add(key)
         except Exception:
             pass
         return refs
@@ -389,15 +409,18 @@ class RefChecker:
         """Check if a path looks like a valid code reference."""
         if not path:
             return False
-        # Must be in src/ and end with .py
-        if not path.startswith("src/"):
-            return False
-        if not path.endswith(".py"):
-            return False
-        # No weird characters
-        if any(c in path for c in ["<", ">", "|", "*", "?"]):
-            return False
-        return True
+
+        # Valid files/directories
+        if path in ("Cargo.toml", "pyproject.toml", "Architecture.md"):
+            return True
+
+        if path.startswith("src/") or path.startswith("crates/"):
+            # Valid extensions if it has one
+            if "." in path:
+                return any(path.endswith(ext) for ext in [".py", ".rs", ".toml"])
+            return True  # Directory reference
+
+        return False
 
     def _check_staleness(
         self,

@@ -4,11 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Cross-Language Reference Tracking**: Resolve references between Python and Rust components
 - [ ] **LLM Benchmarking Harness**: Automate model evaluation across standard tasks
 - [ ] **Shadow Git Visualization**: Visual diff and history in TUI
+- [ ] **Adaptive Loop Strategy**: Automatically switch between DWIM and Structured loops
 
 ## Recently Completed
+
+- **Cross-Language Reference Tracking** (Dec 2025):
+  - Extended `RefChecker` to support Rust files (`.rs`) and `crates/` directory
+  - Added support for tracking references to `Cargo.toml`
+  - Deduplicated reference extraction for better token efficiency
+  - Verified with comprehensive tests in `tests/test_check_refs_rust.py`
 
 - **Recursive Self-Improvement** (Dec 2025):
   - Implemented `telemetry_optimizer_loop` to optimize loops based on session data
