@@ -354,7 +354,7 @@ class WeaknessAnalyzer:
                 if "abstraction" in self.categories:
                     self._analyze_abstractions(result, source, rel_path, tree)
 
-            except Exception as e:
+            except (OSError, UnicodeDecodeError, SyntaxError) as e:
                 logger.debug("Failed to analyze %s: %s", file_path, e)
 
         # Analyze patterns if requested
@@ -388,7 +388,7 @@ class WeaknessAnalyzer:
                         imported_by[imported] = []
                     imported_by[imported].append(module_name)
 
-            except Exception:
+            except (OSError, UnicodeDecodeError, SyntaxError):
                 pass
 
         # Detect coupling issues
@@ -591,7 +591,7 @@ class WeaknessAnalyzer:
                         )
                     )
 
-        except Exception as e:
+        except (OSError, SyntaxError, ValueError) as e:
             logger.debug("Pattern analysis failed: %s", e)
 
 

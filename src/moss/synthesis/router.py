@@ -185,7 +185,7 @@ class StrategyRouter:
             successes = sum(1 for h in history if h.get("outcome") == "success")
             return successes / len(history)
 
-        except Exception:
+        except (OSError, ValueError, KeyError):
             # Silently fail on memory errors
             return 0.5
 
@@ -213,6 +213,6 @@ class StrategyRouter:
                         "iterations": iterations,
                     }
                 )
-            except Exception:
+            except (OSError, ValueError, KeyError):
                 # Silently fail on memory errors
                 pass

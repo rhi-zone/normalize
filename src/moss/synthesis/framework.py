@@ -592,7 +592,7 @@ class SynthesisFramework:
                                     result.total_checks,
                                 )
 
-                        except Exception as e:
+                        except (OSError, ValueError, RuntimeError) as e:
                             logger.warning("Validator %s error: %s", sv.metadata.name, e)
                             # Don't fail on validator errors, continue with others
 
@@ -617,7 +617,7 @@ class SynthesisFramework:
                                 validation_issues.append("Validation failed")
                     finally:
                         temp_path.unlink(missing_ok=True)
-                except Exception as e:
+                except (OSError, ValueError) as e:
                     logger.warning("Legacy validator error: %s", e)
 
             # Check results

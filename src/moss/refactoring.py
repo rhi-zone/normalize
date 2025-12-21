@@ -456,7 +456,7 @@ class Refactorer(WorkspaceRunner):
                     if not dry_run:
                         path.write_text(new_content)
 
-            except Exception as e:
+            except (OSError, SyntaxError) as e:
                 result.errors.append(f"Error processing {path}: {e}")
 
         if result.errors:
@@ -837,7 +837,7 @@ async def inline_symbol(
             if not dry_run:
                 path.write_text(new_content)
 
-    except Exception as e:
+    except (OSError, SyntaxError) as e:
         result.errors.append(f"Error inlining {name}: {e}")
         result.success = False
 
@@ -982,7 +982,7 @@ class CodemodRunner(WorkspaceRunner):
                                 if not dry_run:
                                     path.write_text(new_content)
 
-                        except Exception as e:
+                        except (OSError, SyntaxError) as e:
                             result.errors.append(f"Error in {path}: {e}")
 
         if result.errors:

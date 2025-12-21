@@ -1079,7 +1079,7 @@ class MemoryLayer:
                         max_episodes = config.memory.max_episodes
             except ImportError:
                 pass
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 logger.warning("Failed to load memory config: %s", e)
 
         return cls(plugins=plugins, max_episodes=max_episodes, patterns=patterns)
