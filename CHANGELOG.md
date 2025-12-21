@@ -4,6 +4,12 @@
 
 ### Features
 
+**Session Dec 21 2025**
+- `Symbol Hover in TUI`: Tree view shows symbol children with hover displaying signatures/docstrings
+- `Context Elision Heuristics`: Anchor-preserving elision when token budget exceeded
+- `Experiment Branching`: Multiple concurrent shadow branches for parallel approach testing
+- `GBNF Grammar Support`: Constrained inference for llama.cpp with predefined and custom grammars
+
 **CLI & Workflow Improvements** (Dec 2025)
 - `Workflow Arguments`: `--arg KEY=VALUE` option for passing parameters to workflows
 - `Incremental Test Runner`: `--incremental` flag in watch command runs only related tests

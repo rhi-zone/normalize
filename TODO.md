@@ -4,13 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Symbol Hover Info**: (TUI) Show signatures/docstrings on hover - requires symbol nodes in tree
-- [ ] **Context Elision Heuristics**: (Core) Prune large files while preserving anchors
-- [ ] **Shadow Git Branching**: (Git) Support for multiple concurrent experiment branches
-- [ ] **Local Model Constrained Inference**: Implement GBNF (GGML BNF) for structured output
+- [ ] **LLM Editing Performance Comparison**: Investigate Gemini vs Claude edit quality issues
+- [ ] **Memory Usage Optimization**: Ensure Moss keeps RAM extremely low
+- [ ] **Extensible Agent Modes**: Refactor TUI modes into plugin-based system
+- [ ] **Small/Local Model Brute Force**: Fast models with higher iteration/voting counts
 
 ## Recently Completed
 
+- **Session Dec 21 2025**:
+  - Symbol hover info in TUI with signatures/docstrings
+  - Context elision heuristics (anchor-preserving pruning)
+  - Experiment branching for parallel shadow branches
+  - GBNF grammar support for constrained local model inference
 - **CLI & Workflow Improvements** (Dec 2025):
   - CLAUDE.md/GEMINI.md: Prefer CLI over MCP, added anti-stub constraints
   - Workflow `--arg` option for passing key=value arguments
@@ -32,15 +37,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Future Work
 
 ### Agent Research & Optimization
-- [ ] **LLM Editing Performance Comparison**:
-  - Investigate Gemini 3 Flash and Gemini 3 Pro issues with invalid code edits
-  - Compare with Claude Code and Opus to identify architectural differences
 - [ ] **YOLO Mode Evaluation**: Evaluate if a "YOLO mode" aligns with Moss architectural principles
-- [ ] **Memory Usage Optimization**: Ensure Moss keeps RAM usage extremely low
-- [ ] **Extensible Agent Modes**: Refactor TUI modes into a plugin-based system (Partially Complete)
 - [ ] **'Diffusion-like' methods for large-scale refactors**:
   - Parallelize implementation of components based on high-level contracts
-- [ ] **Small/Local Model Brute Force**: Fast models with higher iteration/voting counts
 - [ ] **Fine-tuned Tiny Models**: Extreme optimization with models like 100M RWKV
 
 ### Codebase Tree Consolidation (see `docs/codebase-tree.md`)
