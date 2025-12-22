@@ -357,8 +357,6 @@ class KeybindBar(Static):
     """
 
     def render(self) -> str:
-        from rich.markup import escape
-
         parts = []
         if self.app:
             for binding in self.app.BINDINGS:
@@ -372,19 +370,18 @@ class KeybindBar(Static):
                 desc = binding.description
                 action = binding.action.replace("app.", "")
                 # Wrap the key in brackets: [Q]uit, [-] Up
+                # Use \[ to escape brackets in Textual markup
                 idx = desc.lower().find(key.lower())
                 if idx >= 0:
                     # Key found in description - wrap it
-                    text = f"{desc[:idx]}[{desc[idx]}]{desc[idx + 1 :]}"
+                    text = f"{desc[:idx]}\\[{desc[idx]}]{desc[idx + 1 :]}"
                 else:
                     # Key not in description, prefix with [key]
-                    text = f"[{key}] {desc}"
-                # Escape brackets for Rich markup, then wrap in click handler
-                escaped = escape(text)
-                parts.append(f"[@click=app.{action}]{escaped}[/]")
+                    text = f"\\[{key}] {desc}"
+                parts.append(f"[@click=app.{action}]{text}[/]")
         left = " ".join(parts)
         # Palette uses Textual's built-in command_palette action
-        right = f"[@click=app.command_palette]{escape('[^p] Palette')}[/]"
+        right = "[@click=app.command_palette]\\[^p] Palette[/]"
         width = self.size.width if self.size.width > 0 else 80
         padding = max(1, width - 50)
         return f"{left}{' ' * padding}{right}"
