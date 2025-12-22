@@ -121,7 +121,7 @@ Tools available via `MossToolExecutor` (use with `moss.` prefix). These are inte
 - `anchor.find` / `anchor.resolve` - Find code anchors
 - `complexity.analyze` - Analyze code complexity
 
-Note: The `skeleton.*` tools are historical from before the Rust rewrite. They exist for backwards compatibility with agent loops.
+Note: The `skeleton.*` tools predate the Rust rewrite. They're subprocess wrappers that should be simplified (see TODO.md).
 
 ## Exit Conditions
 
