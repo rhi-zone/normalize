@@ -183,7 +183,6 @@ class TUIGenerator:
             #sidebar {
                 width: 30;
                 border: solid $primary;
-                padding: 1;
             }
 
             #content {
@@ -192,34 +191,27 @@ class TUIGenerator:
 
             #method-info {
                 height: auto;
-                max-height: 10;
+                max-height: 6;
                 border: solid $secondary;
-                padding: 1;
-                margin-bottom: 1;
             }
 
             #params-container {
                 height: auto;
                 border: solid $secondary;
-                padding: 1;
-                margin-bottom: 1;
             }
 
             #result-container {
                 height: 1fr;
                 border: solid $success;
-                padding: 1;
             }
 
             .param-row {
                 layout: horizontal;
                 height: 3;
-                margin-bottom: 1;
             }
 
             .param-label {
                 width: 20;
-                padding-top: 1;
             }
 
             .param-input {
@@ -227,7 +219,6 @@ class TUIGenerator:
             }
 
             #execute-btn {
-                margin-top: 1;
                 width: 100%;
             }
 
