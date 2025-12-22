@@ -4,6 +4,15 @@
 
 ### Features
 
+**Unified Resolution & Agent Improvements** (Dec 22 2025)
+- `moss analyze` now uses unified path resolution for symbol targeting
+  - Example: `moss analyze cli.py/cmd_telemetry --complexity`
+- Symbol-level token tracking in telemetry (parses `moss view file/symbol` from bash commands)
+- Agent retry loop fallback strategy:
+  - Tracks failures by normalized operation key (verb:target)
+  - `retry_threshold` config (default: 3 failures before fallback)
+  - `FallbackStrategy`: SKIP (continue), REPORT (exit), ALTERNATIVE (suggest)
+
 **Telemetry Enhancements & Analyze Filters** (Dec 22 2025)
 - Added `--kind` filter to `moss analyze` command (filter by function/method, avoids `-t` conflict)
 - Added file token tracking to session analysis (`file_tokens` field)

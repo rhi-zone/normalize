@@ -14,7 +14,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 **Known Issues:**
 - [x] Agent path resolution - FIXED: now routes through Rust CLI with fuzzy resolution
-- [ ] Agent stuck in retry loop (3x same intent) - needs fallback strategy
+- [x] Agent stuck in retry loop - FIXED: fallback strategy (retry_threshold, FallbackStrategy)
 - [ ] Agent behavior inconsistent (some runs hit max turns for same query)
 
 **Docs Alignment:**
@@ -44,7 +44,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [ ] Agent stuck in retry loop fallback strategy (see Known Issues above)
+- [ ] Agent behavior inconsistent (some runs hit max turns for same query)
+- [ ] Python edit uses separate file/symbol targeting (LLM-based, intentionally different)
 
 ## Backlog
 
