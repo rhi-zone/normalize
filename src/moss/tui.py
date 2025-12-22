@@ -1092,11 +1092,20 @@ class MossTUI(App):
                 cmd.focus()
         elif data["type"] == "dir":
             path = data["path"]
-            self._selected_path = str(path)
+            path_str = str(path)
             self._selected_type = "dir"
-            # Navigate into directory on select
+            # Double-click detection: navigate on second click within 0.5s
             if self.current_mode_name == "EXPLORE":
-                self.cd_to(str(path))
+                import time
+
+                now = time.time()
+                if (
+                    self._selected_path == path_str
+                    and now - getattr(self, "_last_dir_click", 0) < 0.5
+                ):
+                    self.cd_to(path_str)
+                self._last_dir_click = now
+            self._selected_path = path_str
         elif data["type"] == "symbol":
             symbol = data["symbol"]
             path = data["path"]
