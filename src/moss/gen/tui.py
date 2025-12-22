@@ -287,6 +287,12 @@ class TUIGenerator:
 
                 # Clear and rebuild params container
                 params_container = self.query_one("#params-container", Container)
+                # Explicitly remove execute button if it exists (avoid duplicate ID)
+                try:
+                    old_btn = self.query_one("#execute-btn", Button)
+                    old_btn.remove()
+                except Exception:
+                    pass
                 params_container.remove_children()
                 self.param_inputs.clear()
 
