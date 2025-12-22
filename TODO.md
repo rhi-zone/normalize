@@ -47,6 +47,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 ## Next Up
 
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
+- [ ] Review hybrid-loops.md for accuracy (user questioned if tools still exist)
+- [ ] Consider generating file extension list from authoritative source (linguist)
 
 ## Backlog
 
@@ -61,6 +63,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] Share: tree-sitter parsers, Language detection, SymbolKind types
 - [ ] Consider: consolidate index.rs, symbols.rs (different designs for CLI vs daemon)
 - [x] Refactor file extension matching: centralized SOURCE_EXTENSIONS constant + helper functions
+
+**Code Organization:**
+- [x] Synthesis plugins: aligned module paths with entry point names (Dec 22)
 
 **Call Graph Improvements:**
 - [x] Call extraction for Python, Rust, TypeScript, JavaScript, Java, Go
