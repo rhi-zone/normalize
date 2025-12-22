@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Removed
+
+**CLI Cleanup** (Dec 22 2025)
+- Removed `moss loop` CLI command and all predefined loops (simple, critic, incremental, etc.)
+- Removed `moss dwim` CLI command (module kept for alias resolution)
+- Use DWIMLoop or TOML workflows instead
+
 ### Features
 
 **CLI Consolidation & Model Update** (Dec 22 2025)
