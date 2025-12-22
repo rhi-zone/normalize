@@ -47,17 +47,13 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 ## Next Up
 
 - [ ] Design: Composable execution architecture
-  - [x] Primitives defined: Scope, ContextStrategy, CacheStrategy (docs/design/execution-primitives.md)
-  - [x] Prototype: src/moss/execution/__init__.py (~450 lines)
-  - [x] Context strategies: FlatContext, TaskListContext, TaskTreeContext
-  - [x] Cache strategies: NoCache, InMemoryCache
-  - [x] Retry strategies: NoRetry, FixedRetry, ExponentialRetry
-  - [x] LLM strategies: NoLLM, SimpleLLM (uses moss.llm.complete)
-  - [x] parse_intent() + execute_intent() - DWIM verb parsing, real CLI execution
-  - [x] TOML analysis: can express state machines; limit is computed values; plugins could help
-  - [ ] Test with real LLM end-to-end
-  - [ ] Define "dwim" as predefined workflow config (not special class)
-  - [ ] Remove DWIMLoop class (1151 lines → ~50 lines of workflow config)
+  - [x] Primitives: Scope, strategies (context/cache/retry/llm) - docs/design/execution-primitives.md
+  - [x] Prototype: src/moss/execution/__init__.py (~500 lines)
+  - [x] Decision model: inline CoT, multiple actions, parse_decision()
+  - [x] agent_loop() handles Decision with prose + actions
+  - [ ] Phase 2: Parallel execution (Decision.parallel)
+  - [ ] Phase 3: Define "dwim" as TOML workflow config
+  - [ ] Phase 4: Wire retry into Scope.run(), remove DWIMLoop
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
 
 ## Backlog
