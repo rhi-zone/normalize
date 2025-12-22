@@ -808,6 +808,64 @@ def evaluate_condition(condition: str, context: str, result: str) -> bool:
     return plugin.evaluate(context, result, param)
 
 
+def llm_select_transition(
+    prompt: str,
+    transitions: list[Transition],
+    context: str,
+    result: str,
+) -> str | None:
+    """Use LLM to select the next state from available transitions.
+
+    Args:
+        prompt: The decision prompt describing what to choose
+        transitions: Available transition options
+        context: Current execution context
+        result: Result from the state's action
+
+    Returns:
+        Selected state name, or None if LLM couldn't decide
+    """
+    from moss.llm import complete
+
+    # Build options list
+    options = [t.next for t in transitions]
+    options_str = ", ".join(options)
+
+    system = (
+        "You are a state machine controller. Select the next state based on the context.\n"
+        "Respond with ONLY the state name, nothing else."
+    )
+
+    user_prompt = f"""Decision: {prompt}
+
+Current context:
+{context}
+
+Action result:
+{result}
+
+Available states: {options_str}
+
+Which state should we transition to? Respond with just the state name."""
+
+    try:
+        response = complete(user_prompt, system=system).strip()
+        # Validate response is one of the options
+        if response in options:
+            return response
+        # Try case-insensitive match
+        for opt in options:
+            if opt.lower() == response.lower():
+                return opt
+        # Try to find option in response
+        for opt in options:
+            if opt in response:
+                return opt
+        return None
+    except Exception:
+        return None
+
+
 @dataclass
 class StepResult:
     """Result from a compound step execution.
@@ -859,13 +917,22 @@ class WorkflowState:
 
     Lifecycle hooks run in this order:
     1. on_entry (when entering state)
-    2. action (main state logic) OR parallel states
+    2. action (main state logic) OR parallel states OR nested workflow
     3. on_exit (before transitioning out)
 
     Parallel execution:
     If `parallel` is set, the state forks into parallel sub-states.
     All parallel states execute concurrently, then join back.
     The `join` field specifies which state to transition to after all complete.
+
+    Nested state machines:
+    If `workflow` is set, the state runs another workflow (TOML file path).
+    Context is passed down; nested workflow runs to completion before transitioning.
+
+    LLM-driven state selection:
+    If `llm_select` is set, the LLM chooses the next state from available transitions.
+    The `llm_select` string is the prompt describing the decision to make.
+    The LLM sees current context, action result, and transition options.
     """
 
     name: str
@@ -876,6 +943,8 @@ class WorkflowState:
     on_exit: str | None = None  # Run before leaving state
     parallel: list[str] | None = None  # State names to execute in parallel
     join: str | None = None  # State to transition to after parallel completion
+    workflow: str | None = None  # Path to nested workflow TOML
+    llm_select: str | None = None  # Prompt for LLM to select next state
 
 
 @dataclass
@@ -1010,6 +1079,8 @@ def load_workflow(path: str) -> WorkflowConfig:
                     on_exit=state_cfg.get("on_exit"),
                     parallel=state_cfg.get("parallel"),
                     join=state_cfg.get("join"),
+                    workflow=state_cfg.get("workflow"),
+                    llm_select=state_cfg.get("llm_select"),
                 )
             )
         return result
@@ -1191,8 +1262,16 @@ def _execute_state(
     scope: Scope,
     state_map: dict[str, WorkflowState],
     prev_state: WorkflowState | None,
+    workflow_base_path: str | None = None,
 ) -> tuple[str, str]:
     """Execute a single state and return (result, next_state_name or empty).
+
+    Args:
+        state: The state to execute
+        scope: Current execution scope
+        state_map: Map of state names to WorkflowState objects
+        prev_state: Previous state (for on_entry detection)
+        workflow_base_path: Base path for resolving nested workflow paths
 
     Returns:
         Tuple of (action result, next state name or "" if terminal/no transition)
@@ -1207,20 +1286,60 @@ def _execute_state(
         scope.context.add("result", "Terminal state reached")
         return "", ""
 
-    # Execute state action
+    # Execute state action, nested workflow, or parallel states
     result = ""
-    if state.action:
+
+    if state.workflow:
+        # Nested state machine: run another workflow
+        from pathlib import Path
+
+        workflow_path = state.workflow
+        if workflow_base_path and not Path(workflow_path).is_absolute():
+            workflow_path = str(Path(workflow_base_path).parent / workflow_path)
+
+        # Run nested workflow in child scope
+        with scope.child(mode="inherited"):
+            # Extract current context as initial_context for nested workflow
+            ctx_str = scope.context.get_context()
+            initial_ctx = {}
+            for line in ctx_str.split("\n"):
+                if ": " in line:
+                    k, v = line.split(": ", 1)
+                    initial_ctx[k] = v
+
+            nested_result = run_workflow(workflow_path, initial_context=initial_ctx)
+            result = f"[nested:{state.workflow}] {nested_result[:200]}"
+            scope.context.add("nested_result", result)
+
+    elif state.action:
         result = scope.run(state.action)
 
     # Find matching transition
     next_state_name = ""
-    for t in state.transitions:
-        if t.condition is None:
-            next_state_name = t.next
-            break
-        if evaluate_condition(t.condition, scope.context.get_context(), result):
-            next_state_name = t.next
-            break
+    ctx = scope.context.get_context()
+
+    if state.llm_select and state.transitions:
+        # LLM-driven state selection
+        selected = llm_select_transition(state.llm_select, state.transitions, ctx, result)
+        if selected:
+            next_state_name = selected
+            scope.context.add("llm_decision", f"Selected: {selected}")
+        else:
+            # Fallback to first unconditional transition
+            for t in state.transitions:
+                if t.condition is None:
+                    next_state_name = t.next
+                    scope.context.add("llm_decision", f"Fallback: {next_state_name}")
+                    break
+    else:
+        # Standard condition-based selection
+        for t in state.transitions:
+            if t.condition is None:
+                next_state_name = t.next
+                break
+            if evaluate_condition(t.condition, ctx, result):
+                next_state_name = t.next
+                break
 
     # Run on_exit hook before transitioning
     if next_state_name and state.on_exit:
@@ -1237,12 +1356,16 @@ def state_machine_loop(
     retry: RetryStrategy | None = None,
     max_transitions: int = 50,
     initial_context: dict[str, str] | None = None,
+    workflow_path: str | None = None,
 ) -> str:
     """Execute state machine until terminal state or limit.
 
     Supports parallel state execution: if a state has `parallel` set,
     all listed states execute concurrently via ThreadPoolExecutor,
     then transition to the `join` state.
+
+    Supports nested state machines: if a state has `workflow` set,
+    it runs another workflow TOML file before transitioning.
 
     Args:
         states: List of workflow states
@@ -1252,6 +1375,7 @@ def state_machine_loop(
         retry: Retry strategy (default: NoRetry)
         max_transitions: Maximum state transitions before stopping
         initial_context: Initial context values
+        workflow_path: Path to the workflow file (for resolving nested workflows)
 
     Returns:
         Final context string
@@ -1308,7 +1432,9 @@ def state_machine_loop(
             def run_parallel_state(pstate: WorkflowState) -> tuple[str, str, str]:
                 """Run a state in parallel, return (name, result, next)."""
                 with scope.child() as child_scope:
-                    result, next_name = _execute_state(pstate, child_scope, state_map, None)
+                    result, next_name = _execute_state(
+                        pstate, child_scope, state_map, None, workflow_path
+                    )
                     return pstate.name, result, next_name
 
             results: list[tuple[str, str, str]] = []
@@ -1330,7 +1456,9 @@ def state_machine_loop(
             continue
 
         # Normal sequential execution
-        result, next_state_name = _execute_state(current, scope, state_map, prev_state)
+        result, next_state_name = _execute_state(
+            current, scope, state_map, prev_state, workflow_path
+        )
 
         if current.terminal:
             break
@@ -1377,6 +1505,7 @@ def run_workflow(path: str, task: str = "", initial_context: dict[str, str] | No
             retry=config.retry,
             max_transitions=config.max_turns,
             initial_context=initial_context,
+            workflow_path=path,
         )
 
     # Step-based workflow

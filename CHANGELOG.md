@@ -13,6 +13,8 @@
 - State lifecycle hooks: `on_entry` (when entering state), `on_exit` (before leaving)
 - Parallel state execution: `parallel` (list of states) + `join` (target state)
 - Fork/join semantics via ThreadPoolExecutor, results collected as `parallel_result`
+- Nested state machines: `workflow` field on states runs another workflow TOML
+- LLM-driven state selection: `llm_select` field lets LLM choose next state from transitions
 
 **Nested Steps** (Dec 23 2025)
 - WorkflowStep now supports compound steps (with sub-steps)
@@ -30,6 +32,7 @@
 - Goto uses Rust index (`find-symbols`) for symbol search - works without git
 - Tree file listing uses new `list-files` Rust command (no more git ls-files dependency)
 - `g` shortcut still works as hidden alias for quick goto
+- Modal keybinds: TUIMode.bindings, active_bindings property, KeybindBar refresh on mode change
 
 ### Documentation
 
@@ -38,17 +41,10 @@
 - Rust = plumbing (deterministic, performance-critical, syntax-aware)
 - Python = interface (LLM, orchestration, TUI, plugins)
 
-**Modal Keybinds Design** (Dec 23 2025)
-- Complete design in docs/tui.md for mode-specific keybindings
-- TUIMode.bindings property for mode-specific bindings
-- active_bindings merges global + mode bindings (mode overrides on conflict)
-- KeybindBar refresh on mode change
-
 ### Refactoring
 
 **Code Cleanup** (Dec 23 2025)
 - SkeletonAPI.expand now uses rust_view() instead of raw call_rust()
-- Documented TUI modal keybinds architecture (needs design before implementation)
 - Python edit assessment: EditAPI (file ops) is used; complexity-routed edit() is stubs
 
 **Workflow Unification** (Dec 23 2025)

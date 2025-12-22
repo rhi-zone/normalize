@@ -36,7 +36,10 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class TUIMode(Protocol):
-    """Protocol for TUI operating modes."""
+    """Protocol for TUI operating modes.
+
+    Mode bindings extend global bindings. Same key in mode overrides global.
+    """
 
     @property
     def name(self) -> str:
@@ -53,6 +56,11 @@ class TUIMode(Protocol):
         """Command input placeholder."""
         ...
 
+    @property
+    def bindings(self) -> list:
+        """Mode-specific key bindings (optional, default [])."""
+        ...
+
     async def on_enter(self, app: MossTUI) -> None:
         """Called when entering this mode."""
         ...
@@ -62,6 +70,7 @@ class PlanMode:
     name = "PLAN"
     color = "blue"
     placeholder = "What is the plan? (e.g. breakdown...)"
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = True
@@ -74,6 +83,7 @@ class ReadMode:
     name = "READ"
     color = "green"
     placeholder = "Explore codebase... (e.g. skeleton, grep, expand)"
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = True
@@ -86,6 +96,7 @@ class WriteMode:
     name = "WRITE"
     color = "red"
     placeholder = "Modify code... (e.g. write, replace, insert)"
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = True
@@ -98,6 +109,7 @@ class DiffMode:
     name = "DIFF"
     color = "magenta"
     placeholder = "Review changes... (revert <file> <line> to undo)"
+    bindings: ClassVar[list] = []  # Future: r=revert, a=accept, n=next, p=prev
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = False
@@ -111,6 +123,7 @@ class SessionMode:
     name = "SESSION"
     color = "yellow"
     placeholder = "Manage sessions... (resume <id> to continue)"
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = False
@@ -137,6 +150,7 @@ class BranchMode:
     name = "BRANCH"
     color = "cyan"
     placeholder = "Manage branches... (branch <name> to switch)"
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = False
@@ -150,6 +164,7 @@ class SwarmMode:
     name = "SWARM"
     color = "white"
     placeholder = "Manage swarm... (wait for workers to complete)"
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = False
@@ -164,6 +179,7 @@ class CommitMode:
     name = "COMMIT"
     color = "green"
     placeholder = "Review commit actions... (select a hunk to view)"
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         app.query_one("#log-view").display = False
@@ -180,6 +196,7 @@ class ExploreMode:
     name = "EXPLORE"
     color = "cyan"
     placeholder = ""
+    bindings: ClassVar[list] = []  # View/Edit/Analyze already in global bindings
 
     async def on_enter(self, app: MossTUI) -> None:
         try:
@@ -346,7 +363,10 @@ class ModeIndicator(Static):
 
 
 class KeybindBar(Static):
-    """Footer showing keybindings built from app bindings."""
+    """Footer showing keybindings built from app bindings.
+
+    Uses active_bindings which merges global + mode-specific bindings.
+    """
 
     DEFAULT_CSS = """
     KeybindBar {
@@ -360,7 +380,8 @@ class KeybindBar(Static):
     def render(self) -> str:
         parts = []
         if self.app:
-            for binding in self.app.BINDINGS:
+            bindings = getattr(self.app, "active_bindings", self.app.BINDINGS)
+            for binding in bindings:
                 if not binding.show:
                     continue
                 key = binding.key
@@ -386,7 +407,8 @@ class KeybindBar(Static):
         # Calculate padding to right-align palette
         # Visible length: description + 3 chars for brackets (e.g., "[Q]uit")
         # Plus spaces between items
-        shown = [b for b in self.app.BINDINGS if b.show] if self.app else []
+        bindings = getattr(self.app, "active_bindings", self.app.BINDINGS) if self.app else []
+        shown = [b for b in bindings if b.show]
         left_len = sum(len(b.description) + 3 for b in shown) + max(0, len(shown) - 1)
         right_len = len("[^p] Palette")
         width = self.size.width if self.size.width > 0 else 80
@@ -887,6 +909,20 @@ class MossTUI(App):
 
     current_mode_name = reactive("EXPLORE")
 
+    @property
+    def active_bindings(self) -> list[Binding]:
+        """Merge global + mode bindings. Mode overrides global on key conflict."""
+        mode = self._mode_registry.get_mode(self.current_mode_name)
+        mode_bindings = getattr(mode, "bindings", []) if mode else []
+        if not mode_bindings:
+            return list(self.BINDINGS)
+
+        # Build lookup: key -> binding (mode overrides global)
+        result = {b.key: b for b in self.BINDINGS}
+        for b in mode_bindings:
+            result[b.key] = b
+        return list(result.values())
+
     def __init__(self, api: MossAPI):
         super().__init__()
         self.api = api
@@ -1075,6 +1111,12 @@ class MossTUI(App):
         self.query_one("#explore-view").display = False
 
         await mode.on_enter(self)
+
+        # Refresh keybind bar to show mode-specific bindings
+        try:
+            self.query_one(KeybindBar).refresh()
+        except Exception:
+            pass  # KeybindBar may not be mounted yet
 
     async def _update_branch_view(self) -> None:
         """Fetch and display all shadow branches."""

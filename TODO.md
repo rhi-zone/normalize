@@ -46,9 +46,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [ ] Implement modal keybinds (design complete - see docs/tui.md)
-- [ ] State machine: nested state machines
-- [ ] State machine: LLM-driven state selection
+- [ ] Remaining docs: prior-art.md, hybrid-loops.md (lower priority)
+- [ ] Python edit uses separate file/symbol targeting (LLM-based, intentionally different)
+- [ ] Stop and plan before adding more features
 
 ## Backlog
 
@@ -70,8 +70,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 **Workflow Enhancements:**
 - [x] State machine: parallel state execution (fork/join with `parallel` and `join` fields)
-- [ ] State machine: nested state machines
-- [ ] State machine: LLM-driven state selection (hybrid with agent_loop)
+- [x] State machine: nested state machines (workflow field on states)
+- [x] State machine: LLM-driven state selection (llm_select field on states)
 
 **Indexing Performance:**
 - [x] Slow reindexing on large repos - FIXED (20s → 1s on ~/git/enso/)
@@ -109,7 +109,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Use detected corrections to identify friction points, improve prompts/tools
 
 **Explore TUI Keybinds:**
-- [ ] Modal keybinds (design complete - see docs/tui.md)
+- [x] Modal keybinds (TUIMode.bindings, active_bindings property, KeybindBar refresh)
 - [x] Jump-to-node shortcut (fuzzy search to quickly navigate tree) - 'g' key
 - [ ] View/Edit/Analyze: mode indicator (bottom right, near palette) OR tabbed content view
 - [ ] Remove theme keybind (T) - wasteful, only toggles light/dark
