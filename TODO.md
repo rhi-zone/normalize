@@ -46,6 +46,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
+- [ ] Design: Composable execution architecture (see docs/architecture-review-dec22.md)
+  - What are the primitives? (context, cache, retry strategies)
+  - How do they compose/nest?
+  - Code vs config for workflows?
+  - Clear Rust/Python boundary
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
 
 ## Backlog
