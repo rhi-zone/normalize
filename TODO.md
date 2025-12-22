@@ -53,10 +53,14 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 **Architecture Cleanup (High Priority):**
 - [ ] Stop and plan before adding more features
 - [ ] Consolidate redundant layers discovered Dec 22:
-  - SkeletonAPI wrappers (just call Rust CLI)
-  - Two agent loops (DWIMLoop vs AgentLoop+workflows)
-  - Python edit (redundant with agent)
-  - Confusing CLI naming (edit means different things)
+  - SkeletonAPI wrappers → use rust_shim directly:
+    - `skeleton.format` → `rust_shim.passthrough("view", [path])`
+    - `skeleton.expand` → `rust_shim.passthrough("view", [path/symbol])`
+    - `skeleton.extract` → same with `--json`
+  - MossToolExecutor → call rust_shim directly
+  - Two agent loops (DWIMLoop vs AgentLoop+workflows) - why both?
+  - Python edit → redundant with agent, remove
+  - Rust edit vs Python edit → same name, different behavior
 - [ ] Define clear boundaries: what's Rust, what's Python, why
 
 **Indexing Performance:**
