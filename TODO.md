@@ -64,11 +64,12 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 **Code Organization:**
 - [x] Synthesis plugins: aligned module paths with entry point names (Dec 22)
-- [ ] Simplify MossAPI/MossToolExecutor: Remove subprocess wrappers
-  - `skeleton.format` → `moss view <path>`
-  - `skeleton.expand` → `moss view <path>/<symbol>` (Rust already does this)
-  - Keep only genuinely Python-only: `patch.apply`
-  - MossToolExecutor could call CLI directly
+- [ ] Simplify MossAPI/MossToolExecutor: Remove redundant Python wrappers
+  - `skeleton.format` → `rust_shim.passthrough("view", [path])`
+  - `skeleton.expand` → `rust_shim.passthrough("view", [path/symbol])`
+  - `skeleton.extract` → same with `--json`
+  - `patch.apply` → possibly `moss edit` (Python LLM-based or Rust structural)
+  - MossToolExecutor could use rust_shim directly
 
 **Call Graph Improvements:**
 - [x] Call extraction for Python, Rust, TypeScript, JavaScript, Java, Go
