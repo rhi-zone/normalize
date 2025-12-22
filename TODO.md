@@ -72,11 +72,13 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] CLI simplification: Too many overlapping commands
   - `view`, `edit`, `analyze` - Rust primitives (keep)
   - Remove Python `edit` - redundant with agent
-  - Unify `workflow` and `agent`? Open questions:
-    - Is agent just a dynamic workflow? (LLM picks steps vs TOML defines steps)
+  - Two parallel agent implementations (!):
+    - `DWIMLoop` class (default `moss agent`) - custom Python, DWIM routing
+    - `AgentLoop` + workflow system (`--vanilla`) - TOML-defined, executor-based
+  - Open questions:
+    - Why two agent loop implementations?
+    - Should DWIMLoop be a workflow, or should workflows use DWIMLoop?
     - What about workflow {list,new,show}? Management commands need a home
-    - Option: `moss workflow run <name>` vs `moss workflow run --agent <task>`
-    - Option: Keep separate but clarify when to use which
 
 **Call Graph Improvements:**
 - [x] Call extraction for Python, Rust, TypeScript, JavaScript, Java, Go
