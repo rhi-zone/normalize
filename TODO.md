@@ -29,8 +29,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 **Unified Plumbing for 3 Primitives:**
 - [x] Path resolution unified: `path_resolve::resolve_unified` used by view, edit (Rust), analyze
-- [ ] Add filters to analyze: `--type`, `--calls`, `--called-by` (currently view-only)
-- [ ] Note: `-t` conflict - view uses `--type`, analyze uses `--threshold`
+- [x] Add `--kind` filter to analyze (uses `--kind` to avoid `-t` conflict with `--threshold`)
+- [ ] Add `--calls`, `--called-by` filters to analyze (currently view-only)
 - [ ] Python edit uses separate file/symbol targeting (LLM-based, intentionally different)
 
 **CLI Cleanup:**
@@ -44,10 +44,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [ ] Add `--kind` filter to `analyze` (filter by symbol type, avoid `-t` conflict with `--threshold`)
-- [ ] Tokens per symbol path in telemetry (leverage codebase tree)
-- [ ] Real-time telemetry mode (`moss telemetry --watch`)
-- [ ] Add Gemini CLI log parser to plugin system
+- [ ] Symbol-level token tracking in telemetry (extend file tokens to symbol paths)
+- [ ] Agent stuck in retry loop fallback strategy (see Known Issues above)
+- [ ] Add filters to analyze: `--calls`, `--called-by` (currently view-only)
 
 ## Backlog
 
@@ -55,7 +54,10 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] `moss telemetry` CLI with aggregate analysis
 - [x] HTML dashboard output
 - [x] Plugin architecture for log formats (LogParser protocol)
-- [ ] Tokens per function/file/module
+- [x] File-level token tracking (`file_tokens` in SessionAnalysis)
+- [x] Gemini CLI log parser
+- [x] Real-time telemetry mode (`--watch`)
+- [ ] Tokens per function/symbol (extend file tracking)
 
 **Memory System** (see `docs/memory-system.md`):
 - [ ] Layered memory for cross-session learning

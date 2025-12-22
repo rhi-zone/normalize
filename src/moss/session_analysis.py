@@ -55,15 +55,20 @@ def detect_log_format(path: Path) -> LogFormat:
 
     # Check file extension hints
     suffix = path.suffix.lower()
-    name = path.name.lower()
 
-    # Moss internal sessions are JSON (not JSONL)
-    if suffix == ".json" and "session" in name:
+    # Check for JSON formats (not JSONL)
+    if suffix == ".json":
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
+                # Moss internal sessions
                 if "tool_calls" in data and "llm_calls" in data:
                     return LogFormat.MOSS
+                # Gemini CLI sessions have sessionId and messages array
+                if "sessionId" in data and "messages" in data:
+                    messages = data.get("messages", [])
+                    if any(m.get("type") == "gemini" for m in messages):
+                        return LogFormat.GEMINI
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -107,6 +112,8 @@ def get_parser_for_format(path: Path, fmt: LogFormat) -> LogParser:
         return ClaudeCodeAnalyzer(path)
     if fmt == LogFormat.MOSS:
         return MossSessionAnalyzer(path)
+    if fmt == LogFormat.GEMINI:
+        return GeminiCliAnalyzer(path)
     # Default to Claude Code parser for unknown formats
     return ClaudeCodeAnalyzer(path)
 
@@ -210,6 +217,7 @@ class SessionAnalysis:
     tool_stats: dict[str, ToolStats] = field(default_factory=dict)
     token_stats: TokenStats = field(default_factory=TokenStats)
     error_patterns: list[ErrorPattern] = field(default_factory=list)
+    file_tokens: dict[str, int] = field(default_factory=dict)
     parallel_opportunities: int = 0
     total_turns: int = 0
 
@@ -234,6 +242,7 @@ class SessionAnalysis:
             "tool_stats": {k: v.to_dict() for k, v in self.tool_stats.items()},
             "token_stats": self.token_stats.to_dict(),
             "error_patterns": [e.to_dict() for e in self.error_patterns],
+            "file_tokens": dict(sorted(self.file_tokens.items(), key=lambda x: -x[1])[:20]),
             "summary": {
                 "total_tool_calls": self.total_tool_calls,
                 "total_errors": self.total_errors,
@@ -315,6 +324,17 @@ class SessionAnalysis:
                 lines.append(f"- **Cache create**: {ts.cache_create:,} tokens")
             lines.append("")
 
+        # File token hotspots
+        if self.file_tokens:
+            lines.append("## File Token Hotspots")
+            lines.append("")
+            lines.append("| File | Tokens |")
+            lines.append("|------|--------|")
+            sorted_files = sorted(self.file_tokens.items(), key=lambda x: -x[1])[:10]
+            for file_path, tokens in sorted_files:
+                lines.append(f"| {file_path} | {tokens:,} |")
+            lines.append("")
+
         # Error patterns
         if self.error_patterns:
             lines.append("## Error Patterns")
@@ -355,6 +375,9 @@ class ClaudeCodeAnalyzer:
 
         # Find error patterns
         result.error_patterns = self._find_error_patterns(entries)
+
+        # Analyze file token usage
+        result.file_tokens = self._analyze_file_tokens(entries)
 
         # Count turns and parallel opportunities
         result.total_turns = self._count_turns(entries)
@@ -531,6 +554,79 @@ class ClaudeCodeAnalyzer:
             return "Import error"
         return "Other"
 
+    def _analyze_file_tokens(self, entries: list[dict]) -> dict[str, int]:
+        """Analyze token usage per file.
+
+        For each assistant turn, identify files accessed via tool calls
+        and distribute the output tokens among those files.
+        """
+        file_tokens: dict[str, int] = {}
+
+        # Group entries by request ID
+        requests: dict[str, dict] = {}
+        for entry in entries:
+            if entry.get("type") != "assistant":
+                continue
+            request_id = entry.get("requestId", str(id(entry)))
+            message = entry.get("message", {})
+            usage = message.get("usage", {})
+            content = message.get("content", [])
+
+            if request_id not in requests:
+                requests[request_id] = {"files": set(), "output_tokens": 0}
+
+            # Track output tokens (take max due to streaming)
+            output = usage.get("output_tokens", 0)
+            requests[request_id]["output_tokens"] = max(
+                requests[request_id]["output_tokens"], output
+            )
+
+            # Extract files from tool calls
+            if isinstance(content, list):
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") == "tool_use":
+                        tool_input = block.get("input", {})
+                        # Read, Edit, Write have file_path
+                        if "file_path" in tool_input:
+                            fp = tool_input["file_path"]
+                            if isinstance(fp, str):
+                                requests[request_id]["files"].add(fp)
+                        # Glob has pattern (extract directory)
+                        if block.get("name") == "Glob" and "pattern" in tool_input:
+                            pat = tool_input["pattern"]
+                            if isinstance(pat, str) and "/" in pat:
+                                dir_part = pat.rsplit("/", 1)[0]
+                                if not dir_part.startswith("*"):
+                                    requests[request_id]["files"].add(dir_part)
+                        # Grep has path
+                        if "path" in tool_input:
+                            p = tool_input["path"]
+                            if isinstance(p, str):
+                                requests[request_id]["files"].add(p)
+
+        # Distribute tokens to files
+        for req in requests.values():
+            files = req["files"]
+            tokens = req["output_tokens"]
+            if files and tokens > 0:
+                per_file = tokens // len(files)
+                for f in files:
+                    # Normalize path (remove absolute prefix if present)
+                    norm_path = f
+                    if norm_path.startswith("/"):
+                        # Try to make relative
+                        parts = norm_path.split("/")
+                        # Find common project markers
+                        for i, part in enumerate(parts):
+                            if part in ("src", "lib", "crates", "tests", "docs"):
+                                norm_path = "/".join(parts[i:])
+                                break
+                    file_tokens[norm_path] = file_tokens.get(norm_path, 0) + per_file
+
+        return file_tokens
+
     def _count_turns(self, entries: list[dict]) -> int:
         """Count assistant turns."""
         seen_request_ids: set[str] = set()
@@ -605,6 +701,138 @@ class MossSessionAnalyzer:
         result.total_turns = data.get("llm_calls", 0)
 
         return result
+
+
+class GeminiCliAnalyzer:
+    """Analyze Gemini CLI session files (JSON format).
+
+    Gemini CLI stores sessions as single JSON files with structure:
+    - sessionId, projectHash, startTime, lastUpdated
+    - messages: array of user/gemini messages with toolCalls, thoughts, tokens
+    """
+
+    def __init__(self, session_path: Path):
+        self.session_path = Path(session_path)
+
+    def analyze(self) -> SessionAnalysis:
+        """Parse and analyze the Gemini CLI session."""
+        result = SessionAnalysis(session_path=self.session_path)
+
+        if not self.session_path.exists():
+            return result
+
+        try:
+            with open(self.session_path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return result
+
+        messages = data.get("messages", [])
+        result.message_counts = self._count_message_types(messages)
+        result.tool_stats = self._analyze_tools(messages)
+        result.token_stats = self._analyze_tokens(messages)
+        result.file_tokens = self._analyze_file_tokens(messages)
+        result.total_turns = self._count_turns(messages)
+
+        return result
+
+    def _count_message_types(self, messages: list[dict]) -> dict[str, int]:
+        """Count message types."""
+        counts: dict[str, int] = {}
+        for msg in messages:
+            msg_type = msg.get("type", "unknown")
+            counts[msg_type] = counts.get(msg_type, 0) + 1
+        return counts
+
+    def _analyze_tools(self, messages: list[dict]) -> dict[str, ToolStats]:
+        """Analyze tool call frequency and success rates."""
+        stats: dict[str, ToolStats] = {}
+
+        for msg in messages:
+            if msg.get("type") != "gemini":
+                continue
+
+            tool_calls = msg.get("toolCalls", [])
+            for tc in tool_calls:
+                tool_name = tc.get("name", "unknown")
+                if tool_name not in stats:
+                    stats[tool_name] = ToolStats(name=tool_name)
+                stats[tool_name].calls += 1
+
+                # Check for errors
+                if tc.get("status") == "error":
+                    stats[tool_name].errors += 1
+
+        return stats
+
+    def _analyze_tokens(self, messages: list[dict]) -> TokenStats:
+        """Analyze token usage from messages."""
+        stats = TokenStats()
+
+        for msg in messages:
+            if msg.get("type") != "gemini":
+                continue
+
+            tokens = msg.get("tokens", {})
+            if not tokens:
+                continue
+
+            stats.api_calls += 1
+            stats.total_input += tokens.get("input", 0)
+            stats.total_output += tokens.get("output", 0)
+            stats.cache_read += tokens.get("cached", 0)
+
+            # Track context (input + cached)
+            context = tokens.get("input", 0) + tokens.get("cached", 0)
+            if stats.min_context == 0 or context < stats.min_context:
+                stats.min_context = context
+            if context > stats.max_context:
+                stats.max_context = context
+
+        return stats
+
+    def _analyze_file_tokens(self, messages: list[dict]) -> dict[str, int]:
+        """Analyze token usage per file."""
+        file_tokens: dict[str, int] = {}
+
+        for msg in messages:
+            if msg.get("type") != "gemini":
+                continue
+
+            tokens = msg.get("tokens", {})
+            output_tokens = tokens.get("output", 0)
+            if output_tokens == 0:
+                continue
+
+            # Extract files from tool calls
+            files: set[str] = set()
+            for tc in msg.get("toolCalls", []):
+                args = tc.get("args", {})
+                # read_file, write_file have file_path
+                if "file_path" in args:
+                    files.add(args["file_path"])
+                # run_shell_command might have file references in command
+                # (skip for now - complex to parse)
+
+            # Distribute tokens to files
+            if files:
+                per_file = output_tokens // len(files)
+                for f in files:
+                    # Normalize path
+                    norm_path = f
+                    if norm_path.startswith("/"):
+                        parts = norm_path.split("/")
+                        for i, part in enumerate(parts):
+                            if part in ("src", "lib", "crates", "tests", "docs"):
+                                norm_path = "/".join(parts[i:])
+                                break
+                    file_tokens[norm_path] = file_tokens.get(norm_path, 0) + per_file
+
+        return file_tokens
+
+    def _count_turns(self, messages: list[dict]) -> int:
+        """Count gemini turns."""
+        return sum(1 for msg in messages if msg.get("type") == "gemini")
 
 
 def analyze_session(path: str | Path) -> SessionAnalysis:

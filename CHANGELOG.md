@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Features
+
+**Telemetry Enhancements & Analyze Filters** (Dec 22 2025)
+- Added `--kind` filter to `moss analyze` command (filter by function/method, avoids `-t` conflict)
+- Added file token tracking to session analysis (`file_tokens` field)
+- Added `moss telemetry --watch` for real-time telemetry monitoring
+- Added `GeminiCliAnalyzer` for Gemini CLI session logs (JSON format)
+- Auto-detection now recognizes Gemini CLI sessions
+
 ### Removed
 
 **CLI Cleanup** (Dec 22 2025)

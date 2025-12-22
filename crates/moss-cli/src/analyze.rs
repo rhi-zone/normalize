@@ -379,8 +379,16 @@ pub fn analyze(
     run_complexity: bool,
     run_security: bool,
     complexity_threshold: Option<usize>,
+    kind_filter: Option<&str>,
 ) -> AnalyzeReport {
     let target_path = target.unwrap_or(".");
+
+    // Normalize kind filter
+    let kind = kind_filter.map(|k| match k.to_lowercase().as_str() {
+        "function" | "functions" | "func" | "fn" => "function",
+        "method" | "methods" => "method",
+        _ => k,
+    });
 
     // Determine what we're analyzing
     let is_file = if let Some(t) = target {
@@ -417,6 +425,16 @@ pub fn analyze(
                 if let (Some(ref mut r), Some(threshold)) = (&mut report, complexity_threshold) {
                     r.functions.retain(|f| f.complexity >= threshold);
                 }
+
+                // Apply kind filter (function = no parent, method = has parent)
+                if let (Some(ref mut r), Some(k)) = (&mut report, &kind) {
+                    match *k {
+                        "function" => r.functions.retain(|f| f.parent.is_none()),
+                        "method" => r.functions.retain(|f| f.parent.is_some()),
+                        _ => {} // Unknown kind, don't filter
+                    }
+                }
+
                 report
             } else {
                 None

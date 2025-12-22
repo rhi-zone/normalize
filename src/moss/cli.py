@@ -2238,6 +2238,7 @@ def cmd_telemetry(args: Namespace) -> int:
     log_paths = [Path(p) for p in getattr(args, "logs", []) or []]
     session_id = getattr(args, "session", None)
     html_output = getattr(args, "html", False)
+    watch_mode = getattr(args, "watch", False)
 
     # Mode 1: Analyze specific moss session
     if session_id:
@@ -2258,6 +2259,9 @@ def cmd_telemetry(args: Namespace) -> int:
             if not path.exists():
                 output.error(f"Log file not found: {path}")
                 return 1
+
+        if watch_mode:
+            return _telemetry_watch_loop(log_paths, output, html_output, args)
 
         analyses = [analyze_session(p) for p in log_paths]
 
@@ -2290,6 +2294,113 @@ def cmd_telemetry(args: Namespace) -> int:
         output.print(_format_aggregate_stats(stats))
 
     return 0
+
+
+def _telemetry_watch_loop(
+    log_paths: list[Path], output: Any, html_output: bool, args: Namespace
+) -> int:
+    """Run continuous telemetry watch loop."""
+    import sys
+    import time
+
+    from moss.session_analysis import analyze_session
+
+    last_mtimes: dict[Path, float] = {}
+    last_output = ""
+    refresh_interval = 2.0  # seconds
+
+    output.print(f"Watching {len(log_paths)} log file(s)... (Ctrl+C to stop)")
+
+    try:
+        while True:
+            # Check if any files changed
+            changed = False
+            for path in log_paths:
+                try:
+                    mtime = path.stat().st_mtime
+                    if path not in last_mtimes or mtime > last_mtimes[path]:
+                        last_mtimes[path] = mtime
+                        changed = True
+                except OSError:
+                    pass
+
+            if changed or not last_output:
+                # Re-analyze
+                analyses = [analyze_session(p) for p in log_paths]
+                if len(analyses) == 1:
+                    analysis = analyses[0]
+                else:
+                    analysis = _aggregate_analyses(analyses)
+
+                # Format output
+                if html_output:
+                    new_output = _generate_telemetry_html(analysis)
+                elif getattr(args, "compact", False):
+                    new_output = analysis.to_compact()
+                else:
+                    new_output = _format_watch_output(analysis)
+
+                # Only redraw if output changed
+                if new_output != last_output:
+                    last_output = new_output
+                    # Clear screen and move cursor to top
+                    sys.stdout.write("\033[2J\033[H")
+                    sys.stdout.write(new_output)
+                    sys.stdout.write(
+                        f"\n\n[Last updated: {time.strftime('%H:%M:%S')}] "
+                        f"Watching... (Ctrl+C to stop)\n"
+                    )
+                    sys.stdout.flush()
+
+            time.sleep(refresh_interval)
+    except KeyboardInterrupt:
+        output.print("\nWatch stopped.")
+        return 0
+
+
+def _format_watch_output(analysis: Any) -> str:
+    """Format telemetry for watch mode (compact live view)."""
+    lines = []
+    lines.append("TELEMETRY WATCH")
+    lines.append("=" * 50)
+    lines.append("")
+
+    # Summary stats
+    lines.append(f"Tool calls: {analysis.total_tool_calls}")
+    lines.append(f"Success rate: {analysis.overall_success_rate:.1%}")
+    lines.append(f"Turns: {analysis.total_turns}")
+    lines.append("")
+
+    # Token stats
+    if analysis.token_stats.api_calls:
+        ts = analysis.token_stats
+        lines.append("TOKENS")
+        lines.append(f"  API calls: {ts.api_calls}")
+        lines.append(f"  Avg context: {ts.avg_context:,}")
+        lines.append(f"  Output: {ts.total_output:,}")
+        if ts.cache_read:
+            lines.append(f"  Cache read: {ts.cache_read:,}")
+        lines.append("")
+
+    # Top tools (compact)
+    if analysis.tool_stats:
+        lines.append("TOP TOOLS")
+        sorted_tools = sorted(analysis.tool_stats.values(), key=lambda t: t.calls, reverse=True)[:5]
+        for tool in sorted_tools:
+            lines.append(f"  {tool.name}: {tool.calls}")
+        lines.append("")
+
+    # File hotspots
+    if analysis.file_tokens:
+        lines.append("FILE HOTSPOTS (by tokens)")
+        sorted_files = sorted(analysis.file_tokens.items(), key=lambda x: -x[1])[:5]
+        for path, tokens in sorted_files:
+            # Truncate long paths
+            display_path = path if len(path) <= 40 else "..." + path[-37:]
+            lines.append(f"  {display_path}: {tokens:,}")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 def _format_session_stats(stats: dict) -> str:
@@ -2371,11 +2482,18 @@ def _aggregate_analyses(analyses: list) -> SessionAnalysis:
         for msg_type, count in analysis.message_counts.items():
             combined_messages[msg_type] = combined_messages.get(msg_type, 0) + count
 
+    # Combine file tokens
+    combined_file_tokens: dict[str, int] = {}
+    for analysis in analyses:
+        for path, tokens in analysis.file_tokens.items():
+            combined_file_tokens[path] = combined_file_tokens.get(path, 0) + tokens
+
     result = SessionAnalysis(
         session_path=Path(f"<{len(analyses)} sessions>"),
         tool_stats=combined_tools,
         token_stats=combined_tokens,
         message_counts=combined_messages,
+        file_tokens=combined_file_tokens,
         total_turns=sum(a.total_turns for a in analyses),
         parallel_opportunities=sum(a.parallel_opportunities for a in analyses),
     )
@@ -5469,6 +5587,12 @@ def create_parser() -> argparse.ArgumentParser:
         "--html",
         action="store_true",
         help="Output as HTML dashboard",
+    )
+    telemetry_parser.add_argument(
+        "--watch",
+        "-w",
+        action="store_true",
+        help="Watch mode - continuously update telemetry as logs change",
     )
     telemetry_parser.set_defaults(func=cmd_telemetry)
 

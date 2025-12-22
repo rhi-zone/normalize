@@ -496,6 +496,10 @@ enum Commands {
         /// Complexity threshold - only show functions above this
         #[arg(short, long)]
         threshold: Option<usize>,
+
+        /// Filter by symbol kind: function, method
+        #[arg(long)]
+        kind: Option<String>,
     },
 
     /// Show comprehensive codebase overview
@@ -711,6 +715,7 @@ fn main() {
             complexity,
             security,
             threshold,
+            kind,
         } => cmd_analyze(
             target.as_deref(),
             root.as_deref(),
@@ -718,6 +723,7 @@ fn main() {
             complexity,
             security,
             threshold,
+            kind.as_deref(),
             cli.json,
         ),
         Commands::Overview { root, compact } => {
@@ -3226,6 +3232,7 @@ fn cmd_analyze(
     complexity: bool,
     security: bool,
     threshold: Option<usize>,
+    kind_filter: Option<&str>,
     json: bool,
 ) -> i32 {
     let root = root
@@ -3246,6 +3253,7 @@ fn cmd_analyze(
         run_complexity,
         run_security,
         threshold,
+        kind_filter,
     );
 
     if json {
