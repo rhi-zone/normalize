@@ -345,7 +345,7 @@ class ModeIndicator(Static):
 
 
 class KeybindBar(Static):
-    """Footer showing keybindings with underlined hotkey letters."""
+    """Footer showing keybindings built from app bindings."""
 
     DEFAULT_CSS = """
     KeybindBar {
@@ -357,21 +357,24 @@ class KeybindBar(Static):
     """
 
     def render(self) -> str:
-        binds = [
-            "[@click=app.quit][u]Q[/u]uit[/]",
-            "[@click=app.toggle_dark][u]T[/u]heme[/]",
-            "[@click=app.primitive_view][u]V[/u]iew[/]",
-            "[@click=app.primitive_edit][u]E[/u]dit[/]",
-            "[@click=app.primitive_analyze][u]A[/u]nalyze[/]",
-            "[@click=app.cd_up][dim]-[/dim]Up[/]",
-            "[@click=app.toggle_command][dim]/[/dim]Cmd[/]",
-        ]
-        left = "  ".join(binds)
-        right = "[@click=app.action_command_palette][dim]Ctrl+P[/dim] Palette[/]"
-        # Pad to push palette right
+        parts = []
+        # Build from app's active bindings
+        if self.app:
+            for binding in self.app.BINDINGS:
+                if not binding.show:
+                    continue
+                key = binding.key
+                # Normalize key display
+                if key == "minus":
+                    key = "-"
+                elif key == "slash":
+                    key = "/"
+                action = binding.action.replace("app.", "")
+                parts.append(f"[@click=app.{action}][b]{key}[/b] {binding.description}[/]")
+        left = " ".join(parts)
+        right = "[@click=app.action_command_palette][b]^p[/b] Palette[/]"
         width = self.size.width if self.size.width > 0 else 80
-        left_len = 45  # approximate
-        padding = max(1, width - left_len - 15)
+        padding = max(1, width - len(left) // 2 - 12)
         return f"{left}{' ' * padding}{right}"
 
 
@@ -703,16 +706,16 @@ class MossTUI(App):
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
-        Binding("q", "quit", "Quit", show=False),
+        Binding("q", "quit", "Quit"),
         Binding("ctrl+c", "handle_ctrl_c", "Interrupt", show=False),
-        Binding("t", "app.toggle_dark", "Theme", show=False),
+        Binding("t", "toggle_dark", "Theme"),
+        Binding("v", "primitive_view", "View"),
+        Binding("e", "primitive_edit", "Edit"),
+        Binding("a", "primitive_analyze", "Analyze"),
+        Binding("minus", "cd_up", "Up"),
+        Binding("slash", "toggle_command", "Cmd"),
         Binding("tab", "next_mode", "Mode", show=False),
-        Binding("v", "primitive_view", "View", show=False),
-        Binding("e", "primitive_edit", "Edit", show=False),
-        Binding("a", "primitive_analyze", "Analyze", show=False),
-        Binding("minus", "cd_up", "Up", show=False),
         Binding("enter", "enter_dir", "Enter", show=False),
-        Binding("slash", "toggle_command", "Cmd", show=False),
         Binding("escape", "hide_command", show=False),
     ]
 
