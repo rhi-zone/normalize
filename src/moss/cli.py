@@ -3669,6 +3669,72 @@ def cmd_agent(args: Namespace) -> int:
             output.error(f"\nFailed: {result.error}")
             return 1
 
+    # New composable execution primitives
+    use_primitives = getattr(args, "primitives", False)
+    if use_primitives:
+        from pathlib import Path as P
+
+        from moss.execution import (
+            ExponentialRetry,
+            InMemoryCache,
+            NoLLM,
+            SimpleLLM,
+            TaskTreeContext,
+            load_workflow,
+        )
+        from moss.execution import (
+            agent_loop as exec_agent_loop,
+        )
+
+        # Find dwim.toml
+        dwim_toml = P(__file__).parent / "workflows" / "dwim.toml"
+
+        output.info(f"Starting agent (primitives): {task}")
+
+        # Load workflow config if available
+        if dwim_toml.exists():
+            config = load_workflow(str(dwim_toml))
+            context = config.context
+            cache = config.cache
+            retry = config.retry
+            llm = config.llm if not mock else NoLLM(actions=["view README.md", "done"])
+            workflow_max_turns = config.max_turns
+        else:
+            # Fallback defaults
+            context = TaskTreeContext()
+            cache = InMemoryCache()
+            retry = ExponentialRetry(max_attempts=3)
+            llm = NoLLM(actions=["view README.md", "done"]) if mock else SimpleLLM()
+            workflow_max_turns = max_turns
+
+        if verbose:
+            output.info(f"Context: {type(context).__name__}")
+            output.info(f"Cache: {type(cache).__name__}")
+            output.info(f"Retry: {type(retry).__name__}")
+            output.info(f"LLM: {type(llm).__name__}")
+            output.info(f"Max turns: {workflow_max_turns}")
+        output.info("")
+
+        try:
+            result = exec_agent_loop(
+                task=task,
+                context=context,
+                cache=cache,
+                retry=retry,
+                llm=llm,
+                max_turns=workflow_max_turns,
+            )
+            output.success("\nCompleted!")
+            output.info(f"Final context:\n{result}")
+            return 0
+        except Exception as e:
+            output.error(f"Agent failed: {e}")
+            if verbose:
+                import traceback
+
+                output.info(traceback.format_exc())
+            return 1
+
     config = LoopConfig(max_turns=max_turns, mock=mock)
     if model:
         config.model = model
@@ -5659,6 +5725,11 @@ def create_parser() -> argparse.ArgumentParser:
         "--mock",
         action="store_true",
         help="Use mock LLM responses (for testing)",
+    )
+    agent_parser.add_argument(
+        "--primitives",
+        action="store_true",
+        help="Use new composable execution primitives (experimental)",
     )
     agent_parser.set_defaults(func=cmd_agent)
 
