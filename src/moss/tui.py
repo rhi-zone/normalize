@@ -1124,6 +1124,24 @@ class MossTUI(App):
         self.current_mode_name = next_mode.name
         self._log(f"Switched to {self.current_mode_name} mode")
 
+    def action_toggle_transparency(self) -> None:
+        """Toggle transparent background for terminal opacity support."""
+        self._transparent_bg = not getattr(self, "_transparent_bg", False)
+        self._save_settings()
+        status = "enabled" if self._transparent_bg else "disabled"
+        self._log(f"Transparent background {status}")
+
+    def get_system_commands(self, screen):
+        """Add custom commands to the command palette."""
+        from textual.command import DiscoveryHit
+
+        yield from super().get_system_commands(screen)
+        yield DiscoveryHit(
+            "Toggle Transparency",
+            self.action_toggle_transparency,
+            "Enable/disable transparent background for terminal opacity",
+        )
+
     async def _update_git_view(self) -> None:
         """Fetch and display shadow git data."""
         try:
