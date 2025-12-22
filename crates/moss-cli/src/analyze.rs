@@ -135,6 +135,7 @@ pub struct AnalyzeReport {
     pub complexity: Option<ComplexityReport>,
     pub security: Option<SecurityReport>,
     pub target_path: String,
+    pub skipped: Vec<String>,
 }
 
 impl AnalyzeReport {
@@ -176,6 +177,14 @@ impl AnalyzeReport {
 
         if let Some(ref security) = self.security {
             sections.push(security.format());
+        }
+
+        if !self.skipped.is_empty() {
+            sections.push(String::new());
+            sections.push("## Skipped".to_string());
+            for s in &self.skipped {
+                sections.push(format!("- {}", s));
+            }
         }
 
         sections.join("\n")
@@ -267,6 +276,18 @@ impl AnalyzeReport {
                     "tools_run": security.tools_run,
                     "tools_skipped": security.tools_skipped,
                 }),
+            );
+        }
+
+        if !self.skipped.is_empty() {
+            obj.insert(
+                "skipped".to_string(),
+                serde_json::Value::Array(
+                    self.skipped
+                        .iter()
+                        .map(|s| serde_json::Value::String(s.clone()))
+                        .collect(),
+                ),
             );
         }
 
@@ -411,6 +432,9 @@ pub fn analyze(
     // Symbol targeting only makes sense for complexity
     let has_symbol_target = !symbol_path.is_empty();
 
+    // Track skipped analyses for user feedback
+    let mut skipped = Vec::new();
+
     let health = if run_health && !is_file && !has_symbol_target {
         // Health is codebase-wide, skip if targeting a symbol
         let analysis_root = if let Some(ref fp) = file_path {
@@ -427,9 +451,12 @@ pub fn analyze(
         None
     };
 
-    let complexity = if run_complexity && is_file {
-        // Complexity for single file
-        if let Some(ref fp) = file_path {
+    let complexity = if run_complexity {
+        if !is_file {
+            // Complexity requires a file target
+            skipped.push("complexity: requires file target (use: moss analyze <file> --complexity)".to_string());
+            None
+        } else if let Some(ref fp) = file_path {
             let full_path = root.join(fp);
             let mut report = analyze_file_complexity(&full_path);
 
@@ -497,5 +524,6 @@ pub fn analyze(
         complexity,
         security,
         target_path: target_path.to_string(),
+        skipped,
     }
 }
