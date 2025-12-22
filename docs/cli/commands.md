@@ -1,5 +1,26 @@
 # CLI Commands
 
+## Command Philosophy
+
+Moss has **three core primitives**:
+
+| Primitive | Purpose | Think of it as |
+|-----------|---------|----------------|
+| `view` | See/find nodes | "What's there?" |
+| `edit` | Modify nodes | "Change this" |
+| `analyze` | Compute properties | "What's wrong?" |
+
+**Why three?** Complexity grows exponentially with combinations. 3 composable primitives with filters (`--type`, `--depth`, `--calls`) are simpler than 30 specialized tools. The entire interface fits in working memory.
+
+**Aliases**: These all route to `view`:
+- `search`, `find`, `grep`, `query`, `locate`, `lookup`
+
+Content search (`grep "pattern"`) should eventually become `view --contains "pattern"`. Currently the Rust CLI has a separate `grep` command for performance, but conceptually it's a view filter.
+
+**Legacy commands**: `health`, `summarize`, `check-docs`, `check-todos` predate the 3-primitive design. Use `analyze --health` instead of `health`. Others may be folded into analyze in future.
+
+---
+
 ## moss synthesize
 
 Synthesize code from a specification.
