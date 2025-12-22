@@ -481,79 +481,107 @@ class ProjectTree(Tree[Any]):
             new_node = tree_node.add(label, expand=True, data={"type": "task", "node": child})
             self._add_task_nodes(new_node, child)
 
-    def update_from_files(self, api: MossAPI, tree_root: Path | None = None) -> None:
-        """Update tree from filesystem.
+    # Extensions for files that can show symbols when expanded
+    EXPANDABLE_EXTS = (
+        ".py",
+        ".rs",
+        ".md",
+        ".js",
+        ".mjs",
+        ".cjs",
+        ".jsx",
+        ".ts",
+        ".mts",
+        ".cts",
+        ".tsx",
+        ".go",
+        ".java",
+        ".c",
+        ".h",
+        ".cpp",
+        ".cc",
+        ".hpp",
+        ".rb",
+        ".sh",
+    )
+    # Directories to skip
+    SKIP_DIRS: ClassVar[set[str]] = {
+        "__pycache__",
+        "node_modules",
+        "target",
+        ".git",
+        ".venv",
+        "venv",
+        "dist",
+        "build",
+    }
 
-        Args:
-            api: The MossAPI instance
-            tree_root: Root directory to show (defaults to api.root)
+    def update_from_files(self, api: MossAPI, tree_root: Path | None = None) -> None:
+        """Update tree from filesystem with lazy loading.
+
+        Only loads immediate children of the root directory.
+        Subdirectories are loaded on expand via on_tree_node_expanded.
         """
         self._api = api
         self.clear()
         root = self.root
         tree_root = tree_root or api.root
         root.label = f"[b]Files: {tree_root.name}[/b]"
+        root.data = {"type": "dir", "path": tree_root, "loaded": True}
 
-        import os
-
-        def add_dir(tree_node: TreeNode[Any], path: Path):
-            try:
-                entries = sorted(os.listdir(path))
-                for entry in entries:
-                    if entry.startswith(".") and entry != ".moss":
-                        continue
-
-                    full_path = path / entry
-                    if full_path.is_dir():
-                        if entry in ("__pycache__", "node_modules", "target", ".git"):
-                            continue
-                        node = tree_node.add(f"📁 {entry}", data={"type": "dir", "path": full_path})
-                        add_dir(node, full_path)
-                    else:
-                        file_data = {"type": "file", "path": full_path, "loaded": False}
-                        # Code files are expandable (symbols loaded on expand)
-                        expandable_exts = (
-                            ".py",
-                            ".rs",
-                            ".md",
-                            ".js",
-                            ".mjs",
-                            ".cjs",
-                            ".jsx",
-                            ".ts",
-                            ".mts",
-                            ".cts",
-                            ".tsx",
-                            ".go",
-                            ".java",
-                            ".c",
-                            ".h",
-                            ".cpp",
-                            ".cc",
-                            ".hpp",
-                            ".rb",
-                            ".sh",
-                        )
-                        if entry.endswith(expandable_exts):
-                            tree_node.add(f"📄 {entry}", data=file_data)
-                        else:
-                            # Add padding to align with expandable items (▶ is 2 chars)
-                            tree_node.add_leaf(f"  📄 {entry}", data=file_data)
-            except OSError:
-                pass
-
-        add_dir(root, tree_root)
+        # Only load immediate children of root
+        self._load_dir_children(root, tree_root)
         root.expand()
 
-    def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
-        """Load symbols lazily when a file node is expanded."""
-        data = event.node.data
-        if not data or data.get("type") != "file" or data.get("loaded"):
+    def _load_dir_children(self, tree_node: TreeNode[Any], path: Path) -> None:
+        """Load immediate children of a directory into tree node."""
+        import os
+
+        try:
+            entries = sorted(os.listdir(path))
+        except OSError:
             return
 
-        path = data["path"]
+        for entry in entries:
+            if entry.startswith(".") and entry != ".moss":
+                continue
+
+            full_path = path / entry
+            if full_path.is_dir():
+                if entry in self.SKIP_DIRS:
+                    continue
+                # Mark as not loaded - will load children on expand
+                data = {"type": "dir", "path": full_path, "loaded": False}
+                tree_node.add(f"📁 {entry}", data=data)
+            else:
+                file_data = {"type": "file", "path": full_path, "loaded": False}
+                if entry.endswith(self.EXPANDABLE_EXTS):
+                    tree_node.add(f"📄 {entry}", data=file_data)
+                else:
+                    tree_node.add_leaf(f"  📄 {entry}", data=file_data)
+
+    def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
+        """Load children lazily when a node is expanded."""
+        data = event.node.data
+        if not data or data.get("loaded"):
+            return
+
+        node_type = data.get("type")
+        path = data.get("path")
+        if not path:
+            return
+
         data["loaded"] = True
 
+        if node_type == "dir":
+            # Lazy load directory children
+            self._load_dir_children(event.node, path)
+        elif node_type == "file":
+            # Lazy load file symbols
+            self._load_file_symbols(event.node, path)
+
+    def _load_file_symbols(self, tree_node: TreeNode[Any], path: Path) -> None:
+        """Load symbols for a file into tree node."""
         # Symbol kind icons
         kind_icons = {
             "class": "📦",
@@ -563,63 +591,61 @@ class ProjectTree(Tree[Any]):
             "heading": "📑",
         }
 
-        def add_symbols(tree_node: TreeNode[Any], symbols: list, path: Path) -> None:
+        def add_symbols(node: TreeNode[Any], symbols: list, file_path: Path) -> None:
             for symbol in symbols:
                 icon = kind_icons.get(symbol.kind, "•")
                 label = f"{icon} {symbol.name}"
-                sym_data = {"type": "symbol", "symbol": symbol, "path": path}
+                sym_data = {"type": "symbol", "symbol": symbol, "path": file_path}
                 if symbol.children:
-                    sym_node = tree_node.add(label, data=sym_data)
-                    add_symbols(sym_node, symbol.children, path)
+                    sym_node = node.add(label, data=sym_data)
+                    add_symbols(sym_node, symbol.children, file_path)
                 else:
-                    # Add padding to align with expandable items
-                    tree_node.add_leaf(f"  {label}", data=sym_data)
+                    node.add_leaf(f"  {label}", data=sym_data)
 
-        # Use unified skeleton API for all supported file types
+        # Extensions that support symbol extraction
         supported_exts = (
             ".py",
             ".rs",
-            ".md",  # original
+            ".md",
             ".js",
             ".mjs",
             ".cjs",
-            ".jsx",  # JavaScript
+            ".jsx",
             ".ts",
             ".mts",
             ".cts",
-            ".tsx",  # TypeScript
-            ".go",  # Go
-            ".java",  # Java
+            ".tsx",
+            ".go",
+            ".java",
             ".c",
-            ".h",  # C
+            ".h",
             ".cpp",
             ".cc",
             ".cxx",
-            ".hpp",  # C++
-            ".rb",  # Ruby
+            ".hpp",
+            ".rb",
             ".sh",
-            ".bash",  # Bash
+            ".bash",
             ".json",
             ".yaml",
-            ".yml",  # Data formats
+            ".yml",
             ".html",
             ".htm",
-            ".css",  # Web
-            ".toml",  # Config
+            ".css",
+            ".toml",
         )
         symbols_found = False
         if self._api and path.suffix in supported_exts:
             try:
                 symbols = self._api.skeleton.extract(path)
                 if symbols:
-                    add_symbols(event.node, symbols, path)
+                    add_symbols(tree_node, symbols, path)
                     symbols_found = True
             except (OSError, ValueError, SyntaxError):
                 pass
 
-        # Hide expand arrow if no symbols were loaded
         if not symbols_found:
-            event.node.allow_expand = False
+            tree_node.allow_expand = False
 
 
 class MossTUI(App):

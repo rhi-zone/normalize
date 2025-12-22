@@ -83,6 +83,10 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] Symbol parsing for call graph: Python, Rust, Java, TypeScript, TSX, JavaScript, Go, JSON, YAML, TOML
 - [x] Data file key extraction: JSON/YAML/TOML keys become symbols (objects=class, values=variable)
 
+**Explore TUI Polish:**
+- [ ] `.moss` folder: don't create automatically (most repos don't have it gitignored)
+- [ ] Terminal output sanitization: reset terminal state after nested command output (escape codes leak through)
+
 **Explore TUI Keybinds:**
 - [ ] Modal keybinds like Blender (mode-specific keys that change based on context)
 - [ ] Live footer keybind updates when mode/context changes
