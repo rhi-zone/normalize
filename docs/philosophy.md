@@ -37,6 +37,18 @@ Examples:
 
 Complexity grows linearly with primitives, exponentially with combinations. A system with 3 composable primitives is simpler than one with 30 specialized tools, even if the 30-tool system has less code per tool.
 
+### Separate Interface, Unify Plumbing
+
+The user-facing interface should reflect intent (view, edit, analyze are different actions). The implementation should share machinery (path resolution, filtering, node targeting, output formatting).
+
+This gives us:
+- **Clarity**: Users know what operation they're performing
+- **Safety**: Read vs write intent is explicit
+- **DRY**: One path resolver, one filter implementation, one tree model
+- **Consistency**: Same `--type`, `--calls`, `--deps` flags work everywhere
+
+The interface serves the user's mental model. The plumbing stays unified.
+
 ### Minimize LLM Usage
 
 LLM calls are expensive (cost) and slow (latency). Design everything to reduce them:
