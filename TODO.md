@@ -63,6 +63,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Backlog
 
+**Skeleton Language Support:**
+- [ ] Add more tree-sitter grammars: YAML, JSON, TypeScript, JavaScript, HTML
+- [ ] Priority: languages used in this codebase first
+- [ ] Consider: Go, Java, C/C++, Ruby for broader utility
+
 **Explore TUI Keybinds:**
 - [ ] Modal keybinds like Blender (mode-specific keys that change based on context)
 - [ ] Live footer keybind updates when mode/context changes

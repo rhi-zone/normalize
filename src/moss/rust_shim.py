@@ -198,6 +198,30 @@ def rust_skeleton(file_path: str, root: str | None = None) -> str | None:
     return output
 
 
+def rust_skeleton_json(file_path: str, root: str | None = None) -> list[dict] | None:
+    """Extract code skeleton as structured data using Rust CLI.
+
+    Returns list of symbol dicts or None if Rust not available.
+    Each symbol has: name, kind, signature, docstring, start_line, end_line, children
+    """
+    if not rust_available():
+        return None
+
+    args = ["--json", "skeleton"]
+    if root:
+        args.extend(["-r", root])
+    args.append(file_path)
+
+    code, output = call_rust(args, json_output=False)
+    if code != 0:
+        return None
+
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError:
+        return None
+
+
 def rust_summarize(file_path: str, root: str | None = None) -> str | None:
     """Summarize a file using Rust CLI.
 

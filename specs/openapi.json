@@ -2763,14 +2763,14 @@
     },
     "/skeleton/extract": {
       "post": {
-        "description": "Extract skeleton from a Python file. List of Symbol objects representing the code structure Note: For non-Python files, use format() which routes through the plugin system.",
+        "description": "Extract skeleton from a file (Python, Rust, Markdown). List of Symbol objects representing the code structure",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
                   "file_path": {
-                    "description": "Path to the Python file (relative to root or absolute)",
+                    "description": "Path to the file (relative to root or absolute)",
                     "type": "string"
                   }
                 },
@@ -2788,7 +2788,7 @@
             "description": "Successful response"
           }
         },
-        "summary": "Extract skeleton from a Python file",
+        "summary": "Extract skeleton from a file (Python, Rust, Markdown)",
         "tags": [
           "skeleton"
         ]

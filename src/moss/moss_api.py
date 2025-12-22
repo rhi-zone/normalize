@@ -314,22 +314,58 @@ class SkeletonAPI(PathResolvingMixin):
     root: Path
 
     def extract(self, file_path: str | Path) -> list[Symbol]:
-        """Extract skeleton from a Python file.
+        """Extract skeleton from a file (Python, Rust, Markdown).
 
         Args:
-            file_path: Path to the Python file (relative to root or absolute)
+            file_path: Path to the file (relative to root or absolute)
 
         Returns:
             List of Symbol objects representing the code structure
-
-        Note:
-            For non-Python files, use format() which routes through the plugin system.
         """
-        from moss.skeleton import extract_python_skeleton
+        from moss.rust_shim import rust_available, rust_skeleton_json
 
         path = self._resolve_path(file_path)
-        source = path.read_text()
-        return extract_python_skeleton(source)
+
+        # Try Rust CLI first (supports Python, Rust, Markdown)
+        if rust_available():
+            try:
+                rel_path = path.relative_to(self.root)
+            except ValueError:
+                rel_path = path
+            json_result = rust_skeleton_json(str(rel_path), root=str(self.root))
+            if json_result is not None:
+                return self._json_to_symbols(json_result)
+
+        # Fallback to Python for .py files
+        if path.suffix == ".py":
+            from moss.skeleton import extract_python_skeleton
+
+            source = path.read_text()
+            return extract_python_skeleton(source)
+
+        return []
+
+    def _json_to_symbols(self, json_data: list[dict] | dict) -> list[Symbol]:
+        """Convert JSON skeleton data to Symbol objects."""
+        from moss.skeleton import Symbol
+
+        def convert(item: dict) -> Symbol:
+            children = [convert(c) for c in item.get("children", [])]
+            return Symbol(
+                name=item.get("name", ""),
+                kind=item.get("kind", ""),
+                signature=item.get("signature", ""),
+                docstring=item.get("docstring"),
+                lineno=item.get("start_line", 0),
+                end_lineno=item.get("end_line"),
+                children=children,
+            )
+
+        # Handle wrapper format: {"file": "...", "symbols": [...]}
+        if isinstance(json_data, dict):
+            json_data = json_data.get("symbols", [])
+
+        return [convert(item) for item in json_data]
 
     def format(self, file_path: str | Path, include_docstrings: bool = True) -> str:
         """Extract and format skeleton as readable text.

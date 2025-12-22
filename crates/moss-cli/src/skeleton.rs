@@ -66,6 +66,7 @@ fn format_symbols(
 pub struct SkeletonExtractor {
     python_parser: Parser,
     rust_parser: Parser,
+    markdown_parser: Parser,
 }
 
 impl SkeletonExtractor {
@@ -80,9 +81,15 @@ impl SkeletonExtractor {
             .set_language(&tree_sitter_rust::LANGUAGE.into())
             .expect("Failed to load Rust grammar");
 
+        let mut markdown_parser = Parser::new();
+        markdown_parser
+            .set_language(&tree_sitter_md::LANGUAGE.into())
+            .expect("Failed to load Markdown grammar");
+
         Self {
             python_parser,
             rust_parser,
+            markdown_parser,
         }
     }
 
@@ -91,6 +98,7 @@ impl SkeletonExtractor {
         let symbols = match ext {
             "py" => self.extract_python(content),
             "rs" => self.extract_rust(content),
+            "md" => self.extract_markdown(content),
             _ => Vec::new(),
         };
 
@@ -578,6 +586,151 @@ impl SkeletonExtractor {
             Some(doc_lines.join("\n"))
         }
     }
+
+    fn extract_markdown(&mut self, content: &str) -> Vec<SkeletonSymbol> {
+        let tree = match self.markdown_parser.parse(content, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut headings = Vec::new();
+        let root = tree.root_node();
+        self.collect_markdown_headings(&root, content, &mut headings);
+
+        // Compute end_line for each heading (line before next heading at same/higher level)
+        let total_lines = content.lines().count();
+        let heading_count = headings.len();
+        for i in 0..heading_count {
+            let (_, level) = &headings[i];
+            let level = *level;
+            // Find next heading at same or higher level
+            let mut end = total_lines;
+            for j in (i + 1)..heading_count {
+                let (_, next_level) = &headings[j];
+                if *next_level <= level {
+                    end = headings[j].0.start_line - 1;
+                    break;
+                }
+            }
+            headings[i].0.end_line = end;
+        }
+
+        // Build nested tree from flat headings list
+        self.build_heading_tree(headings)
+    }
+
+    fn collect_markdown_headings(
+        &self,
+        node: &tree_sitter::Node,
+        content: &str,
+        headings: &mut Vec<(SkeletonSymbol, usize)>, // (symbol, level)
+    ) {
+        // ATX headings have type like "atx_h1_marker", "atx_h2_marker", etc.
+        // The heading node contains the marker and heading_content
+        if node.kind().starts_with("atx_heading") || node.kind() == "setext_heading" {
+            if let Some(sym) = self.extract_markdown_heading(node, content) {
+                let level = self.get_heading_level(node);
+                headings.push((sym, level));
+            }
+        }
+
+        // Recurse into children
+        let mut cursor = node.walk();
+        if cursor.goto_first_child() {
+            loop {
+                self.collect_markdown_headings(&cursor.node(), content, headings);
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+    }
+
+    fn get_heading_level(&self, node: &tree_sitter::Node) -> usize {
+        // atx_heading nodes have a marker child that indicates level
+        let kind = node.kind();
+        if kind.starts_with("atx_heading") {
+            // Look for marker child to count # characters
+            let mut cursor = node.walk();
+            if cursor.goto_first_child() {
+                loop {
+                    let child = cursor.node();
+                    if child.kind().contains("marker") {
+                        // Count the # characters
+                        return child.end_position().column - child.start_position().column;
+                    }
+                    if !cursor.goto_next_sibling() {
+                        break;
+                    }
+                }
+            }
+        }
+        1 // Default to level 1
+    }
+
+    fn extract_markdown_heading(
+        &self,
+        node: &tree_sitter::Node,
+        content: &str,
+    ) -> Option<SkeletonSymbol> {
+        // Get the full heading text
+        let text = &content[node.byte_range()];
+        let line = text.lines().next().unwrap_or("").trim();
+
+        // Extract title (remove # prefix)
+        let title = line.trim_start_matches('#').trim();
+        if title.is_empty() {
+            return None;
+        }
+
+        Some(SkeletonSymbol {
+            name: title.to_string(),
+            kind: "heading",
+            signature: line.to_string(),
+            docstring: None,
+            start_line: node.start_position().row + 1,
+            end_line: node.end_position().row + 1,
+            children: Vec::new(),
+        })
+    }
+
+    fn build_heading_tree(&self, headings: Vec<(SkeletonSymbol, usize)>) -> Vec<SkeletonSymbol> {
+        if headings.is_empty() {
+            return Vec::new();
+        }
+
+        // Stack-based tree building: (symbol, level)
+        let mut result: Vec<SkeletonSymbol> = Vec::new();
+        let mut stack: Vec<(SkeletonSymbol, usize)> = Vec::new();
+
+        for (sym, level) in headings {
+            // Pop items from stack that are at same or lower level
+            while let Some((_, parent_level)) = stack.last() {
+                if *parent_level >= level {
+                    let (completed, _) = stack.pop().unwrap();
+                    if let Some((parent, _)) = stack.last_mut() {
+                        parent.children.push(completed);
+                    } else {
+                        result.push(completed);
+                    }
+                } else {
+                    break;
+                }
+            }
+            stack.push((sym, level));
+        }
+
+        // Empty remaining stack
+        while let Some((completed, _)) = stack.pop() {
+            if let Some((parent, _)) = stack.last_mut() {
+                parent.children.push(completed);
+            } else {
+                result.push(completed);
+            }
+        }
+
+        result
+    }
 }
 
 #[cfg(test)]
@@ -655,5 +808,51 @@ def hello(name: str) -> str:
 
         assert!(formatted.contains("def hello(name: str) -> str:"));
         assert!(formatted.contains("\"\"\"Say hello.\"\"\""));
+    }
+
+    #[test]
+    fn test_markdown_skeleton() {
+        let mut extractor = SkeletonExtractor::new();
+        let content = r#"# Title
+
+Some intro text.
+
+## Section One
+
+Content here.
+
+```bash
+# This is a comment, not a heading
+echo "hello"
+```
+
+## Section Two
+
+### Subsection
+
+More content.
+"#;
+        let result = extractor.extract(&PathBuf::from("test.md"), content);
+
+        // Should have 2 top-level headings: Title, and the h2s should be nested
+        assert!(!result.symbols.is_empty(), "Should have headings");
+
+        let title = &result.symbols[0];
+        assert_eq!(title.name, "Title");
+        assert_eq!(title.kind, "heading");
+
+        // Check that code block comment wasn't extracted as heading
+        let all_names: Vec<&str> = result
+            .symbols
+            .iter()
+            .flat_map(|s| {
+                std::iter::once(s.name.as_str()).chain(s.children.iter().map(|c| c.name.as_str()))
+            })
+            .collect();
+        assert!(
+            !all_names.iter().any(|n| n.contains("comment")),
+            "Code block comments should not be headings: {:?}",
+            all_names
+        );
     }
 }

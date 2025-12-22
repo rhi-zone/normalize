@@ -553,71 +553,14 @@ class ProjectTree(Tree[Any]):
                     # Add padding to align with expandable items
                     tree_node.add_leaf(f"  {label}", data=sym_data)
 
-        if self._api and str(path).endswith(".py"):
+        # Use unified skeleton API for all supported file types (Python, Rust, Markdown)
+        if self._api and path.suffix in (".py", ".rs", ".md"):
             try:
                 symbols = self._api.skeleton.extract(path)
                 if symbols:
                     add_symbols(event.node, symbols, path)
             except (OSError, ValueError, SyntaxError):
                 pass
-        elif str(path).endswith(".md"):
-            # Extract markdown headings
-            try:
-                headings = self._extract_markdown_headings(path)
-                add_symbols(event.node, headings, path)
-            except OSError:
-                pass
-
-    def _extract_markdown_headings(self, path: Path) -> list:
-        """Extract headings from markdown file as a nested tree."""
-        import re
-        from dataclasses import dataclass, field
-
-        @dataclass
-        class HeadingSymbol:
-            name: str
-            kind: str = "heading"
-            signature: str = ""
-            docstring: str | None = None
-            lineno: int = 0
-            level: int = 1
-            children: list = field(default_factory=list)
-
-        content = path.read_text()
-        all_headings = []
-        for i, line in enumerate(content.splitlines(), 1):
-            match = re.match(r"^(#{1,6})\s+(.+)$", line)
-            if match:
-                level = len(match.group(1))
-                title = match.group(2).strip()
-                all_headings.append(
-                    HeadingSymbol(
-                        name=title,
-                        signature=f"{'#' * level} {title}",
-                        lineno=i,
-                        level=level,
-                    )
-                )
-
-        # Build tree: each heading contains children with higher level numbers
-        def build_tree(headings: list, parent_level: int = 0) -> list:
-            result = []
-            i = 0
-            while i < len(headings):
-                h = headings[i]
-                if h.level <= parent_level:
-                    break
-                # Find children (higher level numbers until same or lower)
-                children_start = i + 1
-                children_end = children_start
-                while children_end < len(headings) and headings[children_end].level > h.level:
-                    children_end += 1
-                h.children = build_tree(headings[children_start:children_end], h.level)
-                result.append(h)
-                i = children_end if children_end > children_start else i + 1
-            return result
-
-        return build_tree(all_headings)
 
 
 class MossTUI(App):
@@ -1403,22 +1346,14 @@ class MossTUI(App):
             content = file_path.read_text()
             lines = content.splitlines()
             start = symbol.lineno - 1  # 0-indexed
-            # Find next heading at same or higher level (skip fenced code blocks)
-            level = len(symbol.signature) - len(symbol.signature.lstrip("#"))
-            end = len(lines)
-            in_code_block = False
-            for i in range(start + 1, len(lines)):
-                line = lines[i]
-                if line.startswith("```"):
-                    in_code_block = not in_code_block
-                    continue
-                if in_code_block:
-                    continue
-                if line.startswith("#"):
-                    next_level = len(line) - len(line.lstrip("#"))
-                    if next_level <= level:
-                        end = i
-                        break
+
+            # Use end_lineno from symbol (computed by tree-sitter in Rust)
+            end_lineno = getattr(symbol, "end_lineno", None)
+            if end_lineno is not None:
+                end = end_lineno
+            else:
+                end = len(lines)
+
             section = "\n".join(lines[start:end])
             explore_header.update(f"{symbol.signature} ({end - start} lines)")
             # Render markdown properly (handles code blocks, lists, etc.)

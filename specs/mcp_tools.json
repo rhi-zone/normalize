@@ -1543,7 +1543,7 @@
     "inputSchema": {
       "properties": {
         "file_path": {
-          "description": "Path to the Python file (relative to root or absolute)",
+          "description": "Path to the file (relative to root or absolute)",
           "type": "string"
         }
       },
