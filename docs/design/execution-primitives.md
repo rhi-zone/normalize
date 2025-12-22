@@ -289,7 +289,8 @@ action = "edit {item}"
 | Plugin | Purpose |
 |--------|---------|
 | `llm-decide` | LLM call → next state/action |
-| `for-each` | Iterate over plugin result |
+| `for-each` | Iterate over plugin result (sequential) |
+| `fanout` | Parallel execution over plugin result |
 | `condition` | Predefined conditions (has_errors, file_exists) |
 | `capture` | Store result for later use |
 | `transform` | Extract JSON field, format string |
@@ -315,36 +316,42 @@ For computed values: plugins extend TOML, or use Python directly.
 
 ## Prototype Status
 
-Implemented in `src/moss/execution/__init__.py` (~300 lines):
+Implemented in `src/moss/execution/__init__.py` (~400 lines):
 
 - [x] Scope with pluggable ContextStrategy
 - [x] Context strategies: FlatContext, TaskListContext, TaskTreeContext
 - [x] Cache strategies: NoCache, InMemoryCache
+- [x] LLM strategies: NoLLM (testing), SimpleLLM (production)
 - [x] Nested scopes with different strategies
-- [x] Basic agent_loop using primitives
+- [x] agent_loop() with pluggable LLM
 - [x] parse_intent() - DWIM verb parsing (~20 lines)
-- [x] execute_intent() - routes to rust_shim.passthrough()
+- [x] execute_intent() - routes to rust_shim
 - [x] Scope.run() wired to real execution
 
 Works:
 ```python
-# Nested TaskTree context
+# Agent loop with composable strategies
+from moss.execution import agent_loop, TaskTreeContext, InMemoryCache, SimpleLLM
+
+result = agent_loop(
+    task="Fix type errors in main.py",
+    context=TaskTreeContext(),
+    cache=InMemoryCache(),
+    llm=SimpleLLM(model="claude-3-haiku"),  # or NoLLM for testing
+    max_turns=10,
+)
+
+# Nested scopes with different strategies
 with Scope(context=TaskTreeContext()) as outer:
     outer.context.add('task', 'fix all issues')
     with outer.child() as inner:
         inner.context.add('task', 'fix type errors')
-        # Context shows hierarchical path:
-        # fix all issues
-        #   └── fix type errors
-
-# Intent parsing
-parse_intent('view main.py')  # → Intent(verb='view', target='main.py')
-parse_intent('fix foo.py')    # → Intent(verb='edit', target='foo.py')
+        # Context shows hierarchical path
 ```
 
 ## Next Steps
 
-- [ ] Wire up real LLM calls
-- [ ] Test with real tasks end-to-end
-- [ ] Compare to DWIMLoop output
+- [ ] Test with real LLM end-to-end
+- [ ] Compare output to DWIMLoop
 - [ ] Replace DWIMLoop with new primitives
+- [ ] Implement retry strategy

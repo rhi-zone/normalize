@@ -358,7 +358,71 @@ def execute_intent(intent: Intent) -> str:
 
 
 # =============================================================================
-# Convenience
+# LLM Strategy
+# =============================================================================
+
+AGENT_SYSTEM_PROMPT = """You are an agent that completes tasks using three commands:
+- view <path> - View file skeleton or symbol source
+- edit <path> "task" - Make changes to a file
+- analyze <path> - Analyze code health, complexity, etc.
+- done - Signal task completion
+
+Given the task and context, respond with exactly ONE command. No explanation.
+When the task is complete, respond with "done".
+"""
+
+
+class LLMStrategy(ABC):
+    """Base class for LLM strategies."""
+
+    @abstractmethod
+    def decide(self, task: str, context: str) -> str:
+        """Given task and context, return next action."""
+        ...
+
+
+class NoLLM(LLMStrategy):
+    """No LLM - returns fixed sequence for testing."""
+
+    def __init__(self, actions: list[str] | None = None):
+        self.actions = actions or ["done"]
+        self._index = 0
+
+    def decide(self, task: str, context: str) -> str:
+        if self._index >= len(self.actions):
+            return "done"
+        action = self.actions[self._index]
+        self._index += 1
+        return action
+
+
+class SimpleLLM(LLMStrategy):
+    """LLM strategy using moss.llm.complete."""
+
+    def __init__(
+        self,
+        provider: str | None = None,
+        model: str | None = None,
+        system_prompt: str = AGENT_SYSTEM_PROMPT,
+    ):
+        self.provider = provider
+        self.model = model
+        self.system_prompt = system_prompt
+
+    def decide(self, task: str, context: str) -> str:
+        from moss.llm import complete
+
+        prompt = f"Task: {task}\n\nContext:\n{context}\n\nNext action:"
+        return complete(
+            prompt,
+            system=self.system_prompt,
+            provider=self.provider,
+            model=self.model,
+        ).strip()
+
+
+# =============================================================================
+# Agent Loop
 # =============================================================================
 
 
@@ -366,31 +430,38 @@ def agent_loop(
     task: str,
     context: ContextStrategy | None = None,
     cache: CacheStrategy | None = None,
+    llm: LLMStrategy | None = None,
     max_turns: int = 10,
 ) -> str:
     """Simple agent loop using composable primitives.
 
     This is what DWIMLoop's 1151 lines boils down to.
+
+    Args:
+        task: The task to complete
+        context: Context strategy (default: FlatContext)
+        cache: Cache strategy (default: InMemoryCache)
+        llm: LLM strategy (default: NoLLM for safety)
+        max_turns: Maximum iterations before stopping
     """
     scope = Scope(
         context=context or FlatContext(),
         cache=cache or InMemoryCache(),
     )
+    decider = llm or NoLLM()
 
     scope.context.add("task", task)
 
-    for turn in range(max_turns):
-        # Get context for LLM (would pass to LLM)
-        _ctx = scope.context.get_context()
+    for _turn in range(max_turns):
+        ctx = scope.context.get_context()
 
-        # Placeholder: would call LLM here
-        # llm_output = call_llm(system_prompt, _ctx)
-        llm_output = f"view turn_{turn}"  # Fake
+        # Ask LLM for next action
+        action = decider.decide(task, ctx)
 
-        if "done" in llm_output.lower():
+        if "done" in action.lower():
             break
 
         # Execute action
-        scope.run(llm_output)
+        scope.run(action)
 
     return scope.context.get_context()
