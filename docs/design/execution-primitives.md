@@ -353,6 +353,46 @@ with Scope(context=TaskTreeContext()) as outer:
 ## Next Steps
 
 - [ ] Test with real LLM end-to-end
-- [ ] Compare output to DWIMLoop
-- [ ] Replace DWIMLoop with new primitives
 - [ ] Wire retry strategy into Scope.run()
+- [ ] Define "dwim" as predefined workflow using these primitives
+- [ ] Remove DWIMLoop class (1151 lines → workflow config)
+
+## End Goal
+
+DWIMLoop should not be a special class. It should be a predefined workflow:
+
+```python
+# What DWIMLoop becomes:
+DWIM_WORKFLOW = {
+    "context": TaskTreeContext,
+    "cache": InMemoryCache,  # with preview/truncation
+    "retry": ExponentialRetry(max_attempts=3),
+    "llm": SimpleLLM(system_prompt=DWIM_SYSTEM_PROMPT),
+}
+
+# Usage:
+result = agent_loop("fix type errors", **DWIM_WORKFLOW)
+```
+
+Or in TOML for non-agentic variant:
+
+```toml
+[workflow]
+name = "dwim"
+context = "task_tree"
+cache = "in_memory"
+retry = { strategy = "exponential", max_attempts = 3 }
+
+# LLM config only if agentic
+[workflow.llm]
+provider = "anthropic"
+model = "claude-3-haiku"
+```
+
+**Key insight**: The 1151 lines of DWIMLoop are mostly:
+1. Strategy implementations (now separate: ~200 lines total)
+2. Intent parsing (now `parse_intent`: ~20 lines)
+3. Execution routing (now `execute_intent`: ~20 lines)
+4. Glue code that composes strategies (now `agent_loop`: ~30 lines)
+
+The rest is configuration that belongs in workflow definitions, not code.

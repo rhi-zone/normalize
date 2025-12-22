@@ -56,7 +56,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
   - [x] parse_intent() + execute_intent() - DWIM verb parsing, real CLI execution
   - [x] TOML analysis: can express state machines; limit is computed values; plugins could help
   - [ ] Test with real LLM end-to-end
-  - [ ] Replace DWIMLoop with new primitives
+  - [ ] Define "dwim" as predefined workflow config (not special class)
+  - [ ] Remove DWIMLoop class (1151 lines → ~50 lines of workflow config)
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
 
 ## Backlog

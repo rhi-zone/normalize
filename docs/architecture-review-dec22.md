@@ -106,3 +106,28 @@ Key decisions needed:
 1. How do strategies compose/nest?
 2. Code vs config for complex workflows?
 3. Clear Rust/Python boundary definition
+
+## Progress (Dec 22 continued)
+
+Created `src/moss/execution/__init__.py` (~450 lines) with composable primitives:
+
+| Strategy Type | Implementations |
+|---------------|-----------------|
+| Context | FlatContext, TaskListContext, TaskTreeContext |
+| Cache | NoCache, InMemoryCache |
+| Retry | NoRetry, FixedRetry, ExponentialRetry |
+| LLM | NoLLM, SimpleLLM |
+
+**End goal**: DWIMLoop becomes a predefined workflow, not a special class:
+
+```python
+DWIM_WORKFLOW = {
+    "context": TaskTreeContext,
+    "cache": InMemoryCache,
+    "retry": ExponentialRetry(max_attempts=3),
+    "llm": SimpleLLM(system_prompt=DWIM_PROMPT),
+}
+result = agent_loop("task", **DWIM_WORKFLOW)
+```
+
+This reduces 1151 lines to ~50 lines of workflow configuration.
