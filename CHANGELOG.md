@@ -4,6 +4,16 @@
 
 ### Features
 
+**Explore TUI** (Dec 22 2025)
+- New `moss explore` command with tree + primitives paradigm
+- `ExploreMode` is now default TUI mode (replaces READ/WRITE)
+- Tree navigation with files + symbols (lazy-loaded)
+- Action bar with context-sensitive [V]iew, [E]dit, [A]nalyze buttons
+- Keyboard shortcuts: `v`, `e`, `a` to apply primitives to selected node
+- Command input supports both explicit (`view foo.py`) and implicit (`foo.py`)
+- Detail panel shows view output, edit preview, or analyze reports
+- Mode set now: EXPLORE (default), PLAN, DIFF, SESSION, BRANCH, SWARM, COMMIT
+
 **Unified Resolution & Agent Improvements** (Dec 22 2025)
 - `moss analyze` now uses unified path resolution for symbol targeting
   - Example: `moss analyze cli.py/cmd_telemetry --complexity`
