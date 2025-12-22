@@ -180,13 +180,16 @@ class ExploreMode:
     placeholder = "view <path> | edit <path> | analyze [--health|--complexity|--security]"
 
     async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = False
-        app.query_one("#git-view").display = False
-        app.query_one("#session-view").display = False
-        app.query_one("#swarm-view").display = False
-        app.query_one("#explore-view").display = True
-        app.query_one("#content-header").update("Explore")
-        app._update_tree("file")
+        try:
+            app.query_one("#log-view").display = False
+            app.query_one("#git-view").display = False
+            app.query_one("#session-view").display = False
+            app.query_one("#swarm-view").display = False
+            app.query_one("#explore-view").display = True
+            app.query_one("#content-header").update("Explore")
+            app._update_tree("file")
+        except Exception:
+            pass  # Widgets may not exist during initial mount
 
 
 class ModeRegistry:
@@ -328,11 +331,6 @@ class ModeRegistry:
     def list_modes(self) -> list[str]:
         """Return mode names in cycle order."""
         return list(self._order)
-
-    def __iter__(self):
-        """Iterate over modes in order."""
-        for name in self._order:
-            yield self._modes[name]
 
 
 class ModeIndicator(Static):
@@ -514,6 +512,10 @@ class MossTUI(App):
         height: 1fr;
     }
 
+    #header-bar {
+        height: auto;
+    }
+
     #sidebar {
         width: 30%;
         height: 1fr;
@@ -610,13 +612,13 @@ class MossTUI(App):
         ("a", "primitive_analyze", "Analyze"),
     ]
 
-    current_mode_name = reactive("PLAN")
+    current_mode_name = reactive("EXPLORE")
 
     def __init__(self, api: MossAPI):
         super().__init__()
         self.api = api
         self._task_tree: TaskTree | None = None
-        self._registry = ModeRegistry()
+        self._mode_registry = ModeRegistry()
         self._last_ctrl_c: float = 0
 
     def action_handle_ctrl_c(self) -> None:
@@ -635,7 +637,7 @@ class MossTUI(App):
         from textual.widgets import RichLog
 
         yield Header(show_clock=True)
-        yield Horizontal(ModeIndicator(id="mode-indicator"), id="header-bar", height="auto")
+        yield Horizontal(ModeIndicator(id="mode-indicator"), id="header-bar")
         yield Container(
             Horizontal(
                 Vertical(
@@ -682,8 +684,6 @@ class MossTUI(App):
         self.title = "Moss TUI"
         self.sub_title = f"Project: {self.api.root.name}"
         self.query_one("#command-input").focus()
-        # Initialize first mode (EXPLORE is default)
-        self.current_mode_name = "EXPLORE"
         # Track selected node for action bar
         self._selected_path: str = ""
         self._selected_type: str = ""
@@ -721,7 +721,7 @@ class MossTUI(App):
 
     async def watch_current_mode_name(self, name: str) -> None:
         """React to mode changes."""
-        mode = self._registry.get_mode(name)
+        mode = self._mode_registry.get_mode(name)
         if not mode:
             return
 
@@ -891,7 +891,7 @@ class MossTUI(App):
 
     def action_next_mode(self) -> None:
         """Switch to the next mode."""
-        next_mode = self._registry.next_mode(self.current_mode_name)
+        next_mode = self._mode_registry.next_mode(self.current_mode_name)
         self.current_mode_name = next_mode.name
         self._log(f"Switched to {self.current_mode_name} mode")
 
