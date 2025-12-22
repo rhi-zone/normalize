@@ -38,11 +38,18 @@ def setup_output(args: Namespace) -> Output:
     else:
         verbosity = Verbosity.NORMAL
 
+    # Determine compact mode
+    # Explicit --compact always wins, otherwise default to compact when not a TTY
+    compact = getattr(args, "compact", False)
+    json_format = getattr(args, "json", False)
+    if not compact and not json_format:
+        compact = not sys.stdout.isatty()
+
     # Configure output
     output = configure_output(
         verbosity=verbosity,
-        json_format=getattr(args, "json", False),
-        compact=getattr(args, "compact", False),
+        json_format=json_format,
+        compact=compact,
         no_color=getattr(args, "no_color", False),
         jq_expr=getattr(args, "jq", None),
     )
