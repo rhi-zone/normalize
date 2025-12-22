@@ -20,6 +20,11 @@
 - Context modes for compound steps: `isolated` (default), `shared`, `inherited`
 - InheritedContext wrapper: child sees parent context (read), writes to own storage
 
+**Explore TUI** (Dec 23 2025)
+- Jump-to-node shortcut: press `g` for fuzzy file navigation
+- Fuzzy matching prioritizes: exact name > starts-with > contains in name > in path
+- Shows alternative matches when multiple files match
+
 ### Documentation
 
 **Architecture Boundary** (Dec 23 2025)

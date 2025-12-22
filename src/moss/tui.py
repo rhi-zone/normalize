@@ -864,6 +864,7 @@ class MossTUI(App):
         Binding("v", "primitive_view", "View"),
         Binding("e", "primitive_edit", "Edit"),
         Binding("a", "primitive_analyze", "Analyze"),
+        Binding("g", "goto_node", "Goto"),
         Binding("minus", "cd_up", "Up"),
         Binding("slash", "toggle_command", "Cmd"),
         Binding("tab", "next_mode", "Mode", show=False),
@@ -1160,11 +1161,22 @@ class MossTUI(App):
                 # If already collapsed, go to parent node
                 tree.select_node(tree.cursor_node.parent)
 
+    def action_goto_node(self) -> None:
+        """Show goto input for fuzzy file navigation."""
+        cmd_input = self.query_one("#command-input", Input)
+        cmd_input.placeholder = "Goto: type path to fuzzy match..."
+        cmd_input.value = "goto "
+        cmd_input.display = True
+        cmd_input.focus()
+        # Move cursor to end
+        cmd_input.cursor_position = len(cmd_input.value)
+
     def action_toggle_command(self) -> None:
         """Toggle command input visibility."""
-        cmd_input = self.query_one("#command-input")
+        cmd_input = self.query_one("#command-input", Input)
         if cmd_input.display:
             cmd_input.display = False
+            cmd_input.placeholder = "Enter command..."
             self.query_one("#project-tree").focus()
         else:
             cmd_input.display = True
@@ -1172,10 +1184,11 @@ class MossTUI(App):
 
     def action_hide_command(self) -> None:
         """Hide command input (Escape)."""
-        cmd_input = self.query_one("#command-input")
+        cmd_input = self.query_one("#command-input", Input)
         if cmd_input.display:
             cmd_input.display = False
             cmd_input.value = ""
+            cmd_input.placeholder = "Enter command..."
             self.query_one("#project-tree").focus()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
@@ -1475,6 +1488,13 @@ class MossTUI(App):
                     self.action_cd_to(str(target_path))
                 else:
                     self._log(f"[red]Not a directory: {args[0]}[/]")
+        elif cmd in ("goto", "g", "jump", "j"):
+            # Fuzzy navigation to file
+            pattern = args[0] if args else ""
+            if pattern:
+                self._goto_fuzzy(pattern)
+            else:
+                self._log("[dim]Usage: goto <pattern>[/]")
         else:
             # Try as implicit view (just a path)
             self._selected_path = command
@@ -1528,6 +1548,61 @@ class MossTUI(App):
         self.query_one("#command-input").value = f"expand {target}"
         self.query_one("#command-input").focus()
         # In a full implementation, this would also highlight the node in the tree
+
+    def _goto_fuzzy(self, pattern: str) -> None:
+        """Fuzzy navigate to a file matching pattern."""
+        tree = self.query_one("#project-tree", ProjectTree)
+        if not tree._git_files:
+            self._log("[red]No files indexed[/]")
+            return
+
+        # Fuzzy match: find files containing the pattern (case-insensitive)
+        pattern_lower = pattern.lower()
+        matches = []
+        for f in tree._git_files:
+            f_lower = f.lower()
+            # Score by how early and how well the pattern matches
+            if pattern_lower in f_lower:
+                # Prefer exact filename matches over path matches
+                name = f.split("/")[-1].lower()
+                if pattern_lower == name:
+                    score = 0  # Exact filename match
+                elif name.startswith(pattern_lower):
+                    score = 1  # Filename starts with pattern
+                elif pattern_lower in name:
+                    score = 2  # Pattern in filename
+                else:
+                    score = 3  # Pattern in path
+                matches.append((score, f))
+
+        if not matches:
+            self._log(f"[yellow]No files matching '{pattern}'[/]")
+            return
+
+        # Sort by score, then alphabetically
+        matches.sort(key=lambda x: (x[0], x[1]))
+        best_match = matches[0][1]
+
+        # Navigate to the file
+        target_path = tree._tree_root / best_match
+        if target_path.exists():
+            # Change directory to parent if needed
+            parent = target_path.parent
+            if parent != tree._tree_root:
+                self.action_cd_to(str(parent))
+
+            # Select and view the file
+            self._selected_path = str(target_path)
+            self._selected_type = "file"
+            self._execute_primitive("view", str(target_path))
+
+            # Log matches if there are alternatives
+            if len(matches) > 1:
+                alt_count = min(3, len(matches) - 1)
+                alts = ", ".join(m[1].split("/")[-1] for _, m in matches[1 : alt_count + 1])
+                self._log(f"[dim]Also matched: {alts}[/]")
+        else:
+            self._log(f"[red]File not found: {best_match}[/]")
 
     def action_primitive_view(self) -> None:
         """View the currently selected node."""
