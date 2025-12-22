@@ -37,3 +37,11 @@ Textual uses Rich markup but with its own escaping rules:
 - Built-in action is `command_palette` not `action_command_palette`
 - Add custom commands via `get_system_commands(self, screen)` method
 - Yields `DiscoveryHit(name, callback, description)`
+
+## Markdown Files
+
+- ViewAPI doesn't handle markdown symbols - need TUI-side handling
+- Extract headings as pseudo-symbols with `kind="heading"`
+- Build nested tree based on heading levels (h1 > h2 > h3)
+- Store symbol object when selected for later use (can't recover from path string)
+- Show section content from heading line to next same-or-higher level heading
