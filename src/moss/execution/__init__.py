@@ -422,17 +422,88 @@ class ExponentialRetry(RetryStrategy):
 
 
 # =============================================================================
+# Decision Model
+# =============================================================================
+
+
+@dataclass
+class Decision:
+    """Structured decision from LLM with inline chain-of-thought.
+
+    The LLM outputs natural prose with commands interspersed:
+        Let me check the main file first.
+        view main.py
+        Interesting, the function is on line 42.
+        view utils.py
+
+    This is parsed into actions (commands) and prose (reasoning).
+    """
+
+    raw: str  # Full LLM output
+    actions: list[str] = field(default_factory=list)  # Extracted commands
+    prose: list[str] = field(default_factory=list)  # Extracted reasoning
+    parallel: bool = False  # Execute actions concurrently?
+    done: bool = False  # Task complete?
+
+
+# Command patterns for parsing
+COMMAND_PATTERNS = {"view", "show", "edit", "fix", "analyze", "check", "done", "finished"}
+
+
+def parse_decision(text: str) -> Decision:
+    """Parse LLM output into structured Decision.
+
+    Lines starting with command verbs are actions.
+    Everything else is prose (inline chain-of-thought).
+    """
+    lines = text.strip().split("\n")
+    actions: list[str] = []
+    prose: list[str] = []
+    done = False
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Check if line starts with a command verb
+        first_word = line.split()[0].lower() if line.split() else ""
+
+        if first_word in COMMAND_PATTERNS:
+            if first_word in ("done", "finished"):
+                done = True
+            else:
+                actions.append(line)
+        else:
+            prose.append(line)
+
+    return Decision(
+        raw=text,
+        actions=actions,
+        prose=prose,
+        parallel=False,  # Default sequential
+        done=done,
+    )
+
+
+# =============================================================================
 # LLM Strategy
 # =============================================================================
 
-AGENT_SYSTEM_PROMPT = """You are an agent that completes tasks using three commands:
+AGENT_SYSTEM_PROMPT = """You are an agent that completes tasks using commands:
 - view <path> - View file skeleton or symbol source
 - edit <path> "task" - Make changes to a file
 - analyze <path> - Analyze code health, complexity, etc.
 - done - Signal task completion
 
-Given the task and context, respond with exactly ONE command. No explanation.
-When the task is complete, respond with "done".
+You may think out loud between commands. Each command should be on its own line.
+When the task is complete, say "done".
+
+Example:
+    Let me check the main file first.
+    view main.py
+    Now I'll look at the imports.
+    view utils.py
 """
 
 
@@ -440,24 +511,33 @@ class LLMStrategy(ABC):
     """Base class for LLM strategies."""
 
     @abstractmethod
-    def decide(self, task: str, context: str) -> str:
-        """Given task and context, return next action."""
+    def decide(self, task: str, context: str) -> Decision:
+        """Given task and context, return structured decision."""
         ...
 
 
 class NoLLM(LLMStrategy):
-    """No LLM - returns fixed sequence for testing."""
+    """No LLM - returns fixed sequence for testing.
+
+    Each item in actions can be:
+    - A single command: "view main.py"
+    - Multi-line with prose: "Let me check this.\\nview main.py"
+    - "done" to signal completion
+    """
 
     def __init__(self, actions: list[str] | None = None):
         self.actions = actions or ["done"]
         self._index = 0
 
-    def decide(self, task: str, context: str) -> str:
+    def decide(self, task: str, context: str) -> Decision:
         if self._index >= len(self.actions):
-            return "done"
-        action = self.actions[self._index]
+            return Decision(raw="done", actions=[], done=True)
+
+        raw = self.actions[self._index]
         self._index += 1
-        return action
+
+        # Parse the raw text to extract actions and prose
+        return parse_decision(raw)
 
 
 class SimpleLLM(LLMStrategy):
@@ -473,16 +553,17 @@ class SimpleLLM(LLMStrategy):
         self.model = model
         self.system_prompt = system_prompt
 
-    def decide(self, task: str, context: str) -> str:
+    def decide(self, task: str, context: str) -> Decision:
         from moss.llm import complete
 
-        prompt = f"Task: {task}\n\nContext:\n{context}\n\nNext action:"
-        return complete(
+        prompt = f"Task: {task}\n\nContext:\n{context}\n\nWhat's next?"
+        response = complete(
             prompt,
             system=self.system_prompt,
             provider=self.provider,
             model=self.model,
-        ).strip()
+        )
+        return parse_decision(response)
 
 
 # =============================================================================
@@ -507,6 +588,9 @@ def agent_loop(
         cache: Cache strategy (default: InMemoryCache)
         llm: LLM strategy (default: NoLLM for safety)
         max_turns: Maximum iterations before stopping
+
+    Returns:
+        Final context string
     """
     scope = Scope(
         context=context or FlatContext(),
@@ -519,13 +603,19 @@ def agent_loop(
     for _turn in range(max_turns):
         ctx = scope.context.get_context()
 
-        # Ask LLM for next action
-        action = decider.decide(task, ctx)
+        # Ask LLM for decision (may include multiple actions + prose)
+        decision = decider.decide(task, ctx)
 
-        if "done" in action.lower():
+        # Store prose as reasoning/notes
+        for thought in decision.prose:
+            scope.context.add("note", thought)
+
+        # Check if done
+        if decision.done:
             break
 
-        # Execute action
-        scope.run(action)
+        # Execute actions (sequential for now, parallel in Phase 2)
+        for action in decision.actions:
+            scope.run(action)
 
     return scope.context.get_context()

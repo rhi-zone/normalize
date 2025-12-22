@@ -405,7 +405,57 @@ with Scope(context=TaskTreeContext()) as outer:
         # Context shows hierarchical path
 ```
 
-## Next Steps
+## Implementation Plan
+
+### Phase 1: Decision Model (current)
+
+1. **Add `Decision` dataclass**
+   ```python
+   @dataclass
+   class Decision:
+       raw: str                    # Full LLM output with inline CoT
+       actions: list[str]          # Extracted commands
+       prose: list[str]            # Extracted prose segments
+       parallel: bool = False      # Execute actions concurrently?
+       done: bool = False          # Task complete?
+   ```
+
+2. **Add `parse_decision()` function**
+   - Extract lines matching command patterns (view/edit/analyze/done)
+   - Everything else is prose
+   - Detect "done" to set completion flag
+
+3. **Update `LLMStrategy.decide()` → returns `Decision`**
+   - `NoLLM`: return pre-canned Decision
+   - `SimpleLLM`: call LLM, parse response into Decision
+
+4. **Update `agent_loop()` to handle Decision**
+   - Execute actions (sequential by default)
+   - Store prose in context for visibility
+   - Check `done` flag for loop termination
+
+### Phase 2: Parallel Execution
+
+5. **Add parallel execution path**
+   - If `Decision.parallel=True` and multiple actions, run concurrently
+   - Collect results, update context with all
+
+### Phase 3: Workflow Config
+
+6. **Define DWIM as workflow config**
+   - Create `workflows/dwim.toml`
+   - Load and instantiate strategies from TOML
+
+7. **Remove DWIMLoop class**
+   - Replace with workflow config + agent_loop()
+
+### Phase 4: Retry Integration
+
+8. **Wire retry into Scope.run()**
+   - On error, check retry strategy
+   - Apply delay and retry if allowed
+
+## Next Steps (old)
 
 - [ ] Test with real LLM end-to-end
 - [ ] Wire retry strategy into Scope.run()
