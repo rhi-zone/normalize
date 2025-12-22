@@ -3585,7 +3585,6 @@ def cmd_agent(args: Namespace) -> int:
 
     from moss import MossAPI
     from moss.dwim import analyze_intent
-    from moss.dwim_loop import DWIMLoop, LoopConfig, LoopState, classify_task
 
     output = setup_output(args)
     task = getattr(args, "task", None)
@@ -3605,9 +3604,7 @@ def cmd_agent(args: Namespace) -> int:
 
     # Dry-run mode: show what would happen without executing
     if dry_run:
-        task_type = classify_task(task)
         output.info(f"Task: {task}")
-        output.info(f"Type: {task_type.name}")
         output.info(f"Mode: {'Vanilla' if use_vanilla else 'DWIM'}")
         output.info("")
 
@@ -3669,123 +3666,68 @@ def cmd_agent(args: Namespace) -> int:
             output.error(f"\nFailed: {result.error}")
             return 1
 
-    # Check for legacy mode
-    use_legacy = getattr(args, "legacy", False)
+    # Composable execution primitives
+    from pathlib import Path as P
 
-    if not use_legacy:
-        # Default: composable execution primitives
-        from pathlib import Path as P
+    from moss.execution import (
+        ExponentialRetry,
+        InMemoryCache,
+        NoLLM,
+        SimpleLLM,
+        TaskTreeContext,
+        load_workflow,
+    )
+    from moss.execution import (
+        agent_loop as exec_agent_loop,
+    )
 
-        from moss.execution import (
-            ExponentialRetry,
-            InMemoryCache,
-            NoLLM,
-            SimpleLLM,
-            TaskTreeContext,
-            load_workflow,
-        )
-        from moss.execution import (
-            agent_loop as exec_agent_loop,
-        )
+    # Find dwim.toml
+    dwim_toml = P(__file__).parent / "workflows" / "dwim.toml"
 
-        # Find dwim.toml
-        dwim_toml = P(__file__).parent / "workflows" / "dwim.toml"
+    output.info(f"Starting agent: {task}")
 
-        output.info(f"Starting agent: {task}")
+    # Load workflow config if available
+    if dwim_toml.exists():
+        config = load_workflow(str(dwim_toml))
+        context = config.context
+        cache = config.cache
+        retry = config.retry
+        llm = config.llm if not mock else NoLLM(actions=["view README.md", "done"])
+        workflow_max_turns = config.max_turns
+    else:
+        # Fallback defaults
+        context = TaskTreeContext()
+        cache = InMemoryCache()
+        retry = ExponentialRetry(max_attempts=3)
+        llm = NoLLM(actions=["view README.md", "done"]) if mock else SimpleLLM()
+        workflow_max_turns = max_turns
 
-        # Load workflow config if available
-        if dwim_toml.exists():
-            config = load_workflow(str(dwim_toml))
-            context = config.context
-            cache = config.cache
-            retry = config.retry
-            llm = config.llm if not mock else NoLLM(actions=["view README.md", "done"])
-            workflow_max_turns = config.max_turns
-        else:
-            # Fallback defaults
-            context = TaskTreeContext()
-            cache = InMemoryCache()
-            retry = ExponentialRetry(max_attempts=3)
-            llm = NoLLM(actions=["view README.md", "done"]) if mock else SimpleLLM()
-            workflow_max_turns = max_turns
-
-        if verbose:
-            output.info(f"Context: {type(context).__name__}")
-            output.info(f"Cache: {type(cache).__name__}")
-            output.info(f"Retry: {type(retry).__name__}")
-            output.info(f"LLM: {type(llm).__name__}")
-            output.info(f"Max turns: {workflow_max_turns}")
-        output.info("")
-
-        try:
-            result = exec_agent_loop(
-                task=task,
-                context=context,
-                cache=cache,
-                retry=retry,
-                llm=llm,
-                max_turns=workflow_max_turns,
-            )
-            output.success("\nCompleted!")
-            output.info(f"Final context:\n{result}")
-            return 0
-        except Exception as e:
-            output.error(f"Agent failed: {e}")
-            if verbose:
-                import traceback
-
-                output.info(traceback.format_exc())
-            return 1
-
-    # Legacy mode: DWIMLoop
-    config = LoopConfig(max_turns=max_turns, mock=mock)
-    if model:
-        config.model = model
-
-    from moss.session import Session
-
-    session = Session.create(workspace=api.root, task=task)
-    loop = DWIMLoop(api, config, session=session)
-
-    output.info(f"Starting agent: {task} (session: {session.id})")
     if verbose:
-        output.info(f"Model: {config.model}")
-        output.info(f"Max turns: {max_turns}")
+        output.info(f"Context: {type(context).__name__}")
+        output.info(f"Cache: {type(cache).__name__}")
+        output.info(f"Retry: {type(retry).__name__}")
+        output.info(f"LLM: {type(llm).__name__}")
+        output.info(f"Max turns: {workflow_max_turns}")
     output.info("")
 
     try:
-        result = asyncio.run(loop.run(task))
-    except ImportError as e:
-        output.error(f"Missing dependency: {e}")
-        output.info("Install with: pip install moss[llm]")
-        return 1
+        result = exec_agent_loop(
+            task=task,
+            context=context,
+            cache=cache,
+            retry=retry,
+            llm=llm,
+            max_turns=workflow_max_turns,
+        )
+        output.success("\nCompleted!")
+        output.info(f"Final context:\n{result}")
+        return 0
     except Exception as e:
         output.error(f"Agent failed: {e}")
-        return 1
+        if verbose:
+            import traceback
 
-    # Show results
-    if verbose:
-        output.info(f"\nTurns: {len(result.turns)}")
-        output.info(f"Duration: {result.total_duration_ms}ms")
-        for i, turn in enumerate(result.turns, 1):
-            output.info(f"\n--- Turn {i} ---")
-            output.info(f"Intent: {turn.intent.verb} {turn.intent.target or ''}")
-            if turn.error:
-                output.warning(f"Error: {turn.error}")
-            elif turn.tool_output:
-                out_str = str(turn.tool_output)[:200]
-                output.info(f"Output: {out_str}...")
-
-    if result.state == LoopState.DONE:
-        output.success(f"\nCompleted in {len(result.turns)} turns")
-        if result.final_output:
-            output.info(f"Final: {str(result.final_output)[:500]}")
-        return 0
-    elif result.state == LoopState.MAX_TURNS:
-        output.warning(f"\nMax turns ({max_turns}) reached")
-        return 1
-    else:
-        output.error(f"\nFailed: {result.error}")
+            output.info(traceback.format_exc())
         return 1
 
 
@@ -5728,11 +5670,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--mock",
         action="store_true",
         help="Use mock LLM responses (for testing)",
-    )
-    agent_parser.add_argument(
-        "--legacy",
-        action="store_true",
-        help="Use legacy DWIMLoop instead of composable execution primitives",
     )
     agent_parser.set_defaults(func=cmd_agent)
 

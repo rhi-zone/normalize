@@ -53,9 +53,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
   - [x] Phase 2: Parallel execution (Decision.parallel + ThreadPoolExecutor)
   - [x] Phase 3: dwim.toml + load_workflow() + run_workflow()
   - [x] Phase 4: Retry wired into Scope.run()
-  - [x] CLI: `moss agent --primitives` wired to new execution
-  - [ ] Graduate: Make --primitives default, deprecate DWIMLoop
-  - [ ] Remove: Delete dwim_loop.py (1151 lines → 0)
+  - [x] CLI: `moss agent` now uses execution primitives by default
+  - [x] Removed: dwim_loop.py (1151 lines → 0)
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
 
 ## Backlog
@@ -68,20 +67,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
     - `skeleton.expand` → `rust_shim.passthrough("view", [path/symbol])`
     - `skeleton.extract` → same with `--json`
   - MossToolExecutor → call rust_shim directly
-  - Two agent loops (DWIMLoop vs AgentLoop+workflows) - why both?
-    - AgentLoop: generic step executor - rename to StepExecutor
-    - DWIMLoop (1151 lines): right goals, wrong structure
-      - Bakes in specific choices (EphemeralCache, TaskTree, etc.)
-      - These should be composable strategies, not hardcoded:
-        - context: task_tree | task_list | flat | none
-        - cache: ephemeral | persistent | none
-        - retry: exponential | fixed | none
-      - DWIM parsing is just ~50 lines, should be a simple function
-    - Target: workflows compose strategies, DWIMLoop becomes library code
-    - Open design question: how do strategies compose/nest?
-      - Sub-steps may want different context than parent
-      - TOML awkward for expressing trees/scopes
-      - Maybe code > config for complex workflows?
+  - [x] DWIMLoop removed - replaced by composable execution primitives (src/moss/execution/)
+  - AgentLoop: generic step executor - consider renaming to StepExecutor
   - Python edit → redundant with agent, remove
   - Rust edit vs Python edit → same name, different behavior
 - [ ] Define clear boundaries: what's Rust, what's Python, why

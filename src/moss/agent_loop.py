@@ -760,11 +760,10 @@ class HybridLoopRunner:
 
         result = None
         if "DWIM" in strategy:
-            # Use DWIM loop for simple tasks
-            from moss.dwim_loop import DWIMLoop
+            # Use execution primitives for simple tasks
+            from moss.execution import agent_loop as exec_agent_loop
 
-            loop = DWIMLoop(self.executor.moss_executor.api)
-            result = await loop.run(task)
+            result = exec_agent_loop(task=task)
             actual_strategy = "DWIM"
         else:
             # Use provided structured loop for complex tasks
@@ -786,10 +785,9 @@ class HybridLoopRunner:
         success = False
         if hasattr(result, "success"):
             success = result.success
-        elif hasattr(result, "state"):
-            from moss.dwim_loop import LoopState
-
-            success = result.state == LoopState.DONE
+        elif isinstance(result, str):
+            # New execution primitives return a string (context) on success
+            success = True
 
         self._history.append(
             {"task": task, "strategy": strategy, "success": success, "timestamp": datetime.now(UTC)}
@@ -811,7 +809,7 @@ class HybridLoopRunner:
             pass
 
 
-# NOTE: Predefined loop templates removed. Use DWIMLoop (src/moss/dwim_loop.py)
+# NOTE: Predefined loop templates removed. Use execution primitives (src/moss/execution/)
 # or TOML workflows (.moss/workflows/) instead. See docs/philosophy.md.
 
 # ============================================================================
