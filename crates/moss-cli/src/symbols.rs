@@ -1121,6 +1121,10 @@ impl SymbolParser {
         match ext {
             "py" => self.find_python_calls_with_lines(&source, symbol.start_line),
             "rs" => self.find_rust_calls_with_lines(&source, symbol.start_line),
+            "ts" | "tsx" => self.find_typescript_calls_with_lines(&source, symbol.start_line, ext == "tsx"),
+            "js" | "mjs" | "cjs" => self.find_javascript_calls_with_lines(&source, symbol.start_line),
+            "java" => self.find_java_calls_with_lines(&source, symbol.start_line),
+            "go" => self.find_go_calls_with_lines(&source, symbol.start_line),
             _ => Vec::new(),
         }
     }
@@ -1228,6 +1232,187 @@ impl SymbolParser {
 
             if cursor.goto_first_child() {
                 self.collect_rust_calls_with_lines(cursor, content, base_line, calls);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn find_typescript_calls_with_lines(
+        &mut self,
+        source: &str,
+        base_line: usize,
+        is_tsx: bool,
+    ) -> Vec<(String, usize, Option<String>)> {
+        let parser = if is_tsx {
+            &mut self.tsx_parser
+        } else {
+            &mut self.typescript_parser
+        };
+        let tree = match parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        calls
+    }
+
+    fn find_javascript_calls_with_lines(
+        &mut self,
+        source: &str,
+        base_line: usize,
+    ) -> Vec<(String, usize, Option<String>)> {
+        let tree = match self.javascript_parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        calls
+    }
+
+    /// Shared implementation for JavaScript and TypeScript call extraction
+    fn collect_js_ts_calls_with_lines(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        base_line: usize,
+        calls: &mut Vec<(String, usize, Option<String>)>,
+    ) {
+        loop {
+            let node = cursor.node();
+
+            if node.kind() == "call_expression" {
+                if let Some(func_node) = node.child_by_field_name("function") {
+                    let func_text = &content[func_node.byte_range()];
+                    let line = node.start_position().row + base_line;
+
+                    // Parse qualifier.name or just name (e.g., obj.method(), func())
+                    if let Some(dot_pos) = func_text.rfind('.') {
+                        let qualifier = &func_text[..dot_pos];
+                        let name = &func_text[dot_pos + 1..];
+                        calls.push((name.to_string(), line, Some(qualifier.to_string())));
+                    } else {
+                        calls.push((func_text.to_string(), line, None));
+                    }
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_js_ts_calls_with_lines(cursor, content, base_line, calls);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn find_java_calls_with_lines(
+        &mut self,
+        source: &str,
+        base_line: usize,
+    ) -> Vec<(String, usize, Option<String>)> {
+        let tree = match self.java_parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_java_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        calls
+    }
+
+    fn collect_java_calls_with_lines(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        base_line: usize,
+        calls: &mut Vec<(String, usize, Option<String>)>,
+    ) {
+        loop {
+            let node = cursor.node();
+
+            // Java uses "method_invocation" for method calls
+            if node.kind() == "method_invocation" {
+                if let Some(name_node) = node.child_by_field_name("name") {
+                    let name = &content[name_node.byte_range()];
+                    let line = node.start_position().row + base_line;
+
+                    // Get the object/qualifier if present
+                    let qualifier = node
+                        .child_by_field_name("object")
+                        .map(|obj| content[obj.byte_range()].to_string());
+
+                    calls.push((name.to_string(), line, qualifier));
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_java_calls_with_lines(cursor, content, base_line, calls);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn find_go_calls_with_lines(
+        &mut self,
+        source: &str,
+        base_line: usize,
+    ) -> Vec<(String, usize, Option<String>)> {
+        let tree = match self.go_parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_go_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        calls
+    }
+
+    fn collect_go_calls_with_lines(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        base_line: usize,
+        calls: &mut Vec<(String, usize, Option<String>)>,
+    ) {
+        loop {
+            let node = cursor.node();
+
+            if node.kind() == "call_expression" {
+                if let Some(func_node) = node.child_by_field_name("function") {
+                    let func_text = &content[func_node.byte_range()];
+                    let line = node.start_position().row + base_line;
+
+                    // Go uses . for method calls and package access: pkg.Func(), obj.Method()
+                    if let Some(dot_pos) = func_text.rfind('.') {
+                        let qualifier = &func_text[..dot_pos];
+                        let name = &func_text[dot_pos + 1..];
+                        calls.push((name.to_string(), line, Some(qualifier.to_string())));
+                    } else {
+                        calls.push((func_text.to_string(), line, None));
+                    }
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_go_calls_with_lines(cursor, content, base_line, calls);
                 cursor.goto_parent();
             }
 

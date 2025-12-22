@@ -2,9 +2,11 @@
 
 mod language;
 mod parsers;
+mod paths;
 
 pub use language::Language;
 pub use parsers::Parsers;
+pub use paths::get_moss_dir;
 
 // Re-export grammar crates for use in other modules
 pub use tree_sitter;

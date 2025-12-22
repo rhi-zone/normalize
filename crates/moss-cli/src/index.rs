@@ -1,4 +1,5 @@
 use ignore::WalkBuilder;
+use moss_core::get_moss_dir;
 use rayon::prelude::*;
 use rusqlite::{params, Connection};
 use std::path::{Path, PathBuf};
@@ -20,6 +21,27 @@ struct ParsedFileData {
 // Not yet public - just delete .moss/index.sqlite on schema changes
 const SCHEMA_VERSION: i64 = 2;
 
+/// Supported source file extensions for call graph indexing
+const SOURCE_EXTENSIONS: &[&str] = &[
+    ".py", ".rs", ".java", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".go",
+    ".json", ".yaml", ".yml", ".toml",
+];
+
+/// Check if a file path has a supported source extension
+fn is_source_file(path: &str) -> bool {
+    SOURCE_EXTENSIONS.iter().any(|ext| path.ends_with(ext))
+}
+
+/// Generate SQL WHERE clause for filtering source files
+/// Returns: "path LIKE '%.py' OR path LIKE '%.rs' OR ..."
+fn source_extensions_sql_filter() -> String {
+    SOURCE_EXTENSIONS
+        .iter()
+        .map(|ext| format!("path LIKE '%{}'", ext))
+        .collect::<Vec<_>>()
+        .join(" OR ")
+}
+
 #[derive(Debug, Clone)]
 pub struct IndexedFile {
     pub path: String,
@@ -34,10 +56,10 @@ pub struct FileIndex {
 
 impl FileIndex {
     /// Open or create an index for a directory.
-    /// Index is stored in .moss/index.sqlite
+    /// Index is stored in .moss/index.sqlite (or MOSS_INDEX_DIR if set)
     /// On corruption, automatically deletes and recreates the index.
     pub fn open(root: &Path) -> rusqlite::Result<Self> {
-        let moss_dir = root.join(".moss");
+        let moss_dir = get_moss_dir(root);
         std::fs::create_dir_all(&moss_dir).ok();
 
         let db_path = moss_dir.join("index.sqlite");
@@ -872,16 +894,11 @@ impl FileIndex {
     pub fn refresh_call_graph(&mut self) -> rusqlite::Result<(usize, usize, usize)> {
         // Get all indexed source files BEFORE starting transaction
         let files: Vec<String> = {
-            let mut stmt = self.conn.prepare(
-                "SELECT path FROM files WHERE is_dir = 0 AND (
-                    path LIKE '%.py' OR path LIKE '%.rs' OR
-                    path LIKE '%.java' OR path LIKE '%.ts' OR path LIKE '%.tsx' OR
-                    path LIKE '%.js' OR path LIKE '%.mjs' OR path LIKE '%.cjs' OR
-                    path LIKE '%.go' OR
-                    path LIKE '%.json' OR path LIKE '%.yaml' OR path LIKE '%.yml' OR
-                    path LIKE '%.toml'
-                )"
-            )?;
+            let sql = format!(
+                "SELECT path FROM files WHERE is_dir = 0 AND ({})",
+                source_extensions_sql_filter()
+            );
+            let mut stmt = self.conn.prepare(&sql)?;
             let mut files = Vec::new();
             let mut rows = stmt.query([])?;
             while let Some(row) = rows.next()? {
@@ -992,24 +1009,15 @@ impl FileIndex {
         let (new_files, modified_files, deleted_files) = self.get_changed_files()?;
 
         // Only process supported source and data files
-        let is_source_file = |f: &String| {
-            f.ends_with(".py") || f.ends_with(".rs") ||
-            f.ends_with(".java") || f.ends_with(".ts") || f.ends_with(".tsx") ||
-            f.ends_with(".js") || f.ends_with(".mjs") || f.ends_with(".cjs") ||
-            f.ends_with(".go") ||
-            f.ends_with(".json") || f.ends_with(".yaml") || f.ends_with(".yml") ||
-            f.ends_with(".toml")
-        };
-
         let changed_files: Vec<String> = new_files
             .into_iter()
             .chain(modified_files.into_iter())
-            .filter(is_source_file)
+            .filter(|f| is_source_file(f))
             .collect();
 
         let deleted_source_files: Vec<String> = deleted_files
             .into_iter()
-            .filter(is_source_file)
+            .filter(|f| is_source_file(f))
             .collect();
 
         if changed_files.is_empty() && deleted_source_files.is_empty() {

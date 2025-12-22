@@ -69,13 +69,12 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] Extract shared code from moss-cli and moss-daemon into moss-core crate
 - [x] Share: tree-sitter parsers, Language detection, SymbolKind types
 - [ ] Consider: consolidate index.rs, symbols.rs (different designs for CLI vs daemon)
-- [ ] Refactor file extension matching: ugly SQL with 12+ ORs in refresh_call_graph, use helper or IN clause
+- [x] Refactor file extension matching: centralized SOURCE_EXTENSIONS constant + helper functions
 
 **Call Graph Improvements:**
-- [ ] Call extraction only works for Python (find_callees_with_lines is Python-specific)
-- [ ] Add call extraction for: Java, TypeScript, JavaScript, Go, Rust
+- [x] Call extraction for Python, Rust, TypeScript, JavaScript, Java, Go
 - [ ] Missing language support: Scala, Vue (no tree-sitter grammars yet)
-- [ ] "(no ext)" files are high count (~6k) - likely binary/lockfiles, consider filtering
+- [ ] "(no ext)" files high count in some repos - uses gitignore, add binary detection if needed
 
 **Skeleton Language Support:**
 - [x] Added 16 tree-sitter grammars: Python, Rust, Markdown, JavaScript, TypeScript, TSX, JSON, YAML, HTML, CSS, Go, C, C++, Java, Ruby, Bash, TOML
@@ -84,8 +83,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] Data file key extraction: JSON/YAML/TOML keys become symbols (objects=class, values=variable)
 
 **Explore TUI Polish:**
-- [ ] `.moss` index: support optional external location (not all repos have `.moss` gitignored)
-- [ ] Terminal output sanitization: reset terminal state after nested command output (escape codes leak through)
+- [x] `.moss` index: support optional external location via MOSS_INDEX_DIR env var
 
 **Session Analysis / Self-Improvement:**
 - [ ] Correction pattern detection: extract first 2-3 words of assistant responses, flag patterns like "You're right", "Good point", "Ah yes", "My bad", etc.
@@ -112,6 +110,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Layered memory for cross-session learning
 
 ## Future Work
+
+### Agent TUI (future)
+- [ ] Terminal output sanitization: reset terminal state after nested command output (escape codes leak through)
 
 ### Agent Research
 - [ ] Conversational loop pattern (vs hierarchical)

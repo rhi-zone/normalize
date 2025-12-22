@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 tree-sitter.workspace = true
+dirs.workspace = true
 
 # Language grammars
 tree-sitter-python.workspace = true

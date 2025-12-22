@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use moss_core::get_moss_dir;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -3063,6 +3064,7 @@ fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 {
 
     let client = daemon::DaemonClient::new(&root);
 
+    let moss_dir = get_moss_dir(&root);
     match action {
         DaemonAction::Status => {
             if !client.is_available() {
@@ -3071,12 +3073,12 @@ fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 {
                         "{}",
                         serde_json::json!({
                             "running": false,
-                            "socket": root.join(".moss/daemon.sock").to_string_lossy()
+                            "socket": moss_dir.join("daemon.sock").to_string_lossy()
                         })
                     );
                 } else {
                     eprintln!("Daemon is not running");
-                    eprintln!("Socket: {}", root.join(".moss/daemon.sock").display());
+                    eprintln!("Socket: {}", moss_dir.join("daemon.sock").display());
                 }
                 return 1;
             }
@@ -3498,7 +3500,7 @@ fn cmd_index_stats(root: Option<&Path>, json: bool) -> i32 {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    let moss_dir = root.join(".moss");
+    let moss_dir = get_moss_dir(&root);
     let db_path = moss_dir.join("index.sqlite");
 
     // Get DB file size

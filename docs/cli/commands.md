@@ -204,6 +204,7 @@ moss analyze --check-todos --strict
 
 | Variable | Description |
 |----------|-------------|
+| `MOSS_INDEX_DIR` | Custom location for moss data/index. Absolute path uses that directory directly. Relative path uses `$XDG_DATA_HOME/moss/<relative>`. Default: `.moss` in project root |
 | `MOSS_CONFIG` | Path to config file (default: `moss.toml`) |
 | `MOSS_LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 | `ANTHROPIC_API_KEY` | API key for Anthropic LLM |

@@ -1,4 +1,5 @@
 use ignore::WalkBuilder;
+use moss_core::get_moss_dir;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -38,7 +39,7 @@ pub struct SymbolIndex {
 
 impl SymbolIndex {
     pub fn open(root: &Path) -> rusqlite::Result<Self> {
-        let moss_dir = root.join(".moss");
+        let moss_dir = get_moss_dir(root);
         std::fs::create_dir_all(&moss_dir).ok();
 
         let db_path = moss_dir.join("symbols.sqlite");

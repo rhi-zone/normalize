@@ -1,3 +1,4 @@
+use moss_core::get_moss_dir;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -133,10 +134,11 @@ impl Daemon {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = std::env::current_dir()?;
-    let socket_path = root.join(".moss/daemon.sock");
+    let moss_dir = get_moss_dir(&root);
+    let socket_path = moss_dir.join("daemon.sock");
 
-    // Ensure .moss directory exists
-    std::fs::create_dir_all(root.join(".moss"))?;
+    // Ensure moss data directory exists
+    std::fs::create_dir_all(&moss_dir)?;
 
     // Remove stale socket
     let _ = std::fs::remove_file(&socket_path);

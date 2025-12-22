@@ -1,3 +1,4 @@
+use moss_core::get_moss_dir;
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
@@ -40,7 +41,8 @@ pub struct DaemonClient {
 
 impl DaemonClient {
     pub fn new(root: &Path) -> Self {
-        let socket_path = root.join(".moss/daemon.sock").to_string_lossy().to_string();
+        let moss_dir = get_moss_dir(root);
+        let socket_path = moss_dir.join("daemon.sock").to_string_lossy().to_string();
         let root_path = root.to_path_buf();
         Self {
             socket_path,
@@ -71,11 +73,11 @@ impl DaemonClient {
     fn start_daemon(&self) -> Result<(), String> {
         use std::process::{Command, Stdio};
 
-        // Create .moss directory if it doesn't exist
-        let moss_dir = self.root_path.join(".moss");
+        // Create moss data directory if it doesn't exist
+        let moss_dir = get_moss_dir(&self.root_path);
         if !moss_dir.exists() {
             std::fs::create_dir_all(&moss_dir)
-                .map_err(|e| format!("Failed to create .moss directory: {}", e))?;
+                .map_err(|e| format!("Failed to create moss directory: {}", e))?;
         }
 
         // Try to start moss-server with Unix socket
