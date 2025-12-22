@@ -59,8 +59,12 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
     - `skeleton.extract` → same with `--json`
   - MossToolExecutor → call rust_shim directly
   - Two agent loops (DWIMLoop vs AgentLoop+workflows) - why both?
-    - DWIMLoop extras: task tree, DWIM parsing, ephemeral cache, feedback inbox
-    - These could be workflow features, not a parallel implementation
+    - DWIMLoop: task tree, DWIM parsing, cache, feedback - agent-specific
+    - AgentLoop: generic step executor, used by workflows
+    - Maybe they shouldn't be unified - different abstractions:
+      - Workflow = deterministic step sequence (no LLM decisions)
+      - Agent = LLM decides next step (needs context management)
+    - Shared: tools, executors. Different: control flow.
   - Python edit → redundant with agent, remove
   - Rust edit vs Python edit → same name, different behavior
 - [ ] Define clear boundaries: what's Rust, what's Python, why
