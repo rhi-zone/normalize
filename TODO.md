@@ -15,7 +15,8 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 **Known Issues:**
 - [x] Agent path resolution - FIXED: now routes through Rust CLI with fuzzy resolution
 - [x] Agent stuck in retry loop - FIXED: fallback strategy (retry_threshold, FallbackStrategy)
-- [ ] Agent behavior inconsistent (some runs hit max turns for same query)
+- [x] LLM hallucinating symbol names causes OS error - FIXED: rust_shim input validation
+- [ ] Agent behavior inconsistent (LLM hallucinates symbols; handled gracefully but wastes turns)
 
 **Docs Alignment:**
 - [x] `docs/dwim-architecture.md` - rewritten for 3 primitives
@@ -44,7 +45,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [ ] Agent behavior inconsistent (some runs hit max turns for same query)
+- [ ] Agent LLM hallucination (improve prompts to reduce fake symbol generation)
 - [ ] Python edit uses separate file/symbol targeting (LLM-based, intentionally different)
 
 ## Backlog
