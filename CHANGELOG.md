@@ -12,6 +12,13 @@
 - Fixed `test_typo_correction_search` expectation ("search" alias resolves to "view")
 - Removed 4 obsolete skipped tests for consolidated CLI commands
 
+**check-docs False Positives Fixed** (Dec 22 2025)
+- Reduced warnings from 48 to 6 (remaining are legitimate stale refs)
+- Added project_roots check: only flag refs whose root matches project modules
+- Fixed package discovery: add names without `__init__` suffix (`moss.plugins`)
+- Skip config extensions (`.toml`, `.yaml`, `.json`, etc.)
+- Skip `self.*` references and incomplete refs ending with dot
+
 ### Features
 
 **TUI Improvements** (Dec 22 2025)
@@ -757,9 +764,8 @@ Hyper-modular refactor with auto-generated interfaces:
 
 **29c: Interface Generator Layer**
 - `moss.gen.cli` - Generate argparse CLI from API introspection
-- `moss.gen.http` - Generate FastAPI routes from API
+- `moss.gen.http` - Generate FastAPI routes and OpenAPI spec from API
 - `moss.gen.mcp` - Generate MCP tool definitions from API
-- `moss.gen.openapi` - Generate OpenAPI spec from API
 - 46 tests for interface generators
 
 **29d: Wrapper Packages**

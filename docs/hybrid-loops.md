@@ -103,7 +103,7 @@ The `CompositeToolExecutor` automatically strips the prefix before passing to th
 
 | Loop Tool Name | Executor | Actual Tool Called |
 |----------------|----------|-------------------|
-| `moss.skeleton.format` | MossToolExecutor | `skeleton.format` |
+| `moss.skeleton.format` | MossToolExecutor | `skeleton.format` | <!-- doc-check: ignore -->
 | `mcp.read_file` | MCPToolExecutor | `read_file` |
 | `llm.analyze` | LLMToolExecutor | `analyze` |
 

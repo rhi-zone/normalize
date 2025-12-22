@@ -180,6 +180,7 @@ class DocChecker:
         self.root = root.resolve()
         self.summarizer = Summarizer(include_private=False, include_tests=False)
         self.check_links = check_links
+        self._entry_point_groups: set[str] | None = None
 
     def check(self) -> DocCheckResult:
         """Run all documentation checks."""
@@ -311,7 +312,21 @@ class DocChecker:
             return refs
 
         lines = content.splitlines()
+        in_code_block = False
         for i, line in enumerate(lines, 1):
+            # Track code blocks (triple backticks)
+            if line.strip().startswith("```"):
+                in_code_block = not in_code_block
+                continue
+
+            # Skip references inside code blocks
+            if in_code_block:
+                continue
+
+            # Skip lines with doc-check ignore comment
+            if "doc-check: ignore" in line:
+                continue
+
             # Match backtick references like `moss.cli` or `cli.py`
             for match in re.finditer(r"`([a-zA-Z_][a-zA-Z0-9_./]*)`", line):
                 ref = match.group(1)
@@ -362,6 +377,10 @@ class DocChecker:
         if not normalized:
             return True  # Can't verify, assume it's fine
 
+        # Check if it's an entry point group name (e.g., moss.synthesis.generators)
+        if normalized in self._get_entry_point_groups():
+            return True
+
         # Only check references that share a root module with our codebase
         # This avoids flagging external library references (textual.app, etc.)
         ref_root = normalized.split(".")[0]
@@ -394,6 +413,27 @@ class DocChecker:
             ref = ref[4:]
 
         return ref if ref else None
+
+    def _get_entry_point_groups(self) -> set[str]:
+        """Extract entry point group names from pyproject.toml."""
+        if self._entry_point_groups is not None:
+            return self._entry_point_groups
+
+        self._entry_point_groups = set()
+        pyproject = self.root / "pyproject.toml"
+        if not pyproject.exists():
+            return self._entry_point_groups
+
+        try:
+            content = pyproject.read_text()
+        except (OSError, UnicodeDecodeError):
+            return self._entry_point_groups
+
+        # Match [project.entry-points."group.name"] sections
+        for match in re.finditer(r'\[project\.entry-points\."([^"]+)"\]', content):
+            self._entry_point_groups.add(match.group(1))
+
+        return self._entry_point_groups
 
     def _check_readme(self, summary: ProjectSummary) -> list[DocIssue]:
         """Check README for common issues."""
