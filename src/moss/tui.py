@@ -457,13 +457,13 @@ class ProjectTree(Tree[Any]):
             for symbol in symbols:
                 icon = kind_icons.get(symbol.kind, "•")
                 label = f"{icon} {symbol.name}"
-                sym_node = tree_node.add(
-                    label,
-                    data={"type": "symbol", "symbol": symbol, "path": path},
-                )
-                # Add nested symbols (class methods, nested functions)
+                data = {"type": "symbol", "symbol": symbol, "path": path}
+                # Use add_leaf for symbols without children (no expand arrow)
                 if symbol.children:
+                    sym_node = tree_node.add(label, data=data)
                     add_symbols(sym_node, symbol.children, path)
+                else:
+                    tree_node.add_leaf(label, data=data)
 
         # Simple recursive file tree
         import os
@@ -483,16 +483,20 @@ class ProjectTree(Tree[Any]):
                         node = tree_node.add(f"📁 {entry}", data={"type": "dir", "path": full_path})
                         add_dir(node, full_path)
                     else:
-                        file_node = tree_node.add(
-                            f"📄 {entry}", data={"type": "file", "path": full_path}
-                        )
+                        file_data = {"type": "file", "path": full_path}
                         # Add symbols for Python files
                         if entry.endswith(".py"):
                             try:
                                 symbols = api.skeleton.extract(full_path)
-                                add_symbols(file_node, symbols, full_path)
+                                if symbols:
+                                    file_node = tree_node.add(f"📄 {entry}", data=file_data)
+                                    add_symbols(file_node, symbols, full_path)
+                                else:
+                                    tree_node.add_leaf(f"📄 {entry}", data=file_data)
                             except (OSError, ValueError, SyntaxError):
-                                pass
+                                tree_node.add_leaf(f"📄 {entry}", data=file_data)
+                        else:
+                            tree_node.add_leaf(f"📄 {entry}", data=file_data)
             except OSError:
                 pass
 
@@ -1102,6 +1106,20 @@ class MossTUI(App):
             return
         self._execute_primitive("analyze", self._selected_path)
 
+    def _format_symbols_skeleton(self, symbols: list, indent: int = 0) -> str:
+        """Format symbols list as a skeleton (like CLI output)."""
+        lines = []
+        prefix = "    " * indent
+        for sym in symbols:
+            sig = sym.get("signature", sym.get("name", "?"))
+            children = sym.get("children", [])
+            if children:
+                lines.append(f"{prefix}{sig}:")
+                lines.append(self._format_symbols_skeleton(children, indent + 1))
+            else:
+                lines.append(f"{prefix}{sig}")
+        return "\n".join(lines)
+
     def _execute_primitive(self, primitive: str, target: str, **kwargs) -> None:
         """Execute a primitive (view/edit/analyze) and display results."""
         from moss.core_api import AnalyzeAPI, ViewAPI
@@ -1123,23 +1141,37 @@ class MossTUI(App):
                     if len(files) > 20:
                         explore_detail.write(f"  ... and {len(files) - 20} more\n")
                 elif result.kind == "file":
-                    # Show skeleton or raw content
-                    skeleton = result.content.get("skeleton", "")
-                    if skeleton:
-                        explore_detail.write(skeleton)
+                    # Format symbols as skeleton
+                    symbols = result.content.get("symbols", [])
+                    if symbols:
+                        line_count = result.content.get("line_count", "?")
+                        explore_detail.write(f"Lines: {line_count}\n\n")
+                        explore_detail.write(self._format_symbols_skeleton(symbols))
                     else:
-                        explore_detail.write(str(result.content))
+                        # No symbols - show basic info
+                        line_count = result.content.get("line_count", "?")
+                        explore_detail.write(f"Lines: {line_count}\n(no symbols)")
                 else:  # symbol
-                    signature = result.content.get("signature", "")
                     source = result.content.get("source", "")
-                    if signature:
-                        explore_detail.write(f"{signature}\n\n")
                     if source:
                         explore_detail.write(source)
+                    else:
+                        # Fallback to signature if no source
+                        sig = result.content.get("signature", "")
+                        if sig:
+                            explore_detail.write(sig)
+                        else:
+                            explore_detail.write("(no source available)")
 
             elif primitive == "analyze":
                 api = AnalyzeAPI(self.api.root)
-                result = api.analyze(target=target)
+                # Pass through analyze flags
+                result = api.analyze(
+                    target=target,
+                    health=kwargs.get("health", False),
+                    complexity=kwargs.get("complexity", False),
+                    security=kwargs.get("security", False),
+                )
                 explore_detail.write(f"[b]ANALYZE: {result.target}[/]\n\n")
                 if result.health:
                     explore_detail.write("[b]Health:[/]\n")
