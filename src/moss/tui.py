@@ -357,6 +357,8 @@ class KeybindBar(Static):
     """
 
     def render(self) -> str:
+        from rich.markup import escape
+
         parts = []
         if self.app:
             for binding in self.app.BINDINGS:
@@ -369,18 +371,20 @@ class KeybindBar(Static):
                     key = "/"
                 desc = binding.description
                 action = binding.action.replace("app.", "")
-                # Wrap the key in brackets within description
-                # Use [[ and ]] to escape literal brackets in Rich markup
+                # Wrap the key in brackets: [Q]uit, [-] Up
                 idx = desc.lower().find(key.lower())
                 if idx >= 0:
-                    # Key found in description - wrap it in brackets
-                    styled = f"{desc[:idx]}[[{desc[idx]}]]{desc[idx + 1 :]}"
+                    # Key found in description - wrap it
+                    text = f"{desc[:idx]}[{desc[idx]}]{desc[idx + 1 :]}"
                 else:
                     # Key not in description, prefix with [key]
-                    styled = f"[[{key}]] {desc}"
-                parts.append(f"[@click=app.{action}]{styled}[/]")
+                    text = f"[{key}] {desc}"
+                # Escape brackets for Rich markup, then wrap in click handler
+                escaped = escape(text)
+                parts.append(f"[@click=app.{action}]{escaped}[/]")
         left = " ".join(parts)
-        right = "[@click=app.action_command_palette][[^p]] Palette[/]"
+        # Palette uses Textual's built-in command_palette action
+        right = f"[@click=app.command_palette]{escape('[^p] Palette')}[/]"
         width = self.size.width if self.size.width > 0 else 80
         padding = max(1, width - 50)
         return f"{left}{' ' * padding}{right}"
@@ -710,6 +714,11 @@ class MossTUI(App):
 
     ProjectTree > .tree--label {
         padding-left: 0;
+    }
+
+    CommandPalette > .command-palette--input {
+        height: 1;
+        padding: 0 1;
     }
     """
 
