@@ -148,6 +148,8 @@ fn is_lockfile(path: &str) -> bool {
             | "package-lock.json"
             | "yarn.lock"
             | "pnpm-lock.yaml"
+            | "bun.lockb"
+            | "bun.lock"
             | "poetry.lock"
             | "Pipfile.lock"
             | "Gemfile.lock"
@@ -161,6 +163,8 @@ fn is_lockfile(path: &str) -> bool {
             | "rebar.lock" // Erlang
             | "Podfile.lock" // CocoaPods
             | "shrinkwrap.yaml" // pnpm
+            | "deno.lock" // Deno
+            | "gradle.lockfile" // Gradle
     )
 }
 
