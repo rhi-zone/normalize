@@ -357,20 +357,17 @@ class KeybindBar(Static):
     """
 
     def render(self) -> str:
+        import re
+
         parts = []
         if self.app:
             for binding in self.app.BINDINGS:
                 if not binding.show:
                     continue
-                key = binding.key
-                if key == "minus":
-                    key = "-"
-                elif key == "slash":
-                    key = "/"
                 desc = binding.description
                 action = binding.action.replace("app.", "")
-                # Style first letter bold, rest normal
-                styled = f"[b]{desc[0]}[/]{desc[1:]}" if desc else key
+                # Replace [X] with bold X
+                styled = re.sub(r"\[(.+?)\]", r"[b]\1[/]", desc)
                 parts.append(f"[@click=app.{action}]{styled}[/]")
         left = " ".join(parts)
         right = "[@click=app.action_command_palette][b]^p[/] Palette[/]"
@@ -707,14 +704,14 @@ class MossTUI(App):
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
-        Binding("q", "quit", "Quit"),
+        Binding("q", "quit", "[Q]uit"),
         Binding("ctrl+c", "handle_ctrl_c", "Interrupt", show=False),
-        Binding("t", "toggle_dark", "Theme"),
-        Binding("v", "primitive_view", "View"),
-        Binding("e", "primitive_edit", "Edit"),
-        Binding("a", "primitive_analyze", "Analyze"),
-        Binding("minus", "cd_up", "Up"),
-        Binding("slash", "toggle_command", "Cmd"),
+        Binding("t", "toggle_dark", "[T]heme"),
+        Binding("v", "primitive_view", "[V]iew"),
+        Binding("e", "primitive_edit", "[E]dit"),
+        Binding("a", "primitive_analyze", "[A]nalyze"),
+        Binding("minus", "cd_up", "Up[-]"),
+        Binding("slash", "toggle_command", "Cmd[/]"),
         Binding("tab", "next_mode", "Mode", show=False),
         Binding("enter", "enter_dir", "Enter", show=False),
         Binding("escape", "hide_command", show=False),
