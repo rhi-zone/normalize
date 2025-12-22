@@ -68,8 +68,13 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
   - `skeleton.format` → `rust_shim.passthrough("view", [path])`
   - `skeleton.expand` → `rust_shim.passthrough("view", [path/symbol])`
   - `skeleton.extract` → same with `--json`
-  - `patch.apply` → possibly `moss edit` (Python LLM-based or Rust structural)
   - MossToolExecutor could use rust_shim directly
+- [ ] Unify edit commands: Python `edit` + Rust `edit` = confusing
+  - Rust `edit`: tree-sitter structural ops (--delete, --replace, etc.)
+  - Python `edit --method structural`: incomplete, only handles rename
+  - Python `edit --method synthesis`: LLM-based (main use case)
+  - Option A: Rename Rust edit → `moss patch`
+  - Option B: Python edit delegates to Rust for structural ops
 
 **Call Graph Improvements:**
 - [x] Call extraction for Python, Rust, TypeScript, JavaScript, Java, Go
