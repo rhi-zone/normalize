@@ -140,24 +140,26 @@ Scope(context=TaskTree) {
 
    **Sub-question: Prose between commands?**
 
-   Options:
-   1. **Strict mode**: Commands only, no prose (easier to parse)
-   2. **Prose allowed**: Extract commands from natural language (flexible but noisy)
-   3. **Structured output**: XML/JSON tags delineate commands vs prose
+   Yes - prose is **inline chain-of-thought**. Thinking while acting, not before:
 
    ```
-   # Option 3 example:
-   <thinking>Need to check the main file first</thinking>
-   <action>view main.py</action>
-   <action>view utils.py</action>
-   <note>These are independent, can run in parallel</note>
+   Let me check the main file first.
+   view main.py
+   Interesting, the function is on line 42.
+   Now let me see where it's called.
+   view utils.py
    ```
 
-   Prose could capture:
-   - Intent explanation (why this action?)
+   **Parsing**: Lines matching command patterns (view/edit/analyze/done) are actions.
+   Everything else is prose/thinking. Simple regex, no XML overhead.
+
+   Prose captures:
+   - Intent (why this action?)
    - Observations (what did we learn?)
    - Questions (need clarification?)
-   - Notes for context tracking
+   - Reasoning (inline CoT)
+
+   This is more natural than strict "think then act" - humans reason while working.
 
    TOML representation:
    ```toml
