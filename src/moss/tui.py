@@ -1565,59 +1565,63 @@ class MossTUI(App):
         # In a full implementation, this would also highlight the node in the tree
 
     def _goto_fuzzy(self, pattern: str) -> None:
-        """Fuzzy navigate to a file matching pattern."""
+        """Fuzzy navigate to a file or symbol using Rust index."""
+        from moss.rust_shim import rust_find_symbols
+
         tree = self.query_one("#project-tree", ProjectTree)
-        if not tree._git_files:
-            self._log("[red]No files indexed[/]")
-            return
 
-        # Fuzzy match: find files containing the pattern (case-insensitive)
-        pattern_lower = pattern.lower()
-        matches = []
-        for f in tree._git_files:
-            f_lower = f.lower()
-            # Score by how early and how well the pattern matches
-            if pattern_lower in f_lower:
-                # Prefer exact filename matches over path matches
-                name = f.split("/")[-1].lower()
-                if pattern_lower == name:
-                    score = 0  # Exact filename match
-                elif name.startswith(pattern_lower):
-                    score = 1  # Filename starts with pattern
-                elif pattern_lower in name:
-                    score = 2  # Pattern in filename
+        # Use Rust index for symbol search (works without git)
+        symbols = rust_find_symbols(pattern, fuzzy=True, limit=20, root=str(self.api.root))
+
+        if symbols:
+            # Group by file, pick best match
+            # Prefer: exact name match > function/class > other
+            def score_symbol(s: dict) -> tuple:
+                name = s.get("name", "").lower()
+                kind = s.get("kind", "")
+                pat = pattern.lower()
+                if name == pat:
+                    name_score = 0
+                elif name.startswith(pat):
+                    name_score = 1
                 else:
-                    score = 3  # Pattern in path
-                matches.append((score, f))
+                    name_score = 2
+                kind_score = 0 if kind in ("function", "class", "method") else 1
+                return (name_score, kind_score, s.get("file", ""))
 
-        if not matches:
-            self._log(f"[yellow]No files matching '{pattern}'[/]")
-            return
+            symbols.sort(key=score_symbol)
+            best = symbols[0]
+            file_path = best.get("file", "")
+            line = best.get("line", 1)
 
-        # Sort by score, then alphabetically
-        matches.sort(key=lambda x: (x[0], x[1]))
-        best_match = matches[0][1]
+            if file_path:
+                # Navigate to file and symbol
+                full_path = Path(file_path)
+                if full_path.is_absolute():
+                    rel_path = str(full_path.relative_to(self.api.root))
+                else:
+                    rel_path = file_path
+                    full_path = self.api.root / file_path
 
-        # Navigate to the file in tree
-        target_path = tree._tree_root / best_match
-        if target_path.exists():
-            # Expand path and select node in tree
-            self._expand_and_select_path(tree, best_match)
+                # Expand tree to file
+                self._expand_and_select_path(tree, rel_path)
 
-            # Update selection state
-            self._selected_path = str(target_path)
-            self._selected_type = "file"
+                # Update selection
+                self._selected_path = str(full_path)
+                self._selected_type = "file"
 
-            # Show the file content
-            self._execute_primitive("view", str(target_path))
+                # View the symbol (file:line or file/symbol)
+                view_target = f"{full_path}:{line}" if line else str(full_path)
+                self._execute_primitive("view", view_target)
 
-            # Log matches if there are alternatives
-            if len(matches) > 1:
-                alt_count = min(3, len(matches) - 1)
-                alts = ", ".join(m[1].split("/")[-1] for _, m in matches[1 : alt_count + 1])
-                self._log(f"[dim]Also matched: {alts}[/]")
-        else:
-            self._log(f"[red]File not found: {best_match}[/]")
+                # Show alternatives
+                if len(symbols) > 1:
+                    alts = [f"{s['name']} ({s['kind']})" for s in symbols[1:4]]
+                    self._log(f"[dim]Also: {', '.join(alts)}[/]")
+                return
+
+        # Fallback: file-only search if no symbols found
+        self._log(f"[yellow]No symbols matching '{pattern}'[/]")
 
     def _expand_and_select_path(self, tree: ProjectTree, rel_path: str) -> None:
         """Expand tree nodes along path and select the final node."""
