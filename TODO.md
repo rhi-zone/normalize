@@ -46,10 +46,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [x] Context modes for nested steps: implement shared/inherited (see docs/nested-execution.md)
-- [x] State machine: on_entry/on_exit hooks per state
-- [x] Explore TUI: jump-to-node shortcut (fuzzy search navigation)
-- [x] Define clear Rust/Python boundaries (what goes where, why) → docs/rust-python-boundary.md
+- [ ] State machine: parallel state execution
+- [ ] Nested execution Phase 3: summarize option + expose child results to parent
+- [ ] Modal keybinds (NEEDS DESIGN - see docs/tui.md "Modal Keybinds" section)
 
 ## Backlog
 
@@ -111,7 +110,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 **Explore TUI Keybinds:**
 - [ ] Modal keybinds (NEEDS DESIGN - see docs/tui.md "Modal Keybinds" section)
-- [ ] Jump-to-node shortcut (fuzzy search to quickly navigate tree)
+- [x] Jump-to-node shortcut (fuzzy search to quickly navigate tree) - 'g' key
 - [ ] View/Edit/Analyze: mode indicator (bottom right, near palette) OR tabbed content view
 - [ ] Remove theme keybind (T) - wasteful, only toggles light/dark
 
