@@ -59,6 +59,18 @@ LLM calls are expensive (cost) and slow (latency). Design everything to reduce t
 
 This is why we have skeleton views (understand code without LLM) and validation loops (catch errors without LLM). The goal: an agent that calls the LLM 10x less than naive approaches.
 
+### Never Extract Data Manually
+
+LLMs should never manually extract, enumerate, or guess data that tools can provide deterministically. This includes:
+- Symbol names (use `view` to get actual symbols)
+- File lists (use glob/find tools)
+- Function signatures (use AST-based extraction)
+- Dependencies (use import graph tools)
+
+When an LLM tries to manually enumerate symbols, it hallucinates. We've seen models generate 2000+ fake symbol names following plausible patterns (`resolve_path_command`, `resolve_path_chain`, etc.) that don't exist. The fix isn't better prompting—it's ensuring the LLM never attempts extraction in the first place.
+
+Rule: If data exists in the codebase, there must be a tool to retrieve it. The LLM's job is to decide *what* to look up, not to guess *what exists*.
+
 ### Resource Efficiency
 
 Moss should be extremely lightweight. High memory usage is a bug:
