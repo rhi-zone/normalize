@@ -46,14 +46,14 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [ ] Design: Composable execution architecture
+- [x] Design: Composable execution architecture
   - [x] Primitives: Scope, strategies (context/cache/retry/llm) - docs/design/execution-primitives.md
-  - [x] Prototype: src/moss/execution/__init__.py (~500 lines)
+  - [x] Prototype: src/moss/execution/__init__.py (~800 lines)
   - [x] Decision model: inline CoT, multiple actions, parse_decision()
-  - [x] agent_loop() handles Decision with prose + actions
-  - [ ] Phase 2: Parallel execution (Decision.parallel)
-  - [ ] Phase 3: Define "dwim" as TOML workflow config
-  - [ ] Phase 4: Wire retry into Scope.run(), remove DWIMLoop
+  - [x] Phase 2: Parallel execution (Decision.parallel + ThreadPoolExecutor)
+  - [x] Phase 3: dwim.toml + load_workflow() + run_workflow()
+  - [x] Phase 4: Retry wired into Scope.run()
+  - [ ] Final: Remove DWIMLoop class, use dwim.toml instead
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
 
 ## Backlog

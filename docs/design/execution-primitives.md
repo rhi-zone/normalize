@@ -407,60 +407,33 @@ with Scope(context=TaskTreeContext()) as outer:
 
 ## Implementation Plan
 
-### Phase 1: Decision Model (current)
+### Phase 1: Decision Model ✓
 
-1. **Add `Decision` dataclass**
-   ```python
-   @dataclass
-   class Decision:
-       raw: str                    # Full LLM output with inline CoT
-       actions: list[str]          # Extracted commands
-       prose: list[str]            # Extracted prose segments
-       parallel: bool = False      # Execute actions concurrently?
-       done: bool = False          # Task complete?
-   ```
+- [x] `Decision` dataclass with raw, actions, prose, parallel, done
+- [x] `parse_decision()` extracts commands from inline CoT
+- [x] `LLMStrategy.decide()` returns Decision
+- [x] `agent_loop()` handles multiple actions + prose
 
-2. **Add `parse_decision()` function**
-   - Extract lines matching command patterns (view/edit/analyze/done)
-   - Everything else is prose
-   - Detect "done" to set completion flag
+### Phase 2: Parallel Execution ✓
 
-3. **Update `LLMStrategy.decide()` → returns `Decision`**
-   - `NoLLM`: return pre-canned Decision
-   - `SimpleLLM`: call LLM, parse response into Decision
+- [x] ThreadPoolExecutor for concurrent action execution
+- [x] `Decision.parallel=True` triggers parallel mode
 
-4. **Update `agent_loop()` to handle Decision**
-   - Execute actions (sequential by default)
-   - Store prose in context for visibility
-   - Check `done` flag for loop termination
+### Phase 3: Workflow Config ✓
 
-### Phase 2: Parallel Execution
+- [x] `workflows/dwim.toml` defines DWIM as workflow
+- [x] `load_workflow()` parses TOML, instantiates strategies
+- [x] `run_workflow()` convenience function
 
-5. **Add parallel execution path**
-   - If `Decision.parallel=True` and multiple actions, run concurrently
-   - Collect results, update context with all
+### Phase 4: Retry Integration ✓
 
-### Phase 3: Workflow Config
+- [x] `Scope.run()` retries on error with configurable delay
+- [x] `agent_loop()` accepts retry parameter
 
-6. **Define DWIM as workflow config**
-   - Create `workflows/dwim.toml`
-   - Load and instantiate strategies from TOML
+### Final: Remove DWIMLoop
 
-7. **Remove DWIMLoop class**
-   - Replace with workflow config + agent_loop()
-
-### Phase 4: Retry Integration
-
-8. **Wire retry into Scope.run()**
-   - On error, check retry strategy
-   - Apply delay and retry if allowed
-
-## Next Steps (old)
-
-- [ ] Test with real LLM end-to-end
-- [ ] Wire retry strategy into Scope.run()
-- [ ] Define "dwim" as predefined workflow using these primitives
-- [ ] Remove DWIMLoop class (1151 lines → workflow config)
+- [ ] Wire `moss agent` CLI to use `run_workflow("dwim.toml", task)`
+- [ ] Delete `dwim_loop.py` (1151 lines → 0)
 
 ## End Goal
 
