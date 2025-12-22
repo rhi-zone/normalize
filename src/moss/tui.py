@@ -804,7 +804,8 @@ class MossTUI(App):
         """Called when the app is mounted."""
         self.title = "Explore"
         self.sub_title = ""
-        self.query_one("#command-input").focus()
+        # Focus tree so keybindings are visible (Tab to input)
+        self.query_one("#project-tree").focus()
         # Track selected node for action bar
         self._selected_path: str = ""
         self._selected_type: str = ""
