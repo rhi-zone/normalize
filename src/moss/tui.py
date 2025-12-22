@@ -17,7 +17,7 @@ try:
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, Vertical
     from textual.reactive import reactive
-    from textual.widgets import Input, Static, Tree
+    from textual.widgets import Footer, Input, Static, Tree
     from textual.widgets.tree import TreeNode
 except ImportError:
     # TUI dependencies not installed
@@ -344,36 +344,6 @@ class ModeIndicator(Static):
         return f"Mode: [{self.mode_color} b]{self.mode_name}[/]"
 
 
-class KeybindBar(Static):
-    """Custom footer showing keybindings with integrated hotkey display."""
-
-    DEFAULT_CSS = """
-    KeybindBar {
-        dock: bottom;
-        height: 1;
-        background: $surface;
-    }
-    """
-
-    def render(self) -> str:
-        # Build keybind display with underlined hotkey letter
-        binds = [
-            "[u]Q[/u]uit",
-            "[u]T[/u]heme",
-            "[u]V[/u]iew",
-            "[u]E[/u]dit",
-            "[u]A[/u]nalyze",
-            "[dim]-[/dim] Up",
-            "[dim]Tab[/dim] Mode",
-        ]
-        left = " ".join(f"[on #333333] {b} [/]" for b in binds)
-        right = "[on #333333] [dim]Ctrl+P[/dim] Palette [/]"
-        # Push palette to right (left takes ~50 chars, right ~16)
-        width = self.size.width if self.size.width > 0 else 80
-        padding = max(1, width - 66)
-        return f"{left}{' ' * padding}{right}"
-
-
 class Breadcrumb(Static):
     """Breadcrumb navigation showing path from project root."""
 
@@ -440,6 +410,10 @@ class HoverTooltip(Static):
 class ProjectTree(Tree[Any]):
     """Unified tree for task and file navigation."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._api: MossAPI | None = None
+
     def update_from_tasks(self, task_tree: TaskTree) -> None:
         self.clear()
         root = self.root
@@ -464,33 +438,12 @@ class ProjectTree(Tree[Any]):
             api: The MossAPI instance
             tree_root: Root directory to show (defaults to api.root)
         """
+        self._api = api
         self.clear()
         root = self.root
         tree_root = tree_root or api.root
         root.label = f"[b]Files: {tree_root.name}[/b]"
 
-        # Symbol kind icons
-        kind_icons = {
-            "class": "📦",
-            "function": "⚡",
-            "method": "🔧",
-            "variable": "📌",
-        }
-
-        def add_symbols(tree_node: TreeNode[Any], symbols: list, path: Path) -> None:
-            """Add symbol nodes as children of a file node."""
-            for symbol in symbols:
-                icon = kind_icons.get(symbol.kind, "•")
-                label = f"{icon} {symbol.name}"
-                data = {"type": "symbol", "symbol": symbol, "path": path}
-                # Use add_leaf for symbols without children (no expand arrow)
-                if symbol.children:
-                    sym_node = tree_node.add(label, data=data)
-                    add_symbols(sym_node, symbol.children, path)
-                else:
-                    tree_node.add_leaf(label, data=data)
-
-        # Simple recursive file tree
         import os
 
         def add_dir(tree_node: TreeNode[Any], path: Path):
@@ -507,14 +460,95 @@ class ProjectTree(Tree[Any]):
                         node = tree_node.add(f"📁 {entry}", data={"type": "dir", "path": full_path})
                         add_dir(node, full_path)
                     else:
-                        file_data = {"type": "file", "path": full_path}
-                        # All files are leaves - symbols loaded on expand
-                        tree_node.add_leaf(f"📄 {entry}", data=file_data)
+                        file_data = {"type": "file", "path": full_path, "loaded": False}
+                        # Python and markdown files are expandable (symbols loaded on expand)
+                        if entry.endswith(".py") or entry.endswith(".md"):
+                            tree_node.add(f"📄 {entry}", data=file_data)
+                        else:
+                            tree_node.add_leaf(f"📄 {entry}", data=file_data)
             except OSError:
                 pass
 
         add_dir(root, tree_root)
         root.expand()
+
+    def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
+        """Load symbols lazily when a file node is expanded."""
+        data = event.node.data
+        if not data or data.get("type") != "file" or data.get("loaded"):
+            return
+
+        path = data["path"]
+        data["loaded"] = True
+
+        # Symbol kind icons
+        kind_icons = {
+            "class": "📦",
+            "function": "⚡",
+            "method": "🔧",
+            "variable": "📌",
+            "heading": "📑",
+        }
+
+        def add_symbols(tree_node: TreeNode[Any], symbols: list, path: Path) -> None:
+            for symbol in symbols:
+                icon = kind_icons.get(symbol.kind, "•")
+                label = f"{icon} {symbol.name}"
+                sym_data = {"type": "symbol", "symbol": symbol, "path": path}
+                if symbol.children:
+                    sym_node = tree_node.add(label, data=sym_data)
+                    add_symbols(sym_node, symbol.children, path)
+                else:
+                    tree_node.add_leaf(label, data=sym_data)
+
+        if self._api and str(path).endswith(".py"):
+            try:
+                symbols = self._api.skeleton.extract(path)
+                if symbols:
+                    add_symbols(event.node, symbols, path)
+            except (OSError, ValueError, SyntaxError):
+                pass
+        elif str(path).endswith(".md"):
+            # Extract markdown headings
+            try:
+                headings = self._extract_markdown_headings(path)
+                add_symbols(event.node, headings, path)
+            except OSError:
+                pass
+
+    def _extract_markdown_headings(self, path: Path) -> list:
+        """Extract headings from markdown file as pseudo-symbols."""
+        import re
+        from dataclasses import dataclass
+
+        @dataclass
+        class HeadingSymbol:
+            name: str
+            kind: str = "heading"
+            signature: str = ""
+            docstring: str | None = None
+            lineno: int = 0
+            children: list = None
+
+            def __post_init__(self):
+                if self.children is None:
+                    self.children = []
+
+        headings = []
+        content = path.read_text()
+        for i, line in enumerate(content.splitlines(), 1):
+            match = re.match(r"^(#{1,6})\s+(.+)$", line)
+            if match:
+                level = len(match.group(1))
+                title = match.group(2).strip()
+                headings.append(
+                    HeadingSymbol(
+                        name=title,
+                        signature=f"{'#' * level} {title}",
+                        lineno=i,
+                    )
+                )
+        return headings
 
 
 class MossTUI(App):
@@ -633,14 +667,14 @@ class MossTUI(App):
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
-        Binding("q", "quit", "Quit", show=False),
+        Binding("q", "quit", "Quit"),
         Binding("ctrl+c", "handle_ctrl_c", "Interrupt", show=False),
-        Binding("t", "app.toggle_dark", "Theme", show=False),
-        Binding("tab", "next_mode", "Mode", show=False),
-        Binding("v", "primitive_view", "View", show=False),
-        Binding("e", "primitive_edit", "Edit", show=False),
-        Binding("a", "primitive_analyze", "Analyze", show=False),
-        Binding("minus", "cd_up", "Up", show=False),
+        Binding("t", "app.toggle_dark", "Theme"),
+        Binding("tab", "next_mode", "Mode"),
+        Binding("v", "primitive_view", "View"),
+        Binding("e", "primitive_edit", "Edit"),
+        Binding("a", "primitive_analyze", "Analyze"),
+        Binding("minus", "cd_up", "Up", key_display="-"),
         Binding("enter", "enter_dir", "Enter", show=False),
     ]
 
@@ -754,7 +788,7 @@ class MossTUI(App):
             Input(placeholder="Enter command...", id="command-input"),
             HoverTooltip(id="hover-tooltip"),
         )
-        yield KeybindBar()
+        yield Footer()
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""
