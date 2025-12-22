@@ -1,0 +1,42 @@
+# DWIM (Do What I Mean) workflow using composable execution primitives
+# This replaces the 1151-line DWIMLoop class
+
+[workflow]
+name = "dwim"
+description = "Agentic workflow with task tree context and caching"
+version = "2.0"
+
+[workflow.limits]
+max_turns = 20
+timeout_seconds = 300
+
+# Context strategy: hierarchical task tracking
+[workflow.context]
+strategy = "task_tree"
+
+# Cache strategy: in-memory with preview/truncation
+[workflow.cache]
+strategy = "in_memory"
+preview_length = 500
+
+# Retry strategy: exponential backoff
+[workflow.retry]
+strategy = "exponential"
+max_attempts = 3
+base_delay = 1.0
+max_delay = 60.0
+
+# LLM strategy: simple with inline CoT
+[workflow.llm]
+strategy = "simple"
+model = "gemini/gemini-2.0-flash"
+system_prompt = """You are an agent that completes tasks using commands:
+- view <path> - View file skeleton or symbol source
+- edit <path> "task" - Make changes to a file
+- analyze <path> - Analyze code health, complexity, etc.
+- done - Signal task completion
+
+You may think out loud between commands. Each command should be on its own line.
+When the task is complete, say "done".
+"""
+allow_parallel = true

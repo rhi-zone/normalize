@@ -216,6 +216,70 @@ class InMemoryCache(CacheStrategy):
 
 
 # =============================================================================
+# Retry Strategies
+# =============================================================================
+
+
+class RetryStrategy(ABC):
+    """Base class for retry strategies."""
+
+    @abstractmethod
+    def should_retry(self, attempt: int, error: str) -> bool:
+        """Return True if should retry after this error."""
+        ...
+
+    @abstractmethod
+    def get_delay(self, attempt: int) -> float:
+        """Return delay in seconds before next retry."""
+        ...
+
+
+class NoRetry(RetryStrategy):
+    """No retries - fail immediately."""
+
+    def should_retry(self, attempt: int, error: str) -> bool:
+        return False
+
+    def get_delay(self, attempt: int) -> float:
+        return 0.0
+
+
+class FixedRetry(RetryStrategy):
+    """Fixed delay retries."""
+
+    def __init__(self, max_attempts: int = 3, delay: float = 1.0):
+        self.max_attempts = max_attempts
+        self.delay = delay
+
+    def should_retry(self, attempt: int, error: str) -> bool:
+        return attempt < self.max_attempts
+
+    def get_delay(self, attempt: int) -> float:
+        return self.delay
+
+
+class ExponentialRetry(RetryStrategy):
+    """Exponential backoff retries."""
+
+    def __init__(
+        self,
+        max_attempts: int = 5,
+        base_delay: float = 1.0,
+        max_delay: float = 60.0,
+    ):
+        self.max_attempts = max_attempts
+        self.base_delay = base_delay
+        self.max_delay = max_delay
+
+    def should_retry(self, attempt: int, error: str) -> bool:
+        return attempt < self.max_attempts
+
+    def get_delay(self, attempt: int) -> float:
+        delay = self.base_delay * (2**attempt)
+        return min(delay, self.max_delay)
+
+
+# =============================================================================
 # Scope
 # =============================================================================
 
@@ -232,6 +296,7 @@ class Scope:
 
     context: ContextStrategy = field(default_factory=FlatContext)
     cache: CacheStrategy = field(default_factory=NoCache)
+    retry: RetryStrategy = field(default_factory=NoRetry)
     parent: Scope | None = None
 
     _current: Scope | None = field(default=None, init=False, repr=False)
@@ -247,25 +312,45 @@ class Scope:
         self,
         context: ContextStrategy | None = None,
         cache: CacheStrategy | None = None,
+        retry: RetryStrategy | None = None,
     ) -> Generator[Scope]:
         """Create nested scope, optionally with different strategies."""
         child_scope = Scope(
             context=context or self.context.child(),
             cache=cache or self.cache,
+            retry=retry or self.retry,
             parent=self,
         )
         yield child_scope
 
     def run(self, action: str) -> str:
-        """Execute an action in this scope.
+        """Execute an action in this scope with retry.
 
         1. Parse action (DWIM)
-        2. Execute tool via Rust CLI
+        2. Execute tool via Rust CLI (with retry on error)
         3. Cache result if large
         4. Update context
         """
+        import time
+
         intent = parse_intent(action)
-        result = execute_intent(intent)
+
+        # Execute with retry
+        attempt = 0
+        while True:
+            result = execute_intent(intent)
+
+            # Check for error
+            is_error = result.startswith("[Error")
+
+            if not is_error or not self.retry.should_retry(attempt, result):
+                break
+
+            # Wait and retry
+            delay = self.retry.get_delay(attempt)
+            if delay > 0:
+                time.sleep(delay)
+            attempt += 1
 
         # Cache if needed
         preview, _cache_id = self.cache.preview(result)
@@ -355,70 +440,6 @@ def execute_intent(intent: Intent) -> str:
             return f"[Error] {output.strip()}" if output else f"[Error exit {exit_code}]"
     except Exception as e:
         return f"Error: {e}"
-
-
-# =============================================================================
-# Retry Strategies
-# =============================================================================
-
-
-class RetryStrategy(ABC):
-    """Base class for retry strategies."""
-
-    @abstractmethod
-    def should_retry(self, attempt: int, error: str) -> bool:
-        """Return True if should retry after this error."""
-        ...
-
-    @abstractmethod
-    def get_delay(self, attempt: int) -> float:
-        """Return delay in seconds before next retry."""
-        ...
-
-
-class NoRetry(RetryStrategy):
-    """No retries - fail immediately."""
-
-    def should_retry(self, attempt: int, error: str) -> bool:
-        return False
-
-    def get_delay(self, attempt: int) -> float:
-        return 0.0
-
-
-class FixedRetry(RetryStrategy):
-    """Fixed delay retries."""
-
-    def __init__(self, max_attempts: int = 3, delay: float = 1.0):
-        self.max_attempts = max_attempts
-        self.delay = delay
-
-    def should_retry(self, attempt: int, error: str) -> bool:
-        return attempt < self.max_attempts
-
-    def get_delay(self, attempt: int) -> float:
-        return self.delay
-
-
-class ExponentialRetry(RetryStrategy):
-    """Exponential backoff retries."""
-
-    def __init__(
-        self,
-        max_attempts: int = 5,
-        base_delay: float = 1.0,
-        max_delay: float = 60.0,
-    ):
-        self.max_attempts = max_attempts
-        self.base_delay = base_delay
-        self.max_delay = max_delay
-
-    def should_retry(self, attempt: int, error: str) -> bool:
-        return attempt < self.max_attempts
-
-    def get_delay(self, attempt: int) -> float:
-        delay = self.base_delay * (2**attempt)
-        return min(delay, self.max_delay)
 
 
 # =============================================================================
@@ -575,6 +596,7 @@ def agent_loop(
     task: str,
     context: ContextStrategy | None = None,
     cache: CacheStrategy | None = None,
+    retry: RetryStrategy | None = None,
     llm: LLMStrategy | None = None,
     max_turns: int = 10,
 ) -> str:
@@ -586,6 +608,7 @@ def agent_loop(
         task: The task to complete
         context: Context strategy (default: FlatContext)
         cache: Cache strategy (default: InMemoryCache)
+        retry: Retry strategy (default: NoRetry)
         llm: LLM strategy (default: NoLLM for safety)
         max_turns: Maximum iterations before stopping
 
@@ -595,6 +618,7 @@ def agent_loop(
     scope = Scope(
         context=context or FlatContext(),
         cache=cache or InMemoryCache(),
+        retry=retry or NoRetry(),
     )
     decider = llm or NoLLM()
 
@@ -614,8 +638,161 @@ def agent_loop(
         if decision.done:
             break
 
-        # Execute actions (sequential for now, parallel in Phase 2)
-        for action in decision.actions:
-            scope.run(action)
+        # Execute actions
+        if decision.parallel and len(decision.actions) > 1:
+            # Parallel execution using ThreadPoolExecutor
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            with ThreadPoolExecutor(max_workers=len(decision.actions)) as executor:
+                futures = {
+                    executor.submit(scope.run, action): action for action in decision.actions
+                }
+                for _future in as_completed(futures):
+                    # Results already added to context by scope.run()
+                    pass
+        else:
+            # Sequential execution
+            for action in decision.actions:
+                scope.run(action)
 
     return scope.context.get_context()
+
+
+# =============================================================================
+# Workflow Loader
+# =============================================================================
+
+# Strategy registries
+CONTEXT_STRATEGIES: dict[str, type[ContextStrategy]] = {
+    "flat": FlatContext,
+    "task_list": TaskListContext,
+    "task_tree": TaskTreeContext,
+}
+
+CACHE_STRATEGIES: dict[str, type[CacheStrategy]] = {
+    "none": NoCache,
+    "in_memory": InMemoryCache,
+}
+
+RETRY_STRATEGIES: dict[str, type[RetryStrategy]] = {
+    "none": NoRetry,
+    "fixed": FixedRetry,
+    "exponential": ExponentialRetry,
+}
+
+LLM_STRATEGIES: dict[str, type[LLMStrategy]] = {
+    "none": NoLLM,
+    "simple": SimpleLLM,
+}
+
+
+@dataclass
+class WorkflowConfig:
+    """Parsed workflow configuration."""
+
+    name: str
+    description: str = ""
+    max_turns: int = 20
+    context: ContextStrategy | None = None
+    cache: CacheStrategy | None = None
+    retry: RetryStrategy | None = None
+    llm: LLMStrategy | None = None
+
+
+def load_workflow(path: str) -> WorkflowConfig:
+    """Load workflow configuration from TOML file.
+
+    Args:
+        path: Path to TOML file
+
+    Returns:
+        WorkflowConfig with instantiated strategies
+    """
+    import tomllib
+    from pathlib import Path
+
+    with Path(path).open("rb") as f:
+        data = tomllib.load(f)
+
+    wf = data.get("workflow", {})
+
+    # Parse limits
+    limits = wf.get("limits", {})
+    max_turns = limits.get("max_turns", 20)
+
+    # Parse context strategy
+    context = None
+    if ctx_cfg := wf.get("context"):
+        strategy_name = ctx_cfg.get("strategy", "flat")
+        if strategy_cls := CONTEXT_STRATEGIES.get(strategy_name):
+            context = strategy_cls()
+
+    # Parse cache strategy
+    cache = None
+    if cache_cfg := wf.get("cache"):
+        strategy_name = cache_cfg.get("strategy", "none")
+        if strategy_cls := CACHE_STRATEGIES.get(strategy_name):
+            cache = strategy_cls()
+
+    # Parse retry strategy
+    retry = None
+    if retry_cfg := wf.get("retry"):
+        strategy_name = retry_cfg.get("strategy", "none")
+        if strategy_name == "fixed":
+            retry = FixedRetry(
+                max_attempts=retry_cfg.get("max_attempts", 3),
+                delay=retry_cfg.get("delay", 1.0),
+            )
+        elif strategy_name == "exponential":
+            retry = ExponentialRetry(
+                max_attempts=retry_cfg.get("max_attempts", 5),
+                base_delay=retry_cfg.get("base_delay", 1.0),
+                max_delay=retry_cfg.get("max_delay", 60.0),
+            )
+        elif strategy_cls := RETRY_STRATEGIES.get(strategy_name):
+            retry = strategy_cls()
+
+    # Parse LLM strategy
+    llm = None
+    if llm_cfg := wf.get("llm"):
+        strategy_name = llm_cfg.get("strategy", "none")
+        if strategy_name == "simple":
+            llm = SimpleLLM(
+                provider=llm_cfg.get("provider"),
+                model=llm_cfg.get("model"),
+                system_prompt=llm_cfg.get("system_prompt", AGENT_SYSTEM_PROMPT),
+            )
+        elif strategy_name == "none":
+            actions = llm_cfg.get("actions", ["done"])
+            llm = NoLLM(actions=actions)
+
+    return WorkflowConfig(
+        name=wf.get("name", "unnamed"),
+        description=wf.get("description", ""),
+        max_turns=max_turns,
+        context=context,
+        cache=cache,
+        retry=retry,
+        llm=llm,
+    )
+
+
+def run_workflow(path: str, task: str) -> str:
+    """Load and run a workflow from TOML.
+
+    Args:
+        path: Path to workflow TOML file
+        task: Task description
+
+    Returns:
+        Final context string
+    """
+    config = load_workflow(path)
+    return agent_loop(
+        task=task,
+        context=config.context,
+        cache=config.cache,
+        retry=config.retry,
+        llm=config.llm,
+        max_turns=config.max_turns,
+    )
