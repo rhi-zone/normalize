@@ -17,7 +17,7 @@ try:
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, Vertical
     from textual.reactive import reactive
-    from textual.widgets import Footer, Header, Input, Static, Tree
+    from textual.widgets import Footer, Input, Static, Tree
     from textual.widgets.tree import TreeNode
 except ImportError:
     # TUI dependencies not installed
@@ -344,36 +344,6 @@ class ModeIndicator(Static):
         return f"Mode: [{self.mode_color} b]{self.mode_name}[/]"
 
 
-class ActionBar(Static):
-    """Action bar showing available primitives for current selection."""
-
-    selected_path = reactive("")
-    selected_type = reactive("")  # "file", "dir", "symbol"
-
-    def render(self) -> str:
-        if not self.selected_path:
-            return "[dim]Select a node to see actions[/]"
-
-        # Context-sensitive labels
-        if self.selected_type == "dir":
-            view_label = "tree"
-        elif self.selected_type == "symbol":
-            view_label = "source"
-        else:  # file
-            view_label = "skeleton"
-
-        path_display = self.selected_path
-        if len(path_display) > 40:
-            path_display = "..." + path_display[-37:]
-
-        return (
-            f"[dim]{path_display}[/]  "
-            f"[@click=app.primitive_view()][b]View[/b][/] ({view_label})  "
-            f"[@click=app.primitive_edit()][b]Edit[/b][/]  "
-            f"[@click=app.primitive_analyze()][b]Analyze[/b][/]"
-        )
-
-
 class Breadcrumb(Static):
     """Breadcrumb navigation showing path from project root."""
 
@@ -420,12 +390,15 @@ class HoverTooltip(Static):
                     ".rb": "ruby",
                 }
                 lexer = lexer_map.get(self.file_path.suffix, "text")
+                # Use theme that matches dark/light mode
+                # Note: theme is set at render time, may not perfectly sync
                 syntax = Syntax(
                     self.content,
                     lexer,
-                    theme="monokai",
+                    theme="github-dark",
                     line_numbers=False,
                     word_wrap=True,
+                    background_color="default",
                 )
                 from rich.console import Group
 
@@ -602,14 +575,6 @@ class MossTUI(App):
         overflow-y: auto;
     }
 
-    #action-bar {
-        dock: bottom;
-        height: auto;
-        padding: 0 1;
-        background: $surface-lighten-1;
-        border-top: solid $primary;
-    }
-
     #diff-view {
         height: 1fr;
         border: solid $secondary;
@@ -630,17 +595,37 @@ class MossTUI(App):
         padding: 1;
         display: none;
     }
+
+    Tree {
+        scrollbar-gutter: stable;
+    }
+
+    Tree > .tree--guides {
+        color: $text-muted;
+    }
+
+    Tree > .tree--cursor {
+        background: $accent;
+    }
+
+    ProjectTree {
+        padding: 0;
+    }
+
+    ProjectTree > .tree--label {
+        padding-left: 0;
+    }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
-        Binding("q", "quit", "Quit", show=True),
+        Binding("q", "quit", "[u]Q[/u]uit", show=True, key_display=""),
         Binding("ctrl+c", "handle_ctrl_c", "Interrupt", show=False),
-        Binding("d", "toggle_dark", "Dark", show=True),
+        Binding("d", "toggle_dark", "[u]D[/u]ark", show=True, key_display=""),
         Binding("tab", "next_mode", "Mode", show=True),
-        Binding("v", "primitive_view", "View", show=True),
-        Binding("e", "primitive_edit", "Edit", show=True),
-        Binding("a", "primitive_analyze", "Analyze", show=True),
-        Binding("minus", "cd_up", "Up", show=True),
+        Binding("v", "primitive_view", "[u]V[/u]iew", show=True, key_display=""),
+        Binding("e", "primitive_edit", "[u]E[/u]dit", show=True, key_display=""),
+        Binding("a", "primitive_analyze", "[u]A[/u]nalyze", show=True, key_display=""),
+        Binding("minus", "cd_up", "Up", show=True, key_display="-"),
         Binding("enter", "enter_dir", "Enter", show=False),
     ]
 
@@ -665,11 +650,55 @@ class MossTUI(App):
             self._last_ctrl_c = now
             self._log("Press Ctrl+C again to exit")
 
+    def _get_prefs_path(self) -> Path:
+        """Get path to TUI preferences file."""
+        return self.api.root / ".moss" / "tui_prefs.json"
+
+    def _load_theme(self) -> None:
+        """Load theme preference from disk."""
+        import json
+
+        prefs_path = self._get_prefs_path()
+        if prefs_path.exists():
+            try:
+                prefs = json.loads(prefs_path.read_text())
+                if prefs.get("dark_mode", True) != self.dark:
+                    self.dark = prefs.get("dark_mode", True)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    def _save_theme(self) -> None:
+        """Save theme preference to disk."""
+        import json
+
+        prefs_path = self._get_prefs_path()
+        prefs_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            prefs = {}
+            if prefs_path.exists():
+                try:
+                    prefs = json.loads(prefs_path.read_text())
+                except (json.JSONDecodeError, OSError):
+                    pass
+            prefs["dark_mode"] = self.dark
+            prefs_path.write_text(json.dumps(prefs))
+        except OSError:
+            pass
+
+    def action_toggle_dark(self) -> None:
+        """Toggle dark mode and save preference."""
+        self.dark = not self.dark
+        self._save_theme()
+
+    def _get_syntax_theme(self) -> str:
+        """Get syntax highlighting theme matching current dark/light mode."""
+        return "github-dark" if self.dark else "default"
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         from textual.widgets import RichLog
 
-        yield Header(show_clock=True)
+        # No header - footer provides all needed info
         yield Container(
             Horizontal(
                 Vertical(
@@ -707,7 +736,7 @@ class MossTUI(App):
                 ),
                 id="main-container",
             ),
-            ActionBar(id="action-bar"),
+            # ActionBar removed - actions shown in footer bindings
             Input(placeholder="Enter command...", id="command-input"),
             HoverTooltip(id="hover-tooltip"),
         )
@@ -715,12 +744,14 @@ class MossTUI(App):
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""
-        self.title = "Moss TUI"
-        self.sub_title = f"Project: {self.api.root.name}"
+        self.title = "Explore"
+        self.sub_title = ""
         self.query_one("#command-input").focus()
         # Track selected node for action bar
         self._selected_path: str = ""
         self._selected_type: str = ""
+        # Load theme preference
+        self._load_theme()
 
         # Subscribe to tool calls to show resources
         from moss.events import Event, EventType
@@ -759,8 +790,9 @@ class MossTUI(App):
         if not mode:
             return
 
-        # Update subtitle with mode
-        self.sub_title = f"{self.api.root.name} | {mode.name}"
+        # Update title with mode name
+        self.title = mode.name.title()
+        self.sub_title = ""
 
         self.query_one("#command-input").placeholder = mode.placeholder
 
@@ -858,19 +890,14 @@ class MossTUI(App):
             return
 
         tooltip = self.query_one("#hover-tooltip", HoverTooltip)
-        action_bar = self.query_one("#action-bar", ActionBar)
 
         if data["type"] == "file":
             path = data["path"]
             self._selected_path = str(path)
             self._selected_type = "file"
-            action_bar.selected_path = str(path)
-            action_bar.selected_type = "file"
-            tooltip.file_path = path  # Enable syntax highlighting
-            # Show file skeleton summary in tooltip
+            tooltip.file_path = path
             try:
                 skeleton = self.api.skeleton.format(path)
-                # Take first few lines of skeleton
                 summary = "\n".join(skeleton.split("\n")[:15])
                 if len(skeleton.split("\n")) > 15:
                     summary += "\n..."
@@ -881,26 +908,19 @@ class MossTUI(App):
             path = data["path"]
             self._selected_path = str(path)
             self._selected_type = "dir"
-            action_bar.selected_path = str(path)
-            action_bar.selected_type = "dir"
             tooltip.file_path = None
             tooltip.content = f"Directory: {path.name}"
         elif data["type"] == "symbol":
             symbol = data["symbol"]
             path = data["path"]
-            # Build symbol path like src/foo.py/ClassName
             symbol_path = f"{path}/{symbol.name}"
             self._selected_path = symbol_path
             self._selected_type = "symbol"
-            action_bar.selected_path = symbol_path
-            action_bar.selected_type = "symbol"
-            tooltip.file_path = path  # Enable syntax highlighting for signature
-            # Build symbol info display
+            tooltip.file_path = path
             lines = [symbol.signature]
             if symbol.lineno:
                 lines[0] += f"  # line {symbol.lineno}"
             if symbol.docstring:
-                # Show first few lines of docstring
                 doc_lines = symbol.docstring.strip().split("\n")[:5]
                 if len(doc_lines) < len(symbol.docstring.strip().split("\n")):
                     doc_lines.append("...")
@@ -910,19 +930,14 @@ class MossTUI(App):
                     lines.append('"""')
             tooltip.content = "\n".join(lines)
         elif data["type"] == "task":
-            tooltip.file_path = None  # No syntax highlighting for tasks
+            tooltip.file_path = None
             node = data["node"]
             tooltip.content = f"Goal: {node.goal}\nStatus: {node.status.name}"
             if node.summary:
                 tooltip.content += f"\nSummary: {node.summary}"
-            # Clear action bar for tasks
-            action_bar.selected_path = ""
-            action_bar.selected_type = ""
         else:
             tooltip.file_path = None
             tooltip.content = ""
-            action_bar.selected_path = ""
-            action_bar.selected_type = ""
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         """Handle tree node selection (click/enter)."""
@@ -1263,7 +1278,12 @@ class MossTUI(App):
                         if lexer:
                             from rich.syntax import Syntax
 
-                            syntax = Syntax(skeleton, lexer, theme="monokai")
+                            syntax = Syntax(
+                                skeleton,
+                                lexer,
+                                theme=self._get_syntax_theme(),
+                                background_color="default",
+                            )
                             explore_detail.write(syntax)
                         else:
                             explore_detail.write(skeleton)
@@ -1279,7 +1299,12 @@ class MossTUI(App):
                         if lexer:
                             from rich.syntax import Syntax
 
-                            syntax = Syntax(source, lexer, theme="monokai")
+                            syntax = Syntax(
+                                source,
+                                lexer,
+                                theme=self._get_syntax_theme(),
+                                background_color="default",
+                            )
                             explore_detail.write(syntax)
                         else:
                             explore_detail.write(source)
