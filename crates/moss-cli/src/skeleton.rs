@@ -107,12 +107,22 @@ fn format_symbols(
 
 pub struct SkeletonExtractor {
     parsers: Parsers,
+    show_all: bool,
 }
 
 impl SkeletonExtractor {
     pub fn new() -> Self {
         Self {
             parsers: Parsers::new(),
+            show_all: false,
+        }
+    }
+
+    /// Create an extractor that shows all symbols including private ones
+    pub fn with_all() -> Self {
+        Self {
+            parsers: Parsers::new(),
+            show_all: true,
         }
     }
 
@@ -151,7 +161,7 @@ impl SkeletonExtractor {
         let root = tree.root_node();
         let mut cursor = root.walk();
 
-        Self::collect_python_symbols(&mut cursor, content, &mut symbols, false);
+        Self::collect_python_symbols(&mut cursor, content, &mut symbols, false, self.show_all);
         symbols
     }
 
@@ -160,6 +170,7 @@ impl SkeletonExtractor {
         content: &str,
         symbols: &mut Vec<SkeletonSymbol>,
         in_class: bool,
+        show_all: bool,
     ) {
         loop {
             let node = cursor.node();
@@ -167,12 +178,12 @@ impl SkeletonExtractor {
 
             match kind {
                 "function_definition" | "async_function_definition" => {
-                    if let Some(sym) = Self::extract_python_function(&node, content, in_class) {
+                    if let Some(sym) = Self::extract_python_function(&node, content, in_class, show_all) {
                         symbols.push(sym);
                     }
                 }
                 "class_definition" => {
-                    if let Some(sym) = Self::extract_python_class(&node, content) {
+                    if let Some(sym) = Self::extract_python_class(&node, content, show_all) {
                         symbols.push(sym);
                     }
                     // Skip children - we handle them in extract_python_class
@@ -186,7 +197,7 @@ impl SkeletonExtractor {
 
             // Recurse into children (except for class definitions)
             if kind != "class_definition" && cursor.goto_first_child() {
-                Self::collect_python_symbols(cursor, content, symbols, in_class);
+                Self::collect_python_symbols(cursor, content, symbols, in_class, show_all);
                 cursor.goto_parent();
             }
 
@@ -200,12 +211,13 @@ impl SkeletonExtractor {
         node: &tree_sitter::Node,
         content: &str,
         in_class: bool,
+        show_all: bool,
     ) -> Option<SkeletonSymbol> {
         let name_node = node.child_by_field_name("name")?;
         let name = content[name_node.byte_range()].to_string();
 
-        // Skip private methods unless they're dunder methods
-        if name.starts_with('_') && !name.starts_with("__") {
+        // Skip private methods unless they're dunder methods or show_all is true
+        if !show_all && name.starts_with('_') && !name.starts_with("__") {
             return None;
         }
 
@@ -243,12 +255,13 @@ impl SkeletonExtractor {
     fn extract_python_class(
         node: &tree_sitter::Node,
         content: &str,
+        show_all: bool,
     ) -> Option<SkeletonSymbol> {
         let name_node = node.child_by_field_name("name")?;
         let name = content[name_node.byte_range()].to_string();
 
-        // Skip private classes
-        if name.starts_with('_') && !name.starts_with("__") {
+        // Skip private classes unless show_all is true
+        if !show_all && name.starts_with('_') && !name.starts_with("__") {
             return None;
         }
 
@@ -277,7 +290,7 @@ impl SkeletonExtractor {
         if let Some(body) = node.child_by_field_name("body") {
             let mut cursor = body.walk();
             if cursor.goto_first_child() {
-                Self::collect_python_symbols(&mut cursor, content, &mut children, true);
+                Self::collect_python_symbols(&mut cursor, content, &mut children, true, show_all);
             }
         }
 

@@ -210,6 +210,10 @@ enum Commands {
         /// More focused than --fisheye (shows only what's actually imported)
         #[arg(long)]
         resolve_imports: bool,
+
+        /// Show all symbols including private ones (normally filtered by convention)
+        #[arg(long)]
+        all: bool,
     },
 
     /// Edit a node in the codebase tree (structural code modification)
@@ -638,6 +642,7 @@ fn main() {
             types_only,
             fisheye,
             resolve_imports,
+            all,
         } => cmd_view(
             target.as_deref(),
             root.as_deref(),
@@ -650,6 +655,7 @@ fn main() {
             types_only,
             fisheye,
             resolve_imports,
+            all,
             cli.json,
         ),
         Commands::SearchTree { query, root, limit } => {
@@ -899,6 +905,7 @@ fn cmd_view(
     types_only: bool,
     fisheye: bool,
     resolve_imports: bool,
+    show_all: bool,
     json: bool,
 ) -> i32 {
     let root = root
@@ -944,7 +951,7 @@ fn cmd_view(
         cmd_view_directory(&root.join(&unified.file_path), &root, depth, json)
     } else if unified.symbol_path.is_empty() {
         // View file
-        cmd_view_file(&unified.file_path, &root, depth, line_numbers, show_deps, types_only, fisheye, resolve_imports, json)
+        cmd_view_file(&unified.file_path, &root, depth, line_numbers, show_deps, types_only, fisheye, resolve_imports, show_all, json)
     } else {
         // View symbol within file
         cmd_view_symbol(
@@ -1663,6 +1670,7 @@ fn cmd_view_file(
     types_only: bool,
     fisheye: bool,
     resolve_imports: bool,
+    show_all: bool,
     json: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
@@ -1701,7 +1709,11 @@ fn cmd_view_file(
     }
 
     // Skeleton view
-    let mut extractor = skeleton::SkeletonExtractor::new();
+    let mut extractor = if show_all {
+        skeleton::SkeletonExtractor::with_all()
+    } else {
+        skeleton::SkeletonExtractor::new()
+    };
     let skeleton_result = extractor.extract(&full_path, &content);
 
     // Filter to types only if requested

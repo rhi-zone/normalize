@@ -15,7 +15,9 @@
 - `--resolve-imports`: shows only the specific imported symbols (more focused than fisheye)
   - Lists each imported symbol with its signature, grouped by module
   - Ideal for understanding what a file uses vs. what modules offer
-- Both flags work together for maximum token efficiency
+- `--all`: shows all symbols including private ones (normally filtered by convention)
+  - Useful for debugging or understanding internal implementation details
+- Flags work together for maximum token efficiency
 
 **Package Restructuring** (Dec 23 2025)
 - cli.py (5687 lines) → cli/ package with _main.py (backwards compatible)
