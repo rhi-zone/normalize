@@ -150,6 +150,19 @@ filterwarnings = [
     "ignore:cannot collect test class 'PytestValidator':pytest.PytestCollectionWarning",
 ]
 
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+moss-intelligence = { workspace = true }
+moss-context = { workspace = true }
+moss-orchestration = { workspace = true }
+moss-llm = { workspace = true }
+moss-mcp = { workspace = true }
+moss-lsp = { workspace = true }
+moss-tui = { workspace = true }
+moss-acp = { workspace = true }
+
 [tool.basedpyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
