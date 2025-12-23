@@ -10,8 +10,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 - Fisheye for TypeScript (Python and Rust now supported)
 - Selective import resolution (e.g., `--fisheye=moss.config` to expand only that import)
 
-**2. Rust Crate Consolidation**
-- Consider: consolidate index.rs, symbols.rs (different designs for CLI vs daemon)
+**2. Rust Module Cleanup**
+- index.rs/symbols.rs: Keep separate (good layering: symbols=parsing, index=persistence)
+- Dead code removal: ~20 warnings for unused fields/methods (daemon API, call graph) - need to decide what's planned vs truly dead
 
 **3. TUI: View/Edit/Analyze Mode Refactor**
 - Mode indicator (bottom right, near palette) OR tabbed content view

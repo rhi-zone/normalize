@@ -656,7 +656,7 @@ impl FileIndex {
         // Build SQL based on fuzzy/exact mode
         let (sql, params_vec): (String, Vec<Box<dyn rusqlite::ToSql>>) = if fuzzy {
             let pattern = format!("%{}%", query_lower);
-            let sql = if let Some(k) = kind {
+            let sql = if kind.is_some() {
                 "SELECT name, kind, file, start_line, end_line, parent FROM symbols
                  WHERE LOWER(name) LIKE ?1 AND kind = ?2
                  ORDER BY
@@ -702,7 +702,7 @@ impl FileIndex {
             }
         } else {
             // Exact match
-            let sql = if let Some(k) = kind {
+            let sql = if kind.is_some() {
                 "SELECT name, kind, file, start_line, end_line, parent FROM symbols
                  WHERE LOWER(name) = LOWER(?1) AND kind = ?2
                  LIMIT ?3".to_string()

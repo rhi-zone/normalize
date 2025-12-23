@@ -1268,7 +1268,8 @@ fn cmd_edit(
         ("append", editor.append_to_container(&content, &body, code))
     } else if let Some(dest) = move_before {
         // Move operation: delete from source, insert before destination
-        let dest_loc = match editor.find_symbol(&file_path, &content, dest) {
+        // First verify destination exists
+        let _dest_loc = match editor.find_symbol(&file_path, &content, dest) {
             Some(l) => l,
             None => {
                 eprintln!("Destination symbol not found: {}", dest);
@@ -1277,7 +1278,7 @@ fn cmd_edit(
         };
         let source_content = &content[loc.start_byte..loc.end_byte];
         let without_source = editor.delete_symbol(&content, &loc);
-        // Adjust destination location after deletion
+        // Re-find destination after deletion (location may have shifted)
         let dest_loc_adjusted = match editor.find_symbol(&file_path, &without_source, dest) {
             Some(l) => l,
             None => {
@@ -1287,7 +1288,8 @@ fn cmd_edit(
         };
         ("move_before", editor.insert_before(&without_source, &dest_loc_adjusted, source_content))
     } else if let Some(dest) = move_after {
-        let dest_loc = match editor.find_symbol(&file_path, &content, dest) {
+        // First verify destination exists
+        let _dest_loc = match editor.find_symbol(&file_path, &content, dest) {
             Some(l) => l,
             None => {
                 eprintln!("Destination symbol not found: {}", dest);
@@ -1296,6 +1298,7 @@ fn cmd_edit(
         };
         let source_content = &content[loc.start_byte..loc.end_byte];
         let without_source = editor.delete_symbol(&content, &loc);
+        // Re-find destination after deletion (location may have shifted)
         let dest_loc_adjusted = match editor.find_symbol(&file_path, &without_source, dest) {
             Some(l) => l,
             None => {
@@ -1328,7 +1331,8 @@ fn cmd_edit(
         ("copy_after", editor.insert_after(&content, &dest_loc, source_content))
     } else if let Some(container) = move_prepend {
         // Move to beginning of container
-        let body = match editor.find_container_body(&file_path, &content, container) {
+        // First verify container exists
+        let _body = match editor.find_container_body(&file_path, &content, container) {
             Some(b) => b,
             None => {
                 eprintln!("Container not found: {}", container);
@@ -1337,7 +1341,7 @@ fn cmd_edit(
         };
         let source_content = content[loc.start_byte..loc.end_byte].to_string();
         let without_source = editor.delete_symbol(&content, &loc);
-        // Re-find container body after deletion
+        // Re-find container body after deletion (location may have shifted)
         let body = match editor.find_container_body(&file_path, &without_source, container) {
             Some(b) => b,
             None => {
@@ -1348,7 +1352,8 @@ fn cmd_edit(
         ("move_prepend", editor.prepend_to_container(&without_source, &body, &source_content))
     } else if let Some(container) = move_append {
         // Move to end of container
-        let body = match editor.find_container_body(&file_path, &content, container) {
+        // First verify container exists
+        let _body = match editor.find_container_body(&file_path, &content, container) {
             Some(b) => b,
             None => {
                 eprintln!("Container not found: {}", container);
@@ -1357,7 +1362,7 @@ fn cmd_edit(
         };
         let source_content = content[loc.start_byte..loc.end_byte].to_string();
         let without_source = editor.delete_symbol(&content, &loc);
-        // Re-find container body after deletion
+        // Re-find container body after deletion (location may have shifted)
         let body = match editor.find_container_body(&file_path, &without_source, container) {
             Some(b) => b,
             None => {
@@ -1953,7 +1958,7 @@ fn cmd_view_file(
             if !resolved_symbols.is_empty() {
                 println!("\n## Resolved Imports");
                 let mut current_module = String::new();
-                for (module, name, sig) in resolved_symbols {
+                for (module, _name, sig) in resolved_symbols {
                     if module != current_module {
                         println!("\n# from {}", module);
                         current_module = module;

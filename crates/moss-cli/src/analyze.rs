@@ -492,7 +492,7 @@ pub fn analyze(
     let has_symbol_target = !symbol_path.is_empty();
 
     // Track skipped analyses for user feedback
-    let mut skipped = Vec::new();
+    let skipped = Vec::new();
 
     let health = if run_health && !is_file && !has_symbol_target {
         // Health is codebase-wide, skip if targeting a symbol
