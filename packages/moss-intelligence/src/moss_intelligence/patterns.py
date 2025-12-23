@@ -8,7 +8,7 @@ Detects common patterns:
 - Coupling analysis (module dependencies)
 
 Usage:
-    from moss.patterns import PatternAnalyzer
+    from moss_intelligence.patterns import PatternAnalyzer
 
     analyzer = PatternAnalyzer(project_root)
     results = analyzer.analyze()

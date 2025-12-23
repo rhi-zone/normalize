@@ -7,7 +7,7 @@ replaced with placeholders. This is useful for:
 - Highlighting the "shape" of code
 
 Usage:
-    from moss.elided_literals import elide_literals, ElidedLiteralsProvider
+    from moss_intelligence.elided_literals import elide_literals, ElidedLiteralsProvider
 
     # Elide literals in source code
     elided, stats = elide_literals(source)

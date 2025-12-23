@@ -9,7 +9,7 @@ Identifies potential issues in codebase architecture:
 - Missing error handling
 
 Usage:
-    from moss.weaknesses import WeaknessAnalyzer
+    from moss_intelligence.weaknesses import WeaknessAnalyzer
 
     analyzer = WeaknessAnalyzer(project_root)
     result = analyzer.analyze()
@@ -365,7 +365,7 @@ class WeaknessAnalyzer:
 
     def _analyze_coupling(self, result: WeaknessAnalysis, python_files: list[Path]) -> None:
         """Analyze module coupling."""
-        from moss.patterns import CouplingAnalyzer
+        from moss_intelligence.patterns import CouplingAnalyzer
 
         # Build import graph
         imports_from: dict[str, list[str]] = {}
@@ -555,7 +555,7 @@ class WeaknessAnalyzer:
 
     def _analyze_patterns(self, result: WeaknessAnalysis) -> None:
         """Analyze for pattern inconsistencies."""
-        from moss.patterns import PatternAnalyzer
+        from moss_intelligence.patterns import PatternAnalyzer
 
         try:
             analyzer = PatternAnalyzer(self.root)

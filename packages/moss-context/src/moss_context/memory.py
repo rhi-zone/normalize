@@ -1069,7 +1069,7 @@ class MemoryLayer:
         # Try to load config patterns
         if project_dir:
             try:
-                from moss.toml_config import find_config_file, load_toml_config
+                from moss_cli.toml_config import find_config_file, load_toml_config
 
                 config_path = find_config_file(project_dir)
                 if config_path:

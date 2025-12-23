@@ -178,7 +178,7 @@ class DependencyAnalyzer:
 
     def analyze(self) -> DependencyAnalysis:
         """Run full dependency analysis."""
-        from moss.dependencies import build_dependency_graph
+        from moss_intelligence.dependencies import build_dependency_graph
 
         # Find the source directory
         src_dir = find_source_dir(self.root)

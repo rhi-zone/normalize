@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from .views import View, ViewOptions, ViewProvider, ViewTarget, ViewType
 
 if TYPE_CHECKING:
-    from moss.plugins import PluginMetadata
+    from moss_orchestration.plugins import PluginMetadata
 
 
 @dataclass
@@ -443,7 +443,7 @@ class PythonDependencyPlugin:
 
     @property
     def metadata(self) -> PluginMetadata:
-        from moss.plugins import PluginMetadata
+        from moss_orchestration.plugins import PluginMetadata
 
         return PluginMetadata(
             name="python-dependency",

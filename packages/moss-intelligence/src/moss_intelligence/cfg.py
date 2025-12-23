@@ -8,7 +8,7 @@ This module provides:
 - CFGViewProvider: View provider for generating CFG views
 
 Usage:
-    from moss.cfg import CFGBuilder, CFGViewProvider
+    from moss_intelligence.cfg import CFGBuilder, CFGViewProvider
 
     # Build CFG from source
     builder = CFGBuilder()
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from moss.plugins import PluginMetadata
+    from moss_orchestration.plugins import PluginMetadata
     from .views import View, ViewOptions, ViewTarget
 
 
@@ -723,7 +723,7 @@ class PythonCFGPlugin:
 
     @property
     def metadata(self) -> PluginMetadata:
-        from moss.plugins import PluginMetadata
+        from moss_orchestration.plugins import PluginMetadata
 
         return PluginMetadata(
             name="python-cfg",
@@ -736,7 +736,7 @@ class PythonCFGPlugin:
 
     def supports(self, target: ViewTarget) -> bool:
         """Check if this plugin can handle the target."""
-        from moss.plugins import detect_language
+        from moss_orchestration.plugins import detect_language
 
         if not target.path.exists():
             return False

@@ -8,7 +8,7 @@ appropriate handlers based on complexity:
 - Complex/Novel: Synthesis fallback
 
 Usage:
-    from moss.edit import edit, EditContext
+    from moss_intelligence.edit import edit, EditContext
 
     context = EditContext(project_root=Path("."))
     result = await edit("Add a retry decorator with exponential backoff", context)
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from moss.synthesis import Specification
+    from moss_orchestration.synthesis import Specification
 
 
 # =============================================================================
@@ -231,7 +231,7 @@ async def structural_edit(task: str, context: EditContext) -> EditResult:
     Returns:
         EditResult with changes
     """
-    from moss.refactoring import Refactorer, RefactoringScope, RenameRefactoring
+    from moss_intelligence.refactoring import Refactorer, RefactoringScope, RenameRefactoring
 
     # Parse task to determine refactoring type
     task_lower = task.lower()
@@ -321,10 +321,10 @@ async def synthesize_edit(task: str, context: EditContext) -> EditResult:
     Returns:
         EditResult with synthesized code
     """
-    from moss.synthesis import Context as SynthesisContext
-    from moss.synthesis import SynthesisFramework
-    from moss.synthesis.framework import SynthesisConfig
-    from moss.synthesis.strategies import (
+    from moss_orchestration.synthesis import Context as SynthesisContext
+    from moss_orchestration.synthesis import SynthesisFramework
+    from moss_orchestration.synthesis.framework import SynthesisConfig
+    from moss_orchestration.synthesis.strategies import (
         PatternBasedDecomposition,
         TestDrivenDecomposition,
         TypeDrivenDecomposition,
@@ -400,7 +400,7 @@ def extract_specification(task: str, context: EditContext) -> Specification:
     Returns:
         Specification for synthesis
     """
-    from moss.synthesis import Specification
+    from moss_orchestration.synthesis import Specification
 
     # Build description
     description = task

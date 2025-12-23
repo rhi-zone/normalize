@@ -187,7 +187,7 @@ class ContextHost:
         automatic discovery of installed plugins while maintaining the
         ViewType-based interface.
         """
-        from moss.plugins import get_registry as get_plugin_registry
+        from moss_orchestration.plugins import get_registry as get_plugin_registry
 
         registry = ViewRegistry()
 

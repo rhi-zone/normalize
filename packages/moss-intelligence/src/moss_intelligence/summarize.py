@@ -667,7 +667,7 @@ class DocSummarizer:
             return None
 
         # Use the proper markdown parser that handles code blocks correctly
-        from moss.plugins.markdown import extract_markdown_structure
+        from moss_orchestration.plugins.markdown import extract_markdown_structure
 
         structure = extract_markdown_structure(content)
 
