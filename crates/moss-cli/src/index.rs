@@ -427,6 +427,7 @@ impl FileIndex {
     }
 
     /// Search files by exact name match
+    #[allow(dead_code)] // FileIndex API - used by daemon
     pub fn find_by_name(&self, name: &str) -> rusqlite::Result<Vec<IndexedFile>> {
         let pattern = format!("%/{}", name);
         let mut stmt = self
@@ -445,6 +446,7 @@ impl FileIndex {
     }
 
     /// Search files by stem (filename without extension)
+    #[allow(dead_code)] // FileIndex API - used by daemon
     pub fn find_by_stem(&self, stem: &str) -> rusqlite::Result<Vec<IndexedFile>> {
         let pattern = format!("%/{}%", stem);
         let mut stmt = self
@@ -469,6 +471,7 @@ impl FileIndex {
     }
 
     /// Index symbols and call graph for a file
+    #[allow(dead_code)] // FileIndex API - used by daemon
     pub fn index_file_symbols(
         &self,
         path: &str,
@@ -613,6 +616,7 @@ impl FileIndex {
 
     /// Find callees with resolved import info (name, line, source_module)
     /// Returns: (local_name, line, Option<(source_module, original_name)>)
+    #[allow(dead_code)] // FileIndex API - used by daemon
     pub fn find_callees_resolved(
         &self,
         file: &str,
@@ -875,6 +879,7 @@ impl FileIndex {
     }
 
     /// Find which files import a given module
+    #[allow(dead_code)] // FileIndex API - used by daemon
     pub fn find_importers(&self, module: &str) -> rusqlite::Result<Vec<(String, String, usize)>> {
         let mut stmt = self
             .conn
@@ -1085,6 +1090,7 @@ impl FileIndex {
     }
 
     /// Check if call graph needs refresh
+    #[allow(dead_code)] // FileIndex API - used by daemon
     pub fn needs_call_graph_refresh(&self) -> bool {
         let (symbols, _, _) = self.call_graph_stats().unwrap_or((0, 0, 0));
         symbols == 0

@@ -24,6 +24,7 @@ pub struct Import {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Import variant reserved for import tracking
 pub enum SymbolKind {
     Function,
     Class,
@@ -1022,6 +1023,7 @@ impl SymbolParser {
     }
 
     /// Find callees (functions/methods called) within a symbol
+    #[allow(dead_code)] // Call graph API - used by index
     pub fn find_callees(&mut self, path: &Path, content: &str, symbol_name: &str) -> Vec<String> {
         let symbol = match self.find_symbol(path, content, symbol_name) {
             Some(s) => s,
@@ -1091,6 +1093,7 @@ impl SymbolParser {
     /// Returns: (callee_name, line, Option<qualifier>)
     /// For foo.bar(), returns ("bar", line, Some("foo"))
     /// For bar(), returns ("bar", line, None)
+    #[allow(dead_code)] // Call graph API - used by index
     pub fn find_callees_with_lines(
         &mut self,
         path: &Path,
@@ -1474,6 +1477,7 @@ impl SymbolParser {
     }
 
     /// Find callers (symbols that call a given function) across all files
+    #[allow(dead_code)] // Call graph API - used by index
     pub fn find_callers(
         &mut self,
         root: &Path,

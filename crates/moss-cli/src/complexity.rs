@@ -31,6 +31,7 @@ impl FunctionComplexity {
         }
     }
 
+    #[allow(dead_code)] // TODO: wire into complexity output (see TODO.md backlog)
     pub fn short_name(&self) -> String {
         if let Some(parent) = &self.parent {
             format!("{}.{}", parent, self.name)

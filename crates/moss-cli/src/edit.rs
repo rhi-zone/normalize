@@ -3,6 +3,7 @@ use tree_sitter::Parser;
 
 /// Result of finding a symbol in a file
 #[derive(Debug)]
+#[allow(dead_code)] // Fields used by Debug trait and for edit operations
 pub struct SymbolLocation {
     pub name: String,
     pub kind: String,

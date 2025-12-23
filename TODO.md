@@ -34,6 +34,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 **Call Graph:**
 - Missing language support: Scala, Vue (no tree-sitter grammars yet)
 - "(no ext)" files high count in some repos - add binary detection
+- Wire FunctionComplexity.short_name() into complexity output
+- Complete daemon integration (FileIndex API methods currently unused)
 
 **Session Analysis:**
 - Correction pattern detection: flag "You're right", "Good point", "Ah yes", etc.

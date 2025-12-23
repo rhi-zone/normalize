@@ -140,6 +140,7 @@ impl ControlFlowGraph {
 }
 
 /// CFG result for a file
+#[allow(dead_code)] // file_path provides context for the result
 pub struct CfgResult {
     pub graphs: Vec<ControlFlowGraph>,
     pub file_path: String,

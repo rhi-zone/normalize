@@ -241,6 +241,7 @@ impl DaemonClient {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Fields used by serde deserialization
 pub struct PathMatch {
     pub path: String,
     pub kind: String,

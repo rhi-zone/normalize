@@ -10,6 +10,7 @@ use crate::skeleton::SkeletonExtractor;
 
 /// Summary of a module
 #[derive(Debug)]
+#[allow(dead_code)] // Fields used by Debug trait
 pub struct ModuleSummary {
     pub file_path: String,
     pub module_name: String,

@@ -33,6 +33,7 @@ pub struct ReExport {
 }
 
 /// Dependency information for a file
+#[allow(dead_code)] // file_path provides context; format() is API method
 pub struct DepsResult {
     pub imports: Vec<Import>,
     pub exports: Vec<Export>,
@@ -42,6 +43,7 @@ pub struct DepsResult {
 
 impl DepsResult {
     /// Format as compact text
+    #[allow(dead_code)] // API method for CLI output
     pub fn format(&self) -> String {
         let mut lines = Vec::new();
 

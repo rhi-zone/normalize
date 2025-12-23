@@ -57,6 +57,7 @@ impl Anchor {
 }
 
 /// Result of anchor extraction
+#[allow(dead_code)] // file_path provides context for the result
 pub struct AnchorsResult {
     pub anchors: Vec<Anchor>,
     pub file_path: String,
