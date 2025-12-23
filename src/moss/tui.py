@@ -6,7 +6,6 @@ Uses Textual for a modern, reactive terminal experience.
 from __future__ import annotations
 
 import re
-from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
@@ -66,143 +65,13 @@ class TUIMode(Protocol):
         ...
 
 
-class PlanMode:
-    name = "Plan"
-    color = "blue"
-    placeholder = "What is the plan? (e.g. breakdown...)"
-    bindings: ClassVar[list] = []
+class CodeMode:
+    """Code exploration - navigate files and symbols."""
 
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = True
-        app.query_one("#git-view").display = False
-        app.query_one("#content-header").update("Agent Log")
-        app._update_tree("task")
-
-
-class ReadMode:
-    name = "Read"
-    color = "green"
-    placeholder = "Explore codebase... (e.g. skeleton, grep, expand)"
-    bindings: ClassVar[list] = []
-
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = True
-        app.query_one("#git-view").display = False
-        app.query_one("#content-header").update("Agent Log")
-        app._update_tree("file")
-
-
-class WriteMode:
-    name = "Write"
-    color = "red"
-    placeholder = "Modify code... (e.g. write, replace, insert)"
-    bindings: ClassVar[list] = []
-
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = True
-        app.query_one("#git-view").display = False
-        app.query_one("#content-header").update("Agent Log")
-        app._update_tree("file")
-
-
-class DiffMode:
-    name = "Diff"
-    color = "magenta"
-    placeholder = "Review changes... (revert <file> <line> to undo)"
-    bindings: ClassVar[list] = []  # Future: r=revert, a=accept, n=next, p=prev
-
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = False
-        app.query_one("#git-view").display = True
-        app.query_one("#content-header").update("Shadow Git")
-        await app._update_git_view()
-        app._update_tree("task")
-
-
-class TasksMode:
-    """Unified task view showing all work (sessions, workflows, agents)."""
-
-    name = "Tasks"
-    color = "yellow"
-    placeholder = "View all tasks..."
-    bindings: ClassVar[list] = []
-
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = False
-        app.query_one("#git-view").display = False
-        app.query_one("#session-view").display = True
-        app.query_one("#content-header").update("Tasks")
-        await app._update_task_view()
-
-
-# Backwards compatibility alias
-SessionMode = TasksMode
-
-
-class AgentMode(Enum):
-    """Current operating mode of the agent UI."""
-
-    PLAN = auto()  # Planning next steps
-    READ = auto()  # Code exploration and search
-    WRITE = auto()  # Applying changes and refactoring
-    DIFF = auto()  # Reviewing shadow git changes
-    SESSION = auto()  # Managing and resuming sessions
-    BRANCH = auto()  # Managing multiple experiment branches
-    SWARM = auto()  # Visualizing multi-agent swarm activity
-    COMMIT = auto()  # Viewing grouped actions in a shadow commit
-
-
-class BranchMode:
-    name = "Branch"
-    color = "cyan"
-    placeholder = "Manage branches... (branch <name> to switch)"
-    bindings: ClassVar[list] = []
-
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = False
-        app.query_one("#git-view").display = True
-        app.query_one("#session-view").display = False
-        app.query_one("#content-header").update("Git Dashboard")
-        await app._update_branch_view()
-
-
-class SwarmMode:
-    name = "Swarm"
-    color = "white"
-    placeholder = "Manage swarm... (wait for workers to complete)"
-    bindings: ClassVar[list] = []
-
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = False
-        app.query_one("#git-view").display = False
-        app.query_one("#session-view").display = False
-        app.query_one("#swarm-view").display = True
-        app.query_one("#content-header").update("Swarm Dashboard")
-        await app._update_swarm_view()
-
-
-class CommitMode:
-    name = "Commit"
-    color = "green"
-    placeholder = "Review commit actions... (select a hunk to view)"
-    bindings: ClassVar[list] = []
-
-    async def on_enter(self, app: MossTUI) -> None:
-        app.query_one("#log-view").display = False
-        app.query_one("#git-view").display = True
-        app.query_one("#session-view").display = False
-        app.query_one("#swarm-view").display = False
-        app.query_one("#content-header").update("Commit Dashboard")
-        await app._update_git_view()
-
-
-class ExploreMode:
-    """Unified exploration mode using tree + three primitives (view/edit/analyze)."""
-
-    name = "Explore"
+    name = "Code"
     color = "cyan"
     placeholder = ""
-    bindings: ClassVar[list] = []  # View/Edit/Analyze already in global bindings
+    bindings: ClassVar[list] = []
 
     async def on_enter(self, app: MossTUI) -> None:
         try:
@@ -211,10 +80,67 @@ class ExploreMode:
             app.query_one("#session-view").display = False
             app.query_one("#swarm-view").display = False
             app.query_one("#explore-view").display = True
-            app.query_one("#content-header").update("Explore")
+            app.query_one("#content-header").update("Code")
             app._update_tree("file")
         except Exception:
             pass  # Widgets may not exist during initial mount
+
+
+class AnalysisMode:
+    """Codebase analysis - complexity, security, scopes, imports."""
+
+    name = "Analysis"
+    color = "blue"
+    placeholder = ""
+    bindings: ClassVar[list] = []
+    # Sub-view state tracked in app
+    _sub_views: ClassVar[list[str]] = ["Complexity", "Security", "Scopes", "Imports"]
+
+    async def on_enter(self, app: MossTUI) -> None:
+        try:
+            app.query_one("#log-view").display = True  # Show analysis output
+            app.query_one("#git-view").display = False
+            app.query_one("#session-view").display = False
+            app.query_one("#swarm-view").display = False
+            app.query_one("#explore-view").display = False
+            sub_view = getattr(app, "_analysis_sub_view", "Complexity")
+            app.query_one("#content-header").update(f"Analysis: {sub_view}")
+            app._update_tree("file")
+        except Exception:
+            pass
+
+
+class TasksMode:
+    """All tasks - sessions, workflows, agents. Click task to see diff."""
+
+    name = "Tasks"
+    color = "yellow"
+    placeholder = ""
+    bindings: ClassVar[list] = []
+
+    async def on_enter(self, app: MossTUI) -> None:
+        try:
+            app.query_one("#log-view").display = False
+            app.query_one("#git-view").display = True  # Show selected task's diff
+            app.query_one("#session-view").display = True
+            app.query_one("#swarm-view").display = False
+            app.query_one("#explore-view").display = False
+            app.query_one("#content-header").update("Tasks")
+            await app._update_task_view()
+        except Exception:
+            pass
+
+
+# Backwards compatibility aliases
+ExploreMode = CodeMode
+SessionMode = TasksMode
+PlanMode = AnalysisMode  # Plan → Analysis
+ReadMode = CodeMode
+WriteMode = CodeMode
+DiffMode = TasksMode  # Diff accessed through Tasks
+BranchMode = TasksMode
+SwarmMode = TasksMode
+CommitMode = TasksMode
 
 
 class ModeRegistry:
@@ -238,13 +164,9 @@ class ModeRegistry:
     """
 
     _BUILTIN_MODES: ClassVar[list[type]] = [
-        ExploreMode,  # Default mode - tree + primitives
-        PlanMode,
-        DiffMode,
-        TasksMode,  # Unified task view (sessions, workflows, agents)
-        BranchMode,
-        SwarmMode,
-        CommitMode,
+        CodeMode,  # Default - file/symbol exploration
+        AnalysisMode,  # Codebase analysis (complexity, security, etc.)
+        TasksMode,  # All tasks with diff access
     ]
 
     def __init__(self, discover: bool = True, project_root: Path | None = None):
@@ -410,7 +332,7 @@ class KeybindBar(Static):
         left = " ".join(parts)
 
         # Mode indicator + Palette on the right
-        mode_name = getattr(self.app, "current_mode_name", "Explore") if self.app else "Explore"
+        mode_name = getattr(self.app, "current_mode_name", "Code") if self.app else "Code"
         mode = self.app._mode_registry.get_mode(mode_name) if self.app else None
         mode_color = getattr(mode, "color", "cyan") if mode else "cyan"
         mode_indicator = f"\\[Tab] [{mode_color}]{mode_name}[/]"
@@ -919,7 +841,7 @@ class MossTUI(App):
         Binding("right", "tree_expand", "Expand", show=False),
     ]
 
-    current_mode_name = reactive("Explore")
+    current_mode_name = reactive("Code")
 
     @property
     def active_bindings(self) -> list[Binding]:
@@ -1061,7 +983,7 @@ class MossTUI(App):
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""
-        self.title = "Explore"
+        self.title = "Code"
         self.sub_title = ""
         # Focus tree so keybindings are visible (Tab to input)
         self.query_one("#project-tree").focus()
@@ -1326,8 +1248,8 @@ class MossTUI(App):
             tooltip.file_path = None
             tooltip.content = ""
 
-        # Auto-update preview on arrow navigation in Explore mode (throttled)
-        if self.current_mode_name == "Explore" and data["type"] in ("file", "symbol"):
+        # Auto-update preview on arrow navigation in Code mode (throttled)
+        if self.current_mode_name == "Code" and data["type"] in ("file", "symbol"):
             import time
 
             now = time.time() * 1000  # ms
@@ -1345,8 +1267,8 @@ class MossTUI(App):
             path = data["path"]
             self._selected_path = str(path)
             self._selected_type = "file"
-            # In Explore mode, double-click triggers view
-            if self.current_mode_name == "Explore":
+            # In Code mode, double-click triggers view
+            if self.current_mode_name == "Code":
                 self.action_primitive_view()
             else:
                 self._log(f"Opened file: {path.name}")
@@ -1359,7 +1281,7 @@ class MossTUI(App):
             path_str = str(path)
             self._selected_type = "dir"
             # Double-click detection: navigate on second click within 0.5s
-            if self.current_mode_name == "Explore":
+            if self.current_mode_name == "Code":
                 import time
 
                 now = time.time()
@@ -1378,7 +1300,7 @@ class MossTUI(App):
             self._selected_type = "symbol"
             self._selected_symbol = symbol  # Keep symbol object for markdown headings
             self._selected_file = path
-            if self.current_mode_name == "Explore":
+            if self.current_mode_name == "Code":
                 self.action_primitive_view()
             else:
                 self._log(f"Symbol: {symbol.name} at {path.name}:{symbol.lineno}")
@@ -1588,14 +1510,14 @@ class MossTUI(App):
             self.exit()
             return
 
-        # In Explore mode, parse and route primitive commands
-        if self.current_mode_name == "Explore":
-            self._handle_explore_command(command)
+        # In Code mode, parse and route primitive commands
+        if self.current_mode_name == "Code":
+            self._handle_code_command(command)
         else:
             self._log(f"[{self.current_mode_name}] {command}")
 
-    def _handle_explore_command(self, command: str) -> None:
-        """Parse and execute explore mode commands."""
+    def _handle_code_command(self, command: str) -> None:
+        """Parse and execute Code mode commands."""
         import shlex
 
         try:
