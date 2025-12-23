@@ -333,81 +333,25 @@ def my_function(x: int) -> int:
         assert not serialized.startswith("{")
 
 
-@pytest.mark.skip(reason="Tool names changed in package restructuring - needs update")
 class TestAllToolsReturnCompact:
-    """Test that ALL MCP tools return compact (non-JSON) output.
+    """Test that MCP tools with handlers return compact (non-JSON) output.
 
-    This is a systematic check that no tool returns raw JSON that starts with '{'.
+    This tests tools that have handlers in the dispatcher. Not all introspected
+    tools have handlers - the dispatcher only covers the most useful tools.
+
     Tools should return either:
     - Plain strings (for format functions)
     - Compact text (via to_compact())
     - Formatted lists (via _format_list_compact)
+
+    Some tools return structured data (dicts) which is acceptable for
+    non-formatting tools.
     """
 
-    # Tools that require file paths - we'll create test files for these
-    FILE_TOOLS: ClassVar[set[str]] = {
-        "skeleton_extract_python_skeleton",
-        "skeleton_format_skeleton",
-        "anchors_find_anchors",
-        "anchors_resolve_anchor",
-        "cfg_build_cfg",
-        "dependencies_extract_dependencies",
-        "dependencies_format_dependencies",
-    }
-
-    # Tools that require project root
-    PROJECT_TOOLS: ClassVar[set[str]] = {
-        "health_check",
-        "health_summarize",
-        "health_check_docs",
-        "health_check_todos",
-        "health_analyze_structure",
-        "health_analyze_tests",
-        "complexity_analyze",
-        "complexity_get_high_risk",
-        "dependencies_analyze",
-        "tree_format",
-        "tree_generate",
-        "ref_check_check",
-        "ref_check_check_code_to_docs",
-        "ref_check_check_docs_to_code",
-        "git_hotspots_analyze",
-        "git_hotspots_get_top_hotspots",
-        "external_deps_analyze",
-        "external_deps_list_direct",
-        "external_deps_check_security",
-        "clones_detect",
-        "clones_get_groups",
-        "security_analyze",
-        "security_get_high_severity",
-        "weaknesses_analyze",
-    }
-
-    # Tools that don't need any files
-    STANDALONE_TOOLS: ClassVar[set[str]] = {
-        "dwim_list_tools",
-        "dwim_resolve_tool",
-        "dwim_analyze_intent",
-        "dwim_get_tool_info",
-    }
-
-    # Tools that are async and modify state - skip in automated test
-    SKIP_TOOLS: ClassVar[set[str]] = {
-        "git_init",
-        "git_create_branch",
-        "git_commit",
-        "git_create_checkpoint",
-        "git_list_checkpoints",
-        "git_diff_checkpoint",
-        "git_merge_checkpoint",
-        "git_abort_checkpoint",
-        "patch_apply",
-        "patch_apply_with_fallback",
-        "patch_create",
-        "context_init",
-        "context_compile",
-        "validation_create_chain",
-        "weaknesses_format",  # Requires analysis result as input
+    # Tools that return structured data (dicts) - this is expected
+    STRUCTURED_OUTPUT_TOOLS: ClassVar[set[str]] = {
+        "tree_build_tree",  # Returns tree node structure
+        "dwim_resolve_tool",  # Returns {tool, confidence, message}
     }
 
     @pytest.fixture
@@ -437,48 +381,63 @@ def test_example():
 """)
         return tmp_path
 
-    async def test_all_tools_return_compact_output(self, tools, project_dir: Path):
-        """Verify no tool returns JSON-wrapped output starting with '{'."""
+    async def test_dispatcher_tools_return_valid_output(self, tools, project_dir: Path):
+        """Test all tools with dispatcher handlers return valid output."""
+        from moss_mcp.server_full import _get_tool_dispatcher
+
         python_file = project_dir / "src" / "main.py"
+        dispatcher = _get_tool_dispatcher()
 
         failures = []
 
         for tool in tools:
-            if tool.name in self.SKIP_TOOLS:
+            # Only test tools that have dispatcher handlers
+            if tool.api_path not in dispatcher:
                 continue
 
-            # Build arguments based on tool type
+            # Build arguments based on tool requirements
             args = {}
-            if tool.name in self.FILE_TOOLS:
+            if tool.api_path in {"skeleton.extract_python_skeleton", "skeleton.format_skeleton"}:
                 args["file_path"] = str(python_file)
-                if "anchor" in tool.name:
-                    args["name"] = "my_function"
-            elif tool.name in self.PROJECT_TOOLS:
+            elif tool.api_path in {"anchors.find_anchors", "anchors.resolve_anchor"}:
+                args["file_path"] = str(python_file)
+                args["anchor"] = "function:my_function"
+            elif tool.api_path == "cfg.build_cfg":
+                args["file_path"] = str(python_file)
+            elif tool.api_path in {
+                "dependencies.extract_dependencies",
+                "dependencies.format_dependencies",
+            }:
+                args["file_path"] = str(python_file)
+            elif tool.api_path == "complexity.analyze_complexity":
+                args["path"] = str(project_dir)
+            elif tool.api_path == "security.analyze_security":
+                args["path"] = str(project_dir)
+            elif tool.api_path in {"tree.render_tree", "tree.build_tree"}:
                 args["root"] = str(project_dir)
-                if tool.name == "complexity_analyze":
-                    args["pattern"] = str(python_file)
-            elif tool.name in self.STANDALONE_TOOLS:
-                if tool.name == "dwim_resolve_tool":
-                    args["tool_name"] = "skeleton"
-                elif tool.name == "dwim_analyze_intent":
-                    args["query"] = "show code structure"
-                elif tool.name == "dwim_get_tool_info":
-                    args["tool_name"] = "skeleton"
-            else:
-                # Unknown tool - skip with warning
-                continue
+            elif tool.api_path == "dwim.list_tools":
+                pass  # No args needed
+            elif tool.api_path == "dwim.resolve_tool":
+                args["tool_name"] = "skeleton"
+            elif tool.api_path == "dwim.analyze_intent":
+                args["query"] = "show code structure"
 
             try:
                 result = await _execute_tool(tool.name, args, tools)
                 serialized = _serialize_result(result)
 
                 # Check output format
+                if tool.name in self.STRUCTURED_OUTPUT_TOOLS:
+                    # These return dicts, which is expected
+                    continue
+
                 if isinstance(serialized, str):
                     if serialized.startswith("{"):
                         failures.append(
                             f"{tool.name}: returned string starting with '{{': {serialized[:100]!r}"
                         )
                 elif isinstance(serialized, dict):
+                    # Only flag as failure if it's not in STRUCTURED_OUTPUT_TOOLS
                     failures.append(
                         f"{tool.name}: returned dict instead of string: {list(serialized.keys())}"
                     )
@@ -488,4 +447,4 @@ def test_example():
                     failures.append(f"{tool.name}: raised {type(e).__name__}: {e}")
 
         if failures:
-            pytest.fail("Tools with non-compact output:\n" + "\n".join(failures))
+            pytest.fail("Tools with invalid output:\n" + "\n".join(failures))

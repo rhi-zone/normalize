@@ -468,11 +468,11 @@ def _get_tool_dispatcher() -> dict[str, Any]:
         ),
         # complexity module
         "complexity.analyze_complexity": lambda root, path=None, pattern=None, **kw: analyze_complexity(
-            Path(path) if path else root, pattern=pattern
+            Path(path) if path else root, **({"pattern": pattern} if pattern else {})
         ),
-        # security module
-        "security.analyze_security": lambda root, path=None, pattern=None, **kw: analyze_security(
-            Path(path) if path else root, pattern=pattern
+        # security module (no pattern arg)
+        "security.analyze_security": lambda root, path=None, **kw: analyze_security(
+            Path(path) if path else root
         ),
         # tree module
         "tree.render_tree": lambda root, node=None, **kw: (

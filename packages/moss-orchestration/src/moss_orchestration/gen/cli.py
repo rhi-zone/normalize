@@ -333,7 +333,7 @@ class CLIGenerator:
 class CLIExecutor:
     """Executor for generated CLI commands.
 
-    Runs MossAPI methods based on parsed CLI arguments.
+    Runs tool handlers based on parsed CLI arguments.
     """
 
     def __init__(self, groups: list[CLIGroup]):
@@ -348,6 +348,15 @@ class CLIExecutor:
             for cmd in group.commands:
                 key = f"{group.name}.{cmd.name}"
                 self._command_map[key] = cmd
+        self._dispatcher: dict[str, Any] | None = None
+
+    def _get_dispatcher(self) -> dict[str, Any]:
+        """Get the tool dispatcher (lazy loaded)."""
+        if self._dispatcher is None:
+            from moss_mcp.server_full import _get_tool_dispatcher
+
+            self._dispatcher = _get_tool_dispatcher()
+        return self._dispatcher
 
     def execute(self, args: argparse.Namespace) -> Any:
         """Execute a command based on parsed arguments.
@@ -358,24 +367,20 @@ class CLIExecutor:
         Returns:
             Result from the API call
         """
-        from moss import MossAPI
-
         if not args.command or not args.subcommand:
             return None
 
         root = Path(args.root).resolve()
-        api = MossAPI.for_project(root)
 
-        # Get the sub-API
-        subapi = getattr(api, args.command, None)
-        if subapi is None:
-            raise ValueError(f"Unknown command: {args.command}")
-
-        # Get the method
+        # Build api_path from command and subcommand
         method_name = args.subcommand.replace("-", "_")
-        method = getattr(subapi, method_name, None)
-        if method is None:
-            raise ValueError(f"Unknown subcommand: {args.subcommand}")
+        api_path = f"{args.command}.{method_name}"
+
+        # Get handler from dispatcher
+        dispatcher = self._get_dispatcher()
+        handler = dispatcher.get(api_path)
+        if handler is None:
+            raise ValueError(f"Unknown command: {args.command} {args.subcommand}")
 
         # Build kwargs from args
         cmd_key = f"{args.command}.{args.subcommand}"
@@ -401,8 +406,8 @@ class CLIExecutor:
                 if value is not None and value != opt.default:
                     kwargs[opt_name] = value
 
-        # Call the method
-        return method(**kwargs)
+        # Call the handler with root as first argument
+        return handler(root, **kwargs)
 
 
 def generate_cli(prog: str = "moss") -> argparse.ArgumentParser:

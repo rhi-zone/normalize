@@ -258,7 +258,7 @@ class MCPGenerator:
 class MCPToolExecutor:
     """Executor for MCP tools.
 
-    Runs MossAPI methods based on tool calls.
+    Runs tool methods directly without MossAPI.
     """
 
     def __init__(self, tools: list[MCPTool] | None = None):
@@ -271,6 +271,15 @@ class MCPToolExecutor:
             generator = MCPGenerator()
             tools = generator.generate_tools()
         self._tools = {t.name: t for t in tools}
+        self._dispatcher: dict[str, Any] | None = None
+
+    def _get_dispatcher(self) -> dict[str, Any]:
+        """Get the tool dispatcher (lazy loaded)."""
+        if self._dispatcher is None:
+            from moss_mcp.server_full import _get_tool_dispatcher
+
+            self._dispatcher = _get_tool_dispatcher()
+        return self._dispatcher
 
     def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         """Execute a tool with the given arguments.
@@ -284,29 +293,22 @@ class MCPToolExecutor:
         """
         from pathlib import Path
 
-        from moss import MossAPI
-
         tool = self._tools.get(tool_name)
         if tool is None:
             raise ValueError(f"Unknown tool: {tool_name}")
 
-        # Parse API path
-        parts = tool.api_path.split(".")
-        if len(parts) != 2:
-            raise ValueError(f"Invalid API path: {tool.api_path}")
-
-        subapi_name, method_name = parts
+        # Get handler from dispatcher
+        dispatcher = self._get_dispatcher()
+        handler = dispatcher.get(tool.api_path)
+        if handler is None:
+            raise ValueError(f"No handler for API path: {tool.api_path}")
 
         # Get root from arguments or use current directory
         args = dict(arguments)
         root = Path(args.pop("root", ".")).resolve()
 
-        # Create API and call method
-        api = MossAPI.for_project(root)
-        subapi = getattr(api, subapi_name)
-        method = getattr(subapi, method_name)
-
-        return method(**args)
+        # Call the handler
+        return handler(root, **args)
 
     def list_tools(self) -> list[str]:
         """List all available tool names."""

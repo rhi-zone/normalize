@@ -247,32 +247,29 @@ class TestGenerateCLI:
 # =============================================================================
 
 
-@pytest.mark.skip(reason="CLIExecutor requires MossAPI which was removed")
 class TestCLIExecutor:
     @pytest.fixture
     def executor(self):
         generator = CLIGenerator()
         return generator.generate_executor()
 
-    def test_execute_health_check(self, executor, tmp_path: Path):
-        # Create a minimal project structure
-        (tmp_path / "src").mkdir()
-        (tmp_path / "src" / "__init__.py").touch()
-
+    def test_execute_cfg_build(self, executor, tmp_path: Path):
         import argparse
 
         args = argparse.Namespace(
             root=str(tmp_path),
-            command="health",
-            subcommand="check",
+            command="cfg",
+            subcommand="build-cfg",
             json=False,
         )
+        # Add the source argument that build_cfg expects
+        args.source = "def foo(): pass"
 
         # This should run without error
         result = executor.execute(args)
-        # Health check returns ProjectStatus
+        # CFG build returns list of FunctionCFG
         assert result is not None
-        assert hasattr(result, "health_grade")
+        assert len(result) > 0
 
     def test_execute_unknown_command(self, executor, tmp_path: Path):
         import argparse
@@ -473,7 +470,6 @@ class TestMCPGenerator:
             assert "inputSchema" in defn
 
 
-@pytest.mark.skip(reason="MCPToolExecutor requires MossAPI which was removed")
 class TestMCPToolExecutor:
     @pytest.fixture
     def executor(self):
@@ -484,14 +480,16 @@ class TestMCPToolExecutor:
     def test_list_tools(self, executor):
         tools = executor.list_tools()
         assert len(tools) > 0
-        assert any("cfg" in t for t in tools)  # health removed
+        assert any("cfg" in t for t in tools)
 
     def test_execute_cfg_build(self, executor, tmp_path: Path):
         # Create a test file
-        (tmp_path / "test.py").write_text("def foo(): pass")
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def foo(): pass")
 
-        result = executor.execute("cfg_build_cfg", {"root": str(tmp_path)})
+        result = executor.execute("cfg_build_cfg", {"file_path": str(test_file)})
         assert result is not None
+        assert len(result) > 0  # Should return list of CFG objects
 
     def test_execute_unknown_tool(self, executor):
         with pytest.raises(ValueError, match="Unknown tool"):
