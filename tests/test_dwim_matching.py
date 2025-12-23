@@ -17,13 +17,13 @@ from moss_orchestration.dwim import analyze_intent
 EXACT_MATCH_CASES = [
     # Exact tool names (various formats)
     ("skeleton", "skeleton", 0.95),
-    ("todo_list", "todo_list", 0.95),
-    ("todo-list", "todo_list", 0.95),
-    ("todo list", "todo_list", 0.95),
     ("deps", "deps", 0.95),
     ("cfg", "cfg", 0.95),
     ("anchors", "anchors", 0.95),
     ("query", "query", 0.95),
+    ("callers", "callers", 0.95),
+    ("callees", "callees", 0.95),
+    ("view", "view", 0.95),
 ]
 
 WORD_ORDER_CASES = [
@@ -55,7 +55,7 @@ TYPO_CASES = [
     ("skelton", "skeleton", 0.70),  # missing 'e'
     ("skeletn", "skeleton", 0.70),  # missing 'o'
     ("depss", "deps", 0.70),  # extra 's'
-    ("todoo", "todo_list", 0.50),  # extra 'o'
+    ("anchorss", "anchors", 0.70),  # extra 's'
 ]
 
 SYNONYM_CASES = [
@@ -226,7 +226,8 @@ class TestConsistency:
 
     def test_separator_equivalence(self):
         """Different separators should give same results."""
-        queries = ["todo_list", "todo-list", "todo list"]
+        # Use apply_patch which exists and has an underscore
+        queries = ["apply_patch", "apply-patch", "apply patch"]
         results = [analyze_intent(q) for q in queries]
 
         # All should have same top tool

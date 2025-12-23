@@ -10,8 +10,8 @@ def find_rust_binary() -> Path | None:
     """Find the Rust moss binary if available."""
     # Check common locations
     candidates = [
-        # Development: relative to repo root
-        Path(__file__).parent.parent.parent / "target" / "release" / "moss",
+        # Development: relative to repo root (packages/moss-intelligence/src/moss_intelligence -> repo root)
+        Path(__file__).parent.parent.parent.parent.parent / "target" / "release" / "moss",
         # Installed via cargo
         Path.home() / ".cargo" / "bin" / "moss-cli",
         # System PATH

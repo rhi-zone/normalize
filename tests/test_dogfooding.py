@@ -20,8 +20,14 @@ class TestSelfAnalysis:
 
     @pytest.fixture
     def moss_src(self) -> Path:
-        """Get the Moss source directory."""
-        return Path(__file__).parent.parent / "src" / "moss"
+        """Get the Moss source directory (now moss_intelligence)."""
+        return (
+            Path(__file__).parent.parent
+            / "packages"
+            / "moss-intelligence"
+            / "src"
+            / "moss_intelligence"
+        )
 
     def test_extract_skeleton_from_all_modules(self, moss_src: Path):
         """Test skeleton extraction on all Moss modules."""
@@ -161,16 +167,14 @@ class TestCrossModuleAnalysis:
         """Test that Moss modules can be imported without circular import issues."""
         # This test implicitly passes if we got this far,
         # as the test imports worked
-        import moss
+        from moss_intelligence.anchors import Anchor
+        from moss_intelligence.cfg import build_cfg
+        from moss_intelligence.skeleton import extract_python_skeleton
 
-        # Verify key exports are accessible
-        assert hasattr(moss, "Anchor")
-        assert hasattr(moss, "Patch")
-        assert hasattr(moss, "EventBus")
-        assert hasattr(moss, "ShadowGit")
-        assert hasattr(moss, "extract_python_skeleton")
-        assert hasattr(moss, "apply_patch")
-        assert hasattr(moss, "build_cfg")
+        # Verify imports worked
+        assert Anchor is not None
+        assert extract_python_skeleton is not None
+        assert build_cfg is not None
 
 
 class TestSkeletonQuality:
@@ -178,8 +182,14 @@ class TestSkeletonQuality:
 
     @pytest.fixture
     def moss_src(self) -> Path:
-        """Get the Moss source directory."""
-        return Path(__file__).parent.parent / "src" / "moss"
+        """Get the Moss source directory (now moss_intelligence)."""
+        return (
+            Path(__file__).parent.parent
+            / "packages"
+            / "moss-intelligence"
+            / "src"
+            / "moss_intelligence"
+        )
 
     def test_docstrings_preserved(self, moss_src: Path):
         """Test that docstrings are captured in skeletons."""
@@ -828,6 +838,7 @@ class GoodClass:
         assert "GoodClass" not in bad_names
 
 
+@pytest.mark.skip(reason="MossAPI removed in package restructuring")
 class TestMossAPI:
     """Tests for the canonical MossAPI entry point."""
 

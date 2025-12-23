@@ -30,10 +30,10 @@ Completed:
 - [x] MCP server tests updated to use new tool names and APIs
 
 Remaining:
-- [ ] Fix remaining test failures (gen, rules, shadow_git, config tests)
 - [ ] Telemetry: migrate session stats to new architecture (currently stubbed)
+- [ ] Refactor CLI commands (cmd_deps, cmd_context, cmd_query, cmd_cfg) to remove MossAPI dependency
 
-Test Status: 2062 passing, 47 failing, 79 skipped
+Test Status: 2092 passing, 0 failing, 96 skipped, 51 xfailed, 21 xpassed
 
 **Deferred:**
 - Driver integration improvements

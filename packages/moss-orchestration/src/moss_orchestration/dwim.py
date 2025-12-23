@@ -859,23 +859,11 @@ TOOL_ALIASES: dict[str, str] = {
     # context
     "summary": "context",
     "info": "context",
-    # search_summarize_module
-    "module": "search_summarize_module",
     # apply_patch
     "edit": "apply_patch",
     "modify": "apply_patch",
     "patch": "apply_patch",
     "change": "apply_patch",
-    # web_fetch
-    "fetch": "web_fetch",
-    "browse": "web_fetch",
-    "url": "web_fetch",
-    "webpage": "web_fetch",
-    # web_search
-    "websearch": "web_search",
-    "lookup": "web_search",
-    "google": "web_search",
-    "duckduckgo": "web_search",
 }
 
 # Parameter aliases: alternative parameter names that map to canonical ones
