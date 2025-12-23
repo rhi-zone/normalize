@@ -42,7 +42,7 @@ fn source_extensions_sql_filter() -> String {
         .join(" OR ")
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct IndexedFile {
     pub path: String,
     pub is_dir: bool,

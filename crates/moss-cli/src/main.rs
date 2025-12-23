@@ -617,8 +617,11 @@ enum DaemonAction {
     /// Shutdown the daemon
     Shutdown,
 
-    /// Start the daemon
+    /// Start the daemon (background)
     Start,
+
+    /// Run the daemon in foreground (for debugging)
+    Run,
 }
 
 fn main() {
@@ -3493,6 +3496,17 @@ fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 {
                     eprintln!("Failed to start daemon");
                 }
                 1
+            }
+        }
+
+        DaemonAction::Run => {
+            // Run daemon in foreground (blocking)
+            match daemon::run_daemon(&root) {
+                Ok(code) => code,
+                Err(e) => {
+                    eprintln!("Daemon error: {}", e);
+                    1
+                }
             }
         }
     }

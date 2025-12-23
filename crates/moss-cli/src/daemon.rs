@@ -1,11 +1,18 @@
 use moss_core::get_moss_dir;
+use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use tokio::net::UnixListener;
 
-#[derive(Debug, Serialize)]
+use crate::index::FileIndex;
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "cmd")]
 pub enum Request {
     #[serde(rename = "path")]
@@ -247,4 +254,215 @@ pub struct DaemonStatus {
     pub symbols_indexed: usize,
     pub queries_served: usize,
     pub pid: Option<u32>,
+}
+
+// ============================================================================
+// Daemon Server Implementation
+// ============================================================================
+
+#[derive(Debug, Serialize)]
+struct ServerResponse {
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+impl ServerResponse {
+    fn ok(data: serde_json::Value) -> Self {
+        Self { ok: true, data: Some(data), error: None }
+    }
+    fn err(msg: &str) -> Self {
+        Self { ok: false, data: None, error: Some(msg.to_string()) }
+    }
+}
+
+struct DaemonServer {
+    root: PathBuf,
+    index: Mutex<FileIndex>,
+}
+
+impl DaemonServer {
+    fn new(root: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        let index = FileIndex::open(&root)?;
+        Ok(Self {
+            root,
+            index: Mutex::new(index),
+        })
+    }
+
+    fn handle_request(&self, req: Request) -> ServerResponse {
+        match req {
+            Request::Status => {
+                let idx = self.index.lock().unwrap();
+                let (files, symbols, _) = idx.call_graph_stats().unwrap_or((0, 0, 0));
+                ServerResponse::ok(serde_json::json!({
+                    "root": self.root.to_string_lossy(),
+                    "files": idx.count().unwrap_or(0),
+                    "symbols": symbols,
+                    "call_graph_files": files,
+                }))
+            }
+            Request::Path { query } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_like(&query) {
+                    Ok(matches) => ServerResponse::ok(serde_json::json!(matches)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::Symbols { file } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_symbols(&file, None, false, 100) {
+                    Ok(syms) => ServerResponse::ok(serde_json::json!(syms)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::Callers { symbol } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_callers(&symbol) {
+                    Ok(callers) => ServerResponse::ok(serde_json::json!(callers)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::Callees { symbol, file } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_callees(&symbol, &file) {
+                    Ok(callees) => ServerResponse::ok(serde_json::json!(callees)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::Expand { symbol, file: _ } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_symbol(&symbol) {
+                    Ok(matches) if !matches.is_empty() => {
+                        let (file_path, _, start, end) = &matches[0];
+                        let abs_path = self.root.join(file_path);
+                        match std::fs::read_to_string(&abs_path) {
+                            Ok(content) => {
+                                let lines: Vec<&str> = content.lines().collect();
+                                let start_idx = (*start).saturating_sub(1);
+                                let end_idx = (*end).min(lines.len());
+                                let source = lines[start_idx..end_idx].join("\n");
+                                ServerResponse::ok(serde_json::json!({"source": source}))
+                            }
+                            Err(e) => ServerResponse::err(&e.to_string()),
+                        }
+                    }
+                    Ok(_) => ServerResponse::err("Symbol not found"),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::Shutdown => {
+                ServerResponse::ok(serde_json::json!({"message": "shutting down"}))
+            }
+        }
+    }
+
+    fn trigger_incremental_refresh(&self) {
+        if let Ok(mut idx) = self.index.lock() {
+            // Incremental file refresh
+            if let Err(e) = idx.incremental_refresh() {
+                eprintln!("Error during incremental refresh: {}", e);
+            }
+        }
+    }
+}
+
+/// Run the daemon server in the foreground
+#[tokio::main]
+pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> {
+    let moss_dir = get_moss_dir(root);
+    let socket_path = moss_dir.join("daemon.sock");
+
+    // Ensure moss data directory exists
+    std::fs::create_dir_all(&moss_dir)?;
+
+    // Remove stale socket
+    let _ = std::fs::remove_file(&socket_path);
+
+    let server = Arc::new(DaemonServer::new(root.to_path_buf())?);
+
+    // Initial index
+    {
+        let mut idx = server.index.lock().unwrap();
+        let file_count = idx.refresh()?;
+        let (_, symbols, calls) = idx.incremental_call_graph_refresh()?;
+        eprintln!("Indexed {} files, {} symbols, {} calls", file_count, symbols, calls);
+    }
+
+    // Start file watcher - triggers incremental refresh on changes
+    let server_watcher = server.clone();
+    let root_watcher = root.to_path_buf();
+    std::thread::spawn(move || {
+        let (tx, rx) = channel();
+        let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
+            Ok(w) => w,
+            Err(e) => {
+                eprintln!("Failed to create file watcher: {}", e);
+                return;
+            }
+        };
+        if let Err(e) = watcher.watch(&root_watcher, RecursiveMode::Recursive) {
+            eprintln!("Failed to watch directory: {}", e);
+            return;
+        }
+
+        // Batch file changes - don't reindex on every keystroke
+        use std::time::Instant;
+        let mut last_refresh = Instant::now();
+        let debounce = Duration::from_millis(500);
+
+        for res in rx {
+            if let Ok(event) = res {
+                // Skip .moss directory
+                let dominated_by_moss = event.paths.iter().all(|p| {
+                    p.to_string_lossy().contains(".moss")
+                });
+                if dominated_by_moss {
+                    continue;
+                }
+
+                // Debounce: only refresh if enough time has passed
+                if last_refresh.elapsed() >= debounce {
+                    server_watcher.trigger_incremental_refresh();
+                    last_refresh = Instant::now();
+                }
+            }
+        }
+    });
+
+    // Start socket server
+    let listener = UnixListener::bind(&socket_path)?;
+    eprintln!("Daemon listening on {}", socket_path.display());
+
+    loop {
+        let (stream, _) = listener.accept().await?;
+        let server = server.clone();
+
+        tokio::spawn(async move {
+            let (reader, mut writer) = stream.into_split();
+            let mut reader = tokio::io::BufReader::new(reader);
+            let mut line = String::new();
+
+            while reader.read_line(&mut line).await.unwrap_or(0) > 0 {
+                let response = match serde_json::from_str::<Request>(&line) {
+                    Ok(Request::Shutdown) => {
+                        let resp = server.handle_request(Request::Shutdown);
+                        let resp_str = serde_json::to_string(&resp).unwrap();
+                        let _ = writer.write_all(resp_str.as_bytes()).await;
+                        let _ = writer.write_all(b"\n").await;
+                        std::process::exit(0);
+                    }
+                    Ok(req) => server.handle_request(req),
+                    Err(e) => ServerResponse::err(&format!("Invalid request: {}", e)),
+                };
+
+                let resp_str = serde_json::to_string(&response).unwrap();
+                let _ = writer.write_all(resp_str.as_bytes()).await;
+                let _ = writer.write_all(b"\n").await;
+                line.clear();
+            }
+        });
+    }
 }

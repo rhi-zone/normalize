@@ -571,12 +571,14 @@ dependencies = [
  "grep-searcher",
  "ignore",
  "moss-core",
+ "notify",
  "nucleo-matcher",
  "rayon",
  "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "tree-sitter",
  "walkdir",
 ]
@@ -603,19 +605,6 @@ dependencies = [
  "tree-sitter-toml-updated",
  "tree-sitter-typescript",
  "tree-sitter-yaml",
-]
-
-[[package]]
-name = "moss-daemon"
-version = "0.1.0"
-dependencies = [
- "ignore",
- "moss-core",
- "notify",
- "rusqlite",
- "serde",
- "serde_json",
- "tokio",
 ]
 
 [[package]]

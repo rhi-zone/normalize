@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/moss-core", "crates/moss-cli", "crates/moss-daemon"]
+members = ["crates/moss-core", "crates/moss-cli"]
 
 [workspace.package]
 version = "0.1.0"

@@ -54,6 +54,13 @@
 - Tree file listing uses new `list-files` Rust command (no more git ls-files dependency)
 - `g` shortcut still works as hidden alias for quick goto
 - Modal keybinds: TUIMode.bindings, active_bindings property, KeybindBar refresh on mode change
+- Mode indicator in footer bar (right side, next to palette) - clickable, color-coded
+
+### Bug Fixes
+
+**CLI Fixes** (Dec 23 2025)
+- `moss tree crates/` (trailing slash) now works correctly - uses resolve_unified
+- Callers/callees commands use incremental call graph refresh (respects mtime)
 
 ### Documentation
 

@@ -11,12 +11,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 - Selective import resolution (e.g., `--fisheye=moss.config` to expand only that import)
 
 **2. Rust Module Cleanup**
-- index.rs/symbols.rs: Keep separate (good layering: symbols=parsing, index=persistence)
+- Consider consolidating moss-daemon into moss-cli (reduce crate count)
 - Many "dead code" warnings are serde false positives (daemon Request/Response types)
 
 **3. TUI: View/Edit/Analyze Mode Refactor**
-- Mode indicator (bottom right, near palette) OR tabbed content view
-- Better integration of primitives into TUI workflow
+- [x] Mode indicator in footer (right side, near palette) - clickable, shows mode color
+- Better integration of primitives into TUI workflow (ongoing)
 
 **4. Reference Resolution**
 - Full import graph with alias tracking
