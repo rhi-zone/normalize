@@ -139,18 +139,6 @@ class TasksMode:
             pass
 
 
-# Backwards compatibility aliases
-ExploreMode = CodeMode
-SessionMode = TasksMode
-PlanMode = AnalysisMode  # Plan → Analysis
-ReadMode = CodeMode
-WriteMode = CodeMode
-DiffMode = TasksMode  # Diff accessed through Tasks
-BranchMode = TasksMode
-SwarmMode = TasksMode
-CommitMode = TasksMode
-
-
 class EditModal(ModalScreen[str | None]):
     """Modal dialog for edit task input."""
 
@@ -1764,9 +1752,6 @@ class MossTUI(App):
             root.expand()
         except Exception as e:
             self._log(f"Failed to fetch task data: {e}")
-
-    # Backwards compatibility alias
-    _update_session_view = _update_task_view
 
     async def _update_swarm_view(self) -> None:
         """Fetch and display multi-agent swarm status."""

@@ -376,20 +376,43 @@ class Session:
         except subprocess.CalledProcessError:
             return False
 
-    def get_diff(self) -> str:
-        """Get the diff for this task's shadow branch.
+    def get_diff(
+        self,
+        from_ref: str | None = None,
+        to_ref: str | None = None,
+    ) -> str:
+        """Get diff for this task's shadow branch.
 
-        Returns diff between base branch and shadow branch,
-        or empty string if not available.
+        Args:
+            from_ref: Start reference (default: base branch)
+            to_ref: End reference (default: shadow branch HEAD)
+
+        Examples:
+            get_diff()  # Full diff: base...shadow
+            get_diff(from_ref="HEAD~1")  # Last commit only
+            get_diff(from_ref="abc123", to_ref="def456")  # Between commits
+
+        Returns:
+            Diff output, or empty string if not available.
         """
         import subprocess
 
-        base_branch = self.metadata.get("base_branch")
-        if not self.shadow_branch or not base_branch:
+        if not self.shadow_branch:
             return ""
+
+        # Default from_ref is base branch
+        if from_ref is None:
+            from_ref = self.metadata.get("base_branch")
+            if not from_ref:
+                return ""
+
+        # Default to_ref is shadow branch HEAD
+        if to_ref is None:
+            to_ref = self.shadow_branch
+
         try:
             result = subprocess.run(
-                ["git", "diff", f"{base_branch}...{self.shadow_branch}"],
+                ["git", "diff", f"{from_ref}...{to_ref}"],
                 cwd=self.workspace,
                 capture_output=True,
                 text=True,
@@ -398,6 +421,10 @@ class Session:
             return result.stdout
         except subprocess.CalledProcessError:
             return ""
+
+    def get_last_commit_diff(self) -> str:
+        """Get diff for just the last commit on the shadow branch."""
+        return self.get_diff(from_ref="HEAD~1", to_ref="HEAD")
 
     def pause(self, reason: str = "") -> None:
         """Pause the session."""

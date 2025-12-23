@@ -15,7 +15,6 @@
 **TUI Redesign Phase 2** (Dec 23 2025)
 - Simplified to three modes: Code, Analysis, Tasks
   - Removed: PLAN, READ, WRITE, DIFF, BRANCH, SWARM, COMMIT modes
-  - Backwards compatibility aliases for old mode names
 - Analysis sub-views with `[` and `]` navigation:
   - Complexity: cyclomatic complexity ranking
   - Security: vulnerability scanning
