@@ -11,16 +11,12 @@ Test Status: 2184 passing, 0 failing, 42 skipped (all optional deps)
 ## Backlog
 
 **Language Support:**
-- Fisheye for Go (import resolution from go.mod)
 - Fisheye for Java (package/class resolution)
 - Fisheye for C/C++ (#include resolution)
 - Call graph: Scala, Vue (no tree-sitter grammars yet)
-- In-file tests: Rust's `#[cfg(test)]` modules
 
 **Analysis Features:**
-- Test health: extract pytest markers (@skip, @xfail, @parametrize), summarize skip reasons
 - Session analysis: detect correction patterns ("You're right", "Good point")
-- Binary detection for "(no ext)" files in call graph
 
 **Integration:**
 - Complete daemon integration (FileIndex API methods currently unused)

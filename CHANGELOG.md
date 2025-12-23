@@ -27,11 +27,19 @@ First release. See `docs/` for design docs and `README.md` for usage.
 
 ### Features
 
+**Additional Analysis Modules** (Dec 24 2025)
+- Binary detection in call graph: detects binary files by null byte check (8KB sample)
+- Rust in-file tests: `#[cfg(test)]` module detection in test_gaps analysis
+- Test health module: extracts pytest markers (@skip, @xfail, @skipif, @parametrize)
+- Go fisheye: parse go.mod, scan packages, resolve imports via `--go-imports` flag
+
 **CLI/MCP Integration for Analysis Modules** (Dec 24 2025)
 - Added `moss analyze --test-coverage` flag for test coverage analysis via `moss_intelligence.test_gaps`
 - Added `moss analyze --scopes` flag for public/private symbol statistics via `moss_intelligence.scopes`
-- Regenerated `specs/mcp_tools.json` to include `test_gaps_*` and `scopes_*` MCP tools
-- Both modules now accessible via CLI and MCP
+- Added `moss analyze --test-health` flag for pytest marker extraction
+- Added `moss analyze --go-imports` flag for Go module import analysis
+- Regenerated `specs/mcp_tools.json` to include `test_gaps_*`, `scopes_*`, `test_health_*`, and `go_imports_*` MCP tools
+- All modules now accessible via CLI and MCP
 
 **File Boundaries** (Dec 24 2025)
 - `expand_import_context()` + ViewOptions.expand_imports
