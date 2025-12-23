@@ -4,14 +4,38 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**Driver Integration** (follow-up from driver architecture)
-- Wire TUI to use drivers for task execution (replace direct loop calls)
-- Add driver selection in session creation (CLI and TUI)
-- Test LLMDriver with real API calls
+**Package Restructuring** (see `docs/restructuring-plan.md`, `docs/api-boundaries.md`)
 
-**Call Graph Improvements**
-- Wire FunctionComplexity.short_name() into complexity output
-- Add binary file detection for "(no ext)" files
+Phase 1: Extract moss-intelligence
+- [ ] Create `packages/moss-intelligence/` with pyproject.toml
+- [ ] Move core analysis modules (skeleton, tree, complexity, security, deps, etc.)
+- [ ] Define public API surface (Intelligence class)
+- [ ] Update imports in remaining moss code
+
+Phase 2: Extract moss-context
+- [ ] Create `packages/moss-context/` with pyproject.toml
+- [ ] Move context/memory modules (context.py, context_memory.py, cache.py)
+- [ ] Define WorkingMemory API and protocols (Summarizer, etc.)
+- [ ] Make it domain-agnostic (no code-specific logic)
+
+Phase 3: Extract moss-orchestration
+- [ ] Create `packages/moss-orchestration/` with pyproject.toml
+- [ ] Move agent/session modules (drivers, execution, session, shadow_git)
+- [ ] Define Agent/Session/Driver protocols
+- [ ] Wire to use moss-intelligence and moss-context
+
+Phase 4: Extract moss-llm
+- [ ] Create `packages/moss-llm/` with pyproject.toml
+- [ ] Add litellm dependency
+- [ ] Implement protocol adapters (LLMSummarizer, LLMDecider)
+
+Phase 5: Extract frontends
+- [ ] moss-mcp, moss-tui, moss-lsp as separate packages
+- [ ] Each imports what it needs, wires together
+
+**Deferred (until after restructuring):**
+- Driver Integration (will be part of moss-orchestration)
+- Call Graph Improvements
 
 ## Implementation Notes
 
