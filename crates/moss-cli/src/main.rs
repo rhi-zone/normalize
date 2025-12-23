@@ -1613,9 +1613,67 @@ fn resolve_import(module: &str, current_file: &Path, root: &Path) -> Option<Path
     match ext {
         "py" => resolve_python_import(module, current_file, root),
         "rs" => resolve_rust_import(module, current_file, root),
-        // TypeScript/JavaScript would go here
+        "ts" | "tsx" | "js" | "jsx" | "mts" | "mjs" => {
+            resolve_typescript_import(module, current_file, root)
+        }
         _ => None,
     }
+}
+
+/// Resolve a TypeScript/JavaScript import to a local file path
+/// Only resolves relative imports (./foo, ../foo)
+fn resolve_typescript_import(module: &str, current_file: &Path, _root: &Path) -> Option<PathBuf> {
+    // Only handle relative imports
+    if !module.starts_with('.') {
+        return None;
+    }
+
+    let current_dir = current_file.parent()?;
+
+    // Normalize the path
+    let target = if module.starts_with("./") {
+        current_dir.join(&module[2..])
+    } else if module.starts_with("../") {
+        current_dir.join(module)
+    } else {
+        return None;
+    };
+
+    // Try various extensions in order of preference
+    let extensions = ["ts", "tsx", "js", "jsx", "mts", "mjs"];
+
+    // First try exact path (might already have extension)
+    if target.exists() && target.is_file() {
+        return Some(target);
+    }
+
+    // Try adding extensions
+    for ext in &extensions {
+        let with_ext = target.with_extension(ext);
+        if with_ext.exists() && with_ext.is_file() {
+            return Some(with_ext);
+        }
+    }
+
+    // Try index files in directory
+    if target.is_dir() {
+        for ext in &extensions {
+            let index = target.join(format!("index.{}", ext));
+            if index.exists() && index.is_file() {
+                return Some(index);
+            }
+        }
+    }
+
+    // Try as directory with index
+    for ext in &extensions {
+        let as_dir = target.join(format!("index.{}", ext));
+        if as_dir.exists() && as_dir.is_file() {
+            return Some(as_dir);
+        }
+    }
+
+    None
 }
 
 /// Resolve a Rust import to a local file path

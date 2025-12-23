@@ -74,6 +74,9 @@ impl DepsResult {
 pub struct DepsExtractor {
     python_parser: Parser,
     rust_parser: Parser,
+    typescript_parser: Parser,
+    tsx_parser: Parser,
+    javascript_parser: Parser,
 }
 
 impl DepsExtractor {
@@ -88,9 +91,27 @@ impl DepsExtractor {
             .set_language(&moss_core::tree_sitter_rust::LANGUAGE.into())
             .expect("Failed to load Rust grammar");
 
+        let mut typescript_parser = Parser::new();
+        typescript_parser
+            .set_language(&moss_core::tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
+            .expect("Failed to load TypeScript grammar");
+
+        let mut tsx_parser = Parser::new();
+        tsx_parser
+            .set_language(&moss_core::tree_sitter_typescript::LANGUAGE_TSX.into())
+            .expect("Failed to load TSX grammar");
+
+        let mut javascript_parser = Parser::new();
+        javascript_parser
+            .set_language(&moss_core::tree_sitter_javascript::LANGUAGE.into())
+            .expect("Failed to load JavaScript grammar");
+
         Self {
             python_parser,
             rust_parser,
+            typescript_parser,
+            tsx_parser,
+            javascript_parser,
         }
     }
 
@@ -99,6 +120,9 @@ impl DepsExtractor {
         let (imports, exports) = match ext {
             "py" => self.extract_python(content),
             "rs" => self.extract_rust(content),
+            "ts" | "mts" => self.extract_typescript(content),
+            "tsx" => self.extract_tsx(content),
+            "js" | "mjs" | "jsx" => self.extract_javascript(content),
             _ => (Vec::new(), Vec::new()),
         };
 
@@ -382,6 +406,231 @@ impl DepsExtractor {
             }
         }
     }
+
+    fn extract_typescript(&mut self, content: &str) -> (Vec<Import>, Vec<Export>) {
+        let tree = match self.typescript_parser.parse(content, None) {
+            Some(t) => t,
+            None => return (Vec::new(), Vec::new()),
+        };
+        self.extract_js_ts_deps(&tree, content)
+    }
+
+    fn extract_tsx(&mut self, content: &str) -> (Vec<Import>, Vec<Export>) {
+        let tree = match self.tsx_parser.parse(content, None) {
+            Some(t) => t,
+            None => return (Vec::new(), Vec::new()),
+        };
+        self.extract_js_ts_deps(&tree, content)
+    }
+
+    fn extract_javascript(&mut self, content: &str) -> (Vec<Import>, Vec<Export>) {
+        let tree = match self.javascript_parser.parse(content, None) {
+            Some(t) => t,
+            None => return (Vec::new(), Vec::new()),
+        };
+        self.extract_js_ts_deps(&tree, content)
+    }
+
+    /// Shared extraction for JavaScript/TypeScript AST
+    fn extract_js_ts_deps(
+        &self,
+        tree: &tree_sitter::Tree,
+        content: &str,
+    ) -> (Vec<Import>, Vec<Export>) {
+        let mut imports = Vec::new();
+        let mut exports = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+
+        self.collect_js_ts_deps(&mut cursor, content, &mut imports, &mut exports);
+        (imports, exports)
+    }
+
+    fn collect_js_ts_deps(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        imports: &mut Vec<Import>,
+        exports: &mut Vec<Export>,
+    ) {
+        loop {
+            let node = cursor.node();
+            let kind = node.kind();
+
+            match kind {
+                // import { foo, bar } from './module'
+                // import foo from './module'
+                // import * as foo from './module'
+                "import_statement" => {
+                    let mut module = String::new();
+                    let mut names = Vec::new();
+
+                    for i in 0..node.child_count() {
+                        if let Some(child) = node.child(i) {
+                            match child.kind() {
+                                "string" | "string_fragment" => {
+                                    // Extract module path (remove quotes)
+                                    let text = &content[child.byte_range()];
+                                    module = text.trim_matches(|c| c == '"' || c == '\'').to_string();
+                                }
+                                "import_clause" => {
+                                    // Extract imported names
+                                    self.collect_import_names(child, content, &mut names);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    if !module.is_empty() {
+                        let is_relative = module.starts_with('.');
+                        imports.push(Import {
+                            module,
+                            names,
+                            alias: None,
+                            line: node.start_position().row + 1,
+                            is_relative,
+                        });
+                    }
+                }
+                // export function foo() {}
+                // export class Bar {}
+                // export const baz = ...
+                "export_statement" => {
+                    for i in 0..node.child_count() {
+                        if let Some(child) = node.child(i) {
+                            match child.kind() {
+                                "function_declaration" | "generator_function_declaration" => {
+                                    if let Some(name_node) = child.child_by_field_name("name") {
+                                        exports.push(Export {
+                                            name: content[name_node.byte_range()].to_string(),
+                                            kind: "function",
+                                            line: node.start_position().row + 1,
+                                        });
+                                    }
+                                }
+                                "class_declaration" => {
+                                    if let Some(name_node) = child.child_by_field_name("name") {
+                                        exports.push(Export {
+                                            name: content[name_node.byte_range()].to_string(),
+                                            kind: "class",
+                                            line: node.start_position().row + 1,
+                                        });
+                                    }
+                                }
+                                "lexical_declaration" => {
+                                    // export const foo = ..., bar = ...
+                                    self.collect_variable_names(child, content, exports, node.start_position().row + 1);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                // Top-level function/class (could be exported via export default later)
+                "function_declaration" | "generator_function_declaration" => {
+                    if let Some(name_node) = node.child_by_field_name("name") {
+                        let name = content[name_node.byte_range()].to_string();
+                        if !name.starts_with('_') {
+                            exports.push(Export {
+                                name,
+                                kind: "function",
+                                line: node.start_position().row + 1,
+                            });
+                        }
+                    }
+                }
+                "class_declaration" => {
+                    if let Some(name_node) = node.child_by_field_name("name") {
+                        let name = content[name_node.byte_range()].to_string();
+                        if !name.starts_with('_') {
+                            exports.push(Export {
+                                name,
+                                kind: "class",
+                                line: node.start_position().row + 1,
+                            });
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            // Recurse into children
+            if cursor.goto_first_child() {
+                self.collect_js_ts_deps(cursor, content, imports, exports);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn collect_import_names(&self, node: tree_sitter::Node, content: &str, names: &mut Vec<String>) {
+        let mut cursor = node.walk();
+        loop {
+            let child = cursor.node();
+            match child.kind() {
+                "identifier" => {
+                    names.push(content[child.byte_range()].to_string());
+                }
+                "import_specifier" => {
+                    // { foo as bar } - we want "foo"
+                    if let Some(name) = child.child_by_field_name("name") {
+                        names.push(content[name.byte_range()].to_string());
+                    }
+                }
+                "namespace_import" => {
+                    // import * as foo - we want "foo"
+                    for i in 0..child.child_count() {
+                        if let Some(id) = child.child(i) {
+                            if id.kind() == "identifier" {
+                                names.push(content[id.byte_range()].to_string());
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_import_names(cursor.node(), content, names);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn collect_variable_names(&self, node: tree_sitter::Node, content: &str, exports: &mut Vec<Export>, line: usize) {
+        let mut cursor = node.walk();
+        loop {
+            let child = cursor.node();
+            if child.kind() == "variable_declarator" {
+                if let Some(name_node) = child.child_by_field_name("name") {
+                    if name_node.kind() == "identifier" {
+                        exports.push(Export {
+                            name: content[name_node.byte_range()].to_string(),
+                            kind: "variable",
+                            line,
+                        });
+                    }
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_variable_names(cursor.node(), content, exports, line);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -427,5 +676,31 @@ pub struct Bar {}
         assert!(result.imports.len() >= 2);
         assert!(result.exports.iter().any(|e| e.name == "foo"));
         assert!(result.exports.iter().any(|e| e.name == "Bar"));
+    }
+
+    #[test]
+    fn test_typescript_imports() {
+        let mut extractor = DepsExtractor::new();
+        let content = r#"
+import { foo, bar } from './utils';
+import React from 'react';
+import * as helpers from '../helpers';
+
+export function greet(name: string): string {
+    return `Hello, ${name}`;
+}
+
+export class User {
+    name: string;
+}
+
+export const VERSION = "1.0.0";
+"#;
+        let result = extractor.extract(&PathBuf::from("test.ts"), content);
+
+        assert!(result.imports.len() >= 2);
+        assert!(result.imports.iter().any(|i| i.module == "./utils"));
+        assert!(result.exports.iter().any(|e| e.name == "greet"));
+        assert!(result.exports.iter().any(|e| e.name == "User"));
     }
 }
