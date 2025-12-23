@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from moss.output import Output, get_output
-from moss.watcher import EventType, FileWatcher, WatchConfig, WatchEvent
+from .watcher import EventType, FileWatcher, WatchConfig, WatchEvent
 
 
 @dataclass

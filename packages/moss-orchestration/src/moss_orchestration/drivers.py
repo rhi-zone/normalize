@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from moss.session import Session
+    from .session import Session
 
 
 # =============================================================================

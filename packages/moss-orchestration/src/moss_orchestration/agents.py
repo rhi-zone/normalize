@@ -12,7 +12,7 @@ from typing import Any
 
 from moss.events import EventBus, EventEmitterMixin, EventType
 from moss.handles import HandleRef
-from moss.shadow_git import CommitHandle, ShadowBranch, ShadowGit
+from .shadow_git import CommitHandle, ShadowBranch, ShadowGit
 
 
 class TicketStatus(Enum):
@@ -1046,8 +1046,6 @@ class SwarmCoordinator(EventEmitterMixin):
         Returns:
             SwarmResult with all implementations
         """
-        from moss.agents import Ticket
-
         tickets = [Ticket(task=f"Implement component with contract: {c}") for c in contracts]
 
         return await self.fork_join(tickets, worker_factory)

@@ -4,6 +4,6 @@ TOML-based workflows using composable execution primitives.
 See src/moss/execution/__init__.py for the core execution engine.
 """
 
-from moss.workflows.templates import TEMPLATES
+from .templates import TEMPLATES
 
 __all__ = ["TEMPLATES"]

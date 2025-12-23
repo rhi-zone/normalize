@@ -10,10 +10,10 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from moss.drivers import Action, ActionResult, Context, DriverRegistry
+from .drivers import Action, ActionResult, Context, DriverRegistry
 
 if TYPE_CHECKING:
-    from moss.session import Session
+    from .session import Session
 
 
 @dataclass
@@ -67,7 +67,7 @@ class SyncAgentDriver:
 
     def _run_agent_loop(self, task_description: str) -> str:
         """Run the synchronous agent_loop."""
-        from moss.execution import (
+        from .execution import (
             CACHE_STRATEGIES,
             CONTEXT_STRATEGIES,
             LLM_STRATEGIES,
@@ -134,7 +134,7 @@ class SyncStepDriver:
 
     def _run_step_loop(self) -> str:
         """Run the synchronous step_loop."""
-        from moss.execution import (
+        from .execution import (
             CACHE_STRATEGIES,
             CONTEXT_STRATEGIES,
             RETRY_STRATEGIES,
@@ -207,7 +207,7 @@ class SyncStateMachineDriver:
 
     def _run_state_machine_loop(self) -> str:
         """Run the synchronous state_machine_loop."""
-        from moss.execution import (
+        from .execution import (
             CACHE_STRATEGIES,
             CONTEXT_STRATEGIES,
             RETRY_STRATEGIES,
@@ -280,7 +280,7 @@ class SyncWorkflowDriver:
 
     def _run_workflow(self) -> str:
         """Run the workflow from file."""
-        from moss.execution import run_workflow
+        from .execution import run_workflow
 
         return run_workflow(self.workflow_path, initial_context=self.initial_context or None)
 

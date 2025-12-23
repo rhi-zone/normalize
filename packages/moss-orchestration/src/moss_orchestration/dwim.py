@@ -781,7 +781,7 @@ _discover_entry_points()
 def _register_custom_config() -> None:
     """Register custom tools and aliases from user configuration."""
     try:
-        from moss.dwim_config import get_config
+        from .dwim_config import get_config
     except ImportError:
         return
 
