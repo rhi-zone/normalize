@@ -201,14 +201,14 @@ enum Commands {
         #[arg(long)]
         types_only: bool,
 
-        /// Fisheye view: show target at high detail, imports at signature level
+        /// Focus view: show target at high detail, imports at signature level
         /// Resolves local imports and shows their skeletons inline
-        /// Optionally filter to a specific module: --fisheye=moss.config
+        /// Optionally filter to a specific module: --focus=models
         #[arg(long, value_name = "MODULE", num_args = 0..=1, default_missing_value = "*")]
-        fisheye: Option<String>,
+        focus: Option<String>,
 
         /// Resolve imports: inline signatures of specific imported symbols
-        /// More focused than --fisheye (shows only what's actually imported)
+        /// More targeted than --focus (shows only what's actually imported)
         #[arg(long)]
         resolve_imports: bool,
 
@@ -644,7 +644,7 @@ fn main() {
             calls,
             called_by,
             types_only,
-            fisheye,
+            focus,
             resolve_imports,
             all,
         } => cmd_view(
@@ -657,7 +657,7 @@ fn main() {
             calls,
             called_by,
             types_only,
-            fisheye.as_deref(),
+            focus.as_deref(),
             resolve_imports,
             all,
             cli.json,
@@ -907,7 +907,7 @@ fn cmd_view(
     show_calls: bool,
     show_called_by: bool,
     types_only: bool,
-    fisheye: Option<&str>,
+    focus: Option<&str>,
     resolve_imports: bool,
     show_all: bool,
     json: bool,
@@ -955,7 +955,7 @@ fn cmd_view(
         cmd_view_directory(&root.join(&unified.file_path), &root, depth, json)
     } else if unified.symbol_path.is_empty() {
         // View file
-        cmd_view_file(&unified.file_path, &root, depth, line_numbers, show_deps, types_only, fisheye, resolve_imports, show_all, json)
+        cmd_view_file(&unified.file_path, &root, depth, line_numbers, show_deps, types_only, focus, resolve_imports, show_all, json)
     } else {
         // View symbol within file
         cmd_view_symbol(
@@ -1817,7 +1817,7 @@ fn cmd_view_file(
     line_numbers: bool,
     show_deps: bool,
     types_only: bool,
-    fisheye: Option<&str>,
+    focus: Option<&str>,
     resolve_imports: bool,
     show_all: bool,
     json: bool,
@@ -1872,8 +1872,8 @@ fn cmd_view_file(
         skeleton_result
     };
 
-    // Get deps if showing deps, fisheye, or resolve_imports mode
-    let deps_result = if show_deps || fisheye.is_some() || resolve_imports {
+    // Get deps if showing deps, focus, or resolve_imports mode
+    let deps_result = if show_deps || focus.is_some() || resolve_imports {
         let mut deps_extractor = deps::DepsExtractor::new();
         Some(deps_extractor.extract(&full_path, &content))
     } else {
@@ -1974,20 +1974,20 @@ fn cmd_view_file(
         }
 
         // Fisheye mode: show skeletons of imported local files
-        // With --fisheye alone: show all imports
-        // With --fisheye=module: filter to matching imports
-        if let Some(fisheye_filter) = fisheye {
-            // deps_result is guaranteed to be Some when fisheye is true
+        // With --focus alone: show all imports
+        // With --focus=module: filter to matching imports
+        if let Some(focus_filter) = focus {
+            // deps_result is guaranteed to be Some when focus is true
             let deps = deps_result.as_ref().unwrap();
-            let filter_all = fisheye_filter == "*";
+            let filter_all = focus_filter == "*";
 
             // Collect resolved imports (optionally filtered)
             let mut resolved: Vec<(String, PathBuf)> = Vec::new();
             for imp in &deps.imports {
                 // Check if this import matches the filter
                 let matches_filter = filter_all
-                    || imp.module.contains(fisheye_filter)
-                    || imp.module == fisheye_filter;
+                    || imp.module.contains(focus_filter)
+                    || imp.module == focus_filter;
 
                 if matches_filter {
                     if let Some(resolved_path) = resolve_import(&imp.module, &full_path, root) {

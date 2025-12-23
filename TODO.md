@@ -4,27 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**1. View Primitive Polish**
-- [x] Barrel file hoisting: detect `export * from` and surface re-exported symbols
-- [x] Useless docstring detection: skip "Sets the user id" on `setUserId()`
-- [x] Fisheye for TypeScript/JavaScript (Python, Rust, TS/JS all supported)
-- [x] Selective import resolution (e.g., `--fisheye=models` to expand only matching imports)
-
-**2. Rust Module Cleanup**
-- [x] Consolidated moss-daemon into moss-cli (now `moss daemon run`)
-- Many "dead code" warnings are serde false positives (daemon Request/Response types)
-
-**3. TUI: View/Edit/Analyze Mode Refactor**
-- [x] Mode indicator in footer (right side, near palette) - clickable, shows mode color
-- Better integration of primitives into TUI workflow (ongoing)
-
-**4. Reference Resolution**
+**1. Reference Resolution**
 - Full import graph with alias tracking
 - Variable scoping analysis
 - Type inference for method calls
 - Cross-language tracking (Python ↔ Rust)
 
-**5. Distribution**
+**2. TUI Integration**
+- Better integration of primitives into TUI workflow
+- Suppress dead code warnings from daemon Request/Response types (serde false positives)
+
+**3. Distribution**
 - Auto-updates
 - Portable single binary
 - Pre-built binaries (GitHub Actions)
