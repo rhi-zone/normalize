@@ -74,6 +74,11 @@ Test Status: 2106 passing, 0 failing, 82 skipped, 51 xfailed, 21 xpassed
 - Could be a `moss analyze-session` tool or part of telemetry
 - Use detected corrections to identify friction points
 
+**Test Analysis:**
+- Extract pytest markers: `@pytest.mark.skip`, `@pytest.mark.xfail`, `@pytest.mark.skipif`, `@pytest.mark.parametrize`
+- Summarize test health: skip reasons, xfail counts, conditional skips
+- Could integrate with `moss analyze --tests` or separate `moss test-health` command
+
 **Editor Integration:**
 - LSP refactor actions (rename symbol across files via language server)
 
