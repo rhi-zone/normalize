@@ -402,18 +402,25 @@ class KeybindBar(Static):
                     text = f"\\[{key}] {desc}"
                 parts.append(f"[@click=app.{action}]{text}[/]")
         left = " ".join(parts)
-        # Palette uses Textual's built-in command_palette action
-        right = "\\[^p] Palette"
-        # Calculate padding to right-align palette
-        # Visible length: description + 3 chars for brackets (e.g., "[Q]uit")
-        # Plus spaces between items
+
+        # Mode indicator + Palette on the right
+        mode_name = getattr(self.app, "current_mode_name", "EXPLORE") if self.app else "EXPLORE"
+        mode = self.app._mode_registry.get_mode(mode_name) if self.app else None
+        mode_color = getattr(mode, "color", "cyan") if mode else "cyan"
+        mode_indicator = f"\\[Tab] [{mode_color}]{mode_name}[/]"
+        palette = "\\[^p] Palette"
+        mode_part = f"[@click=app.next_mode]{mode_indicator}[/]"
+        palette_part = f"[@click=app.command_palette]{palette}[/]"
+        right = f"{mode_part} {palette_part}"
+
+        # Calculate padding
         bindings = getattr(self.app, "active_bindings", self.app.BINDINGS) if self.app else []
         shown = [b for b in bindings if b.show]
         left_len = sum(len(b.description) + 3 for b in shown) + max(0, len(shown) - 1)
-        right_len = len("[^p] Palette")
+        right_len = len(f"[Tab] {mode_name}") + len(" [^p] Palette") + 1
         width = self.size.width if self.size.width > 0 else 80
         padding = max(1, width - left_len - right_len - 2)
-        return f"{left}{' ' * padding}[@click=app.command_palette]{right}[/]"
+        return f"{left}{' ' * padding}{right}"
 
 
 class Breadcrumb(Static):
