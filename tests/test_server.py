@@ -66,7 +66,6 @@ class TestServerState:
         assert state.root == tmp_path
         assert state._cache == {}
 
-    
     @pytest.mark.skip(reason="MossAPI removed")
     def test_api_property(self, state: ServerState):
         api = state.api

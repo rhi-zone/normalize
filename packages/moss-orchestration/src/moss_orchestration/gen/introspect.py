@@ -296,6 +296,7 @@ INTELLIGENCE_MODULES = {
 
 # Modules to introspect from moss-orchestration
 ORCHESTRATION_MODULES = {
+    "dwim": "moss_orchestration.dwim",
     "validators": "moss_orchestration.validators",
     "events": "moss_orchestration.events",
 }

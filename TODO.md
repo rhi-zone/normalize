@@ -26,11 +26,14 @@ Completed:
   - refactoring.py, visualization.py, vector_store.py, semantic_search.py
   - server/ subpackage, web.py
 
+- [x] MCP server refactored to use moss_intelligence directly (MossAPI removed)
+- [x] MCP server tests updated to use new tool names and APIs
+
 Remaining:
-- [ ] Fix remaining test failures (mostly MCP server tests)
+- [ ] Fix remaining test failures (gen, rules, shadow_git, config tests)
 - [ ] Telemetry: migrate session stats to new architecture (currently stubbed)
 
-Test Status: 2030 passing, 92 failing, 66 skipped
+Test Status: 2045 passing, 72 failing, 71 skipped
 
 **Deferred:**
 - Driver integration improvements

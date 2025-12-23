@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from moss_intelligence.views import ViewOptions, ViewTarget
 from moss_orchestration.plugins import (
     PluginMetadata,
     PluginRegistry,
@@ -12,7 +13,6 @@ from moss_orchestration.plugins import (
     get_registry,
     reset_registry,
 )
-from moss_intelligence.views import ViewOptions, ViewTarget
 
 # =============================================================================
 # PluginMetadata Tests

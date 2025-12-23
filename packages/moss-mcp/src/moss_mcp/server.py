@@ -191,8 +191,7 @@ def _dwim_rewrite(command: str) -> str | None:
         return None
 
     # Looks like natural language - use DWIM
-    from moss import MossAPI
-    from moss_orchestration.dwim import resolve_tool
+    from moss_orchestration.dwim import analyze_intent, resolve_tool
 
     # First, check if first word is an alias (e.g., "structure" → "skeleton")
     first_word = args[0].lower()
@@ -201,8 +200,7 @@ def _dwim_rewrite(command: str) -> str | None:
         tool = alias_match.tool
     else:
         # Fall back to semantic analysis for full natural language
-        api = MossAPI.for_project(Path.cwd())
-        results = api.dwim.analyze_intent(command, top_k=1)
+        results = analyze_intent(command)[:1]
 
         if not results or results[0].confidence < 0.15:
             return None

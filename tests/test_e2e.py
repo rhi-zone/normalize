@@ -8,14 +8,14 @@ import subprocess
 
 import pytest
 
+from moss_context.memory import Action, Outcome, StateSnapshot, create_memory_manager
 from moss_intelligence.anchors import Anchor, AnchorType
+from moss_intelligence.patches import Patch, PatchType, apply_patch
+from moss_intelligence.skeleton import extract_python_skeleton, format_skeleton
 from moss_orchestration.events import EventBus, EventType
 from moss_orchestration.handles import FileHandle
-from moss_context.memory import Action, Outcome, StateSnapshot, create_memory_manager
-from moss_intelligence.patches import Patch, PatchType, apply_patch
 from moss_orchestration.policy import PolicyEngine, ToolCallContext, create_default_policy_engine
 from moss_orchestration.shadow_git import ShadowGit
-from moss_intelligence.skeleton import extract_python_skeleton, format_skeleton
 from moss_orchestration.validators import SyntaxValidator, create_python_validator_chain
 
 

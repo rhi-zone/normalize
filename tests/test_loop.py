@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from moss_intelligence.anchors import Anchor, AnchorType
+from moss_intelligence.patches import Patch, PatchType
 from moss_orchestration.events import EventBus
 from moss_orchestration.loop import (
     LoopConfig,
@@ -13,7 +14,6 @@ from moss_orchestration.loop import (
     SilentLoop,
     VelocityMetrics,
 )
-from moss_intelligence.patches import Patch, PatchType
 from moss_orchestration.shadow_git import ShadowGit
 from moss_orchestration.validators import SyntaxValidator, ValidatorChain
 
