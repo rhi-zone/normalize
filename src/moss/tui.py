@@ -1483,10 +1483,8 @@ class MossTUI(App):
     def _run_complexity_analysis(self, log_view: RichLog) -> None:
         """Run complexity analysis on codebase."""
         try:
-            from moss.complexity import analyze_complexity
-
             log_view.write("[bold]Complexity Analysis[/]\n")
-            report = analyze_complexity(self.api.root)
+            report = self.api.complexity.analyze()
             if report.functions:
                 # Sort by complexity descending, take top 20
                 sorted_funcs = sorted(report.functions, key=lambda f: -f.complexity)[:20]
@@ -1508,11 +1506,8 @@ class MossTUI(App):
     def _run_security_analysis(self, log_view: RichLog) -> None:
         """Run security analysis on codebase."""
         try:
-            from moss.security import SecurityAnalyzer
-
             log_view.write("[bold]Security Analysis[/]\n")
-            analyzer = SecurityAnalyzer(self.api.root)
-            analysis = analyzer.analyze()
+            analysis = self.api.security.analyze()
             if analysis.findings:
                 for finding in analysis.findings[:20]:
                     severity_colors = {"high": "red", "medium": "yellow", "low": "blue"}
@@ -1529,15 +1524,12 @@ class MossTUI(App):
         try:
             log_view.write("[bold]Scopes Analysis[/]\n")
             # Show public vs private symbols
-            from moss.skeleton import SkeletonExtractor
-
-            extractor = SkeletonExtractor(self.api.root)
             stats = {"public": 0, "private": 0, "files": 0}
             for path in self.api.root.rglob("*.py"):
                 if ".git" in path.parts or "__pycache__" in path.parts:
                     continue
                 try:
-                    symbols = extractor.extract(path)
+                    symbols = self.api.skeleton.extract(path)
                     stats["files"] += 1
                     for sym in symbols:
                         if sym.name.startswith("_"):
@@ -1555,11 +1547,8 @@ class MossTUI(App):
     def _run_imports_analysis(self, log_view: RichLog) -> None:
         """Run imports analysis (dependency graph)."""
         try:
-            from moss.dependency_analysis import DependencyAnalyzer
-
             log_view.write("[bold]Imports Analysis[/]\n")
-            analyzer = DependencyAnalyzer(self.api.root)
-            analysis = analyzer.analyze()
+            analysis = self.api.dependencies.analyze()
 
             if analysis.module_metrics:
                 mods = analysis.total_modules
