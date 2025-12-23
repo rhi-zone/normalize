@@ -3051,16 +3051,23 @@ fn cmd_scopes(
                         "name": binding.name,
                         "kind": binding.kind.as_str(),
                         "line": binding.line,
-                        "column": binding.column
+                        "column": binding.column,
+                        "inferred_type": binding.inferred_type
                     })
                 );
             } else {
+                let type_str = binding
+                    .inferred_type
+                    .as_ref()
+                    .map(|t| format!(" (type: {})", t))
+                    .unwrap_or_default();
                 println!(
-                    "{} {} defined at line {} column {}",
+                    "{} {} defined at line {} column {}{}",
                     binding.kind.as_str(),
                     binding.name,
                     binding.line,
-                    binding.column
+                    binding.column,
+                    type_str
                 );
             }
         } else {
@@ -3081,7 +3088,8 @@ fn cmd_scopes(
                         "name": b.name,
                         "kind": b.kind.as_str(),
                         "line": b.line,
-                        "column": b.column
+                        "column": b.column,
+                        "inferred_type": b.inferred_type
                     })
                 })
                 .collect();
@@ -3092,10 +3100,16 @@ fn cmd_scopes(
                 println!("  (none)");
             } else {
                 for b in &bindings {
+                    let type_str = b
+                        .inferred_type
+                        .as_ref()
+                        .map(|t| format!(": {}", t))
+                        .unwrap_or_default();
                     println!(
-                        "  {} {} (defined line {})",
+                        "  {} {}{} (defined line {})",
                         b.kind.as_str(),
                         b.name,
+                        type_str,
                         b.line
                     );
                 }
@@ -3117,7 +3131,8 @@ fn cmd_scopes(
                         "name": b.name,
                         "kind": b.kind.as_str(),
                         "line": b.line,
-                        "column": b.column
+                        "column": b.column,
+                        "inferred_type": b.inferred_type
                     })
                 }).collect::<Vec<_>>(),
                 "children": scope.children.iter().map(scope_to_json).collect::<Vec<_>>()

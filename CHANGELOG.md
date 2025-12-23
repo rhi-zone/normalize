@@ -15,6 +15,10 @@
 - `moss scopes <file> --line N --find <name>`: find where a name is defined
   - Shows the exact definition location for a name at a given line
   - Handles shadowing correctly (returns innermost definition)
+- Type inference for Python assignments:
+  - Constructor calls: `x = MyClass()` shows `x: MyClass`
+  - Qualified constructors: `x = module.Class()` shows full path
+  - Literals: `x = {}` → dict, `x = []` → list, `x = 1.5` → float
 
 **Import Graph Commands** (Dec 23 2025)
 - `moss imports --graph <file>`: bidirectional import graph

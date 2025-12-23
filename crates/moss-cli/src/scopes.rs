@@ -60,6 +60,8 @@ pub struct Binding {
     pub kind: BindingKind,
     pub line: usize,
     pub column: usize,
+    /// Inferred type (e.g., from constructor call or annotation)
+    pub inferred_type: Option<String>,
 }
 
 /// Type of binding
@@ -161,11 +163,17 @@ impl ScopeResult {
 
         if !scope.bindings.is_empty() {
             for binding in &scope.bindings {
+                let type_suffix = binding
+                    .inferred_type
+                    .as_ref()
+                    .map(|t| format!(": {}", t))
+                    .unwrap_or_default();
                 lines.push(format!(
-                    "{}  {} {} (line {})",
+                    "{}  {} {}{} (line {})",
                     prefix,
                     binding.kind.as_str(),
                     binding.name,
+                    type_suffix,
                     binding.line
                 ));
             }
@@ -270,6 +278,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Function,
                             line: child.start_position().row + 1,
                             column: child.start_position().column,
+                            inferred_type: None,
                         });
                     }
 
@@ -303,6 +312,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Class,
                             line: child.start_position().row + 1,
                             column: child.start_position().column,
+                            inferred_type: None,
                         });
                     }
 
@@ -311,8 +321,12 @@ impl ScopeAnalyzer {
 
                 // Assignments create bindings
                 "assignment" | "augmented_assignment" => {
+                    // Check RHS for type inference (constructor calls)
+                    let inferred_type = child.child_by_field_name("right")
+                        .and_then(|rhs| self.infer_python_type(rhs, source));
+
                     if let Some(left) = child.child_by_field_name("left") {
-                        self.extract_python_targets(left, source, &mut bindings, BindingKind::Variable);
+                        self.extract_python_targets_with_type(left, source, &mut bindings, BindingKind::Variable, inferred_type);
                     }
                 }
 
@@ -327,6 +341,7 @@ impl ScopeAnalyzer {
                                     kind: BindingKind::Variable,
                                     line: target.start_position().row + 1,
                                     column: target.start_position().column,
+                                    inferred_type: None,
                                 });
                             }
                         }
@@ -385,6 +400,7 @@ impl ScopeAnalyzer {
                                     kind: BindingKind::ExceptHandler,
                                     line: grandchild.start_position().row + 1,
                                     column: grandchild.start_position().column,
+                                    inferred_type: None,
                                 });
                             }
                         }
@@ -446,6 +462,17 @@ impl ScopeAnalyzer {
     }
 
     fn extract_python_targets(&self, node: Node, source: &[u8], bindings: &mut Vec<Binding>, kind: BindingKind) {
+        self.extract_python_targets_with_type(node, source, bindings, kind, None);
+    }
+
+    fn extract_python_targets_with_type(
+        &self,
+        node: Node,
+        source: &[u8],
+        bindings: &mut Vec<Binding>,
+        kind: BindingKind,
+        inferred_type: Option<String>,
+    ) {
         match node.kind() {
             "identifier" => {
                 if let Ok(name) = node.utf8_text(source) {
@@ -454,17 +481,94 @@ impl ScopeAnalyzer {
                         kind,
                         line: node.start_position().row + 1,
                         column: node.start_position().column,
+                        inferred_type,
                     });
                 }
             }
             "tuple_pattern" | "list_pattern" | "pattern_list" | "tuple" | "list" => {
+                // For tuple unpacking, we can't easily track types for each element
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
-                    self.extract_python_targets(child, source, bindings, kind);
+                    self.extract_python_targets_with_type(child, source, bindings, kind, None);
                 }
             }
             _ => {}
         }
+    }
+
+    /// Infer the type from a Python expression
+    fn infer_python_type(&self, node: Node, source: &[u8]) -> Option<String> {
+        match node.kind() {
+            // Constructor call: SomeClass() or SomeClass(args)
+            "call" => {
+                if let Some(func) = node.child_by_field_name("function") {
+                    match func.kind() {
+                        "identifier" => {
+                            // Simple constructor: MyClass()
+                            if let Ok(name) = func.utf8_text(source) {
+                                // Check if it looks like a class (starts with uppercase)
+                                let name = name.to_string();
+                                if name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+                                    return Some(name);
+                                }
+                            }
+                        }
+                        "attribute" => {
+                            // Qualified constructor: module.MyClass()
+                            if let Some(attr) = func.child_by_field_name("attribute") {
+                                if let Ok(name) = attr.utf8_text(source) {
+                                    let name = name.to_string();
+                                    if name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+                                        // Include the full qualified name
+                                        if let Ok(full) = func.utf8_text(source) {
+                                            return Some(full.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            // String literal
+            "string" | "concatenated_string" => {
+                return Some("str".to_string());
+            }
+            // Number literals
+            "integer" => {
+                return Some("int".to_string());
+            }
+            "float" => {
+                return Some("float".to_string());
+            }
+            // List literal
+            "list" => {
+                return Some("list".to_string());
+            }
+            // Dict literal
+            "dictionary" => {
+                return Some("dict".to_string());
+            }
+            // Set literal
+            "set" => {
+                return Some("set".to_string());
+            }
+            // Tuple literal
+            "tuple" => {
+                return Some("tuple".to_string());
+            }
+            // Boolean literals
+            "true" | "false" => {
+                return Some("bool".to_string());
+            }
+            // None
+            "none" => {
+                return Some("None".to_string());
+            }
+            _ => {}
+        }
+        None
     }
 
     fn extract_python_params(&self, node: Node, source: &[u8], bindings: &mut Vec<Binding>) {
@@ -478,6 +582,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Parameter,
                             line: child.start_position().row + 1,
                             column: child.start_position().column,
+                            inferred_type: None,
                         });
                     }
                 }
@@ -489,6 +594,7 @@ impl ScopeAnalyzer {
                                 kind: BindingKind::Parameter,
                                 line: name_node.start_position().row + 1,
                                 column: name_node.start_position().column,
+                                inferred_type: None,
                             });
                         }
                     }
@@ -503,6 +609,7 @@ impl ScopeAnalyzer {
                                     kind: BindingKind::Parameter,
                                     line: grandchild.start_position().row + 1,
                                     column: grandchild.start_position().column,
+                                    inferred_type: None,
                                 });
                             }
                         }
@@ -527,6 +634,7 @@ impl ScopeAnalyzer {
                                     kind: BindingKind::Import,
                                     line: first.start_position().row + 1,
                                     column: first.start_position().column,
+                                    inferred_type: None,
                                 });
                             }
                         }
@@ -543,6 +651,7 @@ impl ScopeAnalyzer {
                                 kind: BindingKind::Import,
                                 line: name_node.start_position().row + 1,
                                 column: name_node.start_position().column,
+                                inferred_type: None,
                             });
                         }
                     }
@@ -600,6 +709,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Function,
                             line: child.start_position().row + 1,
                             column: child.start_position().column,
+                            inferred_type: None,
                         });
                     }
 
@@ -631,6 +741,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Class,
                             line: child.start_position().row + 1,
                             column: child.start_position().column,
+                            inferred_type: None,
                         });
                     }
                 }
@@ -648,6 +759,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Class,
                             line: child.start_position().row + 1,
                             column: child.start_position().column,
+                            inferred_type: None,
                         });
                     }
                 }
@@ -730,6 +842,7 @@ impl ScopeAnalyzer {
                     kind: BindingKind::Parameter,
                     line: child.start_position().row + 1,
                     column: child.start_position().column,
+                    inferred_type: None,
                 });
             }
         }
@@ -746,6 +859,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Variable,
                             line: node.start_position().row + 1,
                             column: node.start_position().column,
+                            inferred_type: None,
                         });
                     }
                 }
@@ -794,6 +908,7 @@ impl ScopeAnalyzer {
                                 kind: BindingKind::Import,
                                 line: alias.start_position().row + 1,
                                 column: alias.start_position().column,
+                                inferred_type: None,
                             });
                         }
                     }
@@ -808,6 +923,7 @@ impl ScopeAnalyzer {
                                     kind: BindingKind::Import,
                                     line: item.start_position().row + 1,
                                     column: item.start_position().column,
+                                    inferred_type: None,
                                 });
                             }
                         } else if item.kind() == "use_as_clause" {
@@ -818,6 +934,7 @@ impl ScopeAnalyzer {
                                         kind: BindingKind::Import,
                                         line: alias.start_position().row + 1,
                                         column: alias.start_position().column,
+                                        inferred_type: None,
                                     });
                                 }
                             } else {
@@ -831,6 +948,7 @@ impl ScopeAnalyzer {
                                                 kind: BindingKind::Import,
                                                 line: last.start_position().row + 1,
                                                 column: last.start_position().column,
+                                                inferred_type: None,
                                             });
                                         }
                                     }
@@ -848,6 +966,7 @@ impl ScopeAnalyzer {
                                 kind: BindingKind::Import,
                                 line: name_node.start_position().row + 1,
                                 column: name_node.start_position().column,
+                                inferred_type: None,
                             });
                         }
                     }
@@ -859,6 +978,7 @@ impl ScopeAnalyzer {
                             kind: BindingKind::Import,
                             line: child.start_position().row + 1,
                             column: child.start_position().column,
+                            inferred_type: None,
                         });
                     }
                 }
