@@ -446,6 +446,14 @@ enum Commands {
         /// Resolve a name in context of a file (what module does it come from?)
         #[arg(short = 'R', long)]
         resolve: bool,
+
+        /// Show import graph (what this file imports and what imports it)
+        #[arg(short, long)]
+        graph: bool,
+
+        /// Find files that import the given module
+        #[arg(short, long)]
+        who_imports: bool,
     },
 
     /// Calculate cyclomatic complexity
@@ -748,7 +756,9 @@ fn main() {
             query,
             root,
             resolve,
-        } => cmd_imports(&query, root.as_deref(), resolve, cli.json),
+            graph,
+            who_imports,
+        } => cmd_imports(&query, root.as_deref(), resolve, graph, who_imports, cli.json),
         Commands::Complexity {
             file,
             root,
@@ -3085,7 +3095,14 @@ fn cmd_deps(
     0
 }
 
-fn cmd_imports(query: &str, root: Option<&Path>, resolve: bool, json: bool) -> i32 {
+fn cmd_imports(
+    query: &str,
+    root: Option<&Path>,
+    resolve: bool,
+    graph: bool,
+    who_imports: bool,
+    json: bool,
+) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -3097,6 +3114,150 @@ fn cmd_imports(query: &str, root: Option<&Path>, resolve: bool, json: bool) -> i
         .and_then(|i| i.call_graph_stats().ok())
         .map(|(_, _, imports)| imports)
         .unwrap_or(0);
+
+    // --who_imports: find files that import a given module
+    if who_imports {
+        if import_count == 0 {
+            eprintln!("Import tracking requires indexed call graph. Run: moss reindex --call-graph");
+            return 1;
+        }
+        let idx = idx.unwrap();
+        match idx.find_importers(query) {
+            Ok(importers) => {
+                if json {
+                    let output: Vec<_> = importers
+                        .iter()
+                        .map(|(file, name, line)| {
+                            serde_json::json!({
+                                "file": file,
+                                "name": name,
+                                "line": line
+                            })
+                        })
+                        .collect();
+                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                } else if importers.is_empty() {
+                    println!("No files import '{}'", query);
+                } else {
+                    println!("# Files importing '{}'", query);
+                    for (file, name, line) in &importers {
+                        if name == "*" {
+                            println!("  {} (line {}, wildcard)", file, line);
+                        } else {
+                            println!("  {} (line {}, imports {})", file, line, name);
+                        }
+                    }
+                }
+                return 0;
+            }
+            Err(e) => {
+                eprintln!("Error finding importers: {}", e);
+                return 1;
+            }
+        }
+    }
+
+    // --graph: show what file imports and what imports it
+    if graph {
+        if import_count == 0 {
+            eprintln!("Import graph requires indexed call graph. Run: moss reindex --call-graph");
+            return 1;
+        }
+        let idx = idx.unwrap();
+
+        // Resolve file path
+        let matches = path_resolve::resolve(query, &root);
+        let file_path = match matches.iter().find(|m| m.kind == "file") {
+            Some(m) => &m.path,
+            None => {
+                eprintln!("File not found: {}", query);
+                return 1;
+            }
+        };
+
+        // Get what this file imports
+        let imports = idx.get_imports(file_path).unwrap_or_default();
+
+        // Get what imports this file (convert file path to module name)
+        let module_name = file_path_to_module(file_path);
+        let importers = if let Some(ref module) = module_name {
+            idx.find_importers(module).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        if json {
+            let import_output: Vec<_> = imports
+                .iter()
+                .map(|i| {
+                    serde_json::json!({
+                        "module": i.module,
+                        "name": i.name,
+                        "alias": i.alias,
+                        "line": i.line
+                    })
+                })
+                .collect();
+            let importer_output: Vec<_> = importers
+                .iter()
+                .map(|(file, name, line)| {
+                    serde_json::json!({
+                        "file": file,
+                        "name": name,
+                        "line": line
+                    })
+                })
+                .collect();
+            println!(
+                "{}",
+                serde_json::json!({
+                    "file": file_path,
+                    "module": module_name,
+                    "imports": import_output,
+                    "imported_by": importer_output
+                })
+            );
+        } else {
+            println!("# Import graph for {}", file_path);
+            if let Some(ref m) = module_name {
+                println!("# Module: {}", m);
+            }
+            println!();
+
+            println!("## Imports ({}):", imports.len());
+            if imports.is_empty() {
+                println!("  (none)");
+            } else {
+                for imp in &imports {
+                    let alias = imp
+                        .alias
+                        .as_ref()
+                        .map(|a| format!(" as {}", a))
+                        .unwrap_or_default();
+                    if let Some(module) = &imp.module {
+                        println!("  from {} import {}{}", module, imp.name, alias);
+                    } else {
+                        println!("  import {}{}", imp.name, alias);
+                    }
+                }
+            }
+            println!();
+
+            println!("## Imported by ({}):", importers.len());
+            if importers.is_empty() {
+                println!("  (none)");
+            } else {
+                for (file, name, line) in &importers {
+                    if name == "*" {
+                        println!("  {} (line {}, wildcard)", file, line);
+                    } else {
+                        println!("  {} (line {}, imports {})", file, line, name);
+                    }
+                }
+            }
+        }
+        return 0;
+    }
 
     // For resolve mode, we need the index - no direct fallback possible
     if resolve {
@@ -3227,6 +3388,38 @@ fn cmd_imports(query: &str, root: Option<&Path>, resolve: bool, json: bool) -> i
 
         output_imports(&imports, file_path, json)
     }
+}
+
+/// Convert a file path to a Python module name
+/// e.g., "src/moss/gen/serialize.py" -> "moss.gen.serialize"
+fn file_path_to_module(file_path: &str) -> Option<String> {
+    let path = std::path::Path::new(file_path);
+    let ext = path.extension()?.to_str()?;
+
+    // Only Python files for now
+    if ext != "py" {
+        return None;
+    }
+
+    // Remove extension and common prefixes
+    let stem = path.with_extension("");
+    let stem_str = stem.to_str()?;
+
+    // Strip common source directory prefixes
+    let module_path = stem_str
+        .strip_prefix("src/")
+        .or_else(|| stem_str.strip_prefix("lib/"))
+        .unwrap_or(stem_str);
+
+    // Handle __init__.py - use parent directory as module
+    let module_path = if module_path.ends_with("/__init__") {
+        module_path.strip_suffix("/__init__")?
+    } else {
+        module_path
+    };
+
+    // Convert path separators to dots
+    Some(module_path.replace('/', "."))
 }
 
 fn output_imports(imports: &[symbols::Import], file_path: &str, json: bool) -> i32 {

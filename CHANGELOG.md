@@ -4,6 +4,15 @@
 
 ### Features
 
+**Import Graph Commands** (Dec 23 2025)
+- `moss imports --graph <file>`: bidirectional import graph
+  - Shows what the file imports
+  - Shows what files import it (via module name resolution)
+  - JSON output includes full import details
+- `moss imports --who-imports <module>`: reverse import lookup
+  - Find all files that import a given module
+  - Shows specific symbols imported and line numbers
+
 **View Primitive Enhancements** (Dec 23 2025)
 - `--types-only` flag: filters skeleton to show only type definitions (class, struct, enum, interface)
   - Strips methods/functions for architectural overview
