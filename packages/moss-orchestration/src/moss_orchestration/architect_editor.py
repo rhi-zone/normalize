@@ -22,10 +22,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from moss.moss_api import MossAPI
+from typing import Any, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -503,30 +500,19 @@ Use the same output format as before.
 
 
 class StructuredEditor:
-    """Editor that applies structured edits using MossAPI.
+    """Editor that applies structured edits using moss-intelligence.
 
     Takes an EditPlan and executes each step in order, using
     patch.apply or anchor-based editing.
     """
 
-    def __init__(self, api: MossAPI | None = None, root: Path | str | None = None):
+    def __init__(self, root: Path | str | None = None):
         """Initialize the editor.
 
         Args:
-            api: MossAPI instance (created if None)
-            root: Project root for creating MossAPI
+            root: Project root for file operations
         """
-        self._api = api
-        self._root = Path(root) if root else None
-
-    @property
-    def api(self) -> MossAPI:
-        """Lazy-initialize MossAPI."""
-        if self._api is None:
-            from moss.moss_api import MossAPI
-
-            self._api = MossAPI(self._root or Path.cwd())
-        return self._api
+        self._root = Path(root) if root else Path.cwd()
 
     async def execute(self, plan: EditPlan) -> list[EditResult]:
         """Execute all steps in the edit plan."""
@@ -580,38 +566,58 @@ class StructuredEditor:
     async def _replace(self, file_path: str, target: str, content: str) -> Any:
         """Replace a symbol's content."""
         from moss_intelligence.anchors import Anchor
-        from moss_intelligence.patches import Patch, PatchType
+        from moss_intelligence.patches import Patch, PatchType, apply_patch
 
+        path = self._root / file_path
+        source = path.read_text()
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.REPLACE, content=content)
-        return self.api.patch.apply(file_path, patch)
+        result = apply_patch(source, patch)
+        if result.success:
+            path.write_text(result.patched_code)
+        return result
 
     async def _insert_before(self, file_path: str, target: str, content: str) -> Any:
         """Insert content before a symbol."""
         from moss_intelligence.anchors import Anchor
-        from moss_intelligence.patches import Patch, PatchType
+        from moss_intelligence.patches import Patch, PatchType, apply_patch
 
+        path = self._root / file_path
+        source = path.read_text()
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.INSERT_BEFORE, content=content)
-        return self.api.patch.apply(file_path, patch)
+        result = apply_patch(source, patch)
+        if result.success:
+            path.write_text(result.patched_code)
+        return result
 
     async def _insert_after(self, file_path: str, target: str, content: str) -> Any:
         """Insert content after a symbol."""
         from moss_intelligence.anchors import Anchor
-        from moss_intelligence.patches import Patch, PatchType
+        from moss_intelligence.patches import Patch, PatchType, apply_patch
 
+        path = self._root / file_path
+        source = path.read_text()
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.INSERT_AFTER, content=content)
-        return self.api.patch.apply(file_path, patch)
+        result = apply_patch(source, patch)
+        if result.success:
+            path.write_text(result.patched_code)
+        return result
 
     async def _delete(self, file_path: str, target: str) -> Any:
         """Delete a symbol."""
         from moss_intelligence.anchors import Anchor
-        from moss_intelligence.patches import Patch, PatchType
+        from moss_intelligence.patches import Patch, PatchType, apply_patch
 
+        path = self._root / file_path
+        source = path.read_text()
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.DELETE, content="")
-        return self.api.patch.apply(file_path, patch)
+        result = apply_patch(source, patch)
+        if result.success:
+            path.write_text(result.patched_code)
+        return result
 
     async def _rename(self, file_path: str, target: str, new_name: str) -> Any:
         """Rename a symbol (placeholder - needs refactor support)."""
@@ -635,22 +641,13 @@ class ArchitectEditorLoop:
         self,
         architect: Architect,
         editor: Editor,
-        api: MossAPI | None = None,
+        root: Path | str | None = None,
         max_iterations: int = 3,
     ):
         self.architect = architect
         self.editor = editor
-        self._api = api
+        self._root = Path(root) if root else Path.cwd()
         self.max_iterations = max_iterations
-
-    @property
-    def api(self) -> MossAPI:
-        """Lazy-initialize MossAPI."""
-        if self._api is None:
-            from moss.moss_api import MossAPI
-
-            self._api = MossAPI(Path.cwd())
-        return self._api
 
     async def run(self, task: str, file_path: str) -> LoopResult:
         """Run the Architect/Editor loop.
@@ -662,13 +659,22 @@ class ArchitectEditorLoop:
         Returns:
             LoopResult with success status and details
         """
+        from moss_intelligence.skeleton import (
+            expand_symbol,
+            extract_python_skeleton,
+            format_skeleton,
+        )
+
         total_tokens = 0
         iteration = 0
 
         # Get skeleton for context
         try:
-            skeleton = self.api.skeleton.format(file_path)
-        except (OSError, ValueError) as e:
+            path = self._root / file_path
+            source = path.read_text()
+            symbols = extract_python_skeleton(source)
+            skeleton = format_skeleton(symbols)
+        except (OSError, SyntaxError) as e:
             return LoopResult(
                 success=False,
                 error=f"Failed to get skeleton: {e}",
@@ -688,12 +694,12 @@ class ArchitectEditorLoop:
         # Expand context if requested
         expanded_context: dict[str, str] = {}
         if plan.context_needed:
-            for symbol in plan.context_needed:
+            for symbol_name in plan.context_needed:
                 try:
-                    expanded = self.api.skeleton.expand(file_path, symbol)
+                    expanded = expand_symbol(source, symbol_name)
                     if expanded:
-                        expanded_context[symbol] = expanded
-                except (OSError, ValueError):
+                        expanded_context[symbol_name] = expanded
+                except (OSError, SyntaxError):
                     pass  # Continue without this context
 
             # Re-plan with expanded context
@@ -738,8 +744,11 @@ class ArchitectEditorLoop:
 
             # Validate the result
             try:
-                validation_output = self.api.validation.validate(file_path)
-            except (OSError, ValueError) as e:
+                from moss_orchestration.validators import SyntaxValidator
+
+                validator = SyntaxValidator()
+                validation_output = await validator.validate(self._root / file_path)
+            except (OSError, SyntaxError) as e:
                 return LoopResult(
                     success=False,
                     plan=plan,

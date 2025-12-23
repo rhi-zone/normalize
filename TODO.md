@@ -8,7 +8,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 Completed:
 - [x] moss-intelligence is source of truth (28 modules migrated)
-- [x] MossAPI removed (intentionally - gen/introspect.py and architect_editor.py depend on it)
+- [x] MossAPI removed, architect_editor.py and gen/introspect.py refactored to use moss-intelligence
 - [x] src/moss/ deleted entirely (72k lines)
 - [x] moss-cli package scaffolded with recovered modules (config, help, metrics, etc.)
 - [x] moss-orchestration recovered modules (events, validators, synthesis, gen, etc.)

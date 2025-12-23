@@ -1,11 +1,12 @@
 """API introspection for interface generation.
 
-This module provides tools to introspect the MossAPI and extract
-metadata about its structure, methods, and parameters.
+This module provides tools to introspect moss-intelligence modules and extract
+metadata about their structure, functions, and parameters.
 """
 
 from __future__ import annotations
 
+import importlib
 import inspect
 from dataclasses import dataclass, field
 from typing import Any, get_type_hints
@@ -32,14 +33,14 @@ class APIParameter:
 
 @dataclass
 class APIMethod:
-    """A method on a sub-API.
+    """A function in a module.
 
     Attributes:
-        name: Method name
+        name: Function name
         description: Description from docstring
         parameters: List of parameters
         return_type: String representation of return type
-        is_async: Whether the method is async
+        is_async: Whether the function is async
     """
 
     name: str
@@ -51,13 +52,13 @@ class APIMethod:
 
 @dataclass
 class SubAPI:
-    """A sub-API of MossAPI.
+    """A module containing API functions.
 
     Attributes:
-        name: API name (e.g., "skeleton", "anchor")
-        class_name: Class name (e.g., "SkeletonAPI")
-        description: Description from docstring
-        methods: List of public methods
+        name: Module name (e.g., "skeleton", "anchors")
+        class_name: Module path (e.g., "moss_intelligence.skeleton")
+        description: Description from module docstring
+        methods: List of public functions
     """
 
     name: str
@@ -147,11 +148,11 @@ def _get_type_string(type_hint: Any) -> str:
 
 
 def introspect_method(method: Any, type_hints: dict[str, Any]) -> APIMethod:
-    """Introspect a single method.
+    """Introspect a single function.
 
     Args:
-        method: The method to introspect
-        type_hints: Type hints for the method
+        method: The function to introspect
+        type_hints: Type hints for the function
 
     Returns:
         APIMethod with extracted metadata
@@ -190,10 +191,10 @@ def introspect_method(method: Any, type_hints: dict[str, Any]) -> APIMethod:
 
 
 def introspect_subapi(api_class: type, api_name: str) -> SubAPI:
-    """Introspect a sub-API class.
+    """Introspect a class for its public methods.
 
     Args:
-        api_class: The API class to introspect
+        api_class: The class to introspect
         api_name: The name of the API (e.g., "skeleton")
 
     Returns:
@@ -223,103 +224,98 @@ def introspect_subapi(api_class: type, api_name: str) -> SubAPI:
     )
 
 
-def introspect_api() -> list[SubAPI]:
-    """Introspect the full MossAPI.
+def introspect_module(module_name: str, display_name: str) -> SubAPI:
+    """Introspect a module for its public functions.
+
+    Args:
+        module_name: Full module path (e.g., "moss_intelligence.skeleton")
+        display_name: Display name for the API (e.g., "skeleton")
 
     Returns:
-        List of SubAPI objects describing each sub-API
+        SubAPI with extracted metadata
     """
-    from moss.moss_api import MossAPI
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as e:
+        return SubAPI(
+            name=display_name,
+            class_name=module_name,
+            description=f"Import error: {e}",
+            methods=[],
+        )
 
-    # Auto-discover sub-APIs from MossAPI properties
-    results = []
+    docstring = inspect.getdoc(module)
+    description, _ = _parse_docstring(docstring)
 
-    # We look for public properties that return a class with 'API' in the name
-    # or are explicitly listed in our sub_apis map.
-    for name, member in inspect.getmembers(MossAPI):
+    methods = []
+    for name in dir(module):
+        # Skip private items
         if name.startswith("_"):
             continue
 
-        if isinstance(member, property):
-            # Try to get the return type from type hints
-            try:
-                hints = get_type_hints(member.fget)
-                return_type = hints.get("return")
-                if (
-                    return_type
-                    and hasattr(return_type, "__name__")
-                    and "API" in return_type.__name__
-                ):
-                    results.append(introspect_subapi(return_type, name))
-            except (NameError, AttributeError, TypeError):
-                # Fallback: if we can't get hints, we skip it
-                # For now, keep the manual list for robustness if needed
-                pass
+        member = getattr(module, name)
 
-    if not results:
-        # Fallback to manual list if auto-discovery fails or is incomplete
-        from moss.moss_api import (
-            CFGAPI,
-            DWIMAPI,
-            RAGAPI,
-            AgentAPI,
-            AnchorAPI,
-            ClonesAPI,
-            ComplexityAPI,
-            ContextAPI,
-            DependencyAPI,
-            EditAPI,
-            ExternalDepsAPI,
-            GitAPI,
-            GitHotspotsAPI,
-            GuessabilityAPI,
-            HealthAPI,
-            LessonsAPI,
-            PatchAPI,
-            RefCheckAPI,
-            SearchAPI,
-            SecurityAPI,
-            SkeletonAPI,
-            TodoAPI,
-            TomlAPI,
-            TreeAPI,
-            ValidationAPI,
-            WeaknessesAPI,
-            WebAPI,
-        )
+        # Only include functions defined in this module
+        if not inspect.isfunction(member):
+            continue
+        if getattr(member, "__module__", None) != module_name:
+            continue
 
-        sub_apis = {
-            "skeleton": SkeletonAPI,
-            "tree": TreeAPI,
-            "anchor": AnchorAPI,
-            "patch": PatchAPI,
-            "dependencies": DependencyAPI,
-            "cfg": CFGAPI,
-            "validation": ValidationAPI,
-            "git": GitAPI,
-            "context": ContextAPI,
-            "health": HealthAPI,
-            "todo": TodoAPI,
-            "dwim": DWIMAPI,
-            "agent": AgentAPI,
-            "edit": EditAPI,
-            "complexity": ComplexityAPI,
-            "clones": ClonesAPI,
-            "security": SecurityAPI,
-            "ref_check": RefCheckAPI,
-            "git_hotspots": GitHotspotsAPI,
-            "external_deps": ExternalDepsAPI,
-            "weaknesses": WeaknessesAPI,
-            "rag": RAGAPI,
-            "web": WebAPI,
-            "search": SearchAPI,
-            "guessability": GuessabilityAPI,
-            "lessons": LessonsAPI,
-            "toml": TomlAPI,
-        }
+        try:
+            type_hints = get_type_hints(member)
+        except (NameError, AttributeError, TypeError):
+            type_hints = {}
 
-        for name, cls in sub_apis.items():
-            results.append(introspect_subapi(cls, name))
+        methods.append(introspect_method(member, type_hints))
+
+    return SubAPI(
+        name=display_name,
+        class_name=module_name,
+        description=description,
+        methods=methods,
+    )
+
+
+# Modules to introspect from moss-intelligence
+INTELLIGENCE_MODULES = {
+    "skeleton": "moss_intelligence.skeleton",
+    "anchors": "moss_intelligence.anchors",
+    "patches": "moss_intelligence.patches",
+    "tree": "moss_intelligence.tree",
+    "views": "moss_intelligence.views",
+    "cfg": "moss_intelligence.cfg",
+    "dependencies": "moss_intelligence.dependencies",
+    "complexity": "moss_intelligence.complexity",
+    "security": "moss_intelligence.security",
+    "clones": "moss_intelligence.clones",
+    "diagnostics": "moss_intelligence.diagnostics",
+    "weaknesses": "moss_intelligence.weaknesses",
+    "edit": "moss_intelligence.edit",
+    "summarize": "moss_intelligence.summarize",
+}
+
+# Modules to introspect from moss-orchestration
+ORCHESTRATION_MODULES = {
+    "validators": "moss_orchestration.validators",
+    "events": "moss_orchestration.events",
+}
+
+
+def introspect_api() -> list[SubAPI]:
+    """Introspect the moss-intelligence and moss-orchestration APIs.
+
+    Returns:
+        List of SubAPI objects describing each module's public functions
+    """
+    results = []
+
+    # Introspect moss-intelligence modules
+    for name, module_path in INTELLIGENCE_MODULES.items():
+        results.append(introspect_module(module_path, name))
+
+    # Introspect moss-orchestration modules
+    for name, module_path in ORCHESTRATION_MODULES.items():
+        results.append(introspect_module(module_path, name))
 
     return results
 
@@ -330,5 +326,6 @@ __all__ = [
     "SubAPI",
     "introspect_api",
     "introspect_method",
+    "introspect_module",
     "introspect_subapi",
 ]
