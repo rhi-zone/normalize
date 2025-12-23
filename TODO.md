@@ -4,10 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-- TUI: ScopesAPI for public/private symbol stats
-- Call Graph: wire FunctionComplexity.short_name() into output
+- CLI/MCP integration for test_gaps module
+- CLI/MCP integration for scopes module
 
-Test Status: 2168 passing, 0 failing, 42 skipped (all optional deps)
+Test Status: 2184 passing, 0 failing, 42 skipped (all optional deps)
 
 **Deferred:**
 - Driver integration improvements
@@ -55,7 +55,7 @@ Test Status: 2168 passing, 0 failing, 42 skipped (all optional deps)
 **Call Graph:**
 - Missing language support: Scala, Vue (no tree-sitter grammars yet)
 - "(no ext)" files high count in some repos - add binary detection
-- Wire FunctionComplexity.short_name() into complexity output
+- ✓ Wire FunctionComplexity.short_name() into complexity output (done)
 - Complete daemon integration (FileIndex API methods currently unused)
 
 **Session Analysis:**

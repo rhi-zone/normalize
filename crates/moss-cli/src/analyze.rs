@@ -164,10 +164,17 @@ impl AnalyzeReport {
                 let mut sorted: Vec<_> = complexity.functions.iter().collect();
                 sorted.sort_by(|a, b| b.complexity.cmp(&a.complexity));
                 for func in sorted.iter().take(10) {
+                    // Use short_name for cleaner display (no file path prefix)
+                    let display_name = if func.file_path.is_some() {
+                        // For codebase-wide reports, show file:short_name
+                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    } else {
+                        func.short_name()
+                    };
                     sections.push(format!(
                         "  {:3} {} ({})",
                         func.complexity,
-                        func.qualified_name(),
+                        display_name,
                         func.risk_level()
                     ));
                 }
@@ -233,6 +240,8 @@ impl AnalyzeReport {
                     serde_json::json!({
                         "name": f.name,
                         "parent": f.parent,
+                        "short_name": f.short_name(),
+                        "qualified_name": f.qualified_name(),
                         "complexity": f.complexity,
                         "line": f.start_line,
                         "risk_level": f.risk_level(),
