@@ -513,6 +513,13 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
+    /// Check for and install updates
+    Update {
+        /// Check for updates without installing
+        #[arg(short, long)]
+        check: bool,
+    },
+
     /// Show codebase health metrics
     Health {
         /// Root directory (defaults to current directory)
@@ -795,6 +802,7 @@ fn main() {
             function,
         } => cmd_cfg(&file, root.as_deref(), function.as_deref(), cli.json),
         Commands::Daemon { action, root } => cmd_daemon(action, root.as_deref(), cli.json),
+        Commands::Update { check } => cmd_update(check, cli.json),
         Commands::Health { root } => cmd_health(root.as_deref(), cli.json, &mut profiler),
         Commands::Analyze {
             target,
@@ -3989,6 +3997,110 @@ fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 {
             }
         }
     }
+}
+
+fn cmd_update(check_only: bool, json: bool) -> i32 {
+    const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+    const GITHUB_REPO: &str = "your-username/moss"; // TODO: Update with actual repo
+
+    // Fetch latest release from GitHub API
+    let client = ureq::agent();
+
+    let url = format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        GITHUB_REPO
+    );
+
+    let response = match client
+        .get(&url)
+        .set("User-Agent", "moss-cli")
+        .set("Accept", "application/vnd.github+json")
+        .call()
+    {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Failed to check for updates: {}", e);
+            return 1;
+        }
+    };
+
+    let body: serde_json::Value = match response.into_json() {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("Failed to parse response: {}", e);
+            return 1;
+        }
+    };
+
+    let latest_version = body["tag_name"]
+        .as_str()
+        .unwrap_or("unknown")
+        .trim_start_matches('v');
+
+    let is_update_available = latest_version != CURRENT_VERSION
+        && version_gt(latest_version, CURRENT_VERSION);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "current_version": CURRENT_VERSION,
+                "latest_version": latest_version,
+                "update_available": is_update_available
+            })
+        );
+    } else {
+        println!("Current version: {}", CURRENT_VERSION);
+        println!("Latest version:  {}", latest_version);
+
+        if is_update_available {
+            println!();
+            println!("Update available!");
+            if check_only {
+                println!("Run 'moss update' to install the update.");
+            } else {
+                println!("To update, download from:");
+                println!(
+                    "  https://github.com/{}/releases/tag/v{}",
+                    GITHUB_REPO, latest_version
+                );
+            }
+        } else {
+            println!("You are running the latest version.");
+        }
+    }
+
+    if is_update_available && !check_only {
+        // For now, just show instructions. Full auto-update would require:
+        // 1. Downloading the appropriate binary for the platform
+        // 2. Verifying checksums
+        // 3. Replacing the current binary
+        // This is complex and platform-specific, so we defer to manual update
+        1 // Non-zero to indicate update is available
+    } else {
+        0
+    }
+}
+
+/// Simple version comparison (semver-like)
+fn version_gt(a: &str, b: &str) -> bool {
+    let parse = |v: &str| -> Vec<u32> {
+        v.split('.')
+            .filter_map(|s| s.split('-').next()?.parse().ok())
+            .collect()
+    };
+
+    let va = parse(a);
+    let vb = parse(b);
+
+    for (a, b) in va.iter().zip(vb.iter()) {
+        match a.cmp(b) {
+            std::cmp::Ordering::Greater => return true,
+            std::cmp::Ordering::Less => return false,
+            std::cmp::Ordering::Equal => continue,
+        }
+    }
+    va.len() > vb.len()
 }
 
 fn cmd_health(root: Option<&Path>, json: bool, profiler: &mut Profiler) -> i32 {

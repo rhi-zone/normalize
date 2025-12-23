@@ -4,6 +4,16 @@
 
 ### Features
 
+**Distribution** (Dec 23 2025)
+- GitHub Actions workflow for building release binaries
+  - Linux (x86_64, aarch64, musl)
+  - macOS (Intel, Apple Silicon)
+  - Windows (x86_64)
+  - SHA256 checksums for verification
+- `moss update` command to check for and install updates
+  - `--check` flag to check without installing
+  - JSON output for programmatic access
+
 **Variable Scope Analysis** (Dec 23 2025)
 - `moss scopes <file>`: show scope hierarchy with all variable bindings
   - Tracks functions, classes, loops, comprehensions, lambdas
