@@ -1103,12 +1103,11 @@ def cmd_explore(args: Namespace) -> int:
     """Start the explore TUI (tree + view/edit/analyze primitives)."""
     output = setup_output(args)
     try:
-        from moss.moss_api import MossAPI
-        from moss.tui import run_tui
+        from moss_tui import get_app
 
         directory = Path(getattr(args, "directory", ".")).resolve()
-        api = MossAPI(directory)
-        run_tui(api)
+        app = get_app(project_root=directory)
+        app.run()
         return 0
     except ImportError as e:
         output.error("TUI dependencies not installed. Install with: pip install 'moss[tui]'")
@@ -2039,7 +2038,6 @@ def cmd_analyze_session(args: Namespace) -> int:
 
 def cmd_telemetry(args: Namespace) -> int:
     """Show aggregate telemetry across sessions."""
-    from moss.moss_api import MossAPI
     from moss_orchestration.session_analysis import analyze_session
 
     output = setup_output(args)
@@ -2048,18 +2046,11 @@ def cmd_telemetry(args: Namespace) -> int:
     html_output = getattr(args, "html", False)
     watch_mode = getattr(args, "watch", False)
 
-    # Mode 1: Analyze specific moss session
+    # Mode 1: Analyze specific moss session (not yet migrated)
     if session_id:
-        api = MossAPI.for_project(Path.cwd())
-        stats = api.telemetry.get_session_stats(session_id)
-        if "error" in stats:
-            output.error(stats["error"])
-            return 1
-        if wants_json(args):
-            output.data(stats)
-        else:
-            output.print(_format_session_stats(stats))
-        return 0
+        output.error("Session telemetry not yet migrated to new architecture")
+        output.info("Use --logs to analyze external session logs instead")
+        return 1
 
     # Mode 2: Analyze external Claude Code session logs
     if log_paths:
@@ -2089,19 +2080,10 @@ def cmd_telemetry(args: Namespace) -> int:
             output.print(analysis.to_markdown())
         return 0
 
-    # Mode 3: Default - aggregate stats across all moss sessions
-    api = MossAPI.for_project(Path.cwd())
-    stats = api.telemetry.analyze_all_sessions()
-
-    if html_output:
-        html = _generate_aggregate_html(stats)
-        output.print(html)
-    elif wants_json(args):
-        output.data(stats)
-    else:
-        output.print(_format_aggregate_stats(stats))
-
-    return 0
+    # Mode 3: Default - aggregate stats across all moss sessions (not yet migrated)
+    output.error("Aggregate session telemetry not yet migrated to new architecture")
+    output.info("Use --logs <path> to analyze external session logs")
+    return 1
 
 
 def _telemetry_watch_loop(

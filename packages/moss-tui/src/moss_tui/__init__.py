@@ -39,12 +39,12 @@ def get_app(project_root: Path | None = None):
         project_root: Optional project root directory. Defaults to cwd.
 
     Returns:
-        MossApp instance ready to run.
+        MossTUI instance ready to run.
     """
     try:
-        from moss_tui.app import MossApp
+        from moss_tui.app import MossTUI
 
-        return MossApp(project_root=project_root)
+        return MossTUI(project_root=project_root)
     except ImportError as e:
         raise ImportError(
             f"Failed to import TUI. Ensure moss-tui is installed: {e}"

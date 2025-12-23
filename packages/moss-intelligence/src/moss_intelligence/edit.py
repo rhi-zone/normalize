@@ -640,3 +640,165 @@ class EditAPI:
             original_size=original_size,
             new_size=len(new_content),
         )
+
+
+@dataclass
+class TargetedEditResult:
+    """Result of a targeted edit (delete/replace) operation."""
+
+    target: str
+    operation: str
+    success: bool
+    message: str
+    diff: str | None = None
+
+
+class EditAPIExtended(EditAPI):
+    """Extended EditAPI with delete/replace symbol operations.
+
+    Used by TUI for higher-level edit operations.
+    """
+
+    def delete(self, target: str, dry_run: bool = False) -> TargetedEditResult:
+        """Delete a symbol from a file.
+
+        Args:
+            target: Symbol path (e.g., "src/foo.py:ClassName" or "src/foo.py:func_name")
+            dry_run: If True, only compute diff without applying
+
+        Returns:
+            TargetedEditResult with operation details
+        """
+        from .codebase import CodebaseTree
+
+        try:
+            tree = CodebaseTree(self.root)
+            nodes = tree.resolve(target)
+            if not nodes:
+                return TargetedEditResult(
+                    target=target,
+                    operation="delete",
+                    success=False,
+                    message=f"Could not resolve: {target}",
+                )
+
+            node = nodes[0]
+            if node.lineno == 0:
+                return TargetedEditResult(
+                    target=target,
+                    operation="delete",
+                    success=False,
+                    message=f"Cannot delete non-symbol: {target}",
+                )
+
+            file_path = node.path
+            lines = file_path.read_text().splitlines(keepends=True)
+            start = node.lineno - 1
+            end = node.end_lineno
+
+            deleted_lines = lines[start:end]
+            diff = f"- {'- '.join(deleted_lines)}"
+
+            if dry_run:
+                return TargetedEditResult(
+                    target=target,
+                    operation="delete",
+                    success=True,
+                    message=f"Would delete lines {node.lineno}-{node.end_lineno}",
+                    diff=diff,
+                )
+
+            new_lines = lines[:start] + lines[end:]
+            file_path.write_text("".join(new_lines))
+
+            return TargetedEditResult(
+                target=target,
+                operation="delete",
+                success=True,
+                message=f"Deleted {node.name} (lines {node.lineno}-{node.end_lineno})",
+                diff=diff,
+            )
+        except Exception as e:
+            return TargetedEditResult(
+                target=target,
+                operation="delete",
+                success=False,
+                message=str(e),
+            )
+
+    def replace(
+        self, target: str, new_content: str, dry_run: bool = False
+    ) -> TargetedEditResult:
+        """Replace a symbol's content.
+
+        Args:
+            target: Symbol path
+            new_content: New source code for the symbol
+            dry_run: If True, only compute diff without applying
+
+        Returns:
+            TargetedEditResult with operation details
+        """
+        from .codebase import CodebaseTree
+
+        try:
+            tree = CodebaseTree(self.root)
+            nodes = tree.resolve(target)
+            if not nodes:
+                return TargetedEditResult(
+                    target=target,
+                    operation="replace",
+                    success=False,
+                    message=f"Could not resolve: {target}",
+                )
+
+            node = nodes[0]
+            if node.lineno == 0:
+                return TargetedEditResult(
+                    target=target,
+                    operation="replace",
+                    success=False,
+                    message=f"Cannot replace non-symbol: {target}",
+                )
+
+            file_path = node.path
+            lines = file_path.read_text().splitlines(keepends=True)
+            start = node.lineno - 1
+            end = node.end_lineno
+
+            old_lines = lines[start:end]
+            old_text = "".join(old_lines)
+            new_text = new_content if new_content.endswith("\n") else new_content + "\n"
+
+            diff = f"--- {target}\n+++ {target}\n"
+            for line in old_lines:
+                diff += f"- {line}"
+            for line in new_text.splitlines(keepends=True):
+                diff += f"+ {line}"
+
+            if dry_run:
+                return TargetedEditResult(
+                    target=target,
+                    operation="replace",
+                    success=True,
+                    message=f"Would replace lines {node.lineno}-{node.end_lineno}",
+                    diff=diff,
+                )
+
+            new_lines = lines[:start] + [new_text] + lines[end:]
+            file_path.write_text("".join(new_lines))
+
+            return TargetedEditResult(
+                target=target,
+                operation="replace",
+                success=True,
+                message=f"Replaced {node.name} (lines {node.lineno}-{node.end_lineno})",
+                diff=diff,
+            )
+        except Exception as e:
+            return TargetedEditResult(
+                target=target,
+                operation="replace",
+                success=False,
+                message=str(e),
+            )

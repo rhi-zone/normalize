@@ -16,12 +16,13 @@ Completed:
 - [x] All imports fixed across sub-packages
 - [x] Frontend server files recovered: moss-mcp (server.py, server_full.py), moss-lsp, moss-acp
 - [x] Frontend package imports fixed (MCP, LSP, ACP servers work)
+- [x] TUI refactored to use moss-intelligence directly (ViewAPI, AnalyzeAPI, EditAPIExtended added)
+- [x] CLI broken imports fixed (cmd_explore, cmd_telemetry refactored)
 
 Remaining:
-- [ ] TUI depends on deleted MossAPI/core_api (3 imports to resolve)
-- [ ] CLI commands using MossAPI need refactoring (many commands)
 - [ ] Tests: update all imports from moss.* to sub-packages (60 test files)
 - [ ] Verify CLI commands work end-to-end
+- [ ] Telemetry: migrate session stats to new architecture (currently stubbed)
 
 **Deferred:**
 - Driver integration improvements
@@ -38,9 +39,6 @@ Remaining:
 ## Backlog
 
 **TUI as Library Interface:**
-- Update TUI to use `moss_orchestration.SessionManager` instead of `moss.session` directly
-  - TUI currently imports from `moss.session` in 3 places
-  - Should migrate to use the sub-package API
 - Consider ScopesAPI for public/private symbol stats (or add to SkeletonAPI)
 
 **Reference Resolution (partial):**

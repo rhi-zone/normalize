@@ -35,7 +35,6 @@ except ImportError:
 if TYPE_CHECKING:
     from textual.widgets import RichLog
 
-    from moss.moss_api import MossAPI
     from moss_orchestration.task_tree import TaskNode, TaskTree
 
 
@@ -548,23 +547,23 @@ class ProjectTree(Tree[Any]):
         ".sh",
     )
 
-    def update_from_files(self, api: MossAPI, tree_root: Path | None = None) -> None:
+    def update_from_files(self, project_root: Path, tree_root: Path | None = None) -> None:
         """Update tree from filesystem with lazy loading.
 
         Uses git ls-files to respect .gitignore. Only loads immediate children
         of the root directory; subdirectories load on expand.
         """
-        self._api = api
-        self._tree_root = tree_root or api.root
+        self._project_root = project_root
+        self._tree_root = tree_root or project_root
         self._indexed_files: set[str] = self._get_indexed_files(self._tree_root)
         self.clear()
-        root = self.root
-        root.label = f"[b]Files: {self._tree_root.name}[/b]"
-        root.data = {"type": "dir", "path": self._tree_root, "loaded": True}
+        tree_node = self.root
+        tree_node.label = f"[b]Files: {self._tree_root.name}[/b]"
+        tree_node.data = {"type": "dir", "path": self._tree_root, "loaded": True}
 
         # Only load immediate children of root
-        self._load_dir_children(root, self._tree_root)
-        root.expand()
+        self._load_dir_children(tree_node, self._tree_root)
+        tree_node.expand()
 
     def _get_indexed_files(self, root: Path) -> set[str]:
         """Get all files from Rust index via list-files command.
@@ -708,9 +707,12 @@ class ProjectTree(Tree[Any]):
             ".toml",
         )
         symbols_found = False
-        if self._api and path.suffix in supported_exts:
+        if path.suffix == ".py":
             try:
-                symbols = self._api.skeleton.extract(path)
+                from moss_intelligence.skeleton import extract_python_skeleton
+
+                source = path.read_text()
+                symbols = extract_python_skeleton(source)
                 if symbols:
                     add_symbols(tree_node, symbols, path)
                     symbols_found = True
@@ -943,17 +945,32 @@ class MossTUI(App):
             result[b.key] = b
         return list(result.values())
 
-    def __init__(self, api: MossAPI):
+    def __init__(self, project_root: Path | None = None):
         super().__init__()
-        self.api = api
+        self._root = (project_root or Path.cwd()).resolve()
         self._task_tree: TaskTree | None = None
         self._mode_registry = ModeRegistry()
         self._last_ctrl_c: float = 0
-        self._tree_root: Path = api.root  # Current root for file tree
+        self._tree_root: Path = self._root  # Current root for file tree
         self._transparent_bg: bool = False  # For terminal opacity support
         self._last_preview_update: float = 0  # Throttle preview updates
         self._preview_throttle_ms: int = 100  # Min ms between updates
         self._background_tasks: set = set()  # Keep references to background tasks
+        self._shadow_git = None  # Lazy-loaded shadow git
+
+    @property
+    def root(self) -> Path:
+        """Project root directory."""
+        return self._root
+
+    @property
+    def shadow_git(self):
+        """Lazy-loaded shadow git for safe multi-file editing."""
+        if self._shadow_git is None:
+            from moss_orchestration.shadow_git import ShadowGit
+
+            self._shadow_git = ShadowGit(self._root)
+        return self._shadow_git
 
     def action_handle_ctrl_c(self) -> None:
         """Handle Ctrl+C with double-tap to exit."""
@@ -1062,7 +1079,7 @@ class MossTUI(App):
             Input(
                 placeholder="Enter command...",
                 id="command-input",
-                suggester=PathSuggester(self.api.root),
+                suggester=PathSuggester(self.root),
             ),
             HoverTooltip(id="hover-tooltip"),
         )
@@ -1108,9 +1125,8 @@ class MossTUI(App):
             )
             self.call_from_thread(self._log, msg)
 
-        # In a real app, MossAPI would have an event_bus
-        if hasattr(self.api, "event_bus") and self.api.event_bus:
-            self.api.event_bus.subscribe(EventType.TOOL_CALL, on_tool_call)
+        # Event bus subscription removed during MossAPI migration
+        # TODO: Re-add event bus integration with moss_orchestration.events
 
     async def watch_current_mode_name(self, name: str) -> None:
         """React to mode changes."""
@@ -1145,7 +1161,7 @@ class MossTUI(App):
         diff_view = self.query_one("#diff-view")
 
         try:
-            branches = await self.api.shadow_git.list_branches()
+            branches = await self.shadow_git.list_branches()
             tree.clear()
             root = tree.root
 
@@ -1162,7 +1178,7 @@ class MossTUI(App):
             root.expand()
 
             # Show current diff in diff-view
-            diff = await self.api.shadow_git.get_diff("shadow/current")
+            diff = await self.shadow_git.get_diff("shadow/current")
             diff_view.clear()
             if diff.strip():
                 diff_view.write(diff)
@@ -1177,11 +1193,11 @@ class MossTUI(App):
     async def navigate_branch(self, branch_name: str) -> None:
         """Switch to a specific branch and update view."""
         self._log(f"Switching to branch: {branch_name}")
-        success = await self.api.shadow_git.switch_branch(branch_name)
+        success = await self.shadow_git.switch_branch(branch_name)
         if success:
             self._log(f"[green]Switched to {branch_name}[/]")
             # Refresh the diff view
-            diff = await self.api.shadow_git.get_diff(branch_name)
+            diff = await self.shadow_git.get_diff(branch_name)
             diff_view = self.query_one("#diff-view", RichLog)
             diff_view.clear()
             if diff.strip():
@@ -1197,20 +1213,20 @@ class MossTUI(App):
         if tree_type == "task" and self._task_tree:
             tree.update_from_tasks(self._task_tree)
         else:
-            tree.update_from_files(self.api, self._tree_root)
+            tree.update_from_files(self.root, self._tree_root)
         self._update_breadcrumb()
 
     def _update_breadcrumb(self) -> None:
         """Update breadcrumb to reflect current tree root."""
         breadcrumb = self.query_one("#breadcrumb", Breadcrumb)
-        breadcrumb.project_name = self.api.root.name
-        if self._tree_root == self.api.root:
+        breadcrumb.project_name = self.root.name
+        if self._tree_root == self.root:
             breadcrumb.path_parts = []
         else:
             # Build path parts from project root to current
             parts = []
             current = self._tree_root
-            while current != self.api.root and current != current.parent:
+            while current != self.root and current != current.parent:
                 parts.insert(0, (current.name, current))
                 current = current.parent
             breadcrumb.path_parts = parts
@@ -1225,15 +1241,15 @@ class MossTUI(App):
 
     def action_cd_up(self) -> None:
         """Navigate up one directory."""
-        if self._tree_root != self.api.root:
+        if self._tree_root != self.root:
             self._tree_root = self._tree_root.parent
             self._update_tree("file")
             self._log(f"Changed to: {self._tree_root.name}")
 
     def action_cd_root(self) -> None:
         """Navigate back to project root."""
-        if self._tree_root != self.api.root:
-            self._tree_root = self.api.root
+        if self._tree_root != self.root:
+            self._tree_root = self.root
             self._update_tree("file")
             self._log("Changed to project root")
 
@@ -1302,12 +1318,19 @@ class MossTUI(App):
             self._selected_type = "file"
             tooltip.file_path = path
             try:
-                skeleton = self.api.skeleton.format(path)
+                from moss_intelligence.skeleton import (
+                    extract_python_skeleton,
+                    format_skeleton,
+                )
+
+                source = path.read_text()
+                symbols = extract_python_skeleton(source)
+                skeleton = format_skeleton(symbols)
                 summary = "\n".join(skeleton.split("\n")[:15])
                 if len(skeleton.split("\n")) > 15:
                     summary += "\n..."
                 tooltip.content = summary
-            except (OSError, ValueError):
+            except (OSError, ValueError, SyntaxError):
                 tooltip.content = f"File: {path.name}"
         elif data["type"] == "dir":
             path = data["path"]
@@ -1400,7 +1423,7 @@ class MossTUI(App):
 
         try:
             diff_view = self.query_one("#diff-view", expect_type=RichLog)
-            manager = SessionManager(self.api.root / ".moss" / "sessions")
+            manager = SessionManager(self.root / ".moss" / "sessions")
             task = manager.get(task_id)
 
             diff_view.clear()
@@ -1483,8 +1506,10 @@ class MossTUI(App):
     def _run_complexity_analysis(self, log_view: RichLog) -> None:
         """Run complexity analysis on codebase."""
         try:
+            from moss_intelligence.complexity import analyze_complexity
+
             log_view.write("[bold]Complexity Analysis[/]\n")
-            report = self.api.complexity.analyze()
+            report = analyze_complexity(self.root)
             if report.functions:
                 # Sort by complexity descending, take top 20
                 sorted_funcs = sorted(report.functions, key=lambda f: -f.complexity)[:20]
@@ -1506,13 +1531,15 @@ class MossTUI(App):
     def _run_security_analysis(self, log_view: RichLog) -> None:
         """Run security analysis on codebase."""
         try:
+            from moss_intelligence.security import analyze_security
+
             log_view.write("[bold]Security Analysis[/]\n")
-            analysis = self.api.security.analyze()
+            analysis = analyze_security(self.root)
             if analysis.findings:
                 for finding in analysis.findings[:20]:
                     severity_colors = {"high": "red", "medium": "yellow", "low": "blue"}
-                    color = severity_colors.get(finding.severity, "dim")
-                    log_view.write(f"[{color}]{finding.severity.upper():6}[/] {finding.message}")
+                    color = severity_colors.get(str(finding.severity).lower(), "dim")
+                    log_view.write(f"[{color}]{str(finding.severity).upper():6}[/] {finding.message}")
                     log_view.write(f"       {finding.file}:{finding.line}")
             else:
                 log_view.write("[dim]No security issues found[/]")
@@ -1522,14 +1549,17 @@ class MossTUI(App):
     def _run_scopes_analysis(self, log_view: RichLog) -> None:
         """Run scopes analysis (symbol visibility)."""
         try:
+            from moss_intelligence.skeleton import extract_python_skeleton
+
             log_view.write("[bold]Scopes Analysis[/]\n")
             # Show public vs private symbols
             stats = {"public": 0, "private": 0, "files": 0}
-            for path in self.api.root.rglob("*.py"):
+            for path in self.root.rglob("*.py"):
                 if ".git" in path.parts or "__pycache__" in path.parts:
                     continue
                 try:
-                    symbols = self.api.skeleton.extract(path)
+                    source = path.read_text()
+                    symbols = extract_python_skeleton(source)
                     stats["files"] += 1
                     for sym in symbols:
                         if sym.name.startswith("_"):
@@ -1547,8 +1577,11 @@ class MossTUI(App):
     def _run_imports_analysis(self, log_view: RichLog) -> None:
         """Run imports analysis (dependency graph)."""
         try:
+            from moss_intelligence.dependency_analysis import DependencyAnalyzer
+
             log_view.write("[bold]Imports Analysis[/]\n")
-            analysis = self.api.dependencies.analyze()
+            analyzer = DependencyAnalyzer(self.root)
+            analysis = analyzer.analyze()
 
             if analysis.module_metrics:
                 mods = analysis.total_modules
@@ -1583,7 +1616,7 @@ class MossTUI(App):
         """Resume a task by ID."""
         from moss_orchestration.session import SessionManager, SessionStatus
 
-        manager = SessionManager(self.api.root / ".moss" / "sessions")
+        manager = SessionManager(self.root / ".moss" / "sessions")
         task = manager.get(task_id)
         if task:
             self._log(f"Resuming task: {task.task[:50]}")
@@ -1647,7 +1680,7 @@ class MossTUI(App):
 
         try:
             # Check if any shadow branches exist
-            branches = await self.api.shadow_git.list_branches()
+            branches = await self.shadow_git.list_branches()
             if not branches:
                 diff_view.clear()
                 diff_view.write("[dim]No shadow branches yet.[/]\n\nStart a task to track changes.")
@@ -1656,7 +1689,7 @@ class MossTUI(App):
                 return
 
             # Get current shadow branch diff
-            diff = await self.api.shadow_git.get_diff("shadow/current")
+            diff = await self.shadow_git.get_diff("shadow/current")
             diff_view.clear()
             if diff.strip():
                 diff_view.write(diff)
@@ -1664,7 +1697,7 @@ class MossTUI(App):
                 diff_view.write("[dim]No changes on current branch.[/]")
 
             # Update history (hunks)
-            hunks = await self.api.shadow_git.get_hunks("shadow/current")
+            hunks = await self.shadow_git.get_hunks("shadow/current")
             history.clear()
             root = history.root
             root.label = f"Current Hunks ({len(hunks)})"
@@ -1685,7 +1718,7 @@ class MossTUI(App):
         try:
             from moss_orchestration.session import SessionManager, SessionStatus
 
-            manager = SessionManager(self.api.root / ".moss" / "sessions")
+            manager = SessionManager(self.root / ".moss" / "sessions")
             root_tasks = manager.list_root_tasks()
 
             tree = self.query_one("#session-tree")
@@ -1845,7 +1878,7 @@ class MossTUI(App):
 
     def _handle_edit_command(self, target: str, args: list[str]) -> None:
         """Handle edit command with options."""
-        from moss.core_api import EditAPI
+        from moss_intelligence.edit import EditAPIExtended as EditAPI
 
         explore_detail = self.query_one("#explore-detail")
         explore_detail.clear()
@@ -1861,7 +1894,7 @@ class MossTUI(App):
                 break
 
         try:
-            api = EditAPI(self.api.root)
+            api = EditAPI(self.root)
             if delete:
                 result = api.delete(target, dry_run=dry_run)
             elif replace_content:
@@ -1896,7 +1929,7 @@ class MossTUI(App):
             # Build edit context from target
             target_path = Path(target)
             if not target_path.is_absolute():
-                target_path = self.api.root / target
+                target_path = self.root / target
 
             # Check if target contains a symbol (file/symbol format)
             target_file = None
@@ -1908,7 +1941,7 @@ class MossTUI(App):
                 parts = target.rsplit("/", 1)
                 potential_file = Path(parts[0])
                 if not potential_file.is_absolute():
-                    potential_file = self.api.root / parts[0]
+                    potential_file = self.root / parts[0]
                 if potential_file.exists():
                     target_file = potential_file
                     target_symbol = parts[1]
@@ -1916,7 +1949,7 @@ class MossTUI(App):
                 target_file = target_path if target_path.exists() else None
 
             context = EditContext(
-                project_root=self.api.root,
+                project_root=self.root,
                 target_file=target_file,
                 target_symbol=target_symbol,
             )
@@ -1963,7 +1996,7 @@ class MossTUI(App):
         target_path = Path(target)
         if target_path.is_absolute():
             try:
-                rel_path = str(target_path.relative_to(self.api.root))
+                rel_path = str(target_path.relative_to(self.root))
             except ValueError:
                 rel_path = target
         else:
@@ -1977,7 +2010,7 @@ class MossTUI(App):
         tree = self.query_one("#project-tree", ProjectTree)
 
         # Use Rust index for symbol search (works without git)
-        symbols = rust_find_symbols(pattern, fuzzy=True, limit=20, root=str(self.api.root))
+        symbols = rust_find_symbols(pattern, fuzzy=True, limit=20, root=str(self.root))
 
         if symbols:
             # Group by file, pick best match
@@ -2004,10 +2037,10 @@ class MossTUI(App):
                 # Navigate to file and symbol
                 full_path = Path(file_path)
                 if full_path.is_absolute():
-                    rel_path = str(full_path.relative_to(self.api.root))
+                    rel_path = str(full_path.relative_to(self.root))
                 else:
                     rel_path = file_path
-                    full_path = self.api.root / file_path
+                    full_path = self.root / file_path
 
                 # Expand tree to file
                 self._expand_and_select_path(tree, rel_path)
@@ -2206,7 +2239,7 @@ class MossTUI(App):
 
     def _execute_primitive(self, primitive: str, target: str, **kwargs) -> None:
         """Execute a primitive (view/edit/analyze) and display results."""
-        from moss.core_api import AnalyzeAPI, ViewAPI
+        from moss_intelligence.core_api import AnalyzeAPI, ViewAPI
 
         explore_header = self.query_one("#explore-header", Static)
         explore_detail = self.query_one("#explore-detail")
@@ -2214,7 +2247,7 @@ class MossTUI(App):
 
         try:
             if primitive == "view":
-                api = ViewAPI(self.api.root)
+                api = ViewAPI(self.root)
                 result = api.view(target=target, depth=kwargs.get("depth", 1))
 
                 # Handle failed resolution
@@ -2338,7 +2371,7 @@ class MossTUI(App):
                 edit_task.add_done_callback(self._background_tasks.discard)
 
             elif primitive == "analyze":
-                api = AnalyzeAPI(self.api.root)
+                api = AnalyzeAPI(self.root)
                 result = api.analyze(
                     target=target,
                     health=kwargs.get("health", False),
