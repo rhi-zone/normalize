@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from moss.views import View, ViewOptions, ViewTarget
+    from moss_intelligence.views import View, ViewOptions, ViewTarget
 
 logger = logging.getLogger(__name__)
 
@@ -284,9 +284,9 @@ class PluginRegistry:
         installed via entry points (e.g., during development).
         """
         # Import here to avoid circular imports
-        from moss.cfg import PythonCFGPlugin
-        from moss.dependencies import PythonDependencyPlugin
-        from moss.skeleton import PythonSkeletonPlugin
+        from moss_intelligence.cfg import PythonCFGPlugin
+        from moss_intelligence.dependencies import PythonDependencyPlugin
+        from moss_intelligence.skeleton import PythonSkeletonPlugin
 
         builtins: list[ViewPlugin] = [
             PythonSkeletonPlugin(),

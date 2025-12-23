@@ -10,13 +10,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from moss.api_surface_analysis import APISurfaceAnalysis, APISurfaceAnalyzer
-from moss.check_docs import DocChecker, DocCheckResult
-from moss.check_todos import TodoChecker, TodoCheckResult, TodoStatus
-from moss.dependency_analysis import DependencyAnalysis, DependencyAnalyzer
-from moss.structural_analysis import StructuralAnalysis, StructuralAnalyzer
-from moss.summarize import DocSummarizer, Summarizer
-from moss.test_analysis import TestAnalysis, TestAnalyzer
+from moss_intelligence.api_surface_analysis import APISurfaceAnalysis, APISurfaceAnalyzer
+from moss_intelligence.check_docs import DocChecker, DocCheckResult
+from moss_intelligence.check_todos import TodoChecker, TodoCheckResult, TodoStatus
+from moss_intelligence.dependency_analysis import DependencyAnalysis, DependencyAnalyzer
+from moss_intelligence.structural_analysis import StructuralAnalysis, StructuralAnalyzer
+from moss_intelligence.summarize import DocSummarizer, Summarizer
+from moss_intelligence.test_analysis import TestAnalysis, TestAnalyzer
 
 
 @dataclass

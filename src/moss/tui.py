@@ -571,7 +571,7 @@ class ProjectTree(Tree[Any]):
 
         Falls back to git ls-files if Rust not available.
         """
-        from moss.rust_shim import rust_list_files
+        from moss_intelligence.rust_shim import rust_list_files
 
         # Try Rust index first
         files = rust_list_files(prefix="", limit=10000, root=str(root))
@@ -1887,7 +1887,7 @@ class MossTUI(App):
 
     async def _run_edit_async(self, task: str, target: str) -> None:
         """Run an edit task asynchronously and update UI with results."""
-        from moss.edit import EditContext, edit
+        from moss_intelligence.edit import EditContext, edit
 
         explore_detail = self.query_one("#explore-detail")
         explore_header = self.query_one("#explore-header")
@@ -1972,7 +1972,7 @@ class MossTUI(App):
 
     def _goto_fuzzy(self, pattern: str) -> None:
         """Fuzzy navigate to a file or symbol using Rust index."""
-        from moss.rust_shim import rust_find_symbols
+        from moss_intelligence.rust_shim import rust_find_symbols
 
         tree = self.query_one("#project-tree", ProjectTree)
 

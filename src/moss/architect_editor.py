@@ -579,8 +579,8 @@ class StructuredEditor:
 
     async def _replace(self, file_path: str, target: str, content: str) -> Any:
         """Replace a symbol's content."""
-        from moss.anchors import Anchor
-        from moss.patches import Patch, PatchType
+        from moss_intelligence.anchors import Anchor
+        from moss_intelligence.patches import Patch, PatchType
 
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.REPLACE, content=content)
@@ -588,8 +588,8 @@ class StructuredEditor:
 
     async def _insert_before(self, file_path: str, target: str, content: str) -> Any:
         """Insert content before a symbol."""
-        from moss.anchors import Anchor
-        from moss.patches import Patch, PatchType
+        from moss_intelligence.anchors import Anchor
+        from moss_intelligence.patches import Patch, PatchType
 
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.INSERT_BEFORE, content=content)
@@ -597,8 +597,8 @@ class StructuredEditor:
 
     async def _insert_after(self, file_path: str, target: str, content: str) -> Any:
         """Insert content after a symbol."""
-        from moss.anchors import Anchor
-        from moss.patches import Patch, PatchType
+        from moss_intelligence.anchors import Anchor
+        from moss_intelligence.patches import Patch, PatchType
 
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.INSERT_AFTER, content=content)
@@ -606,8 +606,8 @@ class StructuredEditor:
 
     async def _delete(self, file_path: str, target: str) -> Any:
         """Delete a symbol."""
-        from moss.anchors import Anchor
-        from moss.patches import Patch, PatchType
+        from moss_intelligence.anchors import Anchor
+        from moss_intelligence.patches import Patch, PatchType
 
         anchor = Anchor(name=target)
         patch = Patch(anchor=anchor, patch_type=PatchType.DELETE, content="")

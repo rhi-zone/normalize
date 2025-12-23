@@ -484,7 +484,7 @@ def execute_intent(intent: Intent) -> str:
 
     # Call Rust CLI and capture output
     try:
-        from moss.rust_shim import call_rust
+        from moss_intelligence.rust_shim import call_rust
 
         exit_code, output = call_rust(cli_args)
         if exit_code == 0:

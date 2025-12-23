@@ -253,7 +253,7 @@ async def execute_action(action: Action, task: Session) -> ActionResult:
             return ActionResult(success=True, output=result)
 
         elif action.tool == "edit":
-            from moss.edit import EditContext, edit
+            from moss_intelligence.edit import EditContext, edit
 
             context = EditContext(
                 project_root=task.project_root,

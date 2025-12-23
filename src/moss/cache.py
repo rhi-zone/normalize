@@ -266,7 +266,7 @@ class ParseCache:
 
     def get_or_extract_skeleton(self, path: Path) -> list:
         """Get cached skeleton or extract from file."""
-        from moss.skeleton import extract_python_skeleton
+        from moss_intelligence.skeleton import extract_python_skeleton
 
         cached = self.get_skeleton(path)
         if cached is not None:

@@ -595,7 +595,7 @@ class ACPServer:
 
     async def _handle_patterns(self, session: Session, api: MossAPI) -> None:
         """Handle pattern detection requests."""
-        from moss.patterns import analyze_patterns
+        from moss_intelligence.patterns import analyze_patterns
 
         await self.send_update(session.id, thought="Detecting architectural patterns...")
         try:
@@ -614,7 +614,7 @@ class ACPServer:
         await self.send_update(session.id, thought="Analyzing architectural weaknesses...")
         try:
             analysis = api.weaknesses.analyze()
-            from moss.weaknesses import Severity
+            from moss_intelligence.weaknesses import Severity
 
             by_sev = analysis.by_severity
 

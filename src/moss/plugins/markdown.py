@@ -14,8 +14,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from moss_intelligence.views import View, ViewOptions, ViewTarget
+
     from moss.plugins import PluginMetadata
-    from moss.views import View, ViewOptions, ViewTarget
 
 
 @dataclass
@@ -231,7 +232,7 @@ class MarkdownStructurePlugin:
         options: ViewOptions | None = None,
     ) -> View:
         """Render a structure view for a Markdown file."""
-        from moss.views import View, ViewType
+        from moss_intelligence.views import View, ViewType
 
         source = target.path.read_text()
         structure = extract_markdown_structure(source)

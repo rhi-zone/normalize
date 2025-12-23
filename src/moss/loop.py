@@ -7,8 +7,9 @@ from datetime import UTC, datetime
 from enum import Enum, auto
 from pathlib import Path
 
+from moss_intelligence.patches import Patch, apply_patch
+
 from moss.events import EventBus, EventEmitterMixin, EventType
-from moss.patches import Patch, apply_patch
 from moss.shadow_git import CommitHandle, ShadowBranch, ShadowGit
 from moss.validators import ValidationResult, ValidatorChain
 

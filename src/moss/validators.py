@@ -278,7 +278,7 @@ def diagnostics_to_validation_result(
     Returns:
         ValidationResult with converted issues
     """
-    from moss.diagnostics import Severity
+    from moss_intelligence.diagnostics import Severity
 
     issues = []
     for diag in diagnostic_set.diagnostics:
@@ -355,7 +355,7 @@ class DiagnosticValidator(Validator):
         return self._name
 
     async def validate(self, path: Path) -> ValidationResult:
-        from moss.diagnostics import parse_diagnostics
+        from moss_intelligence.diagnostics import parse_diagnostics
 
         # Substitute {path} in command
         cmd = [arg.replace("{path}", str(path)) for arg in self.command]

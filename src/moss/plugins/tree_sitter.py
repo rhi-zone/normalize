@@ -10,9 +10,10 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from moss_intelligence.tree_sitter import TSSymbol
+    from moss_intelligence.views import View, ViewOptions, ViewTarget
+
     from moss.plugins import PluginMetadata
-    from moss.tree_sitter import TSSymbol
-    from moss.views import View, ViewOptions, ViewTarget
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +79,15 @@ class TreeSitterSkeletonPlugin:
         options: ViewOptions | None = None,
     ) -> View:
         """Render a skeleton view using tree-sitter."""
+        from moss_intelligence.views import View, ViewType
+
         from moss.plugins import detect_language
-        from moss.views import View, ViewType
 
         source = target.path.read_text()
         lang = target.language or detect_language(target.path)
 
         try:
-            from moss.tree_sitter import TreeSitterSkeletonProvider
+            from moss_intelligence.tree_sitter import TreeSitterSkeletonProvider
 
             provider = TreeSitterSkeletonProvider(lang)
             symbols = provider.extract_skeleton(source)

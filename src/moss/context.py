@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from moss.skeleton import Symbol, extract_python_skeleton
-from moss.views import (
+from moss_intelligence.skeleton import Symbol, extract_python_skeleton
+from moss_intelligence.views import (
     Intent,
     RawViewProvider,
     View,

@@ -28,29 +28,30 @@ from moss.core_api import ViewAPI as CoreViewAPI
 from moss.events import EventBus
 
 if TYPE_CHECKING:
-    from moss.anchors import AnchorMatch
-    from moss.cfg import ControlFlowGraph
-    from moss.check_docs import DocCheckResult
-    from moss.check_refs import RefCheckResult
-    from moss.check_todos import TodoCheckResult
-    from moss.complexity import ComplexityReport
+    from moss_intelligence.anchors import AnchorMatch
+    from moss_intelligence.cfg import ControlFlowGraph
+    from moss_intelligence.check_docs import DocCheckResult
+    from moss_intelligence.check_refs import RefCheckResult
+    from moss_intelligence.check_todos import TodoCheckResult
+    from moss_intelligence.complexity import ComplexityReport
+    from moss_intelligence.dependencies import DependencyInfo
+    from moss_intelligence.dependency_analysis import DependencyAnalysis
+    from moss_intelligence.edit import SimpleEditResult
+    from moss_intelligence.external_deps import DependencyAnalysisResult
+    from moss_intelligence.git_hotspots import GitHotspotAnalysis
+    from moss_intelligence.patches import Patch, PatchResult
+    from moss_intelligence.patterns import PatternAnalysis
+    from moss_intelligence.skeleton import Symbol
+    from moss_intelligence.structural_analysis import StructuralAnalysis
+    from moss_intelligence.summarize import ProjectSummary
+    from moss_intelligence.test_analysis import TestAnalysis
+    from moss_intelligence.weaknesses import WeaknessAnalysis
+
     from moss.context import CompiledContext, ContextHost
-    from moss.dependencies import DependencyInfo
-    from moss.dependency_analysis import DependencyAnalysis
-    from moss.edit import SimpleEditResult
-    from moss.external_deps import DependencyAnalysisResult
-    from moss.git_hotspots import GitHotspotAnalysis
-    from moss.patches import Patch, PatchResult
-    from moss.patterns import PatternAnalysis
     from moss.rag import IndexStats, RAGIndex, SearchResult
     from moss.shadow_git import CommitHandle, ShadowBranch, ShadowGit
-    from moss.skeleton import Symbol
     from moss.status import ProjectStatus
-    from moss.structural_analysis import StructuralAnalysis
-    from moss.summarize import ProjectSummary
-    from moss.test_analysis import TestAnalysis
     from moss.validators import ValidationResult, ValidatorChain
-    from moss.weaknesses import WeaknessAnalysis
 
 
 @dataclass
@@ -61,7 +62,7 @@ class PatternsAPI:
 
     def analyze(self, directory: str | Path | None = None) -> PatternAnalysis:
         """Detect architectural patterns in the codebase."""
-        from moss.patterns import PatternAnalyzer
+        from moss_intelligence.patterns import PatternAnalyzer
 
         target = Path(directory) if directory else self.root
         if not target.is_absolute():
@@ -97,7 +98,7 @@ class EditAPI(PathResolvingMixin):
 
     def write_file(self, file_path: str | Path, content: str) -> SimpleEditResult:
         """Overwrite or create a file with new content."""
-        from moss.edit import EditAPI as InternalEditAPI
+        from moss_intelligence.edit import EditAPI as InternalEditAPI
 
         api = InternalEditAPI(self.root)
         return api.write_file(file_path, content)
@@ -110,7 +111,7 @@ class EditAPI(PathResolvingMixin):
         occurrence: int = 0,
     ) -> SimpleEditResult:
         """Replace text in a file."""
-        from moss.edit import EditAPI as InternalEditAPI
+        from moss_intelligence.edit import EditAPI as InternalEditAPI
 
         api = InternalEditAPI(self.root)
         return api.replace_text(file_path, search, replace, occurrence)
@@ -123,7 +124,7 @@ class EditAPI(PathResolvingMixin):
         after_pattern: str | None = None,
     ) -> SimpleEditResult:
         """Insert a line into a file at a specific position."""
-        from moss.edit import EditAPI as InternalEditAPI
+        from moss_intelligence.edit import EditAPI as InternalEditAPI
 
         api = InternalEditAPI(self.root)
         return api.insert_line(file_path, line_content, at_line, after_pattern)
@@ -325,7 +326,7 @@ class SkeletonAPI(PathResolvingMixin):
         Raises:
             FileNotFoundError: If the file does not exist
         """
-        from moss.rust_shim import rust_available, rust_skeleton_json
+        from moss_intelligence.rust_shim import rust_available, rust_skeleton_json
 
         path = self._resolve_path(file_path)
         if not path.exists():
@@ -343,7 +344,7 @@ class SkeletonAPI(PathResolvingMixin):
 
         # Fallback to Python for .py files
         if path.suffix == ".py":
-            from moss.skeleton import extract_python_skeleton
+            from moss_intelligence.skeleton import extract_python_skeleton
 
             source = path.read_text()
             return extract_python_skeleton(source)
@@ -352,7 +353,7 @@ class SkeletonAPI(PathResolvingMixin):
 
     def _json_to_symbols(self, json_data: list[dict] | dict) -> list[Symbol]:
         """Convert JSON skeleton data to Symbol objects."""
-        from moss.skeleton import Symbol
+        from moss_intelligence.skeleton import Symbol
 
         def convert(item: dict) -> Symbol:
             children = [convert(c) for c in item.get("children", [])]
@@ -391,7 +392,7 @@ class SkeletonAPI(PathResolvingMixin):
         if not path.exists():
             return f"File not found: {path}"
 
-        from moss.rust_shim import rust_available, rust_skeleton
+        from moss_intelligence.rust_shim import rust_available, rust_skeleton
 
         if not rust_available():
             raise RuntimeError("Rust CLI required for skeleton. Build with: cargo build --release")
@@ -425,7 +426,7 @@ class SkeletonAPI(PathResolvingMixin):
             content = api.skeleton.expand("src/agent_loop.py", "StepType")
             # Returns complete enum with all values
         """
-        from moss.rust_shim import rust_view
+        from moss_intelligence.rust_shim import rust_view
 
         path = self._resolve_path(file_path)
         try:
@@ -454,7 +455,7 @@ class SkeletonAPI(PathResolvingMixin):
             values = api.skeleton.get_enum_values("src/agent_loop.py", "StepType")
             # Returns: ["TOOL", "LLM", "HYBRID"]
         """
-        from moss.skeleton import get_enum_values
+        from moss_intelligence.skeleton import get_enum_values
 
         path = self._resolve_path(file_path)
         source = path.read_text()
@@ -486,7 +487,7 @@ class TreeAPI(PathResolvingMixin):
         Returns:
             TreeResult with tree visualization and file counts
         """
-        from moss.tree import generate_tree
+        from moss_intelligence.tree import generate_tree
 
         target = self._resolve_path(path) if path else self.root
         return generate_tree(target, tracked_only=tracked_only, gitignore=gitignore)
@@ -507,7 +508,7 @@ class TreeAPI(PathResolvingMixin):
         Returns:
             Formatted tree visualization
         """
-        from moss.tree import generate_tree
+        from moss_intelligence.tree import generate_tree
 
         target = self._resolve_path(path) if path else self.root
         result = generate_tree(target, tracked_only=tracked_only)
@@ -541,7 +542,7 @@ class AnchorAPI(PathResolvingMixin):
         Returns:
             List of AnchorMatch objects with locations and confidence scores
         """
-        from moss.anchors import Anchor, AnchorType, find_anchors
+        from moss_intelligence.anchors import Anchor, AnchorType, find_anchors
 
         path = self._resolve_path(file_path)
         source = path.read_text()
@@ -576,7 +577,7 @@ class AnchorAPI(PathResolvingMixin):
             AnchorNotFoundError: If no match found
             AmbiguousAnchorError: If multiple matches with equal confidence
         """
-        from moss.anchors import Anchor, AnchorType, resolve_anchor
+        from moss_intelligence.anchors import Anchor, AnchorType, resolve_anchor
 
         path = self._resolve_path(file_path)
         source = path.read_text()
@@ -618,7 +619,7 @@ class PatchAPI(PathResolvingMixin):
         Returns:
             PatchResult with success status and modified content
         """
-        from moss.patches import apply_patch
+        from moss_intelligence.patches import apply_patch
 
         path = self._resolve_path(file_path)
         source = path.read_text()
@@ -648,7 +649,7 @@ class PatchAPI(PathResolvingMixin):
         Returns:
             PatchResult with success status and modified content
         """
-        from moss.patches import apply_patch_with_fallback
+        from moss_intelligence.patches import apply_patch_with_fallback
 
         path = self._resolve_path(file_path)
         source = path.read_text()
@@ -677,8 +678,8 @@ class PatchAPI(PathResolvingMixin):
         Returns:
             Patch object ready for application
         """
-        from moss.anchors import Anchor, AnchorType
-        from moss.patches import Patch, PatchType
+        from moss_intelligence.anchors import Anchor, AnchorType
+        from moss_intelligence.patches import Patch, PatchType
 
         type_map = {
             "insert_before": PatchType.INSERT_BEFORE,
@@ -726,7 +727,7 @@ class DependencyAPI(PathResolvingMixin):
         Returns:
             DependencyInfo with imports and exports
         """
-        from moss.dependencies import extract_dependencies
+        from moss_intelligence.dependencies import extract_dependencies
 
         path = self._resolve_path(file_path)
         source = path.read_text()
@@ -738,7 +739,7 @@ class DependencyAPI(PathResolvingMixin):
         Returns:
             DependencyAnalysis with circular deps, god modules, orphans, etc.
         """
-        from moss.dependency_analysis import DependencyAnalyzer
+        from moss_intelligence.dependency_analysis import DependencyAnalyzer
 
         analyzer = DependencyAnalyzer(self.root)
         return analyzer.analyze()
@@ -752,7 +753,7 @@ class DependencyAPI(PathResolvingMixin):
         Returns:
             Formatted string with imports and exports
         """
-        from moss.dependencies import format_dependencies
+        from moss_intelligence.dependencies import format_dependencies
 
         info = self.extract(file_path)
         return format_dependencies(info)
@@ -773,7 +774,7 @@ class DependencyAPI(PathResolvingMixin):
         Returns:
             Dict mapping module names to their dependencies
         """
-        from moss.dependencies import build_dependency_graph
+        from moss_intelligence.dependencies import build_dependency_graph
 
         search_path = str(path) if path else str(self.root)
         return build_dependency_graph(search_path, pattern, internal_only)
@@ -788,7 +789,7 @@ class DependencyAPI(PathResolvingMixin):
         Returns:
             DOT-formatted string for visualization
         """
-        from moss.dependencies import dependency_graph_to_dot
+        from moss_intelligence.dependencies import dependency_graph_to_dot
 
         return dependency_graph_to_dot(graph, title)
 
@@ -808,7 +809,7 @@ class DependencyAPI(PathResolvingMixin):
         Returns:
             List of ReverseDependency objects
         """
-        from moss.dependencies import find_reverse_dependencies
+        from moss_intelligence.dependencies import find_reverse_dependencies
 
         path = str(search_path) if search_path else str(self.root)
         return find_reverse_dependencies(target_module, path, pattern)
@@ -832,7 +833,7 @@ class CFGAPI(PathResolvingMixin):
         Returns:
             List of ControlFlowGraph objects for each function
         """
-        from moss.cfg import build_cfg
+        from moss_intelligence.cfg import build_cfg
 
         path = self._resolve_path(file_path)
         source = path.read_text()
@@ -1054,8 +1055,9 @@ class ContextAPI:
         Returns:
             ContextHost instance
         """
+        from moss_intelligence.views import create_default_registry
+
         from moss.context import ContextHost
-        from moss.views import create_default_registry
 
         if self._host is None:
             registry = create_default_registry()
@@ -1076,7 +1078,7 @@ class ContextAPI:
         Returns:
             CompiledContext with rendered views
         """
-        from moss.views import ViewTarget, ViewType
+        from moss_intelligence.views import ViewTarget, ViewType
 
         host = self.init()
 
@@ -1162,7 +1164,7 @@ class HealthAPI:
         Returns:
             ProjectSummary with module information
         """
-        from moss.summarize import Summarizer
+        from moss_intelligence.summarize import Summarizer
 
         summarizer = Summarizer(include_private=False, include_tests=False)
         return summarizer.summarize_project(self.root)
@@ -1176,7 +1178,7 @@ class HealthAPI:
         Returns:
             DocCheckResult with coverage and issues
         """
-        from moss.check_docs import DocChecker
+        from moss_intelligence.check_docs import DocChecker
 
         checker = DocChecker(self.root, check_links=check_links)
         return checker.check()
@@ -1187,7 +1189,7 @@ class HealthAPI:
         Returns:
             TodoCheckResult with tracked and orphaned TODOs
         """
-        from moss.check_todos import TodoChecker
+        from moss_intelligence.check_todos import TodoChecker
 
         checker = TodoChecker(self.root)
         return checker.check()
@@ -1198,7 +1200,7 @@ class HealthAPI:
         Returns:
             StructuralAnalysis with hotspots and metrics
         """
-        from moss.structural_analysis import StructuralAnalyzer
+        from moss_intelligence.structural_analysis import StructuralAnalyzer
 
         analyzer = StructuralAnalyzer(self.root)
         return analyzer.analyze()
@@ -1209,7 +1211,7 @@ class HealthAPI:
         Returns:
             TestAnalysis with module-test mappings
         """
-        from moss.test_analysis import TestAnalyzer
+        from moss_intelligence.test_analysis import TestAnalyzer
 
         analyzer = TestAnalyzer(self.root)
         return analyzer.analyze()
@@ -1310,7 +1312,7 @@ class TodoAPI:
         Returns:
             TodoListResult with items grouped by section
         """
-        from moss.check_todos import TodoChecker, TodoStatus
+        from moss_intelligence.check_todos import TodoChecker, TodoStatus
 
         checker = TodoChecker(self.root)
         result = checker.check()
@@ -1350,7 +1352,7 @@ class TodoAPI:
         Returns:
             List of TodoSearchResult with matching items, sorted by relevance
         """
-        from moss.check_todos import TodoChecker, TodoStatus
+        from moss_intelligence.check_todos import TodoChecker, TodoStatus
 
         checker = TodoChecker(self.root)
         result = checker.check()
@@ -1407,7 +1409,7 @@ class TodoAPI:
         """
         from collections import defaultdict
 
-        from moss.check_todos import TodoChecker, TodoStatus
+        from moss_intelligence.check_todos import TodoChecker, TodoStatus
 
         checker = TodoChecker(self.root)
         result = checker.check()
@@ -1796,7 +1798,7 @@ class ComplexityAPI:
         Returns:
             ComplexityReport with complexity metrics for all functions
         """
-        from moss.complexity import analyze_complexity
+        from moss_intelligence.complexity import analyze_complexity
 
         return analyze_complexity(self.root, pattern=pattern)
 
@@ -1838,7 +1840,7 @@ class ClonesAPI:
         Returns:
             CloneAnalysis with clone groups and statistics
         """
-        from moss.clones import ElisionLevel, detect_clones
+        from moss_intelligence.clones import ElisionLevel, detect_clones
 
         return detect_clones(self.root, level=ElisionLevel(level), min_lines=min_lines)
 
@@ -1881,7 +1883,7 @@ class SecurityAPI:
         Returns:
             SecurityAnalysis with findings and summary
         """
-        from moss.security import analyze_security
+        from moss_intelligence.security import analyze_security
 
         return analyze_security(self.root, tools=tools, min_severity=min_severity)
 
@@ -1915,7 +1917,7 @@ class RefCheckAPI:
         Returns:
             RefCheckResult with valid, broken, and stale references
         """
-        from moss.check_refs import RefChecker
+        from moss_intelligence.check_refs import RefChecker
 
         checker = RefChecker(self.root, staleness_days=staleness_days)
         return checker.check()
@@ -1958,7 +1960,7 @@ class GitHotspotsAPI:
         Returns:
             GitHotspotAnalysis with frequently changed files
         """
-        from moss.git_hotspots import analyze_hotspots
+        from moss_intelligence.git_hotspots import analyze_hotspots
 
         return analyze_hotspots(self.root, days=days)
 
@@ -2002,7 +2004,7 @@ class ExternalDepsAPI:
         Returns:
             DependencyAnalysisResult with dependency information
         """
-        from moss.external_deps import ExternalDependencyAnalyzer
+        from moss_intelligence.external_deps import ExternalDependencyAnalyzer
 
         analyzer = ExternalDependencyAnalyzer(self.root)
         return analyzer.analyze(
@@ -2057,7 +2059,7 @@ class WeaknessesAPI:
         Returns:
             WeaknessAnalysis with detected weaknesses
         """
-        from moss.weaknesses import WeaknessAnalyzer
+        from moss_intelligence.weaknesses import WeaknessAnalyzer
 
         analyzer = WeaknessAnalyzer(self.root, categories=categories)
         return analyzer.analyze()
@@ -2071,7 +2073,7 @@ class WeaknessesAPI:
         Returns:
             Markdown-formatted report
         """
-        from moss.weaknesses import format_weakness_analysis
+        from moss_intelligence.weaknesses import format_weakness_analysis
 
         return format_weakness_analysis(analysis)
 
@@ -2816,7 +2818,7 @@ class SearchAPI(PathResolvingMixin):
         Returns:
             List of SymbolMatch objects sorted by relevance
         """
-        from moss.rust_shim import rust_find_symbols
+        from moss_intelligence.rust_shim import rust_find_symbols
 
         data = rust_find_symbols(name, kind, fuzzy, limit, str(self.root))
         if data is None:
@@ -2844,7 +2846,7 @@ class SearchAPI(PathResolvingMixin):
         """Fallback Python implementation for find_symbols (slower)."""
         import fnmatch
 
-        from moss.skeleton import extract_python_skeleton
+        from moss_intelligence.skeleton import extract_python_skeleton
 
         results: list[SymbolMatch] = []
         pattern = name.lower()
@@ -2922,7 +2924,7 @@ class SearchAPI(PathResolvingMixin):
         Returns:
             GrepResult with matches and statistics
         """
-        from moss.rust_shim import rust_grep
+        from moss_intelligence.rust_shim import rust_grep
 
         search_path = Path(path) if path else self.root
         if not search_path.is_absolute():
@@ -3305,7 +3307,7 @@ class SearchAPI(PathResolvingMixin):
         Returns:
             RelatedFilesResult with imports_from and imported_by lists
         """
-        from moss.dependencies import (
+        from moss_intelligence.dependencies import (
             extract_dependencies,
             find_reverse_dependencies,
         )
@@ -3412,7 +3414,7 @@ class SearchAPI(PathResolvingMixin):
         """
         import ast
 
-        from moss.dependencies import extract_dependencies
+        from moss_intelligence.dependencies import extract_dependencies
 
         path = self._resolve_path(file_path)
         if not path.exists():
@@ -3496,7 +3498,7 @@ class SearchAPI(PathResolvingMixin):
         """
         import re
 
-        from moss.skeleton import extract_python_skeleton
+        from moss_intelligence.skeleton import extract_python_skeleton
 
         search_path = self._resolve_path(path) if path else self.root
 

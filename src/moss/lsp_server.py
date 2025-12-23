@@ -153,8 +153,8 @@ class MossLanguageServer(LanguageServer if HAS_LSP else object):
 
     def _analyze_python(self, uri: str, version: int, source: str) -> DocumentAnalysis:
         """Perform Python-specific analysis."""
-        from moss.cfg import CFGBuilder
-        from moss.skeleton import extract_python_skeleton
+        from moss_intelligence.cfg import CFGBuilder
+        from moss_intelligence.skeleton import extract_python_skeleton
 
         analysis = DocumentAnalysis(uri=uri, version=version)
 
@@ -415,7 +415,7 @@ def create_server() -> MossLanguageServer:
 
         # Try to resolve as anchor
         try:
-            from moss.anchors import AnchorResolver
+            from moss_intelligence.anchors import AnchorResolver
 
             resolver = AnchorResolver(doc.source)
             match = resolver.resolve(word)

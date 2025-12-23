@@ -13,8 +13,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from moss_intelligence.views import View, ViewOptions, ViewTarget
+
     from moss.plugins import PluginMetadata
-    from moss.views import View, ViewOptions, ViewTarget
 
 
 @dataclass
@@ -158,7 +159,7 @@ class JSONSchemaPlugin:
         options: ViewOptions | None = None,
     ) -> View:
         """Render a schema view for a JSON file."""
-        from moss.views import View, ViewType
+        from moss_intelligence.views import View, ViewType
 
         source = target.path.read_text()
 
@@ -217,7 +218,7 @@ class YAMLSchemaPlugin:
         options: ViewOptions | None = None,
     ) -> View:
         """Render a schema view for a YAML file."""
-        from moss.views import View, ViewType
+        from moss_intelligence.views import View, ViewType
 
         source = target.path.read_text()
 
@@ -285,7 +286,7 @@ class TOMLSchemaPlugin:
         options: ViewOptions | None = None,
     ) -> View:
         """Render a schema view for a TOML file."""
-        from moss.views import View, ViewType
+        from moss_intelligence.views import View, ViewType
 
         source = target.path.read_text()
 

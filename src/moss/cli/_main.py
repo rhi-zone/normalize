@@ -686,8 +686,9 @@ def cmd_deps(args: Namespace) -> int:
 
 def cmd_context(args: Namespace) -> int:
     """Generate compiled context for a file (skeleton + deps + summary)."""
+    from moss_intelligence.rust_shim import rust_available, rust_context
+
     from moss import MossAPI
-    from moss.rust_shim import rust_available, rust_context
 
     output = setup_output(args)
     path = Path(args.path).resolve()
@@ -1341,7 +1342,7 @@ def cmd_rules(args: Namespace) -> int:
 
 def cmd_edit(args: Namespace) -> int:
     """Edit code with intelligent complexity routing."""
-    from moss.edit import EditContext, TaskComplexity, analyze_complexity, edit
+    from moss_intelligence.edit import EditContext, TaskComplexity, analyze_complexity, edit
 
     output = setup_output(args)
     project_dir = Path(getattr(args, "directory", ".")).resolve()
@@ -1393,11 +1394,11 @@ def cmd_edit(args: Namespace) -> int:
 
     async def run_edit():
         if force_method == "structural":
-            from moss.edit import structural_edit
+            from moss_intelligence.edit import structural_edit
 
             return await structural_edit(task, context)
         elif force_method == "synthesis":
-            from moss.edit import synthesize_edit
+            from moss_intelligence.edit import synthesize_edit
 
             return await synthesize_edit(task, context)
         else:
@@ -2594,7 +2595,7 @@ def cmd_git_hotspots(args: Namespace) -> int:
 
 def cmd_coverage(args: Namespace) -> int:
     """Show test coverage statistics."""
-    from moss.test_coverage import analyze_coverage
+    from moss_intelligence.test_coverage import analyze_coverage
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -2931,8 +2932,9 @@ def cmd_complexity(args: Namespace) -> int:
 
 def cmd_clones(args: Namespace) -> int:
     """Detect structural clones via AST hashing."""
+    from moss_intelligence.clones import format_clone_analysis
+
     from moss import MossAPI
-    from moss.clones import format_clone_analysis
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -2963,8 +2965,9 @@ def cmd_clones(args: Namespace) -> int:
 
 def cmd_security(args: Namespace) -> int:
     """Run security analysis with multiple tools."""
+    from moss_intelligence.security import format_security_analysis
+
     from moss import MossAPI
-    from moss.security import format_security_analysis
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -3001,7 +3004,7 @@ def cmd_security(args: Namespace) -> int:
 
 def cmd_patterns(args: Namespace) -> int:
     """Detect architectural patterns in the codebase."""
-    from moss.patterns import analyze_patterns, format_pattern_analysis
+    from moss_intelligence.patterns import analyze_patterns, format_pattern_analysis
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -3037,12 +3040,13 @@ def cmd_patterns(args: Namespace) -> int:
 
 def cmd_weaknesses(args: Namespace) -> int:
     """Identify architectural weaknesses and gaps in the codebase."""
-    from moss import MossAPI
-    from moss.weaknesses import (
+    from moss_intelligence.weaknesses import (
         format_weakness_fixes,
         get_fixable_weaknesses,
         weaknesses_to_sarif,
     )
+
+    from moss import MossAPI
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -5539,7 +5543,7 @@ def _cmd_analyze_python(argv: list[str]) -> int:
     api = MossAPI.for_project(root)
 
     if args.summary:
-        from moss.summarize import Summarizer
+        from moss_intelligence.summarize import Summarizer
 
         summarizer = Summarizer()
         if root.is_file():
@@ -5623,7 +5627,7 @@ def _cmd_analyze_python(argv: list[str]) -> int:
         return 0
 
     # Fallback to Rust for other flags
-    from moss.rust_shim import passthrough
+    from moss_intelligence.rust_shim import passthrough
 
     return passthrough("analyze", argv)
 
@@ -5666,7 +5670,7 @@ def main(argv: list[str] | None = None) -> int:
         if argv[0] == "analyze" and any(f in argv for f in PYTHON_ANALYZE_FLAGS):
             return _cmd_analyze_python(argv[1:])
 
-        from moss.rust_shim import passthrough
+        from moss_intelligence.rust_shim import passthrough
 
         return passthrough(argv[0], argv[1:])
 

@@ -176,7 +176,7 @@ class GuessabilityAnalyzer:
 
     def _analyze_name_alignment(self) -> list[NameAlignmentScore]:
         """Analyze how well module names match their contents."""
-        from moss.skeleton import extract_python_skeleton
+        from moss_intelligence.skeleton import extract_python_skeleton
 
         scores = []
 

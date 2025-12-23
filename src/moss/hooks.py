@@ -228,8 +228,9 @@ def run_pre_commit_checks(project_dir: Path) -> tuple[bool, list[str]]:
     """
     import asyncio
 
+    from moss_intelligence.views import ViewTarget
+
     from moss.plugins import get_registry
-    from moss.views import ViewTarget
 
     staged_files = get_staged_files(project_dir)
     if not staged_files:

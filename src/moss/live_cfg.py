@@ -24,7 +24,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from moss.cfg import CFGBuilder
+from moss_intelligence.cfg import CFGBuilder
 
 if TYPE_CHECKING:
     pass

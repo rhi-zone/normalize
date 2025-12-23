@@ -24,7 +24,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from moss.skeleton import Symbol
+    from moss_intelligence.skeleton import Symbol
+
     from moss.vector_store import SearchResult, VectorStore
 
 logger = logging.getLogger(__name__)
@@ -320,7 +321,7 @@ class CodeIndexer:
     def _chunk_python(self, path: Path, content: str) -> list[CodeChunk]:
         """Create chunks from Python file using AST."""
         try:
-            from moss.skeleton import PythonSkeletonExtractor
+            from moss_intelligence.skeleton import PythonSkeletonExtractor
         except ImportError:
             return self._chunk_generic(path, content)
 

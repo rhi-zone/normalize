@@ -6,6 +6,10 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "psutil>=6.0.0",
+    "moss-intelligence",
+    "moss-context",
+    "moss-orchestration",
+    "moss-llm",
 ]
 
 [project.scripts]
@@ -16,7 +20,7 @@ moss-mcp = "moss.mcp_server:main"
 moss-mcp-full = "moss.mcp_server_full:main"
 
 [project.entry-points."moss.plugins"]
-python-skeleton = "moss.skeleton:PythonSkeletonPlugin"
+python-skeleton = "moss_intelligence.skeleton:PythonSkeletonPlugin"
 python-dependency = "moss.dependencies:PythonDependencyPlugin"
 python-cfg = "moss.cfg:PythonCFGPlugin"
 tree-sitter-skeleton = "moss.plugins.tree_sitter:TreeSitterSkeletonPlugin"
@@ -74,9 +78,6 @@ tree-sitter = [
 chroma = [
     "chromadb>=0.4",
 ]
-rag = [
-    "moss[chroma]",  # alias for backward compat
-]
 server = [
     "fastapi>=0.124.4",
     "uvicorn[standard]>=0.38.0",
@@ -91,7 +92,6 @@ lsp = [
 llm = [
     "litellm>=1.0.0",
 ]
-# anthropic/openai: use litellm instead (consolidated Dec 2025)
 dotenv = [
     "python-dotenv>=1.0.0",
 ]
@@ -104,7 +104,6 @@ local-llm = [
 tui = [
     "textual>=0.89.0",
 ]
-# grpc: removed (unused)
 eval = [
     "swebench>=2.0.0",
     "datasets>=2.0.0",

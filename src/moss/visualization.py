@@ -6,7 +6,7 @@ This module provides:
 - CFGVisualizer: High-level visualization interface
 
 Usage:
-    from moss.cfg import CFGBuilder
+    from moss_intelligence.cfg import CFGBuilder
     from moss.visualization import CFGVisualizer
 
     builder = CFGBuilder()
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from moss.cfg import ControlFlowGraph
+    from moss_intelligence.cfg import ControlFlowGraph
 
 
 # =============================================================================

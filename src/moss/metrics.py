@@ -28,8 +28,7 @@ from pathlib import Path
 from typing import Any
 
 import psutil
-
-from moss.skeleton import extract_python_skeleton
+from moss_intelligence.skeleton import extract_python_skeleton
 
 
 @dataclass

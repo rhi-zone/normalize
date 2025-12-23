@@ -303,8 +303,9 @@ class MossShell:
             self.output.error(f"File not found: {path}")
             return
 
+        from moss_intelligence.views import ViewTarget
+
         from moss.plugins import get_registry
-        from moss.views import ViewTarget
 
         registry = get_registry()
         target = ViewTarget(path=path)
@@ -334,8 +335,9 @@ class MossShell:
             self.output.error(f"File not found: {path}")
             return
 
+        from moss_intelligence.views import ViewTarget
+
         from moss.plugins import get_registry
-        from moss.views import ViewTarget
 
         registry = get_registry()
         target = ViewTarget(path=path)
@@ -367,8 +369,9 @@ class MossShell:
             self.output.error(f"File not found: {path}")
             return
 
+        from moss_intelligence.views import ViewOptions, ViewTarget
+
         from moss.plugins import get_registry
-        from moss.views import ViewOptions, ViewTarget
 
         registry = get_registry()
         target = ViewTarget(path=path)
@@ -405,7 +408,7 @@ class MossShell:
 
         import re
 
-        from moss.skeleton import extract_python_skeleton
+        from moss_intelligence.skeleton import extract_python_skeleton
 
         pattern = re.compile(args[0], re.IGNORECASE)
         results = []
@@ -487,8 +490,9 @@ class MossShell:
             self.output.error(f"File not found: {path}")
             return
 
+        from moss_intelligence.views import ViewTarget
+
         from moss.plugins import get_registry
-        from moss.views import ViewTarget
 
         registry = get_registry()
         target = ViewTarget(path=path)
@@ -527,7 +531,7 @@ class MossShell:
         """Find anchors in a file or directory."""
         path = self._resolve_path(args[0]) if args else self.workspace
 
-        from moss.skeleton import extract_python_skeleton
+        from moss_intelligence.skeleton import extract_python_skeleton
 
         results = []
 
@@ -574,7 +578,7 @@ class MossShell:
         """Show complexity analysis for a path."""
         path = self._resolve_path(args[0]) if args else self.workspace
 
-        from moss.complexity import analyze_complexity
+        from moss_intelligence.complexity import analyze_complexity
 
         try:
             report = analyze_complexity(path)
@@ -613,7 +617,7 @@ class MossShell:
         path = self._resolve_path(args[0]) if args else self.workspace
         tracked_only = "--tracked" in args or "-t" in args
 
-        from moss.tree import generate_tree
+        from moss_intelligence.tree import generate_tree
 
         try:
             result = generate_tree(path, tracked_only=tracked_only)

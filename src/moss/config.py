@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from moss_intelligence.views import ViewProvider, ViewRegistry
+
 from moss.loop import LoopConfig
 from moss.policy import (
     PathPolicy,
@@ -22,7 +24,6 @@ from moss.validators import (
     Validator,
     ValidatorChain,
 )
-from moss.views import ViewProvider, ViewRegistry
 
 
 @dataclass

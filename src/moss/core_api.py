@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from moss import rust_shim
+from moss_intelligence import rust_shim
 
 
 @dataclass

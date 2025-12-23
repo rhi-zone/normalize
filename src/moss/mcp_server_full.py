@@ -675,7 +675,7 @@ def _prompt_prepare_refactor(file_path: Path, goal: str) -> list[PromptMessage]:
 
     # Get complexity if available
     try:
-        from moss.complexity import analyze_complexity
+        from moss_intelligence.complexity import analyze_complexity
 
         report = analyze_complexity(file_path.parent, pattern=str(file_path.name))
         if report.functions:

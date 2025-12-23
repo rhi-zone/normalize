@@ -7,7 +7,11 @@ Primary entry point:
     health = api.health.check()
     skeleton = api.skeleton.extract("src/main.py")
 
-All individual components are also available as direct imports.
+Sub-packages (implementation lives here, moss is the unified namespace):
+    from moss.intelligence import Symbol
+    from moss.context import WorkingMemory
+    from moss.orchestration import Session
+    from moss.llm import LLMSummarizer
 
 Memory optimization: Uses lazy imports to reduce baseline memory usage.
 Only MossAPI is eagerly loaded; other imports happen on first access.
@@ -17,6 +21,13 @@ from __future__ import annotations
 
 import importlib
 from typing import TYPE_CHECKING
+
+# Sub-package aliases (implementation in moss_* packages)
+# These enable: from moss.intelligence import Symbol
+import moss_context as context  # noqa: F401
+import moss_intelligence as intelligence  # noqa: F401
+import moss_llm as llm  # noqa: F401
+import moss_orchestration as orchestration  # noqa: F401
 
 # Eager import: Only the main entry point
 from moss.moss_api import MossAPI
@@ -287,6 +298,77 @@ def __getattr__(name: str) -> object:
 
 # Type checking support - provide hints without runtime imports
 if TYPE_CHECKING:
+    from moss_intelligence.anchors import (
+        AmbiguousAnchorError,
+        Anchor,
+        AnchorMatch,
+        AnchorNotFoundError,
+        AnchorResolver,
+        AnchorType,
+        find_anchors,
+        resolve_anchor,
+    )
+    from moss_intelligence.cfg import (
+        CFGBuilder,
+        CFGEdge,
+        CFGNode,
+        CFGViewProvider,
+        ControlFlowGraph,
+        EdgeType,
+        NodeType,
+        build_cfg,
+    )
+    from moss_intelligence.dependencies import (
+        DependencyInfo,
+        Export,
+        Import,
+        PythonDependencyProvider,
+        extract_dependencies,
+        format_dependencies,
+    )
+    from moss_intelligence.elided_literals import (
+        ElidedLiteralsProvider,
+        ElisionConfig,
+        ElisionStats,
+        elide_literals,
+        elide_literals_regex,
+    )
+    from moss_intelligence.patches import (
+        Patch,
+        PatchResult,
+        PatchType,
+        apply_patch,
+        apply_patch_with_fallback,
+        apply_text_patch,
+    )
+    from moss_intelligence.skeleton import (
+        PythonSkeletonProvider,
+        Symbol,
+        extract_python_skeleton,
+        format_skeleton,
+    )
+    from moss_intelligence.tree_sitter import (
+        LanguageType,
+        QueryMatch,
+        TreeNode,
+        TreeSitterParser,
+        TreeSitterSkeletonProvider,
+        TSSymbol,
+        get_language_for_extension,
+        is_supported_extension,
+    )
+    from moss_intelligence.views import (
+        Intent,
+        RawViewProvider,
+        View,
+        ViewOptions,
+        ViewProvider,
+        ViewRegistry,
+        ViewTarget,
+        ViewType,
+        create_default_registry,
+    )
+
     from moss.agents import (
         Constraint,
         Manager,
@@ -301,16 +383,6 @@ if TYPE_CHECKING:
         WorkerState,
         WorkerStatus,
         create_manager,
-    )
-    from moss.anchors import (
-        AmbiguousAnchorError,
-        Anchor,
-        AnchorMatch,
-        AnchorNotFoundError,
-        AnchorResolver,
-        AnchorType,
-        find_anchors,
-        resolve_anchor,
     )
     from moss.api import (
         APIHandler,
@@ -339,16 +411,6 @@ if TYPE_CHECKING:
         StructuredEditor,
         run_architect_editor,
     )
-    from moss.cfg import (
-        CFGBuilder,
-        CFGEdge,
-        CFGNode,
-        CFGViewProvider,
-        ControlFlowGraph,
-        EdgeType,
-        NodeType,
-        build_cfg,
-    )
     from moss.cli import main as cli_main
     from moss.config import (
         Distro,
@@ -363,21 +425,6 @@ if TYPE_CHECKING:
         register_distro,
     )
     from moss.context import CompiledContext, ContextHost, StaticContext
-    from moss.dependencies import (
-        DependencyInfo,
-        Export,
-        Import,
-        PythonDependencyProvider,
-        extract_dependencies,
-        format_dependencies,
-    )
-    from moss.elided_literals import (
-        ElidedLiteralsProvider,
-        ElisionConfig,
-        ElisionStats,
-        elide_literals,
-        elide_literals_regex,
-    )
     from moss.events import Event, EventBus, EventType
     from moss.handles import (
         BinaryFileHandle,
@@ -444,14 +491,6 @@ if TYPE_CHECKING:
         timed,
         traced,
     )
-    from moss.patches import (
-        Patch,
-        PatchResult,
-        PatchType,
-        apply_patch,
-        apply_patch_with_fallback,
-        apply_text_patch,
-    )
     from moss.policy import (
         PathPolicy,
         Policy,
@@ -477,22 +516,6 @@ if TYPE_CHECKING:
         timed_function,
     )
     from moss.shadow_git import CommitHandle, GitError, ShadowBranch, ShadowGit
-    from moss.skeleton import (
-        PythonSkeletonProvider,
-        Symbol,
-        extract_python_skeleton,
-        format_skeleton,
-    )
-    from moss.tree_sitter import (
-        LanguageType,
-        QueryMatch,
-        TreeNode,
-        TreeSitterParser,
-        TreeSitterSkeletonProvider,
-        TSSymbol,
-        get_language_for_extension,
-        is_supported_extension,
-    )
     from moss.validators import (
         CommandValidator,
         LinterValidatorAdapter,
@@ -513,17 +536,6 @@ if TYPE_CHECKING:
         VectorStore,
         create_vector_store,
         document_hash,
-    )
-    from moss.views import (
-        Intent,
-        RawViewProvider,
-        View,
-        ViewOptions,
-        ViewProvider,
-        ViewRegistry,
-        ViewTarget,
-        ViewType,
-        create_default_registry,
     )
 
 __version__ = "0.1.0"

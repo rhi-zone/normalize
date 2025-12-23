@@ -32,7 +32,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from moss.dependencies import (
+from moss_intelligence.dependencies import (
     DependencyInfo,
     build_dependency_graph,
     extract_dependencies,
