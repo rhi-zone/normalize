@@ -38,11 +38,10 @@ Remaining work:
 ## Backlog
 
 **TUI as Library Interface:**
-- Add TasksAPI to MossAPI (CRUD for sessions: get, list, resume, pause, create)
-  - TUI currently bypasses API: `from moss.session import SessionManager` in 3 places
-  - TelemetryAPI exists for analytics, but no management API
+- Update TUI to use `moss_orchestration.SessionManager` instead of `moss.session` directly
+  - TUI currently imports from `moss.session` in 3 places
+  - Should migrate to use the sub-package API
 - Consider ScopesAPI for public/private symbol stats (or add to SkeletonAPI)
-- `moss view <locator> --full` for viewing full source of a single section/symbol
 
 **Reference Resolution (partial):**
 - Cross-language tracking (Python ↔ Rust) - see `docs/rust-python-boundary.md` for design
