@@ -22,7 +22,7 @@ Exploration of redundancy in Rust and Python CLIs revealed systemic inconsistenc
 
 | Issue | Scope | Notes |
 |-------|-------|-------|
-| File resolution boilerplate | 15+ commands | Same `path_resolve::resolve()` + error handling |
+| File resolution boilerplate | 15+ commands | Same `path_resolve::resolve()` + error handling. **FIXED**: `resolve_and_read()` helper |
 | JSON output formatting | 25+ commands | `if json { println!(serde_json::json!(...)) }` everywhere |
 | Root directory resolution | All 33 commands | Same 3 lines at start of every command |
 | Call graph auto-index check | callees/callers/find_symbols | Identical check-and-reindex logic |
@@ -50,6 +50,7 @@ Exploration of redundancy in Rust and Python CLIs revealed systemic inconsistenc
 
 Most egregious (user-facing inconsistency):
 - **Directory argument style** - positional in some commands, flag in others. Users can't build muscle memory.
+  - **FIXED (2025-12-25)**: Standardized short flag to `-C` across all commands (was mix of `-C` and `-d`).
 
 Most wasteful (code bloat):
 - **Output format handling** - 29 commands × ~5 lines = 150 lines of near-identical code

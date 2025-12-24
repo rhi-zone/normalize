@@ -59,8 +59,11 @@ Phase 4 - Expand:
 - [ ] Svelte, SCSS (frontend)
 
 **CLI Redundancy:** See `docs/llm-code-consistency.md` for full analysis. Key actions:
-- Rust: extract file resolution helper, OutputFormatter trait, share callers/callees impl
-- Python: standardize directory arg (positional vs flag is egregious), output helpers
+- [x] Rust: extract file resolution helper (resolve_and_read in path_resolve.rs)
+- [x] Python: standardize directory arg to -C (was mix of -C and -d)
+- [ ] Rust: OutputFormatter trait for JSON/text output
+- [ ] Rust: share callers/callees implementation
+- [ ] Python: output helpers for JSON/markdown/compact
 
 **Performance:**
 - Investigate slow `moss analyze --health` (+500ms over baseline, not uv startup)
