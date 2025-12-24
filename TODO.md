@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Global package index database: cache indexed external packages at `~/.cache/moss/python-X.Y.db`, `~/.cache/moss/go-X.Y.db`
+- Global package index database: unified `~/.cache/moss/packages.db` with version ranges (min/max per package)
 
 Test Status: 2184 passing, 0 failing, 42 skipped (all optional deps)
 

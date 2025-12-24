@@ -34,18 +34,18 @@ pub fn get_global_cache_dir() -> Option<PathBuf> {
     Some(moss_cache)
 }
 
-/// Get the path to the global index database for a Python version.
-/// e.g., ~/.cache/moss/python-3.11.db
-pub fn get_python_global_db(version: &str) -> Option<PathBuf> {
+/// Get the path to the unified global package index database.
+/// e.g., ~/.cache/moss/packages.db
+///
+/// Schema:
+/// - packages(id, language, name, path, min_major, min_minor, max_major, max_minor, indexed_at)
+/// - symbols(id, package_id, name, kind, signature, line)
+///
+/// Version stored as (major, minor) integers for proper comparison.
+/// max_major/max_minor NULL means "any version".
+pub fn get_global_packages_db() -> Option<PathBuf> {
     let cache = get_global_cache_dir()?;
-    Some(cache.join(format!("python-{}.db", version)))
-}
-
-/// Get the path to the global index database for a Go version.
-/// e.g., ~/.cache/moss/go-1.21.db
-pub fn get_go_global_db(version: &str) -> Option<PathBuf> {
-    let cache = get_global_cache_dir()?;
-    Some(cache.join(format!("go-{}.db", version)))
+    Some(cache.join("packages.db"))
 }
 
 /// Get Python version from the project's interpreter.
