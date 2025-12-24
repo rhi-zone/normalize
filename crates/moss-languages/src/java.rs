@@ -474,6 +474,28 @@ impl Language for Java {
         &["java"]
     }
 
+    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
+        use crate::{PackageSource, PackageSourceKind};
+        let mut sources = Vec::new();
+        if let Some(maven) = find_maven_repository() {
+            sources.push(PackageSource {
+                name: "maven",
+                path: maven,
+                kind: PackageSourceKind::Maven,
+                version_specific: false,
+            });
+        }
+        if let Some(gradle) = find_gradle_cache() {
+            sources.push(PackageSource {
+                name: "gradle",
+                path: gradle,
+                kind: PackageSourceKind::Gradle,
+                version_specific: false,
+            });
+        }
+        sources
+    }
+
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
         use crate::traits::{skip_dotfiles, has_extension};
         if skip_dotfiles(name) { return true; }
@@ -483,4 +505,133 @@ impl Language for Java {
         }
         !is_dir && !has_extension(name, &["java"])
     }
+
+    fn discover_packages(&self, source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
+        match source.kind {
+            crate::PackageSourceKind::Maven => discover_maven_packages(&source.path, &source.path),
+            crate::PackageSourceKind::Gradle => discover_gradle_packages(&source.path, &source.path),
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// Check if a directory contains JAR files (indicates a version directory).
+fn has_jar_files(path: &Path) -> bool {
+    std::fs::read_dir(path)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .any(|e| e.file_name().to_string_lossy().ends_with(".jar"))
+}
+
+/// Find the main JAR in a Maven version directory.
+fn find_maven_jar(version_dir: &Path, artifact: &str) -> Option<PathBuf> {
+    // Prefer sources JAR
+    let entries: Vec<_> = std::fs::read_dir(version_dir).ok()?
+        .flatten()
+        .collect();
+
+    // Look for artifact-version-sources.jar first
+    for entry in &entries {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with(artifact) && name.ends_with("-sources.jar") {
+            return Some(entry.path());
+        }
+    }
+
+    // Fall back to regular jar
+    for entry in &entries {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with(artifact) && name.ends_with(".jar")
+            && !name.ends_with("-sources.jar") && !name.ends_with("-javadoc.jar") {
+            return Some(entry.path());
+        }
+    }
+
+    None
+}
+
+/// Discover packages in Maven repository structure.
+fn discover_maven_packages(maven_repo: &Path, current: &Path) -> Vec<(String, PathBuf)> {
+    let entries = match std::fs::read_dir(current) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut packages = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_dir() {
+            if has_jar_files(&path) {
+                // This is a version directory - parent is artifact, grandparent path is group
+                if let Some(artifact_dir) = current.parent() {
+                    let artifact = current.file_name().unwrap_or_default().to_string_lossy();
+                    if let Ok(group_path) = artifact_dir.strip_prefix(maven_repo) {
+                        let group = group_path.to_string_lossy().replace('/', ".");
+                        let pkg_name = format!("{}:{}", group, artifact);
+
+                        if let Some(jar_path) = find_maven_jar(&path, &artifact) {
+                            packages.push((pkg_name, jar_path));
+                        }
+                    }
+                }
+            } else {
+                packages.extend(discover_maven_packages(maven_repo, &path));
+            }
+        }
+    }
+
+    packages
+}
+
+/// Discover packages in Gradle cache structure.
+fn discover_gradle_packages(gradle_cache: &Path, current: &Path) -> Vec<(String, PathBuf)> {
+    let entries = match std::fs::read_dir(current) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut packages = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_dir() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            // Check if this is a hash directory (40 hex chars)
+            if name.len() == 40 && name.chars().all(|c| c.is_ascii_hexdigit()) {
+                // This is a hash dir, find JAR
+                if let Ok(files) = std::fs::read_dir(&path) {
+                    for file in files.flatten() {
+                        let file_name = file.file_name().to_string_lossy().to_string();
+                        if file_name.ends_with(".jar")
+                            && !file_name.ends_with("-sources.jar")
+                            && !file_name.ends_with("-javadoc.jar")
+                        {
+                            // Extract package info from path
+                            if let Ok(rel) = current.strip_prefix(gradle_cache) {
+                                let parts: Vec<_> = rel.components().collect();
+                                if parts.len() >= 2 {
+                                    let group = parts[..parts.len()-1]
+                                        .iter()
+                                        .map(|c| c.as_os_str().to_string_lossy())
+                                        .collect::<Vec<_>>()
+                                        .join(".");
+                                    let artifact = parts.last().unwrap().as_os_str().to_string_lossy();
+                                    let pkg_name = format!("{}:{}", group, artifact);
+                                    packages.push((pkg_name, file.path()));
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                packages.extend(discover_gradle_packages(gradle_cache, &path));
+            }
+        }
+    }
+
+    packages
 }

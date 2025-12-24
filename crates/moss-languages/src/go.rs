@@ -508,6 +508,28 @@ impl Language for Go {
         find_go_stdlib()
     }
 
+    fn package_sources(&self, project_root: &Path) -> Vec<crate::PackageSource> {
+        use crate::{PackageSource, PackageSourceKind};
+        let mut sources = Vec::new();
+        if let Some(stdlib) = self.find_stdlib(project_root) {
+            sources.push(PackageSource {
+                name: "stdlib",
+                path: stdlib,
+                kind: PackageSourceKind::Recursive,
+                version_specific: true,
+            });
+        }
+        if let Some(cache) = self.find_package_cache(project_root) {
+            sources.push(PackageSource {
+                name: "mod-cache",
+                path: cache,
+                kind: PackageSourceKind::Recursive,
+                version_specific: false,
+            });
+        }
+        sources
+    }
+
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
         // Skip dotfiles
         if name.starts_with('.') {

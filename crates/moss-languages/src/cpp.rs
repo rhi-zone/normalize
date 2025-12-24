@@ -172,6 +172,19 @@ impl Language for Cpp {
         &["cpp", "hpp", "cc", "hh", "cxx", "hxx", "h"]
     }
 
+    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
+        use crate::{PackageSource, PackageSourceKind};
+        c_cpp::find_cpp_include_paths()
+            .into_iter()
+            .map(|path| PackageSource {
+                name: "includes",
+                path,
+                kind: PackageSourceKind::Recursive,
+                version_specific: false,
+            })
+            .collect()
+    }
+
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
         use crate::traits::skip_dotfiles;
         if skip_dotfiles(name) { return true; }

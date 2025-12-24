@@ -80,6 +80,20 @@ impl Language for TypeScript {
         &["ts", "mts", "cts", "js", "mjs", "cjs"]
     }
 
+    fn package_sources(&self, project_root: &Path) -> Vec<crate::PackageSource> {
+        use crate::{PackageSource, PackageSourceKind};
+        let mut sources = Vec::new();
+        if let Some(cache) = self.find_package_cache(project_root) {
+            sources.push(PackageSource {
+                name: "node_modules",
+                path: cache,
+                kind: PackageSourceKind::NpmScoped,
+                version_specific: false,
+            });
+        }
+        sources
+    }
+
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
         use crate::traits::{skip_dotfiles, has_extension};
         if skip_dotfiles(name) { return true; }
@@ -157,6 +171,20 @@ impl Language for Tsx {
 
     fn indexable_extensions(&self) -> &'static [&'static str] {
         &["tsx", "ts", "js"]
+    }
+
+    fn package_sources(&self, project_root: &Path) -> Vec<crate::PackageSource> {
+        use crate::{PackageSource, PackageSourceKind};
+        let mut sources = Vec::new();
+        if let Some(cache) = self.find_package_cache(project_root) {
+            sources.push(PackageSource {
+                name: "node_modules",
+                path: cache,
+                kind: PackageSourceKind::NpmScoped,
+                version_specific: false,
+            });
+        }
+        sources
     }
 
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {

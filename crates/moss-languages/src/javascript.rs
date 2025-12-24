@@ -72,6 +72,32 @@ impl Language for JavaScript {
         &["js", "mjs", "cjs"]
     }
 
+    fn package_sources(&self, project_root: &Path) -> Vec<crate::PackageSource> {
+        use crate::{PackageSource, PackageSourceKind};
+        let mut sources = Vec::new();
+        if let Some(cache) = self.find_package_cache(project_root) {
+            sources.push(PackageSource {
+                name: "node_modules",
+                path: cache,
+                kind: PackageSourceKind::NpmScoped,
+                version_specific: false,
+            });
+        }
+        // Also check for Deno cache
+        if let Some(deno_cache) = ecmascript::find_deno_cache() {
+            let npm_cache = deno_cache.join("npm").join("registry.npmjs.org");
+            if npm_cache.is_dir() {
+                sources.push(PackageSource {
+                    name: "deno-npm",
+                    path: npm_cache,
+                    kind: PackageSourceKind::Deno,
+                    version_specific: false,
+                });
+            }
+        }
+        sources
+    }
+
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
         use crate::traits::{skip_dotfiles, has_extension};
         if skip_dotfiles(name) { return true; }
@@ -81,4 +107,64 @@ impl Language for JavaScript {
         }
         !is_dir && !has_extension(name, &["js", "mjs", "cjs"])
     }
+
+    fn discover_packages(&self, source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
+        match source.kind {
+            crate::PackageSourceKind::NpmScoped => self.discover_npm_scoped_packages(&source.path),
+            crate::PackageSourceKind::Deno => discover_deno_packages(&source.path),
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// Discover packages in Deno npm cache (package/version/ structure with scoped packages).
+fn discover_deno_packages(source_path: &Path) -> Vec<(String, PathBuf)> {
+    let entries = match std::fs::read_dir(source_path) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut packages = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        if !path.is_dir() {
+            continue;
+        }
+
+        // Handle scoped packages (@scope/name)
+        if name.starts_with('@') {
+            if let Ok(scoped) = std::fs::read_dir(&path) {
+                for scoped_entry in scoped.flatten() {
+                    let scoped_path = scoped_entry.path();
+                    let scoped_name = format!("{}/{}", name, scoped_entry.file_name().to_string_lossy());
+                    if let Some((pkg_name, pkg_path)) = find_deno_version_dir(&scoped_path, &scoped_name) {
+                        packages.push((pkg_name, pkg_path));
+                    }
+                }
+            }
+        } else if let Some((pkg_name, pkg_path)) = find_deno_version_dir(&path, &name) {
+            packages.push((pkg_name, pkg_path));
+        }
+    }
+
+    packages
+}
+
+/// Find the latest version directory in a Deno package directory.
+fn find_deno_version_dir(pkg_path: &Path, pkg_name: &str) -> Option<(String, PathBuf)> {
+    let versions: Vec<_> = std::fs::read_dir(pkg_path).ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    if versions.is_empty() {
+        return None;
+    }
+
+    // Use the last version (sorted lexically, usually latest)
+    let version_dir = versions.last()?.path();
+    Some((pkg_name.to_string(), version_dir))
 }

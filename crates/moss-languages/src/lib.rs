@@ -91,7 +91,8 @@ pub use registry::{support_for_extension, support_for_path, supported_languages}
 
 // Re-exports from traits
 pub use traits::{
-    Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+    Export, Import, Language, PackageSource, PackageSourceKind, Symbol, SymbolKind,
+    Visibility, VisibilityMechanism, skip_dotfiles, has_extension,
 };
 
 // Re-export language structs

@@ -336,4 +336,168 @@ pub trait Language: Send + Sync {
         }
         entry_name.to_string()
     }
+
+    /// Return package sources to index for this language.
+    /// Each source describes a directory containing packages.
+    /// Default: returns stdlib and package cache if available.
+    fn package_sources(&self, project_root: &Path) -> Vec<PackageSource> {
+        let mut sources = Vec::new();
+        if let Some(stdlib) = self.find_stdlib(project_root) {
+            sources.push(PackageSource {
+                name: "stdlib",
+                path: stdlib,
+                kind: PackageSourceKind::Flat,
+                version_specific: true,
+            });
+        }
+        if let Some(cache) = self.find_package_cache(project_root) {
+            sources.push(PackageSource {
+                name: "packages",
+                path: cache,
+                kind: PackageSourceKind::Flat,
+                version_specific: false,
+            });
+        }
+        sources
+    }
+
+    /// Discover packages in a source directory.
+    /// Returns (package_name, path) pairs for all packages found.
+    /// Default implementation handles Flat, Recursive, and NpmScoped kinds.
+    /// Languages with special source kinds (Maven, Gradle, Cargo, Deno) should override.
+    fn discover_packages(&self, source: &PackageSource) -> Vec<(String, PathBuf)> {
+        match source.kind {
+            PackageSourceKind::Flat => self.discover_flat_packages(&source.path),
+            PackageSourceKind::Recursive => self.discover_recursive_packages(&source.path, &source.path),
+            PackageSourceKind::NpmScoped => self.discover_npm_scoped_packages(&source.path),
+            // Languages using these kinds must override discover_packages
+            PackageSourceKind::Maven
+            | PackageSourceKind::Gradle
+            | PackageSourceKind::Cargo
+            | PackageSourceKind::Deno => Vec::new(),
+        }
+    }
+
+    /// Discover packages in a flat directory (each entry is a package).
+    fn discover_flat_packages(&self, source_path: &Path) -> Vec<(String, PathBuf)> {
+        let entries = match std::fs::read_dir(source_path) {
+            Ok(e) => e,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut packages = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            if self.should_skip_package_entry(&name, path.is_dir()) {
+                continue;
+            }
+
+            let module_name = self.package_module_name(&name);
+            packages.push((module_name, path));
+        }
+        packages
+    }
+
+    /// Discover packages recursively (each file with matching extension is a package).
+    fn discover_recursive_packages(&self, base_path: &Path, current_path: &Path) -> Vec<(String, PathBuf)> {
+        let entries = match std::fs::read_dir(current_path) {
+            Ok(e) => e,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut packages = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            let is_dir = path.is_dir();
+
+            if self.should_skip_package_entry(&name, is_dir) {
+                continue;
+            }
+
+            if is_dir {
+                packages.extend(self.discover_recursive_packages(base_path, &path));
+            } else {
+                // Get relative path from base as module name
+                let rel_path = path.strip_prefix(base_path)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| name);
+                packages.push((rel_path, path));
+            }
+        }
+        packages
+    }
+
+    /// Discover packages in npm-scoped directory (handles @scope/package).
+    fn discover_npm_scoped_packages(&self, source_path: &Path) -> Vec<(String, PathBuf)> {
+        let entries = match std::fs::read_dir(source_path) {
+            Ok(e) => e,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut packages = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            if self.should_skip_package_entry(&name, path.is_dir()) {
+                continue;
+            }
+
+            if name.starts_with('@') && path.is_dir() {
+                // Scoped package - iterate contents
+                if let Ok(scoped_entries) = std::fs::read_dir(&path) {
+                    for scoped_entry in scoped_entries.flatten() {
+                        let scoped_path = scoped_entry.path();
+                        let scoped_name = scoped_entry.file_name().to_string_lossy().to_string();
+                        if self.should_skip_package_entry(&scoped_name, scoped_path.is_dir()) {
+                            continue;
+                        }
+                        let full_name = format!("{}/{}", name, scoped_name);
+                        packages.push((full_name, scoped_path));
+                    }
+                }
+            } else {
+                let module_name = self.package_module_name(&name);
+                packages.push((module_name, path));
+            }
+        }
+        packages
+    }
+}
+
+/// A source of packages to index.
+#[derive(Debug, Clone)]
+pub struct PackageSource {
+    /// Display name (e.g., "stdlib", "site-packages", "node_modules")
+    pub name: &'static str,
+    /// Path to the source directory
+    pub path: PathBuf,
+    /// How to traverse this source
+    pub kind: PackageSourceKind,
+    /// Whether packages here are version-specific (affects max_version in index)
+    pub version_specific: bool,
+}
+
+/// How to traverse a package source directory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageSourceKind {
+    /// Flat directory of packages (Python site-packages, node_modules)
+    /// Each top-level entry is a package.
+    Flat,
+    /// Recursive directory (Go stdlib, C++ includes)
+    /// Packages are identified by having indexable files.
+    Recursive,
+    /// NPM-style scoped packages (@scope/package)
+    NpmScoped,
+    /// Maven repository structure (group/artifact/version)
+    Maven,
+    /// Gradle cache structure (group/artifact/version/hash)
+    Gradle,
+    /// Cargo registry structure (index/crate-version)
+    Cargo,
+    /// Deno cache structure (needs special handling for npm vs URL deps)
+    Deno,
 }

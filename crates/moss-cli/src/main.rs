@@ -1,7 +1,6 @@
 use clap::{Parser, Subcommand};
 use moss_core::get_moss_dir;
 use moss_languages::external_packages;
-use moss_languages::Language;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -5043,1107 +5042,68 @@ fn cmd_index_packages(only: &[String], clear: bool, root: Option<&Path>, json: b
         }
     }
 
-    // Determine which ecosystems to index
-    let all_ecosystems = ["python", "go", "js", "deno", "java", "cpp", "rust"];
-    let do_all = only.is_empty();
-    let ecosystems: Vec<&str> = if do_all {
-        all_ecosystems.to_vec()
+    // Collect results per language
+    let mut results: std::collections::HashMap<&str, (usize, usize)> = std::collections::HashMap::new();
+
+    // Get all available lang_keys from registered languages
+    let available: Vec<&str> = moss_languages::supported_languages()
+        .iter()
+        .map(|l| l.lang_key())
+        .filter(|k| !k.is_empty())
+        .collect();
+
+    // Filter to requested ecosystems
+    let ecosystems: Vec<&str> = if only.is_empty() {
+        available.clone()
     } else {
         only.iter()
             .map(|s| s.as_str())
-            .filter(|s| all_ecosystems.contains(s))
+            .filter(|s| available.contains(s))
             .collect()
     };
 
-    // Log error for unknown ecosystems (but continue with valid ones)
+    // Log error for unknown ecosystems
     for eco in only {
-        if !all_ecosystems.contains(&eco.as_str()) {
-            eprintln!("Error: unknown ecosystem '{}', valid options: {}", eco, all_ecosystems.join(", "));
+        if !available.contains(&eco.as_str()) {
+            eprintln!("Error: unknown ecosystem '{}', valid options: {}", eco, available.join(", "));
         }
     }
 
-    let mut stats = IndexPackagesStats::default();
-
-    for eco in &ecosystems {
-        match *eco {
-            "python" => index_python_packages(&index, &root, &mut stats, json),
-            "go" => index_go_packages(&index, &mut stats, json),
-            "js" => index_js_packages(&index, &root, &mut stats, json),
-            "deno" => index_deno_packages(&index, &mut stats, json),
-            "java" => index_java_packages(&index, &mut stats, json),
-            "cpp" => index_cpp_packages(&index, &mut stats, json),
-            "rust" => index_rust_packages(&index, &mut stats, json),
-            _ => {}
+    // Index each language using the generic indexer
+    for lang in moss_languages::supported_languages() {
+        let lang_key = lang.lang_key();
+        if lang_key.is_empty() || !ecosystems.contains(&lang_key) {
+            continue;
         }
+        // Skip if we already indexed this lang_key (e.g., TypeScript shares "js" with JavaScript)
+        if results.contains_key(lang_key) {
+            continue;
+        }
+        let (pkgs, syms) = index_language_packages(lang, &index, &root, json);
+        results.insert(lang_key, (pkgs, syms));
     }
 
+    // Output results
     if json {
-        println!("{}", serde_json::json!({
-            "python_packages": stats.python_packages,
-            "python_symbols": stats.python_symbols,
-            "go_packages": stats.go_packages,
-            "go_symbols": stats.go_symbols,
-            "js_packages": stats.js_packages,
-            "js_symbols": stats.js_symbols,
-            "deno_packages": stats.deno_packages,
-            "deno_symbols": stats.deno_symbols,
-            "java_packages": stats.java_packages,
-            "java_symbols": stats.java_symbols,
-            "cpp_packages": stats.cpp_packages,
-            "cpp_symbols": stats.cpp_symbols,
-            "rust_packages": stats.rust_packages,
-            "rust_symbols": stats.rust_symbols,
-        }));
+        let mut json_obj = serde_json::Map::new();
+        for (key, (pkgs, syms)) in &results {
+            json_obj.insert(format!("{}_packages", key), serde_json::json!(pkgs));
+            json_obj.insert(format!("{}_symbols", key), serde_json::json!(syms));
+        }
+        println!("{}", serde_json::Value::Object(json_obj));
     } else {
         println!("\nIndexing complete:");
-        if ecosystems.contains(&"python") {
-            println!("  Python: {} packages, {} symbols", stats.python_packages, stats.python_symbols);
-        }
-        if ecosystems.contains(&"go") {
-            println!("  Go: {} packages, {} symbols", stats.go_packages, stats.go_symbols);
-        }
-        if ecosystems.contains(&"js") {
-            println!("  JavaScript: {} packages, {} symbols", stats.js_packages, stats.js_symbols);
-        }
-        if ecosystems.contains(&"deno") {
-            println!("  Deno: {} packages, {} symbols", stats.deno_packages, stats.deno_symbols);
-        }
-        if ecosystems.contains(&"java") {
-            println!("  Java: {} packages, {} symbols", stats.java_packages, stats.java_symbols);
-        }
-        if ecosystems.contains(&"cpp") {
-            println!("  C/C++: {} headers, {} symbols", stats.cpp_packages, stats.cpp_symbols);
-        }
-        if ecosystems.contains(&"rust") {
-            println!("  Rust: {} packages, {} symbols", stats.rust_packages, stats.rust_symbols);
+        for (key, (pkgs, syms)) in &results {
+            println!("  {}: {} packages, {} symbols", key, pkgs, syms);
         }
     }
 
     0
 }
 
-#[derive(Default)]
-struct IndexPackagesStats {
-    python_packages: usize,
-    python_symbols: usize,
-    go_packages: usize,
-    go_symbols: usize,
-    js_packages: usize,
-    js_symbols: usize,
-    deno_packages: usize,
-    deno_symbols: usize,
-    java_packages: usize,
-    java_symbols: usize,
-    cpp_packages: usize,
-    cpp_symbols: usize,
-    rust_packages: usize,
-    rust_symbols: usize,
-}
-
-/// Index Python stdlib and site-packages.
-fn index_python_packages(
-    index: &external_packages::PackageIndex,
-    root: &Path,
-    stats: &mut IndexPackagesStats,
-    json: bool,
-) {
-    let version = moss_languages::python::get_python_version(root)
-        .and_then(|v| external_packages::Version::parse(&v));
-
-    let min_version = version.unwrap_or(external_packages::Version { major: 3, minor: 0 });
-
-    if !json {
-        println!("Indexing Python packages (version {:?})...", version);
-    }
-
-    let mut extractor = skeleton::SkeletonExtractor::new();
-
-    let python = moss_languages::python::Python;
-
-    // Index stdlib
-    if let Some(stdlib) = python.find_stdlib(root) {
-        if !json {
-            println!("  Stdlib: {}", stdlib.display());
-        }
-        if let Ok(entries) = std::fs::read_dir(&stdlib) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = entry.file_name().to_string_lossy().to_string();
-
-                if python.should_skip_package_entry(&name, path.is_dir()) {
-                    continue;
-                }
-
-                let module_name = python.package_module_name(&name);
-
-                // Skip if already indexed
-                if let Ok(true) = index.is_indexed("python", &module_name) {
-                    continue;
-                }
-
-                let pkg_id = match index.insert_package(
-                    "python",
-                    &module_name,
-                    &path.to_string_lossy(),
-                    min_version,
-                    version, // stdlib is version-specific
-                ) {
-                    Ok(id) => id,
-                    Err(_) => continue,
-                };
-
-                stats.python_packages += 1;
-                let symbols = index_python_path(&mut extractor, index, pkg_id, &path);
-                stats.python_symbols += symbols;
-            }
-        }
-    }
-
-    // Index site-packages
-    if let Some(site_packages) = moss_languages::python::find_python_site_packages(root) {
-        if !json {
-            println!("  Site-packages: {}", site_packages.display());
-        }
-        if let Ok(entries) = std::fs::read_dir(&site_packages) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = entry.file_name().to_string_lossy().to_string();
-
-                if python.should_skip_package_entry(&name, path.is_dir()) {
-                    continue;
-                }
-
-                let module_name = python.package_module_name(&name);
-
-                // Skip if already indexed
-                if let Ok(true) = index.is_indexed("python", &module_name) {
-                    continue;
-                }
-
-                let pkg_id = match index.insert_package(
-                    "python",
-                    &module_name,
-                    &path.to_string_lossy(),
-                    min_version,
-                    None, // packages may work with newer versions
-                ) {
-                    Ok(id) => id,
-                    Err(_) => continue,
-                };
-
-                stats.python_packages += 1;
-                let symbols = index_python_path(&mut extractor, index, pkg_id, &path);
-                stats.python_symbols += symbols;
-            }
-        }
-    }
-}
-
-/// Index a Python path (file or directory) and return symbol count.
-fn index_python_path(
-    extractor: &mut skeleton::SkeletonExtractor,
-    index: &external_packages::PackageIndex,
-    pkg_id: i64,
-    path: &Path,
-) -> usize {
-    let mut count = 0;
-
-    if path.is_file() && path.extension().map_or(false, |e| e == "py") {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            let result = extractor.extract(path, &content);
-            count += count_and_insert_symbols(index, pkg_id, &result.symbols);
-        }
-    } else if path.is_dir() {
-        // Index __init__.py if it exists
-        let init_path = path.join("__init__.py");
-        if init_path.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&init_path) {
-                let result = extractor.extract(&init_path, &content);
-                count += count_and_insert_symbols(index, pkg_id, &result.symbols);
-            }
-        }
-    }
-
-    count
-}
-
-/// Index Go stdlib and mod cache.
-fn index_go_packages(
-    index: &external_packages::PackageIndex,
-    stats: &mut IndexPackagesStats,
-    json: bool,
-) {
-    let go = moss_languages::go::Go;
-    let version = moss_languages::go::get_go_version()
-        .and_then(|v| external_packages::Version::parse(&v));
-
-    let min_version = version.unwrap_or(external_packages::Version { major: 1, minor: 0 });
-
-    if !json {
-        println!("Indexing Go packages (version {:?})...", version);
-    }
-
-    let mut extractor = skeleton::SkeletonExtractor::new();
-
-    // Index stdlib
-    if let Some(stdlib) = go.find_stdlib(Path::new(".")) {
-        if !json {
-            println!("  Stdlib: {}", stdlib.display());
-        }
-        index_go_stdlib_recursive(&go, &mut extractor, index, &stdlib, "", min_version, version, stats);
-    }
-
-    // Index mod cache (just top-level for now - full recursive would be slow)
-    if let Some(mod_cache) = moss_languages::go::find_go_mod_cache() {
-        if !json {
-            println!("  Mod cache: {}", mod_cache.display());
-        }
-        // Note: mod cache indexing is lazy (on-demand) for performance
-        // We just report its availability here
-    }
-}
-
-/// Recursively index Go stdlib packages.
-fn index_go_stdlib_recursive(
-    go: &moss_languages::go::Go,
-    extractor: &mut skeleton::SkeletonExtractor,
-    index: &external_packages::PackageIndex,
-    base: &Path,
-    prefix: &str,
-    min_version: external_packages::Version,
-    max_version: Option<external_packages::Version>,
-    stats: &mut IndexPackagesStats,
-) {
-    let Ok(entries) = std::fs::read_dir(base) else { return };
-
-    let mut has_go_files = false;
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-        let is_dir = path.is_dir();
-
-        if go.should_skip_package_entry(&name, is_dir) {
-            continue;
-        }
-
-        if is_dir {
-            // Recurse into subdirectories
-            let sub_prefix = if prefix.is_empty() {
-                name.clone()
-            } else {
-                format!("{}/{}", prefix, name)
-            };
-            index_go_stdlib_recursive(go, extractor, index, &path, &sub_prefix, min_version, max_version, stats);
-        } else {
-            has_go_files = true;
-        }
-    }
-
-    // If this directory has .go files, index it as a package
-    if has_go_files && !prefix.is_empty() {
-        // Skip if already indexed
-        if let Ok(true) = index.is_indexed("go", prefix) {
-            return;
-        }
-
-        let pkg_id = match index.insert_package(
-            "go",
-            prefix,
-            &base.to_string_lossy(),
-            min_version,
-            max_version,
-        ) {
-            Ok(id) => id,
-            Err(_) => return,
-        };
-
-        stats.go_packages += 1;
-
-        // Index all .go files in this directory
-        if let Ok(entries) = std::fs::read_dir(base) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = entry.file_name().to_string_lossy().to_string();
-                if !go.should_skip_package_entry(&name, false) {
-                    if let Ok(content) = std::fs::read_to_string(&path) {
-                        let result = extractor.extract(&path, &content);
-                        stats.go_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Index JavaScript packages from node_modules.
-fn index_js_packages(
-    index: &external_packages::PackageIndex,
-    root: &Path,
-    stats: &mut IndexPackagesStats,
-    json: bool,
-) {
-    let js = moss_languages::javascript::JavaScript;
-    let version = moss_languages::ecmascript::get_node_version()
-        .and_then(|v| external_packages::Version::parse(&v));
-
-    if !json {
-        println!("Indexing JavaScript packages (version {:?})...", version);
-    }
-
-    let node_modules = match js.find_package_cache(root) {
-        Some(nm) => nm,
-        None => {
-            if !json {
-                println!("  No node_modules found");
-            }
-            return;
-        }
-    };
-
-    if !json {
-        println!("  node_modules: {}", node_modules.display());
-    }
-
-    let min_version = version.unwrap_or(external_packages::Version { major: 0, minor: 0 });
-    let mut extractor = skeleton::SkeletonExtractor::new();
-
-    if let Ok(entries) = std::fs::read_dir(&node_modules) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-
-            // Skip hidden dirs (but not scoped packages starting with @)
-            if js.should_skip_package_entry(&name, path.is_dir()) && !name.starts_with('@') {
-                continue;
-            }
-
-            // Handle scoped packages (@scope/name)
-            if name.starts_with('@') && path.is_dir() {
-                if let Ok(scoped) = std::fs::read_dir(&path) {
-                    for scoped_entry in scoped.flatten() {
-                        let scoped_path = scoped_entry.path();
-                        let scoped_name = format!("{}/{}", name, scoped_entry.file_name().to_string_lossy());
-
-                        if let Some(entry_point) = moss_languages::ecmascript::find_package_entry(&scoped_path) {
-                            index_single_js_package(
-                                index, &mut extractor, &scoped_name, &entry_point, min_version, stats
-                            );
-                        }
-                    }
-                }
-                continue;
-            }
-
-            // Regular package
-            if path.is_dir() {
-                if let Some(entry_point) = moss_languages::ecmascript::find_package_entry(&path) {
-                    index_single_js_package(
-                        index, &mut extractor, &name, &entry_point, min_version, stats
-                    );
-                }
-            }
-        }
-    }
-}
-
-/// Index a single JavaScript package.
-fn index_single_js_package(
-    index: &external_packages::PackageIndex,
-    extractor: &mut skeleton::SkeletonExtractor,
-    name: &str,
-    entry_point: &Path,
-    min_version: external_packages::Version,
-    stats: &mut IndexPackagesStats,
-) {
-    // Skip if already indexed
-    if let Ok(true) = index.is_indexed("js", name) {
-        return;
-    }
-
-    let pkg_id = match index.insert_package(
-        "js",
-        name,
-        &entry_point.to_string_lossy(),
-        min_version,
-        None,
-    ) {
-        Ok(id) => id,
-        Err(_) => return,
-    };
-
-    stats.js_packages += 1;
-
-    if let Ok(content) = std::fs::read_to_string(entry_point) {
-        let result = extractor.extract(entry_point, &content);
-        stats.js_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
-    }
-}
-
-/// Index Deno packages from cache.
-fn index_deno_packages(
-    index: &external_packages::PackageIndex,
-    stats: &mut IndexPackagesStats,
-    json: bool,
-) {
-    let version = moss_languages::ecmascript::get_deno_version()
-        .and_then(|v| external_packages::Version::parse(&v));
-
-    if !json {
-        println!("Indexing Deno packages (version {:?})...", version);
-    }
-
-    let cache = match moss_languages::ecmascript::find_deno_cache() {
-        Some(c) => c,
-        None => {
-            if !json {
-                println!("  No Deno cache found");
-            }
-            return;
-        }
-    };
-
-    if !json {
-        println!("  Deno cache: {}", cache.display());
-    }
-
-    let min_version = version.unwrap_or(external_packages::Version { major: 1, minor: 0 });
-    let mut extractor = skeleton::SkeletonExtractor::new();
-
-    // Index npm packages from Deno's npm cache
-    let npm_cache = cache.join("npm").join("registry.npmjs.org");
-    if npm_cache.is_dir() {
-        if !json {
-            println!("  Indexing npm packages...");
-        }
-        index_deno_npm_packages(index, &npm_cache, min_version, &mut extractor, stats);
-    }
-
-    // Index URL-based deps
-    let deps_cache = cache.join("deps");
-    if deps_cache.is_dir() {
-        if !json {
-            println!("  Indexing URL deps...");
-        }
-        index_deno_url_packages(index, &deps_cache, min_version, &mut extractor, stats);
-    }
-}
-
-/// Index Deno npm packages.
-fn index_deno_npm_packages(
-    index: &external_packages::PackageIndex,
-    npm_cache: &Path,
-    min_version: external_packages::Version,
-    extractor: &mut skeleton::SkeletonExtractor,
-    stats: &mut IndexPackagesStats,
-) {
-    // Structure: npm/registry.npmjs.org/package/version/
-    if let Ok(packages) = std::fs::read_dir(npm_cache) {
-        for pkg_entry in packages.flatten() {
-            let pkg_path = pkg_entry.path();
-            let pkg_name = pkg_entry.file_name().to_string_lossy().to_string();
-
-            if !pkg_path.is_dir() {
-                continue;
-            }
-
-            // Handle scoped packages (@scope/name)
-            if pkg_name.starts_with('@') {
-                if let Ok(scoped) = std::fs::read_dir(&pkg_path) {
-                    for scoped_entry in scoped.flatten() {
-                        let scoped_path = scoped_entry.path();
-                        let full_name = format!("{}/{}", pkg_name, scoped_entry.file_name().to_string_lossy());
-                        index_deno_npm_package(index, extractor, &scoped_path, &full_name, min_version, stats);
-                    }
-                }
-            } else {
-                index_deno_npm_package(index, extractor, &pkg_path, &pkg_name, min_version, stats);
-            }
-        }
-    }
-}
-
-/// Index a single Deno npm package (finds latest version).
-fn index_deno_npm_package(
-    index: &external_packages::PackageIndex,
-    extractor: &mut skeleton::SkeletonExtractor,
-    pkg_path: &Path,
-    name: &str,
-    min_version: external_packages::Version,
-    stats: &mut IndexPackagesStats,
-) {
-    // Skip if already indexed
-    if let Ok(true) = index.is_indexed("deno", name) {
-        return;
-    }
-
-    // Find latest version directory
-    let mut versions: Vec<_> = std::fs::read_dir(pkg_path)
-        .ok()
-        .map(|entries| entries.flatten().filter(|e| e.path().is_dir()).collect())
-        .unwrap_or_default();
-
-    if versions.is_empty() {
-        return;
-    }
-
-    // Sort by version and take the latest
-    versions.sort_by(|a, b| {
-        let a_name = a.file_name().to_string_lossy().to_string();
-        let b_name = b.file_name().to_string_lossy().to_string();
-        external_packages::version_cmp(&a_name, &b_name)
-    });
-
-    let version_dir = versions.last().unwrap().path();
-
-    // Find entry point
-    let entry_point = match moss_languages::ecmascript::find_package_entry(&version_dir) {
-        Some(e) => e,
-        None => return,
-    };
-
-    let pkg_id = match index.insert_package(
-        "deno",
-        name,
-        &entry_point.to_string_lossy(),
-        min_version,
-        None,
-    ) {
-        Ok(id) => id,
-        Err(_) => return,
-    };
-
-    stats.deno_packages += 1;
-
-    if let Ok(content) = std::fs::read_to_string(&entry_point) {
-        let result = extractor.extract(&entry_point, &content);
-        stats.deno_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
-    }
-}
-
-/// Index Deno URL-based packages.
-fn index_deno_url_packages(
-    index: &external_packages::PackageIndex,
-    deps_cache: &Path,
-    min_version: external_packages::Version,
-    extractor: &mut skeleton::SkeletonExtractor,
-    stats: &mut IndexPackagesStats,
-) {
-    // Structure: deps/https/deno.land/<hash> with <hash>.metadata.json
-    for scheme in &["https", "http"] {
-        let scheme_dir = deps_cache.join(scheme);
-        if !scheme_dir.is_dir() {
-            continue;
-        }
-
-        if let Ok(hosts) = std::fs::read_dir(&scheme_dir) {
-            for host_entry in hosts.flatten() {
-                let host_path = host_entry.path();
-                let host = host_entry.file_name().to_string_lossy().to_string();
-
-                if !host_path.is_dir() {
-                    continue;
-                }
-
-                index_deno_host_packages(index, extractor, &host_path, &host, scheme, min_version, stats);
-            }
-        }
-    }
-}
-
-/// Index packages from a specific Deno host cache.
-fn index_deno_host_packages(
-    index: &external_packages::PackageIndex,
-    extractor: &mut skeleton::SkeletonExtractor,
-    host_path: &Path,
-    host: &str,
-    scheme: &str,
-    min_version: external_packages::Version,
-    stats: &mut IndexPackagesStats,
-) {
-    if let Ok(entries) = std::fs::read_dir(host_path) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-
-            // Skip metadata files
-            if name.ends_with(".metadata.json") {
-                continue;
-            }
-
-            // Read metadata to get URL
-            let meta_path = host_path.join(format!("{}.metadata.json", name));
-            if !meta_path.is_file() {
-                continue;
-            }
-
-            let url = match std::fs::read_to_string(&meta_path) {
-                Ok(content) => {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                        json.get("url").and_then(|v| v.as_str()).map(|s| s.to_string())
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => None,
-            };
-
-            let pkg_name = match &url {
-                Some(u) => u.strip_prefix(&format!("{}://", scheme)).unwrap_or(&name).to_string(),
-                None => format!("{}/{}", host, name),
-            };
-
-            // Skip if already indexed
-            if let Ok(true) = index.is_indexed("deno", &pkg_name) {
-                continue;
-            }
-
-            if !path.is_file() {
-                continue;
-            }
-
-            let pkg_id = match index.insert_package(
-                "deno",
-                &pkg_name,
-                &path.to_string_lossy(),
-                min_version,
-                None,
-            ) {
-                Ok(id) => id,
-                Err(_) => continue,
-            };
-
-            stats.deno_packages += 1;
-
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                let result = extractor.extract(&path, &content);
-                stats.deno_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
-            }
-        }
-    }
-}
-
-/// Index Java packages from Maven and Gradle caches.
-fn index_java_packages(
-    index: &external_packages::PackageIndex,
-    stats: &mut IndexPackagesStats,
-    json: bool,
-) {
-    let version = moss_languages::java::get_java_version()
-        .and_then(|v| external_packages::Version::parse(&v));
-
-    if !json {
-        println!("Indexing Java packages (version {:?})...", version);
-    }
-
-    let min_version = version.unwrap_or(external_packages::Version { major: 11, minor: 0 });
-
-    // Index Maven repository
-    if let Some(maven_repo) = moss_languages::java::find_maven_repository() {
-        if !json {
-            println!("  Maven repository: {}", maven_repo.display());
-        }
-        index_maven_packages(index, &maven_repo, min_version, stats);
-    } else if !json {
-        println!("  No Maven repository found");
-    }
-
-    // Index Gradle cache
-    if let Some(gradle_cache) = moss_languages::java::find_gradle_cache() {
-        if !json {
-            println!("  Gradle cache: {}", gradle_cache.display());
-        }
-        index_gradle_packages(index, &gradle_cache, min_version, stats);
-    } else if !json {
-        println!("  No Gradle cache found");
-    }
-}
-
-/// Index Maven repository packages.
-fn index_maven_packages(
-    index: &external_packages::PackageIndex,
-    maven_repo: &Path,
-    min_version: external_packages::Version,
-    stats: &mut IndexPackagesStats,
-) {
-    // Walk the Maven repo, looking for JAR files
-    // Structure: group/artifact/version/artifact-version.jar
-    index_maven_directory(index, maven_repo, maven_repo, min_version, stats);
-}
-
-/// Recursively index a Maven directory.
-fn index_maven_directory(
-    index: &external_packages::PackageIndex,
-    maven_repo: &Path,
-    current: &Path,
-    min_version: external_packages::Version,
-    stats: &mut IndexPackagesStats,
-) {
-    let entries = match std::fs::read_dir(current) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-
-        if path.is_dir() {
-            // Check if this looks like a version directory (contains JARs)
-            if has_jar_files(&path) {
-                // This is a version dir, parent is artifact, grandparent is group path
-                if let Some(artifact_dir) = current.parent() {
-                    let artifact = current.file_name().unwrap_or_default().to_string_lossy();
-                    if let Some(group_path) = artifact_dir.strip_prefix(maven_repo).ok() {
-                        let group = group_path.to_string_lossy().replace('/', ".");
-                        let pkg_name = format!("{}:{}", group, artifact);
-
-                        // Skip if already indexed
-                        if let Ok(true) = index.is_indexed("java", &pkg_name) {
-                            continue;
-                        }
-
-                        // Find the JAR (prefer sources)
-                        if let Some(jar_path) = find_maven_jar(&path, &artifact) {
-                            let _ = index.insert_package(
-                                "java",
-                                &pkg_name,
-                                &jar_path.to_string_lossy(),
-                                min_version,
-                                None,
-                            );
-                            stats.java_packages += 1;
-                            // Note: We don't extract symbols from JARs (binary)
-                        }
-                    }
-                }
-            } else {
-                // Recurse into subdirectory
-                index_maven_directory(index, maven_repo, &path, min_version, stats);
-            }
-        }
-    }
-}
-
-/// Check if a directory contains JAR files.
-fn has_jar_files(dir: &Path) -> bool {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".jar") {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// Find the best JAR in a Maven version directory.
-fn find_maven_jar(version_dir: &Path, artifact: &str) -> Option<PathBuf> {
-    let entries: Vec<_> = std::fs::read_dir(version_dir).ok()?.flatten().collect();
-
-    // Prefer sources JAR
-    for entry in &entries {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with(artifact) && name.ends_with("-sources.jar") {
-            return Some(entry.path());
-        }
-    }
-
-    // Fall back to regular JAR
-    for entry in &entries {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with(artifact) && name.ends_with(".jar") && !name.ends_with("-javadoc.jar") {
-            return Some(entry.path());
-        }
-    }
-
-    None
-}
-
-/// Index Gradle cache packages.
-fn index_gradle_packages(
-    index: &external_packages::PackageIndex,
-    gradle_cache: &Path,
-    min_version: external_packages::Version,
-    stats: &mut IndexPackagesStats,
-) {
-    // Structure: group/artifact/version/hash/artifact-version.jar
-    if let Ok(groups) = std::fs::read_dir(gradle_cache) {
-        for group_entry in groups.flatten() {
-            let group_path = group_entry.path();
-            let group = group_entry.file_name().to_string_lossy().to_string();
-
-            if !group_path.is_dir() {
-                continue;
-            }
-
-            if let Ok(artifacts) = std::fs::read_dir(&group_path) {
-                for artifact_entry in artifacts.flatten() {
-                    let artifact_path = artifact_entry.path();
-                    let artifact = artifact_entry.file_name().to_string_lossy().to_string();
-
-                    if !artifact_path.is_dir() {
-                        continue;
-                    }
-
-                    let pkg_name = format!("{}:{}", group, artifact);
-
-                    // Skip if already indexed
-                    if let Ok(true) = index.is_indexed("java", &pkg_name) {
-                        continue;
-                    }
-
-                    // Find latest version
-                    if let Some(jar_path) = find_gradle_jar(&artifact_path) {
-                        let _ = index.insert_package(
-                            "java",
-                            &pkg_name,
-                            &jar_path.to_string_lossy(),
-                            min_version,
-                            None,
-                        );
-                        stats.java_packages += 1;
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Find the best JAR in a Gradle artifact directory.
-fn find_gradle_jar(artifact_dir: &Path) -> Option<PathBuf> {
-    // Find latest version
-    let mut versions: Vec<_> = std::fs::read_dir(artifact_dir).ok()?
-        .flatten()
-        .filter(|e| e.path().is_dir())
-        .collect();
-
-    versions.sort_by(|a, b| {
-        let a_name = a.file_name().to_string_lossy().to_string();
-        let b_name = b.file_name().to_string_lossy().to_string();
-        external_packages::version_cmp(&a_name, &b_name)
-    });
-
-    let version_dir = versions.last()?.path();
-
-    // Look through hash directories
-    if let Ok(hashes) = std::fs::read_dir(&version_dir) {
-        for hash_entry in hashes.flatten() {
-            let hash_path = hash_entry.path();
-            if !hash_path.is_dir() {
-                continue;
-            }
-
-            // Prefer sources JAR
-            if let Ok(files) = std::fs::read_dir(&hash_path) {
-                for file_entry in files.flatten() {
-                    let name = file_entry.file_name().to_string_lossy().to_string();
-                    if name.ends_with("-sources.jar") {
-                        return Some(file_entry.path());
-                    }
-                }
-            }
-
-            // Fall back to regular JAR
-            if let Ok(files) = std::fs::read_dir(&hash_path) {
-                for file_entry in files.flatten() {
-                    let name = file_entry.file_name().to_string_lossy().to_string();
-                    if name.ends_with(".jar") && !name.ends_with("-sources.jar") && !name.ends_with("-javadoc.jar") {
-                        return Some(file_entry.path());
-                    }
-                }
-            }
-        }
-    }
-
-    None
-}
-
-/// Index C/C++ system headers.
-fn index_cpp_packages(
-    index: &external_packages::PackageIndex,
-    stats: &mut IndexPackagesStats,
-    json: bool,
-) {
-    let cpp = moss_languages::cpp::Cpp;
-    let version = moss_languages::c_cpp::get_gcc_version()
-        .and_then(|v| external_packages::Version::parse(&v));
-
-    if !json {
-        println!("Indexing C/C++ headers (version {:?})...", version);
-    }
-
-    let include_paths = moss_languages::c_cpp::find_cpp_include_paths();
-
-    if include_paths.is_empty() {
-        if !json {
-            println!("  No include paths found");
-        }
-        return;
-    }
-
-    if !json {
-        for path in &include_paths {
-            println!("  Include path: {}", path.display());
-        }
-    }
-
-    let min_version = version.unwrap_or(external_packages::Version { major: 11, minor: 0 });
-    let mut extractor = skeleton::SkeletonExtractor::new();
-
-    // Index headers from each include path
-    for include_path in &include_paths {
-        index_cpp_directory(&cpp, index, include_path, include_path, min_version, &mut extractor, stats);
-    }
-}
-
-/// Recursively index a C/C++ include directory.
-fn index_cpp_directory(
-    cpp: &moss_languages::cpp::Cpp,
-    index: &external_packages::PackageIndex,
-    base_path: &Path,
-    current: &Path,
-    min_version: external_packages::Version,
-    extractor: &mut skeleton::SkeletonExtractor,
-    stats: &mut IndexPackagesStats,
-) {
-    let entries = match std::fs::read_dir(current) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-        let is_dir = path.is_dir();
-
-        if cpp.should_skip_package_entry(&name, is_dir) {
-            continue;
-        }
-
-        if is_dir {
-            index_cpp_directory(cpp, index, base_path, &path, min_version, extractor, stats);
-        } else {
-            // Get relative path from base
-            let rel_path = path.strip_prefix(base_path)
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|_| name.clone());
-
-            // Skip if already indexed
-            if let Ok(true) = index.is_indexed("cpp", &rel_path) {
-                continue;
-            }
-
-            let pkg_id = match index.insert_package(
-                "cpp",
-                &rel_path,
-                &path.to_string_lossy(),
-                min_version,
-                None,
-            ) {
-                Ok(id) => id,
-                Err(_) => continue,
-            };
-
-            stats.cpp_packages += 1;
-
-            // Extract symbols from header
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                let result = extractor.extract(&path, &content);
-                stats.cpp_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
-            }
-        }
-    }
-}
-
-/// Index Rust crates from cargo registry.
-fn index_rust_packages(
-    index: &external_packages::PackageIndex,
-    stats: &mut IndexPackagesStats,
-    json: bool,
-) {
-    let rust = moss_languages::rust::Rust;
-    let version = moss_languages::rust::get_rust_version()
-        .and_then(|v| external_packages::Version::parse(&v));
-
-    if !json {
-        println!("Indexing Rust crates (version {:?})...", version);
-    }
-
-    let registry = match rust.find_package_cache(Path::new(".")) {
-        Some(r) => r,
-        None => {
-            if !json {
-                println!("  No cargo registry found");
-            }
-            return;
-        }
-    };
-
-    if !json {
-        println!("  Cargo registry: {}", registry.display());
-    }
-
-    let min_version = version.unwrap_or(external_packages::Version { major: 1, minor: 0 });
-    let mut extractor = skeleton::SkeletonExtractor::new();
-
-    // Registry structure: ~/.cargo/registry/src/index.crates.io-*/crate-version/
-    if let Ok(indices) = std::fs::read_dir(&registry) {
-        for index_entry in indices.flatten() {
-            let index_path = index_entry.path();
-            if !index_path.is_dir() {
-                continue;
-            }
-
-            if let Ok(crates) = std::fs::read_dir(&index_path) {
-                for crate_entry in crates.flatten() {
-                    let crate_path = crate_entry.path();
-                    let crate_name = crate_entry.file_name().to_string_lossy().to_string();
-
-                    // Skip if not a directory
-                    if !crate_path.is_dir() {
-                        continue;
-                    }
-
-                    // Extract crate name (remove version suffix)
-                    // e.g., "serde-1.0.193" -> "serde"
-                    let name = crate_name.rsplit_once('-')
-                        .map(|(n, _)| n)
-                        .unwrap_or(&crate_name);
-
-                    // Skip if already indexed
-                    if let Ok(true) = index.is_indexed("rust", name) {
-                        continue;
-                    }
-
-                    // Find src/lib.rs
-                    let lib_rs = crate_path.join("src").join("lib.rs");
-                    if !lib_rs.is_file() {
-                        continue;
-                    }
-
-                    let pkg_id = match index.insert_package(
-                        "rust",
-                        name,
-                        &lib_rs.to_string_lossy(),
-                        min_version,
-                        None,
-                    ) {
-                        Ok(id) => id,
-                        Err(_) => continue,
-                    };
-
-                    stats.rust_packages += 1;
-
-                    if let Ok(content) = std::fs::read_to_string(&lib_rs) {
-                        let result = extractor.extract(&lib_rs, &content);
-                        stats.rust_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
-                    }
-                }
-            }
-        }
-    }
-}
+// ============================================================================
+// Generic package indexer using Language trait
+// ============================================================================
 
 /// Count symbols and insert them into the index.
 fn count_and_insert_symbols(
@@ -6164,4 +5124,107 @@ fn count_and_insert_symbols(
         count += count_and_insert_symbols(index, pkg_id, &sym.children);
     }
     count
+}
+
+/// Index packages for a language using its package_sources().
+fn index_language_packages(
+    lang: &dyn moss_languages::Language,
+    index: &external_packages::PackageIndex,
+    project_root: &Path,
+    json: bool,
+) -> (usize, usize) {
+    let version = lang.get_version(project_root)
+        .and_then(|v| external_packages::Version::parse(&v));
+
+    let lang_key = lang.lang_key();
+    if lang_key.is_empty() {
+        return (0, 0);
+    }
+
+    if !json {
+        println!("Indexing {} packages (version {:?})...", lang.name(), version);
+    }
+
+    let sources = lang.package_sources(project_root);
+    if sources.is_empty() {
+        if !json {
+            println!("  No package sources found");
+        }
+        return (0, 0);
+    }
+
+    let min_version = version.unwrap_or(external_packages::Version { major: 0, minor: 0 });
+    let mut extractor = skeleton::SkeletonExtractor::new();
+    let mut total_packages = 0;
+    let mut total_symbols = 0;
+
+    for source in sources {
+        if !json {
+            println!("  {}: {}", source.name, source.path.display());
+        }
+
+        let max_version = if source.version_specific { version } else { None };
+
+        // Use the trait's discover_packages method - no kind-specific dispatch here
+        let discovered = lang.discover_packages(&source);
+
+        for (pkg_name, pkg_path) in discovered {
+            if let Ok(true) = index.is_indexed(lang_key, &pkg_name) {
+                continue;
+            }
+
+            let pkg_id = match index.insert_package(
+                lang_key,
+                &pkg_name,
+                &pkg_path.to_string_lossy(),
+                min_version,
+                max_version,
+            ) {
+                Ok(id) => id,
+                Err(_) => continue,
+            };
+
+            total_packages += 1;
+            total_symbols += index_package_symbols(lang, index, &mut extractor, pkg_id, &pkg_path);
+        }
+    }
+
+    (total_packages, total_symbols)
+}
+
+/// Index symbols from a package path (file or directory).
+fn index_package_symbols(
+    lang: &dyn moss_languages::Language,
+    index: &external_packages::PackageIndex,
+    extractor: &mut skeleton::SkeletonExtractor,
+    pkg_id: i64,
+    path: &Path,
+) -> usize {
+    let extensions = lang.indexable_extensions();
+    if extensions.is_empty() {
+        return 0;
+    }
+
+    if path.is_file() {
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if extensions.contains(&ext) {
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    let result = extractor.extract(path, &content);
+                    return count_and_insert_symbols(index, pkg_id, &result.symbols);
+                }
+            }
+        }
+    } else if path.is_dir() {
+        // For Python: index __init__.py
+        // For other languages: find entry point
+        let init_py = path.join("__init__.py");
+        if init_py.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&init_py) {
+                let result = extractor.extract(&init_py, &content);
+                return count_and_insert_symbols(index, pkg_id, &result.symbols);
+            }
+        }
+    }
+
+    0
 }

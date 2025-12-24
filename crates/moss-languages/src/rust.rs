@@ -503,6 +503,20 @@ impl Language for Rust {
         &["rs"]
     }
 
+    fn package_sources(&self, project_root: &Path) -> Vec<crate::PackageSource> {
+        use crate::{PackageSource, PackageSourceKind};
+        let mut sources = Vec::new();
+        if let Some(cache) = self.find_package_cache(project_root) {
+            sources.push(PackageSource {
+                name: "cargo-registry",
+                path: cache,
+                kind: PackageSourceKind::Cargo,
+                version_specific: false,
+            });
+        }
+        sources
+    }
+
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
         use crate::traits::{skip_dotfiles, has_extension};
         if skip_dotfiles(name) { return true; }
@@ -513,6 +527,59 @@ impl Language for Rust {
         // Only index .rs files
         !is_dir && !has_extension(name, &["rs"])
     }
+
+    fn discover_packages(&self, source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
+        if source.kind != crate::PackageSourceKind::Cargo {
+            return Vec::new();
+        }
+        discover_cargo_packages(&source.path)
+    }
+}
+
+/// Discover packages in Cargo registry structure.
+/// Structure: ~/.cargo/registry/src/index.crates.io-*/crate-version/
+fn discover_cargo_packages(registry: &Path) -> Vec<(String, PathBuf)> {
+    let mut packages = Vec::new();
+
+    // Registry structure: registry/src/index.crates.io-*/crate-version/
+    let indices = match std::fs::read_dir(registry) {
+        Ok(e) => e,
+        Err(_) => return packages,
+    };
+
+    for index_entry in indices.flatten() {
+        let index_path = index_entry.path();
+        if !index_path.is_dir() {
+            continue;
+        }
+
+        let crates = match std::fs::read_dir(&index_path) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for crate_entry in crates.flatten() {
+            let crate_path = crate_entry.path();
+            let crate_name = crate_entry.file_name().to_string_lossy().to_string();
+
+            if !crate_path.is_dir() {
+                continue;
+            }
+
+            // Extract crate name (remove version suffix: "foo-1.2.3" -> "foo")
+            let name = crate_name.rsplit_once('-')
+                .map(|(n, _)| n)
+                .unwrap_or(&crate_name);
+
+            // Find src/lib.rs
+            let lib_rs = crate_path.join("src").join("lib.rs");
+            if lib_rs.is_file() {
+                packages.push((name.to_string(), lib_rs));
+            }
+        }
+    }
+
+    packages
 }
 
 /// Find the crate root (directory containing Cargo.toml).
