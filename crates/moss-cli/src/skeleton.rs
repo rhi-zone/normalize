@@ -239,6 +239,20 @@ impl SkeletonExtractor {
                     self.extract_legacy(lang, content)
                 }
             }
+            Some(Language::JavaScript) | Some(Language::Tsx) => {
+                if let Some(support) = get_support(Language::JavaScript) {
+                    self.extract_with_trait(Language::JavaScript, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::TypeScript) => {
+                if let Some(support) = get_support(Language::TypeScript) {
+                    self.extract_with_trait(Language::TypeScript, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
             // Other languages use legacy extractors (handle complex cases)
             _ => self.extract_legacy(lang, content),
         };
