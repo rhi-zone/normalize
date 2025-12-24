@@ -41,6 +41,24 @@ Do not:
 Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
 "Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."
 
+## Design Principles
+
+**Unify, don't multiply.** Fewer concepts = less mental load for humans and LLMs.
+- One interface that handles multiple cases > separate interfaces per case
+- Plugin/trait systems > hardcoded switches
+- Extend existing abstractions > create parallel ones
+- When user says "WTF is X" - ask: is this a naming issue or a design issue? Often the fix is unification, not renaming.
+
+**Simplicity over cleverness.**
+- If proposing a new dependency, ask: can stdlib/existing code do this?
+- HashMap > inventory crate. OnceLock > lazy_static. Functions > traits (until you need the trait).
+- "Going in circles" = signal to simplify, not add complexity.
+
+**When stuck (2+ failed attempts):**
+- Step back and reconsider the problem itself, not just try more solutions.
+- Ask: "Am I solving the right problem?" (go-imports: naming issue vs architecture issue)
+- Check docs/philosophy.md before questioning design decisions - the feature may be intentional.
+
 ## Development Environment
 
 Run `uv sync --extra all --extra dev` first. Many features require optional dependencies.
