@@ -11,6 +11,7 @@ Test Status: 2184 passing, 0 failing, 42 skipped (all optional deps)
 ## Backlog
 
 **Language Support:**
+- Fisheye for Deno (URL import cache resolution)
 - Fisheye for Java (package/class resolution)
 - Fisheye for C/C++ (#include resolution)
 - Call graph: Scala, Vue (no tree-sitter grammars yet)
