@@ -9,6 +9,33 @@ description = "Fast CLI for moss code intelligence"
 name = "moss"
 path = "src/main.rs"
 
+[features]
+default = ["all-languages"]
+
+# Meta-features (passthrough to moss-languages)
+all-languages = ["moss-languages/all-languages"]
+tier1 = ["moss-languages/tier1"]
+
+# Individual languages
+lang-python = ["moss-languages/lang-python"]
+lang-rust = ["moss-languages/lang-rust"]
+lang-javascript = ["moss-languages/lang-javascript"]
+lang-typescript = ["moss-languages/lang-typescript"]
+lang-go = ["moss-languages/lang-go"]
+lang-java = ["moss-languages/lang-java"]
+lang-c = ["moss-languages/lang-c"]
+lang-cpp = ["moss-languages/lang-cpp"]
+lang-ruby = ["moss-languages/lang-ruby"]
+lang-scala = ["moss-languages/lang-scala"]
+lang-vue = ["moss-languages/lang-vue"]
+lang-markdown = ["moss-languages/lang-markdown"]
+lang-json = ["moss-languages/lang-json"]
+lang-yaml = ["moss-languages/lang-yaml"]
+lang-toml = ["moss-languages/lang-toml"]
+lang-html = ["moss-languages/lang-html"]
+lang-css = ["moss-languages/lang-css"]
+lang-bash = ["moss-languages/lang-bash"]
+
 [dependencies]
 clap.workspace = true
 serde.workspace = true
@@ -18,7 +45,7 @@ ignore.workspace = true
 nucleo-matcher.workspace = true
 rusqlite.workspace = true
 moss-core.workspace = true
-moss-languages = { path = "../moss-languages" }
+moss-languages = { path = "../moss-languages", default-features = false }
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true
