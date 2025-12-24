@@ -4,13 +4,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Fix `index.rs` import indexing to use trait-based extraction (currently Python-only)
-- Complete C++ language support (last Tier 1 language with `todo!()` methods)
+- Refactor `external_packages.rs` to use trait-based resolution (currently per-language functions)
 - Complete non-Tier 1 languages: C, Ruby, Scala, Vue, Bash (all have `todo!()` methods)
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
 
-Test Status: 76 passing, 0 failing
+Test Status: 79 passing, 0 failing
 
 ## Backlog
 
@@ -44,6 +43,9 @@ Phase 3 - Integrate: ✅
 - [x] Refactor `edit.rs` to use trait (uses function_kinds/container_kinds)
 - [x] Refactor `cfg.rs` to use trait (add control_flow_kinds)
 - [x] Delete legacy code from symbols.rs, skeleton.rs, deps.rs (~2000 lines removed)
+- [x] Refactor `index.rs` to use trait-based import extraction
+- [x] Complete C++ language support (scope/control/complexity/nesting kinds)
+- [ ] Refactor `external_packages.rs` to use trait-based resolution
 
 Phase 4 - Expand:
 - [ ] Kotlin, Swift, Dart (mobile)
