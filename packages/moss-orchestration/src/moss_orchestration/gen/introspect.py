@@ -295,7 +295,6 @@ INTELLIGENCE_MODULES = {
     "scopes": "moss_intelligence.scopes",
     "test_gaps": "moss_intelligence.test_gaps",
     "test_health": "moss_intelligence.test_health",
-    "go_imports": "moss_intelligence.go_imports",
 }
 
 # Modules to introspect from moss-orchestration

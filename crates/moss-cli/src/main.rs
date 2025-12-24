@@ -10,6 +10,7 @@ mod complexity;
 mod daemon;
 mod deps;
 mod edit;
+mod go_mod;
 mod grep;
 mod health;
 mod index;
