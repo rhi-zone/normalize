@@ -4,9 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Add moss-languages feature flags to moss-cli Cargo.toml (propagate lang-python, lang-rust, etc. to allow selective compilation)
-- Session analysis: detect correction patterns ("You're right", "Good point", "isn't working")
-- Complete daemon integration (FileIndex API methods currently unused)
+- Split main.rs (5000 lines, 59 functions) into command modules:
+  - commands/view.rs: cmd_view*, cmd_skeleton, cmd_tree, cmd_context, cmd_expand
+  - commands/analyze.rs: cmd_health, cmd_overview, cmd_complexity, cmd_cfg, cmd_anchors, cmd_scopes
+  - commands/search.rs: cmd_grep, cmd_find_symbols, cmd_search_tree, cmd_path
+  - commands/deps.rs: cmd_symbols, cmd_callees, cmd_callers, cmd_deps, cmd_imports
+  - commands/index.rs: cmd_index_packages, cmd_index_stats, cmd_list_files, cmd_reindex
+  - commands/update.rs: cmd_update + self-update helpers
+  - commands/daemon.rs: cmd_daemon
+  - commands/edit.rs: cmd_edit
+- Add moss-languages feature flags to moss-cli Cargo.toml
+- Session analysis: detect correction patterns
+- Complete daemon integration
 
 Test Status: 76 passing, 0 failing
 
