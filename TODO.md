@@ -18,7 +18,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - Session analysis: detect correction patterns
 - Complete daemon integration
 
-Test Status: 76 passing, 0 failing
+Test Status: 64 passing, 0 failing
 
 ## Backlog
 
