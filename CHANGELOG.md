@@ -16,6 +16,11 @@ New `moss sessions` command for analyzing Claude Code and Gemini CLI logs:
 Plugin architecture for log formats (Claude Code JSONL, Gemini CLI JSON).
 Ported Python session_analysis.py (~1200 lines) to Rust with jaq integration.
 
+Added `scripts/session-corrections.sh` for correction pattern extraction:
+- Finds acknowledgments (You're right, Good point), apologies, self-corrections
+- Extracts user messages that triggered corrections
+- Use case: derive CLAUDE.md rules from session analysis
+
 ### Language Feature Flags
 
 Added feature flags to moss-cli for selective language support:
