@@ -63,6 +63,13 @@ First release. See `docs/` for design docs and `README.md` for usage.
 - `expand_import_context(depth=N)` + ViewOptions.import_depth
 - See `docs/file-boundaries.md` for design
 
+### Performance
+
+**Python Path Detection** (Dec 24 2025)
+- Removed Python subprocess calls from Rust (violated architecture boundary)
+- Now detects Python version from filesystem structure (lib/pythonX.Y/)
+- `view --focus` drops from 0.55s to 0.028s (20x faster)
+
 ### Bug Fixes
 
 **CLI Argument Parsing** (Dec 24 2025)
