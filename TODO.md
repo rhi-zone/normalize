@@ -11,7 +11,13 @@ Test Status: 71 passing, 0 failing
 
 ## Backlog
 
-**Language Support** (see `docs/language-support.md` for full list):
+**Language Support Refactor** (prerequisite for expansion):
+- Factor out `LanguageSupport` trait unifying: skeleton, deps, symbols, complexity, scopes, anchors, edit, cfg
+- Each language implements trait (~50 lines vs current ~200+ scattered across 8 files)
+- Registration system mapping Language enum → trait impl
+- See `docs/language-support.md` for 70+ available grammars
+
+**High-Priority Languages** (after refactor):
 - Kotlin, Swift, Dart (mobile)
 - C#, F# (.NET)
 - PHP, Elixir, Erlang (backends)

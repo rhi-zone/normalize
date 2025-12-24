@@ -145,9 +145,15 @@ Other:
 
 ## Adding a New Language
 
+Current process (pre-refactor):
 1. Add to `Cargo.toml` features: `"lang-xxx"`
 2. Add variant to `Language` enum in `language.rs`
 3. Add extension mapping in `from_extension()`
 4. Add arborium name in `Parsers::arborium_name()`
-5. Add `extract_xxx()` method in `skeleton.rs`
-6. Add test in `skeleton.rs`
+5. Add methods in 8 files: skeleton, deps, symbols, complexity, scopes, anchors, edit, cfg
+6. Add tests
+
+Planned refactor: `LanguageSupport` trait
+- Unify all language-specific code into single trait impl per language
+- ~50 lines per language vs ~200+ scattered across 8 files
+- See TODO.md for status
