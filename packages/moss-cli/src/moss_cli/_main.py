@@ -4318,7 +4318,7 @@ def create_parser() -> argparse.ArgumentParser:
     search_parser = subparsers.add_parser("search", help="Semantic search across codebase")
     search_parser.add_argument("--query", "-q", help="Search query (natural language or code)")
     search_parser.add_argument(
-        "--directory", "-d", default=".", help="Directory to search (default: .)"
+        "--directory", "-C", default=".", help="Directory to search (default: .)"
     )
     search_parser.add_argument(
         "--index", "-i", action="store_true", help="Index files before searching"
@@ -5211,7 +5211,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     rag_parser.add_argument(
         "--directory",
-        "-d",
+        "-C",
         default=".",
         help="Project directory (default: current)",
     )
@@ -5258,7 +5258,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     workflow_parser.add_argument(
         "--directory",
-        "-d",
+        "-C",
         default=".",
         help="Project directory for .moss/ lookup (default: current)",
     )
