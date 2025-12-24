@@ -230,10 +230,18 @@ impl SkeletonExtractor {
     pub fn extract(&mut self, path: &Path, content: &str) -> SkeletonResult {
         let lang = Language::from_path(path);
 
-        // Use legacy extractors for now - they handle complex cases like
-        // Rust impl blocks, Go types, etc. better than the trait-based approach.
-        // The trait infrastructure is in place for gradual migration.
-        let symbols = self.extract_legacy(lang, content);
+        // Use trait-based extraction for languages that are fully supported
+        let symbols = match lang {
+            Some(Language::Python) => {
+                if let Some(support) = get_support(Language::Python) {
+                    self.extract_with_trait(Language::Python, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            // Other languages use legacy extractors (handle complex cases)
+            _ => self.extract_legacy(lang, content),
+        };
 
         SkeletonResult {
             symbols,
@@ -2569,5 +2577,42 @@ trait MyTrait {
         assert_eq!(split_identifier("HTTPRequest"), vec!["h", "t", "t", "p", "request"]);
         assert_eq!(split_identifier("parseJSON"), vec!["parse", "j", "s", "o", "n"]);
         assert_eq!(split_identifier("simple"), vec!["simple"]);
+    }
+
+    #[test]
+    fn test_python_trait_extraction() {
+        // Test that trait-based extraction works for Python
+        let extractor = SkeletonExtractor::new();
+        let content = r#"
+def foo(x: int) -> str:
+    """Convert int to string."""
+    return str(x)
+
+class Bar:
+    """A bar class."""
+
+    def method(self, y: float) -> bool:
+        """Check something."""
+        return y > 0
+"#;
+        let path = PathBuf::from("test.py");
+        let result = extractor.extract_with_support(&path, content);
+        assert!(result.is_some(), "Should have trait support for Python");
+
+        let result = result.unwrap();
+        assert_eq!(result.symbols.len(), 2, "Should have 2 top-level symbols");
+
+        let foo = &result.symbols[0];
+        assert_eq!(foo.name, "foo");
+        assert_eq!(foo.kind, "function");
+        assert!(foo.signature.contains("def foo"));
+        assert_eq!(foo.docstring.as_deref(), Some("Convert int to string."));
+
+        let bar = &result.symbols[1];
+        assert_eq!(bar.name, "Bar");
+        assert_eq!(bar.kind, "class");
+        assert_eq!(bar.children.len(), 1, "Class should have 1 method");
+        assert_eq!(bar.children[0].name, "method");
+        assert_eq!(bar.children[0].kind, "method");
     }
 }
