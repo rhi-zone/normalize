@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Refactor `external_packages.rs` to use trait-based resolution (currently per-language functions)
+- Migrate main.rs to use ImportResolver trait (trait added in resolution.rs)
 - Complete non-Tier 1 languages: C, Ruby, Scala, Vue, Bash (all have `todo!()` methods)
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
@@ -45,7 +45,8 @@ Phase 3 - Integrate: ✅
 - [x] Delete legacy code from symbols.rs, skeleton.rs, deps.rs (~2000 lines removed)
 - [x] Refactor `index.rs` to use trait-based import extraction
 - [x] Complete C++ language support (scope/control/complexity/nesting kinds)
-- [ ] Refactor `external_packages.rs` to use trait-based resolution
+- [x] Add `ImportResolver` trait for external package resolution (resolution.rs)
+- [ ] Migrate main.rs callers to use ImportResolver trait
 
 Phase 4 - Expand:
 - [ ] Kotlin, Swift, Dart (mobile)
