@@ -58,6 +58,10 @@ Phase 4 - Expand:
 - [ ] Dockerfile, HCL (infra)
 - [ ] Svelte, SCSS (frontend)
 
+**CLI Redundancy:** See `docs/llm-code-consistency.md` for full analysis. Key actions:
+- Rust: extract file resolution helper, OutputFormatter trait, share callers/callees impl
+- Python: standardize directory arg (positional vs flag is egregious), output helpers
+
 **Performance:**
 - Investigate slow `moss analyze --health` (+500ms over baseline, not uv startup)
 
@@ -75,6 +79,8 @@ Phase 4 - Expand:
 - Conversational loop pattern (vs hierarchical)
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
+- Claude Code over-reliance on Explore agents: spawns agents for direct tool tasks. Symptom of deeper issue?
+- LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 
 ## Deferred
 
