@@ -48,17 +48,15 @@ Phase 3 - Integrate: ✅
 - [x] Add `ImportResolver` trait for external package resolution (resolution.rs)
 - [x] Migrate main.rs callers to use ImportResolver trait
 
-Phase 4 - Expand:
-- [ ] Kotlin, Swift, Dart (mobile)
-- [ ] C#, F# (.NET)
-
-Phase 5 - Remove all trait defaults:
+Phase 4 - Remove all trait defaults:
 - [ ] Remove ALL default implementations from Language trait
 - [ ] Every language explicitly implements every method
 - [ ] Methods that don't apply return None/empty explicitly (compiler enforces, not convention)
 - [ ] Audit callers to handle None cases properly
 
-Phase 6 - Expand:
+Phase 5 - Expand:
+- [ ] Kotlin, Swift, Dart (mobile)
+- [ ] C#, F# (.NET)
 - [ ] PHP, Elixir, Erlang (backends)
 - [ ] Zig, Lua (systems/gamedev)
 - [ ] SQL, GraphQL (data)

@@ -16,12 +16,14 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 - Future work → TODO.md
 - Conventions → this file
 - **Areas for improvement** → TODO.md (self-evaluate constantly, note friction points)
+- **Key insights** → THIS FILE, immediately. If you learn something fundamental about design, coding, or this codebase, add it to CLAUDE.md before doing anything else.
 
 **Triggers to document immediately:**
 - User corrects you → write down what you learned before fixing
 - Trial-and-error (2+ failed attempts) → document what actually works
 - Framework/library quirk discovered → add to relevant docs/ file
 - "I'll remember this" thought → you won't, write it down now
+- **"Aha" moment about design** → add to CLAUDE.md Design Principles NOW
 
 ## Negative Constraints
 
@@ -39,6 +41,7 @@ Do not:
 - **Do half measures** - when adding a trait/abstraction, migrate ALL callers immediately. No "we can consolidate later" or asking whether to do partial vs full migration. Just do the full migration.
 - **Ask permission on design when philosophy is clear** - if "Generalize Don't Multiply" or other tenets point to an obvious answer, don't present options. Just do the right thing.
 - **Return tuples from functions** - use structs with named fields. Tuples obscure meaning and cause ordering bugs. Only use tuples when names would be pure ceremony (e.g., `(x, y)` coordinates).
+- **Use trait default implementations** - defaults let you "implement" a trait without implementing it. That's a silent bug. Every method should be explicitly implemented; compiler enforces completeness, not convention.
 
 Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
 "Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."
