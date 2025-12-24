@@ -16,7 +16,8 @@ Test Status: 74 passing, 0 failing
 Phase 1-4: ✅ Complete (scaffold, port, integrate, remove trait defaults)
 
 Phase 5 - Expand (new languages):
-- [ ] Kotlin, Swift, Dart (mobile)
+- [x] Kotlin (mobile) - full Language trait impl, Maven/Gradle resolution
+- [ ] Swift, Dart (mobile)
 - [ ] C#, F# (.NET)
 - [ ] PHP, Elixir, Erlang (backends)
 - [ ] Zig, Lua (systems/gamedev)

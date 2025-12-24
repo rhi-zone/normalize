@@ -51,7 +51,16 @@ Derived CLAUDE.md design principles from correction pattern analysis:
 - "Simplicity over cleverness" - stdlib > dependencies
 - "When stuck, reconsider the problem" - not just try more solutions
 
-### Tree View Improvements
+### Kotlin Language Support (Phase 5)
+
+Added full Kotlin language support:
+- AST parsing for classes, objects, interfaces, functions, type aliases
+- KDoc comment extraction
+- Visibility detection (public/private/protected/internal)
+- Import resolution via Maven/Gradle (shared infrastructure with Java)
+- Extensions: `.kt`, `.kts`
+
+### Tree View (additional improvements)
 
 - **Boilerplate-aware depth**: Directories like `src/`, `lib/`, `crates/` don't count against `max_depth` limit
   - Shows more useful content at shallow depths
