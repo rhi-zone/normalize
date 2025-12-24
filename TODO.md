@@ -60,6 +60,9 @@ Phase 4 - Expand:
 - [ ] Dockerfile, HCL (infra)
 - [ ] Svelte, SCSS (frontend)
 
+**Performance:**
+- Investigate slow `moss analyze --health` (+500ms over baseline, not uv startup)
+
 **Integration:**
 - LSP refactor actions (rename symbol across files)
 - Cross-language reference tracking (Python ↔ Rust)
