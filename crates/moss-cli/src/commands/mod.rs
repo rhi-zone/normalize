@@ -2,8 +2,6 @@
 
 pub mod analyze_cmd;
 pub mod anchors;
-pub mod callees;
-pub mod callers;
 pub mod cfg;
 pub mod complexity;
 pub mod context;

@@ -298,28 +298,6 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
-    /// Find what a symbol calls
-    Callees {
-        /// Symbol and optional file (supports: "symbol", "file:symbol", "file symbol", "symbol file")
-        #[arg(required = true)]
-        args: Vec<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
-    /// Find symbols that call a given symbol
-    Callers {
-        /// Symbol and optional file (supports: "symbol", "file:symbol", "file symbol", "symbol file")
-        #[arg(required = true)]
-        args: Vec<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
     /// Generate compiled context (skeleton + deps + summary)
     Context {
         /// File to analyze
@@ -701,14 +679,6 @@ fn main() {
         }
         Commands::Symbols { file, root } => {
             commands::symbols_cmd::cmd_symbols(&file, root.as_deref(), cli.json)
-        }
-        Commands::Callees { args, root } => {
-            let (symbol, file) = normalize_symbol_args(&args);
-            commands::callees::cmd_callees(&symbol, file.as_deref(), root.as_deref(), cli.json)
-        }
-        Commands::Callers { args, root } => {
-            let (symbol, _file) = normalize_symbol_args(&args);
-            commands::callers::cmd_callers(&symbol, root.as_deref(), cli.json)
         }
         Commands::Context { file, root } => {
             commands::context::cmd_context(&file, root.as_deref(), cli.json)
