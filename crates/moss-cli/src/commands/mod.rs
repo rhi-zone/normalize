@@ -12,6 +12,5 @@ pub mod list_files;
 pub mod overview;
 pub mod reindex;
 pub mod sessions;
-pub mod summarize_cmd;
 pub mod update;
 pub mod view_cmd;

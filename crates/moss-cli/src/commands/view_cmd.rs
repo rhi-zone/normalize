@@ -582,6 +582,13 @@ fn cmd_view_file(
                 }
             }
 
+            if show_deps && !deps.exports.is_empty() {
+                println!("\n## Exports");
+                for exp in &deps.exports {
+                    println!("  {}", exp.name);
+                }
+            }
+
             if show_deps && !deps.reexports.is_empty() {
                 println!("\n## Re-exports");
                 for reexp in &deps.reexports {
@@ -598,7 +605,8 @@ fn cmd_view_file(
             }
         }
 
-        if depth >= 1 {
+        // Only show symbols if not in deps-only mode
+        if depth >= 1 && !show_deps {
             // Always include docstrings (was: depth >= 2)
             let formatted = skeleton_result.format(true);
             if !formatted.is_empty() {

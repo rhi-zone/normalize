@@ -14,7 +14,6 @@ mod overview;
 mod path_resolve;
 mod sessions;
 mod skeleton;
-mod summarize;
 mod symbols;
 mod tree;
 
@@ -260,16 +259,6 @@ enum Commands {
         compact: bool,
     },
 
-    /// Summarize what a module does
-    Summarize {
-        /// File to summarize
-        file: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
     /// Search for text patterns in files (fast ripgrep-based search)
     Grep {
         /// Regex pattern to search for
@@ -484,7 +473,6 @@ fn main() {
         Commands::Overview { root, compact } => {
             commands::overview::cmd_overview(root.as_deref(), compact, cli.json)
         }
-        Commands::Summarize { file, root } => commands::summarize_cmd::cmd_summarize(&file, root.as_deref(), cli.json),
         Commands::Grep {
             pattern,
             root,
