@@ -19,7 +19,11 @@ Ported Python session_analysis.py (~1200 lines) to Rust with jaq integration.
 Added `scripts/session-corrections.sh` for correction pattern extraction:
 - Finds acknowledgments (You're right, Good point), apologies, self-corrections
 - Extracts user messages that triggered corrections
-- Use case: derive CLAUDE.md rules from session analysis
+
+Derived CLAUDE.md design principles from correction pattern analysis:
+- "Unify, don't multiply" - fewer concepts = less mental load
+- "Simplicity over cleverness" - stdlib > dependencies
+- "When stuck, reconsider the problem" - not just try more solutions
 
 ### Language Feature Flags
 

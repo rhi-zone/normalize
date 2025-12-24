@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Analyze correction patterns → derive CLAUDE.md rules (use scripts/session-corrections.sh)
 - Complete daemon integration
 
 Test Status: 64 passing, 0 failing
