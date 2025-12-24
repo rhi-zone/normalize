@@ -4,6 +4,18 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Session Analysis Command
+
+New `moss sessions` command for analyzing Claude Code and Gemini CLI logs:
+- `moss sessions` - list sessions (newest first)
+- `moss sessions <id>` - dump raw JSONL
+- `moss sessions <id> --jq '.type'` - filter with jq expressions
+- `moss sessions <id> --analyze` - full analysis report
+- `moss sessions "agent-*" --analyze` - aggregate multiple sessions
+
+Plugin architecture for log formats (Claude Code JSONL, Gemini CLI JSON).
+Ported Python session_analysis.py (~1200 lines) to Rust with jaq integration.
+
 ### Language Feature Flags
 
 Added feature flags to moss-cli for selective language support:
