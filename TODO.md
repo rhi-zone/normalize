@@ -4,7 +4,45 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Phase 5: Remove all Language trait defaults (no silent bugs from missing impls)
+**Phase 4: Remove all Language trait defaults** (17 languages × 27 methods):
+
+Trait methods to make required (remove defaults):
+- [ ] Symbol extraction: `has_symbols`, `extract_type`, `extract_docstring`
+- [ ] Imports/exports: `extract_imports`, `extract_public_symbols`
+- [ ] Visibility: `is_public`, `get_visibility`
+- [ ] Edit support: `container_body`, `body_has_docstring`, `node_name`
+- [ ] Module mapping: `file_path_to_module_name`, `module_name_to_paths`
+- [ ] Resolution: `lang_key`, `resolve_local_import`, `resolve_external_import`, `is_stdlib_import`
+- [ ] Package discovery: `get_version`, `find_package_cache`, `indexable_extensions`, `find_stdlib`, `package_module_name`, `package_sources`, `discover_packages`, `find_package_entry`
+- [ ] Keep as provided defaults (utility methods): `discover_flat_packages`, `discover_recursive_packages`, `discover_npm_scoped_packages`
+
+Languages to update (explicit implementations for all methods):
+- [ ] Python (python.rs) - full import resolution
+- [ ] Rust (rust.rs) - full import resolution
+- [ ] JavaScript (javascript.rs, ecmascript.rs) - full import resolution
+- [ ] TypeScript (typescript.rs) - delegates to ecmascript
+- [ ] Go (go.rs) - full import resolution
+- [ ] Java (java.rs) - partial resolution
+- [ ] C (c.rs, c_cpp.rs) - header-based
+- [ ] C++ (cpp.rs) - header-based
+- [ ] Ruby (ruby.rs) - minimal
+- [ ] Scala (scala.rs) - minimal
+- [ ] Vue (vue.rs) - minimal
+- [ ] Bash (bash.rs) - minimal
+- [ ] JSON (json.rs) - data format, most return None/empty
+- [ ] YAML (yaml.rs) - data format
+- [ ] TOML (toml.rs) - data format
+- [ ] Markdown (markdown.rs) - data format
+- [ ] HTML (html.rs) - minimal
+- [ ] CSS (css.rs) - minimal
+
+Audit callers after trait changes:
+- [ ] skeleton.rs - handles None from extract_type/extract_docstring
+- [ ] deps.rs - handles empty from extract_imports
+- [ ] symbols.rs - handles None from node_name
+- [ ] index.rs - handles empty from extract_public_symbols
+
+**After Phase 4:**
 - view.rs internal cleanup (consolidated but messy, problem shifted not solved)
 - Self-documenting CLI names audit (commands, subcommands, flags)
 - Tree view: apply boilerplate_dirs to depth calculation
@@ -15,46 +53,11 @@ Test Status: 65 passing, 0 failing
 
 **Language Support Refactor** (see `docs/language-support.md` for full design):
 
-Phase 1 - Scaffold: ✅
-- [x] Create `crates/moss-languages/` with Cargo.toml, feature flags
-- [x] Define `Language` trait in `traits.rs`
-- [x] Set up registry with `OnceLock` + `#[cfg(feature)]` gating
+Phase 1-3: ✅ Complete (scaffold, port, integrate)
 
-Phase 2 - Port existing languages: ✅
-- [x] Port Python (most complex: docstrings, async, visibility)
-- [x] Port Rust (impl blocks, doc comments, visibility modifiers)
-- [x] Port JavaScript/TypeScript/TSX (shared extractor)
-- [x] Port Go, Java, C, C++, Ruby, Scala, Vue
-- [x] Port config formats: JSON, YAML, TOML, Markdown
+Phase 4 - Remove trait defaults: **In Progress** (see Next Up)
 
-Phase 3 - Integrate: ✅
-- [x] Add trait infrastructure to `skeleton.rs` (extract_with_trait, convert_symbol)
-- [x] Improve trait impls to match legacy behavior (Rust impl blocks, Go types, Java visibility)
-- [x] Migrate languages to trait-based extraction:
-  - Python, JavaScript, TypeScript, Rust, Go, Java, Ruby, C, C++
-  - Scala, Markdown, JSON, YAML, TOML
-  - Vue remains on legacy (needs script element parsing)
-- [x] Add extract_imports/extract_exports to Language trait
-- [x] Refactor `deps.rs` to use trait (Python, Rust, JS, Go migrated)
-- [x] Refactor `complexity.rs` to use trait (complexity_nodes method)
-- [x] Refactor `symbols.rs` to use trait
-- [x] Refactor `anchors.rs` to use trait
-- [x] Refactor `scopes.rs` to use trait (add scope_creating_kinds)
-- [x] Refactor `edit.rs` to use trait (uses function_kinds/container_kinds)
-- [x] Refactor `cfg.rs` to use trait (add control_flow_kinds)
-- [x] Delete legacy code from symbols.rs, skeleton.rs, deps.rs (~2000 lines removed)
-- [x] Refactor `index.rs` to use trait-based import extraction
-- [x] Complete C++ language support (scope/control/complexity/nesting kinds)
-- [x] Add `ImportResolver` trait for external package resolution (resolution.rs)
-- [x] Migrate main.rs callers to use ImportResolver trait
-
-Phase 4 - Remove all trait defaults:
-- [ ] Remove ALL default implementations from Language trait
-- [ ] Every language explicitly implements every method
-- [ ] Methods that don't apply return None/empty explicitly (compiler enforces, not convention)
-- [ ] Audit callers to handle None cases properly
-
-Phase 5 - Expand:
+Phase 5 - Expand (new languages):
 - [ ] Kotlin, Swift, Dart (mobile)
 - [ ] C#, F# (.NET)
 - [ ] PHP, Elixir, Erlang (backends)
