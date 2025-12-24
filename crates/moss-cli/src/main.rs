@@ -168,15 +168,14 @@ enum Commands {
         dry_run: bool,
     },
 
-    /// Rebuild the file index
-    Reindex {
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
+    /// Manage file index
+    Index {
+        #[command(subcommand)]
+        action: commands::index::IndexAction,
 
-        /// Also rebuild the call graph (slower, parses all files)
-        #[arg(short, long)]
-        call_graph: bool,
+        /// Root directory (defaults to current directory)
+        #[arg(short, long, global = true)]
+        root: Option<PathBuf>,
     },
 
     /// Query imports from the index
@@ -303,42 +302,6 @@ enum Commands {
         limit: usize,
     },
 
-    /// Show index statistics (DB size vs codebase size)
-    IndexStats {
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
-    /// List indexed files (with optional prefix filter)
-    ListFiles {
-        /// Path prefix to filter (e.g., "src/moss" for files in that dir)
-        prefix: Option<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Limit results
-        #[arg(short, long, default_value = "1000")]
-        limit: usize,
-    },
-
-    /// Index external packages (stdlib, site-packages) into global cache
-    IndexPackages {
-        /// Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available.
-        #[arg(long, value_delimiter = ',')]
-        only: Vec<String>,
-
-        /// Clear existing index before re-indexing
-        #[arg(long)]
-        clear: bool,
-
-        /// Root directory for finding venv/node_modules (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
     /// Analyze Claude Code and other agent session logs
     Sessions {
         /// Session ID or path (optional - lists sessions if omitted)
@@ -442,7 +405,7 @@ fn main() {
             dry_run,
             cli.json,
         ),
-        Commands::Reindex { root, call_graph } => commands::reindex::cmd_reindex(root.as_deref(), call_graph),
+        Commands::Index { action, root } => commands::index::cmd_index(action, root.as_deref(), cli.json),
         Commands::Imports {
             query,
             root,
@@ -501,13 +464,6 @@ fn main() {
             limit,
             cli.json,
         ),
-        Commands::IndexStats { root } => commands::index_stats::cmd_index_stats(root.as_deref(), cli.json),
-        Commands::ListFiles { prefix, root, limit } => {
-            commands::list_files::cmd_list_files(prefix.as_deref(), root.as_deref(), limit, cli.json)
-        }
-        Commands::IndexPackages { only, clear, root } => {
-            commands::index_packages::cmd_index_packages(&only, clear, root.as_deref(), cli.json)
-        }
         Commands::Sessions {
             session,
             project,

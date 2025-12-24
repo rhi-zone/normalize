@@ -6,6 +6,7 @@ pub mod edit;
 pub mod find_symbols;
 pub mod grep_cmd;
 pub mod imports;
+pub mod index;
 pub mod index_packages;
 pub mod index_stats;
 pub mod list_files;
