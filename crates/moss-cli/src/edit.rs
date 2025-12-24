@@ -411,18 +411,26 @@ impl Editor {
         }
 
         // Find first "real" content (skip docstrings)
+        // Handle both grammar versions:
+        // - Old: expression_statement > string
+        // - New (arborium): string directly
         let mut first_real_idx = 0;
         for (i, child) in children.iter().enumerate() {
-            if child.kind() == "expression_statement" {
+            let is_docstring = if child.kind() == "expression_statement" {
                 // Could be a docstring - check if it's a string
                 let mut child_cursor = child.walk();
                 let first_child = child.children(&mut child_cursor).next();
-                if let Some(fc) = first_child {
-                    if fc.kind() == "string" && i == 0 {
-                        first_real_idx = i + 1;
-                        continue;
-                    }
-                }
+                first_child.map(|fc| fc.kind() == "string").unwrap_or(false)
+            } else if child.kind() == "string" {
+                // Arborium-style: direct string node
+                true
+            } else {
+                false
+            };
+
+            if is_docstring && i == 0 {
+                first_real_idx = i + 1;
+                continue;
             }
             break;
         }
@@ -430,6 +438,10 @@ impl Editor {
         // Check if body is effectively empty (just docstring and/or pass)
         let is_empty = children.iter().skip(first_real_idx).all(|c| {
             if c.kind() == "pass_statement" {
+                return true;
+            }
+            // Handle both grammar versions for docstrings
+            if c.kind() == "string" {
                 return true;
             }
             if c.kind() == "expression_statement" {
