@@ -72,7 +72,7 @@ Phase 6 - Expand:
 - [ ] Rust: OutputFormatter trait for JSON/text output
 - [ ] Python: output helpers for JSON/markdown/compact
 
-**CLI Surface Cleanup** ✅ (align with three-primitive philosophy):
+**CLI Surface Cleanup** (align with three-primitive philosophy):
 - [x] Removed: callers, callees (use view --calls/--called-by)
 - [x] Removed: complexity (use analyze --complexity)
 - [x] Removed: cfg, scopes, health (inscrutable output, use analyze)
@@ -85,6 +85,8 @@ Phase 6 - Expand:
 - [x] Fixed: view lists all matches when query is ambiguous
 - [x] Consolidated: find-symbols → view now searches symbols too
 - CLI reduced from 29 to 8 commands (-5000+ lines)
+- [ ] view.rs: consolidated but messy internally - problem shifted, not solved. Needs proper unification.
+- [ ] Command/subcommand/flag names should be self-documenting (no abbreviations, clear meaning)
 
 **Code Quality:**
 - Audit Rust codebase for tuple returns - replace with structs unconditionally (unless names would be pure ceremony)
