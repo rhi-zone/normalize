@@ -74,7 +74,7 @@ pub fn cmd_sessions_list(project: Option<&Path>, limit: usize, json: bool) -> i3
     0
 }
 
-/// Show/analyze a specific session.
+/// Show/analyze a specific session or sessions matching a pattern.
 pub fn cmd_sessions_show(
     session_id: &str,
     project: Option<&Path>,
@@ -83,26 +83,39 @@ pub fn cmd_sessions_show(
     analyze: bool,
     json: bool,
 ) -> i32 {
-    // Find the session file
-    let session_path = resolve_session_path(session_id, project);
+    // Find matching session files
+    let paths = resolve_session_paths(session_id, project);
 
-    let Some(path) = session_path else {
-        eprintln!("Session not found: {}", session_id);
+    if paths.is_empty() {
+        eprintln!("No sessions found matching: {}", session_id);
         return 1;
-    };
+    }
 
-    // If --analyze, run full analysis
+    // If --analyze with multiple sessions, aggregate
+    if analyze && paths.len() > 1 {
+        return cmd_sessions_analyze_multi(&paths, format, json);
+    }
+
+    // If --analyze with single session
     if analyze {
-        return cmd_sessions_analyze(&path, format, json);
+        return cmd_sessions_analyze(&paths[0], format, json);
     }
 
-    // If --jq, filter and output
+    // If --jq with multiple sessions, apply to all
     if let Some(filter) = jq_filter {
-        return cmd_sessions_jq(&path, filter);
+        let mut exit_code = 0;
+        for path in &paths {
+            let code = cmd_sessions_jq(path, filter);
+            if code != 0 {
+                exit_code = code;
+            }
+        }
+        return exit_code;
     }
 
-    // Default: dump the raw JSONL
-    let file = match File::open(&path) {
+    // Default: dump the raw JSONL (only first match for non-glob)
+    let path = &paths[0];
+    let file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
             eprintln!("Failed to open {}: {}", path.display(), e);
@@ -151,6 +164,83 @@ fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool) -> i32 {
             1
         }
     }
+}
+
+/// Analyze multiple sessions and aggregate statistics.
+fn cmd_sessions_analyze_multi(paths: &[PathBuf], format: Option<&str>, json: bool) -> i32 {
+    use crate::sessions::{SessionAnalysis, ToolStats};
+
+    let mut aggregate = SessionAnalysis::new(PathBuf::from("."), "aggregate");
+    let mut session_count = 0;
+
+    for path in paths {
+        let analysis = if let Some(fmt) = format {
+            crate::sessions::analyze_session_with_format(path, fmt)
+        } else {
+            analyze_session(path)
+        };
+
+        match analysis {
+            Ok(a) => {
+                session_count += 1;
+
+                // Aggregate message counts
+                for (k, v) in a.message_counts {
+                    *aggregate.message_counts.entry(k).or_insert(0) += v;
+                }
+
+                // Aggregate tool stats
+                for (k, v) in a.tool_stats {
+                    let stat = aggregate
+                        .tool_stats
+                        .entry(k.clone())
+                        .or_insert_with(|| ToolStats::new(&k));
+                    stat.calls += v.calls;
+                    stat.errors += v.errors;
+                }
+
+                // Aggregate token stats
+                aggregate.token_stats.total_input += a.token_stats.total_input;
+                aggregate.token_stats.total_output += a.token_stats.total_output;
+                aggregate.token_stats.cache_read += a.token_stats.cache_read;
+                aggregate.token_stats.cache_create += a.token_stats.cache_create;
+                aggregate.token_stats.api_calls += a.token_stats.api_calls;
+                if a.token_stats.min_context > 0 {
+                    aggregate.token_stats.update_context(a.token_stats.min_context);
+                }
+                if a.token_stats.max_context > 0 {
+                    aggregate.token_stats.update_context(a.token_stats.max_context);
+                }
+
+                // Aggregate file tokens
+                for (k, v) in a.file_tokens {
+                    *aggregate.file_tokens.entry(k).or_insert(0) += v;
+                }
+
+                aggregate.total_turns += a.total_turns;
+                aggregate.parallel_opportunities += a.parallel_opportunities;
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to analyze {}: {}", path.display(), e);
+            }
+        }
+    }
+
+    if session_count == 0 {
+        eprintln!("No sessions could be analyzed");
+        return 1;
+    }
+
+    // Update format to show aggregate info
+    aggregate.format = format!("aggregate ({} sessions)", session_count);
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&aggregate).unwrap());
+    } else {
+        println!("{}", aggregate.to_markdown());
+    }
+
+    0
 }
 
 /// Apply jq filter to each line of a JSONL file.
@@ -281,34 +371,67 @@ fn get_sessions_dir(project: Option<&Path>) -> Option<PathBuf> {
     dirs.first().map(|(p, _)| p.clone())
 }
 
-/// Resolve a session ID to a full path.
-fn resolve_session_path(session_id: &str, project: Option<&Path>) -> Option<PathBuf> {
+/// Resolve a session ID pattern to matching paths.
+/// Supports:
+/// - Exact ID: "3585080f-a55a-4a39-9666-02d970c3e144"
+/// - Prefix: "3585" or "3585*"
+/// - Glob: "agent-*"
+/// - Full path: "/path/to/session.jsonl"
+fn resolve_session_paths(session_id: &str, project: Option<&Path>) -> Vec<PathBuf> {
     // If it's already a path, use it directly
     if session_id.contains('/') || session_id.ends_with(".jsonl") {
         let path = PathBuf::from(session_id);
         if path.exists() {
-            return Some(path);
+            return vec![path];
+        }
+        return vec![];
+    }
+
+    let sessions_dir = match get_sessions_dir(project) {
+        Some(d) => d,
+        None => return vec![],
+    };
+
+    // Check for exact match first
+    let exact_path = sessions_dir.join(format!("{}.jsonl", session_id));
+    if exact_path.exists() {
+        return vec![exact_path];
+    }
+
+    // Convert to pattern for matching
+    let pattern = session_id.trim_end_matches('*');
+    let is_glob = session_id.contains('*');
+
+    let mut matches: Vec<PathBuf> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&sessions_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if !name_str.ends_with(".jsonl") {
+                continue;
+            }
+            let stem = name_str.trim_end_matches(".jsonl");
+
+            // Match by prefix
+            if stem.starts_with(pattern) {
+                matches.push(entry.path());
+            }
         }
     }
 
-    // Otherwise, look in the sessions directory
-    let sessions_dir = get_sessions_dir(project)?;
-    let path = sessions_dir.join(format!("{}.jsonl", session_id));
-    if path.exists() {
-        Some(path)
-    } else {
-        // Try fuzzy match
-        if let Ok(entries) = std::fs::read_dir(&sessions_dir) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                if name_str.starts_with(session_id) && name_str.ends_with(".jsonl") {
-                    return Some(entry.path());
-                }
-            }
-        }
-        None
+    // Sort by modification time (newest first)
+    matches.sort_by(|a, b| {
+        let mtime_a = a.metadata().and_then(|m| m.modified()).ok();
+        let mtime_b = b.metadata().and_then(|m| m.modified()).ok();
+        mtime_b.cmp(&mtime_a)
+    });
+
+    // If not a glob pattern, return only the first match
+    if !is_glob && matches.len() > 1 {
+        matches.truncate(1);
     }
+
+    matches
 }
 
 /// Format age in human-readable form.
