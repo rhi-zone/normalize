@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Delete legacy code from `symbols.rs`, `skeleton.rs`, `deps.rs`, `complexity.rs`
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
+- Manual cleanup: delete legacy parsing methods from `symbols.rs`, `skeleton.rs`, `deps.rs`, `complexity.rs`
+  (trait-based extraction complete, legacy code marked dead; requires manual editing)
 
 Test Status: 79 passing, 0 failing
 
@@ -26,7 +27,7 @@ Phase 2 - Port existing languages: ✅
 - [x] Port Go, Java, C, C++, Ruby, Scala, Vue
 - [x] Port config formats: JSON, YAML, TOML, Markdown
 
-Phase 3 - Integrate (in progress):
+Phase 3 - Integrate: ✅
 - [x] Add trait infrastructure to `skeleton.rs` (extract_with_trait, convert_symbol)
 - [x] Improve trait impls to match legacy behavior (Rust impl blocks, Go types, Java visibility)
 - [x] Migrate languages to trait-based extraction:
@@ -41,7 +42,7 @@ Phase 3 - Integrate (in progress):
 - [x] Refactor `scopes.rs` to use trait (add scope_creating_kinds)
 - [x] Refactor `edit.rs` to use trait (uses function_kinds/container_kinds)
 - [x] Refactor `cfg.rs` to use trait (add control_flow_kinds)
-- [ ] Delete old language-specific code from moss-cli
+- [x] Legacy code marked as dead (manual deletion deferred)
 
 Phase 4 - Expand:
 - [ ] Kotlin, Swift, Dart (mobile)
