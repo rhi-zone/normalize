@@ -5200,30 +5200,15 @@ fn index_package_symbols(
     pkg_id: i64,
     path: &Path,
 ) -> usize {
-    let extensions = lang.indexable_extensions();
-    if extensions.is_empty() {
-        return 0;
-    }
+    // Use trait method to find entry point
+    let entry = match lang.find_package_entry(path) {
+        Some(e) => e,
+        None => return 0,
+    };
 
-    if path.is_file() {
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            if extensions.contains(&ext) {
-                if let Ok(content) = std::fs::read_to_string(path) {
-                    let result = extractor.extract(path, &content);
-                    return count_and_insert_symbols(index, pkg_id, &result.symbols);
-                }
-            }
-        }
-    } else if path.is_dir() {
-        // For Python: index __init__.py
-        // For other languages: find entry point
-        let init_py = path.join("__init__.py");
-        if init_py.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&init_py) {
-                let result = extractor.extract(&init_py, &content);
-                return count_and_insert_symbols(index, pkg_id, &result.symbols);
-            }
-        }
+    if let Ok(content) = std::fs::read_to_string(&entry) {
+        let result = extractor.extract(&entry, &content);
+        return count_and_insert_symbols(index, pkg_id, &result.symbols);
     }
 
     0

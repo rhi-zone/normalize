@@ -430,6 +430,18 @@ pub trait Language: Send + Sync {
         packages
     }
 
+    /// Find the entry point file for a package path.
+    /// If path is a file, returns it directly.
+    /// If path is a directory, looks for language-specific entry points.
+    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
+        if path.is_file() {
+            return Some(path.to_path_buf());
+        }
+        // Default: no entry point for directories
+        // Languages should override to specify their entry points
+        None
+    }
+
     /// Discover packages in npm-scoped directory (handles @scope/package).
     fn discover_npm_scoped_packages(&self, source_path: &Path) -> Vec<(String, PathBuf)> {
         let entries = match std::fs::read_dir(source_path) {

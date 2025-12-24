@@ -4,12 +4,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Move package indexing to Language trait: add `index_packages()` method so all of `index_python_packages`, `index_java_packages`, etc. move from main.rs to moss-languages (no language-specific code in moss-cli)
+- Remove `uv run python` calls from moss-cli: run_python_test_coverage, run_python_scopes, run_python_test_health shell out to Python which defeats purpose of Rust CLI
+- Remove language-specific code from analyze commands: python_files/rust_files counters, language-specific analyze functions
 - Add moss-languages feature flags to moss-cli Cargo.toml (propagate lang-python, lang-rust, etc. to allow selective compilation)
 - Session analysis: detect correction patterns ("You're right", "Good point", "isn't working")
 - Complete daemon integration (FileIndex API methods currently unused)
-- Validate node kinds against grammars (test that kinds like "if_statement" exist in grammar)
-- Add `moss view --functions` or similar to list function names without grep (currently need `moss view file | grep ^fn`)
 
 Test Status: 79 passing, 0 failing
 

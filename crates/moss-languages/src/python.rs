@@ -866,6 +866,18 @@ impl Language for Python {
         }
         false
     }
+
+    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
+        if path.is_file() {
+            return Some(path.to_path_buf());
+        }
+        // Python packages use __init__.py as entry point
+        let init_py = path.join("__init__.py");
+        if init_py.is_file() {
+            return Some(init_py);
+        }
+        None
+    }
 }
 
 #[cfg(test)]
