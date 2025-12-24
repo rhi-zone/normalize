@@ -3,7 +3,6 @@
 pub mod analyze_cmd;
 pub mod anchors;
 pub mod cfg;
-pub mod complexity;
 pub mod context;
 pub mod daemon;
 pub mod deps_cmd;

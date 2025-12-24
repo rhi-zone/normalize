@@ -380,20 +380,6 @@ enum Commands {
         who_imports: bool,
     },
 
-    /// Calculate cyclomatic complexity
-    Complexity {
-        /// File to analyze
-        file: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Only show functions with complexity above threshold
-        #[arg(short, long)]
-        threshold: Option<usize>,
-    },
-
     /// Show control flow graph
     Cfg {
         /// File to analyze
@@ -705,11 +691,6 @@ fn main() {
             graph,
             who_imports,
         } => commands::imports::cmd_imports(&query, root.as_deref(), resolve, graph, who_imports, cli.json),
-        Commands::Complexity {
-            file,
-            root,
-            threshold,
-        } => commands::complexity::cmd_complexity(&file, root.as_deref(), threshold, cli.json),
         Commands::Cfg {
             file,
             root,
