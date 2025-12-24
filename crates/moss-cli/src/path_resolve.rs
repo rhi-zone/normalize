@@ -185,6 +185,79 @@ pub fn resolve_unified(query: &str, root: &Path) -> Option<UnifiedPath> {
     None
 }
 
+/// Resolve a query to ALL matching unified paths (for ambiguous queries).
+/// Returns empty vec if no matches, single-element vec if unambiguous,
+/// or multiple elements if query matches multiple files.
+pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
+    let normalized = normalize_separators(query);
+
+    // Absolute paths: single result or none
+    if normalized.starts_with('/') {
+        return resolve_unified(query, root).into_iter().collect();
+    }
+
+    let segments: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
+    if segments.is_empty() {
+        return vec![];
+    }
+
+    // Try exact path first
+    let mut current_path = root.to_path_buf();
+    for (idx, segment) in segments.iter().enumerate() {
+        let test_path = current_path.join(segment);
+        if test_path.is_file() {
+            // Exact match - return single result
+            let file_path = test_path
+                .strip_prefix(root)
+                .unwrap_or(&test_path)
+                .to_string_lossy()
+                .to_string();
+            return vec![UnifiedPath {
+                file_path,
+                symbol_path: segments[idx + 1..].iter().map(|s| s.to_string()).collect(),
+                is_directory: false,
+            }];
+        } else if test_path.is_dir() {
+            current_path = test_path;
+        } else {
+            break;
+        }
+    }
+
+    // Check if we ended at a directory (exact match)
+    if current_path != root.to_path_buf() && current_path.is_dir() {
+        let dir_path = current_path
+            .strip_prefix(root)
+            .unwrap_or(&current_path)
+            .to_string_lossy()
+            .to_string();
+        return vec![UnifiedPath {
+            file_path: dir_path,
+            symbol_path: vec![],
+            is_directory: true,
+        }];
+    }
+
+    // Fuzzy matching - return ALL matches
+    for split_point in (1..=segments.len()).rev() {
+        let file_query = segments[..split_point].join("/");
+        let matches = resolve(&file_query, root);
+
+        if !matches.is_empty() {
+            return matches
+                .into_iter()
+                .map(|m| UnifiedPath {
+                    file_path: m.path,
+                    symbol_path: segments[split_point..].iter().map(|s| s.to_string()).collect(),
+                    is_directory: m.kind == "directory",
+                })
+                .collect();
+        }
+    }
+
+    vec![]
+}
+
 /// Get all files in the repository (uses index if available)
 pub fn all_files(root: &Path) -> Vec<PathMatch> {
     get_paths_for_query(root, "")

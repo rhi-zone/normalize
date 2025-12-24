@@ -33,16 +33,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Resolve a fuzzy path to exact location(s)
-    Path {
-        /// Query to resolve (file path, partial name, or symbol)
-        query: String,
-
-        /// Root directory to search (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
     /// View a node in the codebase tree (directory, file, or symbol)
     View {
         /// Target to view (path like src/main.py/Foo/bar). Optional when using filters.
@@ -179,20 +169,6 @@ enum Commands {
         dry_run: bool,
     },
 
-    /// Search for files/symbols matching a pattern
-    SearchTree {
-        /// Search query
-        query: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Limit results
-        #[arg(short, long, default_value = "20")]
-        limit: usize,
-    },
-
     /// Rebuild the file index
     Reindex {
         /// Root directory (defaults to current directory)
@@ -202,24 +178,6 @@ enum Commands {
         /// Also rebuild the call graph (slower, parses all files)
         #[arg(short, long)]
         call_graph: bool,
-    },
-
-    /// Show module dependencies (imports and exports)
-    Deps {
-        /// File to analyze
-        file: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Show only imports
-        #[arg(short, long)]
-        imports_only: bool,
-
-        /// Show only exports
-        #[arg(short, long)]
-        exports_only: bool,
     },
 
     /// Query imports from the index
@@ -423,9 +381,6 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
-        Commands::Path { query, root } => {
-            commands::path_cmd::cmd_path(&query, root.as_deref(), cli.json)
-        }
         Commands::View {
             target,
             root,
@@ -458,9 +413,6 @@ fn main() {
             full,
             cli.json,
         ),
-        Commands::SearchTree { query, root, limit } => {
-            commands::search_tree::cmd_search_tree(&query, root.as_deref(), limit, cli.json)
-        }
         Commands::Edit {
             target,
             root,
@@ -502,12 +454,6 @@ fn main() {
             cli.json,
         ),
         Commands::Reindex { root, call_graph } => commands::reindex::cmd_reindex(root.as_deref(), call_graph),
-        Commands::Deps {
-            file,
-            root,
-            imports_only,
-            exports_only,
-        } => commands::deps_cmd::cmd_deps(&file, root.as_deref(), imports_only, exports_only, cli.json),
         Commands::Imports {
             query,
             root,

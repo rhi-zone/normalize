@@ -86,11 +86,35 @@ pub fn cmd_view(
         return cmd_view_directory(&root, &root, depth, raw, json);
     }
 
-    // Use unified path resolution
-    let unified = match path_resolve::resolve_unified(target, &root) {
-        Some(u) => u,
-        None => {
+    // Use unified path resolution - get ALL matches
+    let matches = path_resolve::resolve_unified_all(target, &root);
+
+    let unified = match matches.len() {
+        0 => {
             eprintln!("No matches for: {}", target);
+            return 1;
+        }
+        1 => matches.into_iter().next().unwrap(),
+        _ => {
+            // Multiple matches - list them instead of picking one
+            if json {
+                let items: Vec<_> = matches
+                    .iter()
+                    .map(|m| {
+                        serde_json::json!({
+                            "path": m.file_path,
+                            "type": if m.is_directory { "directory" } else { "file" }
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::json!({ "matches": items }));
+            } else {
+                eprintln!("Multiple matches for '{}' - be more specific:", target);
+                for m in &matches {
+                    let kind = if m.is_directory { "directory" } else { "file" };
+                    println!("  {} ({})", m.file_path, kind);
+                }
+            }
             return 1;
         }
     };
