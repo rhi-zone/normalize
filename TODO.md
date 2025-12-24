@@ -62,16 +62,14 @@ Phase 4 - Expand:
 - [x] Rust: extract file resolution helper (resolve_and_read in path_resolve.rs)
 - [x] Python: standardize directory arg to -C (was mix of -C and -d)
 - [ ] Rust: OutputFormatter trait for JSON/text output
-- [ ] Rust: share callers/callees implementation
 - [ ] Python: output helpers for JSON/markdown/compact
 
-**CLI Surface Cleanup** (align with three-primitive philosophy):
-- Rust CLI has 29 commands but design says 3 primitives (view, edit, analyze) + infra
-- `complexity` standalone vs `analyze --complexity` have different output formats - unify
-- `cfg`, `scopes` - inscrutable output, consider removing or improving then folding into analyze
-- `symbols`, `anchors`, `expand`, `context` - should be view modes, not separate commands
-- `callers`/`callees` commands duplicate `view --called-by`/`view --calls` - remove
-- Key distinction: view = tree operations, analyze = summaries
+**CLI Surface Cleanup** ✅ (align with three-primitive philosophy):
+- [x] Removed: callers, callees (use view --calls/--called-by)
+- [x] Removed: complexity (use analyze --complexity)
+- [x] Removed: cfg, scopes, health (inscrutable output, use analyze)
+- [x] Removed: symbols, anchors, expand, context (use view with depth/--full/--deps)
+- CLI reduced from 29 to 19 commands (-3200 lines)
 
 **Bugs:**
 - [x] `view --calls`/`--called-by` semantics were swapped - FIXED

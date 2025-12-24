@@ -4,6 +4,19 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### CLI Surface Cleanup
+
+Major refactoring to align with three-primitive philosophy (view, edit, analyze):
+- Removed 10 redundant commands: callers, callees, complexity, cfg, scopes, health, symbols, anchors, expand, context
+- CLI reduced from 29 to 19 commands (-3200 lines)
+- Functionality consolidated:
+  - Use `view --calls`/`--called-by` instead of callers/callees
+  - Use `analyze --complexity/--health` instead of standalone commands
+  - Use `view file --full` instead of expand
+  - Use `view file` with depth settings instead of symbols/anchors
+- Fixed `view --calls`/`--called-by` semantics (were swapped)
+- Fixed unnecessary trailing "(caller)" in call graph output
+
 ### Tree View Improvements
 
 - **Collapse single-child folders**: `src/moss_intelligence/` shown as one line instead of two
