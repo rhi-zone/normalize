@@ -26,7 +26,9 @@
 
 mod registry;
 mod traits;
-mod ecmascript;
+pub mod ecmascript;
+#[cfg(any(feature = "lang-c", feature = "lang-cpp"))]
+pub mod c_cpp;
 pub mod external_packages;
 
 // Language implementations

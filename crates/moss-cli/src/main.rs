@@ -5146,7 +5146,7 @@ fn index_python_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
-    let version = external_packages::get_python_version(root)
+    let version = moss_languages::python::get_python_version(root)
         .and_then(|v| external_packages::Version::parse(&v));
 
     let min_version = version.unwrap_or(external_packages::Version { major: 3, minor: 0 });
@@ -5158,7 +5158,7 @@ fn index_python_packages(
     let mut extractor = skeleton::SkeletonExtractor::new();
 
     // Index stdlib
-    if let Some(stdlib) = external_packages::find_python_stdlib(root) {
+    if let Some(stdlib) = moss_languages::python::find_python_stdlib(root) {
         if !json {
             println!("  Stdlib: {}", stdlib.display());
         }
@@ -5203,7 +5203,7 @@ fn index_python_packages(
     }
 
     // Index site-packages
-    if let Some(site_packages) = external_packages::find_python_site_packages(root) {
+    if let Some(site_packages) = moss_languages::python::find_python_site_packages(root) {
         if !json {
             println!("  Site-packages: {}", site_packages.display());
         }
@@ -5286,7 +5286,7 @@ fn index_go_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
-    let version = external_packages::get_go_version()
+    let version = moss_languages::go::get_go_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
     let min_version = version.unwrap_or(external_packages::Version { major: 1, minor: 0 });
@@ -5298,7 +5298,7 @@ fn index_go_packages(
     let mut extractor = skeleton::SkeletonExtractor::new();
 
     // Index stdlib
-    if let Some(stdlib) = external_packages::find_go_stdlib() {
+    if let Some(stdlib) = moss_languages::go::find_go_stdlib() {
         if !json {
             println!("  Stdlib: {}", stdlib.display());
         }
@@ -5306,7 +5306,7 @@ fn index_go_packages(
     }
 
     // Index mod cache (just top-level for now - full recursive would be slow)
-    if let Some(mod_cache) = external_packages::find_go_mod_cache() {
+    if let Some(mod_cache) = moss_languages::go::find_go_mod_cache() {
         if !json {
             println!("  Mod cache: {}", mod_cache.display());
         }
@@ -5396,14 +5396,14 @@ fn index_js_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
-    let version = external_packages::get_node_version()
+    let version = moss_languages::ecmascript::get_node_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
     if !json {
         println!("Indexing JavaScript packages (version {:?})...", version);
     }
 
-    let node_modules = match external_packages::find_node_modules(root) {
+    let node_modules = match moss_languages::ecmascript::find_node_modules(root) {
         Some(nm) => nm,
         None => {
             if !json {
@@ -5536,14 +5536,14 @@ fn index_deno_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
-    let version = external_packages::get_deno_version()
+    let version = moss_languages::ecmascript::get_deno_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
     if !json {
         println!("Indexing Deno packages (version {:?})...", version);
     }
 
-    let cache = match external_packages::find_deno_cache() {
+    let cache = match moss_languages::ecmascript::find_deno_cache() {
         Some(c) => c,
         None => {
             if !json {
@@ -5813,7 +5813,7 @@ fn index_java_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
-    let version = external_packages::get_java_version()
+    let version = moss_languages::java::get_java_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
     if !json {
@@ -5823,7 +5823,7 @@ fn index_java_packages(
     let min_version = version.unwrap_or(external_packages::Version { major: 11, minor: 0 });
 
     // Index Maven repository
-    if let Some(maven_repo) = external_packages::find_maven_repository() {
+    if let Some(maven_repo) = moss_languages::java::find_maven_repository() {
         if !json {
             println!("  Maven repository: {}", maven_repo.display());
         }
@@ -5833,7 +5833,7 @@ fn index_java_packages(
     }
 
     // Index Gradle cache
-    if let Some(gradle_cache) = external_packages::find_gradle_cache() {
+    if let Some(gradle_cache) = moss_languages::java::find_gradle_cache() {
         if !json {
             println!("  Gradle cache: {}", gradle_cache.display());
         }
@@ -6049,14 +6049,14 @@ fn index_cpp_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
-    let version = external_packages::get_gcc_version()
+    let version = moss_languages::c_cpp::get_gcc_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
     if !json {
         println!("Indexing C/C++ headers (version {:?})...", version);
     }
 
-    let include_paths = external_packages::find_cpp_include_paths();
+    let include_paths = moss_languages::c_cpp::find_cpp_include_paths();
 
     if include_paths.is_empty() {
         if !json {
@@ -6156,14 +6156,14 @@ fn index_rust_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
-    let version = external_packages::get_rust_version()
+    let version = moss_languages::rust::get_rust_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
     if !json {
         println!("Indexing Rust crates (version {:?})...", version);
     }
 
-    let registry = match external_packages::find_cargo_registry() {
+    let registry = match moss_languages::rust::find_cargo_registry() {
         Some(r) => r,
         None => {
             if !json {

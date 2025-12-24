@@ -1,9 +1,102 @@
 //! Rust language support.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use crate::{Export, Import, LanguageSupport, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use crate::external_packages::{self, ResolvedPackage};
+use crate::external_packages::ResolvedPackage;
 use moss_core::tree_sitter::Node;
+
+// ============================================================================
+// Rust external package resolution
+// ============================================================================
+
+/// Get Rust version.
+pub fn get_rust_version() -> Option<String> {
+    let output = Command::new("rustc").args(["--version"]).output().ok()?;
+
+    if output.status.success() {
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        // "rustc 1.75.0 (82e1608df 2023-12-21)" -> "1.75"
+        for part in version_str.split_whitespace() {
+            if part.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                let parts: Vec<&str> = part.split('.').collect();
+                if parts.len() >= 2 {
+                    return Some(format!("{}.{}", parts[0], parts[1]));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find cargo registry source directory.
+/// Structure: ~/.cargo/registry/src/
+pub fn find_cargo_registry() -> Option<PathBuf> {
+    // Check CARGO_HOME env var
+    if let Ok(cargo_home) = std::env::var("CARGO_HOME") {
+        let registry = PathBuf::from(cargo_home).join("registry").join("src");
+        if registry.is_dir() {
+            return Some(registry);
+        }
+    }
+
+    // Fall back to ~/.cargo/registry/src
+    if let Ok(home) = std::env::var("HOME") {
+        let registry = PathBuf::from(home).join(".cargo").join("registry").join("src");
+        if registry.is_dir() {
+            return Some(registry);
+        }
+    }
+
+    // Windows fallback
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let registry = PathBuf::from(home).join(".cargo").join("registry").join("src");
+        if registry.is_dir() {
+            return Some(registry);
+        }
+    }
+
+    None
+}
+
+/// Resolve a Rust crate import to its source location.
+fn resolve_rust_crate(crate_name: &str, registry: &Path) -> Option<ResolvedPackage> {
+    // Registry structure: registry/src/index.crates.io-*/crate-version/
+    if let Ok(indices) = std::fs::read_dir(registry) {
+        for index_entry in indices.flatten() {
+            let index_path = index_entry.path();
+            if !index_path.is_dir() {
+                continue;
+            }
+
+            if let Ok(crates) = std::fs::read_dir(&index_path) {
+                for crate_entry in crates.flatten() {
+                    let crate_dir = crate_entry.path();
+                    let dir_name = crate_entry.file_name().to_string_lossy().to_string();
+
+                    // Check if this is our crate (name-version pattern)
+                    if dir_name.starts_with(&format!("{}-", crate_name)) {
+                        let lib_rs = crate_dir.join("src").join("lib.rs");
+                        if lib_rs.is_file() {
+                            return Some(ResolvedPackage {
+                                path: lib_rs,
+                                name: crate_name.to_string(),
+                                is_namespace: false,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+// ============================================================================
+// Rust language support
+// ============================================================================
 
 /// Rust language support.
 pub struct Rust;
@@ -394,16 +487,16 @@ impl LanguageSupport for Rust {
     }
 
     fn resolve_external_import(&self, crate_name: &str, _project_root: &Path) -> Option<ResolvedPackage> {
-        let registry = external_packages::find_cargo_registry()?;
-        external_packages::resolve_rust_crate(crate_name, &registry)
+        let registry = find_cargo_registry()?;
+        resolve_rust_crate(crate_name, &registry)
     }
 
     fn get_version(&self, _project_root: &Path) -> Option<String> {
-        external_packages::get_rust_version()
+        get_rust_version()
     }
 
     fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        external_packages::find_cargo_registry()
+        find_cargo_registry()
     }
 
     fn indexable_extensions(&self) -> &'static [&'static str] {

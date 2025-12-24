@@ -1,9 +1,287 @@
 //! Java language support.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use crate::{Export, LanguageSupport, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use crate::external_packages::{self, ResolvedPackage};
+use crate::external_packages::ResolvedPackage;
 use moss_core::tree_sitter::Node;
+
+// ============================================================================
+// Java external package resolution
+// ============================================================================
+
+/// Get Java version.
+pub fn get_java_version() -> Option<String> {
+    let output = Command::new("java").args(["--version"]).output().ok()?;
+
+    if output.status.success() {
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        // "openjdk 17.0.1 2021-10-19" or "java 21.0.1 2023-10-17 LTS"
+        for line in version_str.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                let version = parts[1];
+                let ver_parts: Vec<&str> = version.split('.').collect();
+                if ver_parts.len() >= 2 {
+                    return Some(format!("{}.{}", ver_parts[0], ver_parts[1]));
+                } else if ver_parts.len() == 1 {
+                    return Some(format!("{}.0", ver_parts[0]));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find Maven local repository.
+pub fn find_maven_repository() -> Option<PathBuf> {
+    // Check M2_HOME or MAVEN_HOME env var
+    if let Ok(m2_home) = std::env::var("M2_HOME").or_else(|_| std::env::var("MAVEN_HOME")) {
+        let repo = PathBuf::from(m2_home).join("repository");
+        if repo.is_dir() {
+            return Some(repo);
+        }
+    }
+
+    // Default ~/.m2/repository
+    if let Ok(home) = std::env::var("HOME") {
+        let repo = PathBuf::from(home).join(".m2").join("repository");
+        if repo.is_dir() {
+            return Some(repo);
+        }
+    }
+
+    // Windows fallback
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let repo = PathBuf::from(home).join(".m2").join("repository");
+        if repo.is_dir() {
+            return Some(repo);
+        }
+    }
+
+    None
+}
+
+/// Find Gradle cache directory.
+pub fn find_gradle_cache() -> Option<PathBuf> {
+    // Check GRADLE_USER_HOME env var
+    if let Ok(gradle_home) = std::env::var("GRADLE_USER_HOME") {
+        let cache = PathBuf::from(gradle_home).join("caches").join("modules-2").join("files-2.1");
+        if cache.is_dir() {
+            return Some(cache);
+        }
+    }
+
+    // Default ~/.gradle/caches/modules-2/files-2.1
+    if let Ok(home) = std::env::var("HOME") {
+        let cache = PathBuf::from(home).join(".gradle").join("caches").join("modules-2").join("files-2.1");
+        if cache.is_dir() {
+            return Some(cache);
+        }
+    }
+
+    // Windows fallback
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let cache = PathBuf::from(home).join(".gradle").join("caches").join("modules-2").join("files-2.1");
+        if cache.is_dir() {
+            return Some(cache);
+        }
+    }
+
+    None
+}
+
+/// Resolve a Java import to a source file in Maven/Gradle cache.
+fn resolve_java_import(import: &str, maven_repo: Option<&Path>, gradle_cache: Option<&Path>) -> Option<ResolvedPackage> {
+    let package_path = import.replace('.', "/");
+
+    // Try Maven first
+    if let Some(maven) = maven_repo {
+        if let Some(result) = find_java_package_in_maven(maven, &package_path, import) {
+            return Some(result);
+        }
+    }
+
+    // Try Gradle
+    if let Some(gradle) = gradle_cache {
+        if let Some(result) = find_java_package_in_gradle(gradle, &package_path, import) {
+            return Some(result);
+        }
+    }
+
+    None
+}
+
+fn find_java_package_in_maven(maven_repo: &Path, package_path: &str, import: &str) -> Option<ResolvedPackage> {
+    let target_dir = maven_repo.join(package_path);
+    if target_dir.is_dir() {
+        return find_maven_artifact(&target_dir, import);
+    }
+
+    // Try parent paths
+    let parts: Vec<&str> = package_path.split('/').collect();
+    for i in (2..parts.len()).rev() {
+        let dir_path = parts[..i].join("/");
+        let artifact = parts[i - 1];
+        let search_dir = maven_repo.join(&dir_path);
+
+        if search_dir.is_dir() {
+            if let Some(result) = find_maven_artifact(&search_dir, import) {
+                return Some(result);
+            }
+            let artifact_dir = search_dir.join(artifact);
+            if artifact_dir.is_dir() {
+                if let Some(result) = find_maven_artifact(&artifact_dir, import) {
+                    return Some(result);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn find_maven_artifact(artifact_dir: &Path, import: &str) -> Option<ResolvedPackage> {
+    let versions: Vec<_> = std::fs::read_dir(artifact_dir).ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    if versions.is_empty() {
+        return None;
+    }
+
+    let mut versions: Vec<_> = versions.into_iter().collect();
+    versions.sort_by(|a, b| {
+        let a_name = a.file_name().to_string_lossy().to_string();
+        let b_name = b.file_name().to_string_lossy().to_string();
+        version_cmp(&a_name, &b_name)
+    });
+
+    let version_dir = versions.last()?.path();
+    let artifact_name = artifact_dir.file_name()?.to_string_lossy().to_string();
+    let version = version_dir.file_name()?.to_string_lossy().to_string();
+
+    // Prefer sources JAR
+    let sources_jar = version_dir.join(format!("{}-{}-sources.jar", artifact_name, version));
+    if sources_jar.is_file() {
+        return Some(ResolvedPackage {
+            path: sources_jar,
+            name: import.to_string(),
+            is_namespace: false,
+        });
+    }
+
+    // Fall back to regular JAR
+    let jar = version_dir.join(format!("{}-{}.jar", artifact_name, version));
+    if jar.is_file() {
+        return Some(ResolvedPackage {
+            path: jar,
+            name: import.to_string(),
+            is_namespace: false,
+        });
+    }
+
+    None
+}
+
+fn find_java_package_in_gradle(gradle_cache: &Path, package_path: &str, import: &str) -> Option<ResolvedPackage> {
+    let parts: Vec<&str> = package_path.split('/').collect();
+
+    for i in (2..parts.len()).rev() {
+        let group = parts[..i - 1].join(".");
+        let artifact = parts[i - 1];
+        let group_dir = gradle_cache.join(&group);
+
+        if group_dir.is_dir() {
+            let artifact_dir = group_dir.join(artifact);
+            if artifact_dir.is_dir() {
+                if let Some(result) = find_gradle_artifact(&artifact_dir, import) {
+                    return Some(result);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn find_gradle_artifact(artifact_dir: &Path, import: &str) -> Option<ResolvedPackage> {
+    let versions: Vec<_> = std::fs::read_dir(artifact_dir).ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    if versions.is_empty() {
+        return None;
+    }
+
+    let mut versions: Vec<_> = versions.into_iter().collect();
+    versions.sort_by(|a, b| {
+        let a_name = a.file_name().to_string_lossy().to_string();
+        let b_name = b.file_name().to_string_lossy().to_string();
+        version_cmp(&a_name, &b_name)
+    });
+
+    let version_dir = versions.last()?.path();
+
+    let hash_dirs: Vec<_> = std::fs::read_dir(&version_dir).ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    for hash_dir in hash_dirs {
+        let hash_path = hash_dir.path();
+
+        // Look for sources JAR first
+        if let Ok(entries) = std::fs::read_dir(&hash_path) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.ends_with("-sources.jar") {
+                    return Some(ResolvedPackage {
+                        path: entry.path(),
+                        name: import.to_string(),
+                        is_namespace: false,
+                    });
+                }
+            }
+        }
+
+        // Fall back to regular JAR
+        if let Ok(entries) = std::fs::read_dir(&hash_path) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.ends_with(".jar") && !name.ends_with("-sources.jar") && !name.ends_with("-javadoc.jar") {
+                    return Some(ResolvedPackage {
+                        path: entry.path(),
+                        name: import.to_string(),
+                        is_namespace: false,
+                    });
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let a_parts: Vec<u32> = a.split('.').filter_map(|p| p.parse().ok()).collect();
+    let b_parts: Vec<u32> = b.split('.').filter_map(|p| p.parse().ok()).collect();
+
+    for (ap, bp) in a_parts.iter().zip(b_parts.iter()) {
+        match ap.cmp(bp) {
+            std::cmp::Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    a_parts.len().cmp(&b_parts.len())
+}
+
+// ============================================================================
+// Java language support
+// ============================================================================
 
 /// Java language support.
 pub struct Java;
@@ -173,10 +451,10 @@ impl LanguageSupport for Java {
     }
 
     fn resolve_external_import(&self, import_name: &str, _project_root: &Path) -> Option<ResolvedPackage> {
-        let maven_repo = external_packages::find_maven_repository();
-        let gradle_cache = external_packages::find_gradle_cache();
+        let maven_repo = find_maven_repository();
+        let gradle_cache = find_gradle_cache();
 
-        external_packages::resolve_java_import(
+        resolve_java_import(
             import_name,
             maven_repo.as_deref(),
             gradle_cache.as_deref(),
@@ -184,12 +462,12 @@ impl LanguageSupport for Java {
     }
 
     fn get_version(&self, _project_root: &Path) -> Option<String> {
-        external_packages::get_java_version()
+        get_java_version()
     }
 
     fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        external_packages::find_maven_repository()
-            .or_else(external_packages::find_gradle_cache)
+        find_maven_repository()
+            .or_else(find_gradle_cache)
     }
 
     fn indexable_extensions(&self) -> &'static [&'static str] {

@@ -1,12 +1,13 @@
 //! Go language support.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use crate::{Export, Import, LanguageSupport, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use crate::external_packages::{self, ResolvedPackage};
+use crate::external_packages::ResolvedPackage;
 use moss_core::tree_sitter::Node;
 
 // ============================================================================
-// Go module parsing (inlined from go_mod.rs)
+// Go module parsing (for local import resolution)
 // ============================================================================
 
 /// Information from a go.mod file
@@ -90,6 +91,184 @@ fn resolve_go_import(import_path: &str, module: &GoModule, project_root: &Path) 
     };
 
     Some(target)
+}
+
+// ============================================================================
+// Go external package resolution
+// ============================================================================
+
+/// Get Go version.
+pub fn get_go_version() -> Option<String> {
+    let output = Command::new("go").args(["version"]).output().ok()?;
+
+    if output.status.success() {
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        // "go version go1.21.0 linux/amd64" -> "1.21"
+        for part in version_str.split_whitespace() {
+            if part.starts_with("go") && part.len() > 2 {
+                let ver = part.trim_start_matches("go");
+                // Take major.minor only
+                let parts: Vec<&str> = ver.split('.').collect();
+                if parts.len() >= 2 {
+                    return Some(format!("{}.{}", parts[0], parts[1]));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find Go stdlib directory (GOROOT/src).
+pub fn find_go_stdlib() -> Option<PathBuf> {
+    // Try GOROOT env var
+    if let Ok(goroot) = std::env::var("GOROOT") {
+        let src = PathBuf::from(goroot).join("src");
+        if src.is_dir() {
+            return Some(src);
+        }
+    }
+
+    // Try `go env GOROOT`
+    if let Ok(output) = Command::new("go").args(["env", "GOROOT"]).output() {
+        if output.status.success() {
+            let goroot = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let src = PathBuf::from(goroot).join("src");
+            if src.is_dir() {
+                return Some(src);
+            }
+        }
+    }
+
+    // Common locations
+    for path in &["/usr/local/go/src", "/usr/lib/go/src", "/opt/go/src"] {
+        let src = PathBuf::from(path);
+        if src.is_dir() {
+            return Some(src);
+        }
+    }
+
+    None
+}
+
+/// Check if a Go import is a stdlib import (no dots in first path segment).
+fn is_go_stdlib_import(import_path: &str) -> bool {
+    let first_segment = import_path.split('/').next().unwrap_or(import_path);
+    !first_segment.contains('.')
+}
+
+/// Resolve a Go stdlib import to its source location.
+fn resolve_go_stdlib_import(import_path: &str, stdlib_path: &Path) -> Option<ResolvedPackage> {
+    if !is_go_stdlib_import(import_path) {
+        return None;
+    }
+
+    let pkg_dir = stdlib_path.join(import_path);
+    if pkg_dir.is_dir() {
+        return Some(ResolvedPackage {
+            path: pkg_dir,
+            name: import_path.to_string(),
+            is_namespace: false,
+        });
+    }
+
+    None
+}
+
+/// Find Go module cache directory.
+///
+/// Uses GOMODCACHE env var, falls back to ~/go/pkg/mod
+pub fn find_go_mod_cache() -> Option<PathBuf> {
+    // Check GOMODCACHE env var
+    if let Ok(cache) = std::env::var("GOMODCACHE") {
+        let path = PathBuf::from(cache);
+        if path.is_dir() {
+            return Some(path);
+        }
+    }
+
+    // Fall back to ~/go/pkg/mod using HOME env var
+    if let Ok(home) = std::env::var("HOME") {
+        let mod_cache = PathBuf::from(home).join("go").join("pkg").join("mod");
+        if mod_cache.is_dir() {
+            return Some(mod_cache);
+        }
+    }
+
+    // Windows fallback
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let mod_cache = PathBuf::from(home).join("go").join("pkg").join("mod");
+        if mod_cache.is_dir() {
+            return Some(mod_cache);
+        }
+    }
+
+    None
+}
+
+/// Resolve a Go import from mod cache to its source location.
+///
+/// Import paths like "github.com/user/repo/pkg" are mapped to
+/// $GOMODCACHE/github.com/user/repo@version/pkg
+fn resolve_go_mod_cache_import(import_path: &str, mod_cache: &Path) -> Option<ResolvedPackage> {
+    // Skip standard library imports (no dots in first segment)
+    let first_segment = import_path.split('/').next()?;
+    if !first_segment.contains('.') {
+        // This is stdlib (fmt, os, etc.) - not in mod cache
+        return None;
+    }
+
+    // Find the module in cache
+    // Import path: github.com/user/repo/internal/pkg
+    // Cache path: github.com/user/repo@v1.2.3/internal/pkg
+
+    // We need to find the right version directory
+    // Start with the full path and try progressively shorter prefixes
+    let parts: Vec<&str> = import_path.split('/').collect();
+
+    for i in (2..=parts.len()).rev() {
+        let module_prefix = parts[..i].join("/");
+        let module_dir = mod_cache.join(&module_prefix);
+
+        // The parent directory might contain version directories
+        if let Some(parent) = module_dir.parent() {
+            if parent.is_dir() {
+                // Look for versioned directories matching this module
+                let module_name = module_dir.file_name()?.to_string_lossy();
+                if let Ok(entries) = std::fs::read_dir(parent) {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name();
+                        let name_str = name.to_string_lossy();
+                        // Match module@version pattern
+                        if name_str.starts_with(&format!("{}@", module_name)) {
+                            let versioned_path = entry.path();
+                            // Add remaining path components
+                            let remainder = if i < parts.len() {
+                                parts[i..].join("/")
+                            } else {
+                                String::new()
+                            };
+                            let full_path = if remainder.is_empty() {
+                                versioned_path.clone()
+                            } else {
+                                versioned_path.join(&remainder)
+                            };
+
+                            if full_path.is_dir() {
+                                return Some(ResolvedPackage {
+                                    path: full_path,
+                                    name: import_path.to_string(),
+                                    is_namespace: false,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 // ============================================================================
@@ -293,32 +472,32 @@ impl LanguageSupport for Go {
 
     fn resolve_external_import(&self, import_name: &str, _project_root: &Path) -> Option<ResolvedPackage> {
         // Check stdlib first
-        if external_packages::is_go_stdlib_import(import_name) {
-            if let Some(stdlib) = external_packages::find_go_stdlib() {
-                if let Some(pkg) = external_packages::resolve_go_stdlib_import(import_name, &stdlib) {
+        if is_go_stdlib_import(import_name) {
+            if let Some(stdlib) = find_go_stdlib() {
+                if let Some(pkg) = resolve_go_stdlib_import(import_name, &stdlib) {
                     return Some(pkg);
                 }
             }
         }
 
         // Then mod cache
-        if let Some(mod_cache) = external_packages::find_go_mod_cache() {
-            return external_packages::resolve_go_import(import_name, &mod_cache);
+        if let Some(mod_cache) = find_go_mod_cache() {
+            return resolve_go_mod_cache_import(import_name, &mod_cache);
         }
 
         None
     }
 
     fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        external_packages::is_go_stdlib_import(import_name)
+        is_go_stdlib_import(import_name)
     }
 
     fn get_version(&self, _project_root: &Path) -> Option<String> {
-        external_packages::get_go_version()
+        get_go_version()
     }
 
     fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        external_packages::find_go_mod_cache()
+        find_go_mod_cache()
     }
 
     fn indexable_extensions(&self) -> &'static [&'static str] {

@@ -2,7 +2,8 @@
 
 use std::path::{Path, PathBuf};
 use crate::{LanguageSupport, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use crate::external_packages::{self, ResolvedPackage};
+use crate::external_packages::ResolvedPackage;
+use crate::c_cpp;
 use moss_core::tree_sitter::Node;
 
 /// C language support.
@@ -151,12 +152,12 @@ impl LanguageSupport for C {
     }
 
     fn resolve_external_import(&self, include: &str, _project_root: &Path) -> Option<ResolvedPackage> {
-        let include_paths = external_packages::find_cpp_include_paths();
-        external_packages::resolve_cpp_include(include, &include_paths)
+        let include_paths = c_cpp::find_cpp_include_paths();
+        c_cpp::resolve_cpp_include(include, &include_paths)
     }
 
     fn get_version(&self, _project_root: &Path) -> Option<String> {
-        external_packages::get_gcc_version()
+        c_cpp::get_gcc_version()
     }
 
     fn indexable_extensions(&self) -> &'static [&'static str] {
