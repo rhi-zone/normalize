@@ -309,7 +309,14 @@ impl SkeletonExtractor {
                     self.extract_legacy(lang, content)
                 }
             }
-            // Rust, Go, Java use legacy extractors (need complex handling: impl blocks, type decls)
+            Some(Language::Rust) => {
+                if let Some(support) = get_support(Language::Rust) {
+                    self.extract_with_trait(Language::Rust, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            // Go, Java use legacy extractors (need complex handling: type decls, interface/enum)
             _ => self.extract_legacy(lang, content),
         };
 
@@ -370,7 +377,60 @@ impl SkeletonExtractor {
         let mut cursor = root.walk();
 
         self.collect_with_trait(&mut cursor, content, support, &mut symbols, false);
+
+        // Post-process for Rust: merge impl blocks with their types
+        if lang == Language::Rust {
+            Self::merge_rust_impl_blocks(&mut symbols);
+        }
+
         symbols
+    }
+
+    /// Merge Rust impl blocks with their corresponding struct/enum types
+    fn merge_rust_impl_blocks(symbols: &mut Vec<SkeletonSymbol>) {
+        // Collect impl blocks and their children
+        let mut impl_methods: std::collections::HashMap<String, Vec<SkeletonSymbol>> =
+            std::collections::HashMap::new();
+
+        // Remove impl blocks and collect their methods
+        symbols.retain(|sym| {
+            if sym.kind == "impl" || sym.kind == "module" {
+                // impl blocks are extracted as "impl" or "module" kind
+                if sym.signature.starts_with("impl ") {
+                    let type_name = &sym.name;
+                    impl_methods
+                        .entry(type_name.clone())
+                        .or_default()
+                        .extend(sym.children.clone());
+                    return false; // Remove impl block
+                }
+            }
+            true
+        });
+
+        // Add methods to matching struct/enum
+        for sym in symbols.iter_mut() {
+            if sym.kind == "struct" || sym.kind == "enum" {
+                if let Some(methods) = impl_methods.remove(&sym.name) {
+                    sym.children.extend(methods);
+                }
+            }
+        }
+
+        // Any remaining impl blocks without matching type: add back as impl symbols
+        for (name, methods) in impl_methods {
+            if !methods.is_empty() {
+                symbols.push(SkeletonSymbol {
+                    name: name.clone(),
+                    kind: "impl",
+                    signature: format!("impl {}", name),
+                    docstring: None,
+                    start_line: methods.first().map(|m| m.start_line).unwrap_or(0),
+                    end_line: methods.last().map(|m| m.end_line).unwrap_or(0),
+                    children: methods,
+                });
+            }
+        }
     }
 
     fn collect_with_trait(
