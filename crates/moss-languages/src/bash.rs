@@ -17,10 +17,50 @@ impl LanguageSupport for Bash {
     fn import_kinds(&self) -> &'static [&'static str] { &[] }
     fn public_symbol_kinds(&self) -> &'static [&'static str] { &["function_definition"] }
     fn visibility_mechanism(&self) -> VisibilityMechanism { VisibilityMechanism::AllPublic }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] { todo!("bash: scope_creating_kinds") }
-    fn control_flow_kinds(&self) -> &'static [&'static str] { todo!("bash: control_flow_kinds") }
-    fn complexity_nodes(&self) -> &'static [&'static str] { todo!("bash: complexity_nodes") }
-    fn nesting_nodes(&self) -> &'static [&'static str] { todo!("bash: nesting_nodes") }
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        &[
+            "subshell",
+            "command_substitution",
+        ]
+    }
+
+    fn control_flow_kinds(&self) -> &'static [&'static str] {
+        &[
+            "if_statement",
+            "for_statement",
+            "while_statement",
+            "until_statement",
+            "case_statement",
+            "return_statement",
+            "exit_statement",
+        ]
+    }
+
+    fn complexity_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if_statement",
+            "elif_clause",
+            "for_statement",
+            "while_statement",
+            "until_statement",
+            "case_statement",
+            "case_item",
+            "pipeline", // | chains
+            "list",     // && and || chains
+        ]
+    }
+
+    fn nesting_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if_statement",
+            "for_statement",
+            "while_statement",
+            "until_statement",
+            "case_statement",
+            "function_definition",
+            "subshell",
+        ]
+    }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;

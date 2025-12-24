@@ -35,6 +35,7 @@ Do not:
 - Create special cases - design to avoid them; if stuck, ask user rather than special-casing
 - Deprecate things - no users, just remove; deprecation is for backwards compatibility we don't need
 - **Add to the monolith** - implementation goes in sub-packages (`moss-intelligence`, `moss-orchestration`, etc.), never in `src/moss/`. The `moss` package is a meta-package for external convenience only. Internal code imports from sub-packages, not `moss`.
+- **Do half measures** - when adding a trait/abstraction, migrate ALL callers immediately. No "we can consolidate later" or asking whether to do partial vs full migration. Just do the full migration.
 
 Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
 "Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."

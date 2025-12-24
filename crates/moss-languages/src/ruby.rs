@@ -14,7 +14,9 @@ impl LanguageSupport for Ruby {
     fn container_kinds(&self) -> &'static [&'static str] { &["class", "module"] }
     fn function_kinds(&self) -> &'static [&'static str] { &["method", "singleton_method"] }
     fn type_kinds(&self) -> &'static [&'static str] { &["class", "module"] }
-    fn import_kinds(&self) -> &'static [&'static str] { todo!("ruby: import_kinds") }
+    fn import_kinds(&self) -> &'static [&'static str] {
+        &["call"] // require, require_relative, load are method calls
+    }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class", "module", "method", "singleton_method"]
@@ -23,10 +25,68 @@ impl LanguageSupport for Ruby {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::AllPublic // Ruby methods are public by default
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] { todo!("ruby: scope_creating_kinds") }
-    fn control_flow_kinds(&self) -> &'static [&'static str] { todo!("ruby: control_flow_kinds") }
-    fn complexity_nodes(&self) -> &'static [&'static str] { todo!("ruby: complexity_nodes") }
-    fn nesting_nodes(&self) -> &'static [&'static str] { todo!("ruby: nesting_nodes") }
+
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        &[
+            "do_block",
+            "block",
+            "lambda",
+            "for",
+        ]
+    }
+
+    fn control_flow_kinds(&self) -> &'static [&'static str] {
+        &[
+            "if",
+            "unless",
+            "case",
+            "while",
+            "until",
+            "for",
+            "return",
+            "break",
+            "next",
+            "redo",
+            "retry",
+            "raise",
+            "begin",
+        ]
+    }
+
+    fn complexity_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if",
+            "unless",
+            "case",
+            "when",
+            "while",
+            "until",
+            "for",
+            "begin", // rescue clauses
+            "rescue",
+            "and",
+            "or",
+            "conditional",
+        ]
+    }
+
+    fn nesting_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if",
+            "unless",
+            "case",
+            "while",
+            "until",
+            "for",
+            "begin",
+            "method",
+            "singleton_method",
+            "class",
+            "module",
+            "do_block",
+            "block",
+        ]
+    }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;

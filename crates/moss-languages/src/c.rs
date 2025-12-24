@@ -23,10 +23,52 @@ impl LanguageSupport for C {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::HeaderBased
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] { todo!("c: scope_creating_kinds") }
-    fn control_flow_kinds(&self) -> &'static [&'static str] { todo!("c: control_flow_kinds") }
-    fn complexity_nodes(&self) -> &'static [&'static str] { todo!("c: complexity_nodes") }
-    fn nesting_nodes(&self) -> &'static [&'static str] { todo!("c: nesting_nodes") }
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        &[
+            "for_statement",
+            "while_statement",
+            "compound_statement",
+        ]
+    }
+
+    fn control_flow_kinds(&self) -> &'static [&'static str] {
+        &[
+            "if_statement",
+            "for_statement",
+            "while_statement",
+            "do_statement",
+            "switch_statement",
+            "return_statement",
+            "break_statement",
+            "continue_statement",
+            "goto_statement",
+        ]
+    }
+
+    fn complexity_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if_statement",
+            "for_statement",
+            "while_statement",
+            "do_statement",
+            "switch_statement",
+            "case_statement",
+            "&&",
+            "||",
+            "conditional_expression",
+        ]
+    }
+
+    fn nesting_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if_statement",
+            "for_statement",
+            "while_statement",
+            "do_statement",
+            "switch_statement",
+            "function_definition",
+        ]
+    }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let declarator = node.child_by_field_name("declarator")?;

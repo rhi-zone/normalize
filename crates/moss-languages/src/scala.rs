@@ -14,7 +14,9 @@ impl LanguageSupport for Scala {
     fn container_kinds(&self) -> &'static [&'static str] { &["class_definition", "object_definition", "trait_definition"] }
     fn function_kinds(&self) -> &'static [&'static str] { &["function_definition"] }
     fn type_kinds(&self) -> &'static [&'static str] { &["class_definition", "trait_definition"] }
-    fn import_kinds(&self) -> &'static [&'static str] { todo!("scala: import_kinds") }
+    fn import_kinds(&self) -> &'static [&'static str] {
+        &["import_declaration"]
+    }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class_definition", "object_definition", "trait_definition", "function_definition"]
@@ -46,10 +48,57 @@ impl LanguageSupport for Scala {
             line: node.start_position().row + 1,
         }]
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] { todo!("scala: scope_creating_kinds") }
-    fn control_flow_kinds(&self) -> &'static [&'static str] { todo!("scala: control_flow_kinds") }
-    fn complexity_nodes(&self) -> &'static [&'static str] { todo!("scala: complexity_nodes") }
-    fn nesting_nodes(&self) -> &'static [&'static str] { todo!("scala: nesting_nodes") }
+
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        &[
+            "for_expression",
+            "block",
+            "lambda_expression",
+        ]
+    }
+
+    fn control_flow_kinds(&self) -> &'static [&'static str] {
+        &[
+            "if_expression",
+            "match_expression",
+            "for_expression",
+            "while_expression",
+            "do_while_expression",
+            "try_expression",
+            "return_expression",
+            "throw_expression",
+        ]
+    }
+
+    fn complexity_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if_expression",
+            "match_expression",
+            "case_clause",
+            "for_expression",
+            "while_expression",
+            "do_while_expression",
+            "try_expression",
+            "catch_clause",
+            "infix_expression", // for && and ||
+        ]
+    }
+
+    fn nesting_nodes(&self) -> &'static [&'static str] {
+        &[
+            "if_expression",
+            "match_expression",
+            "for_expression",
+            "while_expression",
+            "do_while_expression",
+            "try_expression",
+            "function_definition",
+            "class_definition",
+            "object_definition",
+            "trait_definition",
+            "block",
+        ]
+    }
 
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
