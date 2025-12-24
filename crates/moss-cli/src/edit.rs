@@ -107,79 +107,8 @@ impl Editor {
         None
     }
 
-    fn find_symbol_in_node(
-        &self,
-        node: tree_sitter::Node,
-        content: &str,
-        name: &str,
-        grammar: &str,
-    ) -> Option<SymbolLocation> {
-        // Check if this node is the symbol we're looking for
-        if let Some(loc) = self.check_node_is_symbol(&node, content, name, grammar) {
-            return Some(loc);
-        }
-
-        // Recurse into children
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(loc) = self.find_symbol_in_node(child, content, name, grammar) {
-                return Some(loc);
-            }
-        }
-
-        None
-    }
-
-    fn check_node_is_symbol(
-        &self,
-        node: &tree_sitter::Node,
-        content: &str,
-        name: &str,
-        grammar: &str,
-    ) -> Option<SymbolLocation> {
-        let kind = node.kind();
-        let symbol_kind = match grammar {
-            "python" => match kind {
-                "function_definition" | "async_function_definition" => Some("function"),
-                "class_definition" => Some("class"),
-                _ => None,
-            },
-            "rust" => match kind {
-                "function_item" => Some("function"),
-                "struct_item" | "enum_item" | "trait_item" => Some("class"),
-                "impl_item" => Some("impl"),
-                _ => None,
-            },
-            _ => None,
-        }?;
-
-        // Get the name of this symbol
-        let name_node = node.child_by_field_name("name")?;
-        let symbol_name = &content[name_node.byte_range()];
-
-        if symbol_name != name {
-            return None;
-        }
-
-        // Calculate indentation from the start of the line
-        let start_byte = node.start_byte();
-        let line_start = content[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let indent = &content[line_start..start_byte];
-        let indent = indent.chars().take_while(|c| c.is_whitespace()).collect::<String>();
-
-        Some(SymbolLocation {
-            name: symbol_name.to_string(),
-            kind: symbol_kind.to_string(),
-            start_byte: node.start_byte(),
-            end_byte: node.end_byte(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            indent,
-        })
-    }
-
     /// Delete a symbol from the content
-    pub fn delete_symbol(&mut self, content: &str, loc: &SymbolLocation) -> String {
+    pub fn delete_symbol(&self, content: &str, loc: &SymbolLocation) -> String {
         let mut result = String::new();
 
         // Find the start of the line containing the symbol
@@ -214,7 +143,7 @@ impl Editor {
     }
 
     /// Replace a symbol with new content
-    pub fn replace_symbol(&mut self, content: &str, loc: &SymbolLocation, new_content: &str) -> String {
+    pub fn replace_symbol(&self, content: &str, loc: &SymbolLocation, new_content: &str) -> String {
         let mut result = String::new();
 
         // Apply indentation to new content
@@ -264,7 +193,7 @@ impl Editor {
     }
 
     /// Insert content before a symbol
-    pub fn insert_before(&mut self, content: &str, loc: &SymbolLocation, new_content: &str) -> String {
+    pub fn insert_before(&self, content: &str, loc: &SymbolLocation, new_content: &str) -> String {
         let mut result = String::new();
 
         // Find the start of the line containing the symbol
@@ -287,7 +216,7 @@ impl Editor {
     }
 
     /// Insert content after a symbol
-    pub fn insert_after(&mut self, content: &str, loc: &SymbolLocation, new_content: &str) -> String {
+    pub fn insert_after(&self, content: &str, loc: &SymbolLocation, new_content: &str) -> String {
         let mut result = String::new();
 
         // Apply indentation to new content
@@ -413,83 +342,6 @@ impl Editor {
         }
 
         None
-    }
-
-    fn find_container_body_in_node(
-        &self,
-        node: tree_sitter::Node,
-        content: &str,
-        name: &str,
-        grammar: &str,
-    ) -> Option<ContainerBody> {
-        // Check if this is our target container
-        if let Some(body) = self.check_node_is_container(&node, content, name, grammar) {
-            return Some(body);
-        }
-
-        // Recurse into children
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(body) = self.find_container_body_in_node(child, content, name, grammar) {
-                return Some(body);
-            }
-        }
-
-        None
-    }
-
-    fn check_node_is_container(
-        &self,
-        node: &tree_sitter::Node,
-        content: &str,
-        name: &str,
-        grammar: &str,
-    ) -> Option<ContainerBody> {
-        let kind = node.kind();
-
-        // Only handle container types (can contain methods/functions)
-        let is_container = match grammar {
-            "python" => kind == "class_definition",
-            "rust" => kind == "impl_item", // Only impl blocks for prepend/append
-            _ => false,
-        };
-
-        if !is_container {
-            return None;
-        }
-
-        // Get the name of this container (impl blocks may use "type" field)
-        let name_node = node
-            .child_by_field_name("name")
-            .or_else(|| node.child_by_field_name("type"))?;
-        let container_name = &content[name_node.byte_range()];
-
-        if container_name != name {
-            return None;
-        }
-
-        // Get the body node
-        let body_node = node.child_by_field_name("body")?;
-
-        // Calculate inner indentation (container indent + one level)
-        let start_byte = node.start_byte();
-        let line_start = content[..start_byte]
-            .rfind('\n')
-            .map(|i| i + 1)
-            .unwrap_or(0);
-        let container_indent: String = content[line_start..start_byte]
-            .chars()
-            .take_while(|c| c.is_whitespace())
-            .collect();
-
-        // Determine inner indent based on language (same for all currently supported)
-        let inner_indent = format!("{}    ", container_indent);
-
-        match grammar {
-            "python" => self.analyze_python_class_body(&body_node, content, &inner_indent),
-            "rust" => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
-            _ => None,
-        }
     }
 
     fn analyze_python_class_body(
@@ -738,7 +590,7 @@ mod tests {
 
     #[test]
     fn test_find_python_function() {
-        let mut editor = Editor::new();
+        let editor = Editor::new();
         let content = r#"
 def foo():
     pass
@@ -755,7 +607,7 @@ def bar():
 
     #[test]
     fn test_delete_symbol() {
-        let mut editor = Editor::new();
+        let editor = Editor::new();
         let content = "def foo():\n    pass\n\ndef bar():\n    return 42\n";
         let loc = editor.find_symbol(&PathBuf::from("test.py"), content, "bar").unwrap();
         let result = editor.delete_symbol(content, &loc);
@@ -765,7 +617,7 @@ def bar():
 
     #[test]
     fn test_insert_before() {
-        let mut editor = Editor::new();
+        let editor = Editor::new();
         let content = "def foo():\n    pass\n\ndef bar():\n    return 42\n";
         let loc = editor.find_symbol(&PathBuf::from("test.py"), content, "bar").unwrap();
         let result = editor.insert_before(content, &loc, "def baz():\n    pass");
@@ -775,7 +627,7 @@ def bar():
 
     #[test]
     fn test_prepend_to_python_class() {
-        let mut editor = Editor::new();
+        let editor = Editor::new();
         let content = r#"class Foo:
     """Docstring."""
 
@@ -797,7 +649,7 @@ def bar():
 
     #[test]
     fn test_append_to_python_class() {
-        let mut editor = Editor::new();
+        let editor = Editor::new();
         let content = r#"class Foo:
     def first(self):
         pass
@@ -818,7 +670,7 @@ def bar():
 
     #[test]
     fn test_prepend_to_rust_impl() {
-        let mut editor = Editor::new();
+        let editor = Editor::new();
         let content = r#"impl Foo {
     fn first(&self) -> i32 {
         1
@@ -837,7 +689,7 @@ def bar():
 
     #[test]
     fn test_append_to_rust_impl() {
-        let mut editor = Editor::new();
+        let editor = Editor::new();
         let content = r#"impl Foo {
     fn first(&self) -> i32 {
         1

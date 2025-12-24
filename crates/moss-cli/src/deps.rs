@@ -541,7 +541,7 @@ mod tests {
 
     #[test]
     fn test_python_imports() {
-        let mut extractor = DepsExtractor::new();
+        let extractor = DepsExtractor::new();
         let content = r#"
 import os
 import json as j
@@ -563,7 +563,7 @@ class Bar:
 
     #[test]
     fn test_rust_imports() {
-        let mut extractor = DepsExtractor::new();
+        let extractor = DepsExtractor::new();
         let content = r#"
 use std::path::Path;
 use std::collections::{HashMap, HashSet};
@@ -581,7 +581,7 @@ pub struct Bar {}
 
     #[test]
     fn test_typescript_imports() {
-        let mut extractor = DepsExtractor::new();
+        let extractor = DepsExtractor::new();
         let content = r#"
 import { foo, bar } from './utils';
 import React from 'react';
@@ -607,7 +607,7 @@ export const VERSION = "1.0.0";
 
     #[test]
     fn test_typescript_barrel_reexports() {
-        let mut extractor = DepsExtractor::new();
+        let extractor = DepsExtractor::new();
         let content = r#"
 export * from './utils';
 export * as helpers from './helpers';
@@ -635,7 +635,7 @@ export { foo, bar } from './specific';
 
     #[test]
     fn test_go_imports() {
-        let mut extractor = DepsExtractor::new();
+        let extractor = DepsExtractor::new();
         let content = r#"
 package main
 

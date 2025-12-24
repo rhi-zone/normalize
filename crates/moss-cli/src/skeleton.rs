@@ -771,7 +771,7 @@ const arrow = () => {};
         let result = extractor.extract(&PathBuf::from("test.ts"), content);
 
         let filtered = result.filter_types();
-        let kinds: Vec<_> = filtered.symbols.iter().map(|s| s.kind).collect();
+        let _kinds: Vec<_> = filtered.symbols.iter().map(|s| s.kind).collect();
         let names: Vec<_> = filtered.symbols.iter().map(|s| s.name.as_str()).collect();
 
         assert!(names.contains(&"MyInterface"), "Should have interface");

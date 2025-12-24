@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_parse_python_function() {
-        let mut parser = SymbolParser::new();
+        let parser = SymbolParser::new();
         let content = r#"
 def foo():
     pass
@@ -776,7 +776,7 @@ def bar(x):
 
     #[test]
     fn test_parse_python_class() {
-        let mut parser = SymbolParser::new();
+        let parser = SymbolParser::new();
         let content = r#"
 class Foo:
     def method(self):
@@ -793,7 +793,7 @@ class Foo:
 
     #[test]
     fn test_parse_rust_function() {
-        let mut parser = SymbolParser::new();
+        let parser = SymbolParser::new();
         let content = r#"
 fn foo() {}
 

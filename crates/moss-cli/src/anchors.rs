@@ -572,7 +572,7 @@ mod tests {
 
     #[test]
     fn test_python_anchors() {
-        let mut extractor = AnchorExtractor::new();
+        let extractor = AnchorExtractor::new();
         let content = r#"
 import os
 
@@ -599,7 +599,7 @@ class Bar:
 
     #[test]
     fn test_rust_anchors() {
-        let mut extractor = AnchorExtractor::new();
+        let extractor = AnchorExtractor::new();
         let content = r#"
 use std::path::Path;
 
@@ -626,7 +626,7 @@ impl Foo {
 
     #[test]
     fn test_find_anchor() {
-        let mut extractor = AnchorExtractor::new();
+        let extractor = AnchorExtractor::new();
         let content = r#"
 def hello_world():
     pass

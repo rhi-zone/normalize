@@ -1250,7 +1250,7 @@ fn cmd_edit(
         }
     };
 
-    let mut editor = edit::Editor::new();
+    let editor = edit::Editor::new();
 
     // Handle file-level operations (prepend/append without a symbol)
     if unified.symbol_path.is_empty() {
