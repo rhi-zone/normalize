@@ -4,11 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Complete daemon integration
-- Streaming --jq support for sessions command (currently loads all files into memory)
-- Tree view remaining:
-  - Smart depth: boilerplate_dirs defined but not yet applied to depth calculation
-  - Per-directory config (.moss/tree.toml or similar)
+- Phase 5: Remove all Language trait defaults (no silent bugs from missing impls)
+- view.rs internal cleanup (consolidated but messy, problem shifted not solved)
+- Self-documenting CLI names audit (commands, subcommands, flags)
+- Tree view: apply boilerplate_dirs to depth calculation
 
 Test Status: 65 passing, 0 failing
 
