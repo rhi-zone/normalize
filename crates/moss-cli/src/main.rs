@@ -2513,7 +2513,7 @@ fn cmd_view_file(
             }
         }
 
-        // Fisheye mode: show skeletons of imported local files
+        // Fisheye mode: show skeletons of imported files (local and external)
         // With --focus alone: show all imports
         // With --focus=module: filter to matching imports
         if let Some(focus_filter) = focus {
@@ -2522,7 +2522,8 @@ fn cmd_view_file(
             let filter_all = focus_filter == "*";
 
             // Collect resolved imports (optionally filtered)
-            let mut resolved: Vec<(String, PathBuf)> = Vec::new();
+            // Tuple: (module_name, resolved_path, display_path)
+            let mut resolved: Vec<(String, PathBuf, String)> = Vec::new();
             for imp in &deps.imports {
                 // Check if this import matches the filter
                 let matches_filter = filter_all
@@ -2531,10 +2532,14 @@ fn cmd_view_file(
 
                 if matches_filter {
                     if let Some(resolved_path) = resolve_import(&imp.module, &full_path, root) {
-                        // Make path relative to root
-                        if let Ok(rel_path) = resolved_path.strip_prefix(root) {
-                            resolved.push((imp.module.clone(), rel_path.to_path_buf()));
-                        }
+                        // For display: use relative path if within root, else use module name
+                        let display = if let Ok(rel_path) = resolved_path.strip_prefix(root) {
+                            rel_path.display().to_string()
+                        } else {
+                            // External package - show abbreviated path
+                            format!("[{}]", imp.module)
+                        };
+                        resolved.push((imp.module.clone(), resolved_path, display));
                     }
                 }
             }
@@ -2543,11 +2548,10 @@ fn cmd_view_file(
                 println!("\n## Imported Modules (Skeletons)");
                 let mut deps_extractor = deps::DepsExtractor::new();
 
-                for (module_name, rel_path) in resolved {
-                    let import_full_path = root.join(&rel_path);
-                    if let Ok(import_content) = std::fs::read_to_string(&import_full_path) {
+                for (module_name, resolved_path, display) in resolved {
+                    if let Ok(import_content) = std::fs::read_to_string(&resolved_path) {
                         let mut import_extractor = skeleton::SkeletonExtractor::new();
-                        let import_skeleton = import_extractor.extract(&import_full_path, &import_content);
+                        let import_skeleton = import_extractor.extract(&resolved_path, &import_content);
                         let import_skeleton = if types_only {
                             import_skeleton.filter_types()
                         } else {
@@ -2556,14 +2560,14 @@ fn cmd_view_file(
 
                         let formatted = import_skeleton.format(false); // depth 1 = signatures only
                         if !formatted.is_empty() {
-                            println!("\n### {} ({})", module_name, rel_path.display());
+                            println!("\n### {} ({})", module_name, display);
                             println!("{}", formatted);
                         }
 
                         // Check for barrel file re-exports and follow them
-                        let import_deps = deps_extractor.extract(&import_full_path, &import_content);
+                        let import_deps = deps_extractor.extract(&resolved_path, &import_content);
                         for reexp in &import_deps.reexports {
-                            if let Some(reexp_path) = resolve_import(&reexp.module, &import_full_path, root) {
+                            if let Some(reexp_path) = resolve_import(&reexp.module, &resolved_path, root) {
                                 if let Ok(reexp_content) = std::fs::read_to_string(&reexp_path) {
                                     let mut reexp_extractor = skeleton::SkeletonExtractor::new();
                                     let reexp_skeleton = reexp_extractor.extract(&reexp_path, &reexp_content);
@@ -2575,15 +2579,15 @@ fn cmd_view_file(
 
                                     let formatted = reexp_skeleton.format(false);
                                     if !formatted.is_empty() {
-                                        let reexp_rel = reexp_path.strip_prefix(root)
+                                        let reexp_display = reexp_path.strip_prefix(root)
                                             .map(|p| p.display().to_string())
-                                            .unwrap_or_else(|_| reexp_path.display().to_string());
+                                            .unwrap_or_else(|_| format!("[{}]", reexp.module));
                                         let export_desc = if reexp.is_star {
                                             format!("export * from '{}'", reexp.module)
                                         } else {
                                             format!("export {{ {} }} from '{}'", reexp.names.join(", "), reexp.module)
                                         };
-                                        println!("\n### {} → {} ({})", module_name, export_desc, reexp_rel);
+                                        println!("\n### {} → {} ({})", module_name, export_desc, reexp_display);
                                         println!("{}", formatted);
                                     }
                                 }
