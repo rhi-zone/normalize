@@ -63,6 +63,13 @@ First release. See `docs/` for design docs and `README.md` for usage.
 - `expand_import_context(depth=N)` + ViewOptions.import_depth
 - See `docs/file-boundaries.md` for design
 
+### Bug Fixes
+
+**CLI Argument Parsing** (Dec 24 2025)
+- `--focus validators` now correctly parses target as "validators" (was consuming it as focus filter)
+- Added `require_equals=true` to `--focus` flag (use `--focus=module` syntax)
+- Added validation: `--focus` without file target now errors instead of silently showing project tree
+
 **Package Restructuring** (Dec 23 2025)
 - Extracted core functionality into separate installable packages:
   - `moss-intelligence`: Code analysis (skeleton, complexity, security, deps, clones)
