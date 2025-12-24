@@ -81,6 +81,7 @@ Phase 4 - Expand:
 **Code Quality:**
 - Audit Rust codebase for tuple returns - replace with structs unconditionally (unless names would be pure ceremony)
   - Already fixed: `find_symbols` → `SymbolMatch`, `call_graph_stats` → `CallGraphStats`, `get_changed_files` → `ChangedFiles`
+  - Also fixed: `IndexedCounts`, `CollapsedChain`, `ParsedPackage`, `ExtractedDeps`
 - Clean up `crates/moss-cli/src/commands/` to mirror actual command list (remove dead modules)
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 
