@@ -50,6 +50,9 @@ pub mod go;
 #[cfg(feature = "lang-java")]
 pub mod java;
 
+#[cfg(feature = "lang-kotlin")]
+pub mod kotlin;
+
 #[cfg(feature = "lang-c")]
 pub mod c;
 
@@ -113,6 +116,9 @@ pub use go::Go;
 
 #[cfg(feature = "lang-java")]
 pub use java::Java;
+
+#[cfg(feature = "lang-kotlin")]
+pub use kotlin::Kotlin;
 
 #[cfg(feature = "lang-c")]
 pub use c::C;

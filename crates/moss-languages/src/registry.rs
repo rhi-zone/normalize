@@ -42,6 +42,9 @@ fn init_builtin() {
         #[cfg(feature = "lang-java")]
         register(&crate::java::Java);
 
+        #[cfg(feature = "lang-kotlin")]
+        register(&crate::kotlin::Kotlin);
+
         #[cfg(feature = "lang-c")]
         register(&crate::c::C);
 
