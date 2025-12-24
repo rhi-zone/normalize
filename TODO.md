@@ -62,6 +62,13 @@ Phase 4 - Expand:
 
 ## Deferred
 
+**Trait migration for specialized modules** (Python/Rust only, need new trait methods):
+- `scopes.rs` - needs scope/binding extraction trait methods
+- `anchors.rs` - needs constant/import anchor extraction
+- `edit.rs` - needs byte position and indentation info in Symbol
+- `cfg.rs` - needs control flow node types in trait
+
+**Other:**
 - Driver integration improvements
 - Python edit separate targeting (LLM-based)
 - Remaining docs: prior-art.md, hybrid-loops.md
