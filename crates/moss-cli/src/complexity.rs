@@ -13,6 +13,7 @@ pub struct FunctionComplexity {
     pub name: String,
     pub complexity: usize,
     pub start_line: usize,
+    #[allow(dead_code)] // Part of public API, may be used by consumers
     pub end_line: usize,
     pub parent: Option<String>, // class/struct name for methods
     pub file_path: Option<String>, // file path for codebase-wide reports

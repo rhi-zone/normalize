@@ -71,11 +71,6 @@ impl FormatRegistry {
             .find(|f| f.name() == name)
             .map(|f| f.as_ref())
     }
-
-    /// List all available formats.
-    pub fn list(&self) -> Vec<&'static str> {
-        self.formats.iter().map(|f| f.name()).collect()
-    }
 }
 
 /// Analyze a session log with auto-format detection.

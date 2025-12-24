@@ -205,19 +205,6 @@ impl DaemonClient {
         serde_json::from_str(&response_str).map_err(|e| format!("Failed to parse response: {}", e))
     }
 
-    pub fn path_query(&self, query: &str) -> Result<Vec<PathMatch>, String> {
-        let response = self.query(&Request::Path {
-            query: query.to_string(),
-        })?;
-        if !response.ok {
-            return Err(response
-                .error
-                .unwrap_or_else(|| "Unknown error".to_string()));
-        }
-        let data = response.data.ok_or("No data in response")?;
-        serde_json::from_value(data).map_err(|e| format!("Failed to parse path matches: {}", e))
-    }
-
     pub fn status(&self) -> Result<DaemonStatus, String> {
         let response = self.query(&Request::Status)?;
         if !response.ok {

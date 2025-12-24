@@ -795,26 +795,9 @@ impl FileIndex {
         })
     }
 
-    /// Get imports for a file
-    pub fn get_imports(&self, file: &str) -> rusqlite::Result<Vec<Import>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT module, name, alias, line FROM imports WHERE file = ?1")?;
-        let imports = stmt
-            .query_map(params![file], |row| {
-                Ok(Import {
-                    module: row.get(0)?,
-                    name: row.get(1)?,
-                    alias: row.get(2)?,
-                    line: row.get(3)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(imports)
-    }
-
     /// Convert a Python module name to possible file paths
     /// e.g., "moss.gen.serialize" → ["src/moss/gen/serialize.py", "moss/gen/serialize.py", ...]
+    /// TODO: Move to Language trait - this is Python-specific
     fn module_to_files(&self, module: &str) -> Vec<String> {
         let parts: Vec<&str> = module.split('.').collect();
         let rel_path = parts.join("/");

@@ -78,12 +78,6 @@ impl ErrorPattern {
         }
     }
 
-    pub fn add_example(&mut self, example: impl Into<String>) {
-        self.count += 1;
-        if self.examples.len() < 3 {
-            self.examples.push(example.into());
-        }
-    }
 }
 
 /// Complete analysis of a session.
@@ -126,26 +120,6 @@ impl SessionAnalysis {
         } else {
             (total - self.total_errors()) as f64 / total as f64
         }
-    }
-
-    /// Format as compact one-liner.
-    pub fn to_compact(&self) -> String {
-        let mut top_tools: Vec<_> = self.tool_stats.values().collect();
-        top_tools.sort_by(|a, b| b.calls.cmp(&a.calls));
-        let tool_summary: String = top_tools
-            .iter()
-            .take(5)
-            .map(|t| format!("{}:{}", t.name, t.calls))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        format!(
-            "session: {} tool calls, {:.0}% success | tools: {} | context: avg {}K tokens",
-            self.total_tool_calls(),
-            self.overall_success_rate() * 100.0,
-            tool_summary,
-            self.token_stats.avg_context() / 1000
-        )
     }
 
     /// Format as markdown report.

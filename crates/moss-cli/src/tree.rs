@@ -26,6 +26,7 @@ pub struct TreeOptions {
     /// Collapse single-child directory chains (src/foo/bar/ → one line)
     pub collapse_single: bool,
     /// Directories that don't count against depth limit (smart depth)
+    #[allow(dead_code)] // TODO: apply to depth calculation
     pub boilerplate_dirs: HashSet<String>,
 }
 
@@ -44,6 +45,7 @@ impl Default for TreeOptions {
 
 /// Result of tree generation
 pub struct TreeResult {
+    #[allow(dead_code)] // Part of public API
     pub root_name: String,
     pub lines: Vec<String>,
     pub file_count: usize,

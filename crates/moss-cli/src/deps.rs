@@ -23,6 +23,7 @@ pub struct Import {
 pub struct Export {
     pub name: String,
     pub kind: &'static str, // "function", "class", "variable"
+    #[allow(dead_code)] // Part of public API
     pub line: usize,
 }
 
