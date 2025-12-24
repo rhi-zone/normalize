@@ -4,6 +4,18 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Package Indexing Trait Methods
+
+Added package indexing methods to `Language` trait:
+- `find_stdlib()` - locate language standard library
+- `should_skip_package_entry()` - filter entries during indexing
+- `package_module_name()` - extract module name from filename
+- Helper functions `skip_dotfiles()` and `has_extension()` for common patterns
+- Refactored Python, Go, JavaScript, C++, Rust indexers to use trait methods
+- C++ now handles extensionless stdlib headers (vector, iostream, etc.)
+- Removed standalone `is_cpp_header` function (-10 net lines in main.rs)
+- Renamed `LanguageSupport` trait to `Language` (each struct IS the language)
+
 ### Language Module Consolidation
 
 Code deduplication in moss-languages:
@@ -13,12 +25,12 @@ Code deduplication in moss-languages:
 
 ### Import Resolution Consolidation
 
-Moved all import resolution logic to `LanguageSupport` trait:
+Moved all import resolution logic to `Language` trait:
 - Added `resolve_local_import()` and `resolve_external_import()` methods to trait
 - Moved `external_packages.rs` and `go_mod.rs` from moss-cli to moss-languages
 - Each language implements resolution: Python, Go, Rust, JavaScript, TypeScript, C, C++, Java
 - Single 12-line `resolve_import()` function in main.rs replaces 550+ lines of per-language code
-- Deleted obsolete `resolution.rs` module (ImportResolver trait merged into LanguageSupport)
+- Deleted obsolete `resolution.rs` module (ImportResolver trait merged into Language)
 
 ### Trait-based Language Architecture
 
@@ -27,7 +39,7 @@ Major refactor: each language struct IS its support implementation.
 - Renamed `PythonSupport` → `Python`, `RustSupport` → `Rust`, etc.
 - Added `support_for_path()` and `support_for_extension()` for dynamic lookup
 - Replaced `parse_lang(Language::X, ...)` with `parse_with_grammar("x", ...)`
-- External crates can now implement `LanguageSupport` for new languages
+- External crates can now implement `Language` for new languages
 - Improved trait API: `export_kinds()` → `public_symbol_kinds()` + `visibility_mechanism()` enum
 - All 76 tests pass
 

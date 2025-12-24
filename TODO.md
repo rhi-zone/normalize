@@ -6,9 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - Session analysis: detect correction patterns ("You're right", "Good point", "isn't working")
 - Complete daemon integration (FileIndex API methods currently unused)
-- ~~Consider: rename `LanguageSupport` → `Language`~~ ✅ Done
 - Validate node kinds against grammars (test that kinds like "if_statement" exist in grammar)
-- Refactor main.rs (6k+ lines): move indexing code to Language trait (index_cpp_directory, index_rust_packages, find_gradle_jar, is_cpp_header → methods on language structs)
 
 Test Status: 79 passing, 0 failing
 
@@ -18,7 +16,7 @@ Test Status: 79 passing, 0 failing
 
 Phase 1 - Scaffold: ✅
 - [x] Create `crates/moss-languages/` with Cargo.toml, feature flags
-- [x] Define `LanguageSupport` trait in `traits.rs`
+- [x] Define `Language` trait in `traits.rs`
 - [x] Set up registry with `OnceLock` + `#[cfg(feature)]` gating
 
 Phase 2 - Port existing languages: ✅
@@ -35,7 +33,7 @@ Phase 3 - Integrate: ✅
   - Python, JavaScript, TypeScript, Rust, Go, Java, Ruby, C, C++
   - Scala, Markdown, JSON, YAML, TOML
   - Vue remains on legacy (needs script element parsing)
-- [x] Add extract_imports/extract_exports to LanguageSupport trait
+- [x] Add extract_imports/extract_exports to Language trait
 - [x] Refactor `deps.rs` to use trait (Python, Rust, JS, Go migrated)
 - [x] Refactor `complexity.rs` to use trait (complexity_nodes method)
 - [x] Refactor `symbols.rs` to use trait
