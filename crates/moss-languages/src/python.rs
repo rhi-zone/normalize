@@ -905,6 +905,19 @@ impl Language for Python {
         // Convert path separators to dots
         Some(module_path.replace('/', "."))
     }
+
+    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
+        // Convert dots to path separators
+        let rel_path = module.replace('.', "/");
+
+        // Try common source directories and both .py and __init__.py
+        let mut candidates = Vec::with_capacity(4);
+        for prefix in &["src/", ""] {
+            candidates.push(format!("{}{}.py", prefix, rel_path));
+            candidates.push(format!("{}{}/__init__.py", prefix, rel_path));
+        }
+        candidates
+    }
 }
 
 #[cfg(test)]

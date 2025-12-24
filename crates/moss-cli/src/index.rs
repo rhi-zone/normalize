@@ -1,5 +1,6 @@
 use ignore::WalkBuilder;
 use moss_core::get_moss_dir;
+use moss_languages::support_for_path;
 use rayon::prelude::*;
 use rusqlite::{params, Connection};
 use std::path::{Path, PathBuf};
@@ -795,19 +796,17 @@ impl FileIndex {
         })
     }
 
-    /// Convert a Python module name to possible file paths
-    /// e.g., "moss.gen.serialize" → ["src/moss/gen/serialize.py", "moss/gen/serialize.py", ...]
-    /// TODO: Move to Language trait - this is Python-specific
-    fn module_to_files(&self, module: &str) -> Vec<String> {
-        let parts: Vec<&str> = module.split('.').collect();
-        let rel_path = parts.join("/");
+    /// Convert a module name to possible file paths using the language's trait method.
+    /// Returns only paths that exist in the index.
+    fn module_to_files(&self, module: &str, source_file: &str) -> Vec<String> {
+        // Get language from the source file extension
+        let lang = match support_for_path(Path::new(source_file)) {
+            Some(l) => l,
+            None => return vec![],
+        };
 
-        // Try common source directories and both .py and __init__.py
-        let mut candidates = Vec::new();
-        for prefix in &["src/", ""] {
-            candidates.push(format!("{}{}.py", prefix, rel_path));
-            candidates.push(format!("{}{}/__init__.py", prefix, rel_path));
-        }
+        // Get candidate paths from the language trait
+        let candidates = lang.module_name_to_paths(module);
 
         // Filter to files that exist in index
         candidates
@@ -868,7 +867,7 @@ impl FileIndex {
 
         // Check each wildcard source to see if it exports the symbol
         for module in &wildcards {
-            let files = self.module_to_files(module);
+            let files = self.module_to_files(module, file);
             for module_file in files {
                 if self.file_exports_symbol(&module_file, name)? {
                     return Ok(Some((module.clone(), name.to_string())));

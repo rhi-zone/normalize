@@ -262,6 +262,13 @@ pub trait Language: Send + Sync {
         None
     }
 
+    /// Convert a module name to candidate file paths (inverse of file_path_to_module_name).
+    /// Returns relative paths that could contain the module.
+    /// Used for wildcard import resolution (e.g., `from foo import *`).
+    fn module_name_to_paths(&self, _module: &str) -> Vec<String> {
+        vec![]
+    }
+
     // === Import Resolution ===
 
     /// Language key for package index cache (e.g., "python", "go", "js").
