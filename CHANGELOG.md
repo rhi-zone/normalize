@@ -77,6 +77,10 @@ First release. See `docs/` for design docs and `README.md` for usage.
 - Added `require_equals=true` to `--focus` flag (use `--focus=module` syntax)
 - Added validation: `--focus` without file target now errors instead of silently showing project tree
 
+**Focus Mode External Imports** (Dec 24 2025)
+- `--focus` now shows skeletons of external packages (stdlib, site-packages), not just local files
+- External imports display as `[module]` in output header
+
 **Package Restructuring** (Dec 23 2025)
 - Extracted core functionality into separate installable packages:
   - `moss-intelligence`: Code analysis (skeleton, complexity, security, deps, clones)
