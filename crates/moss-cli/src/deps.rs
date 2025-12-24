@@ -3,6 +3,9 @@
 //! Extracts imports and exports from source files.
 
 use moss_core::{tree_sitter, Language, Parsers};
+use moss_languages::{get_support, LanguageSupport, SymbolKind as LangSymbolKind};
+use moss_languages::Import as LangImport;
+use moss_languages::Export as LangExport;
 use std::path::Path;
 
 /// An import statement
@@ -103,6 +106,40 @@ pub struct DepsExtractor {
     parsers: Parsers,
 }
 
+/// Convert trait Import to deps Import
+fn convert_import(imp: &LangImport) -> Import {
+    Import {
+        module: imp.module.clone(),
+        names: imp.names.clone(),
+        alias: imp.alias.clone(),
+        line: imp.line,
+        is_relative: imp.is_relative,
+    }
+}
+
+/// Convert trait Export to deps Export
+fn convert_export(exp: &LangExport) -> Export {
+    let kind = match exp.kind {
+        LangSymbolKind::Function => "function",
+        LangSymbolKind::Method => "method",
+        LangSymbolKind::Class => "class",
+        LangSymbolKind::Struct => "struct",
+        LangSymbolKind::Enum => "enum",
+        LangSymbolKind::Trait => "trait",
+        LangSymbolKind::Interface => "interface",
+        LangSymbolKind::Module => "module",
+        LangSymbolKind::Type => "type",
+        LangSymbolKind::Constant => "constant",
+        LangSymbolKind::Variable => "variable",
+        LangSymbolKind::Heading => "heading",
+    };
+    Export {
+        name: exp.name.clone(),
+        kind,
+        line: exp.line,
+    }
+}
+
 impl DepsExtractor {
     pub fn new() -> Self {
         Self {
@@ -112,21 +149,46 @@ impl DepsExtractor {
 
     pub fn extract(&self, path: &Path, content: &str) -> DepsResult {
         let lang = Language::from_path(path);
+
+        // Try trait-based extraction for supported languages
         let (imports, exports, reexports) = match lang {
             Some(Language::Python) => {
-                let (i, e) = self.extract_python(content);
-                (i, e, Vec::new())
+                if let Some(support) = get_support(Language::Python) {
+                    let (i, e) = self.extract_with_trait(Language::Python, content, support);
+                    (i, e, Vec::new())
+                } else {
+                    let (i, e) = self.extract_python(content);
+                    (i, e, Vec::new())
+                }
             }
             Some(Language::Rust) => {
-                let (i, e) = self.extract_rust(content);
-                (i, e, Vec::new())
+                if let Some(support) = get_support(Language::Rust) {
+                    let (i, e) = self.extract_with_trait(Language::Rust, content, support);
+                    (i, e, Vec::new())
+                } else {
+                    let (i, e) = self.extract_rust(content);
+                    (i, e, Vec::new())
+                }
+            }
+            Some(Language::JavaScript) => {
+                if let Some(support) = get_support(Language::JavaScript) {
+                    let (i, e) = self.extract_with_trait(Language::JavaScript, content, support);
+                    (i, e, Vec::new())
+                } else {
+                    let (i, e, r) = self.extract_javascript(content);
+                    (i, e, r)
+                }
             }
             Some(Language::TypeScript) => self.extract_typescript(content),
             Some(Language::Tsx) => self.extract_tsx(content),
-            Some(Language::JavaScript) => self.extract_javascript(content),
             Some(Language::Go) => {
-                let (i, e) = self.extract_go(content);
-                (i, e, Vec::new())
+                if let Some(support) = get_support(Language::Go) {
+                    let (i, e) = self.extract_with_trait(Language::Go, content, support);
+                    (i, e, Vec::new())
+                } else {
+                    let (i, e) = self.extract_go(content);
+                    (i, e, Vec::new())
+                }
             }
             _ => (Vec::new(), Vec::new(), Vec::new()),
         };
@@ -136,6 +198,63 @@ impl DepsExtractor {
             exports,
             reexports,
             file_path: path.to_string_lossy().to_string(),
+        }
+    }
+
+    /// Extract using the LanguageSupport trait
+    fn extract_with_trait(
+        &self,
+        lang: Language,
+        content: &str,
+        support: &dyn LanguageSupport,
+    ) -> (Vec<Import>, Vec<Export>) {
+        let tree = match self.parsers.parse_lang(lang, content) {
+            Some(t) => t,
+            None => return (Vec::new(), Vec::new()),
+        };
+
+        let mut imports = Vec::new();
+        let mut exports = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+
+        self.collect_with_trait(&mut cursor, content, support, &mut imports, &mut exports);
+        (imports, exports)
+    }
+
+    fn collect_with_trait(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        support: &dyn LanguageSupport,
+        imports: &mut Vec<Import>,
+        exports: &mut Vec<Export>,
+    ) {
+        loop {
+            let node = cursor.node();
+            let kind = node.kind();
+
+            // Check for import nodes
+            if support.import_kinds().contains(&kind) {
+                let lang_imports = support.extract_imports(&node, content);
+                imports.extend(lang_imports.iter().map(convert_import));
+            }
+
+            // Check for export nodes
+            if support.export_kinds().contains(&kind) {
+                let lang_exports = support.extract_exports(&node, content);
+                exports.extend(lang_exports.iter().map(convert_export));
+            }
+
+            // Recurse into children
+            if cursor.goto_first_child() {
+                self.collect_with_trait(cursor, content, support, imports, exports);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
         }
     }
 

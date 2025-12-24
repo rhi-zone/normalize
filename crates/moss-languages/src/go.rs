@@ -26,7 +26,7 @@ impl LanguageSupport for GoSupport {
     }
 
     fn export_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "method_declaration", "type_spec"]
+        &["function_declaration", "method_declaration", "type_spec", "const_spec", "var_spec"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
@@ -132,6 +132,8 @@ impl LanguageSupport for GoSupport {
             "function_declaration" => SymbolKind::Function,
             "method_declaration" => SymbolKind::Method,
             "type_spec" => SymbolKind::Type,
+            "const_spec" => SymbolKind::Constant,
+            "var_spec" => SymbolKind::Variable,
             _ => return Vec::new(),
         };
 
