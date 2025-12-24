@@ -553,18 +553,6 @@ enum Commands {
         #[arg(long)]
         security: bool,
 
-        /// Run test coverage analysis (detect missing tests)
-        #[arg(long)]
-        test_coverage: bool,
-
-        /// Run scopes analysis (public/private symbol statistics)
-        #[arg(long)]
-        scopes: bool,
-
-        /// Run test health analysis (pytest markers, skip reasons)
-        #[arg(long)]
-        test_health: bool,
-
         /// Complexity threshold - only show functions above this
         #[arg(short, long)]
         threshold: Option<usize>,
@@ -844,9 +832,6 @@ fn main() {
             health,
             complexity,
             security,
-            test_coverage,
-            scopes,
-            test_health,
             threshold,
             kind,
         } => cmd_analyze(
@@ -855,9 +840,6 @@ fn main() {
             health,
             complexity,
             security,
-            test_coverage,
-            scopes,
-            test_health,
             threshold,
             kind.as_deref(),
             cli.json,
@@ -4359,9 +4341,7 @@ fn cmd_health(root: Option<&Path>, json: bool, profiler: &mut Profiler) -> i32 {
             "{}",
             serde_json::json!({
                 "total_files": report.total_files,
-                "python_files": report.python_files,
-                "rust_files": report.rust_files,
-                "other_files": report.other_files,
+                "files_by_language": report.files_by_language,
                 "total_lines": report.total_lines,
                 "total_functions": report.total_functions,
                 "avg_complexity": (report.avg_complexity * 10.0).round() / 10.0,
@@ -4383,9 +4363,6 @@ fn cmd_analyze(
     health: bool,
     complexity: bool,
     security: bool,
-    test_coverage: bool,
-    scopes: bool,
-    test_health: bool,
     threshold: Option<usize>,
     kind_filter: Option<&str>,
     json: bool,
@@ -4394,8 +4371,8 @@ fn cmd_analyze(
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // If no specific flags, run core analyses (health, complexity, security)
-    let any_flag = health || complexity || security || test_coverage || scopes || test_health;
+    // If no specific flags, run all analyses
+    let any_flag = health || complexity || security;
     let (run_health, run_complexity, run_security) = if !any_flag {
         (true, true, true)
     } else {
@@ -4413,221 +4390,12 @@ fn cmd_analyze(
     );
 
     if json {
-        let mut output = report.to_json();
-
-        // Add test coverage analysis if requested
-        if test_coverage {
-            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
-            if let Some(test_coverage_result) = run_python_test_coverage(&analysis_path, json) {
-                if let serde_json::Value::Object(ref mut map) = output {
-                    map.insert("test_coverage".to_string(), test_coverage_result);
-                }
-            }
-        }
-
-        // Add scopes analysis if requested
-        if scopes {
-            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
-            if let Some(scopes_result) = run_python_scopes(&analysis_path, json) {
-                if let serde_json::Value::Object(ref mut map) = output {
-                    map.insert("scopes".to_string(), scopes_result);
-                }
-            }
-        }
-
-        // Add test health analysis if requested
-        if test_health {
-            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
-            if let Some(test_health_result) = run_python_test_health(&analysis_path, json) {
-                if let serde_json::Value::Object(ref mut map) = output {
-                    map.insert("test_health".to_string(), test_health_result);
-                }
-            }
-        }
-
-        println!("{}", output);
+        println!("{}", report.to_json());
     } else {
         println!("{}", report.format());
-
-        // Add test coverage analysis if requested
-        if test_coverage {
-            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
-            if let Some(test_coverage_result) = run_python_test_coverage(&analysis_path, false) {
-                if let serde_json::Value::String(s) = test_coverage_result {
-                    println!("\n{}", s);
-                }
-            }
-        }
-
-        // Add scopes analysis if requested
-        if scopes {
-            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
-            if let Some(scopes_result) = run_python_scopes(&analysis_path, false) {
-                if let serde_json::Value::String(s) = scopes_result {
-                    println!("\n{}", s);
-                }
-            }
-        }
-
-        // Add test health analysis if requested
-        if test_health {
-            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
-            if let Some(test_health_result) = run_python_test_health(&analysis_path, false) {
-                if let serde_json::Value::String(s) = test_health_result {
-                    println!("\n{}", s);
-                }
-            }
-        }
     }
 
     0
-}
-
-/// Run Python test_gaps module for test coverage analysis
-fn run_python_test_coverage(path: &Path, json: bool) -> Option<serde_json::Value> {
-    use std::process::Command;
-
-    let script = if json {
-        format!(
-            r#"
-import json
-from pathlib import Path
-from moss_intelligence.test_gaps import analyze_test_coverage
-report = analyze_test_coverage(Path('{}'))
-print(json.dumps({{
-    'coverage_percent': report.coverage_percent,
-    'tested_count': report.tested_count,
-    'untested_count': report.untested_count,
-    'total_source_files': report.total_source_files,
-    'patterns': [{{
-        'pattern': p.pattern,
-        'language': p.language,
-        'count': p.count
-    }} for p in report.patterns],
-    'gaps': [{{
-        'source_file': str(gap.source_file),
-        'expected_test': gap.expected_test,
-        'language': gap.language
-    }} for gap in report.gaps[:20]]
-}}))
-"#,
-            path.display()
-        )
-    } else {
-        format!(
-            r#"
-from pathlib import Path
-from moss_intelligence.test_gaps import analyze_test_coverage
-report = analyze_test_coverage(Path('{}'))
-print(report.to_compact())
-"#,
-            path.display()
-        )
-    };
-
-    let output = Command::new("uv")
-        .args(["run", "python", "-c", &script])
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if json {
-            serde_json::from_str(stdout.trim()).ok()
-        } else {
-            Some(serde_json::Value::String(stdout.trim().to_string()))
-        }
-    } else {
-        None
-    }
-}
-
-/// Run Python scopes module for public/private symbol analysis
-fn run_python_scopes(path: &Path, json: bool) -> Option<serde_json::Value> {
-    use std::process::Command;
-
-    let script = if json {
-        format!(
-            r#"
-import json
-from pathlib import Path
-from moss_intelligence.scopes import analyze_project_scopes
-report = analyze_project_scopes(Path('{}'))
-print(json.dumps(report.to_dict()))
-"#,
-            path.display()
-        )
-    } else {
-        format!(
-            r#"
-from pathlib import Path
-from moss_intelligence.scopes import analyze_project_scopes
-report = analyze_project_scopes(Path('{}'))
-print(report.to_compact())
-"#,
-            path.display()
-        )
-    };
-
-    let output = Command::new("uv")
-        .args(["run", "python", "-c", &script])
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if json {
-            serde_json::from_str(stdout.trim()).ok()
-        } else {
-            Some(serde_json::Value::String(stdout.trim().to_string()))
-        }
-    } else {
-        None
-    }
-}
-
-/// Run Python test_health module for pytest marker analysis
-fn run_python_test_health(path: &Path, json: bool) -> Option<serde_json::Value> {
-    use std::process::Command;
-
-    let script = if json {
-        format!(
-            r#"
-import json
-from pathlib import Path
-from moss_intelligence.test_health import analyze_test_health
-report = analyze_test_health(Path('{}'))
-print(json.dumps(report.to_dict()))
-"#,
-            path.display()
-        )
-    } else {
-        format!(
-            r#"
-from pathlib import Path
-from moss_intelligence.test_health import analyze_test_health
-report = analyze_test_health(Path('{}'))
-print(report.to_compact())
-"#,
-            path.display()
-        )
-    };
-
-    let output = Command::new("uv")
-        .args(["run", "python", "-c", &script])
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if json {
-            serde_json::from_str(stdout.trim()).ok()
-        } else {
-            Some(serde_json::Value::String(stdout.trim().to_string()))
-        }
-    } else {
-        None
-    }
 }
 
 fn cmd_overview(root: Option<&Path>, compact: bool, json: bool, profiler: &mut Profiler) -> i32 {
@@ -4645,9 +4413,7 @@ fn cmd_overview(root: Option<&Path>, compact: bool, json: bool, profiler: &mut P
             "{}",
             serde_json::json!({
                 "total_files": report.total_files,
-                "python_files": report.python_files,
-                "rust_files": report.rust_files,
-                "other_files": report.other_files,
+                "files_by_language": report.files_by_language,
                 "total_lines": report.total_lines,
                 "total_functions": report.total_functions,
                 "total_classes": report.total_classes,

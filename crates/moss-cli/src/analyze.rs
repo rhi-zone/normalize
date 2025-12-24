@@ -219,9 +219,7 @@ impl AnalyzeReport {
                 "health".to_string(),
                 serde_json::json!({
                     "total_files": health.total_files,
-                    "python_files": health.python_files,
-                    "rust_files": health.rust_files,
-                    "other_files": health.other_files,
+                    "files_by_language": health.files_by_language,
                     "total_lines": health.total_lines,
                     "avg_complexity": health.avg_complexity,
                     "max_complexity": health.max_complexity,

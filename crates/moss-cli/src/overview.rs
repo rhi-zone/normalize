@@ -6,8 +6,9 @@
 //! - Import/dependency summary
 //! - TODO/FIXME counts
 
+use std::collections::HashMap;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use rayon::prelude::*;
 
@@ -21,9 +22,7 @@ use crate::skeleton::SkeletonExtractor;
 pub struct OverviewReport {
     // Files
     pub total_files: usize,
-    pub python_files: usize,
-    pub rust_files: usize,
-    pub other_files: usize,
+    pub files_by_language: std::collections::HashMap<String, usize>,
     pub total_lines: usize,
 
     // Structure
@@ -66,10 +65,15 @@ impl OverviewReport {
 
         // Files section
         lines.push("## Files".to_string());
-        lines.push(format!(
-            "  {} files ({} Python, {} Rust, {} other)",
-            self.total_files, self.python_files, self.rust_files, self.other_files
-        ));
+        let lang_breakdown: Vec<_> = self.files_by_language.iter()
+            .filter(|(_, count)| **count > 0)
+            .map(|(lang, count)| format!("{} {}", count, lang))
+            .collect();
+        if lang_breakdown.is_empty() {
+            lines.push(format!("  {} files", self.total_files));
+        } else {
+            lines.push(format!("  {} files ({})", self.total_files, lang_breakdown.join(", ")));
+        }
         lines.push(format!("  {} lines of code", self.total_lines));
         lines.push(String::new());
 
@@ -217,10 +221,8 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
     let all_files = path_resolve::all_files(root);
     let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
 
-    // Atomic counters for file type counts
-    let python_files = AtomicUsize::new(0);
-    let rust_files = AtomicUsize::new(0);
-    let other_files = AtomicUsize::new(0);
+    // Thread-safe language file counts
+    let files_by_language: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
 
     // Process files in parallel
     let stats: Vec<FileStats> = files
@@ -229,12 +231,11 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
             let path = root.join(&file.path);
             let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
-            // Count file types
-            match ext {
-                "py" => python_files.fetch_add(1, Ordering::Relaxed),
-                "rs" => rust_files.fetch_add(1, Ordering::Relaxed),
-                _ => other_files.fetch_add(1, Ordering::Relaxed),
-            };
+            // Count files by language using moss_languages
+            if let Some(lang) = moss_languages::support_for_extension(ext) {
+                let mut counts = files_by_language.lock().unwrap();
+                *counts.entry(lang.name().to_string()).or_insert(0) += 1;
+            }
 
             let content = std::fs::read_to_string(&path).ok()?;
             let lines = content.lines().count();
@@ -243,8 +244,9 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
             let todos = content.matches("TODO").count();
             let fixmes = content.matches("FIXME").count();
 
-            // Skip detailed analysis for non-code files
-            if ext != "py" && ext != "rs" {
+            // Skip detailed analysis for files without language support
+            let lang = moss_languages::support_for_extension(ext);
+            if lang.is_none() || !lang.unwrap().has_symbols() {
                 return Some(FileStats {
                     lines,
                     functions: 0,
@@ -404,13 +406,11 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
         OverviewReport::calculate_health_score(avg_complexity, high_risk_ratio, doc_coverage);
     let grade = OverviewReport::grade_from_score(health_score);
 
+    let lang_counts = files_by_language.into_inner().unwrap();
+
     OverviewReport {
-        total_files: python_files.load(Ordering::Relaxed)
-            + rust_files.load(Ordering::Relaxed)
-            + other_files.load(Ordering::Relaxed),
-        python_files: python_files.load(Ordering::Relaxed),
-        rust_files: rust_files.load(Ordering::Relaxed),
-        other_files: other_files.load(Ordering::Relaxed),
+        total_files: files.len(),
+        files_by_language: lang_counts,
         total_lines,
         total_functions,
         total_classes,
