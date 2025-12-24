@@ -4,6 +4,13 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Language Module Consolidation
+
+Code deduplication in moss-languages:
+- Inlined `go_mod.rs` into `go.rs` (GoModule struct, parse/find/resolve functions)
+- Created `ecmascript.rs` with shared JS/TS/TSX implementation (~400 lines deduplicated)
+- JavaScript, TypeScript, and TSX now use shared ecmascript module while keeping separate feature flags
+
 ### Import Resolution Consolidation
 
 Moved all import resolution logic to `LanguageSupport` trait:
