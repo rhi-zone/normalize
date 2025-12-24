@@ -948,12 +948,8 @@ impl FileIndex {
                     }
                 }
 
-                // Parse imports for Python files
-                let imports = if file_path.ends_with(".py") {
-                    parser.parse_python_imports(&content)
-                } else {
-                    Vec::new()
-                };
+                // Parse imports using trait-based extraction (works for all supported languages)
+                let imports = parser.parse_imports(&full_path, &content);
 
                 Some(ParsedFileData {
                     file_path: file_path.clone(),
@@ -1073,15 +1069,14 @@ impl FileIndex {
                 }
             }
 
-            if file_path.ends_with(".py") {
-                let imports = parser.parse_python_imports(&content);
-                for imp in imports {
-                    tx.execute(
-                        "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                        params![file_path, imp.module, imp.name, imp.alias, imp.line],
-                    )?;
-                    import_count += 1;
-                }
+            // Parse imports using trait-based extraction (works for all supported languages)
+            let imports = parser.parse_imports(&full_path, &content);
+            for imp in imports {
+                tx.execute(
+                    "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![file_path, imp.module, imp.name, imp.alias, imp.line],
+                )?;
+                import_count += 1;
             }
         }
 

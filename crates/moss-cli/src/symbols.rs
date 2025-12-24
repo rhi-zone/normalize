@@ -163,133 +163,79 @@ impl SymbolParser {
         }
     }
 
-    /// Parse Python imports from a file
-    pub fn parse_python_imports(&self, content: &str) -> Vec<Import> {
-        let tree = match self.parsers.parse_with_grammar("python", content) {
+    /// Parse imports from any supported language file using trait-based extraction.
+    /// Returns a flattened list where each imported name gets its own Import entry.
+    pub fn parse_imports(&self, path: &Path, content: &str) -> Vec<Import> {
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+
+        // Check if this language has import support
+        if support.import_kinds().is_empty() {
+            return Vec::new();
+        }
+
+        let tree = match self.parsers.parse_with_grammar(support.grammar_name(), content) {
             Some(t) => t,
             None => return Vec::new(),
         };
 
         let mut imports = Vec::new();
         let root = tree.root_node();
-
         let mut cursor = root.walk();
-        self.collect_python_imports(&mut cursor, content, &mut imports);
-
+        self.collect_imports_with_trait(&mut cursor, content, support, &mut imports);
         imports
     }
 
-    fn collect_python_imports(
+    fn collect_imports_with_trait(
         &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
+        support: &dyn LanguageSupport,
         imports: &mut Vec<Import>,
     ) {
         loop {
             let node = cursor.node();
             let kind = node.kind();
 
-            match kind {
-                // import os, import json as j
-                "import_statement" => {
-                    // Iterate through children looking for dotted_name or aliased_import
-                    for i in 0..node.child_count() {
-                        if let Some(child) = node.child(i) {
-                            match child.kind() {
-                                "dotted_name" => {
-                                    let name = &content[child.byte_range()];
-                                    imports.push(Import {
-                                        module: None,
-                                        name: name.to_string(),
-                                        alias: None,
-                                        line: child.start_position().row + 1,
-                                    });
-                                }
-                                "aliased_import" => {
-                                    let name = child
-                                        .child_by_field_name("name")
-                                        .map(|n| content[n.byte_range()].to_string());
-                                    let alias = child
-                                        .child_by_field_name("alias")
-                                        .map(|n| content[n.byte_range()].to_string());
-                                    if let Some(name) = name {
-                                        imports.push(Import {
-                                            module: None,
-                                            name,
-                                            alias,
-                                            line: child.start_position().row + 1,
-                                        });
-                                    }
-                                }
-                                _ => {}
-                            }
+            // Check for import nodes
+            if support.import_kinds().contains(&kind) {
+                let lang_imports = support.extract_imports(&node, content);
+                // Flatten: each name in the import becomes a separate Import entry
+                for lang_imp in lang_imports {
+                    if lang_imp.is_wildcard {
+                        imports.push(Import {
+                            module: Some(lang_imp.module.clone()),
+                            name: "*".to_string(),
+                            alias: lang_imp.alias.clone(),
+                            line: lang_imp.line,
+                        });
+                    } else if lang_imp.names.is_empty() {
+                        // import X (no specific names) - module is the imported thing
+                        imports.push(Import {
+                            module: None,
+                            name: lang_imp.module.clone(),
+                            alias: lang_imp.alias.clone(),
+                            line: lang_imp.line,
+                        });
+                    } else {
+                        // from X import a, b, c - each name gets an entry
+                        for name in &lang_imp.names {
+                            imports.push(Import {
+                                module: Some(lang_imp.module.clone()),
+                                name: name.clone(),
+                                alias: None, // alias applies to whole import, not individual names
+                                line: lang_imp.line,
+                            });
                         }
                     }
                 }
-                // from pathlib import Path, from moss.gen import serialize as ser
-                "import_from_statement" => {
-                    // Get the module name
-                    let module = node
-                        .child_by_field_name("module_name")
-                        .map(|n| content[n.byte_range()].to_string());
-
-                    // Find import items
-                    for i in 0..node.child_count() {
-                        if let Some(child) = node.child(i) {
-                            match child.kind() {
-                                "dotted_name" | "identifier" => {
-                                    // Skip the module name itself (already captured)
-                                    if child.start_byte()
-                                        > node
-                                            .children(&mut node.walk())
-                                            .find(|c| c.kind() == "import")
-                                            .map(|c| c.end_byte())
-                                            .unwrap_or(0)
-                                    {
-                                        let name = &content[child.byte_range()];
-                                        imports.push(Import {
-                                            module: module.clone(),
-                                            name: name.to_string(),
-                                            alias: None,
-                                            line: child.start_position().row + 1,
-                                        });
-                                    }
-                                }
-                                "aliased_import" => {
-                                    let name = child
-                                        .child_by_field_name("name")
-                                        .map(|n| content[n.byte_range()].to_string());
-                                    let alias = child
-                                        .child_by_field_name("alias")
-                                        .map(|n| content[n.byte_range()].to_string());
-                                    if let Some(name) = name {
-                                        imports.push(Import {
-                                            module: module.clone(),
-                                            name,
-                                            alias,
-                                            line: child.start_position().row + 1,
-                                        });
-                                    }
-                                }
-                                "wildcard_import" => {
-                                    imports.push(Import {
-                                        module: module.clone(),
-                                        name: "*".to_string(),
-                                        alias: None,
-                                        line: child.start_position().row + 1,
-                                    });
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-                _ => {}
             }
 
             // Recurse into children
             if cursor.goto_first_child() {
-                self.collect_python_imports(cursor, content, imports);
+                self.collect_imports_with_trait(cursor, content, support, imports);
                 cursor.goto_parent();
             }
 

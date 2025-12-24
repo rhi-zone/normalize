@@ -4,6 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Fix `index.rs` import indexing to use trait-based extraction (currently Python-only)
+- Complete C++ language support (last Tier 1 language with `todo!()` methods)
+- Complete non-Tier 1 languages: C, Ruby, Scala, Vue, Bash (all have `todo!()` methods)
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
 
