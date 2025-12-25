@@ -163,6 +163,7 @@ Current scaffold is TOML state machines. Needs design work:
 - [x] Core: Tool trait, ToolRegistry, SARIF 2.1.0 output
 - [x] Adapters: ruff, oxlint, biome, prettier, tsc, clippy, rustfmt, gofmt, go-vet
 - [x] CLI: `moss lint` with auto-detection, --fix, --sarif, --category filter
+- [x] Custom tools: .moss/tools.toml config, SARIF/JSON consumption
 - [ ] More adapters: mypy, pyright, eslint, deno check, clangd, pylint
 - [ ] Integration: wire into `moss analyze` as unified check runner
 - [ ] Watch mode: run relevant linters on file changes
