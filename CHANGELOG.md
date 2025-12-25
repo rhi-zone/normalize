@@ -4,6 +4,15 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Package Registry Queries
+
+New `moss package` command queries package registries without web search:
+- **moss-packages crate**: Ecosystem trait with implementations for cargo, npm, python
+- Auto-detection from manifest files (Cargo.toml → cargo, package.json → npm, pyproject.toml → python)
+- Tool detection from lockfiles with fallback to fastest available (e.g., bun → pnpm → yarn → npm)
+- Unified output: name, version, description, license, features, dependencies
+- `--json` for structured output
+
 ### Language Node Kind Audits
 
 Added `validate_unused_kinds_audit()` tests to all 34 language files:
