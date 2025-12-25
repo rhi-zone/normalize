@@ -4,18 +4,28 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Node kind pass 2: cross-check dump_node_kinds against existing lists to find *missing* useful kinds
+- Add high-priority languages: xml, clojure, haskell, ocaml, nix
 - Investigate slow `moss analyze --health` (+500ms over baseline)
 - view.rs internal cleanup (see CLI Surface Cleanup)
 - Rust crate feature lookup (see Tooling)
 
-Test Status: 74 passing, 0 failing
+Test Status: 80 passing, 0 failing
 
 ## Backlog
 
-**Language Support:** Phase 1-5 complete. 35 languages supported with embedded content support.
-See `docs/language-support.md` for design. Next: OCaml, Haskell, Clojure, Nim, Crystal.
-Run `scripts/missing-grammars.sh` for all 64 remaining arborium grammars.
+**Language Support:** 34 languages implemented, 64 remaining from arborium.
+See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to refresh.
+
+Missing languages (grouped by category):
+- **Functional:** clojure, commonlisp, elisp, elm, gleam, haskell, idris, lean, ocaml, prolog, rescript, scheme
+- **Systems/Low-level:** ada, asm, d, objc, verilog, vhdl, x86asm
+- **Scripting:** awk, fish, jq, perl, powershell, r, vim, zsh
+- **Scientific:** agda, julia, matlab, typst, uiua
+- **Config/Data:** caddy, capnp, devicetree, diff, dot, ini, jinja2, kdl, meson, nginx, ninja, nix, query, ron, sparql, ssh-config, starlark, textproto, thrift, tlaplus, wit, xml, yuri
+- **Build:** batch, cmake, groovy
+- **Shaders:** glsl, hlsl
+- **Docs:** asciidoc, postscript
+- **Other:** tsx, vb
 
 **CLI Redundancy:** See `docs/llm-code-consistency.md`
 - [ ] Rust: OutputFormatter trait for JSON/text output
@@ -29,8 +39,7 @@ Run `scripts/missing-grammars.sh` for all 64 remaining arborium grammars.
 - Audit Rust codebase for tuple returns - replace with structs unconditionally
   - Already fixed: `find_symbols` → `SymbolMatch`, `call_graph_stats` → `CallGraphStats`, `get_changed_files` → `ChangedFiles`
   - Also fixed: `IndexedCounts`, `CollapsedChain`, `ParsedPackage`, `ExtractedDeps`
-- Validate node kinds against grammars: test exists (`validate_node_kinds` in registry.rs) - all kinds now valid! Enable test (remove #[ignore]). (Prime use case for workflow.toml automation)
-  - Pass 2: cross-check dump_node_kinds against existing lists to ensure we didn't *miss* valid kinds
+- Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 
 **Bugs:**

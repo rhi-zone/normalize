@@ -4,6 +4,13 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Language Node Kind Audits
+
+Added `validate_unused_kinds_audit()` tests to all 34 language files:
+- Each language explicitly documents which tree-sitter node kinds exist but aren't used
+- Tests fail if documented kinds don't exist, are actually used, or if useful kinds are undocumented
+- Catches stale documentation when grammars update or Language trait implementations change
+
 ### Embedded Content Support
 
 Template languages now extract symbols and imports from embedded code:
