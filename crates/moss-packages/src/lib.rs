@@ -99,6 +99,47 @@ pub struct DependencyTree {
     pub roots: Vec<TreeNode>,
 }
 
+/// Security vulnerability found by audit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Vulnerability {
+    pub package: String,
+    pub version: String,
+    pub severity: VulnerabilitySeverity,
+    pub title: String,
+    pub url: Option<String>,
+    pub cve: Option<String>,
+    pub fixed_in: Option<String>,
+}
+
+/// Severity level for vulnerabilities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VulnerabilitySeverity {
+    Critical,
+    High,
+    Medium,
+    Low,
+    Unknown,
+}
+
+impl VulnerabilitySeverity {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            VulnerabilitySeverity::Critical => "critical",
+            VulnerabilitySeverity::High => "high",
+            VulnerabilitySeverity::Medium => "medium",
+            VulnerabilitySeverity::Low => "low",
+            VulnerabilitySeverity::Unknown => "unknown",
+        }
+    }
+}
+
+/// Result of security audit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditResult {
+    pub vulnerabilities: Vec<Vulnerability>,
+}
+
 /// Error type for package operations.
 #[derive(Debug)]
 pub enum PackageError {
@@ -168,6 +209,10 @@ pub trait Ecosystem: Send + Sync {
     /// Get dependency tree from lockfile.
     /// Returns structured tree data.
     fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError>;
+
+    /// Run security audit for known vulnerabilities.
+    /// Default implementation returns empty result (no audit tool available).
+    fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError>;
 
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {

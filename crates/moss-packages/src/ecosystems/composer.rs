@@ -1,7 +1,7 @@
 //! Composer (PHP) ecosystem.
 
 use crate::{
-    Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
+    AuditResult, Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
     PackageQuery, TreeNode,
 };
 use std::path::Path;
@@ -122,6 +122,13 @@ impl Ecosystem for Composer {
                 dependencies: deps,
             }],
         })
+    }
+
+    fn audit(&self, _project_root: &Path) -> Result<AuditResult, PackageError> {
+        // Composer has 'composer audit' in newer versions but JSON output varies
+        Err(PackageError::ToolFailed(
+            "audit not yet supported for Composer. Use: composer audit".to_string(),
+        ))
     }
 }
 

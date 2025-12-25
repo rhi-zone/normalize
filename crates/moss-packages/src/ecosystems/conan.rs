@@ -1,7 +1,7 @@
 //! Conan (C++) ecosystem.
 
 use crate::{
-    Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
+    AuditResult, Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
     PackageQuery, TreeNode,
 };
 use std::path::Path;
@@ -165,6 +165,12 @@ impl Ecosystem for Conan {
                 dependencies: deps,
             }],
         })
+    }
+
+    fn audit(&self, _project_root: &Path) -> Result<AuditResult, PackageError> {
+        Err(PackageError::ToolFailed(
+            "audit not yet supported for Conan".to_string(),
+        ))
     }
 }
 

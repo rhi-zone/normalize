@@ -1,8 +1,8 @@
 //! RubyGems ecosystem.
 
 use crate::{
-    Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
-    PackageQuery, TreeNode,
+    AuditResult, Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
+    PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -142,6 +142,102 @@ impl Ecosystem for Gem {
                 dependencies: deps,
             }],
         })
+    }
+
+    fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
+        // Try bundler-audit (requires bundler-audit gem)
+        let output = Command::new("bundle-audit")
+            .args(["check", "--format", "json"])
+            .current_dir(project_root)
+            .output();
+
+        let output = match output {
+            Ok(o) => o,
+            Err(_) => {
+                return Err(PackageError::ToolFailed(
+                    "bundle-audit not installed. Install with: gem install bundler-audit"
+                        .to_string(),
+                ));
+            }
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.trim().is_empty() {
+            return Ok(AuditResult {
+                vulnerabilities: Vec::new(),
+            });
+        }
+
+        // Parse bundler-audit JSON output
+        let v: serde_json::Value = serde_json::from_str(&stdout)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut vulnerabilities = Vec::new();
+
+        if let Some(results) = v.get("results").and_then(|r| r.as_array()) {
+            for result in results {
+                let gem = result.get("gem");
+                let advisory = result.get("advisory");
+
+                let package = gem
+                    .and_then(|g| g.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let version = gem
+                    .and_then(|g| g.get("version"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let title = advisory
+                    .and_then(|a| a.get("title"))
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let url = advisory
+                    .and_then(|a| a.get("url"))
+                    .and_then(|u| u.as_str())
+                    .map(String::from);
+                let cve = advisory
+                    .and_then(|a| a.get("cve"))
+                    .and_then(|c| c.as_str())
+                    .map(|c| format!("CVE-{}", c));
+                let fixed_in = advisory
+                    .and_then(|a| a.get("patched_versions"))
+                    .and_then(|p| p.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    })
+                    .filter(|s| !s.is_empty());
+
+                let severity = advisory
+                    .and_then(|a| a.get("criticality"))
+                    .and_then(|c| c.as_str())
+                    .map(|s| match s {
+                        "critical" => VulnerabilitySeverity::Critical,
+                        "high" => VulnerabilitySeverity::High,
+                        "medium" => VulnerabilitySeverity::Medium,
+                        "low" => VulnerabilitySeverity::Low,
+                        _ => VulnerabilitySeverity::Unknown,
+                    })
+                    .unwrap_or(VulnerabilitySeverity::Unknown);
+
+                vulnerabilities.push(Vulnerability {
+                    package,
+                    version,
+                    severity,
+                    title,
+                    url,
+                    cve,
+                    fixed_in,
+                });
+            }
+        }
+
+        Ok(AuditResult { vulnerabilities })
     }
 }
 

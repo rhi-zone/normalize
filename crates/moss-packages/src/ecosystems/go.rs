@@ -1,8 +1,8 @@
 //! Go modules ecosystem.
 
 use crate::{
-    Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
-    PackageQuery, TreeNode,
+    AuditResult, Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
+    PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -148,6 +148,65 @@ impl Ecosystem for Go {
                 dependencies: deps,
             }],
         })
+    }
+
+    fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
+        // Try govulncheck (requires golang.org/x/vuln/cmd/govulncheck)
+        let output = Command::new("govulncheck")
+            .args(["-json", "./..."])
+            .current_dir(project_root)
+            .output();
+
+        let output = match output {
+            Ok(o) => o,
+            Err(_) => {
+                return Err(PackageError::ToolFailed(
+                    "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"
+                        .to_string(),
+                ));
+            }
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut vulnerabilities = Vec::new();
+
+        // govulncheck outputs newline-delimited JSON
+        for line in stdout.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                // Look for "finding" entries
+                if let Some(finding) = v.get("finding") {
+                    if let Some(osv) = finding.get("osv") {
+                        let id = osv.as_str().unwrap_or("").to_string();
+                        let trace = finding.get("trace").and_then(|t| t.as_array());
+
+                        // Get package and version from trace
+                        let (package, version) = trace
+                            .and_then(|arr| arr.first())
+                            .map(|t| {
+                                let pkg = t.get("module").and_then(|m| m.as_str()).unwrap_or("");
+                                let ver = t.get("version").and_then(|v| v.as_str()).unwrap_or("");
+                                (pkg.to_string(), ver.to_string())
+                            })
+                            .unwrap_or_default();
+
+                        vulnerabilities.push(Vulnerability {
+                            package,
+                            version,
+                            severity: VulnerabilitySeverity::Unknown,
+                            title: id.clone(),
+                            url: Some(format!("https://pkg.go.dev/vuln/{}", id)),
+                            cve: None,
+                            fixed_in: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(AuditResult { vulnerabilities })
     }
 }
 

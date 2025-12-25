@@ -1,8 +1,8 @@
 //! npm/yarn/pnpm (Node.js) ecosystem.
 
 use crate::{
-    Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
-    PackageQuery, TreeNode,
+    AuditResult, Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
+    PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -165,6 +165,98 @@ impl Ecosystem for Npm {
         let parsed: serde_json::Value = serde_json::from_str(&content)
             .map_err(|e| crate::PackageError::ParseError(format!("invalid JSON: {}", e)))?;
         build_npm_tree(&parsed)
+    }
+
+    fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
+        // Try npm audit (built into npm)
+        let output = Command::new("npm")
+            .args(["audit", "--json"])
+            .current_dir(project_root)
+            .output()
+            .map_err(|e| PackageError::ToolFailed(format!("npm audit failed: {}", e)))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.trim().is_empty() {
+            return Ok(AuditResult {
+                vulnerabilities: Vec::new(),
+            });
+        }
+
+        // Parse npm audit JSON output
+        let v: serde_json::Value = serde_json::from_str(&stdout)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut vulnerabilities = Vec::new();
+
+        // npm audit format has vulnerabilities object with package names as keys
+        if let Some(vulns) = v.get("vulnerabilities").and_then(|v| v.as_object()) {
+            for (pkg_name, vuln) in vulns {
+                let via = vuln.get("via").and_then(|v| v.as_array());
+                let version = vuln
+                    .get("range")
+                    .and_then(|r| r.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                // Each "via" entry is a vulnerability or a dependent package
+                if let Some(via_arr) = via {
+                    for via_entry in via_arr {
+                        // Skip if this is just a package name (string), not a vuln object
+                        if via_entry.is_string() {
+                            continue;
+                        }
+
+                        let title = via_entry
+                            .get("title")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("Unknown vulnerability")
+                            .to_string();
+                        let url = via_entry
+                            .get("url")
+                            .and_then(|u| u.as_str())
+                            .map(String::from);
+                        let cve = via_entry
+                            .get("cwe")
+                            .and_then(|c| c.as_array())
+                            .and_then(|arr| arr.first())
+                            .and_then(|c| c.as_str())
+                            .map(String::from);
+
+                        let severity = via_entry
+                            .get("severity")
+                            .and_then(|s| s.as_str())
+                            .map(|s| match s {
+                                "critical" => VulnerabilitySeverity::Critical,
+                                "high" => VulnerabilitySeverity::High,
+                                "moderate" => VulnerabilitySeverity::Medium,
+                                "low" => VulnerabilitySeverity::Low,
+                                _ => VulnerabilitySeverity::Unknown,
+                            })
+                            .unwrap_or(VulnerabilitySeverity::Unknown);
+
+                        let fixed_in = vuln.get("fixAvailable").and_then(|f| {
+                            if f.is_boolean() {
+                                None
+                            } else {
+                                f.get("version").and_then(|v| v.as_str()).map(String::from)
+                            }
+                        });
+
+                        vulnerabilities.push(Vulnerability {
+                            package: pkg_name.clone(),
+                            version: version.clone(),
+                            severity,
+                            title,
+                            url,
+                            cve,
+                            fixed_in,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(AuditResult { vulnerabilities })
     }
 }
 

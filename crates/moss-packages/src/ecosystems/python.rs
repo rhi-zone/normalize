@@ -1,8 +1,8 @@
 //! Python (pip/uv/poetry) ecosystem.
 
 use crate::{
-    Dependency, DependencyTree, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo,
-    PackageQuery, TreeNode,
+    AuditResult, Dependency, DependencyTree, Ecosystem, Feature, LockfileManager, PackageError,
+    PackageInfo, PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -217,6 +217,93 @@ impl Ecosystem for Python {
         Err(PackageError::ParseError(
             "no lockfile found (uv.lock or poetry.lock)".to_string(),
         ))
+    }
+
+    fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
+        // Try pip-audit (requires pip-audit installed)
+        let output = Command::new("pip-audit")
+            .args(["--format", "json"])
+            .current_dir(project_root)
+            .output();
+
+        let output = match output {
+            Ok(o) => o,
+            Err(_) => {
+                return Err(PackageError::ToolFailed(
+                    "pip-audit not installed. Install with: pip install pip-audit".to_string(),
+                ));
+            }
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.trim().is_empty() || stdout.trim() == "[]" {
+            return Ok(AuditResult {
+                vulnerabilities: Vec::new(),
+            });
+        }
+
+        // Parse pip-audit JSON output (array of vulnerabilities)
+        let v: serde_json::Value = serde_json::from_str(&stdout)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut vulnerabilities = Vec::new();
+
+        if let Some(arr) = v.as_array() {
+            for vuln in arr {
+                let package = vuln
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let version = vuln
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                // Each package can have multiple vulnerabilities
+                if let Some(vulns) = vuln.get("vulns").and_then(|v| v.as_array()) {
+                    for v in vulns {
+                        let title = v
+                            .get("description")
+                            .and_then(|d| d.as_str())
+                            .map(|s| {
+                                if s.len() > 100 {
+                                    format!("{}...", &s[..100])
+                                } else {
+                                    s.to_string()
+                                }
+                            })
+                            .unwrap_or_default();
+                        let cve = v.get("id").and_then(|i| i.as_str()).map(String::from);
+                        let fixed_in = v
+                            .get("fix_versions")
+                            .and_then(|f| f.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_str())
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            })
+                            .filter(|s| !s.is_empty());
+
+                        vulnerabilities.push(Vulnerability {
+                            package: package.clone(),
+                            version: version.clone(),
+                            severity: VulnerabilitySeverity::Unknown, // pip-audit doesn't provide severity
+                            title,
+                            url: cve
+                                .as_ref()
+                                .map(|c| format!("https://nvd.nist.gov/vuln/detail/{}", c)),
+                            cve,
+                            fixed_in,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(AuditResult { vulnerabilities })
     }
 }
 

@@ -1,8 +1,8 @@
 //! Cargo (Rust) ecosystem.
 
 use crate::{
-    Dependency, DependencyTree, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo,
-    PackageQuery, TreeNode,
+    AuditResult, Dependency, DependencyTree, Ecosystem, Feature, LockfileManager, PackageError,
+    PackageInfo, PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -186,6 +186,119 @@ impl Ecosystem for Cargo {
             .collect();
 
         Ok(DependencyTree { roots })
+    }
+
+    fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
+        // Try cargo audit (requires cargo-audit installed)
+        let output = Command::new("cargo")
+            .args(["audit", "--json"])
+            .current_dir(project_root)
+            .output();
+
+        let output = match output {
+            Ok(o) => o,
+            Err(_) => {
+                return Err(PackageError::ToolFailed(
+                    "cargo-audit not installed. Install with: cargo install cargo-audit"
+                        .to_string(),
+                ));
+            }
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.trim().is_empty() {
+            return Ok(AuditResult {
+                vulnerabilities: Vec::new(),
+            });
+        }
+
+        // Parse cargo-audit JSON output
+        let v: serde_json::Value = serde_json::from_str(&stdout)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut vulnerabilities = Vec::new();
+
+        if let Some(vulns) = v.get("vulnerabilities").and_then(|v| v.get("list")) {
+            if let Some(arr) = vulns.as_array() {
+                for vuln in arr {
+                    let advisory = vuln.get("advisory");
+                    let pkg = vuln.get("package");
+
+                    let package = pkg
+                        .and_then(|p| p.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let version = pkg
+                        .and_then(|p| p.get("version"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let title = advisory
+                        .and_then(|a| a.get("title"))
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let url = advisory
+                        .and_then(|a| a.get("url"))
+                        .and_then(|u| u.as_str())
+                        .map(String::from);
+                    let cve = advisory
+                        .and_then(|a| a.get("aliases"))
+                        .and_then(|a| a.as_array())
+                        .and_then(|arr| {
+                            arr.iter()
+                                .find(|a| {
+                                    a.as_str().map(|s| s.starts_with("CVE-")).unwrap_or(false)
+                                })
+                                .and_then(|a| a.as_str().map(String::from))
+                        });
+
+                    // Get severity from CVSS if available
+                    let severity = advisory
+                        .and_then(|a| a.get("cvss"))
+                        .and_then(|c| c.as_f64())
+                        .map(|score| {
+                            if score >= 9.0 {
+                                VulnerabilitySeverity::Critical
+                            } else if score >= 7.0 {
+                                VulnerabilitySeverity::High
+                            } else if score >= 4.0 {
+                                VulnerabilitySeverity::Medium
+                            } else {
+                                VulnerabilitySeverity::Low
+                            }
+                        })
+                        .unwrap_or(VulnerabilitySeverity::Unknown);
+
+                    // Get patched versions
+                    let fixed_in = vuln
+                        .get("versions")
+                        .and_then(|v| v.get("patched"))
+                        .and_then(|p| p.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
+                        .filter(|s| !s.is_empty());
+
+                    vulnerabilities.push(Vulnerability {
+                        package,
+                        version,
+                        severity,
+                        title,
+                        url,
+                        cve,
+                        fixed_in,
+                    });
+                }
+            }
+        }
+
+        Ok(AuditResult { vulnerabilities })
     }
 }
 

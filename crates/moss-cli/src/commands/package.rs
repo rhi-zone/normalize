@@ -1,7 +1,10 @@
 //! Package registry queries.
 
 use clap::Subcommand;
-use moss_packages::{all_ecosystems, detect_all_ecosystems, PackageError, PackageInfo};
+use moss_packages::{
+    all_ecosystems, detect_all_ecosystems, AuditResult, PackageError, PackageInfo,
+    VulnerabilitySeverity,
+};
 use std::path::Path;
 
 #[derive(Subcommand)]
@@ -22,6 +25,8 @@ pub enum PackageAction {
     },
     /// Show outdated packages (installed vs latest)
     Outdated,
+    /// Check for security vulnerabilities
+    Audit,
 }
 
 pub fn cmd_package(
@@ -155,6 +160,7 @@ fn run_for_ecosystem(
         PackageAction::Tree => cmd_tree(eco, project_root, json),
         PackageAction::Why { package } => cmd_why(eco, package, project_root, json),
         PackageAction::Outdated => cmd_outdated(eco, project_root, json),
+        PackageAction::Audit => cmd_audit(eco, project_root, json),
     }
 }
 
@@ -452,6 +458,93 @@ fn cmd_outdated(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: b
     }
 
     0
+}
+
+fn cmd_audit(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool) -> i32 {
+    match eco.audit(project_root) {
+        Ok(result) => {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            } else {
+                print_audit_human(&result, eco.name());
+            }
+            if result.vulnerabilities.iter().any(|v| {
+                matches!(
+                    v.severity,
+                    VulnerabilitySeverity::Critical | VulnerabilitySeverity::High
+                )
+            }) {
+                1 // Exit with error if high/critical vulnerabilities found
+            } else {
+                0
+            }
+        }
+        Err(e) => {
+            eprintln!("error: {}", e);
+            1
+        }
+    }
+}
+
+fn print_audit_human(result: &AuditResult, ecosystem: &str) {
+    if result.vulnerabilities.is_empty() {
+        println!("No vulnerabilities found ({}).", ecosystem);
+        return;
+    }
+
+    let critical = result
+        .vulnerabilities
+        .iter()
+        .filter(|v| v.severity == VulnerabilitySeverity::Critical)
+        .count();
+    let high = result
+        .vulnerabilities
+        .iter()
+        .filter(|v| v.severity == VulnerabilitySeverity::High)
+        .count();
+    let medium = result
+        .vulnerabilities
+        .iter()
+        .filter(|v| v.severity == VulnerabilitySeverity::Medium)
+        .count();
+    let low = result
+        .vulnerabilities
+        .iter()
+        .filter(|v| v.severity == VulnerabilitySeverity::Low)
+        .count();
+
+    println!(
+        "Found {} vulnerabilities ({}) - {} critical, {} high, {} medium, {} low",
+        result.vulnerabilities.len(),
+        ecosystem,
+        critical,
+        high,
+        medium,
+        low
+    );
+    println!();
+
+    for vuln in &result.vulnerabilities {
+        let severity = vuln.severity.as_str();
+        println!(
+            "[{}] {} {} - {}",
+            severity.to_uppercase(),
+            vuln.package,
+            vuln.version,
+            vuln.title
+        );
+
+        if let Some(cve) = &vuln.cve {
+            println!("  CVE: {}", cve);
+        }
+        if let Some(url) = &vuln.url {
+            println!("  URL: {}", url);
+        }
+        if let Some(fixed) = &vuln.fixed_in {
+            println!("  Fixed in: {}", fixed);
+        }
+        println!();
+    }
 }
 
 fn find_ecosystem_by_name(name: &str) -> Option<&'static dyn moss_packages::Ecosystem> {
