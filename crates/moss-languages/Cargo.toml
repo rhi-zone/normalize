@@ -23,7 +23,8 @@ all-languages = [
     "lang-lua", "lang-zig", "lang-elixir", "lang-erlang", "lang-dart",
     "lang-fsharp", "lang-sql", "lang-graphql", "lang-hcl", "lang-scss",
     "lang-svelte", "lang-xml", "lang-clojure", "lang-haskell", "lang-ocaml",
-    "lang-nix",
+    "lang-nix", "lang-perl", "lang-r", "lang-julia", "lang-elm", "lang-cmake",
+    "lang-vim",
 ]
 
 # Tier 1: Most common languages
@@ -74,3 +75,9 @@ lang-clojure = ["arborium/lang-clojure"]
 lang-haskell = ["arborium/lang-haskell"]
 lang-ocaml = ["arborium/lang-ocaml"]
 lang-nix = ["arborium/lang-nix"]
+lang-perl = ["arborium/lang-perl"]
+lang-r = ["arborium/lang-r"]
+lang-julia = ["arborium/lang-julia"]
+lang-elm = ["arborium/lang-elm"]
+lang-cmake = ["arborium/lang-cmake"]
+lang-vim = ["arborium/lang-vim"]

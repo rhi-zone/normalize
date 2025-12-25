@@ -143,6 +143,24 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-nix")]
         register(&crate::nix::Nix);
+
+        #[cfg(feature = "lang-perl")]
+        register(&crate::perl::Perl);
+
+        #[cfg(feature = "lang-r")]
+        register(&crate::r::R);
+
+        #[cfg(feature = "lang-julia")]
+        register(&crate::julia::Julia);
+
+        #[cfg(feature = "lang-elm")]
+        register(&crate::elm::Elm);
+
+        #[cfg(feature = "lang-cmake")]
+        register(&crate::cmake::CMake);
+
+        #[cfg(feature = "lang-vim")]
+        register(&crate::vim::Vim);
     });
 }
 

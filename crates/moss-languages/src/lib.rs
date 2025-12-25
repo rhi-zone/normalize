@@ -149,6 +149,24 @@ pub mod ocaml;
 #[cfg(feature = "lang-nix")]
 pub mod nix;
 
+#[cfg(feature = "lang-perl")]
+pub mod perl;
+
+#[cfg(feature = "lang-r")]
+pub mod r;
+
+#[cfg(feature = "lang-julia")]
+pub mod julia;
+
+#[cfg(feature = "lang-elm")]
+pub mod elm;
+
+#[cfg(feature = "lang-cmake")]
+pub mod cmake;
+
+#[cfg(feature = "lang-vim")]
+pub mod vim;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
@@ -275,3 +293,21 @@ pub use ocaml::OCaml;
 
 #[cfg(feature = "lang-nix")]
 pub use nix::Nix;
+
+#[cfg(feature = "lang-perl")]
+pub use perl::Perl;
+
+#[cfg(feature = "lang-r")]
+pub use r::R;
+
+#[cfg(feature = "lang-julia")]
+pub use julia::Julia;
+
+#[cfg(feature = "lang-elm")]
+pub use elm::Elm;
+
+#[cfg(feature = "lang-cmake")]
+pub use cmake::CMake;
+
+#[cfg(feature = "lang-vim")]
+pub use vim::Vim;
