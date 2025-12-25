@@ -72,16 +72,23 @@ impl Tool for Tsc {
     }
 
     fn detect(&self, root: &Path) -> f32 {
+        // TypeScript is a JS ecosystem tool - require package.json or tsconfig.json
+        let has_tsconfig = crate::tools::has_config_file(root, &["tsconfig.json"]);
+        let has_package_json = crate::tools::has_config_file(root, &["package.json"]);
+
+        if !has_tsconfig && !has_package_json {
+            return 0.0;
+        }
+
         let mut score: f32 = 0.0;
 
         // TypeScript config is definitive
-        if crate::tools::has_config_file(root, &["tsconfig.json"]) {
+        if has_tsconfig {
             score += 0.7;
         }
 
-        // Package.json with typescript dependency
-        if crate::tools::has_config_file(root, &["package.json"]) {
-            // Could parse package.json to check for typescript dep, but this is a heuristic
+        // Package.json indicates JS ecosystem
+        if has_package_json {
             score += 0.2;
         }
 

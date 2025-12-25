@@ -97,22 +97,25 @@ struct BiomeSpan {
     end: usize,
 }
 
-fn detect_biome(root: &Path, extensions: &[&str]) -> f32 {
+fn detect_biome(root: &Path, _extensions: &[&str]) -> f32 {
+    // Biome is a JS ecosystem tool - require package.json or biome config
+    let has_biome_config = crate::tools::has_config_file(root, &["biome.json", "biome.jsonc"]);
+    let has_package_json = crate::tools::has_config_file(root, &["package.json"]);
+
+    if !has_biome_config && !has_package_json {
+        return 0.0;
+    }
+
     let mut score: f32 = 0.0;
 
-    // Biome-specific config
-    if crate::tools::has_config_file(root, &["biome.json", "biome.jsonc"]) {
-        score += 0.6;
+    // Biome-specific config - strong signal
+    if has_biome_config {
+        score += 0.7;
     }
 
     // Package.json indicates JS/TS project
-    if crate::tools::has_config_file(root, &["package.json"]) {
+    if has_package_json {
         score += 0.3;
-    }
-
-    // JS/TS files exist
-    if crate::tools::has_files_with_extensions(root, extensions) {
-        score += 0.1;
     }
 
     score.min(1.0)
