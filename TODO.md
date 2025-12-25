@@ -15,7 +15,10 @@ Test Status: 74 passing, 0 failing
 **Language Support:** Phase 1-5 complete. 35 languages supported.
 See `docs/language-support.md` for design. Next: OCaml, Haskell, Clojure, Nim, Crystal.
 Run `scripts/missing-grammars.sh` for all 64 remaining arborium grammars.
-- Vue/Svelte: embed JS sub-AST into template AST (currently `raw_text`, JS not parsed)
+- Nested AST embedding for template languages:
+  - Vue/Svelte/HTML: `<script>` content is `raw_text`, parse with JS/TS grammar
+  - Vue/Svelte/HTML: `<style>` content is `raw_text`, parse with CSS/SCSS grammar
+  - Merge sub-ASTs into parent, adjust line offsets
 
 **CLI Redundancy:** See `docs/llm-code-consistency.md`
 - [ ] Rust: OutputFormatter trait for JSON/text output
