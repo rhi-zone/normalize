@@ -7,7 +7,7 @@ First release. See `docs/` for design docs and `README.md` for usage.
 ### Package Registry Queries
 
 New `moss package` command queries package registries without web search:
-- **Subcommands**: `info`, `list`, `outdated`
+- **Subcommands**: `info`, `list`, `tree`, `outdated`
 - **moss-packages crate**: Ecosystem trait with implementations for 11 ecosystems
 - **Ecosystems**: cargo, npm, python, go, hex, gem, composer, maven, nuget, nix, conan
 - Auto-detection from manifest files (Cargo.toml → cargo, package.json → npm, etc.)
@@ -15,6 +15,7 @@ New `moss package` command queries package registries without web search:
 - Most ecosystems use HTTP APIs directly (no local tool required)
 - Unified output: name, version, description, license, features, dependencies
 - `list`: Parse manifest for declared dependencies
+- `tree`: Show full dependency tree from lockfile (handles workspaces)
 - `outdated`: Compare installed versions (from lockfile) to latest
 - `--json` for structured output
 

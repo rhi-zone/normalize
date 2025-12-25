@@ -91,6 +91,32 @@ impl Ecosystem for Nuget {
 
         Ok(deps)
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Parse packages.lock.json
+        let lockfile = project_root.join("packages.lock.json");
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read packages.lock.json: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut output = String::new();
+        output.push_str("packages.lock.json\n");
+
+        if let Some(deps) = parsed.get("dependencies").and_then(|d| d.as_object()) {
+            for (framework, framework_deps) in deps {
+                output.push_str(&format!("  [{}]\n", framework));
+                if let Some(pkgs) = framework_deps.as_object() {
+                    for (name, info) in pkgs {
+                        let version = info.get("resolved").and_then(|v| v.as_str()).unwrap_or("");
+                        output.push_str(&format!("    {} v{}\n", name, version));
+                    }
+                }
+            }
+        }
+
+        Ok(output)
+    }
 }
 
 fn fetch_nuget_info(package: &str) -> Result<PackageInfo, PackageError> {

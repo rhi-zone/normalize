@@ -179,6 +179,115 @@ impl Ecosystem for Python {
 
         Err(PackageError::ParseError("no manifest found".to_string()))
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Try uv.lock first (TOML with package entries and dependencies)
+        let uv_lock = project_root.join("uv.lock");
+        if let Ok(content) = std::fs::read_to_string(&uv_lock) {
+            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
+                return build_python_tree(&parsed, project_root);
+            }
+        }
+
+        // Try poetry.lock
+        let poetry_lock = project_root.join("poetry.lock");
+        if let Ok(content) = std::fs::read_to_string(&poetry_lock) {
+            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
+                return build_python_tree(&parsed, project_root);
+            }
+        }
+
+        Err(PackageError::ParseError("no lockfile found (uv.lock or poetry.lock)".to_string()))
+    }
+}
+
+fn build_python_tree(parsed: &toml::Value, project_root: &Path) -> Result<String, PackageError> {
+    // Get project name from pyproject.toml
+    let pyproject = project_root.join("pyproject.toml");
+    let root_name = if let Ok(content) = std::fs::read_to_string(&pyproject) {
+        if let Ok(manifest) = toml::from_str::<toml::Value>(&content) {
+            manifest
+                .get("project")
+                .and_then(|p| p.get("name"))
+                .and_then(|n| n.as_str())
+                .map(String::from)
+                .or_else(|| {
+                    manifest
+                        .get("tool")
+                        .and_then(|t| t.get("poetry"))
+                        .and_then(|p| p.get("name"))
+                        .and_then(|n| n.as_str())
+                        .map(String::from)
+                })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let root_name = root_name.unwrap_or_else(|| "root".to_string());
+
+    // Build package map: name -> (version, dependencies)
+    let mut packages: std::collections::HashMap<String, (String, Vec<String>)> = std::collections::HashMap::new();
+
+    if let Some(pkgs) = parsed.get("package").and_then(|p| p.as_array()) {
+        for pkg in pkgs {
+            let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("");
+            let deps: Vec<String> = pkg
+                .get("dependencies")
+                .and_then(|d| d.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|d| {
+                            d.get("name").and_then(|n| n.as_str()).map(String::from)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            packages.insert(name.to_lowercase().replace(['-', '.'], "_"), (version.to_string(), deps));
+        }
+    }
+
+    let mut output = String::new();
+    output.push_str(&format!("{}\n", root_name));
+
+    let mut visited = std::collections::HashSet::new();
+
+    fn print_tree(
+        name: &str,
+        packages: &std::collections::HashMap<String, (String, Vec<String>)>,
+        visited: &mut std::collections::HashSet<String>,
+        output: &mut String,
+        depth: usize,
+    ) {
+        let normalized = name.to_lowercase().replace(['-', '.'], "_");
+        let indent = "  ".repeat(depth);
+        if let Some((version, deps)) = packages.get(&normalized) {
+            let marker = if visited.contains(&normalized) { " (*)" } else { "" };
+            output.push_str(&format!("{}{} v{}{}\n", indent, name, version, marker));
+
+            if !visited.contains(&normalized) {
+                visited.insert(normalized);
+                for dep in deps {
+                    print_tree(dep, packages, visited, output, depth + 1);
+                }
+            }
+        }
+    }
+
+    // Print direct dependencies
+    if let Some(pkgs) = parsed.get("package").and_then(|p| p.as_array()) {
+        for pkg in pkgs {
+            let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            if !visited.contains(&name.to_lowercase().replace(['-', '.'], "_")) {
+                print_tree(name, &packages, &mut visited, &mut output, 1);
+            }
+        }
+    }
+
+    Ok(output)
 }
 
 fn fetch_pypi_info(query: &PackageQuery) -> Result<PackageInfo, PackageError> {

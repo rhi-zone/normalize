@@ -151,6 +151,10 @@ pub trait Ecosystem: Send + Sync {
     /// List declared dependencies from manifest file.
     fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError>;
 
+    /// Get dependency tree using native package manager.
+    /// Returns formatted tree output as a string.
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError>;
+
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {
         for tool in self.tools() {

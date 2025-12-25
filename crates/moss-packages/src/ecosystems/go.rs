@@ -94,6 +94,41 @@ impl Ecosystem for Go {
 
         Ok(deps)
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // go.sum has all dependencies but not the tree structure
+        // go.mod has direct deps, go.sum has transitive
+        // For now, show flat list from go.sum
+        let go_sum = project_root.join("go.sum");
+        let content = std::fs::read_to_string(&go_sum)
+            .map_err(|e| PackageError::ParseError(format!("failed to read go.sum: {}", e)))?;
+
+        let mut output = String::new();
+
+        // Get module name from go.mod
+        let go_mod = project_root.join("go.mod");
+        if let Ok(mod_content) = std::fs::read_to_string(&go_mod) {
+            if let Some(line) = mod_content.lines().find(|l| l.starts_with("module ")) {
+                let name = line.strip_prefix("module ").unwrap_or("root").trim();
+                output.push_str(&format!("{}\n", name));
+            }
+        }
+
+        // Parse go.sum: each line is "module version hash"
+        let mut seen = std::collections::HashSet::new();
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                let module = parts[0];
+                let version = parts[1].trim_end_matches("/go.mod");
+                if seen.insert(format!("{}@{}", module, version)) {
+                    output.push_str(&format!("  {} {}\n", module, version));
+                }
+            }
+        }
+
+        Ok(output)
+    }
 }
 
 fn fetch_go_proxy_info(package: &str) -> Result<PackageInfo, PackageError> {

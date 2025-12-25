@@ -96,6 +96,36 @@ impl Ecosystem for Gem {
 
         Ok(deps)
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Parse Gemfile.lock for all gems
+        let lockfile = project_root.join("Gemfile.lock");
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read Gemfile.lock: {}", e)))?;
+
+        let mut output = String::new();
+        output.push_str("Gemfile.lock\n");
+
+        // Parse specs section: "    gem_name (version)"
+        let mut in_specs = false;
+        for line in content.lines() {
+            if line.trim() == "specs:" {
+                in_specs = true;
+                continue;
+            }
+            if in_specs && !line.starts_with(' ') {
+                in_specs = false;
+            }
+            if in_specs {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    output.push_str(&format!("  {}\n", trimmed));
+                }
+            }
+        }
+
+        Ok(output)
+    }
 }
 
 fn fetch_rubygems_info(package: &str) -> Result<PackageInfo, PackageError> {

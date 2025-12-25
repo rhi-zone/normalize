@@ -121,6 +121,28 @@ impl Ecosystem for Conan {
 
         Err(PackageError::ParseError("no conanfile found".to_string()))
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Parse conan.lock
+        let lockfile = project_root.join("conan.lock");
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read conan.lock: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut output = String::new();
+        output.push_str("conan.lock\n");
+
+        if let Some(nodes) = parsed.get("graph_lock").and_then(|g| g.get("nodes")).and_then(|n| n.as_object()) {
+            for (_, node) in nodes {
+                if let Some(ref_str) = node.get("ref").and_then(|r| r.as_str()) {
+                    output.push_str(&format!("  {}\n", ref_str));
+                }
+            }
+        }
+
+        Ok(output)
+    }
 }
 
 fn fetch_conancenter_api(package: &str) -> Result<PackageInfo, PackageError> {

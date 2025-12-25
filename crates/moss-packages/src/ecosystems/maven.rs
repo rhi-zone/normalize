@@ -78,6 +78,38 @@ impl Ecosystem for Maven {
 
         Err(PackageError::ParseError("no manifest found".to_string()))
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Try gradle.lockfile first
+        let lockfile = project_root.join("gradle.lockfile");
+        if let Ok(content) = std::fs::read_to_string(&lockfile) {
+            let mut output = String::new();
+            output.push_str("gradle.lockfile\n");
+
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                // Format: group:artifact:version=hash
+                if let Some(coord) = line.split('=').next() {
+                    output.push_str(&format!("  {}\n", coord));
+                }
+            }
+
+            return Ok(output);
+        }
+
+        // Fall back to listing direct deps from manifest
+        let deps = self.list_dependencies(project_root)?;
+        let mut output = String::new();
+        output.push_str("dependencies\n");
+        for dep in deps {
+            let version = dep.version_req.as_deref().unwrap_or("*");
+            output.push_str(&format!("  {} {}\n", dep.name, version));
+        }
+        Ok(output)
+    }
 }
 
 fn parse_pom_dependencies(content: &str) -> Result<Vec<Dependency>, PackageError> {

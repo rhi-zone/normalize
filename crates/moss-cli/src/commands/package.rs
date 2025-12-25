@@ -13,6 +13,8 @@ pub enum PackageAction {
     },
     /// List declared dependencies from manifest
     List,
+    /// Show dependency tree from lockfile
+    Tree,
     /// Show outdated packages (installed vs latest)
     Outdated,
 }
@@ -50,6 +52,7 @@ pub fn cmd_package(
     match action {
         PackageAction::Info { package } => cmd_info(eco, &package, project_root, json),
         PackageAction::List => cmd_list(eco, project_root, json),
+        PackageAction::Tree => cmd_tree(eco, project_root, json),
         PackageAction::Outdated => cmd_outdated(eco, project_root, json),
     }
 }
@@ -102,6 +105,26 @@ fn cmd_list(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool)
                     let optional = if dep.optional { " (optional)" } else { "" };
                     println!("  {} {}{}", dep.name, version, optional);
                 }
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {}", e);
+            1
+        }
+    }
+}
+
+fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool) -> i32 {
+    match eco.dependency_tree(project_root) {
+        Ok(tree) => {
+            if json {
+                println!("{}", serde_json::json!({
+                    "ecosystem": eco.name(),
+                    "tree": tree,
+                }));
+            } else {
+                print!("{}", tree);
             }
             0
         }

@@ -73,6 +73,35 @@ impl Ecosystem for Nix {
 
         Err(PackageError::ParseError("no flake.nix found".to_string()))
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Parse flake.lock for input revisions
+        let lockfile = project_root.join("flake.lock");
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read flake.lock: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut output = String::new();
+        output.push_str("flake.lock\n");
+
+        if let Some(nodes) = parsed.get("nodes").and_then(|n| n.as_object()) {
+            for (name, node) in nodes {
+                if name == "root" {
+                    continue;
+                }
+                let rev = node
+                    .get("locked")
+                    .and_then(|l| l.get("rev"))
+                    .and_then(|r| r.as_str())
+                    .map(|r| &r[..7.min(r.len())])
+                    .unwrap_or("");
+                output.push_str(&format!("  {} {}\n", name, rev));
+            }
+        }
+
+        Ok(output)
+    }
 }
 
 fn fetch_nix_info(package: &str) -> Result<PackageInfo, PackageError> {

@@ -143,6 +143,109 @@ impl Ecosystem for Npm {
 
         Ok(deps)
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, crate::PackageError> {
+        // Find package-lock.json, searching up for monorepo root
+        let lockfile = find_npm_lockfile(project_root)?;
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| crate::PackageError::ParseError(format!("failed to read lockfile: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| crate::PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+        build_npm_tree(&parsed)
+    }
+}
+
+/// Find package-lock.json, searching up from project_root
+fn find_npm_lockfile(project_root: &Path) -> Result<std::path::PathBuf, crate::PackageError> {
+    let mut current = project_root.to_path_buf();
+    loop {
+        // Try various lockfile names
+        for name in ["package-lock.json", "pnpm-lock.yaml", "yarn.lock"] {
+            let lockfile = current.join(name);
+            if lockfile.exists() {
+                // For now, only fully support package-lock.json
+                if name == "package-lock.json" {
+                    return Ok(lockfile);
+                }
+            }
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    Err(crate::PackageError::ParseError(format!(
+        "package-lock.json not found in {} or parent directories",
+        project_root.display()
+    )))
+}
+
+fn build_npm_tree(parsed: &serde_json::Value) -> Result<String, crate::PackageError> {
+    let name = parsed.get("name").and_then(|n| n.as_str()).unwrap_or("root");
+    let version = parsed.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0");
+
+    let mut output = String::new();
+    output.push_str(&format!("{} v{}\n", name, version));
+
+    // v2/v3 format: packages["node_modules/..."]
+    if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object()) {
+        // Build adjacency map from node_modules structure
+        let mut deps_map: std::collections::HashMap<String, Vec<(String, String)>> = std::collections::HashMap::new();
+
+        for (path, info) in packages {
+            if path.is_empty() {
+                continue; // Skip root
+            }
+
+            // Extract package name from path: "node_modules/foo" or "node_modules/foo/node_modules/bar"
+            let parts: Vec<&str> = path.split("/node_modules/").collect();
+            let pkg_name = parts.last().unwrap_or(&"");
+            let pkg_version = info.get("version").and_then(|v| v.as_str()).unwrap_or("");
+
+            // Parent is everything before the last /node_modules/
+            let parent = if parts.len() > 1 {
+                parts[..parts.len() - 1].join("/node_modules/")
+            } else {
+                String::new() // root
+            };
+
+            deps_map
+                .entry(parent)
+                .or_default()
+                .push((pkg_name.to_string(), pkg_version.to_string()));
+        }
+
+        // Print tree from root
+        fn print_deps(
+            parent: &str,
+            deps_map: &std::collections::HashMap<String, Vec<(String, String)>>,
+            output: &mut String,
+            depth: usize,
+            visited: &mut std::collections::HashSet<String>,
+        ) {
+            if let Some(deps) = deps_map.get(parent) {
+                for (name, version) in deps {
+                    let indent = "  ".repeat(depth);
+                    let marker = if visited.contains(name) { " (*)" } else { "" };
+                    output.push_str(&format!("{}{} v{}{}\n", indent, name, version, marker));
+
+                    if !visited.contains(name) {
+                        visited.insert(name.clone());
+                        let child_path = if parent.is_empty() {
+                            name.clone()
+                        } else {
+                            format!("{}/node_modules/{}", parent, name)
+                        };
+                        print_deps(&child_path, deps_map, output, depth + 1, visited);
+                    }
+                }
+            }
+        }
+
+        let mut visited = std::collections::HashSet::new();
+        print_deps("", &deps_map, &mut output, 1, &mut visited);
+    }
+
+    Ok(output)
 }
 
 fn fetch_npm_info(package: &str, tool: &str, args: &[&str]) -> Result<PackageInfo, PackageError> {

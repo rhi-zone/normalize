@@ -82,6 +82,38 @@ impl Ecosystem for Hex {
 
         Ok(deps)
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Parse mix.lock for all deps
+        let lockfile = project_root.join("mix.lock");
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read mix.lock: {}", e)))?;
+
+        let mut output = String::new();
+        output.push_str("mix.lock\n");
+
+        // Format: "package": {:hex, :package, "version", ...}
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('"') && line.contains(":hex") {
+                // Extract name and version
+                if let Some(name_end) = line[1..].find('"') {
+                    let name = &line[1..=name_end];
+                    // Find version after :hex, :name,
+                    let pattern = format!(":hex, :{}, \"", name);
+                    if let Some(ver_start) = line.find(&pattern) {
+                        let after = &line[ver_start + pattern.len()..];
+                        if let Some(ver_end) = after.find('"') {
+                            let version = &after[..ver_end];
+                            output.push_str(&format!("  {} v{}\n", name, version));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(output)
+    }
 }
 
 fn fetch_hex_info(package: &str) -> Result<PackageInfo, PackageError> {

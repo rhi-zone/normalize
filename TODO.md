@@ -6,7 +6,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - view.rs internal cleanup (see CLI Surface Cleanup)
 - Single installation: maturin wheel with embedded Rust binary
-- `moss package tree`: dependency tree (requires resolving transitive deps)
 
 Test Status: 107 passing, 0 failing (moss-languages)
 

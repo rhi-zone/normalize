@@ -77,6 +77,130 @@ impl Ecosystem for Cargo {
 
         Ok(deps)
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Find Cargo.lock - may be in parent if this is a workspace member
+        let (lockfile, workspace_root) = find_cargo_lock(project_root)?;
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read Cargo.lock: {}", e)))?;
+        let parsed: toml::Value = toml::from_str(&content)
+            .map_err(|e| PackageError::ParseError(format!("invalid TOML: {}", e)))?;
+
+        // Get root package name(s) from Cargo.toml
+        let manifest = project_root.join("Cargo.toml");
+        let manifest_content = std::fs::read_to_string(&manifest)
+            .map_err(|e| PackageError::ParseError(format!("failed to read Cargo.toml: {}", e)))?;
+        let manifest_parsed: toml::Value = toml::from_str(&manifest_content)
+            .map_err(|e| PackageError::ParseError(format!("invalid TOML: {}", e)))?;
+
+        // Determine root package(s) to show
+        let root_names: Vec<String> = if let Some(pkg) = manifest_parsed.get("package") {
+            // Single package (or workspace member specified directly)
+            pkg.get("name")
+                .and_then(|n| n.as_str())
+                .map(|s| vec![s.to_string()])
+                .unwrap_or_default()
+        } else if let Some(workspace) = manifest_parsed.get("workspace") {
+            // Workspace root: get all member package names
+            workspace
+                .get("members")
+                .and_then(|m| m.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|m| m.as_str())
+                        .filter_map(|member_path| {
+                            let member_manifest = workspace_root.join(member_path).join("Cargo.toml");
+                            std::fs::read_to_string(&member_manifest).ok().and_then(|c| {
+                                toml::from_str::<toml::Value>(&c).ok().and_then(|v| {
+                                    v.get("package")
+                                        .and_then(|p| p.get("name"))
+                                        .and_then(|n| n.as_str())
+                                        .map(String::from)
+                                })
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        // Build package map: name -> (version, dependencies)
+        let mut packages: std::collections::HashMap<String, (String, Vec<String>)> = std::collections::HashMap::new();
+        if let Some(pkgs) = parsed.get("package").and_then(|p| p.as_array()) {
+            for pkg in pkgs {
+                let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("");
+                let deps: Vec<String> = pkg
+                    .get("dependencies")
+                    .and_then(|d| d.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|d| d.as_str())
+                            .map(|s| s.split_whitespace().next().unwrap_or(s).to_string())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                packages.insert(name.to_string(), (version.to_string(), deps));
+            }
+        }
+
+        // Build tree string
+        let mut output = String::new();
+        let mut visited = std::collections::HashSet::new();
+
+        fn print_tree(
+            name: &str,
+            packages: &std::collections::HashMap<String, (String, Vec<String>)>,
+            visited: &mut std::collections::HashSet<String>,
+            output: &mut String,
+            depth: usize,
+        ) {
+            let indent = "  ".repeat(depth);
+            if let Some((version, deps)) = packages.get(name) {
+                let marker = if visited.contains(name) { " (*)" } else { "" };
+                output.push_str(&format!("{}{} v{}{}\n", indent, name, version, marker));
+
+                if !visited.contains(name) {
+                    visited.insert(name.to_string());
+                    for dep in deps {
+                        print_tree(dep, packages, visited, output, depth + 1);
+                    }
+                }
+            } else {
+                output.push_str(&format!("{}{}\n", indent, name));
+            }
+        }
+
+        for root in &root_names {
+            print_tree(root, &packages, &mut visited, &mut output, 0);
+        }
+
+        if output.is_empty() {
+            output.push_str("(no workspace members found)\n");
+        }
+
+        Ok(output)
+    }
+}
+
+/// Find Cargo.lock, searching up from project_root to find workspace root
+fn find_cargo_lock(project_root: &Path) -> Result<(std::path::PathBuf, std::path::PathBuf), PackageError> {
+    let mut current = project_root.to_path_buf();
+    loop {
+        let lockfile = current.join("Cargo.lock");
+        if lockfile.exists() {
+            return Ok((lockfile, current));
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    Err(PackageError::ParseError(format!(
+        "Cargo.lock not found in {} or parent directories",
+        project_root.display()
+    )))
 }
 
 fn parse_cargo_dep(name: &str, value: &toml::Value, optional: bool) -> Dependency {

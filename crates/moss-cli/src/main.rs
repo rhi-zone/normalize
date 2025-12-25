@@ -285,7 +285,7 @@ enum Commands {
         limit: usize,
     },
 
-    /// Package management: info, list, outdated
+    /// Package management: info, list, tree, outdated
     Package {
         #[command(subcommand)]
         action: commands::package::PackageAction,

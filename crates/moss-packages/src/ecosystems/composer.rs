@@ -82,6 +82,30 @@ impl Ecosystem for Composer {
 
         Ok(deps)
     }
+
+    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+        // Parse composer.lock for full dependency list
+        let lockfile = project_root.join("composer.lock");
+        let content = std::fs::read_to_string(&lockfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read composer.lock: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut output = String::new();
+        output.push_str("composer.lock\n");
+
+        for key in ["packages", "packages-dev"] {
+            if let Some(pkgs) = parsed.get(key).and_then(|p| p.as_array()) {
+                for pkg in pkgs {
+                    let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                    let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("");
+                    output.push_str(&format!("  {} {}\n", name, version));
+                }
+            }
+        }
+
+        Ok(output)
+    }
 }
 
 fn fetch_packagist_info(package: &str) -> Result<PackageInfo, PackageError> {
