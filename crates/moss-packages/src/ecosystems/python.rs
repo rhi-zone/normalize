@@ -1,6 +1,6 @@
 //! Python (pip/uv/poetry) ecosystem.
 
-use crate::{Dependency, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery};
 use std::process::Command;
 
 pub struct Python;
@@ -39,14 +39,17 @@ impl Ecosystem for Python {
         &["curl"] // Uses PyPI API
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        // Use PyPI JSON API directly - no tool needed
-        fetch_pypi_info(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_pypi_info(query)
     }
 }
 
-fn fetch_pypi_info(package: &str) -> Result<PackageInfo, PackageError> {
-    let url = format!("https://pypi.org/pypi/{}/json", package);
+fn fetch_pypi_info(query: &PackageQuery) -> Result<PackageInfo, PackageError> {
+    // PyPI API: /pypi/{package}/json for latest, /pypi/{package}/{version}/json for specific
+    let url = match &query.version {
+        Some(v) => format!("https://pypi.org/pypi/{}/{}/json", query.name, v),
+        None => format!("https://pypi.org/pypi/{}/json", query.name),
+    };
 
     let output = Command::new("curl")
         .args(["-sS", "-f", &url])
@@ -56,13 +59,13 @@ fn fetch_pypi_info(package: &str) -> Result<PackageInfo, PackageError> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if stderr.contains("404") || output.status.code() == Some(22) {
-            return Err(PackageError::NotFound(package.to_string()));
+            return Err(PackageError::NotFound(query.name.clone()));
         }
         return Err(PackageError::RegistryError(stderr.to_string()));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_pypi_json(&stdout, package)
+    parse_pypi_json(&stdout, &query.name)
 }
 
 fn parse_pypi_json(json_str: &str, package: &str) -> Result<PackageInfo, PackageError> {

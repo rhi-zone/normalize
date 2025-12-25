@@ -1,6 +1,6 @@
 //! Conan (C++) ecosystem.
 
-use crate::{Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::process::Command;
 
 pub struct Conan;
@@ -25,8 +25,8 @@ impl Ecosystem for Conan {
         &["curl"] // Uses ConanCenter GitHub API
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        fetch_conancenter_api(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_conancenter_api(&query.name)
     }
 }
 

@@ -1,6 +1,6 @@
 //! npm/yarn/pnpm (Node.js) ecosystem.
 
-use crate::{Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery};
 use std::process::Command;
 
 pub struct Npm;
@@ -40,14 +40,17 @@ impl Ecosystem for Npm {
         &["bun", "pnpm", "yarn", "npm"]
     }
 
-    fn fetch_info(&self, package: &str, tool: &str) -> Result<PackageInfo, PackageError> {
-        // All npm-compatible tools support `npm view` or equivalent
-        // But npm's JSON output is the most reliable
+    fn fetch_info(&self, query: &PackageQuery, tool: &str) -> Result<PackageInfo, PackageError> {
+        // Format: package or package@version
+        let pkg_spec = match &query.version {
+            Some(v) => format!("{}@{}", query.name, v),
+            None => query.name.clone(),
+        };
         match tool {
-            "npm" => fetch_npm_info(package, "npm", &["view", package, "--json"]),
-            "yarn" => fetch_npm_info(package, "yarn", &["info", package, "--json"]),
-            "pnpm" => fetch_npm_info(package, "pnpm", &["view", package, "--json"]),
-            "bun" => fetch_npm_info(package, "bun", &["pm", "view", package]),
+            "npm" => fetch_npm_info(&query.name, "npm", &["view", &pkg_spec, "--json"]),
+            "yarn" => fetch_npm_info(&query.name, "yarn", &["info", &pkg_spec, "--json"]),
+            "pnpm" => fetch_npm_info(&query.name, "pnpm", &["view", &pkg_spec, "--json"]),
+            "bun" => fetch_npm_info(&query.name, "bun", &["pm", "view", &pkg_spec]),
             _ => Err(PackageError::ToolFailed(format!("unknown tool: {}", tool))),
         }
     }

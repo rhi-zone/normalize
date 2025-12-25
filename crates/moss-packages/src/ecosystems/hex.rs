@@ -1,6 +1,6 @@
 //! Hex (Elixir/Erlang) ecosystem.
 
-use crate::{Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::process::Command;
 
 pub struct Hex;
@@ -25,8 +25,8 @@ impl Ecosystem for Hex {
         &["curl"] // Uses hex.pm API
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        fetch_hex_info(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_hex_info(&query.name)
     }
 }
 

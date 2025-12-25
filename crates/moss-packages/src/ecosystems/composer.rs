@@ -1,6 +1,6 @@
 //! Composer (PHP) ecosystem.
 
-use crate::{Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::process::Command;
 
 pub struct Composer;
@@ -25,8 +25,8 @@ impl Ecosystem for Composer {
         &["curl"] // Uses packagist.org API
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        fetch_packagist_info(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_packagist_info(&query.name)
     }
 }
 

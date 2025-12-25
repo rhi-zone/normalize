@@ -1,6 +1,6 @@
 //! Nix ecosystem.
 
-use crate::{Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::process::Command;
 
 pub struct Nix;
@@ -25,8 +25,8 @@ impl Ecosystem for Nix {
         &["nix"]
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        fetch_nix_info(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_nix_info(&query.name)
     }
 }
 

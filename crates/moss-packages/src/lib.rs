@@ -24,6 +24,38 @@ pub mod ecosystems;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+/// Parsed package query (name with optional version).
+#[derive(Debug, Clone)]
+pub struct PackageQuery {
+    pub name: String,
+    pub version: Option<String>,
+}
+
+impl PackageQuery {
+    /// Parse "package" or "package@version" format.
+    pub fn parse(input: &str) -> Self {
+        if let Some((name, version)) = input.rsplit_once('@') {
+            PackageQuery {
+                name: name.to_string(),
+                version: Some(version.to_string()),
+            }
+        } else {
+            PackageQuery {
+                name: input.to_string(),
+                version: None,
+            }
+        }
+    }
+
+    /// Cache key: "package@version" or "package@latest"
+    pub fn cache_key(&self) -> String {
+        match &self.version {
+            Some(v) => format!("{}@{}", self.name, v),
+            None => format!("{}@latest", self.name),
+        }
+    }
+}
+
 /// Information about a package from a registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageInfo {
@@ -109,7 +141,8 @@ pub trait Ecosystem: Send + Sync {
     fn tools(&self) -> &'static [&'static str];
 
     /// Fetch package info using the specified tool.
-    fn fetch_info(&self, package: &str, tool: &str) -> Result<PackageInfo, PackageError>;
+    /// If version is None, fetches latest.
+    fn fetch_info(&self, query: &PackageQuery, tool: &str) -> Result<PackageInfo, PackageError>;
 
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {
@@ -137,28 +170,30 @@ pub trait Ecosystem: Send + Sync {
 
     /// Convenience method: detect tool and fetch info with caching.
     ///
-    /// Strategy: try network first, cache on success, fall back to cache if network fails.
-    /// Cache expires after 24 hours for fresh data, but stale cache is used for offline.
+    /// Accepts "package" or "package@version" format.
+    /// Strategy: try cache first if fresh, else network, cache on success, stale cache as fallback.
     fn query(&self, package: &str, project_root: &Path) -> Result<PackageInfo, PackageError> {
         use std::time::Duration;
 
+        let query = PackageQuery::parse(package);
         let tool = self.detect_tool(project_root).ok_or(PackageError::NoToolFound)?;
+        let cache_key = query.cache_key();
         let cache_ttl = Duration::from_secs(24 * 60 * 60); // 24 hours
 
         // Check fresh cache first (avoid network if recently cached)
-        if let Some(cached) = cache::read(self.name(), package, cache_ttl) {
+        if let Some(cached) = cache::read(self.name(), &cache_key, cache_ttl) {
             return Ok(cached);
         }
 
         // Try network
-        match self.fetch_info(package, tool) {
+        match self.fetch_info(&query, tool) {
             Ok(info) => {
-                cache::write(self.name(), package, &info);
+                cache::write(self.name(), &cache_key, &info);
                 Ok(info)
             }
             Err(e) => {
                 // Network failed - try stale cache
-                if let Some(cached) = cache::read_any(self.name(), package) {
+                if let Some(cached) = cache::read_any(self.name(), &cache_key) {
                     return Ok(cached);
                 }
                 Err(e)

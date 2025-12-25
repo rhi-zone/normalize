@@ -1,6 +1,6 @@
 //! NuGet (.NET) ecosystem.
 
-use crate::{Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::process::Command;
 
 pub struct Nuget;
@@ -25,8 +25,8 @@ impl Ecosystem for Nuget {
         &["curl"] // Uses NuGet API
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        fetch_nuget_info(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_nuget_info(&query.name)
     }
 }
 

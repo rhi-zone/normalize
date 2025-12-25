@@ -1,6 +1,6 @@
 //! Go modules ecosystem.
 
-use crate::{Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::process::Command;
 
 pub struct Go;
@@ -25,9 +25,8 @@ impl Ecosystem for Go {
         &["curl"] // Uses Go module proxy API
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        // Use Go module proxy API
-        fetch_go_proxy_info(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_go_proxy_info(&query.name)
     }
 }
 

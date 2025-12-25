@@ -1,6 +1,6 @@
 //! Maven (Java) ecosystem.
 
-use crate::{Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::process::Command;
 
 pub struct Maven;
@@ -31,8 +31,8 @@ impl Ecosystem for Maven {
         &["curl"] // Uses Maven Central API
     }
 
-    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
-        fetch_maven_info(package)
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_maven_info(&query.name)
     }
 }
 
