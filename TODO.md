@@ -46,15 +46,15 @@ Delete (redundant with Rust CLI or external tools):
 - [x] `cmd_cfg` - control flow graph (deleted from Python CLI)
 - [x] `cmd_query` - `moss view` with filters (deleted from Python CLI)
 - [x] `cmd_rag` - duplicates `cmd_search` (deleted from Python CLI)
-- [ ] `cmd_metrics` / `cmd_report` / `cmd_overview` - consolidate to `moss analyze --overview`
+- [x] `cmd_metrics` / `cmd_report` / `cmd_overview` - consolidate to `moss analyze --overview` (deleted from Python CLI)
 
 Delete (questionable value):
 - [x] `cmd_mutate` - mutation testing wrapper (deleted from Python CLI)
 - [x] `cmd_patterns` / `cmd_weaknesses` / `cmd_clones` (deleted from Python CLI)
-- [ ] `cmd_synthesize` - distinct from `cmd_edit`?
+- [x] `cmd_synthesize` - experimental, mock LLM (deleted from Python CLI)
 
 Consolidate to subcommands:
-- [ ] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}`
+- [x] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}` (deleted from Python CLI)
 - [x] `cmd_mcp_server` / `cmd_acp_server` / `cmd_lsp` → `moss serve {mcp,http,lsp}` (deleted from Python CLI)
 
 **Phase 3: Delete Python**
