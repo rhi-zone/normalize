@@ -22,127 +22,120 @@ impl Ecosystem for Cargo {
     }
 
     fn tools(&self) -> &'static [&'static str] {
-        &["cargo"]
+        &["curl"] // Uses crates.io API
     }
 
-    fn fetch_info(&self, package: &str, tool: &str) -> Result<PackageInfo, PackageError> {
-        match tool {
-            "cargo" => fetch_cargo_info(package),
-            _ => Err(PackageError::ToolFailed(format!("unknown tool: {}", tool))),
-        }
+    fn fetch_info(&self, package: &str, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_crates_io_info(package)
     }
 }
 
-fn fetch_cargo_info(package: &str) -> Result<PackageInfo, PackageError> {
-    let output = Command::new("cargo")
-        .args(["info", package])
+fn fetch_crates_io_info(package: &str) -> Result<PackageInfo, PackageError> {
+    // Get crate metadata
+    let url = format!("https://crates.io/api/v1/crates/{}", package);
+
+    let output = Command::new("curl")
+        .args(["-sS", "-f", "-H", "User-Agent: moss-packages", &url])
         .output()
-        .map_err(|e| PackageError::ToolFailed(e.to_string()))?;
+        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("could not find") {
-            return Err(PackageError::NotFound(package.to_string()));
-        }
-        return Err(PackageError::ToolFailed(stderr.to_string()));
+        return Err(PackageError::NotFound(package.to_string()));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_cargo_info(&stdout, package)
-}
+    let v: serde_json::Value = serde_json::from_str(&stdout)
+        .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
-fn parse_cargo_info(output: &str, package: &str) -> Result<PackageInfo, PackageError> {
-    let mut info = PackageInfo {
-        name: package.to_string(),
-        version: String::new(),
-        description: None,
-        license: None,
-        homepage: None,
-        repository: None,
-        features: Vec::new(),
-        dependencies: Vec::new(),
-    };
+    let crate_info = v
+        .get("crate")
+        .ok_or_else(|| PackageError::ParseError("missing crate field".to_string()))?;
 
-    let mut in_features = false;
-    let mut lines = output.lines().peekable();
+    let name = crate_info
+        .get("name")
+        .and_then(|n| n.as_str())
+        .unwrap_or(package)
+        .to_string();
 
-    // First line: package name and tags (skip)
-    if let Some(first) = lines.next() {
-        // "serde #serde #serialization #no_std"
-        // Name is already set from the query
-        let _ = first;
-    }
+    let version = crate_info
+        .get("max_version")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| PackageError::ParseError("missing max_version".to_string()))?
+        .to_string();
 
-    // Second line: description
-    if let Some(desc) = lines.next() {
-        if !desc.is_empty() && !desc.starts_with("version:") {
-            info.description = Some(desc.to_string());
+    let description = crate_info
+        .get("description")
+        .and_then(|d| d.as_str())
+        .map(String::from);
+
+    let homepage = crate_info
+        .get("homepage")
+        .and_then(|h| h.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+
+    let repository = crate_info
+        .get("repository")
+        .and_then(|r| r.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+
+    // Get version-specific info (license, features)
+    let version_url = format!("https://crates.io/api/v1/crates/{}/{}", package, version);
+
+    let version_output = Command::new("curl")
+        .args(["-sS", "-f", "-H", "User-Agent: moss-packages", &version_url])
+        .output()
+        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
+
+    let (license, features) = if version_output.status.success() {
+        let version_stdout = String::from_utf8_lossy(&version_output.stdout);
+        if let Ok(vv) = serde_json::from_str::<serde_json::Value>(&version_stdout) {
+            let ver = vv.get("version");
+
+            let lic = ver
+                .and_then(|v| v.get("license"))
+                .and_then(|l| l.as_str())
+                .map(String::from);
+
+            let feats = ver
+                .and_then(|v| v.get("features"))
+                .and_then(|f| f.as_object())
+                .map(|obj| {
+                    obj.iter()
+                        .map(|(name, deps)| Feature {
+                            name: name.clone(),
+                            description: None,
+                            dependencies: deps
+                                .as_array()
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|d| d.as_str().map(String::from))
+                                        .collect()
+                                })
+                                .unwrap_or_default(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            (lic, feats)
+        } else {
+            (None, Vec::new())
         }
-    }
-
-    for line in lines {
-        if line.starts_with("version:") {
-            info.version = line.trim_start_matches("version:").trim().to_string();
-        } else if line.starts_with("license:") {
-            info.license = Some(line.trim_start_matches("license:").trim().to_string());
-        } else if line.starts_with("homepage:") {
-            info.homepage = Some(line.trim_start_matches("homepage:").trim().to_string());
-        } else if line.starts_with("repository:") {
-            info.repository = Some(line.trim_start_matches("repository:").trim().to_string());
-        } else if line.starts_with("features:") {
-            in_features = true;
-        } else if line.starts_with("note:") {
-            in_features = false;
-        } else if in_features && line.starts_with(' ') {
-            // Parse feature line: " +default      = [std]" or "  std          = [serde_core/std]"
-            if let Some(feature) = parse_feature_line(line) {
-                info.features.push(feature);
-            }
-        }
-    }
-
-    if info.version.is_empty() {
-        return Err(PackageError::ParseError(
-            "could not find version in output".to_string(),
-        ));
-    }
-
-    Ok(info)
-}
-
-fn parse_feature_line(line: &str) -> Option<Feature> {
-    // " +default      = [std]"
-    // "  derive       = [serde_derive]"
-    let trimmed = line.trim();
-
-    // Remove leading + if present (indicates default feature)
-    let trimmed = trimmed.strip_prefix('+').unwrap_or(trimmed);
-
-    // Split on '='
-    let parts: Vec<&str> = trimmed.splitn(2, '=').collect();
-    if parts.len() != 2 {
-        return None;
-    }
-
-    let name = parts[0].trim().to_string();
-    let deps_str = parts[1].trim();
-
-    // Parse [dep1, dep2] or [dep:name]
-    let deps = if deps_str.starts_with('[') && deps_str.ends_with(']') {
-        let inner = &deps_str[1..deps_str.len() - 1];
-        inner
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
     } else {
-        Vec::new()
+        (None, Vec::new())
     };
 
-    Some(Feature {
+    Ok(PackageInfo {
         name,
-        description: None,
-        dependencies: deps,
+        version,
+        description,
+        license,
+        homepage,
+        repository,
+        features,
+        dependencies: Vec::new(), // Would need separate API call
     })
 }
 
@@ -151,49 +144,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_cargo_info() {
-        let output = r#"serde #serde #serialization #no_std
-A generic serialization/deserialization framework
-version: 1.0.228
-license: MIT OR Apache-2.0
-rust-version: 1.56
-documentation: https://docs.rs/serde
-homepage: https://serde.rs
-repository: https://github.com/serde-rs/serde
-crates.io: https://crates.io/crates/serde/1.0.228
-features:
- +default      = [std]
-  std          = [serde_core/std]
-  alloc        = [serde_core/alloc]
-  derive       = [serde_derive]
-note: to see how you depend on serde, run `cargo tree --invert --package serde@1.0.228`"#;
-
-        let info = parse_cargo_info(output, "serde").unwrap();
-        assert_eq!(info.name, "serde");
-        assert_eq!(info.version, "1.0.228");
-        assert_eq!(
-            info.description,
-            Some("A generic serialization/deserialization framework".to_string())
-        );
-        assert_eq!(info.license, Some("MIT OR Apache-2.0".to_string()));
-        assert_eq!(info.homepage, Some("https://serde.rs".to_string()));
-        assert_eq!(
-            info.repository,
-            Some("https://github.com/serde-rs/serde".to_string())
-        );
-        assert_eq!(info.features.len(), 4);
-        assert_eq!(info.features[0].name, "default");
-        assert_eq!(info.features[0].dependencies, vec!["std"]);
-    }
-
-    #[test]
-    fn test_parse_feature_line() {
-        let f = parse_feature_line(" +default      = [std]").unwrap();
-        assert_eq!(f.name, "default");
-        assert_eq!(f.dependencies, vec!["std"]);
-
-        let f = parse_feature_line("  derive       = [serde_derive]").unwrap();
-        assert_eq!(f.name, "derive");
-        assert_eq!(f.dependencies, vec!["serde_derive"]);
+    fn test_cargo_ecosystem() {
+        let eco = Cargo;
+        assert_eq!(eco.name(), "cargo");
+        assert_eq!(eco.manifest_files(), &["Cargo.toml"]);
     }
 }
