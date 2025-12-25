@@ -52,6 +52,7 @@ Delete (questionable value):
 - [x] `cmd_mutate` - mutation testing wrapper (deleted from Python CLI)
 - [x] `cmd_patterns` / `cmd_weaknesses` / `cmd_clones` (deleted from Python CLI)
 - [x] `cmd_synthesize` - experimental, mock LLM (deleted from Python CLI)
+- [x] `cmd_eval` - SWE-bench harness, research tool (deleted from Python CLI)
 
 Consolidate to subcommands:
 - [x] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}` (deleted from Python CLI)
