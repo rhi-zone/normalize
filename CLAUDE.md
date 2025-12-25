@@ -47,6 +47,7 @@ Do not:
 - **Ask permission on design when philosophy is clear** - if "Generalize Don't Multiply" or other tenets point to an obvious answer, don't present options. Just do the right thing.
 - **Return tuples from functions** - use structs with named fields. Tuples obscure meaning and cause ordering bugs. Only use tuples when names would be pure ceremony (e.g., `(x, y)` coordinates).
 - **Use trait default implementations** - defaults let you "implement" a trait without implementing it. That's a silent bug. Every method should be explicitly implemented; compiler enforces completeness, not convention.
+- **String-match on source content for AST properties** - use tree-sitter node structure, not `text.contains("async")` or `text.starts_with("enum")`. Check node kinds, child nodes, field names. String matching is fragile and misses the point of having a parsed AST.
 
 Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
 "Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."
