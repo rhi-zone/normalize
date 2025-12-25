@@ -26,6 +26,10 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 - **"Aha" moment about design** → add to CLAUDE.md Design Principles NOW
 - **Citing CLAUDE.md as excuse** → if you say "CLAUDE.md says X" after failing to do X, the file failed its purpose. Adjust CLAUDE.md to actually prevent the failure, don't just note the rule exists.
 
+**Don't say these phrases, instead edit first:**
+- "Fair point" / "Good point" / "You're right" → edit TODO.md/CLAUDE.md BEFORE responding
+- "Should have" / "I forgot to" → you're admitting failure, edit docs to prevent recurrence
+
 ## Negative Constraints
 
 Do not:
