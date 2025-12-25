@@ -238,6 +238,10 @@ enum Commands {
         /// Show what functions call the target (callers)
         #[arg(long)]
         called_by: bool,
+
+        /// Run linters and include results in analysis
+        #[arg(long)]
+        lint: bool,
     },
 
     /// Search for text patterns in files (fast ripgrep-based search)
@@ -477,6 +481,7 @@ fn main() {
             kind,
             calls,
             called_by,
+            lint,
         } => commands::analyze::cmd_analyze(
             target.as_deref(),
             root.as_deref(),
@@ -490,6 +495,7 @@ fn main() {
             kind.as_deref(),
             calls,
             called_by,
+            lint,
             cli.json,
         ),
         Commands::Grep {
