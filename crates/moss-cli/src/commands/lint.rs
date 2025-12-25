@@ -1,6 +1,6 @@
 //! Lint command - run linters, formatters, and type checkers.
 
-use moss_tools::{SarifReport, ToolCategory, ToolRegistry};
+use moss_tools::{registry_with_custom, SarifReport, ToolCategory, ToolRegistry};
 use std::path::Path;
 
 /// Run linting tools on the codebase.
@@ -15,7 +15,8 @@ pub fn cmd_lint(
     json: bool,
 ) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
-    let registry = ToolRegistry::with_builtins();
+    // Load built-in tools + custom tools from .moss/tools.toml
+    let registry = registry_with_custom(root);
 
     // List available tools
     if list {

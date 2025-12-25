@@ -35,6 +35,16 @@ impl DiagnosticSeverity {
             Self::Info | Self::Hint => "note",
         }
     }
+
+    /// Parse from SARIF level string.
+    pub fn from_sarif_level(level: &str) -> Self {
+        match level.to_lowercase().as_str() {
+            "error" => Self::Error,
+            "warning" => Self::Warning,
+            "note" | "none" => Self::Info,
+            _ => Self::Warning,
+        }
+    }
 }
 
 /// Source location of a diagnostic.
