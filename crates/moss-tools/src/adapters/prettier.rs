@@ -77,7 +77,7 @@ impl Tool for Prettier {
     fn detect(&self, root: &Path) -> f32 {
         let mut score: f32 = 0.0;
 
-        // Prettier config files
+        // Prettier config files - strong signal
         let prettier_configs = [
             ".prettierrc",
             ".prettierrc.json",
@@ -89,17 +89,16 @@ impl Tool for Prettier {
             "prettier.config.cjs",
         ];
         if crate::tools::has_config_file(root, &prettier_configs) {
-            score += 0.6;
+            score += 0.7;
         }
 
-        // Package.json indicates JS project (likely uses prettier)
+        // Package.json required - prettier is a JS ecosystem tool
+        // Don't run on non-JS projects just because they have .json/.md files
         if crate::tools::has_config_file(root, &["package.json"]) {
             score += 0.3;
-        }
-
-        // Supported files exist
-        if crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            score += 0.1;
+        } else {
+            // No package.json = not a JS project, don't run prettier
+            return 0.0;
         }
 
         score.min(1.0)

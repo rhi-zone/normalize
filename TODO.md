@@ -62,6 +62,7 @@ Delete (broken - used non-existent moss meta-package):
 Consider porting to Rust:
 - [ ] `cmd_check_refs` - bidirectional code/doc reference checking (could be `moss analyze --check-refs`)
 - [ ] `cmd_external_deps` - dependency analysis with vuln/license checking (could be `moss package audit`)
+- [ ] `moss package why <dep>` - show why a dependency is in the tree (like `npm why`)
 - [ ] `cmd_git_hotspots` - git history analysis (could be `moss analyze --hotspots`)
 
 Consolidate to subcommands:
