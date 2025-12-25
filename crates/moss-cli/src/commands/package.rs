@@ -15,6 +15,11 @@ pub enum PackageAction {
     List,
     /// Show dependency tree from lockfile
     Tree,
+    /// Show why a dependency is in the tree
+    Why {
+        /// Package name to trace
+        package: String,
+    },
     /// Show outdated packages (installed vs latest)
     Outdated,
 }
@@ -148,6 +153,7 @@ fn run_for_ecosystem(
         PackageAction::Info { package } => cmd_info(eco, package, project_root, json),
         PackageAction::List => cmd_list(eco, project_root, json),
         PackageAction::Tree => cmd_tree(eco, project_root, json),
+        PackageAction::Why { package } => cmd_why(eco, package, project_root, json),
         PackageAction::Outdated => cmd_outdated(eco, project_root, json),
     }
 }
@@ -260,6 +266,109 @@ fn print_node(node: &moss_packages::TreeNode, depth: usize) {
     }
     for child in &node.dependencies {
         print_node(child, depth + 1);
+    }
+}
+
+fn cmd_why(
+    eco: &dyn moss_packages::Ecosystem,
+    package: &str,
+    project_root: &Path,
+    json: bool,
+) -> i32 {
+    match eco.dependency_tree(project_root) {
+        Ok(tree) => {
+            let paths = find_dependency_paths(&tree, package);
+
+            if paths.is_empty() {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "package": package,
+                            "found": false,
+                            "paths": []
+                        })
+                    );
+                } else {
+                    println!("Package '{}' not found in dependency tree", package);
+                }
+                return 1;
+            }
+
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "package": package,
+                        "found": true,
+                        "paths": paths.iter().map(|path| {
+                            path.iter().map(|(name, version)| {
+                                serde_json::json!({
+                                    "name": name,
+                                    "version": version
+                                })
+                            }).collect::<Vec<_>>()
+                        }).collect::<Vec<_>>()
+                    })
+                );
+            } else {
+                println!("'{}' is required by {} path(s):", package, paths.len());
+                println!();
+                for (i, path) in paths.iter().enumerate() {
+                    if i > 0 {
+                        println!();
+                    }
+                    for (j, (name, version)) in path.iter().enumerate() {
+                        let indent = "  ".repeat(j);
+                        if version.is_empty() {
+                            println!("{}{}", indent, name);
+                        } else {
+                            println!("{}{} v{}", indent, name, version);
+                        }
+                    }
+                }
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {}", e);
+            1
+        }
+    }
+}
+
+/// Find all paths from root packages to the target dependency.
+fn find_dependency_paths(
+    tree: &moss_packages::DependencyTree,
+    target: &str,
+) -> Vec<Vec<(String, String)>> {
+    let mut all_paths = Vec::new();
+
+    for root in &tree.roots {
+        let mut current_path = vec![(root.name.clone(), root.version.clone())];
+        find_paths_recursive(root, target, &mut current_path, &mut all_paths);
+    }
+
+    all_paths
+}
+
+fn find_paths_recursive(
+    node: &moss_packages::TreeNode,
+    target: &str,
+    current_path: &mut Vec<(String, String)>,
+    all_paths: &mut Vec<Vec<(String, String)>>,
+) {
+    // Check if current node is the target
+    if node.name == target || node.name.ends_with(&format!("/{}", target)) {
+        all_paths.push(current_path.clone());
+        return;
+    }
+
+    // Recurse into dependencies
+    for child in &node.dependencies {
+        current_path.push((child.name.clone(), child.version.clone()));
+        find_paths_recursive(child, target, current_path, all_paths);
+        current_path.pop();
     }
 }
 
