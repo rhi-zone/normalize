@@ -14,6 +14,8 @@ All three server protocols now implemented:
   - Document symbols (nested structure from skeleton extraction)
   - Workspace symbol search (from index)
   - Hover (symbol kind, signature, docstring)
+  - Go to definition (jumps to symbol definition)
+  - Find references (finds all callers via call graph)
 
 ### Package Management
 

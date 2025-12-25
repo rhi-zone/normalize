@@ -35,7 +35,7 @@ Servers (port to Rust):
 - [x] `moss serve {mcp,http,lsp}` - command structure added
 - [x] `moss serve mcp` - working with rmcp 0.12 (`--features mcp`)
 - [x] `moss serve http` - REST API with axum (health, files, symbols, search)
-- [x] `moss serve lsp` - LSP server with tower-lsp (symbols, hover)
+- [x] `moss serve lsp` - LSP server with tower-lsp (symbols, hover, definition, references)
 
 TUI (evaluate):
 - [x] `cmd_tui` / `cmd_explore` / `cmd_shell` - deleted (Textual too expensive to port, HTTP API + web UI preferred)
