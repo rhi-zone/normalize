@@ -145,7 +145,7 @@ async fn get_file(
     let content =
         std::fs::read_to_string(&file_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let mut extractor = SkeletonExtractor::new();
+    let extractor = SkeletonExtractor::new();
     let result = extractor.extract(&file_path, &content);
 
     let symbols: Vec<SymbolInfo> = result

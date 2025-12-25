@@ -115,7 +115,7 @@ impl LanguageServer for MossBackend {
         };
 
         // Extract symbols using skeleton extractor
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let result = extractor.extract(&file_path, &content);
 
         // Convert to LSP document symbols (nested structure)
@@ -230,7 +230,7 @@ impl LanguageServer for MossBackend {
         };
 
         // Extract symbols
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let result = extractor.extract(&file_path, &content);
 
         // Find symbol at position (1-indexed line)

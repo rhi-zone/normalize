@@ -472,7 +472,7 @@ fn extract_file_symbols(file_path: &Path, view_path: &str) -> Option<Vec<ViewNod
     let content = std::fs::read_to_string(file_path).ok()?;
 
     // Extract skeleton
-    let mut extractor = SkeletonExtractor::new();
+    let extractor = SkeletonExtractor::new();
     let result = extractor.extract(file_path, &content);
 
     if result.symbols.is_empty() {

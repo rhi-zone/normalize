@@ -1,7 +1,9 @@
+use crate::extract::{compute_complexity, ExtractOptions, Extractor};
 use crate::parsers::Parsers;
 use arborium::tree_sitter;
 use moss_languages::{
-    support_for_grammar, support_for_path, Language, SymbolKind as LangSymbolKind,
+    support_for_grammar, support_for_path, Language, Symbol as LangSymbol,
+    SymbolKind as LangSymbolKind,
 };
 use std::path::Path;
 
@@ -69,12 +71,16 @@ fn convert_symbol_kind(kind: LangSymbolKind) -> SymbolKind {
 }
 
 pub struct SymbolParser {
-    parsers: Parsers,
+    extractor: Extractor,
+    parsers: Parsers, // Keep for import parsing and call graph analysis
 }
 
 impl SymbolParser {
     pub fn new() -> Self {
         Self {
+            extractor: Extractor::with_options(ExtractOptions {
+                include_private: true, // symbols.rs includes all symbols for indexing
+            }),
             parsers: Parsers::new(),
         }
     }
@@ -85,159 +91,102 @@ impl SymbolParser {
             None => return Vec::new(),
         };
 
-        self.parse_with_trait(content, support)
-    }
+        // Use shared extractor for symbol extraction
+        let result = self.extractor.extract(path, content);
 
-    fn parse_with_trait(&self, content: &str, support: &dyn Language) -> Vec<Symbol> {
-        let tree = match self
+        // Parse once for complexity computation
+        let tree = self
             .parsers
-            .parse_with_grammar(support.grammar_name(), content)
-        {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
+            .parse_with_grammar(support.grammar_name(), content);
 
-        let root = tree.root_node();
+        // Flatten nested symbols and compute complexity
         let mut symbols = Vec::new();
-        self.collect_with_trait(&mut root.walk(), content, support, &mut symbols, None);
+        for sym in &result.symbols {
+            self.flatten_symbol(sym, None, &mut symbols, content, support, tree.as_ref());
+        }
         symbols
     }
 
-    /// Compute cyclomatic complexity for a function node.
-    /// Complexity = 1 (base) + number of decision points (if, for, while, match arms, etc.)
-    fn compute_complexity(node: &tree_sitter::Node, support: &dyn Language) -> usize {
-        let mut complexity = 1; // Base complexity
-        let complexity_nodes = support.complexity_nodes();
-        let mut cursor = node.walk();
+    /// Flatten a nested symbol into the flat list with parent references
+    fn flatten_symbol(
+        &self,
+        sym: &LangSymbol,
+        parent: Option<&str>,
+        symbols: &mut Vec<Symbol>,
+        content: &str,
+        support: &dyn Language,
+        tree: Option<&tree_sitter::Tree>,
+    ) {
+        let kind = convert_symbol_kind(sym.kind);
+        let is_function = matches!(kind, SymbolKind::Function | SymbolKind::Method);
 
-        if !cursor.goto_first_child() {
-            return complexity;
-        }
+        // Compute complexity for functions if we have a parse tree
+        let complexity = if is_function {
+            tree.and_then(|t| {
+                self.find_function_node(t, sym.start_line)
+                    .map(|node| compute_complexity(&node, support))
+            })
+        } else {
+            None
+        };
 
-        loop {
-            if complexity_nodes.contains(&cursor.node().kind()) {
-                complexity += 1;
-            }
+        symbols.push(Symbol {
+            name: sym.name.clone(),
+            kind,
+            start_line: sym.start_line,
+            end_line: sym.end_line,
+            parent: parent.map(String::from),
+            complexity,
+        });
 
-            if cursor.goto_first_child() {
-                continue;
-            }
-            if cursor.goto_next_sibling() {
-                continue;
-            }
-            loop {
-                if !cursor.goto_parent() {
-                    return complexity;
-                }
-                if cursor.goto_next_sibling() {
-                    break;
-                }
-            }
+        // Recurse into children with current symbol as parent
+        for child in &sym.children {
+            self.flatten_symbol(child, Some(&sym.name), symbols, content, support, tree);
         }
     }
 
-    fn collect_with_trait(
+    /// Find a function node at a given line for complexity computation
+    fn find_function_node<'a>(
         &self,
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        support: &dyn Language,
-        symbols: &mut Vec<Symbol>,
-        parent: Option<&str>,
-    ) {
+        tree: &'a tree_sitter::Tree,
+        target_line: usize,
+    ) -> Option<tree_sitter::Node<'a>> {
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+        self.find_node_at_line(&mut cursor, target_line)
+    }
+
+    fn find_node_at_line<'a>(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor<'a>,
+        target_line: usize,
+    ) -> Option<tree_sitter::Node<'a>> {
         loop {
             let node = cursor.node();
-            let kind = node.kind();
+            let start = node.start_position().row + 1;
 
-            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
-            if let Some(embedded) = support.embedded_content(&node, content) {
-                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
-                    if let Some(sub_tree) = self
-                        .parsers
-                        .parse_with_grammar(embedded.grammar, &embedded.content)
-                    {
-                        let mut sub_symbols = Vec::new();
-                        let sub_root = sub_tree.root_node();
-                        let mut sub_cursor = sub_root.walk();
-                        self.collect_with_trait(
-                            &mut sub_cursor,
-                            &embedded.content,
-                            sub_lang,
-                            &mut sub_symbols,
-                            parent,
-                        );
-
-                        // Adjust line numbers for embedded content offset
-                        for mut sym in sub_symbols {
-                            sym.start_line += embedded.start_line - 1;
-                            sym.end_line += embedded.start_line - 1;
-                            symbols.push(sym);
-                        }
-                    }
-                }
-                // Don't descend into embedded nodes - we've already processed them
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-
-            // Check for container (class, struct, etc.)
-            if support.container_kinds().contains(&kind) {
-                if let Some(sym) = support.extract_container(&node, content) {
-                    let sym_name = sym.name.clone();
-                    symbols.push(Symbol {
-                        name: sym.name,
-                        kind: convert_symbol_kind(sym.kind),
-                        start_line: sym.start_line,
-                        end_line: sym.end_line,
-                        parent: parent.map(String::from),
-                        complexity: None,
-                    });
-
-                    // Recurse into container to find methods
-                    if cursor.goto_first_child() {
-                        self.collect_with_trait(cursor, content, support, symbols, Some(&sym_name));
-                        cursor.goto_parent();
-                    }
-                    if cursor.goto_next_sibling() {
-                        continue;
-                    }
-                    break;
+            // If this node starts at our target line and is a function-like node, return it
+            if start == target_line {
+                let kind = node.kind();
+                // Common function node kinds across languages
+                if kind.contains("function")
+                    || kind.contains("method")
+                    || kind == "function_definition"
+                    || kind == "method_definition"
+                    || kind == "function_item"
+                    || kind == "function_declaration"
+                    || kind == "arrow_function"
+                    || kind == "generator_function"
+                {
+                    return Some(node);
                 }
             }
 
-            // Check for function
-            if support.function_kinds().contains(&kind) {
-                if let Some(sym) = support.extract_function(&node, content, parent.is_some()) {
-                    let complexity = Self::compute_complexity(&node, support);
-                    symbols.push(Symbol {
-                        name: sym.name,
-                        kind: convert_symbol_kind(sym.kind),
-                        start_line: sym.start_line,
-                        end_line: sym.end_line,
-                        parent: parent.map(String::from),
-                        complexity: Some(complexity),
-                    });
+            // Descend if target might be in subtree
+            if cursor.goto_first_child() {
+                if let Some(found) = self.find_node_at_line(cursor, target_line) {
+                    return Some(found);
                 }
-            }
-
-            // Check for type (struct, enum, interface - when not a container)
-            if support.type_kinds().contains(&kind) && !support.container_kinds().contains(&kind) {
-                if let Some(sym) = support.extract_type(&node, content) {
-                    symbols.push(Symbol {
-                        name: sym.name,
-                        kind: convert_symbol_kind(sym.kind),
-                        start_line: sym.start_line,
-                        end_line: sym.end_line,
-                        parent: parent.map(String::from),
-                        complexity: None,
-                    });
-                }
-            }
-
-            // Recurse into children (but not for containers, handled above)
-            if !support.container_kinds().contains(&kind) && cursor.goto_first_child() {
-                self.collect_with_trait(cursor, content, support, symbols, parent);
                 cursor.goto_parent();
             }
 
@@ -245,6 +194,7 @@ impl SymbolParser {
                 break;
             }
         }
+        None
     }
 
     /// Parse imports from any supported language file using trait-based extraction.

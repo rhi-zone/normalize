@@ -1,14 +1,11 @@
 //! AST-based code skeleton extraction.
 //!
 //! Extracts function/class signatures with optional docstrings.
+//! Uses the shared Extractor from extract.rs for tree traversal.
 
-use crate::parsers::Parsers;
+use crate::extract::{ExtractOptions, Extractor};
 use crate::tree::{ViewNode, ViewNodeKind};
-use arborium::tree_sitter;
-use moss_languages::{
-    support_for_grammar, support_for_path, Language, Symbol as LangSymbol,
-    SymbolKind as LangSymbolKind,
-};
+use moss_languages::{Symbol as LangSymbol, SymbolKind as LangSymbolKind};
 use std::path::Path;
 
 /// A code symbol with its signature
@@ -118,15 +115,6 @@ impl SkeletonResult {
     }
 }
 
-/// Recursively adjust line numbers for nested symbols
-fn adjust_children_lines(children: &mut [SkeletonSymbol], offset: usize) {
-    for child in children {
-        child.start_line += offset;
-        child.end_line += offset;
-        adjust_children_lines(&mut child.children, offset);
-    }
-}
-
 /// Convert a moss_languages::Symbol to SkeletonSymbol
 fn convert_symbol(sym: &LangSymbol) -> SkeletonSymbol {
     let kind = match sym.kind {
@@ -155,231 +143,50 @@ fn convert_symbol(sym: &LangSymbol) -> SkeletonSymbol {
     }
 }
 
+/// Skeleton extractor using shared Extractor from extract.rs
 pub struct SkeletonExtractor {
-    parsers: Parsers,
-    show_all: bool,
+    extractor: Extractor,
 }
 
 impl SkeletonExtractor {
     pub fn new() -> Self {
         Self {
-            parsers: Parsers::new(),
-            show_all: false,
+            extractor: Extractor::new(),
         }
     }
 
     /// Create an extractor that shows all symbols including private ones
     pub fn with_all() -> Self {
         Self {
-            parsers: Parsers::new(),
-            show_all: true,
+            extractor: Extractor::with_options(ExtractOptions {
+                include_private: true,
+            }),
         }
     }
 
-    pub fn extract(&mut self, path: &Path, content: &str) -> SkeletonResult {
-        let support = support_for_path(path);
-
-        let symbols = match support {
-            Some(s) => self.extract_with_trait(content, s),
-            None => Vec::new(),
-        };
-
+    pub fn extract(&self, path: &Path, content: &str) -> SkeletonResult {
+        let result = self.extractor.extract(path, content);
         SkeletonResult {
-            symbols,
-            file_path: path.to_string_lossy().to_string(),
+            symbols: result.symbols.iter().map(convert_symbol).collect(),
+            file_path: result.file_path,
         }
     }
 
     /// Trait-based extraction (for future use when implementations are complete)
     #[allow(dead_code)]
     pub fn extract_with_support(&self, path: &Path, content: &str) -> Option<SkeletonResult> {
-        let support = support_for_path(path)?;
-        let symbols = self.extract_with_trait(content, support);
+        let result = self.extractor.extract(path, content);
+        if result.symbols.is_empty() {
+            // Check if this is a supported file type that just has no symbols
+            use moss_languages::support_for_path;
+            if support_for_path(path).is_none() {
+                return None;
+            }
+        }
         Some(SkeletonResult {
-            symbols,
-            file_path: path.to_string_lossy().to_string(),
+            symbols: result.symbols.iter().map(convert_symbol).collect(),
+            file_path: result.file_path,
         })
-    }
-
-    /// Extract using the Language trait (new unified approach)
-    fn extract_with_trait(&self, content: &str, support: &dyn Language) -> Vec<SkeletonSymbol> {
-        let tree = match self
-            .parsers
-            .parse_with_grammar(support.grammar_name(), content)
-        {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut symbols = Vec::new();
-        let root = tree.root_node();
-        let mut cursor = root.walk();
-
-        self.collect_with_trait(&mut cursor, content, support, &mut symbols, false);
-
-        // Post-process for Rust: merge impl blocks with their types
-        if support.grammar_name() == "rust" {
-            Self::merge_rust_impl_blocks(&mut symbols);
-        }
-
-        symbols
-    }
-
-    /// Merge Rust impl blocks with their corresponding struct/enum types
-    fn merge_rust_impl_blocks(symbols: &mut Vec<SkeletonSymbol>) {
-        // Collect impl blocks and their children
-        let mut impl_methods: std::collections::HashMap<String, Vec<SkeletonSymbol>> =
-            std::collections::HashMap::new();
-
-        // Remove impl blocks and collect their methods
-        symbols.retain(|sym| {
-            if sym.kind == "impl" || sym.kind == "module" {
-                // impl blocks are extracted as "impl" or "module" kind
-                if sym.signature.starts_with("impl ") {
-                    let type_name = &sym.name;
-                    impl_methods
-                        .entry(type_name.clone())
-                        .or_default()
-                        .extend(sym.children.clone());
-                    return false; // Remove impl block
-                }
-            }
-            true
-        });
-
-        // Add methods to matching struct/enum
-        for sym in symbols.iter_mut() {
-            if sym.kind == "struct" || sym.kind == "enum" {
-                if let Some(methods) = impl_methods.remove(&sym.name) {
-                    sym.children.extend(methods);
-                }
-            }
-        }
-
-        // Any remaining impl blocks without matching type: add back as impl symbols
-        for (name, methods) in impl_methods {
-            if !methods.is_empty() {
-                symbols.push(SkeletonSymbol {
-                    name: name.clone(),
-                    kind: "impl",
-                    signature: format!("impl {}", name),
-                    docstring: None,
-                    start_line: methods.first().map(|m| m.start_line).unwrap_or(0),
-                    end_line: methods.last().map(|m| m.end_line).unwrap_or(0),
-                    children: methods,
-                });
-            }
-        }
-    }
-
-    fn collect_with_trait(
-        &self,
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        support: &dyn Language,
-        symbols: &mut Vec<SkeletonSymbol>,
-        in_container: bool,
-    ) {
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-
-            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
-            if let Some(embedded) = support.embedded_content(&node, content) {
-                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
-                    if let Some(sub_tree) = self
-                        .parsers
-                        .parse_with_grammar(embedded.grammar, &embedded.content)
-                    {
-                        let mut sub_symbols = Vec::new();
-                        let sub_root = sub_tree.root_node();
-                        let mut sub_cursor = sub_root.walk();
-                        self.collect_with_trait(
-                            &mut sub_cursor,
-                            &embedded.content,
-                            sub_lang,
-                            &mut sub_symbols,
-                            false,
-                        );
-
-                        // Adjust line numbers for embedded content offset
-                        for mut sym in sub_symbols {
-                            sym.start_line += embedded.start_line - 1;
-                            sym.end_line += embedded.start_line - 1;
-                            adjust_children_lines(&mut sym.children, embedded.start_line - 1);
-                            symbols.push(sym);
-                        }
-                    }
-                }
-                // Don't descend into embedded nodes - we've already processed them
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-
-            // Check if this is a function
-            if support.function_kinds().contains(&kind) {
-                if let Some(sym) = support.extract_function(&node, content, in_container) {
-                    // Filter by visibility unless show_all
-                    if self.show_all || matches!(sym.visibility, moss_languages::Visibility::Public)
-                    {
-                        symbols.push(convert_symbol(&sym));
-                    }
-                }
-            }
-            // Check if this is a container (class, impl, module)
-            else if support.container_kinds().contains(&kind) {
-                if let Some(sym) = support.extract_container(&node, content) {
-                    if self.show_all || matches!(sym.visibility, moss_languages::Visibility::Public)
-                    {
-                        let mut skeleton_sym = convert_symbol(&sym);
-
-                        // Recurse into container body
-                        if let Some(body) = support.container_body(&node) {
-                            let mut body_cursor = body.walk();
-                            if body_cursor.goto_first_child() {
-                                self.collect_with_trait(
-                                    &mut body_cursor,
-                                    content,
-                                    support,
-                                    &mut skeleton_sym.children,
-                                    true,
-                                );
-                            }
-                        }
-
-                        symbols.push(skeleton_sym);
-                    }
-                }
-                // Don't descend further after processing container
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-            // Check if this is a standalone type (struct, enum, etc.)
-            else if support.type_kinds().contains(&kind)
-                && !support.container_kinds().contains(&kind)
-            {
-                if let Some(sym) = support.extract_type(&node, content) {
-                    if self.show_all || matches!(sym.visibility, moss_languages::Visibility::Public)
-                    {
-                        symbols.push(convert_symbol(&sym));
-                    }
-                }
-            }
-
-            // Descend into children for other nodes
-            if cursor.goto_first_child() {
-                self.collect_with_trait(cursor, content, support, symbols, in_container);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
     }
 }
 
@@ -390,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_python_skeleton() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 def foo(x: int) -> str:
     """Convert int to string."""
@@ -421,7 +228,7 @@ class Bar:
 
     #[test]
     fn test_rust_skeleton() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 /// A simple struct
 pub struct Foo {
@@ -447,7 +254,7 @@ impl Foo {
 
     #[test]
     fn test_to_view_node() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 def greet(name: str) -> str:
     """Return a personalized greeting message."""
@@ -468,7 +275,7 @@ def greet(name: str) -> str:
 
     #[test]
     fn test_markdown_skeleton() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"# Title
 
 Some intro text.
@@ -514,7 +321,7 @@ More content.
 
     #[test]
     fn test_javascript_skeleton() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"function greet(name) {
   console.log("Hello, " + name);
 }
@@ -548,7 +355,7 @@ class Greeter {
 
     #[test]
     fn test_filter_types() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 def helper():
     pass
@@ -578,7 +385,7 @@ class AnotherClass:
 
     #[test]
     fn test_filter_types_rust() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 fn helper() {}
 
@@ -615,7 +422,7 @@ fn another_function() {}
 
     #[test]
     fn test_filter_types_typescript() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 function helper() {}
 
@@ -651,7 +458,7 @@ const arrow = () => {};
 
     #[test]
     fn test_filter_types_go() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 package main
 
@@ -680,7 +487,7 @@ type MyInterface interface {
 
     #[test]
     fn test_filter_types_java() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 public class MyClass {
     public void method() {}
@@ -706,7 +513,7 @@ enum MyEnum {
 
     #[test]
     fn test_filter_types_ruby() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 def helper
 end
@@ -734,7 +541,7 @@ end
 
     #[test]
     fn test_scala_skeleton() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 object Main {
   def hello(name: String): String = {
@@ -771,7 +578,7 @@ trait Greeter {
 
     #[test]
     fn test_vue_skeleton() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 <template>
   <div>{{ message }}</div>
@@ -808,7 +615,7 @@ div { color: red; }
 
     #[test]
     fn test_filter_types_scala() {
-        let mut extractor = SkeletonExtractor::new();
+        let extractor = SkeletonExtractor::new();
         let content = r#"
 def helper(): Unit = {}
 

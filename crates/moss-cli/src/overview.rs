@@ -287,7 +287,7 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
             }
 
             // Skeleton analysis for structure and doc coverage
-            let mut skeleton_extractor = SkeletonExtractor::new();
+            let skeleton_extractor = SkeletonExtractor::new();
             let skeleton = skeleton_extractor.extract(&path, &content);
 
             let mut classes = 0;

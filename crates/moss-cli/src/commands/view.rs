@@ -419,7 +419,7 @@ fn cmd_view_file(
     }
 
     // Skeleton view
-    let mut extractor = if show_all {
+    let extractor = if show_all {
         skeleton::SkeletonExtractor::with_all()
     } else {
         skeleton::SkeletonExtractor::new()
@@ -531,7 +531,7 @@ fn cmd_view_file(
 
                 for (module_name, resolved_path, display) in resolved {
                     if let Ok(import_content) = std::fs::read_to_string(&resolved_path) {
-                        let mut import_extractor = skeleton::SkeletonExtractor::new();
+                        let import_extractor = skeleton::SkeletonExtractor::new();
                         let import_skeleton =
                             import_extractor.extract(&resolved_path, &import_content);
                         let import_skeleton = if types_only {
@@ -562,7 +562,7 @@ fn cmd_view_file(
                                 resolve_import(&reexp.module, &resolved_path, root)
                             {
                                 if let Ok(reexp_content) = std::fs::read_to_string(&reexp_path) {
-                                    let mut reexp_extractor = skeleton::SkeletonExtractor::new();
+                                    let reexp_extractor = skeleton::SkeletonExtractor::new();
                                     let reexp_skeleton =
                                         reexp_extractor.extract(&reexp_path, &reexp_content);
                                     let reexp_skeleton = if types_only {
@@ -622,7 +622,7 @@ fn cmd_view_file(
 
                 if let Some(resolved_path) = resolve_import(&imp.module, &full_path, root) {
                     if let Ok(import_content) = std::fs::read_to_string(&resolved_path) {
-                        let mut import_extractor = skeleton::SkeletonExtractor::new();
+                        let import_extractor = skeleton::SkeletonExtractor::new();
                         let import_skeleton =
                             import_extractor.extract(&resolved_path, &import_content);
 
@@ -717,7 +717,7 @@ fn cmd_view_symbol(
         0
     } else {
         // Try skeleton extraction for more context
-        let mut extractor = skeleton::SkeletonExtractor::new();
+        let extractor = skeleton::SkeletonExtractor::new();
         let skeleton_result = extractor.extract(&full_path, &content);
 
         if let Some(sym) = find_symbol(&skeleton_result.symbols, symbol_name) {

@@ -7,6 +7,7 @@ mod complexity;
 mod daemon;
 mod deps;
 mod edit;
+mod extract;
 mod grep;
 mod health;
 mod index;
