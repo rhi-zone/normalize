@@ -4,6 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Node kind pass 2: cross-check dump_node_kinds against existing lists to find *missing* useful kinds
 - Investigate slow `moss analyze --health` (+500ms over baseline)
 - view.rs internal cleanup (see CLI Surface Cleanup)
 - Rust crate feature lookup (see Tooling)
