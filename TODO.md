@@ -4,7 +4,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Storage usage command (`moss analyze --storage` or similar)
+- Call graph bug: same-named method on different object shows as self-call
+- `moss package` subcommands: list, tree, outdated
 - view.rs internal cleanup (see CLI Surface Cleanup)
+- Single installation: maturin wheel with embedded Rust binary
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
@@ -30,18 +34,12 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 - Deduplicate SQL queries in moss-cli: many ad-hoc queries could use shared prepared statements or query builders
 - Cache line counts in index: `analyze --health` still reads all files for line counting, could store in files table
 
-**Bugs:**
-- Call graph shows same-named method on different object as self-call (e.g., `suggest_tool` calls `router.suggest_tool`)
-
 **Integration:**
 - Complete daemon integration (FileIndex API methods currently unused)
 - LSP refactor actions (rename symbol across files)
 - Cross-language reference tracking (Python ↔ Rust)
-- Single installation: Python + Rust CLI must install as a unit (maturin wheel with embedded binary)
 
 **Tooling:**
-- `moss package` subcommands: list, tree, outdated
-- Storage usage command: view disk usage for index database and package cache (~/.cache/moss/)
 - Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (Opus 4.5 drops TODO items when editing markdown)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 
