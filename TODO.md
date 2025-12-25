@@ -54,6 +54,16 @@ Delete (questionable value):
 - [x] `cmd_synthesize` - experimental, mock LLM (deleted from Python CLI)
 - [x] `cmd_eval` - SWE-bench harness, research tool (deleted from Python CLI)
 
+Delete (broken - used non-existent moss meta-package):
+- [x] `cmd_search` - semantic search (Python broke, Rust has `moss grep`)
+- [x] `cmd_checkpoint` - shadow branch management (Python broke)
+- [x] `cmd_security` - multi-tool security (Rust has `moss analyze --security`)
+
+Consider porting to Rust:
+- [ ] `cmd_check_refs` - bidirectional code/doc reference checking (could be `moss analyze --check-refs`)
+- [ ] `cmd_external_deps` - dependency analysis with vuln/license checking (could be `moss package audit`)
+- [ ] `cmd_git_hotspots` - git history analysis (could be `moss analyze --hotspots`)
+
 Consolidate to subcommands:
 - [x] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}` (deleted from Python CLI)
 - [x] `cmd_mcp_server` / `cmd_acp_server` / `cmd_lsp` → `moss serve {mcp,http,lsp}` (deleted from Python CLI)
