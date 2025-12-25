@@ -7,21 +7,20 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - Investigate slow `moss analyze --health` (+500ms over baseline)
 - view.rs internal cleanup (see CLI Surface Cleanup)
 - Rust crate feature lookup (see Tooling)
-- Add more languages (32 remaining)
+- Add more languages (24 remaining)
 
 Test Status: 85 passing, 0 failing
 
 ## Backlog
 
-**Language Support:** 66 languages implemented, 32 remaining from arborium.
+**Language Support:** 74 languages implemented, 24 remaining from arborium.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to refresh.
 
 Missing languages (grouped by category):
-- **Functional:** idris, lean, prolog, rescript
-- **Systems/Low-level:** ada, asm, d, objc, verilog, vhdl, x86asm
-- **Scientific:** agda, matlab, typst, uiua
-- **Config/Data:** caddy, capnp, devicetree, jinja2, meson, nginx, ninja, query, ron, sparql, ssh-config, starlark, textproto, thrift, tlaplus, wit, yuri
-- **Build:** batch
+- **Functional:** idris, lean, rescript
+- **Systems/Low-level:** asm, objc, verilog, vhdl, x86asm
+- **Scientific:** typst, uiua
+- **Config/Data:** caddy, capnp, devicetree, jinja2, ninja, query, ron, sparql, ssh-config, starlark, textproto, thrift, tlaplus, wit, yuri
 - **Docs:** asciidoc, postscript
 - **Other:** vb
 
