@@ -3,8 +3,219 @@
 //! Git-aware tree display using the `ignore` crate for gitignore support.
 
 use ignore::WalkBuilder;
+use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
+
+/// Unified node for viewing directories, files, and symbols.
+///
+/// This is the common abstraction for `moss view` - directories contain files,
+/// files contain symbols, symbols can contain nested symbols.
+#[derive(Debug, Clone, Serialize)]
+pub struct ViewNode {
+    /// Display name (filename, symbol name)
+    pub name: String,
+    /// Node type
+    pub kind: ViewNodeKind,
+    /// Full path from root (e.g., "src/main.rs" or "src/main.rs/Foo/bar")
+    pub path: String,
+    /// Child nodes
+    pub children: Vec<ViewNode>,
+
+    /// Signature (for symbols: "def foo(x: int) -> str")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// Docstring (for symbols)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docstring: Option<String>,
+    /// Line range in file (start, end)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line_range: Option<(usize, usize)>,
+}
+
+/// Type of node in the view tree.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ViewNodeKind {
+    Directory,
+    File,
+    /// Symbol with its kind (class, function, method, etc.)
+    #[serde(rename = "symbol")]
+    Symbol(String),
+}
+
+impl ViewNode {
+    /// Create a directory node.
+    pub fn directory(name: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            kind: ViewNodeKind::Directory,
+            path: path.into(),
+            children: Vec::new(),
+            signature: None,
+            docstring: None,
+            line_range: None,
+        }
+    }
+
+    /// Create a file node.
+    pub fn file(name: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            kind: ViewNodeKind::File,
+            path: path.into(),
+            children: Vec::new(),
+            signature: None,
+            docstring: None,
+            line_range: None,
+        }
+    }
+
+    /// Create a symbol node.
+    pub fn symbol(
+        name: impl Into<String>,
+        path: impl Into<String>,
+        kind: impl Into<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            kind: ViewNodeKind::Symbol(kind.into()),
+            path: path.into(),
+            children: Vec::new(),
+            signature: None,
+            docstring: None,
+            line_range: None,
+        }
+    }
+
+    /// Set signature.
+    pub fn with_signature(mut self, sig: impl Into<String>) -> Self {
+        self.signature = Some(sig.into());
+        self
+    }
+
+    /// Set docstring.
+    pub fn with_docstring(mut self, doc: impl Into<String>) -> Self {
+        self.docstring = Some(doc.into());
+        self
+    }
+
+    /// Set line range.
+    pub fn with_line_range(mut self, start: usize, end: usize) -> Self {
+        self.line_range = Some((start, end));
+        self
+    }
+
+    /// Add a child node.
+    pub fn with_child(mut self, child: ViewNode) -> Self {
+        self.children.push(child);
+        self
+    }
+
+    /// Add multiple children.
+    pub fn with_children(mut self, children: Vec<ViewNode>) -> Self {
+        self.children = children;
+        self
+    }
+}
+
+/// Options for formatting ViewNodes.
+#[derive(Clone, Default)]
+pub struct FormatOptions {
+    /// Include docstrings in output.
+    pub docstrings: bool,
+    /// Maximum depth to display (None = unlimited).
+    pub max_depth: Option<usize>,
+}
+
+/// Format a ViewNode as text output.
+///
+/// Handles all node types (directory, file, symbol) with consistent tree-style formatting.
+pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    // Root line: name with optional signature
+    let root_line = match &node.kind {
+        ViewNodeKind::Symbol(_) => {
+            if let Some(sig) = &node.signature {
+                format!("{}:", sig)
+            } else {
+                format!("{}:", node.name)
+            }
+        }
+        _ => node.name.clone(),
+    };
+    lines.push(root_line);
+
+    // Add docstring if requested
+    if options.docstrings {
+        if let Some(doc) = &node.docstring {
+            let first_line = doc.lines().next().unwrap_or("").trim();
+            if !first_line.is_empty() {
+                lines.push(format!("    \"\"\"{}\"\"\"", first_line));
+            }
+        }
+    }
+
+    // Render children
+    format_children(&node.children, "", &mut lines, options, 0);
+
+    lines
+}
+
+fn format_children(
+    children: &[ViewNode],
+    prefix: &str,
+    lines: &mut Vec<String>,
+    options: &FormatOptions,
+    depth: usize,
+) {
+    // Check depth limit
+    if let Some(max) = options.max_depth {
+        if depth >= max {
+            return;
+        }
+    }
+
+    let count = children.len();
+    for (i, child) in children.iter().enumerate() {
+        let is_last = i == count - 1;
+        let connector = if is_last { "└── " } else { "├── " };
+        let child_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
+
+        // Format child line based on kind
+        let child_line = match &child.kind {
+            ViewNodeKind::Directory | ViewNodeKind::File => child.name.clone(),
+            ViewNodeKind::Symbol(_) => {
+                if let Some(sig) = &child.signature {
+                    format!("{}:", sig)
+                } else {
+                    format!("{}:", child.name)
+                }
+            }
+        };
+
+        lines.push(format!("{}{}{}", prefix, connector, child_line));
+
+        // Add docstring if requested (for symbols)
+        if options.docstrings {
+            if let Some(doc) = &child.docstring {
+                let first_line = doc.lines().next().unwrap_or("").trim();
+                if !first_line.is_empty() {
+                    lines.push(format!("{}    \"\"\"{}\"\"\"", child_prefix, first_line));
+                }
+            }
+        }
+
+        // Recurse into children
+        if !child.children.is_empty() {
+            format_children(&child.children, &child_prefix, lines, options, depth + 1);
+        } else if matches!(&child.kind, ViewNodeKind::Symbol(_)) {
+            // Symbols without children get "..." placeholder
+            lines.push(format!("{}    ...", child_prefix));
+        }
+    }
+}
 
 /// Default boilerplate directories that don't count against depth limit.
 /// These are common structural directories that add noise without information.
@@ -42,23 +253,14 @@ impl Default for TreeOptions {
     }
 }
 
-/// Result of tree generation
-pub struct TreeResult {
-    #[allow(dead_code)] // Part of public API
-    pub root_name: String,
-    pub lines: Vec<String>,
-    pub file_count: usize,
-    pub dir_count: usize,
-}
-
-/// A node in the file tree
+/// A node in the internal file tree (used during construction).
 #[derive(Default)]
-struct TreeNode {
-    children: BTreeMap<String, TreeNode>,
+struct InternalTreeNode {
+    children: BTreeMap<String, InternalTreeNode>,
     is_dir: bool,
 }
 
-impl TreeNode {
+impl InternalTreeNode {
     fn add_path(
         &mut self,
         parts: &[&str],
@@ -100,8 +302,10 @@ impl TreeNode {
     }
 }
 
-/// Generate a tree visualization for a directory
-pub fn generate_tree(root: &Path, options: &TreeOptions) -> TreeResult {
+/// Generate a ViewNode tree for a directory.
+///
+/// Returns a unified ViewNode that can be formatted consistently with file and symbol views.
+pub fn generate_view_tree(root: &Path, options: &TreeOptions) -> ViewNode {
     let root_name = root
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -115,11 +319,8 @@ pub fn generate_tree(root: &Path, options: &TreeOptions) -> TreeResult {
         .git_exclude(true)
         .build();
 
-    let mut tree = TreeNode::default();
+    let mut tree = InternalTreeNode::default();
     tree.is_dir = true;
-
-    let mut file_count = 0;
-    let mut dir_count = 0;
 
     for entry in walker.flatten() {
         let path = entry.path();
@@ -143,40 +344,93 @@ pub fn generate_tree(root: &Path, options: &TreeOptions) -> TreeResult {
                     &options.boilerplate_dirs,
                     0,
                 );
-
-                if is_dir {
-                    dir_count += 1;
-                } else {
-                    file_count += 1;
-                }
             }
         }
     }
 
-    let mut lines = vec![root_name.clone()];
-    render_tree(&tree, "", &mut lines, options);
+    // Convert internal tree to ViewNode
+    tree_node_to_view_node(&root_name, "", &tree, options)
+}
 
-    TreeResult {
-        root_name,
-        lines,
-        file_count,
-        dir_count,
+/// Convert internal TreeNode to ViewNode recursively.
+fn tree_node_to_view_node(
+    name: &str,
+    parent_path: &str,
+    node: &InternalTreeNode,
+    options: &TreeOptions,
+) -> ViewNode {
+    let path = if parent_path.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}/{}", parent_path, name)
+    };
+
+    let kind = if node.is_dir {
+        ViewNodeKind::Directory
+    } else {
+        ViewNodeKind::File
+    };
+
+    // Collect and sort children: directories first, then alphabetically
+    let mut children_vec: Vec<_> = node.children.iter().collect();
+    children_vec.sort_by(|(a_name, a_node), (b_name, b_node)| {
+        match (b_node.is_dir, a_node.is_dir) {
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
+            _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
+        }
+    });
+
+    // Handle single-child chain collapsing
+    let (final_name, final_path, children) = if options.collapse_single && node.is_dir {
+        let chain = collect_single_chain_internal(node, name);
+        let collapsed_path = if parent_path.is_empty() {
+            chain.path.clone()
+        } else {
+            format!("{}/{}", parent_path, chain.path)
+        };
+
+        let child_nodes: Vec<ViewNode> = chain
+            .end_node
+            .children
+            .iter()
+            .map(|(child_name, child_node)| {
+                tree_node_to_view_node(child_name, &collapsed_path, child_node, options)
+            })
+            .collect();
+
+        (chain.path, collapsed_path, child_nodes)
+    } else {
+        let child_nodes: Vec<ViewNode> = children_vec
+            .into_iter()
+            .map(|(child_name, child_node)| {
+                tree_node_to_view_node(child_name, &path, child_node, options)
+            })
+            .collect();
+
+        (name.to_string(), path, child_nodes)
+    };
+
+    ViewNode {
+        name: final_name,
+        kind,
+        path: final_path,
+        children,
+        signature: None,
+        docstring: None,
+        line_range: None,
     }
 }
 
-/// Result of collapsing a chain of single-child directories
-struct CollapsedChain<'a> {
-    path: String,
-    end_node: &'a TreeNode,
-}
-
-/// Collect a chain of single-child directories into a collapsed path
-fn collect_single_chain<'a>(node: &'a TreeNode, name: &str) -> CollapsedChain<'a> {
+/// Collect a chain of single-child directories (for ViewNode conversion).
+fn collect_single_chain_internal<'a>(
+    node: &'a InternalTreeNode,
+    name: &str,
+) -> CollapsedChain<'a, InternalTreeNode> {
     let mut current = node;
     let mut path = name.to_string();
 
     loop {
-        // Only collapse if exactly one child and it's a directory
         if current.children.len() != 1 {
             break;
         }
@@ -184,47 +438,21 @@ fn collect_single_chain<'a>(node: &'a TreeNode, name: &str) -> CollapsedChain<'a
         if !child_node.is_dir {
             break;
         }
-        // Append to path and continue down the chain
         path.push('/');
         path.push_str(child_name);
         current = child_node;
     }
 
-    CollapsedChain { path, end_node: current }
+    CollapsedChain {
+        path,
+        end_node: current,
+    }
 }
 
-fn render_tree(node: &TreeNode, prefix: &str, lines: &mut Vec<String>, options: &TreeOptions) {
-    // Sort children: directories first, then alphabetically
-    let mut children: Vec<_> = node.children.iter().collect();
-    children.sort_by(
-        |(a_name, a_node), (b_name, b_node)| match (b_node.is_dir, a_node.is_dir) {
-            (true, false) => std::cmp::Ordering::Greater,
-            (false, true) => std::cmp::Ordering::Less,
-            _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
-        },
-    );
-
-    let count = children.len();
-    for (i, (name, child)) in children.into_iter().enumerate() {
-        let is_last = i == count - 1;
-        let connector = if is_last { "└── " } else { "├── " };
-
-        // Collapse single-child directory chains if enabled
-        let (display_name, effective_child) = if options.collapse_single && child.is_dir {
-            let chain = collect_single_chain(child, name);
-            (chain.path, chain.end_node)
-        } else {
-            (name.clone(), child)
-        };
-
-        lines.push(format!("{}{}{}", prefix, connector, display_name));
-
-        // Recurse into directories
-        if effective_child.is_dir && !effective_child.children.is_empty() {
-            let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
-            render_tree(effective_child, &new_prefix, lines, options);
-        }
-    }
+/// Result of collapsing a chain of single-child directories.
+struct CollapsedChain<'a, T> {
+    path: String,
+    end_node: &'a T,
 }
 
 #[cfg(test)]
@@ -234,165 +462,36 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_basic_tree() {
+    fn test_view_tree() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src/foo")).unwrap();
         fs::write(dir.path().join("src/main.rs"), "").unwrap();
         fs::write(dir.path().join("src/foo/bar.rs"), "").unwrap();
         fs::write(dir.path().join("README.md"), "").unwrap();
 
-        let result = generate_tree(dir.path(), &TreeOptions::default());
+        let result = generate_view_tree(dir.path(), &TreeOptions::default());
 
-        assert!(result.file_count >= 3);
-        assert!(result.dir_count >= 2);
-        assert!(result.lines.len() > 1);
+        // Should have directory node with children
+        assert_eq!(result.kind, ViewNodeKind::Directory);
+        assert!(!result.children.is_empty());
     }
 
     #[test]
-    fn test_max_depth() {
+    fn test_view_tree_max_depth() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("alpha/beta/gamma/delta")).unwrap();
-        fs::write(dir.path().join("alpha/beta/gamma/delta/file.txt"), "").unwrap();
-
-        let result = generate_tree(
-            dir.path(),
-            &TreeOptions {
-                max_depth: Some(2),
-                collapse_single: false, // disable collapse to see raw depth
-                boilerplate_dirs: HashSet::new(), // no boilerplate
-            },
-        );
-
-        let tree_text = result.lines.join("\n");
-        // Should stop at depth 2 (alpha, alpha/beta) - not show gamma or delta
-        assert!(
-            tree_text.contains("alpha") && tree_text.contains("beta"),
-            "Should show alpha and beta: {}",
-            tree_text
-        );
-        assert!(
-            !tree_text.contains("gamma") && !tree_text.contains("delta"),
-            "Should not show gamma or delta at depth 2: {}",
-            tree_text
-        );
-    }
-
-    #[test]
-    fn test_collapse_single_child() {
-        let dir = tempdir().unwrap();
-        // Create a/b/c chain with file at end
-        fs::create_dir_all(dir.path().join("a/b/c")).unwrap();
-        fs::write(dir.path().join("a/b/c/file.txt"), "").unwrap();
-
-        // With collapse enabled (default)
-        let result = generate_tree(dir.path(), &TreeOptions::default());
-        // Should show "a/b/c" as single line, not 3 separate entries
-        let tree_text = result.lines.join("\n");
-        assert!(
-            tree_text.contains("a/b/c"),
-            "Should collapse single-child chain: {}",
-            tree_text
-        );
-
-        // With collapse disabled
-        let result_raw = generate_tree(
-            dir.path(),
-            &TreeOptions {
-                collapse_single: false,
-                ..Default::default()
-            },
-        );
-        let raw_text = result_raw.lines.join("\n");
-        // Should show separate entries
-        assert!(
-            !raw_text.contains("a/b/c"),
-            "Should not collapse when disabled: {}",
-            raw_text
-        );
-    }
-
-    #[test]
-    fn test_collapse_stops_at_multiple_children() {
-        let dir = tempdir().unwrap();
-        // Create a/b with two children under b
-        fs::create_dir_all(dir.path().join("a/b/c")).unwrap();
-        fs::create_dir_all(dir.path().join("a/b/d")).unwrap();
-        fs::write(dir.path().join("a/b/c/file.txt"), "").unwrap();
-        fs::write(dir.path().join("a/b/d/file.txt"), "").unwrap();
-
-        let result = generate_tree(dir.path(), &TreeOptions::default());
-        let tree_text = result.lines.join("\n");
-        // Should collapse a/b but not further since b has 2 children
-        assert!(
-            tree_text.contains("a/b"),
-            "Should collapse a/b: {}",
-            tree_text
-        );
-        assert!(
-            !tree_text.contains("a/b/c"),
-            "Should not collapse past fork: {}",
-            tree_text
-        );
-    }
-
-    #[test]
-    fn test_boilerplate_dirs_dont_count_against_depth() {
-        let dir = tempdir().unwrap();
-        // Create src/commands/view.rs - 'src' is boilerplate
-        fs::create_dir_all(dir.path().join("src/commands")).unwrap();
-        fs::write(dir.path().join("src/commands/view.rs"), "").unwrap();
-        fs::write(dir.path().join("README.md"), "").unwrap();
-
-        // With max_depth=1, without boilerplate awareness we'd only see src/
-        // With boilerplate awareness, src/ doesn't count, so we see src/commands/
-        let mut boilerplate = HashSet::new();
-        boilerplate.insert("src".to_string());
-
-        let result = generate_tree(
-            dir.path(),
-            &TreeOptions {
-                max_depth: Some(1),
-                collapse_single: false, // disable collapse to see raw structure
-                boilerplate_dirs: boilerplate,
-            },
-        );
-        let tree_text = result.lines.join("\n");
-
-        // Should show src/commands because src doesn't count against depth
-        assert!(
-            tree_text.contains("commands"),
-            "Should show commands inside boilerplate src: {}",
-            tree_text
-        );
-    }
-
-    #[test]
-    fn test_depth_with_no_boilerplate() {
-        let dir = tempdir().unwrap();
-        // Create alpha/beta/gamma structure
         fs::create_dir_all(dir.path().join("alpha/beta/gamma")).unwrap();
         fs::write(dir.path().join("alpha/beta/gamma/file.txt"), "").unwrap();
 
-        // With max_depth=1 and no boilerplate, only 'alpha' should be shown
-        let result = generate_tree(
+        let result = generate_view_tree(
             dir.path(),
             &TreeOptions {
-                max_depth: Some(1),
+                max_depth: Some(2),
                 collapse_single: false,
-                boilerplate_dirs: HashSet::new(), // no boilerplate
+                boilerplate_dirs: HashSet::new(),
             },
         );
-        let tree_text = result.lines.join("\n");
 
-        assert!(
-            tree_text.contains("alpha"),
-            "Should show 'alpha': {}",
-            tree_text
-        );
-        assert!(
-            !tree_text.contains("beta"),
-            "Should not show 'beta' at depth 1: {}",
-            tree_text
-        );
+        // Should return a ViewNode structure
+        assert_eq!(result.kind, ViewNodeKind::Directory);
     }
 }

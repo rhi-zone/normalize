@@ -2,6 +2,7 @@
 //!
 //! Extracts function/class signatures with optional docstrings.
 
+use crate::tree::{ViewNode, ViewNodeKind};
 use moss_core::{tree_sitter, Parsers};
 use moss_languages::{support_for_grammar, support_for_path, Language, Symbol as LangSymbol, SymbolKind as LangSymbolKind};
 use std::path::Path;
@@ -18,6 +19,33 @@ pub struct SkeletonSymbol {
     pub children: Vec<SkeletonSymbol>,
 }
 
+impl SkeletonSymbol {
+    /// Convert to a ViewNode for unified viewing.
+    pub fn to_view_node(&self, parent_path: &str) -> ViewNode {
+        let path = if parent_path.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}/{}", parent_path, self.name)
+        };
+
+        let children: Vec<ViewNode> = self
+            .children
+            .iter()
+            .map(|c| c.to_view_node(&path))
+            .collect();
+
+        ViewNode {
+            name: self.name.clone(),
+            kind: ViewNodeKind::Symbol(self.kind.to_string()),
+            path,
+            children,
+            signature: Some(self.signature.clone()),
+            docstring: self.docstring.clone(),
+            line_range: Some((self.start_line, self.end_line)),
+        }
+    }
+}
+
 /// Result of skeleton extraction
 pub struct SkeletonResult {
     pub symbols: Vec<SkeletonSymbol>,
@@ -25,6 +53,22 @@ pub struct SkeletonResult {
 }
 
 impl SkeletonResult {
+    /// Convert to a ViewNode with file as root and symbols as children.
+    pub fn to_view_node(&self) -> ViewNode {
+        let file_name = Path::new(&self.file_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| self.file_path.clone());
+
+        let children: Vec<ViewNode> = self
+            .symbols
+            .iter()
+            .map(|s| s.to_view_node(&file_name))
+            .collect();
+
+        ViewNode::file(&file_name, &self.file_path).with_children(children)
+    }
+
     /// Format skeleton as text output
     pub fn format(&self, include_docstrings: bool) -> String {
         let mut lines = Vec::new();

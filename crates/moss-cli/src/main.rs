@@ -57,14 +57,6 @@ enum Commands {
         #[arg(short = 't', long = "type")]
         kind: Option<String>,
 
-        /// Show what functions the target calls (callees)
-        #[arg(long)]
-        calls: bool,
-
-        /// Show what functions call the target (callers)
-        #[arg(long)]
-        called_by: bool,
-
         /// Show only type definitions (class, struct, enum, interface, type alias)
         /// Filters out functions/methods for architectural overview
         #[arg(long)]
@@ -235,6 +227,14 @@ enum Commands {
         /// Filter by symbol kind: function, method
         #[arg(long)]
         kind: Option<String>,
+
+        /// Show what functions the target calls (callees)
+        #[arg(long)]
+        calls: bool,
+
+        /// Show what functions call the target (callers)
+        #[arg(long)]
+        called_by: bool,
     },
 
     /// Search for text patterns in files (fast ripgrep-based search)
@@ -311,8 +311,6 @@ fn main() {
             line_numbers,
             deps,
             kind,
-            calls,
-            called_by,
             types_only,
             raw,
             focus,
@@ -326,8 +324,6 @@ fn main() {
             line_numbers,
             deps,
             kind.as_deref(),
-            calls,
-            called_by,
             types_only,
             raw,
             focus.as_deref(),
@@ -390,6 +386,8 @@ fn main() {
             compact,
             threshold,
             kind,
+            calls,
+            called_by,
         } => commands::analyze::cmd_analyze(
             target.as_deref(),
             root.as_deref(),
@@ -401,6 +399,8 @@ fn main() {
             compact,
             threshold,
             kind.as_deref(),
+            calls,
+            called_by,
             cli.json,
         ),
         Commands::Grep {

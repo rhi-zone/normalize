@@ -62,6 +62,7 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
   - Commits ahead of remote
   - Uncommitted changes summary
   - TODO.md delta (items added/completed)
+- Introspect ~/.claude/plans/ - list/view saved plan files from Claude Code sessions
 
 ## Deferred
 

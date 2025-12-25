@@ -1,6 +1,7 @@
 //! View command - unified view of files, directories, and symbols.
 
 use crate::{deps, index, path_resolve, skeleton, symbols, tree};
+use crate::tree::{FormatOptions, ViewNode, ViewNodeKind};
 use moss_languages::support_for_path;
 use std::path::{Path, PathBuf};
 
@@ -43,26 +44,6 @@ fn cmd_view_symbol_direct(
     cmd_view_symbol(file_path, &[symbol_name.to_string()], root, depth, full, json)
 }
 
-/// Try various separators to parse file:symbol format
-fn parse_file_symbol_string(s: &str) -> Option<(String, String)> {
-    // Try various separators: #, ::, :
-    for sep in ["#", "::", ":"] {
-        if let Some(idx) = s.find(sep) {
-            let (file, rest) = s.split_at(idx);
-            let symbol = &rest[sep.len()..];
-            if !file.is_empty() && !symbol.is_empty() && looks_like_file(file) {
-                return Some((symbol.to_string(), file.to_string()));
-            }
-        }
-    }
-    None
-}
-
-/// Check if a string looks like a file path
-fn looks_like_file(s: &str) -> bool {
-    s.contains('.') || s.contains('/')
-}
-
 /// Unified view command
 pub fn cmd_view(
     target: Option<&str>,
@@ -71,8 +52,6 @@ pub fn cmd_view(
     line_numbers: bool,
     show_deps: bool,
     kind_filter: Option<&str>,
-    show_calls: bool,
-    show_called_by: bool,
     types_only: bool,
     raw: bool,
     focus: Option<&str>,
@@ -89,20 +68,6 @@ pub fn cmd_view(
     if let Some(kind) = kind_filter {
         let scope = target.unwrap_or(".");
         return cmd_view_filtered(&root, scope, kind, json);
-    }
-
-    // Handle --calls or --called-by with a target symbol
-    if show_calls || show_called_by {
-        let target = match target {
-            Some(t) => t,
-            None => {
-                eprintln!("--calls and --called-by require a target symbol");
-                return 1;
-            }
-        };
-        // show_called_by → find callers (what calls this)
-        // show_calls → find callees (what this calls)
-        return cmd_view_calls(&root, target, show_called_by, show_calls, json);
     }
 
     // --focus requires a file target
@@ -210,130 +175,6 @@ pub fn cmd_view(
             json,
         )
     }
-}
-
-/// Show callers/callees of a symbol
-fn cmd_view_calls(
-    root: &Path,
-    target: &str,
-    show_callers: bool,
-    show_callees: bool,
-    json: bool,
-) -> i32 {
-    // Try to parse target as file:symbol or just symbol
-    let (symbol, file_hint) = if let Some((sym, file)) = parse_file_symbol_string(target) {
-        (sym, Some(file))
-    } else {
-        (target.to_string(), None)
-    };
-
-    // Try index first
-    let idx = match index::FileIndex::open(root) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!("Failed to open index: {}. Run: moss reindex --call-graph", e);
-            return 1;
-        }
-    };
-
-    let stats = idx.call_graph_stats().unwrap_or_default();
-    if stats.calls == 0 {
-        eprintln!("Call graph not indexed. Run: moss reindex --call-graph");
-        return 1;
-    }
-
-    let mut results: Vec<(String, String, usize, &str)> = Vec::new(); // (file, symbol, line, direction)
-
-    // Get callers if requested
-    if show_callers {
-        match idx.find_callers(&symbol) {
-            Ok(callers) => {
-                for (file, sym, line) in callers {
-                    results.push((file, sym, line, "caller"));
-                }
-            }
-            Err(e) => {
-                eprintln!("Error finding callers: {}", e);
-            }
-        }
-    }
-
-    // Get callees if requested
-    if show_callees {
-        // Need to find file for symbol first
-        let file_path = if let Some(f) = &file_hint {
-            let matches = path_resolve::resolve(f, root);
-            matches
-                .iter()
-                .find(|m| m.kind == "file")
-                .map(|m| m.path.clone())
-        } else {
-            idx.find_symbol(&symbol)
-                .ok()
-                .and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
-        };
-
-        if let Some(file_path) = file_path {
-            match idx.find_callees(&file_path, &symbol) {
-                Ok(callees) => {
-                    for (name, line) in callees {
-                        results.push((file_path.clone(), name, line, "callee"));
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error finding callees: {}", e);
-                }
-            }
-        }
-    }
-
-    if results.is_empty() {
-        if json {
-            println!("[]");
-        } else {
-            let direction = if show_callers && show_callees {
-                "callers or callees"
-            } else if show_callers {
-                "callers"
-            } else {
-                "callees"
-            };
-            eprintln!("No {} found for: {}", direction, symbol);
-        }
-        return 1;
-    }
-
-    // Sort by file, then line
-    results.sort_by(|a, b| (&a.0, a.2).cmp(&(&b.0, b.2)));
-
-    if json {
-        let output: Vec<_> = results
-            .iter()
-            .map(|(file, sym, line, direction)| {
-                serde_json::json!({
-                    "file": file,
-                    "symbol": sym,
-                    "line": line,
-                    "direction": direction
-                })
-            })
-            .collect();
-        println!("{}", serde_json::to_string(&output).unwrap());
-    } else {
-        let header = if show_callers && show_callees {
-            format!("Callers and callees of {}", symbol)
-        } else if show_callers {
-            format!("Callers of {}", symbol)
-        } else {
-            format!("Callees of {}", symbol)
-        };
-        println!("{}:", header);
-        for (file, sym, line, _direction) in &results {
-            println!("  {}:{}:{}", file, line, sym);
-        }
-    }
-
-    0
 }
 
 /// List symbols matching a kind filter within a scope
@@ -446,9 +287,11 @@ fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i32 {
     0
 }
 
-fn cmd_view_directory(dir: &Path, root: &Path, depth: i32, raw: bool, json: bool) -> i32 {
+fn cmd_view_directory(dir: &Path, _root: &Path, depth: i32, raw: bool, json: bool) -> i32 {
     let effective_depth = if depth < 0 { None } else { Some(depth as usize) };
-    let result = tree::generate_tree(
+
+    // Generate ViewNode tree
+    let view_node = tree::generate_view_tree(
         dir,
         &tree::TreeOptions {
             max_depth: effective_depth,
@@ -457,31 +300,37 @@ fn cmd_view_directory(dir: &Path, root: &Path, depth: i32, raw: bool, json: bool
         },
     );
 
-    let rel_path = dir
-        .strip_prefix(root)
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| dir.to_string_lossy().to_string());
+    // Count files and directories
+    fn count_nodes(node: &ViewNode) -> (usize, usize) {
+        let mut files = 0;
+        let mut dirs = 0;
+        for child in &node.children {
+            match child.kind {
+                ViewNodeKind::Directory => {
+                    dirs += 1;
+                    let (sub_files, sub_dirs) = count_nodes(child);
+                    files += sub_files;
+                    dirs += sub_dirs;
+                }
+                ViewNodeKind::File => files += 1,
+                ViewNodeKind::Symbol(_) => {}
+            }
+        }
+        (files, dirs)
+    }
+    let (file_count, dir_count) = count_nodes(&view_node);
 
     if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "type": "directory",
-                "path": rel_path,
-                "file_count": result.file_count,
-                "dir_count": result.dir_count,
-                "tree": result.lines
-            })
-        );
+        // Serialize the ViewNode directly for structured output
+        println!("{}", serde_json::to_string(&view_node).unwrap());
     } else {
-        for line in &result.lines {
+        // Format as text tree
+        let lines = tree::format_view_node(&view_node, &FormatOptions::default());
+        for line in &lines {
             println!("{}", line);
         }
         println!();
-        println!(
-            "{} directories, {} files",
-            result.dir_count, result.file_count
-        );
+        println!("{} directories, {} files", dir_count, file_count);
     }
     0
 }
@@ -571,62 +420,9 @@ fn cmd_view_file(
     };
 
     if json {
-        fn symbol_to_json(sym: &skeleton::SkeletonSymbol, include_children: bool) -> serde_json::Value {
-            let children = if include_children {
-                sym.children
-                    .iter()
-                    .map(|c| symbol_to_json(c, include_children))
-                    .collect::<Vec<_>>()
-            } else {
-                vec![]
-            };
-            serde_json::json!({
-                "name": sym.name,
-                "kind": sym.kind,
-                "signature": sym.signature,
-                "docstring": sym.docstring,
-                "start_line": sym.start_line,
-                "end_line": sym.end_line,
-                "children": children
-            })
-        }
-
-        let include_children = depth >= 2;
-        let symbols: Vec<_> = skeleton_result
-            .symbols
-            .iter()
-            .map(|s| symbol_to_json(s, include_children))
-            .collect();
-
-        let mut output = serde_json::json!({
-            "type": "file",
-            "path": file_path,
-            "line_count": content.lines().count(),
-            "symbols": symbols
-        });
-
-        if let Some(deps) = deps_result {
-            output["imports"] = serde_json::json!(deps.imports.iter().map(|i| {
-                serde_json::json!({
-                    "module": i.module,
-                    "names": i.names,
-                    "line": i.line
-                })
-            }).collect::<Vec<_>>());
-
-            if !deps.reexports.is_empty() {
-                output["reexports"] = serde_json::json!(deps.reexports.iter().map(|r| {
-                    serde_json::json!({
-                        "module": r.module,
-                        "names": r.names,
-                        "is_star": r.is_star,
-                        "line": r.line
-                    })
-                }).collect::<Vec<_>>());
-            }
-        }
-
-        println!("{}", output);
+        // Use ViewNode for consistent structured output
+        let view_node = skeleton_result.to_view_node();
+        println!("{}", serde_json::to_string(&view_node).unwrap());
     } else {
         println!("# {}", file_path);
         println!("Lines: {}", content.lines().count());
@@ -901,19 +697,9 @@ fn cmd_view_symbol(
 
             // Default: show skeleton (signature + docstring)
             if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "type": "symbol",
-                        "path": full_symbol_path,
-                        "name": sym.name,
-                        "kind": sym.kind,
-                        "signature": sym.signature,
-                        "docstring": sym.docstring,
-                        "start_line": sym.start_line,
-                        "end_line": sym.end_line
-                    })
-                );
+                // Use ViewNode for consistent structured output
+                let view_node = sym.to_view_node(&full_symbol_path);
+                println!("{}", serde_json::to_string(&view_node).unwrap());
             } else {
                 println!("# {} ({})", full_symbol_path, sym.kind);
                 if !sym.signature.is_empty() {
