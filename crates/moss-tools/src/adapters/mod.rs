@@ -14,6 +14,7 @@ mod prettier;
 mod ruff;
 mod rustfmt;
 mod tsc;
+mod tsgo;
 
 pub use biome::{BiomeFormat, BiomeLint};
 pub use clippy::Clippy;
@@ -24,6 +25,7 @@ pub use prettier::Prettier;
 pub use ruff::Ruff;
 pub use rustfmt::Rustfmt;
 pub use tsc::Tsc;
+pub use tsgo::Tsgo;
 
 use crate::Tool;
 
@@ -38,6 +40,7 @@ pub fn all_adapters() -> Vec<Box<dyn Tool>> {
         Box::new(BiomeLint::new()),
         Box::new(BiomeFormat::new()),
         Box::new(Prettier::new()),
+        Box::new(Tsgo::new()), // Native TypeScript (faster than tsc)
         Box::new(Tsc::new()),
         // Rust
         Box::new(Clippy::new()),

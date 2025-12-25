@@ -162,12 +162,17 @@ Current scaffold is TOML state machines. Needs design work:
 
 **Unified Linting Infrastructure (moss-tools):**
 - [x] Core: Tool trait, ToolRegistry, SARIF 2.1.0 output
-- [x] Adapters: ruff, oxlint, biome, prettier, tsc, clippy, rustfmt, gofmt, go-vet
+- [x] Adapters: ruff, oxlint, oxfmt, biome, prettier, tsc, tsgo, clippy, rustfmt, gofmt, go-vet
 - [x] CLI: `moss lint` with auto-detection, --fix, --sarif, --category filter
 - [x] Custom tools: .moss/tools.toml config, SARIF/JSON consumption
+- [x] Package manager cascade: pnpm exec, npx, pnpm dlx, global (JS); uv run, pipx run, global (Python)
 - [ ] More adapters: mypy, pyright, eslint, deno check, clangd, pylint
 - [ ] Integration: wire into `moss analyze` as unified check runner
 - [ ] Watch mode: run relevant linters on file changes
+
+**VS Code Extension (editors/vscode/):**
+- [ ] Update extension to be accurate (currently Python-only, needs broader language support)
+- [ ] Consider switching to @typescript/native-preview for faster TypeScript support
 
 **View Filtering:**
 - Filter out tests from views (--no-tests or --exclude=tests)
