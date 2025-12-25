@@ -1,6 +1,7 @@
 //! NuGet (.NET) ecosystem.
 
 use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Nuget;
@@ -27,6 +28,26 @@ impl Ecosystem for Nuget {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_nuget_info(&query.name)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        // packages.lock.json format:
+        // {"dependencies": {"net8.0": {"PackageName": {"resolved": "1.0.0", ...}}}}
+        let lockfile = project_root.join("packages.lock.json");
+        let content = std::fs::read_to_string(lockfile).ok()?;
+        let parsed: serde_json::Value = serde_json::from_str(&content).ok()?;
+
+        // Check all target frameworks
+        if let Some(deps) = parsed.get("dependencies").and_then(|d| d.as_object()) {
+            for (_, framework_deps) in deps {
+                if let Some(pkg) = framework_deps.get(package) {
+                    if let Some(v) = pkg.get("resolved").and_then(|v| v.as_str()) {
+                        return Some(v.to_string());
+                    }
+                }
+            }
+        }
+        None
     }
 }
 

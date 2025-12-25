@@ -1,6 +1,7 @@
 //! Cargo (Rust) ecosystem.
 
 use crate::{Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Cargo;
@@ -27,6 +28,21 @@ impl Ecosystem for Cargo {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_crates_io_info(query)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        let lockfile = project_root.join("Cargo.lock");
+        let content = std::fs::read_to_string(lockfile).ok()?;
+        let parsed: toml::Value = toml::from_str(&content).ok()?;
+
+        parsed
+            .get("package")?
+            .as_array()?
+            .iter()
+            .find(|pkg| pkg.get("name").and_then(|n| n.as_str()) == Some(package))
+            .and_then(|pkg| pkg.get("version"))
+            .and_then(|v| v.as_str())
+            .map(String::from)
     }
 }
 

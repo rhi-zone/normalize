@@ -1,6 +1,7 @@
 //! Nix ecosystem.
 
 use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Nix;
@@ -27,6 +28,12 @@ impl Ecosystem for Nix {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_nix_info(&query.name)
+    }
+
+    fn installed_version(&self, _package: &str, _project_root: &Path) -> Option<String> {
+        // flake.lock contains input revisions, not package versions
+        // Nix packages are pinned by nixpkgs revision, not individual versions
+        None
     }
 }
 

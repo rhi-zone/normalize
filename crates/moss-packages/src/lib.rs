@@ -144,6 +144,10 @@ pub trait Ecosystem: Send + Sync {
     /// If version is None, fetches latest.
     fn fetch_info(&self, query: &PackageQuery, tool: &str) -> Result<PackageInfo, PackageError>;
 
+    /// Look up installed version from lockfile.
+    /// Returns None if no lockfile or package not found.
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String>;
+
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {
         for tool in self.tools() {
@@ -171,11 +175,18 @@ pub trait Ecosystem: Send + Sync {
     /// Convenience method: detect tool and fetch info with caching.
     ///
     /// Accepts "package" or "package@version" format.
+    /// If no version specified, checks lockfile for installed version first.
     /// Strategy: try cache first if fresh, else network, cache on success, stale cache as fallback.
     fn query(&self, package: &str, project_root: &Path) -> Result<PackageInfo, PackageError> {
         use std::time::Duration;
 
-        let query = PackageQuery::parse(package);
+        let mut query = PackageQuery::parse(package);
+
+        // If no explicit version, check lockfile for installed version
+        if query.version.is_none() {
+            query.version = self.installed_version(&query.name, project_root);
+        }
+
         let tool = self.detect_tool(project_root).ok_or(PackageError::NoToolFound)?;
         let cache_key = query.cache_key();
         let cache_ttl = Duration::from_secs(24 * 60 * 60); // 24 hours

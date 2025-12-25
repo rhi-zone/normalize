@@ -1,6 +1,7 @@
 //! npm/yarn/pnpm (Node.js) ecosystem.
 
 use crate::{Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Npm;
@@ -53,6 +54,52 @@ impl Ecosystem for Npm {
             "bun" => fetch_npm_info(&query.name, "bun", &["pm", "view", &pkg_spec]),
             _ => Err(PackageError::ToolFailed(format!("unknown tool: {}", tool))),
         }
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        // Try package-lock.json first (most common)
+        let lockfile = project_root.join("package-lock.json");
+        if let Ok(content) = std::fs::read_to_string(&lockfile) {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
+                // v2/v3 format: packages["node_modules/pkg"]
+                if let Some(pkgs) = parsed.get("packages").and_then(|p| p.as_object()) {
+                    let key = format!("node_modules/{}", package);
+                    if let Some(pkg) = pkgs.get(&key) {
+                        if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
+                            return Some(v.to_string());
+                        }
+                    }
+                }
+                // v1 format: dependencies["pkg"]
+                if let Some(deps) = parsed.get("dependencies").and_then(|d| d.as_object()) {
+                    if let Some(pkg) = deps.get(package) {
+                        if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
+                            return Some(v.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Try yarn.lock (text format: "pkg@version": resolved "..." version "x.y.z")
+        let yarn_lock = project_root.join("yarn.lock");
+        if let Ok(content) = std::fs::read_to_string(yarn_lock) {
+            // Look for lines like: "react@^18.0.0":
+            // Followed by: version "18.2.0"
+            let mut in_package = false;
+            for line in content.lines() {
+                if line.starts_with(&format!("\"{}@", package)) || line.starts_with(&format!("{}@", package)) {
+                    in_package = true;
+                } else if in_package && line.trim().starts_with("version ") {
+                    let version = line.trim().strip_prefix("version ")?;
+                    return Some(version.trim_matches('"').to_string());
+                } else if !line.starts_with(' ') && !line.is_empty() {
+                    in_package = false;
+                }
+            }
+        }
+
+        None
     }
 }
 

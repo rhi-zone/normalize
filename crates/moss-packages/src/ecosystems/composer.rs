@@ -1,6 +1,7 @@
 //! Composer (PHP) ecosystem.
 
 use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Composer;
@@ -27,6 +28,24 @@ impl Ecosystem for Composer {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_packagist_info(&query.name)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        let lockfile = project_root.join("composer.lock");
+        let content = std::fs::read_to_string(lockfile).ok()?;
+        let parsed: serde_json::Value = serde_json::from_str(&content).ok()?;
+
+        // Check both packages and packages-dev
+        for key in ["packages", "packages-dev"] {
+            if let Some(pkgs) = parsed.get(key).and_then(|p| p.as_array()) {
+                for pkg in pkgs {
+                    if pkg.get("name").and_then(|n| n.as_str()) == Some(package) {
+                        return pkg.get("version").and_then(|v| v.as_str()).map(String::from);
+                    }
+                }
+            }
+        }
+        None
     }
 }
 

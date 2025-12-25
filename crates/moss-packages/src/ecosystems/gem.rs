@@ -1,6 +1,7 @@
 //! RubyGems ecosystem.
 
 use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Gem;
@@ -27,6 +28,29 @@ impl Ecosystem for Gem {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_rubygems_info(&query.name)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        // Gemfile.lock format:
+        //   specs:
+        //     rails (7.0.0)
+        let lockfile = project_root.join("Gemfile.lock");
+        let content = std::fs::read_to_string(lockfile).ok()?;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+            // Format: "gem_name (version)"
+            if let Some(rest) = trimmed.strip_prefix(package) {
+                if rest.starts_with(' ') || rest.starts_with('(') {
+                    if let Some(start) = rest.find('(') {
+                        if let Some(end) = rest.find(')') {
+                            return Some(rest[start + 1..end].to_string());
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 }
 

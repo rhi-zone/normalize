@@ -7,3 +7,4 @@ description = "Package registry queries for multiple ecosystems"
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+toml = "0.8"

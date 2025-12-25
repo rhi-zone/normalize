@@ -1,6 +1,7 @@
 //! Go modules ecosystem.
 
 use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Go;
@@ -27,6 +28,24 @@ impl Ecosystem for Go {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_go_proxy_info(&query.name)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        // Parse go.mod for require statements
+        let go_mod = project_root.join("go.mod");
+        let content = std::fs::read_to_string(go_mod).ok()?;
+
+        for line in content.lines() {
+            let line = line.trim();
+            // Format: module/path v1.2.3
+            if line.starts_with(package) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 && parts[0] == package {
+                    return Some(parts[1].to_string());
+                }
+            }
+        }
+        None
     }
 }
 

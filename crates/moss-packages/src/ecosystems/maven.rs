@@ -1,6 +1,7 @@
 //! Maven (Java) ecosystem.
 
 use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Maven;
@@ -33,6 +34,31 @@ impl Ecosystem for Maven {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_maven_info(&query.name)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        // gradle.lockfile format:
+        // group:artifact:version=hash
+        let lockfile = project_root.join("gradle.lockfile");
+        let content = std::fs::read_to_string(lockfile).ok()?;
+
+        // Package can be "group:artifact" or just "artifact"
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            // Format: group:artifact:version=hash
+            let coord = line.split('=').next()?;
+            let parts: Vec<&str> = coord.split(':').collect();
+            if parts.len() >= 3 {
+                let coord_str = format!("{}:{}", parts[0], parts[1]);
+                if coord_str == package || parts[1] == package {
+                    return Some(parts[2].to_string());
+                }
+            }
+        }
+        None
     }
 }
 

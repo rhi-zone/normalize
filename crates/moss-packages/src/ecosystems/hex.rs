@@ -1,6 +1,7 @@
 //! Hex (Elixir/Erlang) ecosystem.
 
 use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Hex;
@@ -27,6 +28,23 @@ impl Ecosystem for Hex {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_hex_info(&query.name)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        // mix.lock is Elixir term format:
+        //   "package_name": {:hex, :package_name, "1.2.3", ...}
+        let lockfile = project_root.join("mix.lock");
+        let content = std::fs::read_to_string(lockfile).ok()?;
+
+        // Simple text extraction: look for "package": {:hex, :package, "version"
+        let pattern = format!("\"{}\": {{:hex, :{}, \"", package, package);
+        if let Some(start) = content.find(&pattern) {
+            let after = &content[start + pattern.len()..];
+            if let Some(end) = after.find('"') {
+                return Some(after[..end].to_string());
+            }
+        }
+        None
     }
 }
 

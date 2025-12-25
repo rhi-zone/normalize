@@ -1,6 +1,7 @@
 //! Python (pip/uv/poetry) ecosystem.
 
 use crate::{Dependency, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery};
+use std::path::Path;
 use std::process::Command;
 
 pub struct Python;
@@ -41,6 +42,70 @@ impl Ecosystem for Python {
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
         fetch_pypi_info(query)
+    }
+
+    fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
+        // Normalize package name (PEP 503: lowercase, replace - and . with _)
+        let normalized = package.to_lowercase().replace(['-', '.'], "_");
+
+        // Try uv.lock (TOML format)
+        let uv_lock = project_root.join("uv.lock");
+        if let Ok(content) = std::fs::read_to_string(&uv_lock) {
+            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
+                if let Some(packages) = parsed.get("package").and_then(|p| p.as_array()) {
+                    for pkg in packages {
+                        let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                        let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
+                        if name_normalized == normalized {
+                            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
+                                return Some(v.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Try poetry.lock (TOML format)
+        let poetry_lock = project_root.join("poetry.lock");
+        if let Ok(content) = std::fs::read_to_string(&poetry_lock) {
+            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
+                if let Some(packages) = parsed.get("package").and_then(|p| p.as_array()) {
+                    for pkg in packages {
+                        let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                        let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
+                        if name_normalized == normalized {
+                            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
+                                return Some(v.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Try Pipfile.lock (JSON format)
+        let pipfile_lock = project_root.join("Pipfile.lock");
+        if let Ok(content) = std::fs::read_to_string(pipfile_lock) {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
+                // Check default and develop sections
+                for section in ["default", "develop"] {
+                    if let Some(deps) = parsed.get(section).and_then(|s| s.as_object()) {
+                        for (name, info) in deps {
+                            let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
+                            if name_normalized == normalized {
+                                if let Some(v) = info.get("version").and_then(|v| v.as_str()) {
+                                    // Strip "==" prefix
+                                    return Some(v.strip_prefix("==").unwrap_or(v).to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
     }
 }
 
