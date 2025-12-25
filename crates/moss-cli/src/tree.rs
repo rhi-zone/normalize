@@ -128,6 +128,10 @@ pub struct FormatOptions {
     pub docstrings: bool,
     /// Maximum depth to display (None = unlimited).
     pub max_depth: Option<usize>,
+    /// Show line numbers for symbols.
+    pub line_numbers: bool,
+    /// Skip the root node and only show children (useful for file views).
+    pub skip_root: bool,
 }
 
 /// Format a ViewNode as text output.
@@ -136,8 +140,32 @@ pub struct FormatOptions {
 pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String> {
     let mut lines = Vec::new();
 
-    // Root line: name with optional signature
-    let root_line = match &node.kind {
+    if !options.skip_root {
+        // Root line: name with optional signature and line numbers
+        let root_line = format_node_line(node, options);
+        lines.push(root_line);
+
+        // Add docstring if requested
+        if options.docstrings {
+            if let Some(doc) = &node.docstring {
+                let first_line = doc.lines().next().unwrap_or("").trim();
+                if !first_line.is_empty() && !is_useless_docstring(&node.name, first_line) {
+                    lines.push(format!("    \"\"\"{}\"\"\"", first_line));
+                }
+            }
+        }
+    }
+
+    // Render children
+    let prefix = if options.skip_root { "" } else { "" };
+    format_children(&node.children, prefix, &mut lines, options, 0);
+
+    lines
+}
+
+/// Format a single node line with optional line numbers.
+fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
+    let base = match &node.kind {
         ViewNodeKind::Symbol(_) => {
             if let Some(sig) = &node.signature {
                 format!("{}:", sig)
@@ -147,22 +175,37 @@ pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String>
         }
         _ => node.name.clone(),
     };
-    lines.push(root_line);
 
-    // Add docstring if requested
-    if options.docstrings {
-        if let Some(doc) = &node.docstring {
-            let first_line = doc.lines().next().unwrap_or("").trim();
-            if !first_line.is_empty() {
-                lines.push(format!("    \"\"\"{}\"\"\"", first_line));
-            }
+    // Add line info for symbols if requested
+    if options.line_numbers {
+        if let Some((start, end)) = node.line_range {
+            let size = end.saturating_sub(start) + 1;
+            return format!("{} L{}-{} ({} lines)", base, start, end, size);
         }
     }
 
-    // Render children
-    format_children(&node.children, "", &mut lines, options, 0);
+    base
+}
 
-    lines
+/// Check if a docstring is useless (just repeats the name).
+fn is_useless_docstring(name: &str, doc_line: &str) -> bool {
+    let doc_lower = doc_line.to_lowercase();
+    let name_lower = name.to_lowercase();
+
+    // Docstring is just the name, optionally with "function" or "class" etc.
+    if doc_lower == name_lower
+        || doc_lower == format!("{} function", name_lower)
+        || doc_lower == format!("{} method", name_lower)
+        || doc_lower == format!("{} class", name_lower)
+        || doc_lower == format!("the {} function", name_lower)
+        || doc_lower == format!("the {} method", name_lower)
+        || doc_lower == format!("a {} function", name_lower)
+    {
+        return true;
+    }
+
+    // Very short and starts with the name
+    doc_lower.len() < name_lower.len() + 10 && doc_lower.starts_with(&name_lower)
 }
 
 fn format_children(
@@ -185,25 +228,15 @@ fn format_children(
         let connector = if is_last { "└── " } else { "├── " };
         let child_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
 
-        // Format child line based on kind
-        let child_line = match &child.kind {
-            ViewNodeKind::Directory | ViewNodeKind::File => child.name.clone(),
-            ViewNodeKind::Symbol(_) => {
-                if let Some(sig) = &child.signature {
-                    format!("{}:", sig)
-                } else {
-                    format!("{}:", child.name)
-                }
-            }
-        };
-
+        // Format child line using shared formatter
+        let child_line = format_node_line(child, options);
         lines.push(format!("{}{}{}", prefix, connector, child_line));
 
         // Add docstring if requested (for symbols)
         if options.docstrings {
             if let Some(doc) = &child.docstring {
                 let first_line = doc.lines().next().unwrap_or("").trim();
-                if !first_line.is_empty() {
+                if !first_line.is_empty() && !is_useless_docstring(&child.name, first_line) {
                     lines.push(format!("{}    \"\"\"{}\"\"\"", child_prefix, first_line));
                 }
             }
@@ -543,6 +576,7 @@ mod tests {
                 max_depth: Some(2),
                 collapse_single: false,
                 boilerplate_dirs: HashSet::new(),
+                include_symbols: false,
             },
         );
 

@@ -486,11 +486,20 @@ fn cmd_view_file(
 
         // Only show symbols if not in deps-only mode
         if depth >= 1 && !show_deps {
-            // Always include docstrings (was: depth >= 2)
-            let formatted = skeleton_result.format(true);
-            if !formatted.is_empty() {
+            // Use ViewNode for consistent formatting
+            let view_node = skeleton_result.to_view_node();
+            let format_options = FormatOptions {
+                docstrings: true,
+                line_numbers: true,
+                skip_root: true, // Skip file header, we already printed it
+                max_depth: None,
+            };
+            let lines = tree::format_view_node(&view_node, &format_options);
+            if !lines.is_empty() {
                 println!("\n## Symbols");
-                println!("{}", formatted);
+                for line in lines {
+                    println!("{}", line);
+                }
             }
         }
 
@@ -531,10 +540,19 @@ fn cmd_view_file(
                             import_skeleton
                         };
 
-                        let formatted = import_skeleton.format(false);
-                        if !formatted.is_empty() {
+                        let view_node = import_skeleton.to_view_node();
+                        let format_options = FormatOptions {
+                            docstrings: false,
+                            line_numbers: true,
+                            skip_root: true,
+                            max_depth: None,
+                        };
+                        let lines = tree::format_view_node(&view_node, &format_options);
+                        if !lines.is_empty() {
                             println!("\n### {} ({})", module_name, display);
-                            println!("{}", formatted);
+                            for line in lines {
+                                println!("{}", line);
+                            }
                         }
 
                         // Check for barrel file re-exports and follow them
@@ -553,8 +571,15 @@ fn cmd_view_file(
                                         reexp_skeleton
                                     };
 
-                                    let formatted = reexp_skeleton.format(false);
-                                    if !formatted.is_empty() {
+                                    let view_node = reexp_skeleton.to_view_node();
+                                    let format_options = FormatOptions {
+                                        docstrings: false,
+                                        line_numbers: true,
+                                        skip_root: true,
+                                        max_depth: None,
+                                    };
+                                    let lines = tree::format_view_node(&view_node, &format_options);
+                                    if !lines.is_empty() {
                                         let reexp_display = reexp_path
                                             .strip_prefix(root)
                                             .map(|p| p.display().to_string())
@@ -572,7 +597,9 @@ fn cmd_view_file(
                                             "\n### {} → {} ({})",
                                             module_name, export_desc, reexp_display
                                         );
-                                        println!("{}", formatted);
+                                        for line in lines {
+                                            println!("{}", line);
+                                        }
                                     }
                                 }
                             }
@@ -725,18 +752,23 @@ fn cmd_view_symbol(
                 return 0;
             }
 
-            // Default: show skeleton (signature + docstring)
+            // Default: show skeleton (signature + docstring + children)
+            let view_node = sym.to_view_node(&full_symbol_path);
             if json {
                 // Use ViewNode for consistent structured output
-                let view_node = sym.to_view_node(&full_symbol_path);
                 println!("{}", serde_json::to_string(&view_node).unwrap());
             } else {
+                // Use ViewNode for consistent text formatting
                 println!("# {} ({})", full_symbol_path, sym.kind);
-                if !sym.signature.is_empty() {
-                    println!("{}", sym.signature);
-                }
-                if let Some(doc) = &sym.docstring {
-                    println!("\n{}", doc);
+                let format_options = FormatOptions {
+                    docstrings: true,
+                    line_numbers: true,
+                    skip_root: false,
+                    max_depth: None,
+                };
+                let lines = tree::format_view_node(&view_node, &format_options);
+                for line in lines {
+                    println!("{}", line);
                 }
             }
             0
