@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 1. Command/subcommand/flag names should be self-documenting
 
-Test Status: 107 passing, 0 failing (moss-languages)
+Test Status: 110 passing, 0 failing (moss-languages)
 
 ## Python → Rust Migration
 
