@@ -51,14 +51,42 @@ Derived CLAUDE.md design principles from correction pattern analysis:
 - "Simplicity over cleverness" - stdlib > dependencies
 - "When stuck, reconsider the problem" - not just try more solutions
 
-### Kotlin Language Support (Phase 5)
+### Phase 5 Language Support
 
-Added full Kotlin language support:
+Added 5 new languages with full Language trait implementations:
+
+**Kotlin:**
 - AST parsing for classes, objects, interfaces, functions, type aliases
 - KDoc comment extraction
 - Visibility detection (public/private/protected/internal)
 - Import resolution via Maven/Gradle (shared infrastructure with Java)
 - Extensions: `.kt`, `.kts`
+
+**C#:**
+- Classes, structs, interfaces, records, namespaces
+- XML doc comment extraction with tag stripping
+- NuGet cache detection hints
+- Extensions: `.cs`
+
+**Swift:**
+- Classes, structs, protocols, enums, actors
+- Swift doc comment extraction
+- Swift Package Manager version detection
+- Extensions: `.swift`
+
+**PHP:**
+- Classes, interfaces, traits, enums, namespaces
+- PHPDoc comment extraction
+- PSR-4 path resolution hints, Composer integration
+- Extensions: `.php`, `.phtml`
+
+**Dockerfile:**
+- FROM stage extraction as containers
+- Image name and stage alias parsing
+- Simplified implementation for infrastructure files
+- Extensions: `.dockerfile`
+
+Total languages now supported: 24
 
 ### Tree View (additional improvements)
 

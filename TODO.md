@@ -4,8 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Phase 5: Add new language support (start with Kotlin or C#)
 - Investigate slow `moss analyze --health` (+500ms over baseline)
+- Phase 5: Continue adding languages (Dart, F#, Elixir, etc.)
 
 Test Status: 74 passing, 0 failing
 
@@ -17,12 +17,15 @@ Phase 1-4: ✅ Complete (scaffold, port, integrate, remove trait defaults)
 
 Phase 5 - Expand (new languages):
 - [x] Kotlin (mobile) - full Language trait impl, Maven/Gradle resolution
-- [ ] Swift, Dart (mobile)
-- [ ] C#, F# (.NET)
-- [ ] PHP, Elixir, Erlang (backends)
+- [x] C# (.NET) - classes, structs, interfaces, records, XML docs, NuGet hints
+- [x] Swift (mobile) - classes, structs, protocols, enums, actors, SPM hints
+- [x] PHP (backend) - PSR-4 paths, PHPDoc, Composer integration
+- [x] Dockerfile (infra) - FROM stage extraction, image/alias parsing
+- [ ] Dart (mobile), F# (.NET)
+- [ ] Elixir, Erlang (backends)
 - [ ] Zig, Lua (systems/gamedev)
 - [ ] SQL, GraphQL (data)
-- [ ] Dockerfile, HCL (infra)
+- [ ] HCL (infra)
 - [ ] Svelte, SCSS (frontend)
 
 **CLI Redundancy:** See `docs/llm-code-consistency.md` for full analysis. Key actions:
