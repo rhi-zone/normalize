@@ -1,12 +1,11 @@
 //! Workflow configuration and TOML parsing.
 
-use serde::Deserialize;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
 /// Top-level workflow configuration from TOML.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WorkflowConfig {
     pub workflow: WorkflowMetadata,
     #[serde(default)]
@@ -16,7 +15,7 @@ pub struct WorkflowConfig {
 }
 
 /// Workflow metadata section.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WorkflowMetadata {
     pub name: String,
     #[serde(default)]
@@ -38,7 +37,7 @@ pub struct WorkflowMetadata {
 }
 
 /// Workflow execution limits.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct WorkflowLimits {
     #[serde(default = "default_max_turns")]
     pub max_turns: usize,
@@ -51,7 +50,7 @@ fn default_max_turns() -> usize {
 }
 
 /// Context management strategy configuration.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ContextConfig {
     #[serde(default = "default_context_strategy")]
     pub strategy: String,
@@ -62,7 +61,7 @@ fn default_context_strategy() -> String {
 }
 
 /// Cache strategy configuration.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct CacheConfig {
     #[serde(default = "default_cache_strategy")]
     pub strategy: String,
@@ -75,7 +74,7 @@ fn default_cache_strategy() -> String {
 }
 
 /// Retry strategy configuration.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct RetryConfig {
     #[serde(default = "default_retry_strategy")]
     pub strategy: String,
@@ -100,7 +99,7 @@ fn default_base_delay() -> f64 {
 }
 
 /// LLM configuration (optional).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LlmConfig {
     #[serde(default = "default_llm_strategy")]
     pub strategy: String,
@@ -117,7 +116,7 @@ fn default_llm_strategy() -> String {
 }
 
 /// A step in a step-based workflow.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WorkflowStep {
     pub name: String,
     pub action: String,
@@ -128,7 +127,7 @@ pub struct WorkflowStep {
 }
 
 /// A state in a state machine workflow.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WorkflowState {
     pub name: String,
     #[serde(default)]
@@ -142,7 +141,7 @@ pub struct WorkflowState {
 }
 
 /// A transition between states.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Transition {
     #[serde(default)]
     pub condition: Option<String>,
@@ -151,7 +150,7 @@ pub struct Transition {
 }
 
 /// A parallel action within a state.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ParallelAction {
     pub name: String,
     pub action: String,

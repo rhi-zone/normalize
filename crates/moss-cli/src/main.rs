@@ -301,6 +301,16 @@ enum Commands {
         #[arg(short, long, global = true)]
         root: Option<PathBuf>,
     },
+
+    /// Run TOML-defined workflows
+    Workflow {
+        #[command(subcommand)]
+        action: commands::workflow::WorkflowAction,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long, global = true)]
+        root: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -451,6 +461,9 @@ fn main() {
             root.as_deref(),
             cli.json,
         ),
+        Commands::Workflow { action, root } => {
+            commands::workflow::cmd_workflow(action, root.as_deref(), cli.json)
+        }
     };
 
     std::process::exit(exit_code);

@@ -16,6 +16,9 @@ default = ["all-languages"]
 all-languages = ["moss-languages/all-languages"]
 tier1 = ["moss-languages/tier1"]
 
+# Optional LLM support for workflows
+llm = ["rig-core"]
+
 # Individual languages
 lang-python = ["moss-languages/lang-python"]
 lang-rust = ["moss-languages/lang-rust"]
@@ -63,6 +66,7 @@ jaq-core = "2"
 jaq-std = "2"
 jaq-json = { version = "1", features = ["serde_json"] }
 toml = "0.8"
+rig-core = { version = "0.27", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

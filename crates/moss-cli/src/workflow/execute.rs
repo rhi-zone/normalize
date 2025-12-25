@@ -235,8 +235,12 @@ fn execute_action(action: &str, root: &Path) -> Result<String, String> {
         return Err("Empty action".to_string());
     }
 
+    // Use current executable for moss commands
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("Failed to get current executable: {}", e))?;
+
     // Build moss command
-    let output = Command::new("moss")
+    let output = Command::new(&current_exe)
         .args(&parts)
         .current_dir(root)
         .output()
