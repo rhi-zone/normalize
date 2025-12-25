@@ -23,12 +23,12 @@ Goal: Delete `packages/` entirely. Single Rust binary, no Python dependency.
 Each command: port, redesign, or delete?
 
 Core (port to Rust):
-- [ ] `cmd_workflow` - TOML state machine engine, orchestrates primitives
+- [x] `cmd_workflow` - TOML state machine engine, ported to Rust (list/run/show/new)
 - LLM lives in workflow engine, not primitives. Primitives stay deterministic:
   - `view` - no LLM
   - `edit` - structural/AST only, no LLM
   - `analyze` - no LLM
-- `cmd_agent` = `moss workflow run dwim`, not a separate command
+- `cmd_agent` = `moss workflow run dwim`, not a separate command (use Rust workflow)
 
 Servers (port to Rust):
 - [x] `moss serve {mcp,http,lsp}` - command structure added
