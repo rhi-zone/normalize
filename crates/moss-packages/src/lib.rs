@@ -11,13 +11,14 @@
 //!
 //! // Detect ecosystem from project files
 //! if let Some(ecosystem) = detect_ecosystem(Path::new(".")) {
-//!     // Query package info
-//!     if let Ok(info) = ecosystem.fetch_info("serde") {
+//!     // Query package info (with offline cache)
+//!     if let Ok(info) = ecosystem.query("serde", Path::new(".")) {
 //!         println!("{}: {}", info.name, info.version);
 //!     }
 //! }
 //! ```
 
+mod cache;
 pub mod ecosystems;
 
 use serde::{Deserialize, Serialize};
@@ -134,10 +135,35 @@ pub trait Ecosystem: Send + Sync {
         self.find_tool()
     }
 
-    /// Convenience method: detect tool and fetch info.
+    /// Convenience method: detect tool and fetch info with caching.
+    ///
+    /// Strategy: try network first, cache on success, fall back to cache if network fails.
+    /// Cache expires after 24 hours for fresh data, but stale cache is used for offline.
     fn query(&self, package: &str, project_root: &Path) -> Result<PackageInfo, PackageError> {
+        use std::time::Duration;
+
         let tool = self.detect_tool(project_root).ok_or(PackageError::NoToolFound)?;
-        self.fetch_info(package, tool)
+        let cache_ttl = Duration::from_secs(24 * 60 * 60); // 24 hours
+
+        // Check fresh cache first (avoid network if recently cached)
+        if let Some(cached) = cache::read(self.name(), package, cache_ttl) {
+            return Ok(cached);
+        }
+
+        // Try network
+        match self.fetch_info(package, tool) {
+            Ok(info) => {
+                cache::write(self.name(), package, &info);
+                Ok(info)
+            }
+            Err(e) => {
+                // Network failed - try stale cache
+                if let Some(cached) = cache::read_any(self.name(), package) {
+                    return Ok(cached);
+                }
+                Err(e)
+            }
+        }
     }
 }
 
