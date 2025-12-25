@@ -68,10 +68,13 @@ Consolidate to subcommands:
 - [x] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}` (deleted from Python CLI)
 - [x] `cmd_mcp_server` / `cmd_acp_server` / `cmd_lsp` → `moss serve {mcp,http,lsp}` (deleted from Python CLI)
 
-**Phase 3: Delete Python**
-- [ ] Remove `packages/` directory
-- [ ] Remove Python-related CI/tooling
-- [ ] Update installation docs
+**Phase 3: Delete Python** ✓
+- [x] Remove `packages/` directory (~75k lines)
+- [x] Remove tests/, examples/, scripts/*.py (~30k lines)
+- [x] Remove pyproject.toml, uv.lock, StyleGuide.py
+- [x] Update flake.nix (remove python313, uv, ruff)
+- [x] Update pre-commit hook (Rust-only)
+- [ ] Update installation docs (README, etc.)
 
 **Python Package Inventory (pre-deletion reference):**
 
