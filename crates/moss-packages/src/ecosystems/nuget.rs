@@ -49,6 +49,48 @@ impl Ecosystem for Nuget {
         }
         None
     }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        // Look for .csproj files and parse PackageReference elements
+        let entries = std::fs::read_dir(project_root)
+            .map_err(|e| PackageError::ParseError(format!("failed to read directory: {}", e)))?;
+
+        let mut deps = Vec::new();
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(ext) = path.extension() {
+                if ext == "csproj" || ext == "fsproj" || ext == "vbproj" {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        // Parse <PackageReference Include="Name" Version="1.0" />
+                        for line in content.lines() {
+                            if line.contains("PackageReference") {
+                                if let Some(include_start) = line.find("Include=\"") {
+                                    let after = &line[include_start + 9..];
+                                    if let Some(include_end) = after.find('"') {
+                                        let name = after[..include_end].to_string();
+                                        let version_req = if let Some(ver_start) = line.find("Version=\"") {
+                                            let ver_after = &line[ver_start + 9..];
+                                            ver_after.find('"').map(|end| ver_after[..end].to_string())
+                                        } else {
+                                            None
+                                        };
+                                        deps.push(Dependency {
+                                            name,
+                                            version_req,
+                                            optional: false,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(deps)
+    }
 }
 
 fn fetch_nuget_info(package: &str) -> Result<PackageInfo, PackageError> {

@@ -1,6 +1,6 @@
 //! Maven (Java) ecosystem.
 
-use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::path::Path;
 use std::process::Command;
 
@@ -60,6 +60,124 @@ impl Ecosystem for Maven {
         }
         None
     }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        // Try pom.xml first
+        let pom = project_root.join("pom.xml");
+        if let Ok(content) = std::fs::read_to_string(&pom) {
+            return parse_pom_dependencies(&content);
+        }
+
+        // Try build.gradle or build.gradle.kts
+        for gradle_file in ["build.gradle", "build.gradle.kts"] {
+            let gradle = project_root.join(gradle_file);
+            if let Ok(content) = std::fs::read_to_string(&gradle) {
+                return parse_gradle_dependencies(&content);
+            }
+        }
+
+        Err(PackageError::ParseError("no manifest found".to_string()))
+    }
+}
+
+fn parse_pom_dependencies(content: &str) -> Result<Vec<Dependency>, PackageError> {
+    let mut deps = Vec::new();
+
+    // Simple XML parsing: <dependency><groupId>...</groupId><artifactId>...</artifactId><version>...</version></dependency>
+    let mut in_dependency = false;
+    let mut group_id = String::new();
+    let mut artifact_id = String::new();
+    let mut version = String::new();
+    let mut optional = false;
+
+    for line in content.lines() {
+        let line = line.trim();
+
+        if line.contains("<dependency>") {
+            in_dependency = true;
+            group_id.clear();
+            artifact_id.clear();
+            version.clear();
+            optional = false;
+        } else if line.contains("</dependency>") {
+            if in_dependency && !artifact_id.is_empty() {
+                deps.push(Dependency {
+                    name: if group_id.is_empty() {
+                        artifact_id.clone()
+                    } else {
+                        format!("{}:{}", group_id, artifact_id)
+                    },
+                    version_req: if version.is_empty() { None } else { Some(version.clone()) },
+                    optional,
+                });
+            }
+            in_dependency = false;
+        } else if in_dependency {
+            if let Some(val) = extract_xml_value(line, "groupId") {
+                group_id = val;
+            } else if let Some(val) = extract_xml_value(line, "artifactId") {
+                artifact_id = val;
+            } else if let Some(val) = extract_xml_value(line, "version") {
+                version = val;
+            } else if line.contains("<optional>true</optional>") {
+                optional = true;
+            }
+        }
+    }
+
+    Ok(deps)
+}
+
+fn extract_xml_value(line: &str, tag: &str) -> Option<String> {
+    let start_tag = format!("<{}>", tag);
+    let end_tag = format!("</{}>", tag);
+
+    if let Some(start) = line.find(&start_tag) {
+        let content_start = start + start_tag.len();
+        if let Some(end) = line.find(&end_tag) {
+            return Some(line[content_start..end].to_string());
+        }
+    }
+    None
+}
+
+fn parse_gradle_dependencies(content: &str) -> Result<Vec<Dependency>, PackageError> {
+    let mut deps = Vec::new();
+
+    // Parse implementation 'group:artifact:version' or implementation("group:artifact:version")
+    for line in content.lines() {
+        let line = line.trim();
+
+        // Check for dependency declarations
+        for prefix in ["implementation", "api", "compileOnly", "runtimeOnly", "testImplementation"] {
+            if line.starts_with(prefix) {
+                // Extract the dependency string from quotes
+                let after = &line[prefix.len()..];
+                let dep_str = if let Some(start) = after.find('"') {
+                    let rest = &after[start + 1..];
+                    rest.find('"').map(|end| &rest[..end])
+                } else if let Some(start) = after.find('\'') {
+                    let rest = &after[start + 1..];
+                    rest.find('\'').map(|end| &rest[..end])
+                } else {
+                    None
+                };
+
+                if let Some(dep) = dep_str {
+                    let parts: Vec<&str> = dep.split(':').collect();
+                    if parts.len() >= 2 {
+                        deps.push(Dependency {
+                            name: format!("{}:{}", parts[0], parts[1]),
+                            version_req: parts.get(2).map(|s| s.to_string()),
+                            optional: prefix == "compileOnly" || prefix == "testImplementation",
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(deps)
 }
 
 fn fetch_maven_info(package: &str) -> Result<PackageInfo, PackageError> {

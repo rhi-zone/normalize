@@ -1,6 +1,6 @@
 //! Cargo (Rust) ecosystem.
 
-use crate::{Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery};
+use crate::{Dependency, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery};
 use std::path::Path;
 use std::process::Command;
 
@@ -43,6 +43,69 @@ impl Ecosystem for Cargo {
             .and_then(|pkg| pkg.get("version"))
             .and_then(|v| v.as_str())
             .map(String::from)
+    }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        let manifest = project_root.join("Cargo.toml");
+        let content = std::fs::read_to_string(&manifest)
+            .map_err(|e| PackageError::ParseError(format!("failed to read Cargo.toml: {}", e)))?;
+        let parsed: toml::Value = toml::from_str(&content)
+            .map_err(|e| PackageError::ParseError(format!("invalid TOML: {}", e)))?;
+
+        let mut deps = Vec::new();
+
+        // Parse [dependencies]
+        if let Some(table) = parsed.get("dependencies").and_then(|d| d.as_table()) {
+            for (name, value) in table {
+                deps.push(parse_cargo_dep(name, value, false));
+            }
+        }
+
+        // Parse [dev-dependencies]
+        if let Some(table) = parsed.get("dev-dependencies").and_then(|d| d.as_table()) {
+            for (name, value) in table {
+                deps.push(parse_cargo_dep(name, value, false));
+            }
+        }
+
+        // Parse [build-dependencies]
+        if let Some(table) = parsed.get("build-dependencies").and_then(|d| d.as_table()) {
+            for (name, value) in table {
+                deps.push(parse_cargo_dep(name, value, false));
+            }
+        }
+
+        Ok(deps)
+    }
+}
+
+fn parse_cargo_dep(name: &str, value: &toml::Value, optional: bool) -> Dependency {
+    match value {
+        toml::Value::String(version) => Dependency {
+            name: name.to_string(),
+            version_req: Some(version.clone()),
+            optional,
+        },
+        toml::Value::Table(table) => {
+            let version = table
+                .get("version")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let opt = table
+                .get("optional")
+                .and_then(|o| o.as_bool())
+                .unwrap_or(optional);
+            Dependency {
+                name: name.to_string(),
+                version_req: version,
+                optional: opt,
+            }
+        }
+        _ => Dependency {
+            name: name.to_string(),
+            version_req: None,
+            optional,
+        },
     }
 }
 

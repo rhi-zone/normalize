@@ -1,6 +1,6 @@
 //! Nix ecosystem.
 
-use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::path::Path;
 use std::process::Command;
 
@@ -34,6 +34,44 @@ impl Ecosystem for Nix {
         // flake.lock contains input revisions, not package versions
         // Nix packages are pinned by nixpkgs revision, not individual versions
         None
+    }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        // Nix flake inputs from flake.nix
+        let flake = project_root.join("flake.nix");
+        if let Ok(content) = std::fs::read_to_string(&flake) {
+            let mut deps = Vec::new();
+
+            // Extract inputs: inputs.name.url = "github:..." or inputs = { name = {...} }
+            // Simple approach: look for github: or nixpkgs patterns
+            for line in content.lines() {
+                let line = line.trim();
+                if line.contains("github:") || line.contains("nixpkgs") {
+                    // Extract input name from patterns like: name.url = "..." or name = { url = "..." }
+                    if let Some(eq) = line.find('=') {
+                        let before = line[..eq].trim();
+                        let name = before.split('.').next().unwrap_or(before);
+                        if !name.is_empty() && !name.starts_with('#') && name != "url" {
+                            // Extract URL as version
+                            if let Some(start) = line.find('"') {
+                                let rest = &line[start + 1..];
+                                if let Some(end) = rest.find('"') {
+                                    deps.push(Dependency {
+                                        name: name.to_string(),
+                                        version_req: Some(rest[..end].to_string()),
+                                        optional: false,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return Ok(deps);
+        }
+
+        Err(PackageError::ParseError("no flake.nix found".to_string()))
     }
 }
 

@@ -1,6 +1,6 @@
 //! Go modules ecosystem.
 
-use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::path::Path;
 use std::process::Command;
 
@@ -46,6 +46,53 @@ impl Ecosystem for Go {
             }
         }
         None
+    }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        let go_mod = project_root.join("go.mod");
+        let content = std::fs::read_to_string(&go_mod)
+            .map_err(|e| PackageError::ParseError(format!("failed to read go.mod: {}", e)))?;
+
+        let mut deps = Vec::new();
+        let mut in_require_block = false;
+
+        for line in content.lines() {
+            let line = line.trim();
+
+            if line == "require (" {
+                in_require_block = true;
+                continue;
+            }
+            if line == ")" {
+                in_require_block = false;
+                continue;
+            }
+
+            // Single-line require: require module/path v1.2.3
+            if line.starts_with("require ") {
+                let rest = line.strip_prefix("require ").unwrap().trim();
+                if let Some((module, version)) = rest.split_once(' ') {
+                    deps.push(Dependency {
+                        name: module.to_string(),
+                        version_req: Some(version.to_string()),
+                        optional: false,
+                    });
+                }
+            } else if in_require_block && !line.is_empty() && !line.starts_with("//") {
+                // Inside require block: module/path v1.2.3
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let indirect = parts.len() > 2 && parts[2..].contains(&"//") && line.contains("indirect");
+                    deps.push(Dependency {
+                        name: parts[0].to_string(),
+                        version_req: Some(parts[1].to_string()),
+                        optional: indirect,
+                    });
+                }
+            }
+        }
+
+        Ok(deps)
     }
 }
 

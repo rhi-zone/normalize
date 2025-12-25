@@ -47,6 +47,41 @@ impl Ecosystem for Composer {
         }
         None
     }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        let manifest = project_root.join("composer.json");
+        let content = std::fs::read_to_string(&manifest)
+            .map_err(|e| PackageError::ParseError(format!("failed to read composer.json: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut deps = Vec::new();
+
+        if let Some(require) = parsed.get("require").and_then(|r| r.as_object()) {
+            for (name, version) in require {
+                if name == "php" || name.starts_with("ext-") {
+                    continue;
+                }
+                deps.push(Dependency {
+                    name: name.clone(),
+                    version_req: version.as_str().map(String::from),
+                    optional: false,
+                });
+            }
+        }
+
+        if let Some(require_dev) = parsed.get("require-dev").and_then(|r| r.as_object()) {
+            for (name, version) in require_dev {
+                deps.push(Dependency {
+                    name: name.clone(),
+                    version_req: version.as_str().map(String::from),
+                    optional: false,
+                });
+            }
+        }
+
+        Ok(deps)
+    }
 }
 
 fn fetch_packagist_info(package: &str) -> Result<PackageInfo, PackageError> {

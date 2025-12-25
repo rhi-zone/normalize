@@ -148,6 +148,9 @@ pub trait Ecosystem: Send + Sync {
     /// Returns None if no lockfile or package not found.
     fn installed_version(&self, package: &str, project_root: &Path) -> Option<String>;
 
+    /// List declared dependencies from manifest file.
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError>;
+
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {
         for tool in self.tools() {

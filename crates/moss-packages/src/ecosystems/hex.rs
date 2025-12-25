@@ -46,6 +46,42 @@ impl Ecosystem for Hex {
         }
         None
     }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        // mix.exs is Elixir code, we can extract deps from defp deps do [...] end
+        let mixfile = project_root.join("mix.exs");
+        let content = std::fs::read_to_string(&mixfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read mix.exs: {}", e)))?;
+
+        let mut deps = Vec::new();
+
+        // Simple pattern extraction: {:dep_name, "~> 1.0"} or {:dep_name, ">= 1.0"}
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with("{:") {
+                // Extract atom name after {:
+                if let Some(end) = line[2..].find(|c: char| c == ',' || c == '}') {
+                    let name = line[2..2 + end].to_string();
+                    // Try to find version string
+                    let rest = &line[2 + end..];
+                    let version_req = if let Some(start) = rest.find('"') {
+                        let ver_str = &rest[start + 1..];
+                        ver_str.find('"').map(|end| ver_str[..end].to_string())
+                    } else {
+                        None
+                    };
+                    let optional = rest.contains("optional: true");
+                    deps.push(Dependency {
+                        name,
+                        version_req,
+                        optional,
+                    });
+                }
+            }
+        }
+
+        Ok(deps)
+    }
 }
 
 fn fetch_hex_info(package: &str) -> Result<PackageInfo, PackageError> {

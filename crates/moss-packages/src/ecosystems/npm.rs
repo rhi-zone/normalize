@@ -101,6 +101,48 @@ impl Ecosystem for Npm {
 
         None
     }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, crate::PackageError> {
+        let manifest = project_root.join("package.json");
+        let content = std::fs::read_to_string(&manifest)
+            .map_err(|e| crate::PackageError::ParseError(format!("failed to read package.json: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| crate::PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+
+        let mut deps = Vec::new();
+
+        if let Some(d) = parsed.get("dependencies").and_then(|d| d.as_object()) {
+            for (name, version) in d {
+                deps.push(Dependency {
+                    name: name.clone(),
+                    version_req: version.as_str().map(String::from),
+                    optional: false,
+                });
+            }
+        }
+
+        if let Some(d) = parsed.get("devDependencies").and_then(|d| d.as_object()) {
+            for (name, version) in d {
+                deps.push(Dependency {
+                    name: name.clone(),
+                    version_req: version.as_str().map(String::from),
+                    optional: false,
+                });
+            }
+        }
+
+        if let Some(d) = parsed.get("optionalDependencies").and_then(|d| d.as_object()) {
+            for (name, version) in d {
+                deps.push(Dependency {
+                    name: name.clone(),
+                    version_req: version.as_str().map(String::from),
+                    optional: true,
+                });
+            }
+        }
+
+        Ok(deps)
+    }
 }
 
 fn fetch_npm_info(package: &str, tool: &str, args: &[&str]) -> Result<PackageInfo, PackageError> {

@@ -107,6 +107,78 @@ impl Ecosystem for Python {
 
         None
     }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<crate::Dependency>, PackageError> {
+        // Try pyproject.toml first
+        let pyproject = project_root.join("pyproject.toml");
+        if let Ok(content) = std::fs::read_to_string(&pyproject) {
+            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
+                let mut deps = Vec::new();
+
+                // PEP 621: [project.dependencies]
+                if let Some(project) = parsed.get("project") {
+                    if let Some(dependencies) = project.get("dependencies").and_then(|d| d.as_array()) {
+                        for dep in dependencies {
+                            if let Some(req) = dep.as_str().and_then(|s| parse_requirement(s)) {
+                                deps.push(req);
+                            }
+                        }
+                    }
+                    // Optional dependencies
+                    if let Some(optional) = project.get("optional-dependencies").and_then(|o| o.as_table()) {
+                        for (_group, group_deps) in optional {
+                            if let Some(arr) = group_deps.as_array() {
+                                for dep in arr {
+                                    if let Some(mut req) = dep.as_str().and_then(|s| parse_requirement(s)) {
+                                        req.optional = true;
+                                        deps.push(req);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Poetry: [tool.poetry.dependencies]
+                if let Some(poetry) = parsed.get("tool").and_then(|t| t.get("poetry")) {
+                    if let Some(dependencies) = poetry.get("dependencies").and_then(|d| d.as_table()) {
+                        for (name, value) in dependencies {
+                            if name == "python" {
+                                continue;
+                            }
+                            let version_req = match value {
+                                toml::Value::String(v) => Some(v.clone()),
+                                toml::Value::Table(t) => t.get("version").and_then(|v| v.as_str()).map(String::from),
+                                _ => None,
+                            };
+                            deps.push(crate::Dependency {
+                                name: name.clone(),
+                                version_req,
+                                optional: false,
+                            });
+                        }
+                    }
+                }
+
+                if !deps.is_empty() {
+                    return Ok(deps);
+                }
+            }
+        }
+
+        // Fallback: requirements.txt
+        let requirements = project_root.join("requirements.txt");
+        if let Ok(content) = std::fs::read_to_string(requirements) {
+            let deps: Vec<_> = content
+                .lines()
+                .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
+                .filter_map(parse_requirement)
+                .collect();
+            return Ok(deps);
+        }
+
+        Err(PackageError::ParseError("no manifest found".to_string()))
+    }
 }
 
 fn fetch_pypi_info(query: &PackageQuery) -> Result<PackageInfo, PackageError> {

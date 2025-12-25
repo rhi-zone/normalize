@@ -4,10 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Call graph bug: same-named method on different object shows as self-call
-- `moss package` subcommands: list, tree, outdated
 - view.rs internal cleanup (see CLI Surface Cleanup)
 - Single installation: maturin wheel with embedded Rust binary
+- `moss package tree`: dependency tree (requires resolving transitive deps)
 
 Test Status: 107 passing, 0 failing (moss-languages)
 

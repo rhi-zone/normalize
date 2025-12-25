@@ -1,6 +1,6 @@
 //! Conan (C++) ecosystem.
 
-use crate::{PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
 use std::path::Path;
 use std::process::Command;
 
@@ -49,6 +49,77 @@ impl Ecosystem for Conan {
             }
         }
         None
+    }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        // Parse conanfile.txt
+        let conanfile_txt = project_root.join("conanfile.txt");
+        if let Ok(content) = std::fs::read_to_string(&conanfile_txt) {
+            let mut deps = Vec::new();
+            let mut in_requires = false;
+
+            for line in content.lines() {
+                let line = line.trim();
+
+                if line == "[requires]" {
+                    in_requires = true;
+                    continue;
+                }
+                if line.starts_with('[') {
+                    in_requires = false;
+                    continue;
+                }
+
+                if in_requires && !line.is_empty() {
+                    // Format: pkg/version or pkg/version@user/channel
+                    if let Some((name, rest)) = line.split_once('/') {
+                        let version = rest.split('@').next().unwrap_or(rest);
+                        deps.push(Dependency {
+                            name: name.to_string(),
+                            version_req: Some(version.to_string()),
+                            optional: false,
+                        });
+                    }
+                }
+            }
+
+            return Ok(deps);
+        }
+
+        // Try conanfile.py (Python, harder to parse)
+        let conanfile_py = project_root.join("conanfile.py");
+        if let Ok(content) = std::fs::read_to_string(&conanfile_py) {
+            let mut deps = Vec::new();
+
+            // Look for requires = ["pkg/version", ...]
+            for line in content.lines() {
+                if line.contains("requires") || line.contains("self.requires(") {
+                    // Extract quoted strings
+                    let mut pos = 0;
+                    while let Some(start) = line[pos..].find('"') {
+                        let after = &line[pos + start + 1..];
+                        if let Some(end) = after.find('"') {
+                            let req = &after[..end];
+                            if let Some((name, rest)) = req.split_once('/') {
+                                let version = rest.split('@').next().unwrap_or(rest);
+                                deps.push(Dependency {
+                                    name: name.to_string(),
+                                    version_req: Some(version.to_string()),
+                                    optional: false,
+                                });
+                            }
+                            pos = pos + start + 2 + end;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return Ok(deps);
+        }
+
+        Err(PackageError::ParseError("no conanfile found".to_string()))
     }
 }
 

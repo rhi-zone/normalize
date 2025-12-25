@@ -52,6 +52,50 @@ impl Ecosystem for Gem {
         }
         None
     }
+
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
+        // Parse Gemfile (Ruby DSL, but we can extract simple patterns)
+        let gemfile = project_root.join("Gemfile");
+        let content = std::fs::read_to_string(&gemfile)
+            .map_err(|e| PackageError::ParseError(format!("failed to read Gemfile: {}", e)))?;
+
+        let mut deps = Vec::new();
+
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') || line.is_empty() {
+                continue;
+            }
+
+            // gem 'name' or gem 'name', 'version' or gem "name", "~> 1.0"
+            if line.starts_with("gem ") {
+                let rest = &line[4..];
+                // Extract gem name from quotes
+                let quote = rest.chars().next();
+                if quote == Some('\'') || quote == Some('"') {
+                    let q = quote.unwrap();
+                    if let Some(end) = rest[1..].find(q) {
+                        let name = rest[1..=end].to_string();
+                        // Try to find version after the gem name
+                        let after_name = &rest[end + 2..];
+                        let version_req = if let Some(start) = after_name.find(q) {
+                            let ver_str = &after_name[start + 1..];
+                            ver_str.find(q).map(|end| ver_str[..end].to_string())
+                        } else {
+                            None
+                        };
+                        deps.push(Dependency {
+                            name,
+                            version_req,
+                            optional: false,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(deps)
+    }
 }
 
 fn fetch_rubygems_info(package: &str) -> Result<PackageInfo, PackageError> {

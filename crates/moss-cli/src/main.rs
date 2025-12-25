@@ -285,17 +285,17 @@ enum Commands {
         limit: usize,
     },
 
-    /// Query package registry for package information
+    /// Package management: info, list, outdated
     Package {
-        /// Package name to query
-        package: String,
+        #[command(subcommand)]
+        action: commands::package::PackageAction,
 
         /// Force specific ecosystem (cargo, npm, python)
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         ecosystem: Option<String>,
 
         /// Root directory (defaults to current directory)
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         root: Option<PathBuf>,
     },
 }
@@ -439,11 +439,11 @@ fn main() {
             }
         }
         Commands::Package {
-            package,
+            action,
             ecosystem,
             root,
         } => commands::package::cmd_package(
-            &package,
+            action,
             ecosystem.as_deref(),
             root.as_deref(),
             cli.json,
