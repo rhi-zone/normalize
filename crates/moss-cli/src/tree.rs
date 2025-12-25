@@ -2,7 +2,9 @@
 //!
 //! Git-aware tree display using the `ignore` crate for gitignore support.
 
+use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
+use moss_languages::support_for_path;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -231,6 +233,8 @@ pub struct TreeOptions {
     pub collapse_single: bool,
     /// Directories that don't count against depth limit (smart depth)
     pub boilerplate_dirs: HashSet<String>,
+    /// Include symbols inside files (requires depth > 1)
+    pub include_symbols: bool,
 }
 
 impl Default for TreeOptions {
@@ -242,6 +246,7 @@ impl Default for TreeOptions {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
+            include_symbols: false,
         }
     }
 }
@@ -342,7 +347,7 @@ pub fn generate_view_tree(root: &Path, options: &TreeOptions) -> ViewNode {
     }
 
     // Convert internal tree to ViewNode
-    tree_node_to_view_node(&root_name, "", &tree, options)
+    tree_node_to_view_node(&root_name, "", &tree, options, root)
 }
 
 /// Convert internal TreeNode to ViewNode recursively.
@@ -351,6 +356,7 @@ fn tree_node_to_view_node(
     parent_path: &str,
     node: &InternalTreeNode,
     options: &TreeOptions,
+    fs_root: &Path,
 ) -> ViewNode {
     let path = if parent_path.is_empty() {
         name.to_string()
@@ -375,7 +381,7 @@ fn tree_node_to_view_node(
     });
 
     // Handle single-child chain collapsing
-    let (final_name, final_path, children) = if options.collapse_single && node.is_dir {
+    let (final_name, final_path, mut children) = if options.collapse_single && node.is_dir {
         let chain = collect_single_chain_internal(node, name);
         let collapsed_path = if parent_path.is_empty() {
             chain.path.clone()
@@ -388,7 +394,7 @@ fn tree_node_to_view_node(
             .children
             .iter()
             .map(|(child_name, child_node)| {
-                tree_node_to_view_node(child_name, &collapsed_path, child_node, options)
+                tree_node_to_view_node(child_name, &collapsed_path, child_node, options, fs_root)
             })
             .collect();
 
@@ -397,12 +403,21 @@ fn tree_node_to_view_node(
         let child_nodes: Vec<ViewNode> = children_vec
             .into_iter()
             .map(|(child_name, child_node)| {
-                tree_node_to_view_node(child_name, &path, child_node, options)
+                tree_node_to_view_node(child_name, &path, child_node, options, fs_root)
             })
             .collect();
 
         (name.to_string(), path, child_nodes)
     };
+
+    // For files, extract symbols if include_symbols is enabled
+    if !node.is_dir && options.include_symbols {
+        // Get the actual file path on disk
+        let file_path = fs_root.parent().unwrap_or(fs_root).join(&final_path);
+        if let Some(symbol_children) = extract_file_symbols(&file_path, &final_path) {
+            children = symbol_children;
+        }
+    }
 
     ViewNode {
         name: final_name,
@@ -412,6 +427,53 @@ fn tree_node_to_view_node(
         signature: None,
         docstring: None,
         line_range: None,
+    }
+}
+
+/// Extract symbols from a file and convert to ViewNodes.
+fn extract_file_symbols(file_path: &Path, view_path: &str) -> Option<Vec<ViewNode>> {
+    // Check if file has language support
+    let _support = support_for_path(file_path)?;
+
+    // Read file content
+    let content = std::fs::read_to_string(file_path).ok()?;
+
+    // Extract skeleton
+    let mut extractor = SkeletonExtractor::new();
+    let result = extractor.extract(file_path, &content);
+
+    if result.symbols.is_empty() {
+        return None;
+    }
+
+    // Convert to ViewNodes
+    let children: Vec<ViewNode> = result
+        .symbols
+        .iter()
+        .map(|sym| skeleton_to_view_node(sym, view_path))
+        .collect();
+
+    Some(children)
+}
+
+/// Convert a SkeletonSymbol to a ViewNode.
+fn skeleton_to_view_node(sym: &SkeletonSymbol, parent_path: &str) -> ViewNode {
+    let path = format!("{}/{}", parent_path, sym.name);
+
+    let children: Vec<ViewNode> = sym
+        .children
+        .iter()
+        .map(|child| skeleton_to_view_node(child, &path))
+        .collect();
+
+    ViewNode {
+        name: sym.name.clone(),
+        kind: ViewNodeKind::Symbol(sym.kind.to_string()),
+        path,
+        children,
+        signature: Some(sym.signature.clone()),
+        docstring: sym.docstring.clone(),
+        line_range: Some((sym.start_line, sym.end_line)),
     }
 }
 

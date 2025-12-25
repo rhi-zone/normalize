@@ -307,12 +307,16 @@ fn cmd_view_directory(dir: &Path, _root: &Path, depth: i32, raw: bool, json: boo
         Some(depth as usize)
     };
 
+    // Include symbols inside files when depth > 1
+    let include_symbols = depth > 1 || depth < 0;
+
     // Generate ViewNode tree
     let view_node = tree::generate_view_tree(
         dir,
         &tree::TreeOptions {
             max_depth: effective_depth,
             collapse_single: !raw,
+            include_symbols,
             ..Default::default()
         },
     );
