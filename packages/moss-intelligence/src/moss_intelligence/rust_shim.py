@@ -12,6 +12,7 @@ def find_rust_binary() -> Path | None:
     candidates = [
         # Development: relative to repo root (packages/moss-intelligence/src/moss_intelligence -> repo root)
         Path(__file__).parent.parent.parent.parent.parent / "target" / "release" / "moss",
+        Path(__file__).parent.parent.parent.parent.parent / "target" / "debug" / "moss",
         # Installed via cargo
         Path.home() / ".cargo" / "bin" / "moss-cli",
         # System PATH

@@ -37,6 +37,7 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 - Complete daemon integration (FileIndex API methods currently unused)
 - LSP refactor actions (rename symbol across files)
 - Cross-language reference tracking (Python ↔ Rust)
+- Single installation: Python + Rust CLI must install as a unit (maturin wheel with embedded binary)
 
 **Tooling:**
 - `moss package` subcommands: list, tree, outdated
@@ -57,6 +58,7 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 - Claude Code over-reliance on Explore agents: spawns agents for direct tool tasks. Symptom of deeper issue?
 - Session analysis: detect correction patterns ("You're right", "Good point", "Fair point", "Should have", "Right -", "isn't working")
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
+- Analyze long chains of uninterrupted tool calls (friction indicator)
 
 **Session Tooling:**
 - End-of-session summary workflow (.moss/workflows/session-summary.toml, no LLM):
