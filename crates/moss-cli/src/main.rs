@@ -249,6 +249,10 @@ enum Commands {
         /// Show git history hotspots (high churn + high complexity)
         #[arg(long)]
         hotspots: bool,
+
+        /// Check documentation references (broken links in docs)
+        #[arg(long)]
+        check_refs: bool,
     },
 
     /// Search for text patterns in files (fast ripgrep-based search)
@@ -498,6 +502,7 @@ fn main() {
             callers,
             lint,
             hotspots,
+            check_refs,
         } => commands::analyze::cmd_analyze(
             target.as_deref(),
             root.as_deref(),
@@ -513,6 +518,7 @@ fn main() {
             callers,
             lint,
             hotspots,
+            check_refs,
             cli.json,
         ),
         Commands::Grep {

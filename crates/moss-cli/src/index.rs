@@ -759,6 +759,15 @@ impl FileIndex {
         Ok(symbols)
     }
 
+    /// Get all distinct symbol names as a HashSet.
+    pub fn all_symbol_names(&self) -> rusqlite::Result<std::collections::HashSet<String>> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT name FROM symbols")?;
+        let names = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<std::collections::HashSet<_>, _>>()?;
+        Ok(names)
+    }
+
     /// Get complexity stats for a file (avg, max)
     pub fn file_complexity(&self, file: &str) -> rusqlite::Result<(f64, usize)> {
         let mut stmt = self.conn.prepare(
