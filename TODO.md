@@ -13,7 +13,7 @@ Test Status: 74 passing, 0 failing
 ## Backlog
 
 **Language Support:** Phase 1-5 complete. 35 languages supported.
-See `docs/language-support.md` for design. Future languages: OCaml, Haskell, Clojure, Nim, Crystal.
+See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` for remaining arborium grammars.
 
 **CLI Redundancy:** See `docs/llm-code-consistency.md`
 - [ ] Rust: OutputFormatter trait for JSON/text output
@@ -43,7 +43,7 @@ See `docs/language-support.md` for design. Future languages: OCaml, Haskell, Clo
 
 **Tooling:**
 - Avoid web search for Rust crate features: `cargo info <crate> --features` or similar offline lookup
-- Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (LLM text editing is lossy)
+- Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (Opus 4.5 drops TODO items when editing markdown)
 
 **View Filtering:**
 - Filter out tests from views (--no-tests or --exclude=tests)
