@@ -1,3 +1,4 @@
+use crate::config::MossConfig;
 use crate::paths::get_moss_dir;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -81,8 +82,8 @@ impl DaemonClient {
         self.query(&Request::Status).is_ok()
     }
 
-    /// Ensure daemon is running, starting it if necessary
-    /// Returns true if daemon is running (was running or was started)
+    /// Ensure daemon is running, starting it if necessary.
+    /// Returns true if daemon is running (was running or was started).
     pub fn ensure_running(&self) -> bool {
         if self.is_available() {
             return true;
@@ -91,6 +92,20 @@ impl DaemonClient {
         let _ = std::fs::remove_file(&self.socket_path);
         // Try to start daemon
         self.start_daemon().is_ok()
+    }
+
+    /// Ensure daemon is available based on config settings.
+    /// If daemon is enabled and auto_start is true, starts daemon if needed.
+    /// Returns true if daemon is available for queries.
+    pub fn ensure_available_with_config(&self, config: &MossConfig) -> bool {
+        if !config.daemon.enabled {
+            return false;
+        }
+        if config.daemon.auto_start {
+            self.ensure_running()
+        } else {
+            self.is_available()
+        }
     }
 
     fn start_daemon(&self) -> Result<(), String> {

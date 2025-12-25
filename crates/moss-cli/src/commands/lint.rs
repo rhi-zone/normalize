@@ -2,6 +2,7 @@
 
 use moss_tools::{registry_with_custom, SarifReport, ToolCategory, ToolRegistry};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use rayon::prelude::*;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
@@ -202,20 +203,21 @@ pub fn cmd_lint_list(root: Option<&Path>, json: bool) -> i32 {
 
     // Only check tools relevant to this codebase (detected via config files, lockfiles, etc.)
     // Use version() to infer availability - avoids duplicate process spawns
+    // Parallelize version checks since each spawns a subprocess
     let detected = registry.detect(root);
     let tools: Vec<_> = detected
-        .iter()
+        .par_iter()
         .map(|(t, _)| {
             let info = t.info();
             let version = t.version();
             let available = version.is_some();
             (
-                info.name,
-                info.category.as_str(),
+                info.name.to_string(),
+                info.category.as_str().to_string(),
                 available,
                 version,
                 info.extensions.join(", "),
-                info.website,
+                info.website.to_string(),
             )
         })
         .collect();
@@ -239,8 +241,8 @@ pub fn cmd_lint_list(root: Option<&Path>, json: bool) -> i32 {
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
         println!("Detected tools:\n");
-        for (name, category, available, version, extensions, website) in tools {
-            let status = if available { "✓" } else { "✗" };
+        for (name, category, available, version, extensions, website) in &tools {
+            let status = if *available { "✓" } else { "✗" };
             let ver = version.as_deref().unwrap_or("not installed");
             println!("  {} {} ({}) - {}", status, name, category, ver);
             println!("    Extensions: {}", extensions);

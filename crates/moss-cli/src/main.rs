@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod analyze;
 mod commands;
 mod complexity;
+mod config;
 mod daemon;
 mod deps;
 mod edit;

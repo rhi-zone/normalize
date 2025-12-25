@@ -1,6 +1,7 @@
 //! Tool registry for discovering and running tools.
 
 use crate::{Diagnostic, Tool, ToolCategory, ToolResult};
+use rayon::prelude::*;
 use std::path::Path;
 
 /// Registry of available tools.
@@ -58,10 +59,11 @@ impl ToolRegistry {
     /// Returns tools sorted by relevance (highest first).
     /// Note: Only checks availability for tools with positive detection scores
     /// (avoids spawning processes for irrelevant tools).
+    /// Uses parallel iteration for better performance.
     pub fn detect(&self, root: &Path) -> Vec<(&dyn Tool, f32)> {
         let mut relevant: Vec<_> = self
             .tools
-            .iter()
+            .par_iter()
             .map(|t| {
                 let score = t.detect(root);
                 (t.as_ref(), score)
