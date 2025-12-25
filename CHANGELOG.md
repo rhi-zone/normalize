@@ -38,9 +38,12 @@ Template languages now extract symbols and imports from embedded code:
 ### CLI Surface Cleanup
 
 Major refactoring to align with three-primitive philosophy (view, edit, analyze):
-- **CLI reduced from 29 to 9 commands** (-5000+ lines)
+- **CLI reduced from 29 to 8 commands** (-5000+ lines)
+- **Unified ViewNode abstraction**: Directories, files, and symbols share the same tree structure
+  - JSON output returns structured ViewNode data instead of string lines
+  - `--calls`/`--called-by` moved to `moss analyze` (call graph analysis, not viewing)
 - Removed 20 redundant commands:
-  - callers, callees → view --calls/--called-by
+  - callers, callees → analyze --calls/--called-by
   - complexity → analyze --complexity
   - cfg, scopes, health → analyze (inscrutable output removed)
   - symbols, anchors, expand, context → view with depth/--full
@@ -49,7 +52,7 @@ Major refactoring to align with three-primitive philosophy (view, edit, analyze)
   - reindex, index-stats, list-files, index-packages → `moss index` subcommand
   - overview → analyze --overview
 - Fixes:
-  - view --calls/--called-by semantics were swapped
+  - view --calls/--called-by semantics were swapped (now in analyze)
   - view --deps now shows exports (was missing), doesn't show symbols
   - view lists all matches when query is ambiguous (was silently picking first)
 

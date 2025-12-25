@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- view.rs internal cleanup (see CLI Surface Cleanup)
 - Single installation: maturin wheel with embedded Rust binary
 
 Test Status: 107 passing, 0 failing (moss-languages)
@@ -19,7 +18,7 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 - [ ] Python: output helpers for JSON/markdown/compact
 
 **CLI Surface Cleanup:** CLI reduced from 29 to 8 commands (-5000+ lines). Remaining:
-- [ ] view.rs: consolidated but messy internally - problem shifted, not solved. Needs proper unification.
+- [x] view.rs: unified ViewNode abstraction for directories, files, and symbols. --calls/--called-by moved to analyze.
 - [ ] Command/subcommand/flag names should be self-documenting (no abbreviations, clear meaning)
 
 **Code Quality:**
