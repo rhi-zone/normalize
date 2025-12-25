@@ -17,17 +17,33 @@ use crate::index::FileIndex;
 pub enum Request {
     #[serde(rename = "path")]
     Path { query: String },
+    #[serde(rename = "file_name")]
+    FileName { name: String },
+    #[serde(rename = "file_stem")]
+    FileStem { stem: String },
     #[serde(rename = "symbols")]
     Symbols { file: String },
     #[serde(rename = "callers")]
     Callers { symbol: String },
     #[serde(rename = "callees")]
     Callees { symbol: String, file: String },
+    #[serde(rename = "callees_resolved")]
+    CalleesResolved { symbol: String, file: String },
     #[serde(rename = "expand")]
     Expand {
         symbol: String,
         file: Option<String>,
     },
+    #[serde(rename = "importers")]
+    Importers { module: String },
+    #[serde(rename = "resolve_import")]
+    ResolveImport { file: String, name: String },
+    #[serde(rename = "cross_refs")]
+    CrossRefs { file: String },
+    #[serde(rename = "cross_ref_sources")]
+    CrossRefSources { target: String },
+    #[serde(rename = "all_cross_refs")]
+    AllCrossRefs,
     #[serde(rename = "status")]
     Status,
     #[serde(rename = "shutdown")]
@@ -277,6 +293,8 @@ impl ServerResponse {
 struct DaemonServer {
     root: PathBuf,
     index: Mutex<FileIndex>,
+    start_time: std::time::Instant,
+    query_count: std::sync::atomic::AtomicUsize,
 }
 
 impl DaemonServer {
@@ -285,24 +303,49 @@ impl DaemonServer {
         Ok(Self {
             root,
             index: Mutex::new(index),
+            start_time: std::time::Instant::now(),
+            query_count: std::sync::atomic::AtomicUsize::new(0),
         })
     }
 
     fn handle_request(&self, req: Request) -> ServerResponse {
+        use std::sync::atomic::Ordering;
+
+        // Track query count (Status and Shutdown don't count as queries)
+        let is_query = !matches!(req, Request::Status | Request::Shutdown);
+        if is_query {
+            self.query_count.fetch_add(1, Ordering::Relaxed);
+        }
+
         match req {
             Request::Status => {
                 let idx = self.index.lock().unwrap();
                 let stats = idx.call_graph_stats().unwrap_or_default();
                 ServerResponse::ok(serde_json::json!({
-                    "root": self.root.to_string_lossy(),
-                    "files": idx.count().unwrap_or(0),
-                    "symbols": stats.symbols,
-                    "calls": stats.calls,
+                    "uptime_secs": self.start_time.elapsed().as_secs(),
+                    "files_indexed": idx.count().unwrap_or(0),
+                    "symbols_indexed": stats.symbols,
+                    "queries_served": self.query_count.load(Ordering::Relaxed),
+                    "pid": std::process::id(),
                 }))
             }
             Request::Path { query } => {
                 let idx = self.index.lock().unwrap();
                 match idx.find_like(&query) {
+                    Ok(matches) => ServerResponse::ok(serde_json::json!(matches)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::FileName { name } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_by_name(&name) {
+                    Ok(matches) => ServerResponse::ok(serde_json::json!(matches)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::FileStem { stem } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_by_stem(&stem) {
                     Ok(matches) => ServerResponse::ok(serde_json::json!(matches)),
                     Err(e) => ServerResponse::err(&e.to_string()),
                 }
@@ -328,6 +371,28 @@ impl DaemonServer {
                     Err(e) => ServerResponse::err(&e.to_string()),
                 }
             }
+            Request::CalleesResolved { symbol, file } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_callees_resolved(&file, &symbol) {
+                    Ok(callees) => {
+                        // Convert to JSON-friendly format
+                        let results: Vec<serde_json::Value> = callees
+                            .into_iter()
+                            .map(|(name, line, source)| {
+                                serde_json::json!({
+                                    "name": name,
+                                    "line": line,
+                                    "source": source.map(|(module, orig)| {
+                                        serde_json::json!({"module": module, "original_name": orig})
+                                    })
+                                })
+                            })
+                            .collect();
+                        ServerResponse::ok(serde_json::json!(results))
+                    }
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
             Request::Expand { symbol, file: _ } => {
                 let idx = self.index.lock().unwrap();
                 match idx.find_symbol(&symbol) {
@@ -346,6 +411,53 @@ impl DaemonServer {
                         }
                     }
                     Ok(_) => ServerResponse::err("Symbol not found"),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::Importers { module } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_importers(&module) {
+                    Ok(importers) => {
+                        let results: Vec<serde_json::Value> = importers
+                            .into_iter()
+                            .map(|(file, name, line)| {
+                                serde_json::json!({"file": file, "name": name, "line": line})
+                            })
+                            .collect();
+                        ServerResponse::ok(serde_json::json!(results))
+                    }
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::ResolveImport { file, name } => {
+                let idx = self.index.lock().unwrap();
+                match idx.resolve_import(&file, &name) {
+                    Ok(Some((module, orig_name))) => ServerResponse::ok(serde_json::json!({
+                        "module": module,
+                        "original_name": orig_name
+                    })),
+                    Ok(None) => ServerResponse::ok(serde_json::json!(null)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::CrossRefs { file } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_cross_refs(&file) {
+                    Ok(refs) => ServerResponse::ok(serde_json::json!(refs)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::CrossRefSources { target } => {
+                let idx = self.index.lock().unwrap();
+                match idx.find_cross_ref_sources(&target) {
+                    Ok(refs) => ServerResponse::ok(serde_json::json!(refs)),
+                    Err(e) => ServerResponse::err(&e.to_string()),
+                }
+            }
+            Request::AllCrossRefs => {
+                let idx = self.index.lock().unwrap();
+                match idx.all_cross_refs() {
+                    Ok(refs) => ServerResponse::ok(serde_json::json!(refs)),
                     Err(e) => ServerResponse::err(&e.to_string()),
                 }
             }
@@ -384,9 +496,10 @@ pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> 
         let mut idx = server.index.lock().unwrap();
         let file_count = idx.refresh()?;
         let stats = idx.incremental_call_graph_refresh()?;
+        let cross_ref_count = idx.refresh_cross_refs().unwrap_or(0);
         eprintln!(
-            "Indexed {} files, {} symbols, {} calls",
-            file_count, stats.symbols, stats.calls
+            "Indexed {} files, {} symbols, {} calls, {} cross-refs",
+            file_count, stats.symbols, stats.calls, cross_ref_count
         );
     }
 

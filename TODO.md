@@ -4,9 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Daemon integration: complete FileIndex API methods
-2. LSP refactor actions (rename symbol across files)
-3. Cross-language reference tracking (Python ↔ Rust)
+1. Trait-based FFI detection: refactor cross_refs detection to use traits instead of hardcoded patterns
+2. OutputFormatter trait for consistent JSON/text output across commands
+3. Test and publish VS Code extension to marketplace
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
@@ -154,9 +154,9 @@ Current scaffold is TOML state machines. Needs design work:
 - [x] Consolidate skeleton.rs and symbols.rs: shared extract.rs with Extractor class
 
 **Integration:**
-- Complete daemon integration (FileIndex API methods currently unused)
-- LSP refactor actions (rename symbol across files)
-- Cross-language reference tracking (Python ↔ Rust)
+- [x] Complete daemon integration (FileIndex API methods exposed via daemon)
+- [x] LSP refactor actions (rename symbol across files with prepare_rename/rename)
+- [x] Cross-language reference tracking (PyO3, wasm-bindgen, napi-rs, ctypes/cffi detection)
 
 **Tooling:**
 - Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (Opus 4.5 drops TODO items when editing markdown)

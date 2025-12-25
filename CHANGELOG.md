@@ -35,6 +35,26 @@ All three server protocols now implemented:
   - Hover (symbol kind, signature, docstring)
   - Go to definition (jumps to symbol definition)
   - Find references (finds all callers via call graph)
+  - **Rename symbol** (cross-file refactoring with prepare_rename support)
+
+### Daemon Integration
+
+Complete FileIndex API exposed via daemon socket:
+- File search: `find_by_name`, `find_by_stem`, `find_like`
+- Symbol queries: `find_symbols`, `find_symbol`, `find_callers`, `find_callees`
+- Import resolution: `resolve_import`, `find_callees_resolved`, `find_importers`
+- Cross-language references: `find_cross_refs`, `find_cross_ref_sources`, `all_cross_refs`
+- Status now includes uptime, query count, PID
+
+### Cross-Language Reference Tracking
+
+Detects and indexes cross-language FFI bindings:
+- **Rust → Python**: PyO3 crates detected via Cargo.toml
+- **Rust → JavaScript**: wasm-bindgen crates
+- **Rust → Node.js**: napi-rs crates
+- **Rust → C ABI**: cdylib crates
+- **Python → C**: ctypes/cffi usage detection
+- All refs stored in `cross_refs` table, queryable via daemon
 
 ### Package Management
 

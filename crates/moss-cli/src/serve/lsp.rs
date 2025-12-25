@@ -79,6 +79,10 @@ impl LanguageServer for MossBackend {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
+                rename_provider: Some(OneOf::Right(RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: Default::default(),
+                })),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -451,6 +455,228 @@ impl LanguageServer for MossBackend {
             Ok(Some(locations))
         }
     }
+
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> Result<Option<PrepareRenameResponse>> {
+        let uri = params.text_document.uri;
+        let position = params.position;
+
+        let file_path = match uri.to_file_path() {
+            Ok(p) => p,
+            Err(_) => return Ok(None),
+        };
+
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => return Ok(None),
+        };
+
+        let lines: Vec<&str> = content.lines().collect();
+        let line_idx = position.line as usize;
+        if line_idx >= lines.len() {
+            return Ok(None);
+        }
+
+        let line = lines[line_idx];
+        let col = position.character as usize;
+        let (word, start_col, end_col) = extract_word_with_range(line, col);
+
+        if word.is_empty() {
+            return Ok(None);
+        }
+
+        // Verify this is a known symbol
+        let index = self.index.lock().unwrap();
+        let index = match index.as_ref() {
+            Some(i) => i,
+            None => return Ok(None),
+        };
+
+        // Check if symbol exists in index
+        if index
+            .find_symbol(&word)
+            .map(|m| m.is_empty())
+            .unwrap_or(true)
+        {
+            // Also check if it's a caller (referenced symbol)
+            if index
+                .find_callers(&word)
+                .map(|m| m.is_empty())
+                .unwrap_or(true)
+            {
+                return Ok(None);
+            }
+        }
+
+        Ok(Some(PrepareRenameResponse::Range(Range {
+            start: Position {
+                line: position.line,
+                character: start_col as u32,
+            },
+            end: Position {
+                line: position.line,
+                character: end_col as u32,
+            },
+        })))
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        let new_name = params.new_name;
+
+        let file_path = match uri.to_file_path() {
+            Ok(p) => p,
+            Err(_) => return Ok(None),
+        };
+
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => return Ok(None),
+        };
+
+        let lines: Vec<&str> = content.lines().collect();
+        let line_idx = position.line as usize;
+        if line_idx >= lines.len() {
+            return Ok(None);
+        }
+
+        let line = lines[line_idx];
+        let col = position.character as usize;
+        let (old_name, _, _) = extract_word_with_range(line, col);
+
+        if old_name.is_empty() {
+            return Ok(None);
+        }
+
+        let index = self.index.lock().unwrap();
+        let root = self.root.lock().unwrap();
+
+        let (index, root) = match (index.as_ref(), root.as_ref()) {
+            (Some(i), Some(r)) => (i, r),
+            _ => return Ok(None),
+        };
+
+        // Collect all locations that need renaming
+        let mut file_edits: std::collections::HashMap<Url, Vec<TextEdit>> =
+            std::collections::HashMap::new();
+
+        // Find definition sites
+        if let Ok(defs) = index.find_symbol(&old_name) {
+            for (file, _kind, start_line, _end_line) in defs {
+                let target_path = root.join(&file);
+                if let Ok(target_uri) = Url::from_file_path(&target_path) {
+                    // Read file to find exact position
+                    if let Ok(file_content) = std::fs::read_to_string(&target_path) {
+                        if let Some(edit) =
+                            find_rename_edit(&file_content, start_line, &old_name, &new_name)
+                        {
+                            file_edits.entry(target_uri).or_default().push(edit);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Find reference sites (callers)
+        if let Ok(callers) = index.find_callers(&old_name) {
+            for (file, _caller_name, line) in callers {
+                let target_path = root.join(&file);
+                if let Ok(target_uri) = Url::from_file_path(&target_path) {
+                    if let Ok(file_content) = std::fs::read_to_string(&target_path) {
+                        if let Some(edit) =
+                            find_rename_edit(&file_content, line, &old_name, &new_name)
+                        {
+                            file_edits.entry(target_uri).or_default().push(edit);
+                        }
+                    }
+                }
+            }
+        }
+
+        if file_edits.is_empty() {
+            return Ok(None);
+        }
+
+        // Convert to WorkspaceEdit
+        let changes: std::collections::HashMap<Url, Vec<TextEdit>> = file_edits;
+
+        Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        }))
+    }
+}
+
+/// Extract the word at a given column position in a line, with start/end positions.
+fn extract_word_with_range(line: &str, col: usize) -> (String, usize, usize) {
+    let chars: Vec<char> = line.chars().collect();
+    if col >= chars.len() {
+        return (String::new(), 0, 0);
+    }
+
+    // Find start of word
+    let mut start = col;
+    while start > 0 && is_identifier_char(chars[start - 1]) {
+        start -= 1;
+    }
+
+    // Find end of word
+    let mut end = col;
+    while end < chars.len() && is_identifier_char(chars[end]) {
+        end += 1;
+    }
+
+    (chars[start..end].iter().collect(), start, end)
+}
+
+/// Find a rename edit for a symbol at a given line.
+fn find_rename_edit(
+    content: &str,
+    line_num: usize,
+    old_name: &str,
+    new_name: &str,
+) -> Option<TextEdit> {
+    let lines: Vec<&str> = content.lines().collect();
+    let line_idx = line_num.saturating_sub(1);
+    if line_idx >= lines.len() {
+        return None;
+    }
+
+    let line = lines[line_idx];
+
+    // Find the symbol in this line (first occurrence)
+    // Use word boundary matching to avoid partial matches
+    let mut pos = 0;
+    while let Some(idx) = line[pos..].find(old_name) {
+        let abs_idx = pos + idx;
+        let before_ok =
+            abs_idx == 0 || !is_identifier_char(line.chars().nth(abs_idx - 1).unwrap_or(' '));
+        let after_ok = abs_idx + old_name.len() >= line.len()
+            || !is_identifier_char(line.chars().nth(abs_idx + old_name.len()).unwrap_or(' '));
+
+        if before_ok && after_ok {
+            return Some(TextEdit {
+                range: Range {
+                    start: Position {
+                        line: line_idx as u32,
+                        character: abs_idx as u32,
+                    },
+                    end: Position {
+                        line: line_idx as u32,
+                        character: (abs_idx + old_name.len()) as u32,
+                    },
+                },
+                new_text: new_name.to_string(),
+            });
+        }
+        pos = abs_idx + old_name.len();
+    }
+
+    None
 }
 
 /// Extract the word at a given column position in a line.
