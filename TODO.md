@@ -43,7 +43,6 @@ Current scaffold is TOML state machines. Needs design work:
 - Minimal memory footprint (currently loads full index per root)
 
 **HTTP Server:**
-- OpenAPI spec for `moss serve http` endpoints (enables client codegen, docs)
 - Codegen from OpenAPI: generate TypeScript/Python/Rust clients
 
 **Tooling:**

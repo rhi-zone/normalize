@@ -1,1300 +1,76 @@
 {
+  "openapi": "3.1.0",
   "info": {
-    "description": "Headless agent orchestration layer",
     "title": "Moss API",
+    "description": "Code intelligence API for moss",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    },
     "version": "0.1.0"
   },
-  "openapi": "3.0.3",
   "paths": {
-    "/agent/run-dwim": {
-      "post": {
-        "description": "Run DWIM agent on a task. Uses composable execution primitives with task tree context. Final context string from agent execution",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "mock": {
-                    "default": false,
-                    "description": "Use mock LLM for testing",
-                    "type": "boolean"
-                  },
-                  "task": {
-                    "description": "Task description",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "task"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Run DWIM agent on a task",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/analyze/analyze": {
+    "/files": {
       "get": {
-        "description": "Analyze codebase health, complexity, and security. AnalyzeResult with analysis data",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "complexity": {
-                    "default": false,
-                    "description": "Run complexity analysis",
-                    "type": "boolean"
-                  },
-                  "health": {
-                    "default": false,
-                    "description": "Run health analysis",
-                    "type": "boolean"
-                  },
-                  "security": {
-                    "default": false,
-                    "description": "Run security analysis",
-                    "type": "boolean"
-                  },
-                  "target": {
-                    "description": "Path to analyze (defaults to cwd)",
-                    "type": "string"
-                  },
-                  "threshold": {
-                    "description": "Complexity threshold filter If no flags specified, runs all analyses.",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze codebase health, complexity, and security",
         "tags": [
-          "analyze"
-        ]
-      }
-    },
-    "/analyze/complexity": {
-      "post": {
-        "description": "Run complexity analysis only. Convenience wrapper for complexity-only analysis.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "target": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "threshold": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Run complexity analysis only",
-        "tags": [
-          "analyze"
-        ]
-      }
-    },
-    "/analyze/health": {
-      "post": {
-        "description": "Run health analysis only. Convenience wrapper for health-only analysis.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "target": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Run health analysis only",
-        "tags": [
-          "analyze"
-        ]
-      }
-    },
-    "/analyze/security": {
-      "post": {
-        "description": "Run security analysis only. Convenience wrapper for security-only analysis.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "target": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Run security analysis only",
-        "tags": [
-          "analyze"
-        ]
-      }
-    },
-    "/anchor/find": {
-      "get": {
-        "description": "Find anchors matching a name in a file. List of AnchorMatch objects with locations and confidence scores",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "anchor_type": {
-                    "default": "function",
-                    "description": "Type filter - \"function\", \"class\", \"variable\", \"method\", \"import\"",
-                    "type": "string"
-                  },
-                  "file_path": {
-                    "description": "Path to search in",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "Name to search for (supports fuzzy matching)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find anchors matching a name in a file",
-        "tags": [
-          "anchor"
-        ]
-      }
-    },
-    "/anchor/resolve": {
-      "get": {
-        "description": "Resolve a single anchor (raises if ambiguous or not found). Single best AnchorMatch AnchorNotFoundError: If no match found AmbiguousAnchorError: If multiple matches with equal confidence",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "anchor_type": {
-                    "default": "function",
-                    "description": "Type filter",
-                    "type": "string"
-                  },
-                  "file_path": {
-                    "description": "Path to search in",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "Name to search for",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Resolve a single anchor (raises if ambiguous or not found)",
-        "tags": [
-          "anchor"
-        ]
-      }
-    },
-    "/cfg/build": {
-      "post": {
-        "description": "Build CFGs for all functions in a file. List of ControlFlowGraph objects for each function",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the Python file",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Build CFGs for all functions in a file",
-        "tags": [
-          "cfg"
-        ]
-      }
-    },
-    "/clones/detect": {
-      "post": {
-        "description": "Detect structural clones in the codebase. CloneAnalysis with clone groups and statistics",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "level": {
-                    "default": 0,
-                    "description": "Elision level (0-3) controlling normalization: 0 = names only (exact structural clones) 1 = + literals (same structure, different constants) 2 = + calls (same pattern, different functions) 3 = control flow skeleton only",
-                    "type": "integer"
-                  },
-                  "min_lines": {
-                    "default": 3,
-                    "description": "Minimum function lines to consider (default: 3)",
-                    "type": "integer"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Detect structural clones in the codebase",
-        "tags": [
-          "clones"
-        ]
-      }
-    },
-    "/clones/get-groups": {
-      "get": {
-        "description": "Get clone groups with at least min_count members. List of clone group details",
-        "parameters": [
-          {
-            "description": "Elision level (0-3)",
-            "in": "query",
-            "name": "level",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Minimum clones per group (default: 2)",
-            "in": "query",
-            "name": "min_count",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
+          "files"
         ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get clone groups with at least min_count members",
-        "tags": [
-          "clones"
-        ]
-      }
-    },
-    "/complexity/analyze": {
-      "get": {
-        "description": "Analyze cyclomatic complexity of all Python files. ComplexityReport with complexity metrics for all functions",
+        "summary": "List indexed files",
+        "operationId": "list_files",
         "parameters": [
           {
-            "description": "Glob pattern for files to analyze (default: all Python files)",
-            "in": "query",
             "name": "pattern",
+            "in": "query",
+            "description": "Glob pattern to filter files",
             "required": false,
             "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze cyclomatic complexity of all Python files",
-        "tags": [
-          "complexity"
-        ]
-      }
-    },
-    "/complexity/get-high-risk": {
-      "get": {
-        "description": "Get functions exceeding a complexity threshold. List of function details for high-complexity functions",
-        "parameters": [
-          {
-            "description": "Complexity threshold (default: 10)",
-            "in": "query",
-            "name": "threshold",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get functions exceeding a complexity threshold",
-        "tags": [
-          "complexity"
-        ]
-      }
-    },
-    "/context/compile": {
-      "post": {
-        "description": "Compile context for the given files. CompiledContext with rendered views",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_paths": {
-                    "description": "Files to include in context",
-                    "type": "array"
-                  },
-                  "view_types": {
-                    "description": "View types to generate (default: skeleton, dependency)",
-                    "type": "array"
-                  }
-                },
-                "required": [
-                  "file_paths"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Compile context for the given files",
-        "tags": [
-          "context"
-        ]
-      }
-    },
-    "/context/init": {
-      "post": {
-        "description": "Initialize the context host with default view providers. ContextHost instance",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Initialize the context host with default view providers",
-        "tags": [
-          "context"
-        ]
-      }
-    },
-    "/dependencies/analyze": {
-      "get": {
-        "description": "Run full dependency analysis on the project. DependencyAnalysis with circular deps, god modules, orphans, etc.",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Run full dependency analysis on the project",
-        "tags": [
-          "dependencies"
-        ]
-      }
-    },
-    "/dependencies/build-graph": {
-      "post": {
-        "description": "Build a dependency graph for the project. Dict mapping module names to their dependencies",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "internal_only": {
-                    "default": true,
-                    "description": "Only include internal module dependencies",
-                    "type": "boolean"
-                  },
-                  "path": {
-                    "description": "Directory to analyze (defaults to project root)",
-                    "type": "string"
-                  },
-                  "pattern": {
-                    "default": "**/*.py",
-                    "description": "Glob pattern for files to include",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Build a dependency graph for the project",
-        "tags": [
-          "dependencies"
-        ]
-      }
-    },
-    "/dependencies/extract": {
-      "post": {
-        "description": "Extract imports and exports from a file. DependencyInfo with imports and exports",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to analyze",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Extract imports and exports from a file",
-        "tags": [
-          "dependencies"
-        ]
-      }
-    },
-    "/dependencies/find-reverse": {
-      "get": {
-        "description": "Find files that import a given module. List of ReverseDependency objects",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "pattern": {
-                    "default": "**/*.py",
-                    "description": "Glob pattern for files to search",
-                    "type": "string"
-                  },
-                  "search_path": {
-                    "description": "Directory to search in (defaults to project root)",
-                    "type": "string"
-                  },
-                  "target_module": {
-                    "description": "Module name to search for",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "target_module"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find files that import a given module",
-        "tags": [
-          "dependencies"
-        ]
-      }
-    },
-    "/dependencies/format": {
-      "post": {
-        "description": "Extract and format dependencies as readable text. Formatted string with imports and exports",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to analyze",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Extract and format dependencies as readable text",
-        "tags": [
-          "dependencies"
-        ]
-      }
-    },
-    "/dependencies/graph-to-dot": {
-      "post": {
-        "description": "Convert a dependency graph to DOT format. DOT-formatted string for visualization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "graph": {
-                    "description": "Dependency graph from build_graph()",
-                    "type": "string"
-                  },
-                  "title": {
-                    "default": "Dependencies",
-                    "description": "Title for the graph",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "graph"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Convert a dependency graph to DOT format",
-        "tags": [
-          "dependencies"
-        ]
-      }
-    },
-    "/dwim/analyze-intent": {
-      "get": {
-        "description": "Find the right Moss tool for any task using natural language. USE THIS FIRST when you don't know which tool to use! Describe what you want to do and get ranked suggestions. Examples: - \"summarize the codebase\" \u2192 health_summarize - \"show file structure\" \u2192 skeleton_format - \"find TODOs\" \u2192 health_check_todos - \"check code complexity\" \u2192 complexity_analyze List of ToolMatchResult sorted by confidence (highest first)",
-        "parameters": [
-          {
-            "description": "Natural language description of what you want to do",
-            "in": "query",
-            "name": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
-            "description": "Maximum number of suggestions to return",
-            "in": "query",
-            "name": "top_k",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find the right Moss tool for any task using natural language",
-        "tags": [
-          "dwim"
-        ]
-      }
-    },
-    "/dwim/get-tool-info": {
-      "get": {
-        "description": "Get detailed information about a specific tool. ToolInfoResult or None if tool not found",
-        "parameters": [
-          {
-            "description": "Tool name (can be alias or misspelled)",
-            "in": "query",
-            "name": "tool_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get detailed information about a specific tool",
-        "tags": [
-          "dwim"
-        ]
-      }
-    },
-    "/dwim/list-tools": {
-      "get": {
-        "description": "List all available tools with their metadata. ToolListResult with descriptions, keywords, etc.",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List all available tools with their metadata",
-        "tags": [
-          "dwim"
-        ]
-      }
-    },
-    "/dwim/resolve-tool": {
-      "get": {
-        "description": "Resolve a tool name to its canonical form. Handles exact matches, semantic aliases, and fuzzy matching for typos. ToolMatchResult with canonical name and confidence",
-        "parameters": [
-          {
-            "description": "Tool name to resolve (may be misspelled or alias)",
-            "in": "query",
-            "name": "tool_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Resolve a tool name to its canonical form",
-        "tags": [
-          "dwim"
-        ]
-      }
-    },
-    "/edit/insert-line": {
-      "post": {
-        "description": "Insert a line into a file at a specific position.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "after_pattern": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "at_line": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "file_path": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "line_content": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "line_content"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Insert a line into a file at a specific position",
-        "tags": [
-          "edit"
-        ]
-      }
-    },
-    "/edit/replace-text": {
-      "post": {
-        "description": "Replace text in a file.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "occurrence": {
-                    "default": 0,
-                    "description": "",
-                    "type": "integer"
-                  },
-                  "replace": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "search": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "search",
-                  "replace"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Replace text in a file",
-        "tags": [
-          "edit"
-        ]
-      }
-    },
-    "/edit/write-file": {
-      "post": {
-        "description": "Overwrite or create a file with new content.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "content": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "file_path": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "content"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Overwrite or create a file with new content",
-        "tags": [
-          "edit"
-        ]
-      }
-    },
-    "/external_deps/analyze": {
-      "get": {
-        "description": "Analyze project dependencies. DependencyAnalysisResult with dependency information",
-        "parameters": [
-          {
-            "description": "If True, resolve full transitive dependency tree",
-            "in": "query",
-            "name": "resolve",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "If True, check for known vulnerabilities via OSV API",
-            "in": "query",
-            "name": "check_vulns",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "If True, check license compatibility",
-            "in": "query",
-            "name": "check_licenses",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze project dependencies",
-        "tags": [
-          "external_deps"
-        ]
-      }
-    },
-    "/external_deps/check-security": {
-      "get": {
-        "description": "Check for security vulnerabilities. List of vulnerability details",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Check for security vulnerabilities",
-        "tags": [
-          "external_deps"
-        ]
-      }
-    },
-    "/external_deps/list-direct": {
-      "get": {
-        "description": "List direct dependencies. List of direct dependency details",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List direct dependencies",
-        "tags": [
-          "external_deps"
-        ]
-      }
-    },
-    "/git/abort-checkpoint": {
-      "post": {
-        "description": "Abandon a checkpoint and delete its branch. Dict with 'success' boolean",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "name": {
-                    "description": "Checkpoint branch name to abort",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Abandon a checkpoint and delete its branch",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/commit": {
-      "post": {
-        "description": "Create a commit on the specified shadow branch. CommitHandle referencing the new commit",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "branch": {
-                    "description": "ShadowBranch to commit on",
-                    "type": "string"
-                  },
-                  "message": {
-                    "description": "Commit message",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "branch",
-                  "message"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Create a commit on the specified shadow branch",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/create-branch": {
-      "post": {
-        "description": "Create an isolated shadow branch for agent work. ShadowBranch for managing the branch",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "name": {
-                    "description": "Optional branch name (auto-generated if not provided)",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Create an isolated shadow branch for agent work",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/create-checkpoint": {
-      "post": {
-        "description": "Create a checkpoint with current changes. Checkpoints are shadow branches that capture current work state, allowing safe experimentation with easy rollback. Dict with 'branch' name and 'commit' SHA",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "message": {
-                    "description": "Optional commit message for initial checkpoint state",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "Optional checkpoint name (auto-generated if not provided)",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Create a checkpoint with current changes",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/diff-checkpoint": {
-      "post": {
-        "description": "Show changes in a checkpoint. Dict with 'diff' (full diff) and 'stat' (summary stats)",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "name": {
-                    "description": "Checkpoint branch name",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Show changes in a checkpoint",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/init": {
-      "post": {
-        "description": "Initialize shadow git for the project. ShadowGit instance for managing branches",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Initialize shadow git for the project",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/list-checkpoints": {
-      "get": {
-        "description": "List active checkpoints. List of checkpoint info dicts with 'name' and 'type' keys",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List active checkpoints",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/merge-checkpoint": {
-      "post": {
-        "description": "Merge checkpoint changes into base branch. Dict with 'commit' SHA of merge commit",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "message": {
-                    "description": "Optional merge commit message",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "Checkpoint branch name to merge",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Merge checkpoint changes into base branch",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git/restore-checkpoint": {
-      "post": {
-        "description": "Restore working directory to a checkpoint state. This checks out the checkpoint branch, reverting all files to the state captured when the checkpoint was created. Dict with 'branch' name and 'commit' SHA of restored state",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "name": {
-                    "description": "Checkpoint branch name to restore",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Restore working directory to a checkpoint state",
-        "tags": [
-          "git"
-        ]
-      }
-    },
-    "/git_hotspots/analyze": {
-      "get": {
-        "description": "Analyze git history for hot spots. GitHotspotAnalysis with frequently changed files",
-        "parameters": [
-          {
-            "description": "Number of days to analyze (default: 90)",
-            "in": "query",
-            "name": "days",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze git history for hot spots",
-        "tags": [
-          "git_hotspots"
-        ]
-      }
-    },
-    "/git_hotspots/get-top-hotspots": {
-      "get": {
-        "description": "Get the top N most frequently changed files. List of hotspot details for most frequently changed files",
-        "parameters": [
-          {
-            "description": "Number of days to analyze",
-            "in": "query",
-            "name": "days",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Maximum number of files to return",
-            "in": "query",
             "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results",
             "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{path}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Get file information and symbols",
+        "operationId": "get_file",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "File path relative to root",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1302,1210 +78,171 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get the top N most frequently changed files",
-        "tags": [
-          "git_hotspots"
-        ]
-      }
-    },
-    "/guessability/analyze": {
-      "get": {
-        "description": "Analyze codebase guessability. Evaluates: - Name-content alignment: Do module names reflect their contents? - Predictability: Are similar things in similar places? - Pattern consistency: Are conventions followed? GuessabilityReport with scores and recommendations",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze codebase guessability",
-        "tags": [
-          "guessability"
-        ]
-      }
-    },
-    "/guessability/recommendations": {
-      "post": {
-        "description": "Get guessability improvement recommendations. List of actionable recommendations",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get guessability improvement recommendations",
-        "tags": [
-          "guessability"
-        ]
-      }
-    },
-    "/guessability/score": {
-      "post": {
-        "description": "Get overall guessability score. GuessabilityScore with 'score' (0.0-1.0) and 'grade' (A-F)",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get overall guessability score",
-        "tags": [
-          "guessability"
-        ]
-      }
-    },
-    "/health/analyze-structure": {
-      "get": {
-        "description": "Analyze structural code quality. StructuralAnalysis with hotspots and metrics",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze structural code quality",
-        "tags": [
-          "health"
-        ]
-      }
-    },
-    "/health/analyze-tests": {
-      "get": {
-        "description": "Analyze test coverage structure. TestAnalysis with module-test mappings",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze test coverage structure",
-        "tags": [
-          "health"
-        ]
-      }
-    },
-    "/health/check": {
-      "get": {
-        "description": "Run health analysis on the project. ProjectStatus with health score, grade, and filtered weak spots",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "focus": {
-                    "description": "Filter weak spots by category. Valid values: \"deps\" - dependency issues only \"tests\" - test coverage issues only \"complexity\" - complexity issues only \"api\" - API surface issues only None or \"all\" - show all categories",
-                    "type": "string"
-                  },
-                  "severity": {
-                    "default": "low",
-                    "description": "Minimum severity level to include. Valid values: \"low\" (default) - show all issues \"medium\" - show medium and high severity only \"high\" - show only high severity issues",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
+            "description": "File info with symbols",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileInfoResponse"
+                }
               }
             }
           },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
+          "404": {
+            "description": "File not found"
           }
-        },
-        "summary": "Run health analysis on the project",
-        "tags": [
-          "health"
-        ]
+        }
       }
     },
-    "/health/check-docs": {
+    "/health": {
       "get": {
-        "description": "Check documentation health. DocCheckResult with coverage and issues",
-        "parameters": [
-          {
-            "description": "If True, verify that links in docs are valid",
-            "in": "query",
-            "name": "check_links",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
+        "tags": [
+          "health"
         ],
+        "summary": "Check server health",
+        "operationId": "health",
         "responses": {
           "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Check documentation health",
-        "tags": [
-          "health"
-        ]
-      }
-    },
-    "/health/check-todos": {
-      "get": {
-        "description": "Check TODO tracking health. TodoCheckResult with tracked and orphaned TODOs",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Check TODO tracking health",
-        "tags": [
-          "health"
-        ]
-      }
-    },
-    "/health/summarize": {
-      "get": {
-        "description": "Generate a project summary. ProjectSummary with module information",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Generate a project summary",
-        "tags": [
-          "health"
-        ]
-      }
-    },
-    "/lessons/add": {
-      "post": {
-        "description": "Add a new lesson. Dict with 'success' boolean and 'lesson' data",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "category": {
-                    "default": "",
-                    "description": "Category (e.g., \"pattern\", \"mistake\", \"insight\")",
-                    "type": "string"
-                  },
-                  "keywords": {
-                    "description": "Keywords for matching (auto-extracted if not provided)",
-                    "type": "array"
-                  },
-                  "text": {
-                    "description": "The lesson text",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "text"
-                ],
-                "type": "object"
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
               }
             }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
           }
-        },
-        "summary": "Add a new lesson",
-        "tags": [
-          "lessons"
-        ]
+        }
       }
     },
-    "/lessons/clear": {
-      "post": {
-        "description": "Clear all lessons. Dict with 'success' boolean",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Clear all lessons",
-        "tags": [
-          "lessons"
-        ]
-      }
-    },
-    "/lessons/find-relevant": {
+    "/search": {
       "get": {
-        "description": "Find lessons relevant to the given context. List of relevant Lesson objects",
+        "tags": [
+          "search"
+        ],
+        "summary": "Search files and symbols",
+        "operationId": "search",
         "parameters": [
           {
-            "description": "Current context (e.g., error message, task description)",
+            "name": "q",
             "in": "query",
-            "name": "context",
+            "description": "Search query string",
             "required": true,
             "schema": {
               "type": "string"
             }
           },
           {
-            "description": "Maximum number of lessons to return",
+            "name": "type",
             "in": "query",
+            "description": "Search type: \"file\", \"symbol\", or \"all\"",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
           }
-        },
-        "summary": "Find lessons relevant to the given context",
-        "tags": [
-          "lessons"
-        ]
+        }
       }
     },
-    "/lessons/list": {
+    "/symbols": {
       "get": {
-        "description": "List lessons, optionally filtered by category. List of Lesson objects",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "category": {
-                    "description": "Filter by category (case-insensitive)",
-                    "type": "string"
-                  },
-                  "limit": {
-                    "default": 20,
-                    "description": "Maximum number of lessons to return",
-                    "type": "integer"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List lessons, optionally filtered by category",
         "tags": [
-          "lessons"
-        ]
-      }
-    },
-    "/lessons/search": {
-      "post": {
-        "description": "Search lessons by keyword. List of matching Lesson objects",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "limit": {
-                    "default": 5,
-                    "description": "Maximum number of results",
-                    "type": "integer"
-                  },
-                  "query": {
-                    "description": "Search query (matches text, category, and keywords)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "query"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Search lessons by keyword",
-        "tags": [
-          "lessons"
-        ]
-      }
-    },
-    "/patch/apply": {
-      "post": {
-        "description": "Apply a patch to a file. PatchResult with success status and modified content",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the file to patch",
-                    "type": "string"
-                  },
-                  "patch": {
-                    "description": "Patch object describing the change",
-                    "type": "string"
-                  },
-                  "write": {
-                    "default": true,
-                    "description": "Whether to write changes to disk",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "patch"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Apply a patch to a file",
-        "tags": [
-          "patch"
-        ]
-      }
-    },
-    "/patch/apply-with-fallback": {
-      "post": {
-        "description": "Apply a patch with automatic text fallback. First tries AST-aware patching, falls back to text-based if that fails. PatchResult with success status and modified content",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the file to patch",
-                    "type": "string"
-                  },
-                  "patch": {
-                    "description": "Patch object describing the change",
-                    "type": "string"
-                  },
-                  "write": {
-                    "default": true,
-                    "description": "Whether to write changes to disk",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "patch"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Apply a patch with automatic text fallback",
-        "tags": [
-          "patch"
-        ]
-      }
-    },
-    "/patch/create": {
-      "post": {
-        "description": "Create a Patch object. Patch object ready for application",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "anchor_name": {
-                    "description": "Name of the anchor to target",
-                    "type": "string"
-                  },
-                  "content": {
-                    "description": "New content for the patch",
-                    "type": "string"
-                  },
-                  "kwargs": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "patch_type": {
-                    "description": "Type of patch - \"insert_before\", \"insert_after\", \"replace\", \"delete\"",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "patch_type",
-                  "anchor_name",
-                  "content",
-                  "kwargs"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Create a Patch object",
-        "tags": [
-          "patch"
-        ]
-      }
-    },
-    "/patterns/analyze": {
-      "get": {
-        "description": "Detect architectural patterns in the codebase.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "directory": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Detect architectural patterns in the codebase",
-        "tags": [
-          "patterns"
-        ]
-      }
-    },
-    "/rag/clear": {
-      "post": {
-        "description": "Clear the index. Dict with 'success' boolean",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Clear the index",
-        "tags": [
-          "rag"
-        ]
-      }
-    },
-    "/rag/index": {
-      "post": {
-        "description": "Index files for semantic search. Number of chunks indexed",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "force": {
-                    "default": false,
-                    "description": "Re-index even if content hasn't changed",
-                    "type": "boolean"
-                  },
-                  "path": {
-                    "description": "Directory to index (defaults to project root)",
-                    "type": "string"
-                  },
-                  "patterns": {
-                    "description": "Glob patterns to include (default: code and docs)",
-                    "type": "array"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Index files for semantic search",
-        "tags": [
-          "rag"
-        ]
-      }
-    },
-    "/rag/search": {
-      "post": {
-        "description": "Search the index with natural language or code queries. List of SearchResult objects with file paths, scores, and snippets",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "kind": {
-                    "description": "Filter by symbol kind (e.g., \"function\", \"class\", \"module\")",
-                    "type": "string"
-                  },
-                  "limit": {
-                    "default": 10,
-                    "description": "Maximum results to return",
-                    "type": "integer"
-                  },
-                  "mode": {
-                    "default": "hybrid",
-                    "description": "Search mode - \"hybrid\", \"embedding\", or \"tfidf\"",
-                    "type": "string"
-                  },
-                  "query": {
-                    "description": "Natural language or code query",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "query"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Search the index with natural language or code queries",
-        "tags": [
-          "rag"
-        ]
-      }
-    },
-    "/rag/stats": {
-      "post": {
-        "description": "Get index statistics. IndexStats with document count, files indexed, and backend info",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get index statistics",
-        "tags": [
-          "rag"
-        ]
-      }
-    },
-    "/ref_check/check": {
-      "get": {
-        "description": "Run bidirectional reference check. RefCheckResult with valid, broken, and stale references",
-        "parameters": [
-          {
-            "description": "Warn if target modified more than N days after source",
-            "in": "query",
-            "name": "staleness_days",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
+          "symbols"
         ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Run bidirectional reference check",
-        "tags": [
-          "ref_check"
-        ]
-      }
-    },
-    "/ref_check/check-code-to-docs": {
-      "get": {
-        "description": "Check only code-to-documentation references. List of broken code->doc references",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Check only code-to-documentation references",
-        "tags": [
-          "ref_check"
-        ]
-      }
-    },
-    "/ref_check/check-docs-to-code": {
-      "get": {
-        "description": "Check only documentation-to-code references. List of broken doc->code references",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Check only documentation-to-code references",
-        "tags": [
-          "ref_check"
-        ]
-      }
-    },
-    "/search/explain-symbol": {
-      "post": {
-        "description": "Explain a symbol: show its definition, callers, and callees. Finds where a symbol is defined, what calls it, and what it calls. Useful for understanding code relationships and impact of changes. SymbolExplanation with callers and callees, or None if not found explanation = api.search.explain_symbol(\"process_request\") print(f\"Called by: {len(explanation.callers)} functions\") print(f\"Calls: {len(explanation.callees)} functions\")",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Optional file path to narrow down the search",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "Symbol name to explain (function, class, or method)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Explain a symbol: show its definition, callers, and callees",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/find-definitions": {
-      "get": {
-        "description": "Find where a symbol is defined. Shortcut for find_symbols with exact matching. List of SymbolMatch objects for definitions",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "kind": {
-                    "description": "Filter by kind: function, class, method",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "Exact symbol name to find",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find where a symbol is defined",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/find-files": {
-      "get": {
-        "description": "Find files matching a glob pattern. List of relative file paths matching the pattern",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "limit": {
-                    "default": 100,
-                    "description": "Maximum number of results to return",
-                    "type": "integer"
-                  },
-                  "path": {
-                    "description": "Directory to search in (defaults to project root)",
-                    "type": "string"
-                  },
-                  "pattern": {
-                    "description": "Glob pattern (e.g., \"**/*.py\", \"src/**/*.ts\")",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "pattern"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find files matching a glob pattern",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/find-related-files": {
-      "get": {
-        "description": "Find files related to the given file through imports. Analyzes both: - Files that the given file imports from - Files that import the given file RelatedFilesResult with imports_from and imported_by lists",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the file to analyze",
-                    "type": "string"
-                  },
-                  "pattern": {
-                    "default": "**/*.py",
-                    "description": "Glob pattern for files to search for reverse dependencies",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find files related to the given file through imports",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/find-symbols": {
-      "get": {
-        "description": "Find symbols by name across the codebase using Rust CLI. Searches all Python/Rust files for functions, classes, methods matching the given name. Uses the indexed symbol database for fast lookups (~1ms vs ~700ms for full codebase scan). List of SymbolMatch objects sorted by relevance",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "fuzzy": {
-                    "default": true,
-                    "description": "If True, match partial names; if False, exact match only",
-                    "type": "boolean"
-                  },
-                  "kind": {
-                    "description": "Filter by kind: function, class, method",
-                    "type": "string"
-                  },
-                  "limit": {
-                    "default": 50,
-                    "description": "Maximum number of results to return",
-                    "type": "integer"
-                  },
-                  "name": {
-                    "description": "Symbol name to search for (supports partial matching)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find symbols by name across the codebase using Rust CLI",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/find-usages": {
-      "get": {
-        "description": "Find usages of a symbol in the codebase. Searches for references to a symbol name, optionally excluding the definition sites. GrepResult with usage locations",
+        "summary": "List symbols from index",
+        "operationId": "list_symbols",
         "parameters": [
           {
-            "description": "Symbol name to find usages of",
-            "in": "query",
             "name": "name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "If True, exclude definition lines",
             "in": "query",
-            "name": "exclude_definitions",
+            "description": "Symbol name pattern",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
-            "description": "Maximum number of results to return",
+            "name": "kind",
             "in": "query",
+            "description": "Filter by kind (function, class, etc.)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Find usages of a symbol in the codebase",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/grep": {
-      "post": {
-        "description": "Search for text patterns in files using Rust CLI. GrepResult with matches and statistics",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "context_lines": {
-                    "default": 0,
-                    "description": "Number of context lines before/after match (unused)",
-                    "type": "integer"
-                  },
-                  "glob": {
-                    "description": "Glob pattern to filter files (e.g., \"*.py\", \"**/*.ts\")",
-                    "type": "string"
-                  },
-                  "ignore_case": {
-                    "default": false,
-                    "description": "If True, perform case-insensitive matching",
-                    "type": "boolean"
-                  },
-                  "limit": {
-                    "default": 100,
-                    "description": "Maximum number of matches to return",
-                    "type": "integer"
-                  },
-                  "path": {
-                    "description": "Directory to search in (defaults to project root)",
-                    "type": "string"
-                  },
-                  "pattern": {
-                    "description": "Regex pattern to search for",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "pattern"
-                ],
-                "type": "object"
+            "description": "List of symbols",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SymbolListResponse"
+                }
               }
             }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
           }
-        },
-        "summary": "Search for text patterns in files using Rust CLI",
-        "tags": [
-          "search"
-        ]
+        }
       }
     },
-    "/search/query": {
-      "post": {
-        "description": "Query symbols with pattern matching and filters. Provides flexible querying of codebase symbols with regex matching and structural filters. List of QueryMatch objects matching the filters",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "inherits": {
-                    "description": "Filter classes that inherit from this base",
-                    "type": "string"
-                  },
-                  "kind": {
-                    "description": "Filter by symbol kind (function, class, method, variable)",
-                    "type": "string"
-                  },
-                  "max_lines": {
-                    "description": "Maximum number of lines in symbol",
-                    "type": "string"
-                  },
-                  "min_lines": {
-                    "description": "Minimum number of lines in symbol",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "Regex pattern to match symbol names",
-                    "type": "string"
-                  },
-                  "path": {
-                    "description": "Directory or file to search (defaults to project root)",
-                    "type": "string"
-                  },
-                  "pattern": {
-                    "default": "**/*.py",
-                    "description": "Glob pattern for files to search (default: **/*.py)",
-                    "type": "string"
-                  },
-                  "signature": {
-                    "description": "Regex pattern to match signatures",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Query symbols with pattern matching and filters",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/resolve-file": {
+    "/symbols/{name}": {
       "get": {
-        "description": "Resolve a file name with DWIM (Do What I Mean). Handles typos, missing extensions, and partial paths. FileMatch with resolved path and confidence",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "extensions": {
-                    "description": "Extensions to try if name has none (default: .py, .ts, .js, .tsx, .jsx)",
-                    "type": "array"
-                  },
-                  "name": {
-                    "description": "File name, partial path, or module name to resolve",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Resolve a file name with DWIM (Do What I Mean)",
         "tags": [
-          "search"
-        ]
-      }
-    },
-    "/search/summarize-module": {
-      "get": {
-        "description": "Summarize what a Python module does. Extracts: - Module docstring - Public classes with their docstrings - Public functions with their docstrings - Public constants - Basic metrics (line count, import count) ModuleSummary with module information",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the Python file",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Summarize what a Python module does",
-        "tags": [
-          "search"
-        ]
-      }
-    },
-    "/security/analyze": {
-      "get": {
-        "description": "Run security analysis. SecurityAnalysis with findings and summary",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "min_severity": {
-                    "default": "low",
-                    "description": "Minimum severity to report (\"low\", \"medium\", \"high\", \"critical\")",
-                    "type": "string"
-                  },
-                  "tools": {
-                    "description": "List of tools to use (None = all available)",
-                    "type": "array"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Run security analysis",
-        "tags": [
-          "security"
-        ]
-      }
-    },
-    "/security/get-high-severity": {
-      "get": {
-        "description": "Get high and critical severity findings. List of high/critical security findings",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get high and critical severity findings",
-        "tags": [
-          "security"
-        ]
-      }
-    },
-    "/shadow_git/begin-multi-commit": {
-      "post": {
-        "description": "Begin grouping multiple changes into one commit.",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Begin grouping multiple changes into one commit",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/shadow_git/finish-multi-commit": {
-      "post": {
-        "description": "Finish grouping changes and create the commit.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "branch_name": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "message": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "branch_name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Finish grouping changes and create the commit",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/shadow_git/get-diff": {
-      "get": {
-        "description": "Get the full diff for a shadow branch.",
+          "symbols"
+        ],
+        "summary": "Get symbol details and source code",
+        "operationId": "get_symbol",
         "parameters": [
           {
-            "description": "",
-            "in": "query",
-            "name": "branch_name",
+            "name": "name",
+            "in": "path",
+            "description": "Symbol name",
             "required": true,
             "schema": {
               "type": "string"
@@ -2514,1344 +251,233 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get the full diff for a shadow branch",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/shadow_git/get-hunks": {
-      "get": {
-        "description": "Get parsed diff hunks for a branch.",
-        "parameters": [
-          {
-            "description": "",
-            "in": "query",
-            "name": "branch_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get parsed diff hunks for a branch",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/shadow_git/list-branches": {
-      "get": {
-        "description": "List all active shadow branches.",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List all active shadow branches",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/shadow_git/rollback-hunk": {
-      "post": {
-        "description": "Surgically rollback a specific hunk by file and line number.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "branch_name": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "file_path": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "line": {
-                    "description": "",
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "branch_name",
-                  "file_path",
-                  "line"
-                ],
-                "type": "object"
+            "description": "Symbol details with source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SymbolDetailResponse"
+                }
               }
             }
           },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
+          "404": {
+            "description": "Symbol not found"
           }
-        },
-        "summary": "Surgically rollback a specific hunk by file and line number",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/shadow_git/smart-merge": {
-      "post": {
-        "description": "Merge a shadow branch with automated conflict resolution.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "branch_name": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "message": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "branch_name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Merge a shadow branch with automated conflict resolution",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/shadow_git/switch-branch": {
-      "post": {
-        "description": "Switch to a different shadow branch.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "branch_name": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "branch_name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Switch to a different shadow branch",
-        "tags": [
-          "shadow_git"
-        ]
-      }
-    },
-    "/skeleton/expand": {
-      "post": {
-        "description": "Get the full source code of a named symbol. Useful for getting complete enum definitions, class bodies, or function implementations when the skeleton isn't enough. Full source code of the symbol, or None if not found # Get full enum definition content = api.skeleton.expand(\"src/agent_loop.py\", \"StepType\") # Returns complete enum with all values",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the file",
-                    "type": "string"
-                  },
-                  "symbol_name": {
-                    "description": "Name of the symbol to expand (e.g., \"StepType\", \"my_function\")",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "symbol_name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get the full source code of a named symbol",
-        "tags": [
-          "skeleton"
-        ]
-      }
-    },
-    "/skeleton/extract": {
-      "post": {
-        "description": "Extract skeleton from a file (Python, Rust, Markdown). List of Symbol objects representing the code structure FileNotFoundError: If the file does not exist",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the file (relative to root or absolute)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Extract skeleton from a file (Python, Rust, Markdown)",
-        "tags": [
-          "skeleton"
-        ]
-      }
-    },
-    "/skeleton/format": {
-      "post": {
-        "description": "Extract and format skeleton as readable text. Delegates to Rust CLI. Fails if Rust not available. Formatted string representation of the skeleton RuntimeError: If Rust CLI is not available",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to the file",
-                    "type": "string"
-                  },
-                  "include_docstrings": {
-                    "default": true,
-                    "description": "Whether to include docstrings (ignored, Rust controls)",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Extract and format skeleton as readable text",
-        "tags": [
-          "skeleton"
-        ]
-      }
-    },
-    "/skeleton/get-enum-values": {
-      "get": {
-        "description": "Extract enum member names from an Enum class. List of enum member names, or None if not found values = api.skeleton.get_enum_values(\"src/agent_loop.py\", \"StepType\") # Returns: [\"TOOL\", \"LLM\", \"HYBRID\"]",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "enum_name": {
-                    "description": "Name of the Enum class",
-                    "type": "string"
-                  },
-                  "file_path": {
-                    "description": "Path to the Python file",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path",
-                  "enum_name"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Extract enum member names from an Enum class",
-        "tags": [
-          "skeleton"
-        ]
-      }
-    },
-    "/structural_edit/delete": {
-      "post": {
-        "description": "Delete a symbol or file. Convenience wrapper for delete operation.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "dry_run": {
-                    "default": false,
-                    "description": "",
-                    "type": "boolean"
-                  },
-                  "target": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "target"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Delete a symbol or file",
-        "tags": [
-          "structural_edit"
-        ]
-      }
-    },
-    "/structural_edit/edit": {
-      "post": {
-        "description": "Edit a node in the codebase tree. EditResult with operation status",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "after": {
-                    "description": "Insert content after target",
-                    "type": "string"
-                  },
-                  "append": {
-                    "description": "Insert at end of target container",
-                    "type": "string"
-                  },
-                  "before": {
-                    "description": "Insert content before target",
-                    "type": "string"
-                  },
-                  "delete": {
-                    "default": false,
-                    "description": "Delete the target node",
-                    "type": "boolean"
-                  },
-                  "dry_run": {
-                    "default": false,
-                    "description": "Show what would change without applying",
-                    "type": "boolean"
-                  },
-                  "move_after": {
-                    "description": "Move target after another node",
-                    "type": "string"
-                  },
-                  "move_before": {
-                    "description": "Move target before another node",
-                    "type": "string"
-                  },
-                  "prepend": {
-                    "description": "Insert at beginning of target container",
-                    "type": "string"
-                  },
-                  "replace": {
-                    "description": "Replace target with new content",
-                    "type": "string"
-                  },
-                  "swap": {
-                    "description": "Swap target with another node",
-                    "type": "string"
-                  },
-                  "target": {
-                    "description": "Path to edit (like src/foo.py/Bar/method)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "target"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Edit a node in the codebase tree",
-        "tags": [
-          "structural_edit"
-        ]
-      }
-    },
-    "/structural_edit/insert-after": {
-      "post": {
-        "description": "Insert content after a symbol. Convenience wrapper for after operation.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "content": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "dry_run": {
-                    "default": false,
-                    "description": "",
-                    "type": "boolean"
-                  },
-                  "target": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "target",
-                  "content"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Insert content after a symbol",
-        "tags": [
-          "structural_edit"
-        ]
-      }
-    },
-    "/structural_edit/insert-before": {
-      "post": {
-        "description": "Insert content before a symbol. Convenience wrapper for before operation.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "content": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "dry_run": {
-                    "default": false,
-                    "description": "",
-                    "type": "boolean"
-                  },
-                  "target": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "target",
-                  "content"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Insert content before a symbol",
-        "tags": [
-          "structural_edit"
-        ]
-      }
-    },
-    "/structural_edit/replace": {
-      "post": {
-        "description": "Replace a symbol with new content. Convenience wrapper for replace operation.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "content": {
-                    "description": "",
-                    "type": "string"
-                  },
-                  "dry_run": {
-                    "default": false,
-                    "description": "",
-                    "type": "boolean"
-                  },
-                  "target": {
-                    "description": "",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "target",
-                  "content"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Replace a symbol with new content",
-        "tags": [
-          "structural_edit"
-        ]
-      }
-    },
-    "/telemetry/analyze-all-sessions": {
-      "get": {
-        "description": "Analyze patterns across all recorded sessions.",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze patterns across all recorded sessions",
-        "tags": [
-          "telemetry"
-        ]
-      }
-    },
-    "/telemetry/get-session-stats": {
-      "get": {
-        "description": "Get comprehensive statistics for a session.",
-        "parameters": [
-          {
-            "description": "",
-            "in": "query",
-            "name": "session_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get comprehensive statistics for a session",
-        "tags": [
-          "telemetry"
-        ]
-      }
-    },
-    "/todo/list": {
-      "get": {
-        "description": "List TODOs, optionally filtered by section. TodoListResult with items grouped by section",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "include_done": {
-                    "default": false,
-                    "description": "Include completed TODOs (default: False)",
-                    "type": "boolean"
-                  },
-                  "per_section_limit": {
-                    "default": 5,
-                    "description": "Max items to show per section (default: 5)",
-                    "type": "integer"
-                  },
-                  "section": {
-                    "description": "Filter to specific section (case-insensitive partial match)",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List TODOs, optionally filtered by section",
-        "tags": [
-          "todo"
-        ]
-      }
-    },
-    "/todo/search": {
-      "post": {
-        "description": "Search TODOs by keyword. List of TodoSearchResult with matching items, sorted by relevance",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "include_done": {
-                    "default": false,
-                    "description": "Include completed TODOs (default: False)",
-                    "type": "boolean"
-                  },
-                  "query": {
-                    "description": "Search query (case-insensitive, matches text and section)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "query"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Search TODOs by keyword",
-        "tags": [
-          "todo"
-        ]
-      }
-    },
-    "/todo/sections": {
-      "post": {
-        "description": "List all TODO sections with counts. List of dicts with section name, pending count, and done count",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List all TODO sections with counts",
-        "tags": [
-          "todo"
-        ]
-      }
-    },
-    "/toml/keys": {
-      "post": {
-        "description": "List all key paths in a TOML file. List of dotted key paths",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "path": {
-                    "description": "Path to TOML file",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "List all key paths in a TOML file",
-        "tags": [
-          "toml"
-        ]
-      }
-    },
-    "/toml/parse": {
-      "post": {
-        "description": "Parse a TOML file to dict. Parsed TOML as dict",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "path": {
-                    "description": "Path to TOML file (relative to project root)",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Parse a TOML file to dict",
-        "tags": [
-          "toml"
-        ]
-      }
-    },
-    "/toml/query": {
-      "post": {
-        "description": "Query a TOML file with jq-like syntax. Supported syntax: .key          - Access object key .key.subkey   - Nested access .[0]          - Array index .*            - All values .key|keys     - Get keys of object .key|length   - Get length .key?         - Optional access Query result",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "path": {
-                    "description": "Path to TOML file",
-                    "type": "string"
-                  },
-                  "query_path": {
-                    "description": "jq-like query (e.g., \".project.name\")",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "path",
-                  "query_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Query a TOML file with jq-like syntax",
-        "tags": [
-          "toml"
-        ]
-      }
-    },
-    "/toml/summary": {
-      "post": {
-        "description": "Get summary of TOML file structure. Dict with sections, key_count, nested_depth, types",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "path": {
-                    "description": "Path to TOML file",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Get summary of TOML file structure",
-        "tags": [
-          "toml"
-        ]
-      }
-    },
-    "/tree/format": {
-      "post": {
-        "description": "Generate and format tree as readable text. Formatted tree visualization",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "compact": {
-                    "default": false,
-                    "description": "If True, use token-efficient format",
-                    "type": "boolean"
-                  },
-                  "path": {
-                    "description": "Directory to visualize (default: project root)",
-                    "type": "string"
-                  },
-                  "tracked_only": {
-                    "default": false,
-                    "description": "If True, only show git-tracked files",
-                    "type": "boolean"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Generate and format tree as readable text",
-        "tags": [
-          "tree"
-        ]
-      }
-    },
-    "/tree/generate": {
-      "post": {
-        "description": "Generate a tree visualization of a directory. TreeResult with tree visualization and file counts",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "gitignore": {
-                    "default": true,
-                    "description": "If True, respect .gitignore when showing all files",
-                    "type": "boolean"
-                  },
-                  "path": {
-                    "description": "Directory to visualize (default: project root)",
-                    "type": "string"
-                  },
-                  "tracked_only": {
-                    "default": false,
-                    "description": "If True, only show git-tracked files",
-                    "type": "boolean"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Generate a tree visualization of a directory",
-        "tags": [
-          "tree"
-        ]
-      }
-    },
-    "/validation/create-chain": {
-      "post": {
-        "description": "Create a standard Python validator chain. ValidatorChain configured for Python (syntax + ruff + pytest)",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Create a standard Python validator chain",
-        "tags": [
-          "validation"
-        ]
-      }
-    },
-    "/validation/validate": {
-      "post": {
-        "description": "Validate a Python file with the default chain. ValidationResult with any issues found",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "file_path": {
-                    "description": "Path to validate",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file_path"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Validate a Python file with the default chain",
-        "tags": [
-          "validation"
-        ]
-      }
-    },
-    "/view/view": {
-      "post": {
-        "description": "View a node in the codebase tree. ViewResult with node content",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "called_by": {
-                    "default": false,
-                    "description": "Show symbols the target calls",
-                    "type": "boolean"
-                  },
-                  "calls": {
-                    "default": false,
-                    "description": "Show symbols that call the target",
-                    "type": "boolean"
-                  },
-                  "deps": {
-                    "default": false,
-                    "description": "Show dependencies (imports/exports)",
-                    "type": "boolean"
-                  },
-                  "depth": {
-                    "default": 1,
-                    "description": "Expansion depth (0=names, 1=signatures, 2=children, -1=all)",
-                    "type": "integer"
-                  },
-                  "kind": {
-                    "description": "Filter by symbol type (class, function, method)",
-                    "type": "string"
-                  },
-                  "line_numbers": {
-                    "default": false,
-                    "description": "Include line numbers",
-                    "type": "boolean"
-                  },
-                  "target": {
-                    "description": "Path to view (file, directory, or symbol like src/foo.py/Bar)",
-                    "type": "string"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "View a node in the codebase tree",
-        "tags": [
-          "view"
-        ]
-      }
-    },
-    "/weaknesses/analyze": {
-      "get": {
-        "description": "Analyze codebase for architectural weaknesses. WeaknessAnalysis with detected weaknesses",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "categories": {
-                    "description": "Categories to check (None = all)",
-                    "type": "array"
-                  }
-                },
-                "required": [],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Analyze codebase for architectural weaknesses",
-        "tags": [
-          "weaknesses"
-        ]
-      }
-    },
-    "/weaknesses/format": {
-      "post": {
-        "description": "Format weakness analysis as markdown. Markdown-formatted report",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "analysis": {
-                    "description": "WeaknessAnalysis to format",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "analysis"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Format weakness analysis as markdown",
-        "tags": [
-          "weaknesses"
-        ]
-      }
-    },
-    "/web/clear-cache": {
-      "post": {
-        "description": "Clear the web content cache. Number of cached items cleared",
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Clear the web content cache",
-        "tags": [
-          "web"
-        ]
-      }
-    },
-    "/web/extract-content": {
-      "post": {
-        "description": "Extract clean content from HTML string. Dict with title, text, token_estimate, metadata",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "html": {
-                    "description": "Raw HTML content",
-                    "type": "string"
-                  },
-                  "url": {
-                    "default": "",
-                    "description": "Optional URL for metadata",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "html"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Extract clean content from HTML string",
-        "tags": [
-          "web"
-        ]
-      }
-    },
-    "/web/fetch": {
-      "post": {
-        "description": "Fetch and extract content from URL. Dict with url, title, text, token_estimate, metadata",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "extract_main": {
-                    "default": true,
-                    "description": "Extract main content vs full page (default: True)",
-                    "type": "boolean"
-                  },
-                  "url": {
-                    "description": "URL to fetch",
-                    "type": "string"
-                  },
-                  "use_cache": {
-                    "default": true,
-                    "description": "Check cache first (default: True)",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "url"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Fetch and extract content from URL",
-        "tags": [
-          "web"
-        ]
-      }
-    },
-    "/web/search": {
-      "post": {
-        "description": "Search the web with token-efficient results. Dict with query, results list, and compact string representation",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "max_results": {
-                    "default": 5,
-                    "description": "Maximum number of results (default: 5)",
-                    "type": "integer"
-                  },
-                  "query": {
-                    "description": "Search query",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "query"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Search the web with token-efficient results",
-        "tags": [
-          "web"
-        ]
+        }
       }
     }
   },
-  "tags": [
-    {
-      "description": "API for agent orchestration and loops. Provides access to agent execution using composable execution primitives.",
-      "name": "agent"
-    },
-    {
-      "description": "API for codebase analysis (health, complexity, security). Wraps the Rust `moss analyze` command for comprehensive analysis.",
-      "name": "analyze"
-    },
-    {
-      "description": "API for finding code locations using fuzzy anchors. Anchors identify code elements (functions, classes, variables) by name and type, with fuzzy matching support.",
-      "name": "anchor"
-    },
-    {
-      "description": "API for control flow graph analysis. Builds control flow graphs showing execution paths through functions.",
-      "name": "cfg"
-    },
-    {
-      "description": "API for structural clone detection. Detects structurally similar code by normalizing AST subtrees and comparing hashes. Helps identify code that could potentially be abstracted into shared functions.",
-      "name": "clones"
-    },
-    {
-      "description": "API for cyclomatic complexity analysis. Calculates McCabe cyclomatic complexity for Python functions, helping identify code that may be difficult to test or maintain.",
-      "name": "complexity"
-    },
-    {
-      "description": "API for context compilation. Compiles code views (skeletons, CFGs, dependencies) into structured context for AI consumption.",
-      "name": "context"
-    },
-    {
-      "description": "API for dependency analysis. Analyzes import/export relationships, detects circular dependencies, and provides coupling metrics.",
-      "name": "dependencies"
-    },
-    {
-      "description": "START HERE - Tool discovery and routing for Moss. Don't know which Moss tool to use? Ask DWIM! This API helps you find the right tool for any task using natural language queries. Features: - Natural language queries: describe what you want, get tool suggestions - Semantic aliases: map conceptual names to canonical tools - Fuzzy matching: handle typos and variations - Confidence scoring: know when to auto-correct vs suggest",
-      "name": "dwim"
-    },
-    {
-      "description": "API for direct file modifications. Provides tools for writing files, replacing text, and inserting lines. Useful for simple edits that don't require AST awareness.",
-      "name": "edit"
-    },
-    {
-      "description": "API for external dependency analysis. Analyzes PyPI/npm dependencies including transitive dependencies, security vulnerabilities, and license compatibility.",
-      "name": "external_deps"
-    },
-    {
-      "description": "API for shadow git operations. Provides atomic commit/rollback operations for safe code modifications.",
-      "name": "git"
-    },
-    {
-      "description": "API for git hotspot analysis. Identifies frequently changed files in the git repository. High churn areas may indicate code that needs refactoring.",
-      "name": "git_hotspots"
-    },
-    {
-      "description": "API for evaluating codebase structure quality. Measures how intuitive and predictable the codebase structure is. Can you guess where to find functionality based on its name?",
-      "name": "guessability"
-    },
-    {
-      "description": "API for project health analysis. Provides comprehensive project health metrics and reports.",
-      "name": "health"
-    },
-    {
-      "description": "API for agent learning and lessons management. Records and surfaces lessons learned from session failures and mistakes. Lessons are stored in .moss/lessons.md.",
-      "name": "lessons"
-    },
-    {
-      "description": "API for applying code patches. Supports AST-aware patching with automatic fallback to text-based patching when AST parsing fails.",
-      "name": "patch"
-    },
-    {
-      "description": "API for architectural pattern detection.",
-      "name": "patterns"
-    },
-    {
-      "description": "API for RAG (Retrieval-Augmented Generation) semantic search. Provides semantic code search capabilities using vector embeddings. Index your codebase once, then search with natural language queries.",
-      "name": "rag"
-    },
-    {
-      "description": "API for bidirectional reference checking. Validates that code files reference their documentation and documentation references implementation files. Detects stale references where targets have been modified after sources.",
-      "name": "ref_check"
-    },
-    {
-      "description": "API for codebase search operations. Provides unified search across the codebase using structural analysis (skeleton/anchors), text patterns (grep), and file patterns (glob). Use this instead of raw grep/glob for better integration with Moss.",
-      "name": "search"
-    },
-    {
-      "description": "API for security analysis. Orchestrates multiple security tools (bandit, semgrep) to detect vulnerabilities and security issues in the codebase.",
-      "name": "security"
-    },
-    {
-      "description": "API for advanced shadow git operations. Provides first-class access to 'Shadow Git' features: diffs, surgical hunk-level rollback, and branch management.",
-      "name": "shadow_git"
-    },
-    {
-      "description": "API for code skeleton extraction. Extracts structural summaries of code (classes, functions, signatures) without implementation details. Supports multiple languages via plugin system.",
-      "name": "skeleton"
-    },
-    {
-      "description": "API for structural code modifications. Wraps the Rust `moss edit` command for precise, AST-aware edits.",
-      "name": "structural_edit"
-    },
-    {
-      "description": "API for session telemetry and analysis. Provides tools for analyzing token usage, tool patterns, and codebase access patterns across sessions.",
-      "name": "telemetry"
-    },
-    {
-      "description": "API for TODO management and search. Search and browse TODOs from TODO.md. Useful for finding relevant work items and understanding project priorities.",
-      "name": "todo"
-    },
-    {
-      "description": "API for navigating TOML configuration files. Provides jq-like querying for exploring config files (pyproject.toml, Cargo.toml, etc.) efficiently. api = MossAPI.for_project(\".\") name = api.toml.query(\"pyproject.toml\", \".project.name\") deps = api.toml.query(\"Cargo.toml\", \".dependencies|keys\")",
-      "name": "toml"
-    },
-    {
-      "description": "API for git-aware file tree visualization. Shows project structure with awareness of git tracking status.",
-      "name": "tree"
-    },
-    {
-      "description": "API for code validation. Runs validators (syntax, linting, tests) and reports issues.",
-      "name": "validation"
-    },
-    {
-      "description": "API for viewing codebase nodes (directories, files, symbols). Wraps the Rust `moss view` command for fast, consistent results.",
-      "name": "view"
-    },
-    {
-      "description": "API for architectural weakness analysis. Identifies potential issues in codebase architecture: - Tight coupling between components - Missing abstractions - Inconsistent patterns - Technical debt indicators",
-      "name": "weaknesses"
-    },
-    {
-      "description": "API for token-efficient web fetching and search. Provides web content extraction optimized for LLM context. Strips HTML noise, extracts main content, caches results. api = MossAPI.for_project(\".\") content = await api.web.fetch(\"https://docs.python.org/3/\") print(f\"Tokens: ~{content.token_estimate}\") results = await api.web.search(\"python asyncio tutorial\") print(results.to_compact())",
-      "name": "web"
+  "components": {
+    "schemas": {
+      "FileInfoResponse": {
+        "type": "object",
+        "description": "File info response.",
+        "required": [
+          "path",
+          "symbols"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File path"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SymbolInfo"
+            },
+            "description": "Symbols defined in the file"
+          }
+        }
+      },
+      "FileListResponse": {
+        "type": "object",
+        "description": "File list response.",
+        "required": [
+          "files"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of file paths"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "description": "Health check response.",
+        "required": [
+          "status",
+          "files_indexed"
+        ],
+        "properties": {
+          "files_indexed": {
+            "type": "integer",
+            "description": "Number of files in the index",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "description": "Server status"
+          }
+        }
+      },
+      "IndexedSymbol": {
+        "type": "object",
+        "description": "Indexed symbol info",
+        "required": [
+          "name",
+          "kind",
+          "file",
+          "line"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "File containing the symbol"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Symbol kind"
+          },
+          "line": {
+            "type": "integer",
+            "description": "Line number",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "description": "Symbol name"
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "description": "Search response.",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            },
+            "description": "Search results"
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "description": "Individual search result",
+        "required": [
+          "path",
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Result kind (file or symbol kind)"
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Line number (if symbol result)",
+            "minimum": 0
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Symbol name (if symbol result)"
+          },
+          "path": {
+            "type": "string",
+            "description": "File path"
+          }
+        }
+      },
+      "SymbolDetailResponse": {
+        "type": "object",
+        "description": "Symbol detail response",
+        "required": [
+          "name",
+          "file",
+          "start_line",
+          "end_line",
+          "source"
+        ],
+        "properties": {
+          "end_line": {
+            "type": "integer",
+            "description": "End line",
+            "minimum": 0
+          },
+          "file": {
+            "type": "string",
+            "description": "File containing the symbol"
+          },
+          "name": {
+            "type": "string",
+            "description": "Symbol name"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source code"
+          },
+          "start_line": {
+            "type": "integer",
+            "description": "Start line",
+            "minimum": 0
+          }
+        }
+      },
+      "SymbolInfo": {
+        "type": "object",
+        "description": "Symbol info for file response.",
+        "required": [
+          "name",
+          "kind",
+          "line"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Symbol kind (function, class, etc.)"
+          },
+          "line": {
+            "type": "integer",
+            "description": "Line number",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "description": "Symbol name"
+          }
+        }
+      },
+      "SymbolListResponse": {
+        "type": "object",
+        "description": "Symbol search response.",
+        "required": [
+          "symbols"
+        ],
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexedSymbol"
+            },
+            "description": "List of matching symbols"
+          }
+        }
+      }
     }
-  ]
+  }
 }

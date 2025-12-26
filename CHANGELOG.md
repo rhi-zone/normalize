@@ -39,6 +39,13 @@ Unified extraction layer in `extract.rs`:
   - skeleton: nested children, signatures, docstrings (for viewing)
   - symbols: flat with parent refs, complexity (for indexing)
 
+### OpenAPI Auto-Generation
+
+HTTP server now auto-generates OpenAPI spec using utoipa:
+- Spec served at `/openapi.json` when server is running
+- `moss serve http --openapi` outputs spec without starting server
+- Replaces stale Python-generated spec (was 117KB, now accurate 10KB)
+
 ### Unified Filtering
 
 Added `--exclude` and `--only` flags for filtering across commands (`view`, `analyze`, `edit`, `grep`):

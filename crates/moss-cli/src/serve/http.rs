@@ -13,6 +13,30 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use utoipa::{OpenApi, ToSchema};
+
+/// OpenAPI documentation
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Moss API",
+        version = "0.1.0",
+        description = "Code intelligence API for moss"
+    ),
+    paths(health, list_files, get_file, list_symbols, get_symbol, search),
+    components(schemas(
+        HealthResponse,
+        FileListResponse,
+        FileInfoResponse,
+        SymbolInfo,
+        SymbolListResponse,
+        IndexedSymbol,
+        SearchResponse,
+        SearchResult,
+        SymbolDetailResponse
+    ))
+)]
+pub struct ApiDoc;
 
 /// Shared server state.
 struct AppState {
@@ -38,6 +62,7 @@ pub async fn run_http_server(root: &std::path::Path, port: u16) -> i32 {
 
     // Build routes
     let app = Router::new()
+        .route("/openapi.json", get(openapi_spec))
         .route("/health", get(health))
         .route("/files", get(list_files))
         .route("/files/*path", get(get_file))
@@ -48,6 +73,7 @@ pub async fn run_http_server(root: &std::path::Path, port: u16) -> i32 {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     eprintln!("HTTP server listening on http://{}", addr);
+    eprintln!("OpenAPI spec available at http://{}/openapi.json", addr);
 
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
@@ -65,13 +91,29 @@ pub async fn run_http_server(root: &std::path::Path, port: u16) -> i32 {
     0
 }
 
+/// Serve OpenAPI spec as JSON
+async fn openapi_spec() -> Json<utoipa::openapi::OpenApi> {
+    Json(ApiDoc::openapi())
+}
+
 /// Health check response.
-#[derive(Serialize)]
-struct HealthResponse {
+#[derive(Serialize, ToSchema)]
+pub struct HealthResponse {
+    /// Server status
     status: &'static str,
+    /// Number of files in the index
     files_indexed: usize,
 }
 
+/// Check server health
+#[utoipa::path(
+    get,
+    path = "/health",
+    responses(
+        (status = 200, description = "Server is healthy", body = HealthResponse)
+    ),
+    tag = "health"
+)]
 async fn health(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
     let files_indexed = state
         .index
@@ -85,18 +127,31 @@ async fn health(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
 }
 
 /// File list query parameters.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 struct FileListQuery {
+    /// Glob pattern to filter files
     pattern: Option<String>,
+    /// Maximum number of results
     limit: Option<usize>,
 }
 
 /// File list response.
-#[derive(Serialize)]
-struct FileListResponse {
+#[derive(Serialize, ToSchema)]
+pub struct FileListResponse {
+    /// List of file paths
     files: Vec<String>,
 }
 
+/// List indexed files
+#[utoipa::path(
+    get,
+    path = "/files",
+    params(FileListQuery),
+    responses(
+        (status = 200, description = "List of files", body = FileListResponse)
+    ),
+    tag = "files"
+)]
 async fn list_files(
     State(state): State<Arc<AppState>>,
     Query(query): Query<FileListQuery>,
@@ -119,20 +174,38 @@ async fn list_files(
 }
 
 /// File info response.
-#[derive(Serialize)]
-struct FileInfoResponse {
+#[derive(Serialize, ToSchema)]
+pub struct FileInfoResponse {
+    /// File path
     path: String,
+    /// Symbols defined in the file
     symbols: Vec<SymbolInfo>,
 }
 
 /// Symbol info for file response.
-#[derive(Serialize)]
-struct SymbolInfo {
+#[derive(Serialize, ToSchema)]
+pub struct SymbolInfo {
+    /// Symbol name
     name: String,
+    /// Symbol kind (function, class, etc.)
     kind: String,
+    /// Line number
     line: usize,
 }
 
+/// Get file information and symbols
+#[utoipa::path(
+    get,
+    path = "/files/{path}",
+    params(
+        ("path" = String, Path, description = "File path relative to root")
+    ),
+    responses(
+        (status = 200, description = "File info with symbols", body = FileInfoResponse),
+        (status = 404, description = "File not found")
+    ),
+    tag = "files"
+)]
 async fn get_file(
     State(state): State<Arc<AppState>>,
     Path(path): Path<String>,
@@ -165,27 +238,46 @@ async fn get_file(
 }
 
 /// Symbol search query.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 struct SymbolQuery {
+    /// Symbol name pattern
     name: Option<String>,
+    /// Filter by kind (function, class, etc.)
     kind: Option<String>,
+    /// Maximum number of results
     limit: Option<usize>,
 }
 
 /// Symbol search response.
-#[derive(Serialize)]
-struct SymbolListResponse {
+#[derive(Serialize, ToSchema)]
+pub struct SymbolListResponse {
+    /// List of matching symbols
     symbols: Vec<IndexedSymbol>,
 }
 
-#[derive(Serialize)]
-struct IndexedSymbol {
+/// Indexed symbol info
+#[derive(Serialize, ToSchema)]
+pub struct IndexedSymbol {
+    /// Symbol name
     name: String,
+    /// Symbol kind
     kind: String,
+    /// File containing the symbol
     file: String,
+    /// Line number
     line: usize,
 }
 
+/// List symbols from index
+#[utoipa::path(
+    get,
+    path = "/symbols",
+    params(SymbolQuery),
+    responses(
+        (status = 200, description = "List of symbols", body = SymbolListResponse)
+    ),
+    tag = "symbols"
+)]
 async fn list_symbols(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SymbolQuery>,
@@ -217,10 +309,38 @@ async fn list_symbols(
     Json(SymbolListResponse { symbols })
 }
 
+/// Symbol detail response
+#[derive(Serialize, ToSchema)]
+pub struct SymbolDetailResponse {
+    /// Symbol name
+    name: String,
+    /// File containing the symbol
+    file: String,
+    /// Start line
+    start_line: usize,
+    /// End line
+    end_line: usize,
+    /// Source code
+    source: String,
+}
+
+/// Get symbol details and source code
+#[utoipa::path(
+    get,
+    path = "/symbols/{name}",
+    params(
+        ("name" = String, Path, description = "Symbol name")
+    ),
+    responses(
+        (status = 200, description = "Symbol details with source", body = SymbolDetailResponse),
+        (status = 404, description = "Symbol not found")
+    ),
+    tag = "symbols"
+)]
 async fn get_symbol(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
+) -> Result<Json<SymbolDetailResponse>, StatusCode> {
     let matches = state
         .index
         .lock()
@@ -242,38 +362,58 @@ async fn get_symbol(
     let end_idx = (*end).min(lines.len());
     let source = lines[start_idx..end_idx].join("\n");
 
-    Ok(Json(serde_json::json!({
-        "name": name,
-        "file": file,
-        "start_line": start,
-        "end_line": end,
-        "source": source,
-    })))
+    Ok(Json(SymbolDetailResponse {
+        name,
+        file: file.clone(),
+        start_line: *start,
+        end_line: *end,
+        source,
+    }))
 }
 
 /// Generic search query.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 struct SearchQuery {
+    /// Search query string
     q: String,
+    /// Search type: "file", "symbol", or "all"
     #[serde(rename = "type")]
+    #[param(rename = "type")]
     search_type: Option<String>,
+    /// Maximum number of results
     limit: Option<usize>,
 }
 
 /// Search response.
-#[derive(Serialize)]
-struct SearchResponse {
+#[derive(Serialize, ToSchema)]
+pub struct SearchResponse {
+    /// Search results
     results: Vec<SearchResult>,
 }
 
-#[derive(Serialize)]
-struct SearchResult {
+/// Individual search result
+#[derive(Serialize, ToSchema)]
+pub struct SearchResult {
+    /// File path
     path: String,
+    /// Result kind (file or symbol kind)
     kind: String,
+    /// Symbol name (if symbol result)
     name: Option<String>,
+    /// Line number (if symbol result)
     line: Option<usize>,
 }
 
+/// Search files and symbols
+#[utoipa::path(
+    get,
+    path = "/search",
+    params(SearchQuery),
+    responses(
+        (status = 200, description = "Search results", body = SearchResponse)
+    ),
+    tag = "search"
+)]
 async fn search(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SearchQuery>,
