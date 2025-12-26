@@ -2851,6 +2851,7 @@ dependencies = [
  "jaq-json",
  "jaq-std",
  "libc",
+ "moss-jsonschema",
  "moss-languages",
  "moss-openapi",
  "moss-packages",
@@ -2875,6 +2876,13 @@ dependencies = [
  "utoipa",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "moss-jsonschema"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

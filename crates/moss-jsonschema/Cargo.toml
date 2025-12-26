@@ -1,0 +1,9 @@
+[package]
+name = "moss-jsonschema"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+description = "JSON Schema type generation"
+
+[dependencies]
+serde_json.workspace = true

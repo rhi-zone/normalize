@@ -53,6 +53,7 @@ rusqlite.workspace = true
 arborium.workspace = true
 dirs = "5"
 moss-languages = { path = "../moss-languages", default-features = false }
+moss-jsonschema = { path = "../moss-jsonschema" }
 moss-openapi = { path = "../moss-openapi" }
 moss-packages = { path = "../moss-packages" }
 moss-tools = { path = "../moss-tools" }
