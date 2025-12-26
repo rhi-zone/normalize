@@ -13,9 +13,6 @@ Test Status: 110 passing, 0 failing (moss-languages)
 **Workflow Engine:**
 - [ ] Port LLM calling logic (streaming, tool use) as workflow component
 
-**Consider Porting:**
-- [x] `cmd_check_refs` - bidirectional code/doc reference checking → `moss analyze --check-refs`
-
 **Rust Redesign Candidates:**
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration
@@ -44,9 +41,6 @@ Current scaffold is TOML state machines. Needs design work:
 **Daemon Design:**
 - Multi-codebase: single daemon indexing multiple roots simultaneously
 - Minimal memory footprint (currently loads full index per root)
-- Per-project config: .moss/config.toml to disable daemon/indexing
-- Global config: ~/.config/moss/config.toml for defaults
-- Auto-start: `moss` commands start daemon if enabled and not running (~2.3ms check cost)
 
 **HTTP Server:**
 - OpenAPI spec for `moss serve http` endpoints (enables client codegen, docs)
@@ -55,17 +49,6 @@ Current scaffold is TOML state machines. Needs design work:
 **Tooling:**
 - Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (Opus 4.5 drops TODO items when editing markdown)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
-
-**Linting:**
-- `lint list` now ~100ms (removed recursive dir scans, config-only detection)
-
-**View Filtering:**
-- See `docs/view-filtering.md` for design (Option E: @alias sigil with built-ins + config override)
-- [x] `view` command: `--exclude`, `--only` flags with `@alias` and glob support
-- [x] `analyze` command: complexity filtering with `--exclude`, `--only`
-- [x] `edit` command: filter guards target resolution
-- [x] `grep` command: replaced `--glob` with `--exclude`/`--only`
-- [ ] `lint` command: decided against - linter configs handle exclusions
 
 **Agent Research:**
 - Conversational loop pattern (vs hierarchical)
@@ -109,10 +92,10 @@ Tracking what was in Python packages, what's been reimplemented, what's intentio
 - Gen commands for MCP/HTTP/gRPC/LSP - MCP/HTTP/LSP in Rust
 
 **moss-intelligence (~36 files):**
-- Skeleton extraction - ✓ in Rust
-- Complexity analysis - ✓ in Rust
-- Dependency analysis - ✓ in Rust
-- Security analysis - ✓ in Rust (shells to bandit)
+- Skeleton extraction - done
+- Complexity analysis - done
+- Dependency analysis - done
+- Security analysis - done (shells to bandit)
 - Edit routing (LLM-powered) - not yet in Rust
 - Summarization (LLM-powered) - not yet in Rust
 
@@ -125,12 +108,12 @@ Tracking what was in Python packages, what's been reimplemented, what's intentio
 - Context compilation (skeleton + deps + summary) - partial via `view --deps`
 
 **moss-mcp/acp:**
-- MCP server - ✓ in Rust
+- MCP server - done
 - ACP server - dropped (unused)
 - dwim.py tool resolution - simplified in Rust (3 primitives)
 
 **moss-lsp:**
-- LSP server - ✓ in Rust
+- LSP server - done
 
 ## Implementation Notes
 
