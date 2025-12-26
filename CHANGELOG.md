@@ -23,6 +23,15 @@ Implemented `auto{}` driver for Lua workflows (requires `llm` feature):
 - Minimal system prompt for token efficiency
 - Example: `auto{prompt="Find and fix bugs", model="anthropic"}`
 
+### Interactive Workflow Sessions
+
+Coroutine-based sessions for interactive workflows:
+- `prompt(message)` - yields to frontend for text input
+- `menu(options)` - yields to frontend for selection from list
+- `WorkflowSession::step()` - drive workflow from frontend
+- `RuntimeState` enum: `Waiting(Prompt|Menu)`, `Done`, `Error`
+- Lua code looks synchronous, frontend controls the event loop
+
 ### Documentation Reference Checking
 
 `moss analyze --check-refs` scans markdown files for code references in backticks and validates against indexed symbols. Reports broken references with file:line and context.

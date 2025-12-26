@@ -27,4 +27,4 @@ mod lua_runtime;
 pub(crate) mod llm;
 
 #[cfg(feature = "lua")]
-pub use lua_runtime::LuaRuntime;
+pub use lua_runtime::{CommandResult, LuaRuntime, RuntimeState, RuntimeYield, WorkflowSession};

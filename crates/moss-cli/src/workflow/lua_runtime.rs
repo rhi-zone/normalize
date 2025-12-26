@@ -5,18 +5,43 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use mlua::{FromLua, Lua, Result as LuaResult, Table, UserData, UserDataMethods, Value};
+use mlua::{FromLua, Lua, Result as LuaResult, Table, Thread, UserData, UserDataMethods, Value};
 
 #[cfg(feature = "llm")]
 use super::llm::{parse_agent_response, AgentAction, LlmClient, AGENT_SYSTEM_PROMPT};
+
+/// What the runtime is waiting for from the frontend.
+#[derive(Debug, Clone)]
+pub enum RuntimeYield {
+    /// Waiting for user to enter text.
+    Prompt { message: String },
+    /// Waiting for user to pick from options.
+    Menu { options: Vec<String> },
+}
+
+/// State of an interactive workflow.
+#[derive(Debug)]
+pub enum RuntimeState {
+    /// Waiting for input from the frontend.
+    Waiting(RuntimeYield),
+    /// Finished successfully.
+    Done(Option<CommandResult>),
+    /// Errored.
+    Error(String),
+}
 
 /// Lua workflow runtime.
 pub struct LuaRuntime {
     lua: Lua,
 }
 
+/// Interactive workflow session (coroutine-based).
+pub struct WorkflowSession {
+    thread: Thread,
+}
+
 /// Result of a command execution.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CommandResult {
     pub output: String,
     pub success: bool,
@@ -149,6 +174,97 @@ impl LuaRuntime {
         self.lua.load(script).exec()
     }
 
+    /// Create an interactive workflow session from a script.
+    /// The script runs as a coroutine that can yield for user input.
+    pub fn create_session(&self, script: &str) -> LuaResult<WorkflowSession> {
+        // Wrap script in coroutine.create
+        let wrapped = format!(
+            r#"return coroutine.create(function()
+                {}
+            end)"#,
+            script
+        );
+        let thread: Thread = self.lua.load(&wrapped).eval()?;
+        Ok(WorkflowSession { thread })
+    }
+}
+
+impl WorkflowSession {
+    /// Start or resume the workflow. Call with None to start, Some(input) to resume.
+    pub fn step(&self, input: Option<&str>) -> LuaResult<RuntimeState> {
+        use mlua::ThreadStatus;
+
+        match self.thread.status() {
+            ThreadStatus::Resumable => {
+                // Resume with input (or nothing if starting)
+                let result: mlua::MultiValue = if let Some(inp) = input {
+                    self.thread.resume(inp)?
+                } else {
+                    self.thread.resume(())?
+                };
+
+                // Check if we yielded or finished
+                match self.thread.status() {
+                    ThreadStatus::Resumable => {
+                        // Yielded - parse what we're waiting for
+                        let mut values = result.into_iter();
+                        let yield_type = values
+                            .next()
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        match yield_type.as_deref() {
+                            Some("prompt") => {
+                                let message = values
+                                    .next()
+                                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                                    .unwrap_or_default();
+                                Ok(RuntimeState::Waiting(RuntimeYield::Prompt { message }))
+                            }
+                            Some("menu") => {
+                                let options = values
+                                    .next()
+                                    .and_then(|v| {
+                                        if let Value::Table(t) = v {
+                                            let opts: Vec<String> = t
+                                                .sequence_values::<String>()
+                                                .filter_map(|r| r.ok())
+                                                .collect();
+                                            Some(opts)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .unwrap_or_default();
+                                Ok(RuntimeState::Waiting(RuntimeYield::Menu { options }))
+                            }
+                            _ => Ok(RuntimeState::Error("Unknown yield type".to_string())),
+                        }
+                    }
+                    ThreadStatus::Finished => {
+                        // Finished - try to get CommandResult from return value
+                        let cmd_result = result.into_iter().next().and_then(|v| {
+                            if let Value::UserData(ud) = v {
+                                ud.borrow::<CommandResult>().ok().map(|r| r.clone())
+                            } else {
+                                None
+                            }
+                        });
+                        Ok(RuntimeState::Done(cmd_result))
+                    }
+                    ThreadStatus::Running => {
+                        Ok(RuntimeState::Error("Thread still running".to_string()))
+                    }
+                    ThreadStatus::Error => Ok(RuntimeState::Error("Thread error".to_string())),
+                }
+            }
+            ThreadStatus::Finished => Ok(RuntimeState::Done(None)),
+            ThreadStatus::Running => Ok(RuntimeState::Error("Thread already running".to_string())),
+            ThreadStatus::Error => Ok(RuntimeState::Error("Thread in error state".to_string())),
+        }
+    }
+}
+
+impl LuaRuntime {
     fn register_commands(lua: &Lua, globals: &Table) -> LuaResult<()> {
         // TODO: Refactor cmd_* functions to take typed structs, then call directly.
         // For now, convert typed opts to CLI args and use subprocess.
@@ -328,6 +444,22 @@ impl LuaRuntime {
             })?,
         )?;
 
+        // prompt(message) -> string (yields to frontend)
+        // menu(options) -> string (yields to frontend)
+        // These are Lua functions because yield must happen from Lua, not Rust
+        lua.load(
+            r#"
+            function prompt(message)
+                return coroutine.yield("prompt", message or "")
+            end
+
+            function menu(options)
+                return coroutine.yield("menu", options)
+            end
+            "#,
+        )
+        .exec()?;
+
         Ok(())
     }
 
@@ -485,7 +617,6 @@ fn run_subprocess(args: &[String]) -> LuaResult<CommandResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
 
     #[test]
     fn test_view_opts_from_string() {
@@ -506,5 +637,61 @@ mod tests {
                 assert!(opts.context);
             })
             .unwrap();
+    }
+
+    #[test]
+    fn test_session_prompt() {
+        let runtime = LuaRuntime::new(std::path::Path::new(".")).unwrap();
+        let session = runtime
+            .create_session(r#"local x = prompt("Enter name: ") return x"#)
+            .unwrap();
+
+        // Start - should yield waiting for prompt
+        match session.step(None).unwrap() {
+            RuntimeState::Waiting(RuntimeYield::Prompt { message }) => {
+                assert_eq!(message, "Enter name: ");
+            }
+            other => panic!("Expected Prompt, got {:?}", other),
+        }
+
+        // Resume with input - should finish
+        match session.step(Some("Alice")).unwrap() {
+            RuntimeState::Done(_) => {}
+            other => panic!("Expected Done, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_session_menu() {
+        let runtime = LuaRuntime::new(std::path::Path::new(".")).unwrap();
+        let session = runtime
+            .create_session(r#"local x = menu({"a", "b", "c"}) return x"#)
+            .unwrap();
+
+        // Start - should yield waiting for menu
+        match session.step(None).unwrap() {
+            RuntimeState::Waiting(RuntimeYield::Menu { options }) => {
+                assert_eq!(options, vec!["a", "b", "c"]);
+            }
+            other => panic!("Expected Menu, got {:?}", other),
+        }
+
+        // Resume with selection - should finish
+        match session.step(Some("b")).unwrap() {
+            RuntimeState::Done(_) => {}
+            other => panic!("Expected Done, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_session_no_yield() {
+        let runtime = LuaRuntime::new(std::path::Path::new(".")).unwrap();
+        let session = runtime.create_session(r#"return "done""#).unwrap();
+
+        // Start - should finish immediately
+        match session.step(None).unwrap() {
+            RuntimeState::Done(_) => {}
+            other => panic!("Expected Done, got {:?}", other),
+        }
     }
 }
