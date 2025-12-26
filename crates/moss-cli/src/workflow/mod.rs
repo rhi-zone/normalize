@@ -1,17 +1,7 @@
-//! TOML-based workflow engine.
-//!
-//! Workflows orchestrate moss primitives (view, edit, analyze) through:
-//! - Step-based execution (linear sequence)
-//! - State machine execution (conditional transitions)
-//!
-//! LLM integration is scaffolded but not yet implemented.
+//! Lua workflow engine.
 
-mod config;
-mod execute;
-#[allow(dead_code)]
-mod llm;
-#[allow(dead_code)]
-mod strategies;
+#[cfg(feature = "lua")]
+mod lua_runtime;
 
-pub use config::load_workflow;
-pub use execute::run_workflow;
+#[cfg(feature = "lua")]
+pub use lua_runtime::LuaRuntime;

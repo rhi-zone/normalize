@@ -10,7 +10,7 @@ name = "moss"
 path = "src/main.rs"
 
 [features]
-default = ["all-languages"]
+default = ["all-languages", "lua"]
 
 # Meta-features (passthrough to moss-languages)
 all-languages = ["moss-languages/all-languages"]
@@ -21,6 +21,9 @@ llm = ["rig-core", "tokio-stream"]
 
 # Optional MCP server support
 mcp = ["rmcp", "schemars"]
+
+# Optional Lua workflow engine
+lua = ["mlua"]
 
 # Individual languages
 lang-python = ["moss-languages/lang-python"]
@@ -79,6 +82,7 @@ tokio-stream = { version = "0.1", optional = true }
 rmcp = { version = "0.12", features = ["server", "macros", "schemars", "transport-io"], optional = true }
 schemars = { version = "1", optional = true }
 tower-lsp = "0.20"
+mlua = { version = "0.10", features = ["luajit52", "vendored"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

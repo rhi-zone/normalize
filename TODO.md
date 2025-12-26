@@ -52,6 +52,7 @@ Current scaffold is TOML state machines. Needs design work:
 - Session analysis: detect correction patterns ("You're right", "Good point", "Fair point", "Should have", "Right -", "isn't working")
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 - Analyze long chains of uninterrupted tool calls (friction indicator)
+- Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 
 **Distribution:**
 - Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc. (single binary, wrapper scripts)
