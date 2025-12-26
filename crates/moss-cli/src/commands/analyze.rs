@@ -9,6 +9,7 @@ use moss_tools::registry_with_custom;
 use std::path::{Path, PathBuf};
 
 /// Run analysis on a target (file or directory)
+#[allow(clippy::too_many_arguments)]
 pub fn cmd_analyze(
     target: Option<&str>,
     root: Option<&Path>,
@@ -26,7 +27,10 @@ pub fn cmd_analyze(
     hotspots: bool,
     check_refs: bool,
     json: bool,
+    _exclude: &[String],
+    _only: &[String],
 ) -> i32 {
+    // TODO: Apply exclude/only filters to analysis targets
     // --overview runs the overview report
     if show_overview {
         return cmd_overview(root, compact, json);

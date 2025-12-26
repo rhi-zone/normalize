@@ -1,5 +1,8 @@
 //! View command - unified view of files, directories, and symbols.
 
+use crate::commands::filter::detect_project_languages;
+use crate::config::MossConfig;
+use crate::filter::Filter;
 use crate::tree::{FormatOptions, ViewNode, ViewNodeKind};
 use crate::{daemon, deps, index, path_resolve, skeleton, symbols, tree};
 use moss_languages::support_for_path;
@@ -66,6 +69,8 @@ pub fn cmd_view(
     include_private: bool,
     full: bool,
     json: bool,
+    exclude: &[String],
+    only: &[String],
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -73,6 +78,29 @@ pub fn cmd_view(
 
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&root);
+
+    // Build filter if exclude/only patterns are specified
+    let filter = if !exclude.is_empty() || !only.is_empty() {
+        let config = MossConfig::load(&root);
+        let languages = detect_project_languages(&root);
+        let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
+
+        match Filter::new(exclude, only, &config.filter, &lang_refs) {
+            Ok(f) => {
+                // Print warnings for disabled aliases
+                for warning in f.warnings() {
+                    eprintln!("warning: {}", warning);
+                }
+                Some(f)
+            }
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        None
+    };
 
     // If kind filter is specified without target (or with "."), list matching symbols
     if let Some(kind) = kind_filter {
@@ -90,7 +118,7 @@ pub fn cmd_view(
 
     // Handle "." as current directory
     if target == "." {
-        return cmd_view_directory(&root, &root, depth, raw, json);
+        return cmd_view_directory(&root, &root, depth, raw, json, filter.as_ref());
     }
 
     // Use unified path resolution - get ALL matches
@@ -164,7 +192,14 @@ pub fn cmd_view(
 
     if unified.is_directory {
         // View directory
-        cmd_view_directory(&root.join(&unified.file_path), &root, depth, raw, json)
+        cmd_view_directory(
+            &root.join(&unified.file_path),
+            &root,
+            depth,
+            raw,
+            json,
+            filter.as_ref(),
+        )
     } else if unified.symbol_path.is_empty() {
         // View file (--full overrides depth to show raw content)
         let effective_depth = if full { -1 } else { depth };
@@ -303,7 +338,14 @@ fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i32 {
     0
 }
 
-fn cmd_view_directory(dir: &Path, _root: &Path, depth: i32, raw: bool, json: bool) -> i32 {
+fn cmd_view_directory(
+    dir: &Path,
+    _root: &Path,
+    depth: i32,
+    raw: bool,
+    json: bool,
+    filter: Option<&Filter>,
+) -> i32 {
     let effective_depth = if depth < 0 {
         None
     } else {
@@ -323,6 +365,13 @@ fn cmd_view_directory(dir: &Path, _root: &Path, depth: i32, raw: bool, json: boo
             ..Default::default()
         },
     );
+
+    // Apply filter if present
+    let view_node = if let Some(f) = filter {
+        filter_view_node(view_node, f)
+    } else {
+        view_node
+    };
 
     // Count files and directories
     fn count_nodes(node: &ViewNode) -> (usize, usize) {
@@ -357,6 +406,42 @@ fn cmd_view_directory(dir: &Path, _root: &Path, depth: i32, raw: bool, json: boo
         println!("{} directories, {} files", dir_count, file_count);
     }
     0
+}
+
+/// Filter a ViewNode tree, removing nodes that don't pass the filter.
+fn filter_view_node(mut node: ViewNode, filter: &Filter) -> ViewNode {
+    node.children = node
+        .children
+        .into_iter()
+        .filter_map(|child| {
+            // Check if this node passes the filter
+            let path = Path::new(&child.path);
+            match child.kind {
+                ViewNodeKind::Directory => {
+                    // Recursively filter directory children
+                    let filtered = filter_view_node(child, filter);
+                    // Keep directory if it has any children left
+                    if filtered.children.is_empty() {
+                        None
+                    } else {
+                        Some(filtered)
+                    }
+                }
+                ViewNodeKind::File => {
+                    if filter.matches(path) {
+                        Some(child)
+                    } else {
+                        None
+                    }
+                }
+                ViewNodeKind::Symbol(_) => {
+                    // Symbols are not filtered by path
+                    Some(child)
+                }
+            }
+        })
+        .collect();
+    node
 }
 
 /// Resolve an import to a local file path based on the source file's language.

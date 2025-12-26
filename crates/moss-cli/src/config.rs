@@ -12,9 +12,15 @@
 //!
 //! [index]
 //! enabled = true
+//!
+//! [filter.aliases]
+//! tests = ["*_test.*", "my_custom_tests/**"]  # override built-in
+//! vendor = ["vendor/**", "third_party/**"]     # add new alias
+//! config = []                                   # disable built-in
 //! ```
 
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Daemon configuration.
@@ -35,12 +41,22 @@ pub struct IndexConfig {
     pub enabled: bool,
 }
 
+/// Filter configuration for --exclude and --only flags.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(default)]
+pub struct FilterConfig {
+    /// Custom filter aliases. Keys are alias names (without @), values are glob patterns.
+    /// Setting an empty array disables a built-in alias.
+    pub aliases: HashMap<String, Vec<String>>,
+}
+
 /// Root configuration structure.
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct MossConfig {
     pub daemon: DaemonConfig,
     pub index: IndexConfig,
+    pub filter: FilterConfig,
 }
 
 impl MossConfig {
@@ -75,6 +91,7 @@ impl MossConfig {
                 auto_start: true,
             },
             index: IndexConfig { enabled: true },
+            filter: FilterConfig::default(),
         }
     }
 
@@ -98,6 +115,11 @@ impl MossConfig {
     fn merge(self, other: Self) -> Self {
         // For now, simple override - other takes precedence
         // A more sophisticated merge would check which fields were explicitly set
+        let mut merged_aliases = self.filter.aliases;
+        for (k, v) in other.filter.aliases {
+            merged_aliases.insert(k, v);
+        }
+
         Self {
             daemon: DaemonConfig {
                 enabled: other.daemon.enabled,
@@ -105,6 +127,9 @@ impl MossConfig {
             },
             index: IndexConfig {
                 enabled: other.index.enabled,
+            },
+            filter: FilterConfig {
+                aliases: merged_aliases,
             },
         }
     }
@@ -138,6 +163,9 @@ mod tests {
 [daemon]
 enabled = false
 auto_start = false
+
+[index]
+enabled = true
 "#
         )
         .unwrap();
@@ -145,7 +173,7 @@ auto_start = false
         let config = MossConfig::load(dir.path());
         assert!(!config.daemon.enabled);
         assert!(!config.daemon.auto_start);
-        assert!(config.index.enabled); // default
+        assert!(config.index.enabled);
     }
 
     #[test]
@@ -171,5 +199,37 @@ auto_start = false
         // This is a known limitation - we'd need Option<bool> for proper merge
         assert!(!config.daemon.enabled); // serde default
         assert!(!config.daemon.auto_start);
+    }
+
+    #[test]
+    fn test_filter_aliases_config() {
+        let dir = TempDir::new().unwrap();
+        let moss_dir = dir.path().join(".moss");
+        std::fs::create_dir_all(&moss_dir).unwrap();
+
+        let config_path = moss_dir.join("config.toml");
+        let mut file = std::fs::File::create(&config_path).unwrap();
+        writeln!(
+            file,
+            r#"
+[filter.aliases]
+tests = ["my_tests/**"]
+vendor = ["vendor/**", "third_party/**"]
+config = []
+"#
+        )
+        .unwrap();
+
+        let config = MossConfig::load(dir.path());
+        assert_eq!(
+            config.filter.aliases.get("tests"),
+            Some(&vec!["my_tests/**".to_string()])
+        );
+        assert_eq!(
+            config.filter.aliases.get("vendor"),
+            Some(&vec!["vendor/**".to_string(), "third_party/**".to_string()])
+        );
+        // Empty array disables alias
+        assert_eq!(config.filter.aliases.get("config"), Some(&vec![]));
     }
 }

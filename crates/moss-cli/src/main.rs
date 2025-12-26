@@ -9,6 +9,7 @@ mod daemon;
 mod deps;
 mod edit;
 mod extract;
+mod filter;
 mod grep;
 mod health;
 mod index;
@@ -94,6 +95,16 @@ enum Commands {
         /// Show full source code (for symbols: complete implementation, for files: raw content)
         #[arg(long)]
         full: bool,
+
+        /// Exclude paths matching pattern or @alias (repeatable)
+        /// Patterns: globs like "*.test.js", "**/tests/**"
+        /// Aliases: @tests, @config, @build, @docs, @generated
+        #[arg(long, value_name = "PATTERN")]
+        exclude: Vec<String>,
+
+        /// Include only paths matching pattern or @alias (repeatable)
+        #[arg(long, value_name = "PATTERN")]
+        only: Vec<String>,
     },
 
     /// Edit a node in the codebase tree (structural code modification)
@@ -257,6 +268,24 @@ enum Commands {
         /// Check documentation references (broken links in docs)
         #[arg(long)]
         check_refs: bool,
+
+        /// Exclude paths matching pattern or @alias (repeatable)
+        #[arg(long, value_name = "PATTERN")]
+        exclude: Vec<String>,
+
+        /// Include only paths matching pattern or @alias (repeatable)
+        #[arg(long, value_name = "PATTERN")]
+        only: Vec<String>,
+    },
+
+    /// Manage filter aliases
+    Filter {
+        #[command(subcommand)]
+        action: FilterAction,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long, global = true)]
+        root: Option<PathBuf>,
     },
 
     /// Search for text patterns in files (fast ripgrep-based search)
@@ -400,6 +429,12 @@ enum ServeProtocol {
     Lsp,
 }
 
+#[derive(Subcommand)]
+enum FilterAction {
+    /// List available filter aliases
+    Aliases,
+}
+
 /// Reset SIGPIPE to default behavior so piping to `head` etc. doesn't panic.
 #[cfg(unix)]
 fn reset_sigpipe() {
@@ -429,6 +464,8 @@ fn main() {
             resolve_imports,
             include_private,
             full,
+            exclude,
+            only,
         } => commands::view::cmd_view(
             target.as_deref(),
             root.as_deref(),
@@ -443,6 +480,8 @@ fn main() {
             include_private,
             full,
             cli.json,
+            &exclude,
+            &only,
         ),
         Commands::Edit {
             target,
@@ -507,6 +546,8 @@ fn main() {
             lint,
             hotspots,
             check_refs,
+            exclude,
+            only,
         } => commands::analyze::cmd_analyze(
             target.as_deref(),
             root.as_deref(),
@@ -524,7 +565,12 @@ fn main() {
             hotspots,
             check_refs,
             cli.json,
+            &exclude,
+            &only,
         ),
+        Commands::Filter { action, root } => {
+            commands::filter::cmd_filter(action, root.as_deref(), cli.json)
+        }
         Commands::Grep {
             pattern,
             root,
