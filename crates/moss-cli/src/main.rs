@@ -366,6 +366,16 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
+    /// List and view Claude Code plans from ~/.claude/plans/
+    Plans {
+        /// Plan name to view (omit to list all plans)
+        name: Option<String>,
+
+        /// Limit number of plans to list
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
     /// Run TOML-defined workflows
     Workflow {
         #[command(subcommand)]
@@ -674,6 +684,9 @@ fn main() {
             } else {
                 commands::sessions::cmd_sessions_list(project.as_deref(), limit, cli.json)
             }
+        }
+        Commands::Plans { name, limit } => {
+            commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
         }
         Commands::Package {
             action,
