@@ -95,7 +95,7 @@ impl OpenApiClientGenerator for TypeScriptFetch {
         out.push_str("    }\n");
         out.push_str("    const res = await fetch(url.toString());\n");
         out.push_str("    if (!res.ok) throw new Error(`HTTP ${res.status}`);\n");
-        out.push_str("    return res.json();\n");
+        out.push_str("    return await res.json() as T;\n");
         out.push_str("  }\n\n");
 
         // Generate methods from paths
