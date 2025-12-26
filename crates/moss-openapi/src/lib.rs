@@ -18,7 +18,11 @@ pub trait OpenApiClientGenerator {
 
 /// Registry of available generators.
 pub fn generators() -> Vec<Box<dyn OpenApiClientGenerator>> {
-    vec![Box::new(TypeScriptFetch), Box::new(PythonUrllib)]
+    vec![
+        Box::new(TypeScriptFetch),
+        Box::new(PythonUrllib),
+        Box::new(RustUreq),
+    ]
 }
 
 /// Find a generator by language (returns first match).
@@ -28,6 +32,7 @@ pub fn find_generator(lang: &str) -> Option<Box<dyn OpenApiClientGenerator>> {
         g.language() == lang_lower
             || (lang_lower == "ts" && g.language() == "typescript")
             || (lang_lower == "py" && g.language() == "python")
+            || (lang_lower == "rs" && g.language() == "rust")
     })
 }
 
@@ -318,6 +323,225 @@ impl OpenApiClientGenerator for PythonUrllib {
     }
 }
 
+// --- Rust (ureq) ---
+
+struct RustUreq;
+
+impl OpenApiClientGenerator for RustUreq {
+    fn language(&self) -> &'static str {
+        "rust"
+    }
+    fn variant(&self) -> &'static str {
+        "ureq"
+    }
+
+    fn generate(&self, spec: &Value) -> String {
+        let mut out = String::new();
+        out.push_str("//! Auto-generated from OpenAPI spec\n");
+        out.push_str("//! Uses ureq (blocking HTTP)\n\n");
+        out.push_str("use serde::{Deserialize, Serialize};\n\n");
+
+        // Generate structs from schemas
+        if let Some(schemas) = spec
+            .pointer("/components/schemas")
+            .and_then(|s| s.as_object())
+        {
+            for (name, schema) in schemas {
+                out.push_str("#[derive(Debug, Clone, Serialize, Deserialize)]\n");
+                out.push_str(&format!("pub struct {} {{\n", name));
+                if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
+                    let required: Vec<&str> = schema
+                        .get("required")
+                        .and_then(|r| r.as_array())
+                        .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+                        .unwrap_or_default();
+                    for (prop_name, prop) in props {
+                        let rust_type = json_schema_to_rust(prop);
+                        let field_type = if required.contains(&prop_name.as_str()) {
+                            rust_type
+                        } else {
+                            format!("Option<{}>", rust_type)
+                        };
+                        out.push_str(&format!(
+                            "    pub {}: {},\n",
+                            to_snake_case(prop_name),
+                            field_type
+                        ));
+                    }
+                }
+                out.push_str("}\n\n");
+            }
+        }
+
+        // Generate client struct
+        out.push_str("pub struct ApiClient {\n");
+        out.push_str("    base_url: String,\n");
+        out.push_str("}\n\n");
+
+        out.push_str("impl ApiClient {\n");
+        out.push_str("    pub fn new(base_url: impl Into<String>) -> Self {\n");
+        out.push_str("        Self { base_url: base_url.into() }\n");
+        out.push_str("    }\n\n");
+
+        // Generate methods from paths
+        if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
+            for (path, methods) in paths {
+                if let Some(op) = methods.get("get").and_then(|g| g.as_object()) {
+                    let op_id = op
+                        .get("operationId")
+                        .and_then(|id| id.as_str())
+                        .unwrap_or("unknown");
+                    let params = op
+                        .get("parameters")
+                        .and_then(|p| p.as_array())
+                        .map(|a| a.as_slice())
+                        .unwrap_or(&[]);
+
+                    let path_params: Vec<&str> = params
+                        .iter()
+                        .filter(|p| p.get("in").and_then(|i| i.as_str()) == Some("path"))
+                        .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+                        .collect();
+                    let query_params: Vec<(&str, bool)> = params
+                        .iter()
+                        .filter(|p| p.get("in").and_then(|i| i.as_str()) == Some("query"))
+                        .filter_map(|p| {
+                            let name = p.get("name").and_then(|n| n.as_str())?;
+                            let required =
+                                p.get("required").and_then(|r| r.as_bool()).unwrap_or(false);
+                            Some((name, required))
+                        })
+                        .collect();
+
+                    let op_value = Value::Object(op.clone());
+                    let resp_type = op_value
+                        .pointer("/responses/200/content/application~1json/schema")
+                        .map(json_schema_to_rust)
+                        .unwrap_or_else(|| "()".to_string());
+
+                    // Build function signature
+                    let mut args = Vec::new();
+                    args.push("&self".to_string());
+                    for p in &path_params {
+                        args.push(format!("{}: &str", to_snake_case(p)));
+                    }
+                    for (p, required) in &query_params {
+                        let param_type = if *required {
+                            "&str".to_string()
+                        } else {
+                            "Option<&str>".to_string()
+                        };
+                        args.push(format!("{}: {}", to_snake_case(p), param_type));
+                    }
+
+                    out.push_str(&format!(
+                        "    pub fn {}({}) -> Result<{}, ureq::Error> {{\n",
+                        to_snake_case(op_id),
+                        args.join(", "),
+                        resp_type
+                    ));
+
+                    // Build URL with path params
+                    let url_expr = if path_params.is_empty() {
+                        format!("format!(\"{{}}{}\"", path)
+                    } else {
+                        let rust_path = path_params.iter().fold(path.to_string(), |acc, p| {
+                            acc.replace(&format!("{{{}}}", p), &format!("{{{}}}", to_snake_case(p)))
+                        });
+                        format!("format!(\"{{}}{}\", ", rust_path)
+                    };
+                    out.push_str(&format!("        let url = {}self.base_url);\n", url_expr));
+
+                    // Build request
+                    out.push_str("        let mut req = ureq::get(&url);\n");
+                    for (p, required) in &query_params {
+                        let snake = to_snake_case(p);
+                        if *required {
+                            out.push_str(&format!(
+                                "        req = req.query(\"{}\", {});\n",
+                                p, snake
+                            ));
+                        } else {
+                            out.push_str(&format!(
+                                "        if let Some(v) = {} {{ req = req.query(\"{}\", v); }}\n",
+                                snake, p
+                            ));
+                        }
+                    }
+
+                    out.push_str("        let resp: ");
+                    out.push_str(&resp_type);
+                    out.push_str(" = req.call()?.into_json()?;\n");
+                    out.push_str("        Ok(resp)\n");
+                    out.push_str("    }\n\n");
+                }
+            }
+        }
+
+        out.push_str("}\n");
+        out
+    }
+}
+
+fn to_snake_case(s: &str) -> String {
+    let mut result = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() {
+            if i > 0 {
+                result.push('_');
+            }
+            result.push(c.to_lowercase().next().unwrap());
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+fn json_schema_to_rust(schema: &Value) -> String {
+    if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
+        return ref_path
+            .split('/')
+            .last()
+            .unwrap_or("serde_json::Value")
+            .to_string();
+    }
+
+    let type_val = schema.get("type");
+
+    if let Some(arr) = type_val.and_then(|t| t.as_array()) {
+        let types: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
+        let non_null: Vec<_> = types.iter().filter(|t| **t != "null").collect();
+        if non_null.len() == 1 {
+            let base = type_str_to_rust(non_null[0]);
+            return format!("Option<{}>", base);
+        }
+    }
+
+    if let Some(type_str) = type_val.and_then(|t| t.as_str()) {
+        if type_str == "array" {
+            if let Some(items) = schema.get("items") {
+                return format!("Vec<{}>", json_schema_to_rust(items));
+            }
+            return "Vec<serde_json::Value>".to_string();
+        }
+        return type_str_to_rust(type_str);
+    }
+
+    "serde_json::Value".to_string()
+}
+
+fn type_str_to_rust(t: &str) -> String {
+    match t {
+        "string" => "String".to_string(),
+        "integer" => "i64".to_string(),
+        "number" => "f64".to_string(),
+        "boolean" => "bool".to_string(),
+        "object" => "serde_json::Value".to_string(),
+        _ => "serde_json::Value".to_string(),
+    }
+}
+
 // --- Helpers ---
 
 fn json_schema_to_ts(schema: &Value) -> String {
@@ -409,6 +633,8 @@ mod tests {
         assert!(find_generator("ts").is_some());
         assert!(find_generator("python").is_some());
         assert!(find_generator("py").is_some());
+        assert!(find_generator("rust").is_some());
+        assert!(find_generator("rs").is_some());
         assert!(find_generator("unknown").is_none());
     }
 
@@ -417,5 +643,13 @@ mod tests {
         let gens = list_generators();
         assert!(gens.iter().any(|(l, _)| *l == "typescript"));
         assert!(gens.iter().any(|(l, _)| *l == "python"));
+        assert!(gens.iter().any(|(l, _)| *l == "rust"));
+    }
+
+    #[test]
+    fn test_to_snake_case() {
+        assert_eq!(to_snake_case("getUserById"), "get_user_by_id");
+        assert_eq!(to_snake_case("API"), "a_p_i");
+        assert_eq!(to_snake_case("simple"), "simple");
     }
 }

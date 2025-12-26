@@ -10,10 +10,15 @@
 
 #[cfg(feature = "llm")]
 use rig::{
+    agent::MultiTurnStreamItem,
     client::{CompletionClient, ProviderClient},
     completion::Prompt,
     providers,
+    streaming::{StreamedAssistantContent, StreamingPrompt},
 };
+
+#[cfg(feature = "llm")]
+use tokio_stream::StreamExt;
 
 /// Callback for streaming chunks.
 pub type StreamCallback = Box<dyn Fn(&str) + Send + Sync>;
@@ -255,6 +260,75 @@ impl RigLlm {
             Provider::XAI => run_provider!(providers::xai::Client::from_env()),
         }
     }
+
+    async fn complete_streaming_async(
+        &self,
+        system: Option<&str>,
+        prompt: &str,
+        callback: &StreamCallback,
+    ) -> Result<String, String> {
+        macro_rules! run_provider_streaming {
+            ($client:expr) => {{
+                let client = $client;
+                let mut builder = client.agent(&self.model);
+                if let Some(sys) = system {
+                    builder = builder.preamble(sys);
+                }
+                let agent = builder.build();
+
+                let mut stream = agent.stream_prompt(prompt).await;
+
+                let mut full_response = String::new();
+                while let Some(chunk_result) = stream.next().await {
+                    match chunk_result {
+                        Ok(MultiTurnStreamItem::StreamAssistantItem(content)) => {
+                            if let StreamedAssistantContent::Text(text) = content {
+                                let s = text.text();
+                                callback(s);
+                                full_response.push_str(s);
+                            }
+                        }
+                        Ok(MultiTurnStreamItem::StreamUserItem(_)) => {
+                            // Tool results - handled separately
+                        }
+                        Ok(MultiTurnStreamItem::FinalResponse(resp)) => {
+                            // Use final response if we didn't collect incrementally
+                            if full_response.is_empty() {
+                                full_response = resp.response().to_string();
+                            }
+                        }
+                        Err(e) => {
+                            return Err(format!("Stream error: {}", e));
+                        }
+                        _ => {} // Non-exhaustive enum
+                    }
+                }
+                Ok(full_response)
+            }};
+        }
+
+        match self.provider {
+            Provider::Anthropic => {
+                run_provider_streaming!(providers::anthropic::Client::from_env())
+            }
+            Provider::OpenAI => run_provider_streaming!(providers::openai::Client::from_env()),
+            Provider::Azure => run_provider_streaming!(providers::azure::Client::from_env()),
+            Provider::Gemini => run_provider_streaming!(providers::gemini::Client::from_env()),
+            Provider::Cohere => run_provider_streaming!(providers::cohere::Client::from_env()),
+            Provider::DeepSeek => run_provider_streaming!(providers::deepseek::Client::from_env()),
+            Provider::Groq => run_provider_streaming!(providers::groq::Client::from_env()),
+            Provider::Mistral => run_provider_streaming!(providers::mistral::Client::from_env()),
+            Provider::Ollama => run_provider_streaming!(providers::ollama::Client::from_env()),
+            Provider::OpenRouter => {
+                run_provider_streaming!(providers::openrouter::Client::from_env())
+            }
+            Provider::Perplexity => {
+                run_provider_streaming!(providers::perplexity::Client::from_env())
+            }
+            Provider::Together => run_provider_streaming!(providers::together::Client::from_env()),
+            Provider::XAI => run_provider_streaming!(providers::xai::Client::from_env()),
+        }
+    }
 }
 
 #[cfg(feature = "llm")]
@@ -271,8 +345,22 @@ impl LlmStrategy for RigLlm {
         rt.block_on(self.complete_async(Some(system), prompt))
     }
 
-    // Streaming uses default impl (calls complete and sends full result to callback)
-    // TODO: Implement true streaming once rig API stabilizes
+    fn complete_streaming(&self, prompt: &str, callback: StreamCallback) -> Result<String, String> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| format!("Failed to create runtime: {}", e))?;
+        rt.block_on(self.complete_streaming_async(None, prompt, &callback))
+    }
+
+    fn complete_with_system_streaming(
+        &self,
+        system: &str,
+        prompt: &str,
+        callback: StreamCallback,
+    ) -> Result<String, String> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| format!("Failed to create runtime: {}", e))?;
+        rt.block_on(self.complete_streaming_async(Some(system), prompt, &callback))
+    }
 }
 
 /// Build an LLM strategy from workflow config.
