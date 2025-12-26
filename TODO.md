@@ -92,6 +92,10 @@ Current scaffold is TOML state machines. Needs design work:
 - LLM adapters (rig crate available)
 - Working memory with summarization
 
+**Servers:**
+- gRPC server (gen command existed in Python)
+- ACP server (dropped as unused - revive if needed)
+
 ## Implementation Notes
 
 **Self-update (`moss update`):**
