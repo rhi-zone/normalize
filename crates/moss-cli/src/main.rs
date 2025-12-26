@@ -610,7 +610,9 @@ fn main() {
                         )
                     }
                 }
-                LintAction::List => commands::lint::cmd_lint_list(root.as_deref(), cli.json),
+                LintAction::List => {
+                    commands::lint::cmd_lint_list(root.as_deref(), cli.json, cli.jq.as_deref())
+                }
             }
         }
         Commands::Serve { protocol, root } => match protocol {

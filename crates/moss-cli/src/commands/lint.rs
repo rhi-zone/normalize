@@ -1,11 +1,51 @@
 //! Lint command - run linters, formatters, and type checkers.
 
+use crate::output::{OutputFormat, OutputFormatter};
 use moss_tools::{registry_with_custom, SarifReport, ToolCategory, ToolRegistry};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
+use serde::Serialize;
+use std::fmt::Write;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
+
+/// Tool info for lint list output
+#[derive(Debug, Serialize)]
+pub struct ToolListItem {
+    pub name: String,
+    pub category: String,
+    pub available: bool,
+    pub version: Option<String>,
+    pub extensions: String,
+    pub website: String,
+}
+
+/// Result of lint list command
+#[derive(Debug, Serialize)]
+pub struct LintListResult {
+    pub tools: Vec<ToolListItem>,
+}
+
+impl OutputFormatter for LintListResult {
+    fn format_text(&self) -> String {
+        let mut out = String::from("Detected tools:\n\n");
+        for tool in &self.tools {
+            let status = if tool.available { "✓" } else { "✗" };
+            let ver = tool.version.as_deref().unwrap_or("not installed");
+            writeln!(
+                out,
+                "  {} {} ({}) - {}",
+                status, tool.name, tool.category, ver
+            )
+            .unwrap();
+            writeln!(out, "    Extensions: {}", tool.extensions).unwrap();
+            writeln!(out, "    Website: {}", tool.website).unwrap();
+            writeln!(out).unwrap();
+        }
+        out
+    }
+}
 
 /// Run linting tools on the codebase.
 pub fn cmd_lint_run(
@@ -197,7 +237,7 @@ pub fn cmd_lint_run(
 }
 
 /// List available linting tools.
-pub fn cmd_lint_list(root: Option<&Path>, json: bool) -> i32 {
+pub fn cmd_lint_list(root: Option<&Path>, json: bool, jq: Option<&str>) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
     let registry = registry_with_custom(root);
 
@@ -205,51 +245,25 @@ pub fn cmd_lint_list(root: Option<&Path>, json: bool) -> i32 {
     // Use version() to infer availability - avoids duplicate process spawns
     // Parallelize version checks since each spawns a subprocess
     let detected = registry.detect(root);
-    let tools: Vec<_> = detected
+    let tools: Vec<ToolListItem> = detected
         .par_iter()
         .map(|(t, _)| {
             let info = t.info();
             let version = t.version();
-            let available = version.is_some();
-            (
-                info.name.to_string(),
-                info.category.as_str().to_string(),
-                available,
+            ToolListItem {
+                name: info.name.to_string(),
+                category: info.category.as_str().to_string(),
+                available: version.is_some(),
                 version,
-                info.extensions.join(", "),
-                info.website.to_string(),
-            )
+                extensions: info.extensions.join(", "),
+                website: info.website.to_string(),
+            }
         })
         .collect();
 
-    if json {
-        let output: Vec<_> = tools
-            .iter()
-            .map(
-                |(name, category, available, version, extensions, website)| {
-                    serde_json::json!({
-                        "name": name,
-                        "category": category,
-                        "available": available,
-                        "version": version,
-                        "extensions": extensions,
-                        "website": website,
-                    })
-                },
-            )
-            .collect();
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Detected tools:\n");
-        for (name, category, available, version, extensions, website) in &tools {
-            let status = if *available { "✓" } else { "✗" };
-            let ver = version.as_deref().unwrap_or("not installed");
-            println!("  {} {} ({}) - {}", status, name, category, ver);
-            println!("    Extensions: {}", extensions);
-            println!("    Website: {}", website);
-            println!();
-        }
-    }
+    let result = LintListResult { tools };
+    let format = OutputFormat::from_flags(json, jq);
+    result.print(&format);
 
     0
 }
