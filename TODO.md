@@ -4,9 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Expand docs nav in `docs/.vitepress/config.ts` - all docs now linked
-- [x] Review docs content for vitepress compatibility - fixed Vue template escaping, dead links
-
 Test Status: 110 passing, 0 failing (moss-languages)
 
 ## Remaining Work
@@ -80,6 +77,13 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.
   - Auto-generate and publish in sync with GitHub releases
   - Single binary + thin wrapper scripts per ecosystem
+- Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
+
+**Vision (Aspirational):**
+- Shadow Git: atomic commits per tool call, automatic rollback on failure
+- Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
+- Synthesis: decompose complex tasks into solvable subproblems (`moss synthesize`)
+- Plugin Architecture: extensible view providers, synthesis strategies, code generators
 
 ## Deferred
 
