@@ -86,6 +86,8 @@ Run `uv sync --extra all --extra dev` first. Many features require optional depe
 uv sync --extra all --extra dev  # Install dependencies
 ```
 
+**Debug builds:** `[profile.dev] debug = 0` in Cargo.toml - tree-sitter grammars bloat debug builds to ~2GB otherwise. This is moss-specific; don't copy to other projects without considering the tradeoff.
+
 ## Recipes
 
 Scaffold MCP Tool:
