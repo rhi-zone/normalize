@@ -521,9 +521,10 @@ fn build_tree_text(
     Ok(DependencyTree { roots: vec![root] })
 }
 
-// NOTE: bun.lockb binary format doesn't yet support transitive deps.
-// The dependency relationships are in the "dependencies" buffer but parsing
-// Bun's zig-based serialization is complex. Use text format (bun.lock) instead.
+// TODO: Parse tree structure from bun.lockb for transitive deps.
+// Binary format stores tree in: trees[i].dependencies → hoisted_deps[off..off+len] → dep_ids
+// Each dep_id maps to resolutions → package_id → packages[pkg_id] for name/version.
+// Text format (bun.lock) has full transitive support; prefer that format.
 fn build_tree_binary(project_root: &Path) -> Result<DependencyTree, PackageError> {
     let lockfile = find_binary_lockfile(project_root)
         .ok_or_else(|| PackageError::ParseError("bun.lockb not found".to_string()))?;

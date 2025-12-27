@@ -4,6 +4,12 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Package Command
+
+- `moss package why <pkg>` and `moss package tree` now show full transitive dependency trees for pnpm, yarn, and bun lockfiles
+- `--jq` flag works with all package subcommands for filtering JSON output
+- Fixed docs: downgraded vitepress to stable 1.6.4, fixed mermaid CJS interop
+
 ### Todo Command
 
 `moss todo` for structured TODO.md editing:
