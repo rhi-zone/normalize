@@ -245,23 +245,14 @@ fn is_lockfile(path: &str) -> bool {
 }
 
 pub fn analyze_health(root: &Path) -> HealthReport {
-    // Open the index if enabled
-    let mut index = match FileIndex::open_if_enabled(root) {
-        Some(idx) => idx,
-        None => {
-            return HealthReport {
-                total_files: 0,
-                files_by_language: HashMap::new(),
-                total_lines: 0,
-                avg_complexity: 0.0,
-                max_complexity: 0,
-                high_risk_functions: 0,
-                total_functions: 0,
-                large_files: Vec::new(),
-            };
-        }
-    };
+    // Try index first, fall back to filesystem walk
+    if let Some(mut index) = FileIndex::open_if_enabled(root) {
+        return analyze_health_indexed(root, &mut index);
+    }
+    analyze_health_unindexed(root)
+}
 
+fn analyze_health_indexed(_root: &Path, index: &mut FileIndex) -> HealthReport {
     // Ensure file index is up to date (incremental - only changed files)
     let _ = index.incremental_refresh();
     // Note: We don't call refresh_call_graph() here - it's slow.
@@ -348,6 +339,60 @@ pub fn analyze_health(root: &Path) -> HealthReport {
         max_complexity,
         high_risk_functions,
         total_functions,
+        large_files,
+    }
+}
+
+/// Analyze health by walking the filesystem (slower, no complexity data)
+fn analyze_health_unindexed(root: &Path) -> HealthReport {
+    use ignore::WalkBuilder;
+
+    let mut files_by_language: HashMap<String, usize> = HashMap::new();
+    let mut total_files = 0;
+    let mut total_lines = 0;
+    let mut large_files = Vec::new();
+
+    let walker = WalkBuilder::new(root).hidden(true).git_ignore(true).build();
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+
+        total_files += 1;
+
+        if let Some(lang) = moss_languages::support_for_path(path) {
+            *files_by_language
+                .entry(lang.name().to_string())
+                .or_insert(0) += 1;
+        }
+
+        // Count lines
+        if let Ok(content) = std::fs::read_to_string(path) {
+            let lines = content.lines().count();
+            total_lines += lines;
+
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if lines >= LARGE_THRESHOLD && !is_lockfile(&rel_path.to_string_lossy()) {
+                large_files.push(LargeFile {
+                    path: rel_path.to_string_lossy().to_string(),
+                    lines,
+                });
+            }
+        }
+    }
+
+    large_files.sort_by(|a, b| b.lines.cmp(&a.lines));
+
+    HealthReport {
+        total_files,
+        files_by_language,
+        total_lines,
+        avg_complexity: 0.0, // No complexity without index
+        max_complexity: 0,
+        high_risk_functions: 0,
+        total_functions: 0,
         large_files,
     }
 }
