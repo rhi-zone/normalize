@@ -8,6 +8,33 @@
 use std::fs;
 use std::path::Path;
 
+use clap::Subcommand;
+
+#[derive(Subcommand)]
+pub enum TodoAction {
+    /// List items in the primary section (default)
+    List {
+        /// Show full TODO.md content
+        #[arg(short, long)]
+        full: bool,
+    },
+    /// Add an item to the primary section
+    Add {
+        /// Item text to add
+        text: String,
+    },
+    /// Mark an item as done (fuzzy text match)
+    Done {
+        /// Text to match (case-insensitive substring)
+        query: String,
+    },
+    /// Remove an item (fuzzy text match)
+    Rm {
+        /// Text to match (case-insensitive substring)
+        query: String,
+    },
+}
+
 /// Detected item format in a section
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ItemFormat {
@@ -299,21 +326,38 @@ fn add_item(content: &str, section_name: Option<&str>, item_text: &str) -> Resul
     Ok(result)
 }
 
+/// Find item by fuzzy text match
+fn find_item_by_text<'a>(section: &'a Section, query: &str) -> Result<&'a Item, String> {
+    let query_lower = query.to_lowercase();
+
+    // Exact substring match first
+    let matches: Vec<_> = section
+        .items
+        .iter()
+        .filter(|i| i.text.to_lowercase().contains(&query_lower))
+        .collect();
+
+    match matches.len() {
+        0 => Err(format!("No item matching '{}' found", query)),
+        1 => Ok(matches[0]),
+        _ => {
+            // Multiple matches - show them
+            let mut msg = format!("Multiple items match '{}'. Be more specific:\n", query);
+            for (i, item) in matches.iter().enumerate() {
+                msg.push_str(&format!("  {}. {}\n", i + 1, item.text));
+            }
+            Err(msg)
+        }
+    }
+}
+
 /// Mark an item as done (toggle checkbox or add [x])
-fn mark_item_done(content: &str, index: usize) -> Result<(String, String), String> {
+fn mark_item_done(content: &str, query: &str) -> Result<(String, String), String> {
     let sections = parse_todo(content);
     let section_idx = find_primary_section(&sections).ok_or("No sections found")?;
     let section = &sections[section_idx];
 
-    if index == 0 || index > section.items.len() {
-        return Err(format!(
-            "Invalid index {}. Section has {} items.",
-            index,
-            section.items.len()
-        ));
-    }
-
-    let item = &section.items[index - 1];
+    let item = find_item_by_text(section, query)?;
     let lines: Vec<&str> = content.lines().collect();
 
     // Build new content with item marked as done
@@ -370,21 +414,13 @@ fn mark_line_done(line: &str) -> String {
     line.to_string()
 }
 
-/// Remove an item by index
-fn remove_item(content: &str, index: usize) -> Result<(String, String), String> {
+/// Remove an item by text match
+fn remove_item(content: &str, query: &str) -> Result<(String, String), String> {
     let sections = parse_todo(content);
     let section_idx = find_primary_section(&sections).ok_or("No sections found")?;
     let section = &sections[section_idx];
 
-    if index == 0 || index > section.items.len() {
-        return Err(format!(
-            "Invalid index {}. Section has {} items.",
-            index,
-            section.items.len()
-        ));
-    }
-
-    let item = &section.items[index - 1];
+    let item = find_item_by_text(section, query)?;
     let lines: Vec<&str> = content.lines().collect();
 
     // Build new content without the item line
@@ -450,14 +486,7 @@ fn renumber_section(content: &str, section_name: &str) -> String {
 }
 
 /// Main command handler
-pub fn cmd_todo(
-    action: Option<&str>,
-    item: Option<&str>,
-    index: Option<usize>,
-    full: bool,
-    json: bool,
-    root: &Path,
-) -> i32 {
+pub fn cmd_todo(action: Option<TodoAction>, json: bool, root: &Path) -> i32 {
     let todo_path = root.join("TODO.md");
 
     if !todo_path.exists() {
@@ -474,107 +503,74 @@ pub fn cmd_todo(
     };
 
     match action {
-        Some("add") => {
-            let Some(item_text) = item else {
-                eprintln!("Usage: moss todo add \"item text\"");
-                return 1;
-            };
-
-            match add_item(&content, None, item_text) {
-                Ok(new_content) => {
-                    if let Err(e) = fs::write(&todo_path, &new_content) {
-                        eprintln!("Error writing TODO.md: {}", e);
-                        return 1;
-                    }
-                    if json {
-                        println!(
-                            "{}",
-                            serde_json::json!({"status": "added", "item": item_text})
-                        );
-                    } else {
-                        let sections = parse_todo(&content);
-                        let section_name = find_primary_section(&sections)
-                            .map(|i| sections[i].name.as_str())
-                            .unwrap_or("TODO");
-                        println!("Added to {}: {}", section_name, item_text);
-                    }
-                    0
+        Some(TodoAction::Add { text }) => match add_item(&content, None, &text) {
+            Ok(new_content) => {
+                if let Err(e) = fs::write(&todo_path, &new_content) {
+                    eprintln!("Error writing TODO.md: {}", e);
+                    return 1;
                 }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    1
-                }
-            }
-        }
-
-        Some("done") => {
-            let Some(idx) = index else {
-                eprintln!("Usage: moss todo done <index>");
-                return 1;
-            };
-
-            match mark_item_done(&content, idx) {
-                Ok((new_content, completed_item)) => {
-                    if let Err(e) = fs::write(&todo_path, &new_content) {
-                        eprintln!("Error writing TODO.md: {}", e);
-                        return 1;
-                    }
-                    if json {
-                        println!(
-                            "{}",
-                            serde_json::json!({"status": "completed", "item": completed_item})
-                        );
-                    } else {
-                        println!("Marked done: {}", completed_item);
-                    }
-                    0
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    1
-                }
-            }
-        }
-
-        Some("rm") | Some("remove") => {
-            let Some(idx) = index else {
-                eprintln!("Usage: moss todo rm <index>");
-                return 1;
-            };
-
-            match remove_item(&content, idx) {
-                Ok((new_content, removed_item)) => {
-                    if let Err(e) = fs::write(&todo_path, &new_content) {
-                        eprintln!("Error writing TODO.md: {}", e);
-                        return 1;
-                    }
-                    if json {
-                        println!(
-                            "{}",
-                            serde_json::json!({"status": "removed", "item": removed_item})
-                        );
-                    } else {
-                        println!("Removed: {}", removed_item);
-                    }
-                    0
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    1
-                }
-            }
-        }
-
-        None | Some("list") => {
-            if full {
                 if json {
-                    println!("{}", serde_json::json!({"content": content}));
+                    println!("{}", serde_json::json!({"status": "added", "item": text}));
                 } else {
-                    print!("{}", content);
+                    let sections = parse_todo(&content);
+                    let section_name = find_primary_section(&sections)
+                        .map(|i| sections[i].name.as_str())
+                        .unwrap_or("TODO");
+                    println!("Added to {}: {}", section_name, text);
                 }
-                return 0;
+                0
             }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                1
+            }
+        },
 
+        Some(TodoAction::Done { query }) => match mark_item_done(&content, &query) {
+            Ok((new_content, completed_item)) => {
+                if let Err(e) = fs::write(&todo_path, &new_content) {
+                    eprintln!("Error writing TODO.md: {}", e);
+                    return 1;
+                }
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({"status": "completed", "item": completed_item})
+                    );
+                } else {
+                    println!("Marked done: {}", completed_item);
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                1
+            }
+        },
+
+        Some(TodoAction::Rm { query }) => match remove_item(&content, &query) {
+            Ok((new_content, removed_item)) => {
+                if let Err(e) = fs::write(&todo_path, &new_content) {
+                    eprintln!("Error writing TODO.md: {}", e);
+                    return 1;
+                }
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({"status": "removed", "item": removed_item})
+                    );
+                } else {
+                    println!("Removed: {}", removed_item);
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                1
+            }
+        },
+
+        None | Some(TodoAction::List { full: false }) => {
             let sections = parse_todo(&content);
 
             if json {
@@ -628,10 +624,13 @@ pub fn cmd_todo(
             0
         }
 
-        Some(other) => {
-            eprintln!("Unknown action: {}", other);
-            eprintln!("Usage: moss todo [add|done|rm|list]");
-            1
+        Some(TodoAction::List { full: true }) => {
+            if json {
+                println!("{}", serde_json::json!({"content": content}));
+            } else {
+                print!("{}", content);
+            }
+            0
         }
     }
 }

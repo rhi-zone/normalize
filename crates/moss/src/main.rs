@@ -375,18 +375,11 @@ enum Commands {
 
     /// Structured TODO.md editing (prevents content loss)
     Todo {
-        /// Action: add, done, list (default: list)
-        action: Option<String>,
-
-        /// Item text (for add) or index (for done)
-        item: Option<String>,
-
-        /// Show full TODO.md content
-        #[arg(short, long)]
-        full: bool,
+        #[command(subcommand)]
+        action: Option<commands::todo::TodoAction>,
 
         /// Root directory (defaults to current directory)
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         root: Option<PathBuf>,
     },
 
@@ -703,22 +696,9 @@ fn main() {
         Commands::Plans { name, limit } => {
             commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
         }
-        Commands::Todo {
-            action,
-            item,
-            full,
-            root,
-        } => {
+        Commands::Todo { action, root } => {
             let root = root.as_deref().unwrap_or(Path::new("."));
-            let index = item.as_ref().and_then(|s| s.parse::<usize>().ok());
-            commands::todo::cmd_todo(
-                action.as_deref(),
-                item.as_deref(),
-                index,
-                full,
-                cli.json,
-                root,
-            )
+            commands::todo::cmd_todo(action, cli.json, root)
         }
         Commands::Package {
             action,
