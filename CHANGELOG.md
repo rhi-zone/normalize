@@ -4,6 +4,13 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Build System
+
+Optimizations for faster development iteration:
+- Dev profile: `debug=0`, `split-debuginfo=unpacked`, build-override opt-level=3
+- Mold linker support via flake.nix (cuts linking from ~3.3s to ~0.3s)
+- Release profile: LTO + strip reduced 25MB → 18MB binary
+
 ### Dynamic Grammar Loading
 
 External grammar loading for faster builds and user extensibility:
