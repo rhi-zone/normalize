@@ -1,4 +1,6 @@
 use crate::config::MossConfig;
+use crate::index::FileIndex;
+use crate::merge::Merge;
 use crate::paths::get_moss_dir;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -11,7 +13,24 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
 
-use crate::index::FileIndex;
+/// Daemon configuration.
+#[derive(Debug, Clone, Deserialize, Merge)]
+#[serde(default)]
+pub struct DaemonConfig {
+    /// Whether to use the daemon for queries.
+    pub enabled: bool,
+    /// Whether to auto-start the daemon when running moss commands.
+    pub auto_start: bool,
+}
+
+impl Default for DaemonConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            auto_start: true,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "cmd")]

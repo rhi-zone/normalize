@@ -24,29 +24,12 @@
 //! show_all = true             # show all sections by default
 //! ```
 
+use crate::commands::todo::TodoConfig;
+use crate::daemon::DaemonConfig;
+use crate::filter::FilterConfig;
 use crate::merge::Merge;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::path::Path;
-
-/// Daemon configuration.
-#[derive(Debug, Clone, Deserialize, Merge)]
-#[serde(default)]
-pub struct DaemonConfig {
-    /// Whether to use the daemon for queries.
-    pub enabled: bool,
-    /// Whether to auto-start the daemon when running moss commands.
-    pub auto_start: bool,
-}
-
-impl Default for DaemonConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            auto_start: true,
-        }
-    }
-}
 
 /// Index configuration.
 #[derive(Debug, Clone, Deserialize, Merge)]
@@ -60,29 +43,6 @@ impl Default for IndexConfig {
     fn default() -> Self {
         Self { enabled: true }
     }
-}
-
-/// Filter configuration for --exclude and --only flags.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
-#[serde(default)]
-pub struct FilterConfig {
-    /// Custom filter aliases. Keys are alias names (without @), values are glob patterns.
-    /// Setting an empty array disables a built-in alias.
-    pub aliases: HashMap<String, Vec<String>>,
-}
-
-/// Todo command configuration.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
-#[serde(default)]
-pub struct TodoConfig {
-    /// Path to todo file (relative to project root).
-    /// If not set, auto-detects from common filenames.
-    pub file: Option<String>,
-    /// Primary section name to show by default.
-    /// If not set, uses common patterns: "Next Up", "TODO", "Tasks".
-    pub primary_section: Option<String>,
-    /// Default to showing all sections instead of just primary.
-    pub show_all: bool,
 }
 
 /// Root configuration structure.

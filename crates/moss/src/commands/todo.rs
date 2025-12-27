@@ -9,8 +9,24 @@ use std::fs;
 use std::path::Path;
 
 use clap::{Args, Subcommand};
+use serde::Deserialize;
 
-use crate::config::{MossConfig, TodoConfig};
+use crate::config::MossConfig;
+use crate::merge::Merge;
+
+/// Todo command configuration.
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct TodoConfig {
+    /// Path to todo file (relative to project root).
+    /// If not set, auto-detects from common filenames.
+    pub file: Option<String>,
+    /// Primary section name to show by default.
+    /// If not set, uses common patterns: "Next Up", "TODO", "Tasks".
+    pub primary_section: Option<String>,
+    /// Default to showing all sections instead of just primary.
+    pub show_all: bool,
+}
 
 #[derive(Subcommand)]
 pub enum TodoAction {

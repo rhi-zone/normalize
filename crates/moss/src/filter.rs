@@ -7,9 +7,20 @@
 //! Built-in aliases are language-aware (e.g., @tests includes `*_test.go` for Go,
 //! `test_*.py` for Python). Config can override or add new aliases.
 
-use crate::config::FilterConfig;
+use crate::merge::Merge;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::Path;
+
+/// Filter configuration for --exclude and --only flags.
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct FilterConfig {
+    /// Custom filter aliases. Keys are alias names (without @), values are glob patterns.
+    /// Setting an empty array disables a built-in alias.
+    pub aliases: HashMap<String, Vec<String>>,
+}
 
 /// Built-in filter aliases.
 /// Each alias maps to patterns that vary by detected language.
