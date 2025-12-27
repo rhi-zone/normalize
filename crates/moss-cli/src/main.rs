@@ -289,6 +289,10 @@ enum Commands {
         #[arg(long)]
         stale_docs: bool,
 
+        /// Check that all {{example: path#name}} references have matching markers
+        #[arg(long)]
+        check_examples: bool,
+
         /// Exclude paths matching pattern or @alias (repeatable)
         #[arg(long, value_name = "PATTERN")]
         exclude: Vec<String>,
@@ -633,6 +637,7 @@ fn main() {
             hotspots,
             check_refs,
             stale_docs,
+            check_examples,
             exclude,
             only,
         } => commands::analyze::cmd_analyze(
@@ -652,6 +657,7 @@ fn main() {
             hotspots,
             check_refs,
             stale_docs,
+            check_examples,
             cli.json,
             &exclude,
             &only,

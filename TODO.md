@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 **Documentation Sync (see `docs/documentation.md`):**
 - [x] External doc tracking: `<!-- covers: src/foo.rs -->` parser, `moss analyze --stale-docs`
-- Example extraction: `[example: name]` markers in test files, `{{example: path#name}}` expansion in docs
+- [x] Example validation: `[example: name]` markers, `moss analyze --check-examples`
 
 Test Status: 110 passing, 0 failing (moss-languages)
 

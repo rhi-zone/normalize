@@ -64,15 +64,11 @@ fn example_basic_usage() {
 }
 ```
 
-Docs reference by marker:
+Docs reference by marker (syntax - not yet implemented):
 
-```markdown
-## Basic Usage
+    \{\{example: tests/parser_test.rs#basic-usage\}\}
 
-{{example: tests/parser_test.rs#basic-usage}}
-```
-
-`moss docs build` (or similar) expands these references. If the marker doesn't exist, build fails.
+Validate with `moss analyze --check-examples`. Future: `moss docs build` will expand these.
 
 ## Implementation
 
@@ -87,8 +83,9 @@ Docs reference by marker:
 - [ ] Integration with `moss view` to show related docs
 
 ### Phase 3: Example extraction
-- [ ] `[example: name]` marker parser
-- [ ] `{{example: path#name}}` expansion
+- [x] `[example: name]` marker parser
+- [x] `{{example: path#name}}` reference validation (`moss analyze --check-examples`)
+- [ ] `{{example: path#name}}` expansion (future `moss docs build`)
 - [ ] Test that examples compile/run
 
 ## Open Questions
