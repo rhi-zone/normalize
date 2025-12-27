@@ -1,77 +1,83 @@
 # Moss
 
-**Tooling orchestration with structural awareness.**
+**Structural code intelligence for humans and AI agents.**
 
-Moss implements a "Compiled Context" approach that prioritizes architectural awareness (AST-based understanding) over raw text processing, with verification loops ensuring correctness before output.
+Moss provides tools for understanding, navigating, and modifying code at a structural level (AST, control flow, dependencies) rather than treating code as text.
+
+## Quick Start
+
+```bash
+# Build from source
+git clone https://github.com/pterror/moss
+cd moss
+cargo build --release
+
+# Or with nix
+nix develop
+cargo build --release
+
+# View a file's structure
+moss view src/main.rs
+
+# Analyze codebase health
+moss analyze --health
+
+# Search for a symbol
+moss view SkeletonExtractor
+```
+
+## Three Primitives
+
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `view` | See structure | `moss view src/` `moss view MyClass` |
+| `edit` | Modify code | `moss edit src/foo.rs/func --delete` |
+| `analyze` | Compute metrics | `moss analyze --complexity` |
+
+See [Primitives Spec](primitives-spec.md) for full documentation.
 
 ## Key Features
 
-- **Structural Editing** - AST-based code modifications with fuzzy anchor matching
-- **Shadow Git** - Atomic commits per tool call, automatic rollback on failure
-- **Verification Loops** - Domain-specific validation (compiler, linter, tests)
-- **Plugin Architecture** - Extensible view providers, synthesis strategies, generators
-- **Code Synthesis** - Decompose complex tasks into solvable subproblems
+- **98 Languages** - Tree-sitter grammars for comprehensive language support
+- **Structural Editing** - AST-based code modifications with fuzzy matching
+- **Lua Workflows** - Scriptable automation with `auto{}` LLM driver
+- **Background Indexing** - Daemon maintains symbol/call graph index
+- **Shadow Git** - Hunk-level edit tracking in `.moss/.git`
 
-## Quick Example
+## Architecture
 
-```bash
-# Synthesize code from a specification
-moss synthesize "Create a function that validates email addresses" \
-    --type "(email: str) -> bool"
-
-# See how a task would be decomposed
-moss synthesize "Build a REST API with CRUD for users" --dry-run
+```
+moss view/edit/analyze     CLI commands
+        │
+        ▼
+    FileIndex              SQLite symbol/call graph
+        │
+        ▼
+  SkeletonExtractor        AST → structured output
+        │
+        ▼
+   GrammarLoader           Dynamic .so grammar loading
 ```
 
-## Architecture Overview
+## Configuration
 
-```mermaid
-flowchart TB
-    Request[User Request]
-    Request --> Config
+Create `.moss/config.toml`:
 
-    subgraph Config[Config Engine]
-        ConfigNote[Policy Engine - safety rules]
-    end
+```toml
+[index]
+enabled = true
 
-    Config --> Context
+[view]
+depth = 1
+line_numbers = false
 
-    subgraph Context[Context Host]
-        ContextNote[View Providers - Skeleton, CFG, Dependencies]
-    end
-
-    Context --> Synthesis
-
-    subgraph Synthesis[Synthesis Framework]
-        SynthesisNote[Strategies + Generators + Validators]
-    end
-
-    Synthesis --> Shadow
-
-    subgraph Shadow[Shadow Git]
-        ShadowNote[Atomic commits, rollback]
-    end
-
-    Shadow --> Output[Output]
+[filter.aliases]
+tests = ["**/test_*.py", "**/*_test.go"]
 ```
 
-## Installation
+## Documentation
 
-```bash
-# Clone the repository
-git clone https://github.com/pterror/moss
-cd moss
-
-# Using nix (recommended)
-nix develop
-
-# Or using pip
-pip install -e ".[dev]"
-```
-
-## Next Steps
-
-- [Installation Guide](getting-started/installation.md) - Detailed setup instructions
-- [Quickstart](getting-started/quickstart.md) - Your first synthesis
-- [Architecture Overview](architecture/overview.md) - How Moss works
-- [Synthesis Guide](synthesis/overview.md) - Understanding code synthesis
+- [Philosophy](philosophy.md) - Design tenets and principles
+- [Primitives Spec](primitives-spec.md) - view, edit, analyze reference
+- [Language Support](language-support.md) - 98 supported languages
+- [Lua Workflows](workflow-format.md) - Automation with Lua scripts
