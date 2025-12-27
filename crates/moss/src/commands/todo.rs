@@ -10,29 +10,64 @@ use std::path::Path;
 
 use clap::Subcommand;
 
+use clap::Args;
+
 #[derive(Subcommand)]
 pub enum TodoAction {
-    /// List items in the primary section (default)
+    /// List items (primary section by default, or filtered)
     List {
-        /// Show full TODO.md content
-        #[arg(short, long)]
-        full: bool,
+        #[command(flatten)]
+        filter: ListFilter,
     },
     /// Add an item to the primary section
     Add {
         /// Item text to add
         text: String,
+        /// Target section (default: primary section)
+        #[arg(short, long)]
+        section: Option<String>,
     },
     /// Mark an item as done (fuzzy text match)
     Done {
         /// Text to match (case-insensitive substring)
         query: String,
+        /// Target section (default: primary section)
+        #[arg(short, long)]
+        section: Option<String>,
     },
     /// Remove an item (fuzzy text match)
     Rm {
         /// Text to match (case-insensitive substring)
         query: String,
+        /// Target section (default: primary section)
+        #[arg(short, long)]
+        section: Option<String>,
     },
+    /// Remove all completed items
+    Clean,
+}
+
+#[derive(Args, Default)]
+pub struct ListFilter {
+    /// Show full raw TODO.md content
+    #[arg(long)]
+    pub raw: bool,
+
+    /// Show only completed items
+    #[arg(long, conflicts_with = "pending")]
+    pub done: bool,
+
+    /// Show only pending items (default)
+    #[arg(long, conflicts_with = "done")]
+    pub pending: bool,
+
+    /// Show all items regardless of status
+    #[arg(short, long, conflicts_with_all = ["done", "pending"])]
+    pub all: bool,
+
+    /// Filter to specific section (fuzzy match)
+    #[arg(short, long)]
+    pub section: Option<String>,
 }
 
 /// Detected item format in a section
@@ -352,10 +387,19 @@ fn find_item_by_text<'a>(section: &'a Section, query: &str) -> Result<&'a Item, 
 }
 
 /// Mark an item as done (toggle checkbox or add [x])
-fn mark_item_done(content: &str, query: &str) -> Result<(String, String), String> {
+fn mark_item_done(
+    content: &str,
+    query: &str,
+    section_name: Option<&str>,
+) -> Result<(String, String), String> {
     let sections = parse_todo(content);
-    let section_idx = find_primary_section(&sections).ok_or("No sections found")?;
-    let section = &sections[section_idx];
+    let section = if let Some(name) = section_name {
+        find_section_by_name(&sections, name)
+            .ok_or_else(|| format!("Section '{}' not found", name))?
+    } else {
+        let idx = find_primary_section(&sections).ok_or("No sections found")?;
+        &sections[idx]
+    };
 
     let item = find_item_by_text(section, query)?;
     let lines: Vec<&str> = content.lines().collect();
@@ -415,10 +459,19 @@ fn mark_line_done(line: &str) -> String {
 }
 
 /// Remove an item by text match
-fn remove_item(content: &str, query: &str) -> Result<(String, String), String> {
+fn remove_item(
+    content: &str,
+    query: &str,
+    section_name: Option<&str>,
+) -> Result<(String, String), String> {
     let sections = parse_todo(content);
-    let section_idx = find_primary_section(&sections).ok_or("No sections found")?;
-    let section = &sections[section_idx];
+    let section = if let Some(name) = section_name {
+        find_section_by_name(&sections, name)
+            .ok_or_else(|| format!("Section '{}' not found", name))?
+    } else {
+        let idx = find_primary_section(&sections).ok_or("No sections found")?;
+        &sections[idx]
+    };
 
     let item = find_item_by_text(section, query)?;
     let lines: Vec<&str> = content.lines().collect();
@@ -485,6 +538,169 @@ fn renumber_section(content: &str, section_name: &str) -> String {
     result
 }
 
+/// Find section by name (fuzzy match)
+fn find_section_by_name<'a>(sections: &'a [Section], name: &str) -> Option<&'a Section> {
+    let name_lower = name.to_lowercase();
+    sections
+        .iter()
+        .find(|s| s.name.to_lowercase().contains(&name_lower))
+}
+
+/// Display sections with proper headers and filtering
+fn display_sections(sections: &[Section], filter: &ListFilter, json: bool) {
+    // Determine which sections to show
+    let sections_to_show: Vec<&Section> = if let Some(ref section_filter) = filter.section {
+        sections
+            .iter()
+            .filter(|s| {
+                s.name
+                    .to_lowercase()
+                    .contains(&section_filter.to_lowercase())
+            })
+            .collect()
+    } else if filter.all || filter.done {
+        // Show all sections when filtering globally
+        sections.iter().collect()
+    } else {
+        // Default: just primary section
+        if let Some(idx) = find_primary_section(sections) {
+            vec![&sections[idx]]
+        } else {
+            vec![]
+        }
+    };
+
+    // Filter items by status
+    let status_filter = |item: &Item| -> bool {
+        if filter.all {
+            true
+        } else if filter.done {
+            item.done
+        } else {
+            // default: pending only
+            !item.done
+        }
+    };
+
+    if json {
+        let sections_json: Vec<_> = sections_to_show
+            .iter()
+            .map(|s| {
+                let items: Vec<_> = s
+                    .items
+                    .iter()
+                    .filter(|i| status_filter(i))
+                    .enumerate()
+                    .map(|(i, item)| {
+                        serde_json::json!({
+                            "index": i + 1,
+                            "text": item.text,
+                            "done": item.done
+                        })
+                    })
+                    .collect();
+                serde_json::json!({
+                    "name": s.name,
+                    "level": s.header_level,
+                    "format": format!("{:?}", s.format),
+                    "items": items
+                })
+            })
+            .filter(|s| !s["items"].as_array().unwrap().is_empty())
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&sections_json).unwrap());
+    } else {
+        let mut any_output = false;
+
+        for section in sections_to_show {
+            let filtered_items: Vec<_> =
+                section.items.iter().filter(|i| status_filter(i)).collect();
+
+            if filtered_items.is_empty() {
+                continue;
+            }
+
+            if any_output {
+                println!(); // blank line between sections
+            }
+
+            // Print header with proper level
+            println!("{} {}", "#".repeat(section.header_level), section.name);
+
+            for item in &filtered_items {
+                let marker = if item.done { "[x]" } else { "[ ]" };
+                // Use the original format for display
+                let prefix = match section.format {
+                    ItemFormat::Checkbox => format!("- {} ", marker),
+                    ItemFormat::Numbered => {
+                        if item.done {
+                            format!("- {} ", marker)
+                        } else {
+                            "- ".to_string()
+                        }
+                    }
+                    ItemFormat::Bullet => {
+                        if item.done {
+                            format!("- {} ", marker)
+                        } else {
+                            "- ".to_string()
+                        }
+                    }
+                    ItemFormat::Asterisk => {
+                        if item.done {
+                            format!("* {} ", marker)
+                        } else {
+                            "* ".to_string()
+                        }
+                    }
+                    ItemFormat::Plain => {
+                        if item.done {
+                            format!("{} ", marker)
+                        } else {
+                            "".to_string()
+                        }
+                    }
+                };
+                println!("{}{}", prefix, item.text);
+            }
+
+            any_output = true;
+        }
+
+        if !any_output {
+            if filter.done {
+                println!("No completed items");
+            } else {
+                println!("No pending items");
+            }
+        }
+    }
+}
+
+/// Remove all completed items from the file
+fn clean_done_items(content: &str) -> String {
+    let sections = parse_todo(content);
+    let done_lines: std::collections::HashSet<usize> = sections
+        .iter()
+        .flat_map(|s| s.items.iter().filter(|i| i.done).map(|i| i.line_num))
+        .collect();
+
+    let mut result = String::new();
+    for (i, line) in content.lines().enumerate() {
+        if !done_lines.contains(&i) {
+            result.push_str(line);
+            result.push('\n');
+        }
+    }
+
+    // Preserve trailing newline behavior
+    if !content.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
+
+    result
+}
+
 /// Main command handler
 pub fn cmd_todo(action: Option<TodoAction>, json: bool, root: &Path) -> i32 {
     let todo_path = root.join("TODO.md");
@@ -503,133 +719,136 @@ pub fn cmd_todo(action: Option<TodoAction>, json: bool, root: &Path) -> i32 {
     };
 
     match action {
-        Some(TodoAction::Add { text }) => match add_item(&content, None, &text) {
-            Ok(new_content) => {
-                if let Err(e) = fs::write(&todo_path, &new_content) {
-                    eprintln!("Error writing TODO.md: {}", e);
-                    return 1;
+        Some(TodoAction::Add { text, section }) => {
+            match add_item(&content, section.as_deref(), &text) {
+                Ok(new_content) => {
+                    if let Err(e) = fs::write(&todo_path, &new_content) {
+                        eprintln!("Error writing TODO.md: {}", e);
+                        return 1;
+                    }
+                    if json {
+                        println!("{}", serde_json::json!({"status": "added", "item": text}));
+                    } else {
+                        let sections = parse_todo(&content);
+                        let section_name = if let Some(ref s) = section {
+                            find_section_by_name(&sections, s)
+                                .map(|sec| sec.name.as_str())
+                                .unwrap_or(s)
+                        } else {
+                            find_primary_section(&sections)
+                                .map(|i| sections[i].name.as_str())
+                                .unwrap_or("TODO")
+                        };
+                        println!("Added to {}: {}", section_name, text);
+                    }
+                    0
                 }
-                if json {
-                    println!("{}", serde_json::json!({"status": "added", "item": text}));
-                } else {
-                    let sections = parse_todo(&content);
-                    let section_name = find_primary_section(&sections)
-                        .map(|i| sections[i].name.as_str())
-                        .unwrap_or("TODO");
-                    println!("Added to {}: {}", section_name, text);
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    1
                 }
-                0
             }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                1
-            }
-        },
+        }
 
-        Some(TodoAction::Done { query }) => match mark_item_done(&content, &query) {
-            Ok((new_content, completed_item)) => {
-                if let Err(e) = fs::write(&todo_path, &new_content) {
-                    eprintln!("Error writing TODO.md: {}", e);
-                    return 1;
+        Some(TodoAction::Done { query, section }) => {
+            match mark_item_done(&content, &query, section.as_deref()) {
+                Ok((new_content, completed_item)) => {
+                    if let Err(e) = fs::write(&todo_path, &new_content) {
+                        eprintln!("Error writing TODO.md: {}", e);
+                        return 1;
+                    }
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({"status": "completed", "item": completed_item})
+                        );
+                    } else {
+                        println!("Marked done: {}", completed_item);
+                    }
+                    0
                 }
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({"status": "completed", "item": completed_item})
-                    );
-                } else {
-                    println!("Marked done: {}", completed_item);
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    1
                 }
-                0
             }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                1
-            }
-        },
+        }
 
-        Some(TodoAction::Rm { query }) => match remove_item(&content, &query) {
-            Ok((new_content, removed_item)) => {
-                if let Err(e) = fs::write(&todo_path, &new_content) {
-                    eprintln!("Error writing TODO.md: {}", e);
-                    return 1;
+        Some(TodoAction::Rm { query, section }) => {
+            match remove_item(&content, &query, section.as_deref()) {
+                Ok((new_content, removed_item)) => {
+                    if let Err(e) = fs::write(&todo_path, &new_content) {
+                        eprintln!("Error writing TODO.md: {}", e);
+                        return 1;
+                    }
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({"status": "removed", "item": removed_item})
+                        );
+                    } else {
+                        println!("Removed: {}", removed_item);
+                    }
+                    0
                 }
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({"status": "removed", "item": removed_item})
-                    );
-                } else {
-                    println!("Removed: {}", removed_item);
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    1
                 }
-                0
             }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                1
-            }
-        },
+        }
 
-        None | Some(TodoAction::List { full: false }) => {
+        Some(TodoAction::Clean) => {
             let sections = parse_todo(&content);
+            let done_count: usize = sections
+                .iter()
+                .map(|s| s.items.iter().filter(|i| i.done).count())
+                .sum();
+
+            if done_count == 0 {
+                if json {
+                    println!("{}", serde_json::json!({"status": "clean", "removed": 0}));
+                } else {
+                    println!("No completed items to remove");
+                }
+                return 0;
+            }
+
+            let new_content = clean_done_items(&content);
+            if let Err(e) = fs::write(&todo_path, &new_content) {
+                eprintln!("Error writing TODO.md: {}", e);
+                return 1;
+            }
 
             if json {
-                let sections_json: Vec<_> = sections
-                    .iter()
-                    .map(|s| {
-                        let items: Vec<_> = s
-                            .items
-                            .iter()
-                            .enumerate()
-                            .map(|(i, item)| {
-                                serde_json::json!({
-                                    "index": i + 1,
-                                    "text": item.text,
-                                    "done": item.done
-                                })
-                            })
-                            .collect();
-                        serde_json::json!({
-                            "name": s.name,
-                            "format": format!("{:?}", s.format),
-                            "items": items
-                        })
-                    })
-                    .collect();
-                println!("{}", serde_json::to_string_pretty(&sections_json).unwrap());
+                println!(
+                    "{}",
+                    serde_json::json!({"status": "clean", "removed": done_count})
+                );
             } else {
-                // Show primary section by default
-                if let Some(idx) = find_primary_section(&sections) {
-                    let section = &sections[idx];
-                    println!("{} {}\n", "#".repeat(section.header_level), section.name);
-                    if section.items.is_empty() {
-                        println!("  (no items)");
-                    } else {
-                        for (i, item) in section.items.iter().enumerate() {
-                            let marker = if item.done { "[x]" } else { "   " };
-                            println!("{}  {}. {}", marker, i + 1, item.text);
-                        }
-                    }
-                    // Show section count
-                    if sections.len() > 1 {
-                        eprintln!(
-                            "\n({} sections total, use --full to see all)",
-                            sections.len()
-                        );
-                    }
-                } else {
-                    println!("No sections found in TODO.md");
-                }
+                println!("Removed {} completed item(s)", done_count);
             }
             0
         }
 
-        Some(TodoAction::List { full: true }) => {
-            if json {
-                println!("{}", serde_json::json!({"content": content}));
-            } else {
-                print!("{}", content);
+        None => {
+            let sections = parse_todo(&content);
+            display_sections(&sections, &ListFilter::default(), json);
+            0
+        }
+
+        Some(TodoAction::List { filter }) => {
+            if filter.raw {
+                if json {
+                    println!("{}", serde_json::json!({"content": content}));
+                } else {
+                    print!("{}", content);
+                }
+                return 0;
             }
+
+            let sections = parse_todo(&content);
+            display_sections(&sections, &filter, json);
             0
         }
     }
