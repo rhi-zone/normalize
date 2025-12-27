@@ -196,22 +196,26 @@ moss-core = { path = "../moss-core" }
 arborium = { workspace = true }
 
 [features]
-default = ["all-languages"]
+default = ["common"]
 
-# Meta-features
-all-languages = [
-    "lang-python", "lang-rust", "lang-javascript", "lang-typescript",
-    "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-ruby",
-    "lang-scala", "lang-kotlin", "lang-swift", "lang-dart",
-    "lang-csharp", "lang-fsharp", "lang-php", "lang-elixir",
-    # ... all others
-]
-
-# Tier 1: Most common
+# Tier 1: Core languages (~5MB) - universally useful, small grammars
 tier1 = [
     "lang-python", "lang-rust", "lang-javascript", "lang-typescript",
-    "lang-go", "lang-java", "lang-cpp",
+    "lang-go", "lang-java", "lang-c",
+    "lang-markdown", "lang-json", "lang-yaml", "lang-toml",
+    "lang-html", "lang-css", "lang-bash",
 ]
+
+# Tier 2: Common but larger (~25MB)
+tier2 = [
+    "lang-cpp", "lang-ruby", "lang-kotlin", "lang-c-sharp",
+    "lang-swift", "lang-php", "lang-scala", "lang-tsx", "lang-vue",
+    # ... plus lua, zig, elixir, dart, dockerfile, graphql, hcl, scss
+]
+
+# common = tier1 + tier2 (default, ~30MB)
+# niche = large/specialized grammars (opt-in, ~60MB)
+# all-languages = common + niche (~90MB)
 
 # Individual language features (each enables arborium grammar)
 lang-python = ["arborium/lang-python"]
