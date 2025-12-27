@@ -42,7 +42,7 @@ When facing N use cases, prefer one flexible solution over N specialized ones. C
 Examples:
 - Three primitives (view, edit, analyze) with rich options, not 100 specialized tools
 - Log formats as plugins, not N hardcoded parsers
-- `--json` + `--jq` + `--compact` flags, not `--format=X` for every format
+- `--json` + `--jq` + `--pretty` flags, not `--format=X` for every format
 - Lua for workflows instead of TOML-for-simple + DSL-for-complex (see `crates/moss/src/workflow/mod.rs`)
 - Distros that compose, not fork
 

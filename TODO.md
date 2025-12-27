@@ -21,6 +21,12 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 **Workflow Engine:**
 - [x] Port LLM calling logic (streaming, tool use) as workflow component
 
+**Token-Efficient Output:**
+Default output optimized for LLM context efficiency. Add `--pretty` for human-friendly display.
+- Default: minimal decoration, dense but scannable
+- `--pretty`: tables, colors, aligned columns for terminal use
+- Consider: elide common patterns (e.g., `pub fn` → `fn` in listing context)
+
 **Rust Redesign Candidates:**
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration

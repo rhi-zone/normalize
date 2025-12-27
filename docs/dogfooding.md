@@ -46,7 +46,8 @@ Effective pattern for understanding unfamiliar code:
 
 **Global flags:**
 - `--json` for structured output
-- `--compact` for minimal output (planned)
+- `--pretty` for human-friendly display (tables, colors, alignment)
+- Default is token-efficient (minimal decoration)
 - All commands work with fuzzy paths
 
 ## Future Improvements
