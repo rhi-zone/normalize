@@ -3,6 +3,7 @@
 mod cargo;
 mod composer;
 mod conan;
+mod deno;
 mod gem;
 mod go;
 mod hex;
@@ -18,6 +19,7 @@ use std::path::Path;
 pub use cargo::Cargo;
 pub use composer::Composer;
 pub use conan::Conan;
+pub use deno::Deno;
 pub use gem::Gem;
 pub use go::Go;
 pub use hex::Hex;
@@ -29,7 +31,7 @@ pub use python::Python;
 
 /// All registered ecosystems.
 static ECOSYSTEMS: &[&dyn Ecosystem] = &[
-    &Cargo, &Npm, &Python, &Go, &Hex, &Gem, &Composer, &Maven, &Nuget, &Nix, &Conan,
+    &Cargo, &Npm, &Deno, &Python, &Go, &Hex, &Gem, &Composer, &Maven, &Nuget, &Nix, &Conan,
 ];
 
 /// Detect ecosystem from project files.

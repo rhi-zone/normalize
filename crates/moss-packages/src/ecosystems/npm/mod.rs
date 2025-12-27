@@ -1,8 +1,12 @@
-//! npm/yarn/pnpm (Node.js) ecosystem.
+//! npm/yarn/pnpm/bun (Node.js) ecosystem.
+
+mod lockfile_npm;
+mod lockfile_pnpm;
+mod lockfile_yarn;
 
 use crate::{
     AuditResult, Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
-    PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
+    PackageQuery, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -60,63 +64,25 @@ impl Ecosystem for Npm {
     }
 
     fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
-        // Try package-lock.json first (most common)
-        let lockfile = project_root.join("package-lock.json");
-        if let Ok(content) = std::fs::read_to_string(&lockfile) {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-                // v2/v3 format: packages["node_modules/pkg"]
-                if let Some(pkgs) = parsed.get("packages").and_then(|p| p.as_object()) {
-                    let key = format!("node_modules/{}", package);
-                    if let Some(pkg) = pkgs.get(&key) {
-                        if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                            return Some(v.to_string());
-                        }
-                    }
-                }
-                // v1 format: dependencies["pkg"]
-                if let Some(deps) = parsed.get("dependencies").and_then(|d| d.as_object()) {
-                    if let Some(pkg) = deps.get(package) {
-                        if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                            return Some(v.to_string());
-                        }
-                    }
-                }
-            }
+        // Try each lockfile format
+        if let Some(v) = lockfile_npm::installed_version(package, project_root) {
+            return Some(v);
         }
-
-        // Try yarn.lock (text format: "pkg@version": resolved "..." version "x.y.z")
-        let yarn_lock = project_root.join("yarn.lock");
-        if let Ok(content) = std::fs::read_to_string(yarn_lock) {
-            // Look for lines like: "react@^18.0.0":
-            // Followed by: version "18.2.0"
-            let mut in_package = false;
-            for line in content.lines() {
-                if line.starts_with(&format!("\"{}@", package))
-                    || line.starts_with(&format!("{}@", package))
-                {
-                    in_package = true;
-                } else if in_package && line.trim().starts_with("version ") {
-                    let version = line.trim().strip_prefix("version ")?;
-                    return Some(version.trim_matches('"').to_string());
-                } else if !line.starts_with(' ') && !line.is_empty() {
-                    in_package = false;
-                }
-            }
+        if let Some(v) = lockfile_pnpm::installed_version(package, project_root) {
+            return Some(v);
         }
-
+        if let Some(v) = lockfile_yarn::installed_version(package, project_root) {
+            return Some(v);
+        }
         None
     }
 
-    fn list_dependencies(
-        &self,
-        project_root: &Path,
-    ) -> Result<Vec<Dependency>, crate::PackageError> {
+    fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError> {
         let manifest = project_root.join("package.json");
-        let content = std::fs::read_to_string(&manifest).map_err(|e| {
-            crate::PackageError::ParseError(format!("failed to read package.json: {}", e))
-        })?;
+        let content = std::fs::read_to_string(&manifest)
+            .map_err(|e| PackageError::ParseError(format!("failed to read package.json: {}", e)))?;
         let parsed: serde_json::Value = serde_json::from_str(&content)
-            .map_err(|e| crate::PackageError::ParseError(format!("invalid JSON: {}", e)))?;
+            .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
         let mut deps = Vec::new();
 
@@ -156,15 +122,23 @@ impl Ecosystem for Npm {
         Ok(deps)
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, crate::PackageError> {
-        // Find package-lock.json, searching up for monorepo root
-        let lockfile = find_npm_lockfile(project_root)?;
-        let content = std::fs::read_to_string(&lockfile).map_err(|e| {
-            crate::PackageError::ParseError(format!("failed to read lockfile: {}", e))
-        })?;
-        let parsed: serde_json::Value = serde_json::from_str(&content)
-            .map_err(|e| crate::PackageError::ParseError(format!("invalid JSON: {}", e)))?;
-        build_npm_tree(&parsed)
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
+        // Try each lockfile format in order of preference
+        if let Some(tree) = lockfile_pnpm::dependency_tree(project_root) {
+            return tree;
+        }
+        if let Some(tree) = lockfile_yarn::dependency_tree(project_root) {
+            return tree;
+        }
+        if let Some(tree) = lockfile_npm::dependency_tree(project_root) {
+            return tree;
+        }
+        // bun.lockb is binary, skip for now
+
+        Err(PackageError::ParseError(format!(
+            "no supported lockfile found in {} or parent directories",
+            project_root.display()
+        )))
     }
 
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
@@ -257,134 +231,6 @@ impl Ecosystem for Npm {
         }
 
         Ok(AuditResult { vulnerabilities })
-    }
-}
-
-/// Find package-lock.json, searching up from project_root
-fn find_npm_lockfile(project_root: &Path) -> Result<std::path::PathBuf, crate::PackageError> {
-    let mut current = project_root.to_path_buf();
-    loop {
-        // Try various lockfile names
-        for name in ["package-lock.json", "pnpm-lock.yaml", "yarn.lock"] {
-            let lockfile = current.join(name);
-            if lockfile.exists() {
-                // For now, only fully support package-lock.json
-                if name == "package-lock.json" {
-                    return Ok(lockfile);
-                }
-            }
-        }
-        if !current.pop() {
-            break;
-        }
-    }
-    Err(crate::PackageError::ParseError(format!(
-        "package-lock.json not found in {} or parent directories",
-        project_root.display()
-    )))
-}
-
-fn build_npm_tree(parsed: &serde_json::Value) -> Result<DependencyTree, crate::PackageError> {
-    let name = parsed
-        .get("name")
-        .and_then(|n| n.as_str())
-        .unwrap_or("root");
-    let version = parsed
-        .get("version")
-        .and_then(|v| v.as_str())
-        .unwrap_or("0.0.0");
-
-    // v2/v3 format: packages["node_modules/..."]
-    let packages = parsed.get("packages").and_then(|p| p.as_object());
-
-    if let Some(packages) = packages {
-        // Build adjacency map from node_modules structure
-        let mut deps_map: std::collections::HashMap<String, Vec<(String, String)>> =
-            std::collections::HashMap::new();
-
-        for (path, info) in packages {
-            if path.is_empty() {
-                continue; // Skip root
-            }
-
-            // Extract package name from path: "node_modules/foo" or "node_modules/foo/node_modules/bar"
-            let parts: Vec<&str> = path.split("/node_modules/").collect();
-            let pkg_name = parts.last().unwrap_or(&"");
-            let pkg_version = info.get("version").and_then(|v| v.as_str()).unwrap_or("");
-
-            // Parent is everything before the last /node_modules/
-            let parent = if parts.len() > 1 {
-                parts[..parts.len() - 1].join("/node_modules/")
-            } else {
-                String::new() // root
-            };
-
-            deps_map
-                .entry(parent)
-                .or_default()
-                .push((pkg_name.to_string(), pkg_version.to_string()));
-        }
-
-        fn build_node(
-            name: &str,
-            version: &str,
-            parent_path: &str,
-            deps_map: &std::collections::HashMap<String, Vec<(String, String)>>,
-            visited: &mut std::collections::HashSet<String>,
-        ) -> TreeNode {
-            let children = if visited.contains(name) {
-                Vec::new()
-            } else {
-                visited.insert(name.to_string());
-                let child_path = if parent_path.is_empty() {
-                    name.to_string()
-                } else {
-                    format!("{}/node_modules/{}", parent_path, name)
-                };
-                deps_map
-                    .get(&child_path)
-                    .map(|deps| {
-                        deps.iter()
-                            .map(|(n, v)| build_node(n, v, &child_path, deps_map, visited))
-                            .collect()
-                    })
-                    .unwrap_or_default()
-            };
-
-            TreeNode {
-                name: name.to_string(),
-                version: version.to_string(),
-                dependencies: children,
-            }
-        }
-
-        // Build root children
-        let mut visited = std::collections::HashSet::new();
-        let root_deps = deps_map
-            .get("")
-            .map(|deps| {
-                deps.iter()
-                    .map(|(n, v)| build_node(n, v, "", &deps_map, &mut visited))
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let root = TreeNode {
-            name: name.to_string(),
-            version: version.to_string(),
-            dependencies: root_deps,
-        };
-
-        Ok(DependencyTree { roots: vec![root] })
-    } else {
-        // No packages section, return minimal tree
-        Ok(DependencyTree {
-            roots: vec![TreeNode {
-                name: name.to_string(),
-                version: version.to_string(),
-                dependencies: Vec::new(),
-            }],
-        })
     }
 }
 
