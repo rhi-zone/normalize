@@ -128,11 +128,15 @@ impl Merge for PathBuf {
     }
 }
 
-// === Option: other wins if Some ===
+// === Option: merge inner values if both Some ===
 
-impl<T> Merge for Option<T> {
+impl<T: Merge> Merge for Option<T> {
     fn merge(self, other: Self) -> Self {
-        other.or(self)
+        match (self, other) {
+            (Some(a), Some(b)) => Some(a.merge(b)),
+            (None, b) => b,
+            (a, None) => a,
+        }
     }
 }
 
@@ -191,7 +195,19 @@ mod tests {
     fn test_option_merge() {
         assert_eq!(None::<i32>.merge(Some(1)), Some(1));
         assert_eq!(Some(1).merge(None), Some(1));
-        assert_eq!(Some(1).merge(Some(2)), Some(2));
+        assert_eq!(Some(1).merge(Some(2)), Some(2)); // inner merge: other wins for primitives
+    }
+
+    #[test]
+    fn test_option_hashmap_merge() {
+        // Option<HashMap> should merge inner hashmaps when both Some
+        let a: Option<HashMap<&str, i32>> = Some([("x", 1), ("y", 2)].into_iter().collect());
+        let b: Option<HashMap<&str, i32>> = Some([("y", 3), ("z", 4)].into_iter().collect());
+
+        let merged = a.merge(b).unwrap();
+        assert_eq!(merged.get("x"), Some(&1)); // from a
+        assert_eq!(merged.get("y"), Some(&3)); // b wins
+        assert_eq!(merged.get("z"), Some(&4)); // from b
     }
 
     #[test]
