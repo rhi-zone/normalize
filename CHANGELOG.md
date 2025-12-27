@@ -33,6 +33,15 @@ Coroutine-based sessions for interactive workflows:
 - `RuntimeState` enum: `Waiting(Prompt|Menu)`, `Done`, `Error`
 - Lua code looks synchronous, frontend controls the event loop
 
+### Docstring Display Levels
+
+Three-level docstring display for `moss view`:
+- Skeleton mode: no docstrings (structure only)
+- Default: summary only (up to double blank line `\n\n\n`)
+- `--docs` flag: full docstrings
+
+The double-blank convention allows separating summary from extended docs inline. Design doc: `docs/documentation.md`.
+
 ### Documentation Reference Checking
 
 `moss analyze --check-refs` scans markdown files for code references in backticks and validates against indexed symbols. Reports broken references with file:line and context.
