@@ -1109,4 +1109,37 @@ mod tests {
         bad[..10].copy_from_slice(b"wrong head");
         assert!(BunLockb::parse(&bad).is_none());
     }
+
+    #[test]
+    fn test_parse_real_lockb_embedded() {
+        // Real bun.lockb from bun/bench/bundle (1139 bytes)
+        // Contains: bundle (root) with devDependency bun-types@0.5.8
+        const LOCKB_BASE64: &str = "IyEvdXNyL2Jpbi9lbnYgYnVuCmJ1bi1sb2NrZmlsZS1mb3JtYXQtdjAKAgAAALF9h1TvqtCSnpIhE6ZZVtegxB+KP4bOgQRHCtNLVpnM4wMAAAAAAAACAAAAAAAAAAgAAAAAAAAABwAAAAAAAACAAAAAAAAAABgCAAAAAAAAAABidW5kbGUAAAAAAAAJAACA9Ht4wQTAuqJ77GfNiBLrIgGdcG8BAAAAGJ5wbwEAAABwnXBvAQAAABzZM48BAFt3AAAAAAAAAAAAABAAAAAAADiQ8gIBAAAAQJ5wbwEAAAACAAAAAAAAAAkAAAA6AACAAAAAAAUAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAAP4P/gEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQD+D/4BAAABAAAAAAAAAAAAAAAEVHwD0MAHo3wraYAeqTWH2NDmXOdGfC3wWWOnZvK93ytI6yq/LkgsCjDudWNmN7MlfPvJb2zoLMnkzhjxNwLsLwAAAAAbMY8BAGgjAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQAAgAFeMC5gAgAAAAAAAHQCAAAAAAAACjxzcmMuaW5zdGFsbC5sb2NrZmlsZS5UcmVlPiAyMCBzaXplb2YsIDQgYWxpZ25vZgoAAAAAAAAAAAAA/v////////8AAAAAAQAAAKACAAAAAAAApAIAAAAAAAAKPHUzMj4gNCBzaXplb2YsIDQgYWxpZ25vZgoAAAAAANACAAAAAAAA1AIAAAAAAAAKPHUzMj4gNCBzaXplb2YsIDQgYWxpZ25vZgoAAQAAAAgDAAAAAAAAIgMAAAAAAAAKPFsyNl11OD4gMjYgc2l6ZW9mLCAxIGFsaWdub2YKAAAAAAAAAAAACQAAgHvsZ82IEusiCAFeMC41LjAAAGwDAAAAAAAAbAMAAAAAAAAKPHNyYy5pbnN0YWxsLnNlbXZlci5FeHRlcm5hbFN0cmluZz4gMTYgc2l6ZW9mLCA4IGFsaWdub2YKmAMAAAAAAADbAwAAAAAAAAo8dTg+IDEgc2l6ZW9mLCAxIGFsaWdub2YKAABidW4tdHlwZXNodHRwczovL3JlZ2lzdHJ5Lm5wbWpzLm9yZy9idW4tdHlwZXMvLS9idW4tdHlwZXMtMC41LjgudGd6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+        use base64::Engine;
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(LOCKB_BASE64)
+            .expect("invalid base64");
+
+        let parsed = BunLockb::parse(&data).expect("failed to parse bun.lockb");
+
+        // Should have 2 packages: root "bundle" and "bun-types"
+        assert_eq!(parsed.packages.len(), 2);
+
+        // Find bun-types package
+        let bun_types = parsed
+            .packages
+            .iter()
+            .find(|p| p.name == "bun-types")
+            .expect("bun-types not found");
+        assert_eq!(bun_types.version, "0.5.8"); // v2 format stores version in Resolution
+
+        // Root package
+        let root = parsed
+            .packages
+            .iter()
+            .find(|p| p.name == "bundle")
+            .expect("root package not found");
+        assert_eq!(root.version, "0.0.0"); // Root packages have 0.0.0 version
+    }
 }

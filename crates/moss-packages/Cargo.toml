@@ -11,3 +11,6 @@ serde_json_lenient = "0.2"
 serde_yaml = "0.9"
 toml = "0.8"
 ureq = "2"
+
+[dev-dependencies]
+base64 = "0.22"
