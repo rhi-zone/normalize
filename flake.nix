@@ -22,6 +22,9 @@
             rust-analyzer
             clippy
             rustfmt
+            # Fast linker for incremental builds
+            mold
+            clang
             # VS Code extension (editors/vscode/)
             nodejs_22
           ];

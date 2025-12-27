@@ -52,6 +52,11 @@ libloading = "0.8"
 # Minimize debug build size (full debug info adds ~2GB)
 [profile.dev]
 debug = 0
+split-debuginfo = "unpacked"  # Faster incremental builds on Linux
+
+# Speed up proc-macro and build-script builds
+[profile.dev.build-override]
+opt-level = 3
 
 # Optimize release builds for size
 [profile.release]
