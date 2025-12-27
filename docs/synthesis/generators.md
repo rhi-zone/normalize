@@ -189,7 +189,7 @@ result = await generator.generate(spec, context, hints)
 
 ## Future Generators
 
-See [Roadmap](roadmap.md) for planned non-LLM generators:
+Planned non-LLM generators:
 
 - **EnumerativeGenerator** - AST enumeration
 - **SMTGenerator** - Z3-based synthesis

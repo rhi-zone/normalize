@@ -146,4 +146,3 @@ enabled = ["template", "llm"]
 
 - [Strategies](strategies.md) - Available decomposition strategies
 - [Generators](generators.md) - Code generation approaches
-- [Roadmap](roadmap.md) - Future generator implementations

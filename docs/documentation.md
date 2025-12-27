@@ -66,7 +66,7 @@ fn example_basic_usage() {
 
 Docs reference by marker (syntax - not yet implemented):
 
-    \{\{example: tests/parser_test.rs#basic-usage\}\}
+    {​{example: tests/parser_test.rs#basic-usage}​}
 
 Validate with `moss analyze --check-examples`. Future: `moss docs build` will expand these.
 
@@ -84,8 +84,8 @@ Validate with `moss analyze --check-examples`. Future: `moss docs build` will ex
 
 ### Phase 3: Example extraction
 - [x] `[example: name]` marker parser
-- [x] `{{example: path#name}}` reference validation (`moss analyze --check-examples`)
-- [ ] `{{example: path#name}}` expansion (future `moss docs build`)
+- [x] `{​{example: path#name}}` reference validation (`moss analyze --check-examples`)
+- [ ] `{​{example: path#name}}` expansion (future `moss docs build`)
 - [ ] Test that examples compile/run
 
 ## Open Questions

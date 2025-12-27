@@ -106,6 +106,7 @@ export default withMermaid(
             { text: 'Log Analysis', link: '/log-analysis' },
             { text: 'Recursive Improvement', link: '/recursive-improvement' },
             { text: 'Restructuring Plan', link: '/restructuring-plan' },
+            { text: 'Low-Priority Research', link: '/research-low-priority' },
           ]
         },
       ]
