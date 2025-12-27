@@ -3,10 +3,17 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- Add --section flag to moss todo add for targeting specific sections
-- Add moss todo clean to remove all [x] items
 
 Test Status: 110 passing, 0 failing (moss-languages)
+
+**moss todo v2 design** (needs more thought before implementing):
+- Filename: `--file PATH` flag, auto-detect (TODO.md, TASKS.md, todo.txt), config fallback
+- Filters: `--done`, `--pending`, `--all`; `--section "Name"` to scope operations
+- Output format: grouped by section with headers vs flat with prefixes? TBD
+- `--section` flag for add/done/rm to target specific sections
+- `clean` command to remove all [x] items
+- Config (`[todo]` in moss.toml): file, primary_section, default filters
+- Consider: fuzzy section matching, multiple section selection, regex filters
 
 
 ## Remaining Work
