@@ -90,7 +90,7 @@ pub fn dependency_tree(project_root: &Path) -> Option<Result<DependencyTree, Pac
         return Some(build_tree_text(&parsed, project_root));
     }
 
-    // Fall back to binary format (versions not yet parsed from Resolution field)
+    // Fall back to binary format
     if let Some(lockfile) = find_binary_lockfile(project_root) {
         if lockfile.exists() {
             return Some(build_tree_binary(project_root));
@@ -187,6 +187,8 @@ impl<'a> BunLockb<'a> {
         let mut offset = HEADER_MAGIC.len(); // 42
 
         // Format version (u32 LE)
+        // v0-v2: Resolution uses u32 version (64 bytes)
+        // v3+: Resolution uses u64 version (72 bytes)
         let format_version = read_u32_le(data, &mut offset)?;
         if format_version > 10 {
             return None;
@@ -227,10 +229,18 @@ impl<'a> BunLockb<'a> {
         // Package MultiArrayList field offsets (fields stored as arrays, sorted by alignment):
         // - names:        offset 0,              each 8 bytes (String)
         // - name_hashes:  offset pkg_count * 8,  each 8 bytes (u64)
-        // - resolution:   offset pkg_count * 16, each 72 bytes (Resolution)
-        // - dependencies: offset pkg_count * 88, each 8 bytes (DependencySlice)
-        // - resolutions:  offset pkg_count * 96, each 8 bytes (PackageIDSlice)
-        let packages = Self::extract_packages(data, pkg_begin, packages_count, string_bytes);
+        // - resolution:   offset pkg_count * 16, each (v2: 64, v3+: 72) bytes
+        // - dependencies: after resolutions, each 8 bytes (DependencySlice)
+        // - resolutions:  after dependencies, each 8 bytes (PackageIDSlice)
+        let resolution_size = if format_version <= 2 { 64 } else { 72 };
+        let packages = Self::extract_packages(
+            data,
+            pkg_begin,
+            packages_count,
+            string_bytes,
+            resolution_size,
+            format_version,
+        );
 
         Some(Self {
             packages,
@@ -307,10 +317,10 @@ impl<'a> BunLockb<'a> {
 
     /// Extract packages using proper String encoding and slice references
     ///
-    /// MultiArrayList layout (fields as arrays, sorted by alignment descending):
+    /// MultiArrayList layout (fields stored in declaration order):
     /// - names[count]:        8 bytes each (String)
     /// - name_hashes[count]:  8 bytes each (u64)
-    /// - resolution[count]:   72 bytes each (Resolution)
+    /// - resolution[count]:   (v2: 64, v3+: 72) bytes each (Resolution)
     /// - dependencies[count]: 8 bytes each (DependencySlice = {off: u32, len: u32})
     /// - resolutions[count]:  8 bytes each (PackageIDSlice = {off: u32, len: u32})
     /// - meta[count], bin[count], scripts[count]: remaining fields
@@ -319,22 +329,21 @@ impl<'a> BunLockb<'a> {
         pkg_begin: usize,
         count: usize,
         string_bytes: &[u8],
+        resolution_size: usize,
+        format_version: u32,
     ) -> Vec<BunPackage> {
         let mut packages = Vec::with_capacity(count);
 
-        // Package.Serializer.save() writes fields in DECLARATION ORDER:
-        // name(8), name_hash(8), resolution(72), dependencies(8), resolutions(8), meta(?), bin(?), scripts(?)
-        //
         // Field offsets (from pkg_begin):
         // - names: 0
         // - name_hashes: count * 8
         // - resolution: count * 16
-        // - dependencies: count * 88 (after resolution's 72 bytes)
-        // - resolutions: count * 96 (after dependencies' 8 bytes)
-        // - meta, bin, scripts: after resolutions
+        // - dependencies: count * (16 + resolution_size)
+        // - resolutions: count * (16 + resolution_size + 8)
         let names_off = 0;
-        let deps_off = count * 88;
-        let res_off = count * 96;
+        let resolution_off = count * 16;
+        let deps_off = count * (16 + resolution_size);
+        let res_off = count * (16 + resolution_size + 8);
 
         for i in 0..count {
             // Read name
@@ -392,15 +401,93 @@ impl<'a> BunLockb<'a> {
                 Slice::default()
             };
 
+            // Read version from Resolution field
+            // v2: 64 bytes, v3+: 72 bytes
+            // Layout: tag(1) + padding(7) + value(56 or 64)
+            let res_addr = pkg_begin + resolution_off + i * resolution_size;
+            let version = Self::read_resolution_version(data, res_addr, format_version);
+
             packages.push(BunPackage {
                 name,
-                version: "0.0.0".to_string(), // TODO: read from Resolution field
+                version,
                 dependencies,
                 resolutions,
             });
         }
 
         packages
+    }
+
+    /// Read version from Resolution struct
+    /// v2: 64 bytes (tag(1) + padding(7) + VersionedURL(56))
+    /// v3+: 72 bytes (tag(1) + padding(7) + VersionedURL(64))
+    /// VersionedURL: url(8) + Version
+    /// v2 Version: major(u32) + minor(u32) + patch(u32) + padding(4) + tag(32) = 48 bytes
+    /// v3 Version: major(u64) + minor(u64) + patch(u64) + tag(32) = 56 bytes
+    fn read_resolution_version(data: &[u8], res_offset: usize, format_version: u32) -> String {
+        const TAG_NPM: u8 = 2;
+        const TAG_ROOT: u8 = 1;
+        const TAG_WORKSPACE: u8 = 72;
+
+        let res_size = if format_version <= 2 { 64 } else { 72 };
+        if res_offset + res_size > data.len() {
+            return "?".to_string();
+        }
+
+        let tag = data[res_offset];
+
+        match tag {
+            TAG_NPM => {
+                // npm: version at offset 16 (tag+padding=8, url=8)
+                let ver_offset = res_offset + 16;
+
+                if format_version <= 2 {
+                    // v2: u32 version fields
+                    if ver_offset + 12 > data.len() {
+                        return "?".to_string();
+                    }
+                    let major = u32::from_le_bytes(
+                        data[ver_offset..ver_offset + 4]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    );
+                    let minor = u32::from_le_bytes(
+                        data[ver_offset + 4..ver_offset + 8]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    );
+                    let patch = u32::from_le_bytes(
+                        data[ver_offset + 8..ver_offset + 12]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    );
+                    format!("{}.{}.{}", major, minor, patch)
+                } else {
+                    // v3+: u64 version fields
+                    if ver_offset + 24 > data.len() {
+                        return "?".to_string();
+                    }
+                    let major = u64::from_le_bytes(
+                        data[ver_offset..ver_offset + 8]
+                            .try_into()
+                            .unwrap_or([0; 8]),
+                    );
+                    let minor = u64::from_le_bytes(
+                        data[ver_offset + 8..ver_offset + 16]
+                            .try_into()
+                            .unwrap_or([0; 8]),
+                    );
+                    let patch = u64::from_le_bytes(
+                        data[ver_offset + 16..ver_offset + 24]
+                            .try_into()
+                            .unwrap_or([0; 8]),
+                    );
+                    format!("{}.{}.{}", major, minor, patch)
+                }
+            }
+            TAG_ROOT | TAG_WORKSPACE => "0.0.0".to_string(),
+            _ => "0.0.0".to_string(),
+        }
     }
 
     /// Read a String value (from SemverString.zig)
