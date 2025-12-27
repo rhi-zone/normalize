@@ -6,6 +6,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
+1. Enable mold linker: uncomment `.cargo/config.toml` after nix shell reload
+2. Verify CI workflows: push to trigger GitHub Actions, check grammar builds work
+3. First release dry-run: test `cargo xtask build-grammars` + release workflow locally
+4. Consider: `moss todo` command for structured TODO.md editing (prevents content loss)
+
 ## Remaining Work
 
 **Workflow Engine:**
