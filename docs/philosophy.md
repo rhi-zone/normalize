@@ -213,6 +213,16 @@ Real-world code is often messy. Moss should:
 - Support incremental improvement (clean up as you go, or don't)
 - Not impose architectural opinions unless asked
 
+### Just Work, Then Customize
+
+Tools should work immediately on whatever users already have:
+- Parse common formats without configuration (TODO.md, CHANGELOG, configs)
+- Handle variations gracefully (checkboxes, numbers, bullets, headers)
+- Never require users to restructure files to match tool expectations
+- Detect patterns, don't mandate them
+
+When structure is ambiguous, make a reasonable choice. When truly unclear, ask—but aim for that to be rare. The goal: zero configuration for 90% of cases, explicit config for edge cases.
+
 ### Workflows Become Presets
 
 If you have a workflow, the intuitive way to proceed should be to codify it. Custom presets are first-class citizens:

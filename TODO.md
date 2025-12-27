@@ -3,12 +3,11 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
+- Add --section flag to moss todo add for targeting specific sections
+- Add moss todo clean to remove all [x] items
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
-1. Verify CI workflows: push to trigger GitHub Actions, check grammar builds work
-2. First release dry-run: test `cargo xtask build-grammars` + release workflow locally
-3. Add `moss todo done` to move completed items to proper CHANGELOG section (currently appends to file end)
 
 ## Remaining Work
 
