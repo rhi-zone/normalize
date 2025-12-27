@@ -3,7 +3,7 @@
 use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
-use crate::tree::{FormatOptions, ViewNode, ViewNodeKind};
+use crate::tree::{DocstringDisplay, FormatOptions, ViewNode, ViewNodeKind};
 use crate::{daemon, deps, index, path_resolve, skeleton, symbols, tree};
 use moss_languages::support_for_path;
 use std::path::{Path, PathBuf};
@@ -42,6 +42,7 @@ fn cmd_view_symbol_direct(
     root: &Path,
     depth: i32,
     full: bool,
+    show_docs: bool,
     json: bool,
 ) -> i32 {
     cmd_view_symbol(
@@ -50,6 +51,7 @@ fn cmd_view_symbol_direct(
         root,
         depth,
         full,
+        show_docs,
         json,
     )
 }
@@ -68,6 +70,7 @@ pub fn cmd_view(
     resolve_imports: bool,
     include_private: bool,
     full: bool,
+    show_docs: bool,
     context: bool,
     json: bool,
     exclude: &[String],
@@ -137,7 +140,9 @@ pub fn cmd_view(
         (0, 1) => {
             // Single symbol match - construct path to it
             let sym = &symbol_matches[0];
-            return cmd_view_symbol_direct(&sym.file, &sym.name, &root, depth, full, json);
+            return cmd_view_symbol_direct(
+                &sym.file, &sym.name, &root, depth, full, show_docs, json,
+            );
         }
         _ => {
             // Multiple matches - list files and symbols
@@ -214,6 +219,7 @@ pub fn cmd_view(
             focus,
             resolve_imports,
             include_private,
+            show_docs,
             context,
             json,
         )
@@ -225,6 +231,7 @@ pub fn cmd_view(
             &root,
             depth,
             full,
+            show_docs,
             json,
         )
     }
@@ -471,6 +478,7 @@ fn cmd_view_file(
     focus: Option<&str>,
     resolve_imports: bool,
     include_private: bool,
+    show_docs: bool,
     context: bool,
     json: bool,
 ) -> i32 {
@@ -581,7 +589,13 @@ fn cmd_view_file(
             // Use ViewNode for consistent formatting
             let view_node = skeleton_result.to_view_node();
             let format_options = FormatOptions {
-                docstrings: !context, // Skip docstrings in context mode for brevity
+                docstrings: if context {
+                    DocstringDisplay::None // Skip docstrings in context mode for brevity
+                } else if show_docs {
+                    DocstringDisplay::Full
+                } else {
+                    DocstringDisplay::Summary
+                },
                 line_numbers: true,
                 skip_root: true, // Skip file header, we already printed it
                 max_depth: None,
@@ -634,7 +648,7 @@ fn cmd_view_file(
 
                         let view_node = import_skeleton.to_view_node();
                         let format_options = FormatOptions {
-                            docstrings: false,
+                            docstrings: DocstringDisplay::None,
                             line_numbers: true,
                             skip_root: true,
                             max_depth: None,
@@ -665,7 +679,7 @@ fn cmd_view_file(
 
                                     let view_node = reexp_skeleton.to_view_node();
                                     let format_options = FormatOptions {
-                                        docstrings: false,
+                                        docstrings: DocstringDisplay::None,
                                         line_numbers: true,
                                         skip_root: true,
                                         max_depth: None,
@@ -771,6 +785,7 @@ fn cmd_view_symbol(
     root: &Path,
     depth: i32,
     full: bool,
+    show_docs: bool,
     json: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
@@ -853,7 +868,11 @@ fn cmd_view_symbol(
                 // Use ViewNode for consistent text formatting
                 println!("# {} ({})", full_symbol_path, sym.kind);
                 let format_options = FormatOptions {
-                    docstrings: true,
+                    docstrings: if show_docs {
+                        DocstringDisplay::Full
+                    } else {
+                        DocstringDisplay::Summary
+                    },
                     line_numbers: true,
                     skip_root: false,
                     max_depth: None,

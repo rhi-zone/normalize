@@ -67,17 +67,42 @@ impl ViewNode {
     }
 }
 
+/// How to display docstrings in formatted output.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub enum DocstringDisplay {
+    /// No docstrings (skeleton mode).
+    None,
+    /// Show summary only - first paragraph, up to double blank line.
+    #[default]
+    Summary,
+    /// Show full docstrings (--docs mode).
+    Full,
+}
+
 /// Options for formatting ViewNodes.
 #[derive(Clone, Default)]
 pub struct FormatOptions {
-    /// Include docstrings in output.
-    pub docstrings: bool,
+    /// How to display docstrings.
+    pub docstrings: DocstringDisplay,
     /// Maximum depth to display (None = unlimited).
     pub max_depth: Option<usize>,
     /// Show line numbers for symbols.
     pub line_numbers: bool,
     /// Skip the root node and only show children (useful for file views).
     pub skip_root: bool,
+}
+
+/// Extract docstring summary (everything up to double blank line).
+///
+/// The double blank line convention: `\n\n\n` separates summary from extended docs.
+/// Single blank lines (`\n\n`) are normal paragraph breaks within the summary.
+/// If no double blank, the entire docstring is considered the summary.
+pub fn docstring_summary(doc: &str) -> &str {
+    if let Some(pos) = doc.find("\n\n\n") {
+        doc[..pos].trim()
+    } else {
+        doc.trim()
+    }
 }
 
 /// Format a ViewNode as text output.
@@ -91,14 +116,9 @@ pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String>
         let root_line = format_node_line(node, options);
         lines.push(root_line);
 
-        // Add docstring if requested
-        if options.docstrings {
-            if let Some(doc) = &node.docstring {
-                let first_line = doc.lines().next().unwrap_or("").trim();
-                if !first_line.is_empty() && !is_useless_docstring(&node.name, first_line) {
-                    lines.push(format!("    \"\"\"{}\"\"\"", first_line));
-                }
-            }
+        // Add docstring based on display mode
+        if let Some(doc) = &node.docstring {
+            format_docstring(doc, &node.name, "    ", options.docstrings, &mut lines);
         }
     }
 
@@ -107,6 +127,57 @@ pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String>
     format_children(&node.children, prefix, &mut lines, options, 0);
 
     lines
+}
+
+/// Format a docstring according to the display mode.
+fn format_docstring(
+    doc: &str,
+    name: &str,
+    prefix: &str,
+    mode: DocstringDisplay,
+    lines: &mut Vec<String>,
+) {
+    match mode {
+        DocstringDisplay::None => {}
+        DocstringDisplay::Summary => {
+            let summary = docstring_summary(doc);
+            if summary.is_empty()
+                || is_useless_docstring(name, summary.lines().next().unwrap_or(""))
+            {
+                return;
+            }
+            // Show entire summary paragraph
+            let summary_lines: Vec<&str> = summary.lines().collect();
+            if summary_lines.len() == 1 {
+                lines.push(format!("{}\"\"\"{}\"\"\"", prefix, summary_lines[0]));
+            } else {
+                lines.push(format!("{}\"\"\"", prefix));
+                for line in summary_lines {
+                    lines.push(format!("{}{}", prefix, line));
+                }
+                lines.push(format!("{}\"\"\"", prefix));
+            }
+        }
+        DocstringDisplay::Full => {
+            let trimmed = doc.trim();
+            if trimmed.is_empty()
+                || is_useless_docstring(name, trimmed.lines().next().unwrap_or(""))
+            {
+                return;
+            }
+            // Multi-line docstring
+            let doc_lines: Vec<&str> = trimmed.lines().collect();
+            if doc_lines.len() == 1 {
+                lines.push(format!("{}\"\"\"{}\"\"\"", prefix, doc_lines[0]));
+            } else {
+                lines.push(format!("{}\"\"\"", prefix));
+                for line in doc_lines {
+                    lines.push(format!("{}{}", prefix, line));
+                }
+                lines.push(format!("{}\"\"\"", prefix));
+            }
+        }
+    }
 }
 
 /// Format a single node line with optional line numbers.
@@ -178,14 +249,10 @@ fn format_children(
         let child_line = format_node_line(child, options);
         lines.push(format!("{}{}{}", prefix, connector, child_line));
 
-        // Add docstring if requested (for symbols)
-        if options.docstrings {
-            if let Some(doc) = &child.docstring {
-                let first_line = doc.lines().next().unwrap_or("").trim();
-                if !first_line.is_empty() && !is_useless_docstring(&child.name, first_line) {
-                    lines.push(format!("{}    \"\"\"{}\"\"\"", child_prefix, first_line));
-                }
-            }
+        // Add docstring based on display mode
+        if let Some(doc) = &child.docstring {
+            let doc_prefix = format!("{}    ", child_prefix);
+            format_docstring(doc, &child.name, &doc_prefix, options.docstrings, lines);
         }
 
         // Recurse into children

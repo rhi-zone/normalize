@@ -96,6 +96,10 @@ enum Commands {
         #[arg(long)]
         full: bool,
 
+        /// Show full docstrings (by default only summary up to double blank line is shown)
+        #[arg(long)]
+        docs: bool,
+
         /// Context view: skeleton + imports combined (ideal for LLM context)
         #[arg(long)]
         context: bool,
@@ -534,6 +538,7 @@ fn main() {
             resolve_imports,
             include_private,
             full,
+            docs,
             context,
             exclude,
             only,
@@ -550,6 +555,7 @@ fn main() {
             resolve_imports,
             include_private,
             full,
+            docs,
             context,
             cli.json,
             &exclude,
