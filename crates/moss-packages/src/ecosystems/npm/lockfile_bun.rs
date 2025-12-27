@@ -2,7 +2,13 @@
 //!
 //! Binary format ported from Bun (MIT License):
 //! Copyright (c) 2022 Oven-sh
-//! https://github.com/oven-sh/bun/blob/main/src/install/lockfile.zig
+//! https://github.com/oven-sh/bun/blob/main/src/install/lockfile/
+//!
+//! Key source files:
+//! - bun.lockb.zig: Main serializer, file format layout
+//! - Buffers.zig: Buffer serialization (trees, hoisted_deps, resolutions, dependencies, extern_strings, string_bytes)
+//! - Package.zig: Package struct and MultiArrayList serialization
+//! - semver/SemverString.zig: String encoding (inline vs external)
 
 use crate::{DependencyTree, PackageError, TreeNode};
 use std::path::Path;
@@ -89,14 +95,38 @@ pub fn dependency_tree(project_root: &Path) -> Option<Result<DependencyTree, Pac
 
 // ============================================================================
 // Binary format parser (bun.lockb)
+//
+// File format (from bun.lockb.zig):
+//   - Header: 42 bytes ("#!/usr/bin/env bun\nbun-lockfile-format-v0\n")
+//   - Format version: u32 LE
+//   - Meta hash: 32 bytes
+//   - Total buffer size: u64 LE
+//   - Packages MultiArrayList (header + data)
+//   - Buffers (6 sequential): trees, hoisted_deps, resolutions, dependencies, extern_strings, string_bytes
+//   - Zero marker: u64 = 0
+//
+// Buffer format (from Buffers.zig):
+//   - start_pos: u64 LE (absolute file position where data starts)
+//   - end_pos: u64 LE (absolute file position where data ends)
+//   - Type description string + alignment padding
+//   - Data bytes at [start_pos..end_pos]
+//   - Next buffer header starts at end_pos
+//
+// String encoding (from SemverString.zig):
+//   - 8 bytes total
+//   - Inline if bytes[7] & 0x80 == 0: null-terminated string in bytes[0..7]
+//   - External if bytes[7] & 0x80 != 0: Pointer { off: u32, len: u32 } via bitcast
+//     - ptr() truncates to u63 then bitcasts: off = low 32 bits, len = next 32 bits
 // ============================================================================
 
 /// Header magic for bun.lockb files
 const HEADER_MAGIC: &[u8] = b"#!/usr/bin/env bun\nbun-lockfile-format-v0\n";
 
 /// Parsed bun.lockb file
-struct BunLockb {
+struct BunLockb<'a> {
     packages: Vec<BunPackage>,
+    #[allow(dead_code)]
+    string_bytes: &'a [u8],
 }
 
 #[derive(Debug, Clone)]
@@ -105,8 +135,8 @@ struct BunPackage {
     version: String,
 }
 
-impl BunLockb {
-    fn parse(data: &[u8]) -> Option<Self> {
+impl<'a> BunLockb<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
         // Validate header
         if data.len() < HEADER_MAGIC.len() + 100 {
             return None;
@@ -123,78 +153,148 @@ impl BunLockb {
             return None;
         }
 
-        // Skip meta_hash (32 bytes) + total_buffer_size (8 bytes)
-        offset = 0x56; // packages_count location based on format analysis
+        // Meta hash (32 bytes)
+        offset += 32;
 
-        // Read packages count
-        let packages_count = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?) as usize;
+        // Total buffer size (u64 LE)
+        offset += 8;
+
+        // Packages MultiArrayList header (from Package.zig Serializer.save):
+        //   list_len: u64, alignment: u64, field_count: u64, begin_at: u64, end_at: u64
+        let packages_count = read_u64_le(data, &mut offset)? as usize;
+        let _alignment = read_u64_le(data, &mut offset)?;
+        let _field_count = read_u64_le(data, &mut offset)?;
+        let pkg_begin = read_u64_le(data, &mut offset)? as usize;
+        let pkg_end = read_u64_le(data, &mut offset)? as usize;
 
         if packages_count == 0 || packages_count > 100_000 {
             return None;
         }
-
-        // Skip to packages data start (after MultiArrayList header)
-        // Header: count (u64) + alignment (u64) + begin (u64) + end (u64) = 32 bytes
-        offset = 0x6e;
-        let pkg_begin = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?) as usize;
-        offset += 8;
-        let pkg_end = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?) as usize;
-
         if pkg_begin >= pkg_end || pkg_end > data.len() {
             return None;
         }
 
-        // Each package name is a String (8 bytes), stored contiguously in MultiArrayList
-        // names[0..count] at pkg_begin, then name_hashes[0..count], then resolutions...
-        let names_end = pkg_begin + packages_count * 8;
-        if names_end > pkg_end {
-            return None;
-        }
+        // Buffers start at pkg_end
+        // Read through 6 buffers to find string_bytes (buffer index 5, 0-indexed)
+        let string_bytes = Self::find_buffer(data, pkg_end, 5)?;
 
-        let packages = Self::extract_inline_packages(data, pkg_begin, names_end);
-        Some(Self { packages })
+        // Package names start at pkg_begin (first field in MultiArrayList, sorted by alignment)
+        // Names are String[count], each 8 bytes
+        let packages = Self::extract_packages(data, pkg_begin, packages_count, string_bytes);
+
+        Some(Self {
+            packages,
+            string_bytes,
+        })
     }
 
-    /// Extract packages with inline names (≤7 chars).
-    /// TODO: External strings require finding the string_bytes buffer location.
-    fn extract_inline_packages(data: &[u8], start: usize, end: usize) -> Vec<BunPackage> {
-        let mut packages = Vec::new();
-        let mut offset = start;
+    /// Find buffer by index (0-indexed). Buffers are sequential, each header at previous end_pos.
+    fn find_buffer(data: &[u8], buffers_start: usize, buffer_index: usize) -> Option<&[u8]> {
+        let mut offset = buffers_start;
 
-        while offset + 8 <= end {
+        for i in 0..=buffer_index {
+            if offset + 16 > data.len() {
+                return None;
+            }
+
+            let start_pos = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?) as usize;
+            let end_pos =
+                u64::from_le_bytes(data[offset + 8..offset + 16].try_into().ok()?) as usize;
+
+            // Validate - 0xDEADBEEF means placeholder wasn't patched
+            if start_pos == 0xDEADBEEF || end_pos == 0xDEADBEEF {
+                return None;
+            }
+            if start_pos > end_pos || end_pos > data.len() {
+                return None;
+            }
+
+            if i == buffer_index {
+                return Some(&data[start_pos..end_pos]);
+            }
+
+            // Next buffer's header starts at this buffer's end_pos
+            offset = end_pos;
+        }
+
+        None
+    }
+
+    /// Extract packages using proper String encoding
+    fn extract_packages(
+        data: &[u8],
+        names_start: usize,
+        count: usize,
+        string_bytes: &[u8],
+    ) -> Vec<BunPackage> {
+        let mut packages = Vec::with_capacity(count);
+
+        for i in 0..count {
+            let offset = names_start + i * 8;
+            if offset + 8 > data.len() {
+                break;
+            }
+
             let bytes: [u8; 8] = match data[offset..offset + 8].try_into() {
                 Ok(b) => b,
                 Err(_) => break,
             };
 
-            // Inline string: byte[7] < 0x80
-            if bytes[7] < 0x80 {
-                let end_pos = bytes.iter().position(|&b| b == 0).unwrap_or(8);
-                if end_pos > 0 && end_pos <= 7 {
-                    if let Ok(name) = std::str::from_utf8(&bytes[..end_pos]) {
-                        if Self::is_valid_package_name(name) {
-                            packages.push(BunPackage {
-                                name: name.to_string(),
-                                version: "0.0.0".to_string(),
-                            });
-                        }
-                    }
+            if let Some(name) = Self::read_string(&bytes, string_bytes) {
+                if Self::is_valid_package_name(&name) {
+                    packages.push(BunPackage {
+                        name,
+                        version: "0.0.0".to_string(), // TODO: read from Resolution field
+                    });
                 }
             }
-            // Skip external strings for now - they require string_bytes buffer
-
-            offset += 8;
         }
 
         packages
     }
 
+    /// Read a String value (from SemverString.zig)
+    fn read_string(bytes: &[u8; 8], string_bytes: &[u8]) -> Option<String> {
+        // isInline: bytes[7] & 0x80 == 0
+        if bytes[7] & 0x80 == 0 {
+            // Inline string: scan for null byte in bytes[0..8]
+            let end_pos = bytes.iter().position(|&b| b == 0).unwrap_or(8);
+            if end_pos == 0 {
+                return None; // Empty string
+            }
+            std::str::from_utf8(&bytes[..end_pos])
+                .ok()
+                .map(|s| s.to_string())
+        } else {
+            // External string: Pointer { off: u32, len: u32 }
+            // ptr() method: @as(Pointer, @bitCast(@as(u64, @as(u63, @truncate(@as(u64, @bitCast(this)))))))
+            // This truncates to 63 bits (clears bit 63), then bitcasts to Pointer
+            let raw = u64::from_le_bytes(*bytes);
+            let truncated = raw & 0x7FFF_FFFF_FFFF_FFFF; // Clear high bit (u63 truncation)
+            let off = (truncated & 0xFFFF_FFFF) as usize;
+            let len = ((truncated >> 32) & 0xFFFF_FFFF) as usize;
+
+            if len > 0 && off + len <= string_bytes.len() {
+                std::str::from_utf8(&string_bytes[off..off + len])
+                    .ok()
+                    .map(|s| s.to_string())
+            } else {
+                None
+            }
+        }
+    }
+
     fn is_valid_package_name(name: &str) -> bool {
         !name.is_empty()
             && name.len() <= 214
-            && name
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '@' || c == '/')
+            && name.chars().all(|c| {
+                c.is_ascii_alphanumeric()
+                    || c == '-'
+                    || c == '_'
+                    || c == '@'
+                    || c == '/'
+                    || c == '.'
+            })
     }
 
     fn find_package_version(&self, package: &str) -> Option<String> {
@@ -233,6 +333,15 @@ fn read_u32_le(data: &[u8], offset: &mut usize) -> Option<u32> {
     let bytes: [u8; 4] = data[*offset..*offset + 4].try_into().ok()?;
     *offset += 4;
     Some(u32::from_le_bytes(bytes))
+}
+
+fn read_u64_le(data: &[u8], offset: &mut usize) -> Option<u64> {
+    if *offset + 8 > data.len() {
+        return None;
+    }
+    let bytes: [u8; 8] = data[*offset..*offset + 8].try_into().ok()?;
+    *offset += 8;
+    Some(u64::from_le_bytes(bytes))
 }
 
 // ============================================================================
