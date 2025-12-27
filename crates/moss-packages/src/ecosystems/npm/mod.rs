@@ -1,5 +1,6 @@
 //! npm/yarn/pnpm/bun (Node.js) ecosystem.
 
+mod lockfile_bun;
 mod lockfile_npm;
 mod lockfile_pnpm;
 mod lockfile_yarn;
@@ -37,6 +38,10 @@ impl Ecosystem for Npm {
                 manager: "npm",
             },
             LockfileManager {
+                filename: "bun.lock",
+                manager: "bun",
+            },
+            LockfileManager {
                 filename: "bun.lockb",
                 manager: "bun",
             },
@@ -72,6 +77,9 @@ impl Ecosystem for Npm {
             return Some(v);
         }
         if let Some(v) = lockfile_yarn::installed_version(package, project_root) {
+            return Some(v);
+        }
+        if let Some(v) = lockfile_bun::installed_version(package, project_root) {
             return Some(v);
         }
         None
@@ -133,7 +141,9 @@ impl Ecosystem for Npm {
         if let Some(tree) = lockfile_npm::dependency_tree(project_root) {
             return tree;
         }
-        // bun.lockb is binary, skip for now
+        if let Some(tree) = lockfile_bun::dependency_tree(project_root) {
+            return tree;
+        }
 
         Err(PackageError::ParseError(format!(
             "no supported lockfile found in {} or parent directories",

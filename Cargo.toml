@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+default-members = ["crates/moss"]
 members = [
     "crates/moss",
     "crates/moss-jsonschema",
