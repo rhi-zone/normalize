@@ -3,6 +3,11 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 
 export default withMermaid(
   defineConfig({
+  vite: {
+    optimizeDeps: {
+      include: ['mermaid'],
+    },
+  },
   title: 'Moss',
   description: 'Code intelligence CLI with structural awareness',
 
