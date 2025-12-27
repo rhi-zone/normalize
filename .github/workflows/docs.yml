@@ -6,7 +6,7 @@ on:
       - master
     paths:
       - 'docs/**'
-      - 'mkdocs.yml'
+      - 'package.json'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -25,22 +25,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.13'
+          node-version: '22'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Install dependencies
-        run: |
-          pip install mkdocs-material
+        run: pnpm install --frozen-lockfile
 
       - name: Build documentation
-        run: mkdocs build
+        run: pnpm docs:build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site/
+          path: docs/.vitepress/dist/
 
   deploy:
     environment:

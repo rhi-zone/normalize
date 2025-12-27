@@ -1,5 +1,7 @@
 # Documentation build
 site/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
 
 # Moss runtime data
 .moss/
