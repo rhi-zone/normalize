@@ -10,6 +10,8 @@ use mlua::{FromLua, Lua, Result as LuaResult, Table, Thread, UserData, UserDataM
 #[cfg(feature = "llm")]
 use super::llm::{parse_agent_response, AgentAction, LlmClient, AGENT_SYSTEM_PROMPT};
 
+use super::shadow::ShadowGit;
+
 /// What the runtime is waiting for from the frontend.
 #[derive(Debug, Clone)]
 pub enum RuntimeYield {
@@ -159,6 +161,7 @@ impl LuaRuntime {
             Self::register_commands(&lua, &globals)?;
             Self::register_helpers(&lua, &globals, &root)?;
             Self::register_drivers(&lua, &globals, &root)?;
+            Self::register_shadow(&lua, &globals, &root)?;
         }
 
         Ok(Self { lua })
@@ -531,6 +534,165 @@ impl LuaRuntime {
 
         Ok(())
     }
+
+    fn register_shadow(lua: &Lua, globals: &Table, root: &Path) -> LuaResult<()> {
+        let shadow_table = lua.create_table()?;
+        let root_path = root.to_path_buf();
+
+        // shadow.open() -> initializes/opens shadow git, returns snapshot id
+        let root_clone = root_path.clone();
+        shadow_table.set(
+            "open",
+            lua.create_function(move |lua, ()| {
+                let sg = ShadowGit::open(&root_clone).map_err(mlua::Error::external)?;
+                let head = sg.head().map_err(mlua::Error::external)?;
+                // Store in registry for later use
+                lua.set_named_registry_value("_shadow_git", LuaShadowGit(std::sync::Arc::new(sg)))?;
+                Ok(head)
+            })?,
+        )?;
+
+        // shadow.snapshot(files) -> snapshot id
+        shadow_table.set(
+            "snapshot",
+            lua.create_function(|lua, files: Vec<String>| {
+                let sg: LuaShadowGit = lua.named_registry_value("_shadow_git")?;
+                let paths: Vec<std::path::PathBuf> =
+                    files.iter().map(std::path::PathBuf::from).collect();
+                let refs: Vec<&Path> = paths.iter().map(|p| p.as_path()).collect();
+                let id = sg.0.snapshot(&refs).map_err(mlua::Error::external)?;
+                Ok(id)
+            })?,
+        )?;
+
+        // shadow.hunks() -> table of hunks
+        shadow_table.set(
+            "hunks",
+            lua.create_function(|lua, ()| {
+                let sg: LuaShadowGit = lua.named_registry_value("_shadow_git")?;
+                let hunks = sg.0.hunks().map_err(mlua::Error::external)?;
+
+                let result = lua.create_table()?;
+                for (i, hunk) in hunks.iter().enumerate() {
+                    let h = lua.create_table()?;
+                    h.set("id", hunk.id)?;
+                    h.set("file", hunk.file.to_string_lossy().to_string())?;
+                    h.set("old_start", hunk.old_start)?;
+                    h.set("old_lines", hunk.old_lines)?;
+                    h.set("new_start", hunk.new_start)?;
+                    h.set("new_lines", hunk.new_lines)?;
+                    h.set("header", hunk.header.clone())?;
+                    h.set("content", hunk.content.clone())?;
+                    h.set("is_deletion", hunk.is_pure_deletion())?;
+                    h.set("deletion_ratio", hunk.deletion_ratio())?;
+                    result.set(i + 1, h)?;
+                }
+                Ok(result)
+            })?,
+        )?;
+
+        // shadow.hunks_since(snapshot_id) -> table of hunks
+        shadow_table.set(
+            "hunks_since",
+            lua.create_function(|lua, snapshot_id: String| {
+                let sg: LuaShadowGit = lua.named_registry_value("_shadow_git")?;
+                let hunks =
+                    sg.0.hunks_since(&snapshot_id)
+                        .map_err(mlua::Error::external)?;
+
+                let result = lua.create_table()?;
+                for (i, hunk) in hunks.iter().enumerate() {
+                    let h = lua.create_table()?;
+                    h.set("id", hunk.id)?;
+                    h.set("file", hunk.file.to_string_lossy().to_string())?;
+                    h.set("old_start", hunk.old_start)?;
+                    h.set("old_lines", hunk.old_lines)?;
+                    h.set("new_start", hunk.new_start)?;
+                    h.set("new_lines", hunk.new_lines)?;
+                    h.set("header", hunk.header.clone())?;
+                    h.set("content", hunk.content.clone())?;
+                    h.set("is_deletion", hunk.is_pure_deletion())?;
+                    h.set("deletion_ratio", hunk.deletion_ratio())?;
+                    result.set(i + 1, h)?;
+                }
+                Ok(result)
+            })?,
+        )?;
+
+        // shadow.restore(snapshot_id, files?) -> restores files to snapshot state
+        shadow_table.set(
+            "restore",
+            lua.create_function(|lua, (snapshot_id, files): (String, Option<Vec<String>>)| {
+                let sg: LuaShadowGit = lua.named_registry_value("_shadow_git")?;
+                let file_refs = files.as_ref().map(|f| {
+                    let paths: Vec<std::path::PathBuf> =
+                        f.iter().map(std::path::PathBuf::from).collect();
+                    paths
+                });
+                let refs: Option<Vec<&Path>> = file_refs
+                    .as_ref()
+                    .map(|p| p.iter().map(|x| x.as_path()).collect());
+                sg.0.restore(&snapshot_id, refs.as_deref())
+                    .map_err(mlua::Error::external)?;
+                Ok(())
+            })?,
+        )?;
+
+        // shadow.head() -> current snapshot id
+        shadow_table.set(
+            "head",
+            lua.create_function(|lua, ()| {
+                let sg: LuaShadowGit = lua.named_registry_value("_shadow_git")?;
+                let head = sg.0.head().map_err(mlua::Error::external)?;
+                Ok(head)
+            })?,
+        )?;
+
+        // shadow.list() -> list of all snapshots
+        shadow_table.set(
+            "list",
+            lua.create_function(|lua, ()| {
+                let sg: LuaShadowGit = lua.named_registry_value("_shadow_git")?;
+                let snapshots = sg.0.list_snapshots().map_err(mlua::Error::external)?;
+
+                let result = lua.create_table()?;
+                for (i, (id, msg)) in snapshots.iter().enumerate() {
+                    let s = lua.create_table()?;
+                    s.set("id", id.clone())?;
+                    s.set("message", msg.clone())?;
+                    result.set(i + 1, s)?;
+                }
+                Ok(result)
+            })?,
+        )?;
+
+        globals.set("shadow", shadow_table)?;
+        Ok(())
+    }
+}
+
+/// Wrapper for ShadowGit to store in Lua registry.
+struct LuaShadowGit(std::sync::Arc<ShadowGit>);
+
+impl Clone for LuaShadowGit {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl UserData for LuaShadowGit {}
+
+impl FromLua for LuaShadowGit {
+    fn from_lua(value: Value, _lua: &Lua) -> LuaResult<Self> {
+        match value {
+            Value::UserData(ud) => Ok(ud.borrow::<LuaShadowGit>()?.clone()),
+            _ => Err(mlua::Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "LuaShadowGit".to_string(),
+                message: Some("expected ShadowGit userdata".to_string()),
+            }),
+        }
+    }
 }
 
 /// Run an LLM-driven autonomous loop.
@@ -759,5 +921,41 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("requires actions table"), "Error was: {}", err);
+    }
+
+    #[test]
+    fn test_shadow_lua_api() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let runtime = LuaRuntime::new(tmp.path()).unwrap();
+
+        // Open shadow git
+        let result = runtime.run_string(
+            r#"
+            local head = shadow.open()
+            assert(head ~= nil, "shadow.open() should return head")
+            assert(#head > 0, "head should be non-empty")
+            "#,
+        );
+        assert!(result.is_ok(), "shadow.open failed: {:?}", result);
+
+        // Create a file and snapshot it
+        std::fs::write(tmp.path().join("test.txt"), "hello").unwrap();
+
+        let result = runtime.run_string(
+            r#"
+            local snap = shadow.snapshot({"test.txt"})
+            assert(snap ~= nil, "snapshot should return id")
+            "#,
+        );
+        assert!(result.is_ok(), "shadow.snapshot failed: {:?}", result);
+
+        // List snapshots
+        let result = runtime.run_string(
+            r#"
+            local snaps = shadow.list()
+            assert(#snaps >= 2, "should have at least 2 snapshots (initial + our snapshot)")
+            "#,
+        );
+        assert!(result.is_ok(), "shadow.list failed: {:?}", result);
     }
 }

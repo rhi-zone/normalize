@@ -80,7 +80,9 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
 **Vision (Aspirational):**
-- Shadow Git: atomic commits per tool call, automatic rollback on failure
+- [x] Shadow Git: hunk-level edit tracking in `.moss/.git` (see `workflow/shadow.rs`, Lua API: `shadow.*`)
+  - TODO: auto-track all edits made via `moss edit` / workflow edit tools
+  - TODO: `[shadow]` config section (enabled, retention policy, deletion warnings)
 - Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
 - Synthesis: decompose complex tasks into solvable subproblems (`moss synthesize`)
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators

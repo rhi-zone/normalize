@@ -26,5 +26,9 @@ mod lua_runtime;
 #[cfg(feature = "llm")]
 pub(crate) mod llm;
 
+mod shadow;
+
 #[cfg(feature = "lua")]
 pub use lua_runtime::{CommandResult, LuaRuntime, RuntimeState, RuntimeYield, WorkflowSession};
+
+pub use shadow::{Hunk, ShadowGit, SnapshotId};
