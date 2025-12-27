@@ -2,10 +2,9 @@
 
 Behavioral rules for Claude Code working in this repository.
 Design philosophy: `docs/philosophy.md`. Key tenets: Generalize Don't Multiply, Separate Interface/Unify Plumbing, Minimize LLM usage, Structure > Text. Three primitives: view, edit, analyze.
-Rust/Python boundary: `docs/rust-python-boundary.md`. Rust = plumbing (fast, deterministic), Python = interface (LLM, orchestration).
-TUI conventions: `docs/tui.md`. Textual framework quirks and lessons learned.
+Architecture: `docs/architecture-decisions.md`. Pure Rust, dynamic grammar loading, Lua workflows, index-optional design.
 
-**Index-first architecture:** Core data extraction (symbols, imports, calls) goes in the Rust index. Python layers build on top of indexed data, never bypass it. When adding language support: first add extraction to the indexer (deps.rs, skeleton.rs), then build Python features that query the index. Don't build standalone Python parsers for data that should be indexed. **Never call Python from Rust** - the boundary is one-way (Python calls Rust CLI).
+**Index-first architecture:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer (deps.rs, skeleton.rs), then expose via commands. All commands should work without the index (graceful degradation via filesystem fallbacks).
 
 ## Core Rule
 

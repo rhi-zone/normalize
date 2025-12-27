@@ -21,19 +21,20 @@ export default withMermaid(
     logo: '/logo.svg',
 
     nav: [
-      { text: 'Guide', link: '/getting-started/installation' },
+      { text: 'Guide', link: '/index' },
       { text: 'CLI Reference', link: '/cli/commands' },
-      { text: 'Architecture', link: '/architecture/overview' },
+      { text: 'Design', link: '/philosophy' },
     ],
 
     sidebar: {
       '/': [
         {
-          text: 'Getting Started',
+          text: 'Guide',
           items: [
-            { text: 'Installation', link: '/getting-started/installation' },
-            { text: 'Quickstart', link: '/getting-started/quickstart' },
-            { text: 'MCP Integration', link: '/getting-started/mcp-integration' },
+            { text: 'Overview', link: '/index' },
+            { text: 'Primitives Spec', link: '/primitives-spec' },
+            { text: 'Workflow Format', link: '/workflow-format' },
+            { text: 'Language Support', link: '/language-support' },
           ]
         },
         {
@@ -44,51 +45,21 @@ export default withMermaid(
           ]
         },
         {
-          text: 'Architecture',
-          items: [
-            { text: 'Overview', link: '/architecture/overview' },
-            { text: 'Events', link: '/architecture/events' },
-            { text: 'Plugins', link: '/architecture/plugins' },
-            { text: 'CLI Architecture', link: '/cli-architecture' },
-            { text: 'DWIM Architecture', link: '/dwim-architecture' },
-            { text: 'Rust/Python Boundary', link: '/rust-python-boundary' },
-            { text: 'API Boundaries', link: '/api-boundaries' },
-          ]
-        },
-        {
-          text: 'Synthesis',
-          items: [
-            { text: 'Overview', link: '/synthesis/overview' },
-            { text: 'Strategies', link: '/synthesis/strategies' },
-            { text: 'Generators', link: '/synthesis/generators' },
-          ]
-        },
-        {
           text: 'Design',
           items: [
             { text: 'Philosophy', link: '/philosophy' },
-            { text: 'Primitives Spec', link: '/primitives-spec' },
-            { text: 'Documentation Strategy', link: '/documentation' },
-            { text: 'Language Support', link: '/language-support' },
             { text: 'Architecture Decisions', link: '/architecture-decisions' },
             { text: 'Unification', link: '/unification' },
+            { text: 'View Filtering', link: '/view-filtering' },
           ]
         },
         {
-          text: 'Internals',
+          text: 'Development',
           collapsed: true,
           items: [
-            { text: 'TUI Design', link: '/tui-design' },
-            { text: 'TUI Notes', link: '/tui' },
-            { text: 'Session Modes', link: '/session-modes' },
             { text: 'Dogfooding', link: '/dogfooding' },
-            { text: 'Async Tasks', link: '/async-tasks' },
-            { text: 'Nested Execution', link: '/nested-execution' },
-            { text: 'Memory System', link: '/memory-system' },
-            { text: 'Workflow Format', link: '/workflow-format' },
-            { text: 'View Filtering', link: '/view-filtering' },
-            { text: 'File Boundaries', link: '/file-boundaries' },
-            { text: 'Codebase Tree', link: '/codebase-tree' },
+            { text: 'Session Modes', link: '/session-modes' },
+            { text: 'Documentation Strategy', link: '/documentation' },
           ]
         },
         {
@@ -104,8 +75,6 @@ export default withMermaid(
             { text: 'Prior Art', link: '/prior-art' },
             { text: 'Ampcode', link: '/research/ampcode' },
             { text: 'Log Analysis', link: '/log-analysis' },
-            { text: 'Recursive Improvement', link: '/recursive-improvement' },
-            { text: 'Restructuring Plan', link: '/restructuring-plan' },
             { text: 'Low-Priority Research', link: '/research-low-priority' },
           ]
         },

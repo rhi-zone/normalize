@@ -1,104 +1,102 @@
 # Architecture Decisions
 
-This document records key architectural decisions and their rationale.
+Key architectural decisions and their rationale.
 
-## Language Choice: Rust + Python Hybrid
+## Language Choice: Pure Rust
 
-**Decision**: Moss uses Rust for plumbing, Python for interface.
+**Decision**: Moss is implemented entirely in Rust.
 
-See `docs/rust-python-boundary.md` for the full decision framework.
+### Why Rust?
 
-### Division of Labor
+- **Performance**: Parallel indexing with rayon for large codebases (100k+ files)
+- **Tree-sitter native**: First-class tree-sitter integration
+- **Single binary**: No runtime dependencies, easy distribution
+- **Memory safety**: No GC pauses during indexing
 
-**Rust (moss-cli, moss-core, moss-languages):**
-- Tree-sitter parsing for 17+ languages
-- SQLite-backed symbol/call graph index
-- Fast queries (callers, callees, deps, complexity)
-- Structural operations (view, edit, analyze core)
-- Daemon for background indexing
+### Crate Structure
 
-**Python (packages/moss-*):**
-- LLM integration (edit synthesis, agents)
-- Orchestration (workflows, state machines)
-- User interfaces (CLI wrapper, TUI, MCP, LSP)
-- Rich analysis (patterns, clones, test coverage)
-- Plugins (generators, validators, view providers)
-
-### Why This Split?
-
-**Rust for deterministic, performance-critical, syntax-aware operations.** Python's GIL and interpreter overhead made indexing 100k+ file repos slow. Rust with rayon gives true parallelism.
-
-**Python for LLM orchestration and rapid iteration.** The AI ecosystem is Python-first. Prototyping new agent behaviors is faster in Python.
-
-### The Shim Pattern
-
-Python calls Rust via subprocess:
 ```
-Python CLI → rust_shim.passthrough() → Rust binary → JSON output
+crates/
+├── moss/              # Core library + CLI
+├── moss-languages/    # 98 language definitions
+├── moss-packages/     # Package ecosystem support
+├── moss-tools/        # MCP tool generation
+├── moss-derive/       # Proc macros
+├── moss-jsonschema/   # Schema generation
+└── moss-openapi/      # OpenAPI generation
 ```
 
-Rules:
-- Rust commands always support `--json` for machine consumption
-- Passthrough commands bypass Python entirely for speed
-- Python gracefully degrades if Rust binary unavailable
+## Dynamic Grammar Loading
 
-## Local Neural Network Memory Budget
+**Decision**: Load tree-sitter grammars from external `.so` files.
 
-**Problem**: Local models for summarization/embeddings can be memory-hungry.
+### Why?
 
-### Model Size Reference
+- **Build time**: Bundling 98 grammars bloats compile time
+- **Binary size**: Grammars add ~142MB uncompressed
+- **User extensibility**: Users can add custom grammars
 
-| Model | Params | FP32 | FP16 |
-|-------|--------|------|------|
-| all-MiniLM-L6-v2 | 33M | 130MB | 65MB |
-| distilbart-cnn | 139M | 560MB | 280MB |
-| T5-small | 60M | 240MB | 120MB |
-| T5-base | 220M | 880MB | 440MB |
-| T5-large | 770M | 3GB | 1.5GB |
-| T5-3B | 3B | 12GB | 6GB |
+### Loading Order
+
+1. `MOSS_GRAMMAR_PATH` environment variable
+2. `~/.config/moss/grammars/`
+3. Built-in fallback (if compiled with grammar features)
+
+## Lua for Workflows
+
+**Decision**: Use Lua (LuaJIT via mlua) for workflow scripting.
+
+### Why Not TOML/YAML?
+
+Once you need conditionals (`if is_dirty() then commit() end`), you're fighting the format. We tried TOML first and deleted ~1500 lines.
+
+### Why Lua?
+
+- ~200KB runtime, extremely fast
+- Simple syntax: `view("foo.rs")` vs TOML's `view: foo.rs`
+- Battle-tested: nginx, redis, neovim all use Lua
+- Full language when needed: loops, functions, error handling
+
+## Index-Optional Design
+
+**Decision**: All commands work without the index (with graceful degradation).
+
+### Fallback Behavior
+
+| Feature | With Index | Without Index |
+|---------|------------|---------------|
+| Symbol search | SQLite query | Filesystem walk + parsing |
+| Health metrics | Cached stats | Real-time file scan |
+| Path resolution | Index lookup | Glob patterns |
+
+### Configuration
+
+```toml
+[index]
+enabled = true  # Set to false to disable indexing entirely
+```
+
+## Local Model Memory Budget
+
+For future local LLM/embedding integration:
+
+| Model | Params | FP16 RAM |
+|-------|--------|----------|
+| all-MiniLM-L6-v2 | 33M | 65MB |
+| distilbart-cnn | 139M | 280MB |
+| T5-small | 60M | 120MB |
+| T5-base | 220M | 440MB |
 
 ### Recommendations
 
-1. **Default to smallest viable model**: T5-small or distilbart-cnn for summarization
-2. **Make model configurable**: Users with more RAM can opt for larger models
-3. **Lazy loading**: Don't load models until first use
-4. **Graceful degradation**: If model loading fails (OOM), fall back to extractive methods or skip
-5. **Consider quantization**: INT8 reduces memory ~4x with minimal quality loss
+1. Default to smallest viable model
+2. Lazy loading (don't load until first use)
+3. Graceful degradation (fall back to extractive methods if OOM)
+4. Consider INT8 quantization (~4x memory reduction)
 
-### Pre-summarization Strategy
+### Pre-summarization Tiers
 
-For web fetching and document processing, use a tiered approach:
-
-1. **Zero-cost extraction** (always): title, headings, OpenGraph metadata
-2. **Extractive** (cheap): TextRank, TF-IDF sentence ranking - no NN needed
-3. **Small NN** (optional): all-MiniLM for embeddings, distilbart for abstractive
-4. **LLM** (expensive): Only when extractive/small NN insufficient
-
-Configuration in `.moss/config.yaml`:
-```yaml
-summarization:
-  model: "distilbart-cnn"  # or "t5-small", "extractive-only", "none"
-  max_memory_mb: 500       # Skip NN if would exceed
-  fallback: "extractive"   # What to do if model unavailable
-```
-
-## Future Considerations
-
-### When to Consider Rewriting in Another Language
-
-**Don't rewrite unless**:
-- Profiling shows Python is the bottleneck (not I/O, not subprocesses)
-- The bottleneck can't be solved with PyO3/Cython
-- The rewrite scope is bounded (single hot module, not entire codebase)
-
-**Likely candidates for Rust extraction**:
-- AST diffing algorithms
-- Large-scale structural matching
-- Real-time incremental parsing
-
-### Hybrid Architecture Pattern
-
-If performance becomes critical, consider the ruff/uv pattern:
-- Core algorithms in Rust
-- Python wrapper for API/CLI
-- Best of both worlds: performance + ecosystem
+1. **Zero-cost**: Title, headings, metadata extraction
+2. **Extractive**: TextRank, TF-IDF (no NN needed)
+3. **Small NN**: Embeddings, abstractive summary
+4. **LLM**: Only when simpler methods insufficient

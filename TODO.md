@@ -101,11 +101,32 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Plugin system (partial - Rust traits exist)
 - Event bus, validators, policies
 - PR review, diff analysis
+- TUI (Textual-based explorer)
+- DWIM tool routing with aliases
 
 **LLM-Powered:**
-- Edit routing
-- Summarization
+- Edit routing (complexity assessment → structural vs LLM)
+- Summarization with local models
 - Working memory with summarization
+
+**Memory System Design (from deleted docs):**
+Three-layer architecture for agent context:
+1. Automatic (always loaded): preferences, conventions
+2. Triggered (pattern-activated): episodic warnings, semantic rules
+3. On-demand (`memory.recall(query)`): explicit agent queries
+
+**Local NN Budget (from deleted docs):**
+| Model | Params | FP16 RAM |
+|-------|--------|----------|
+| all-MiniLM-L6-v2 | 33M | 65MB |
+| distilbart-cnn | 139M | 280MB |
+| T5-small | 60M | 120MB |
+
+Pre-summarization tiers: extractive (free) → small NN → LLM (expensive)
+
+**Usage Patterns (from dogfooding):**
+- Investigation flow: `view .` → `view <file> --types-only` → `analyze --complexity` → `view <symbol>`
+- Token efficiency: use `--types-only` for architecture, `--depth` sparingly
 
 ## Implementation Notes
 
