@@ -3,13 +3,13 @@
 //! Extracts imports and exports from source files.
 
 use crate::parsers::Parsers;
-use arborium::tree_sitter;
 use moss_languages::Export as LangExport;
 use moss_languages::Import as LangImport;
 use moss_languages::{
     support_for_grammar, support_for_path, Language, SymbolKind as LangSymbolKind,
 };
 use std::path::Path;
+use tree_sitter;
 
 /// An import statement
 #[derive(Debug, Clone)]

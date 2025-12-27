@@ -2,9 +2,9 @@
 
 use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use arborium::tree_sitter::Node;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tree_sitter::Node;
 
 // ============================================================================
 // Java external package resolution

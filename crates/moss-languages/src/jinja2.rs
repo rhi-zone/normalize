@@ -2,8 +2,8 @@
 
 use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, Visibility, VisibilityMechanism};
-use arborium::tree_sitter::Node;
 use std::path::{Path, PathBuf};
+use tree_sitter::Node;
 
 /// Jinja2 language support.
 pub struct Jinja2;

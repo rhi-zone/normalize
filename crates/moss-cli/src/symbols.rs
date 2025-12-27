@@ -1,11 +1,11 @@
 use crate::extract::{compute_complexity, ExtractOptions, Extractor};
 use crate::parsers::Parsers;
-use arborium::tree_sitter;
 use moss_languages::{
     support_for_grammar, support_for_path, Language, Symbol as LangSymbol,
     SymbolKind as LangSymbolKind,
 };
 use std::path::Path;
+use tree_sitter;
 
 #[derive(Debug, Clone)]
 pub struct Symbol {

@@ -23,14 +23,13 @@ Test Status: 110 passing, 0 failing (moss-languages)
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
 
 **Grammar Loading (external .so files):**
-Benefits: faster builds, smaller distribution, independent grammar updates, user extensibility
-- Spike confirmed: can compile grammar C to .so, load dynamically via libloading
-- `gcc -shared -fPIC parser.c scanner.c -o lang.so` (size varies: json 28K, toml 131K, go 1.5M, python 3.3M)
-- Symbol: `tree_sitter_{lang}` (except rust uses `tree_sitter_rust_orchard` variant)
-- Scanner uses `ts_calloc`/`ts_free` - resolved at runtime from main binary
-- Need: build script for all grammars, loader in moss-languages, distribute .so files
-- Extension point: `~/.config/moss/grammars/` for user-added grammars
-- WASM alternative exists (tree-sitter `wasm` feature) but native .so is simpler
+Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so files (~142MB total).
+- Grammars load from: `MOSS_GRAMMAR_PATH` env var, `~/.config/moss/grammars/`
+- See `crates/moss-languages/src/grammar_loader.rs` for loader implementation
+- Remaining: ship .so files with releases, `moss grammars install` command
+
+**Crate Naming:**
+- Consider renaming `moss-cli` - it's also a library that exports commands, not just a CLI binary
 
 
 **Workflow Engine:**
@@ -49,6 +48,11 @@ Benefits: faster builds, smaller distribution, independent grammar updates, user
 **Tooling:**
 - Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (Opus 4.5 drops TODO items when editing markdown)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
+
+**Workspace/Context Management:**
+- Persistent workspace concept (like Notion): files, tool results, context stored permanently
+- Cross-session continuity without re-reading everything
+- Investigate memory-mapped context, incremental updates
 
 **Agent Research:**
 - Conversational loop pattern (vs hierarchical)

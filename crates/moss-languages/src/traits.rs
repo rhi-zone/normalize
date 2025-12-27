@@ -1,8 +1,8 @@
 //! Core trait for language support.
 
 use crate::external_packages::ResolvedPackage;
-use arborium::tree_sitter::Node;
 use std::path::{Path, PathBuf};
+use tree_sitter::Node;
 
 /// Symbol kind classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

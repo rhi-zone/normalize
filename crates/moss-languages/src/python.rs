@@ -2,9 +2,9 @@
 
 use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use arborium::tree_sitter::Node;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use tree_sitter::Node;
 
 // ============================================================================
 // Python path cache (filesystem-based detection, no subprocess calls)
@@ -1009,13 +1009,14 @@ impl Language for Python {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arborium::{tree_sitter::Parser, GrammarStore};
+    use crate::GrammarLoader;
+    use tree_sitter::Parser;
 
-    fn parse_python(content: &str) -> arborium::tree_sitter::Tree {
-        let store = GrammarStore::new();
-        let grammar = store.get("python").unwrap();
+    fn parse_python(content: &str) -> tree_sitter::Tree {
+        let loader = GrammarLoader::new();
+        let language = loader.get("python").unwrap();
         let mut parser = Parser::new();
-        parser.set_language(grammar.language()).unwrap();
+        parser.set_language(&language).unwrap();
         parser.parse(content, None).unwrap()
     }
 

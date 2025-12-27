@@ -7,6 +7,7 @@ members = [
     "crates/moss-openapi",
     "crates/moss-packages",
     "crates/moss-tools",
+    "xtask",
 ]
 
 [workspace.package]
@@ -45,9 +46,8 @@ grep-matcher = "0.1"
 grep-regex = "0.1"
 grep-searcher = "0.1"
 
-# Parsing - arborium bundles ~70 tree-sitter grammars
-# Features controlled by moss-languages, not here
-arborium = { version = "2.4", default-features = false }
+# Dynamic loading
+libloading = "0.8"
 
 # Minimize debug build size (full debug info adds ~2GB)
 [profile.dev]

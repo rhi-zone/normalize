@@ -4,9 +4,9 @@
 //! skeleton.rs (for viewing) and symbols.rs (for indexing).
 
 use crate::parsers::Parsers;
-use arborium::tree_sitter;
 use moss_languages::{support_for_grammar, support_for_path, Language, Symbol, Visibility};
 use std::path::Path;
+use tree_sitter;
 
 /// Result of extracting symbols from a file.
 pub struct ExtractResult {

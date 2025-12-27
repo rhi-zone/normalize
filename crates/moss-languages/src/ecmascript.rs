@@ -5,9 +5,9 @@
 
 use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Symbol, SymbolKind, Visibility};
-use arborium::tree_sitter::Node;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tree_sitter::Node;
 
 // ============================================================================
 // Node kind constants

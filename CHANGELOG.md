@@ -4,6 +4,14 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Dynamic Grammar Loading
+
+External grammar loading for faster builds and user extensibility:
+- `cargo xtask build-grammars` compiles 97 tree-sitter grammars to shared libraries
+- Grammars load from `MOSS_GRAMMAR_PATH`, `~/.config/moss/grammars/`, then arborium fallback
+- Platform support: .so (Linux), .dylib (macOS), .dll (Windows)
+- User-added grammars: drop `.so` files in `~/.config/moss/grammars/`
+
 ### Lua Workflow Engine
 
 Replaced TOML workflow engine with Lua (LuaJIT via mlua):

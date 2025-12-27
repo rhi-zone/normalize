@@ -4,9 +4,9 @@
 //! Complexity = number of decision points + 1
 
 use crate::parsers::Parsers;
-use arborium::tree_sitter;
 use moss_languages::{support_for_path, Language};
 use std::path::Path;
+use tree_sitter;
 
 /// Complexity data for a function
 #[derive(Debug, Clone)]

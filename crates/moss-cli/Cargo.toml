@@ -10,14 +10,7 @@ name = "moss"
 path = "src/main.rs"
 
 [features]
-default = ["common", "lua"]
-
-# Meta-features (passthrough to moss-languages)
-tier1 = ["moss-languages/tier1"]
-tier2 = ["moss-languages/tier2"]
-common = ["moss-languages/common"]
-niche = ["moss-languages/niche"]
-all-languages = ["moss-languages/all-languages"]
+default = ["lua"]
 
 # Optional LLM support for workflows
 llm = ["rig-core", "tokio-stream"]
@@ -28,26 +21,6 @@ mcp = ["rmcp", "schemars"]
 # Optional Lua workflow engine
 lua = ["mlua"]
 
-# Individual languages
-lang-python = ["moss-languages/lang-python"]
-lang-rust = ["moss-languages/lang-rust"]
-lang-javascript = ["moss-languages/lang-javascript"]
-lang-typescript = ["moss-languages/lang-typescript"]
-lang-go = ["moss-languages/lang-go"]
-lang-java = ["moss-languages/lang-java"]
-lang-c = ["moss-languages/lang-c"]
-lang-cpp = ["moss-languages/lang-cpp"]
-lang-ruby = ["moss-languages/lang-ruby"]
-lang-scala = ["moss-languages/lang-scala"]
-lang-vue = ["moss-languages/lang-vue"]
-lang-markdown = ["moss-languages/lang-markdown"]
-lang-json = ["moss-languages/lang-json"]
-lang-yaml = ["moss-languages/lang-yaml"]
-lang-toml = ["moss-languages/lang-toml"]
-lang-html = ["moss-languages/lang-html"]
-lang-css = ["moss-languages/lang-css"]
-lang-bash = ["moss-languages/lang-bash"]
-
 [dependencies]
 clap.workspace = true
 serde.workspace = true
@@ -56,9 +29,9 @@ walkdir.workspace = true
 ignore.workspace = true
 nucleo-matcher.workspace = true
 rusqlite.workspace = true
-arborium.workspace = true
+tree-sitter = "0.24"
 dirs = "5"
-moss-languages = { path = "../moss-languages", default-features = false }
+moss-languages = { path = "../moss-languages" }
 moss-jsonschema = { path = "../moss-jsonschema" }
 moss-openapi = { path = "../moss-openapi" }
 moss-packages = { path = "../moss-packages" }
