@@ -4,6 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Finish vitepress setup: `corepack enable && pnpm install`, update pnpm version in package.json, test `pnpm docs:dev`
+- Expand docs nav in `docs/.vitepress/config.ts` - many docs not yet linked
+- Review docs content for vitepress compatibility (frontmatter, etc)
+
 Test Status: 110 passing, 0 failing (moss-languages)
 
 ## Remaining Work
