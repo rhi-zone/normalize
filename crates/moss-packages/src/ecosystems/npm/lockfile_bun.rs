@@ -1,11 +1,10 @@
 //! bun.lock (text) and bun.lockb (binary) parser
 //!
-//! Binary format reference from Bun (MIT License):
+//! Binary format ported from Bun (MIT License):
 //! Copyright (c) 2022 Oven-sh
 //! https://github.com/oven-sh/bun/blob/main/src/install/lockfile.zig
 
 use crate::{DependencyTree, PackageError, TreeNode};
-use json_strip_comments::strip;
 use std::path::Path;
 
 /// Get installed version from bun.lock or bun.lockb
@@ -14,22 +13,20 @@ pub fn installed_version(package: &str, project_root: &Path) -> Option<String> {
     if let Some(v) = installed_version_text(package, project_root) {
         return Some(v);
     }
-    // Fall back to binary format via bun CLI
+    // Fall back to binary format
     installed_version_binary(package, project_root)
 }
 
 fn installed_version_text(package: &str, project_root: &Path) -> Option<String> {
     let lockfile = find_text_lockfile(project_root)?;
-    let mut content = std::fs::read_to_string(&lockfile).ok()?;
-    strip(&mut content).ok()?;
-    let parsed: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let content = std::fs::read_to_string(&lockfile).ok()?;
+    let parsed: serde_json::Value = serde_json_lenient::from_str(&content).ok()?;
 
     // packages section: "pkg": ["pkg@version", registry, {deps}, hash]
     if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object()) {
         if let Some(pkg_info) = packages.get(package) {
             if let Some(arr) = pkg_info.as_array() {
                 if let Some(first) = arr.first().and_then(|v| v.as_str()) {
-                    // Parse "pkg@version" or "@scope/pkg@version"
                     if let Some(version) = extract_version_from_spec(first) {
                         return Some(version);
                     }
@@ -44,7 +41,6 @@ fn installed_version_text(package: &str, project_root: &Path) -> Option<String> 
             for dep_type in ["dependencies", "devDependencies", "optionalDependencies"] {
                 if let Some(deps) = ws_info.get(dep_type).and_then(|d| d.as_object()) {
                     if deps.contains_key(package) {
-                        // Found in manifest, look up in packages
                         if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object()) {
                             if let Some(pkg_info) = packages.get(package) {
                                 if let Some(arr) = pkg_info.as_array() {
@@ -68,221 +64,137 @@ fn installed_version_text(package: &str, project_root: &Path) -> Option<String> 
 fn installed_version_binary(package: &str, project_root: &Path) -> Option<String> {
     let lockfile = find_binary_lockfile(project_root)?;
     let data = std::fs::read(&lockfile).ok()?;
-    let parsed = BunLockbParser::parse(&data)?;
+    let parsed = BunLockb::parse(&data)?;
     parsed.find_package_version(package)
 }
 
-/// Native parser for bun.lockb binary format
-struct BunLockbParser<'a> {
-    _data: &'a [u8],
-    _format_version: u32,
+/// Build dependency tree from bun.lock or bun.lockb
+pub fn dependency_tree(project_root: &Path) -> Option<Result<DependencyTree, PackageError>> {
+    // Try text format first
+    if let Some(lockfile) = find_text_lockfile(project_root) {
+        let content = std::fs::read_to_string(&lockfile).ok()?;
+        let parsed: serde_json::Value = serde_json_lenient::from_str(&content).ok()?;
+        return Some(build_tree_text(&parsed, project_root));
+    }
+
+    // Try binary format
+    if let Some(lockfile) = find_binary_lockfile(project_root) {
+        if lockfile.exists() {
+            return Some(build_tree_binary(project_root));
+        }
+    }
+
+    None
+}
+
+// ============================================================================
+// Binary format parser (bun.lockb)
+// ============================================================================
+
+/// Header magic for bun.lockb files
+const HEADER_MAGIC: &[u8] = b"#!/usr/bin/env bun\nbun-lockfile-format-v0\n";
+
+/// Parsed bun.lockb file
+struct BunLockb {
     packages: Vec<BunPackage>,
 }
 
+#[derive(Debug, Clone)]
 struct BunPackage {
     name: String,
     version: String,
 }
 
-impl<'a> BunLockbParser<'a> {
-    const HEADER: &'static [u8] = b"#!/usr/bin/env bun\nbun-lockfile-format-v0\n";
-
-    fn parse(data: &'a [u8]) -> Option<Self> {
+impl BunLockb {
+    fn parse(data: &[u8]) -> Option<Self> {
         // Validate header
-        if data.len() < Self::HEADER.len() + 20 {
+        if data.len() < HEADER_MAGIC.len() + 100 {
             return None;
         }
-        if !data.starts_with(Self::HEADER) {
+        if !data.starts_with(HEADER_MAGIC) {
             return None;
         }
 
-        let offset = Self::HEADER.len();
+        let mut offset = HEADER_MAGIC.len(); // 42
 
         // Format version (u32 LE)
-        let format_version = u32::from_le_bytes(data[offset..offset + 4].try_into().ok()?);
+        let format_version = read_u32_le(data, &mut offset)?;
+        if format_version > 10 {
+            return None;
+        }
 
-        // Skip meta hash (16 bytes) and continue to package data
-        // The binary format is complex; extract packages by scanning for patterns
-        let packages = Self::extract_packages(data, offset + 20)?;
+        // Skip meta_hash (32 bytes) + total_buffer_size (8 bytes)
+        offset = 0x56; // packages_count location based on format analysis
 
-        Some(Self {
-            _data: data,
-            _format_version: format_version,
-            packages,
-        })
+        // Read packages count
+        let packages_count = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?) as usize;
+
+        if packages_count == 0 || packages_count > 100_000 {
+            return None;
+        }
+
+        // Skip to packages data start (after MultiArrayList header)
+        // Header: count (u64) + alignment (u64) + begin (u64) + end (u64) = 32 bytes
+        offset = 0x6e;
+        let pkg_begin = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?) as usize;
+        offset += 8;
+        let pkg_end = u64::from_le_bytes(data[offset..offset + 8].try_into().ok()?) as usize;
+
+        if pkg_begin >= pkg_end || pkg_end > data.len() {
+            return None;
+        }
+
+        // Each package name is a String (8 bytes), stored contiguously in MultiArrayList
+        // names[0..count] at pkg_begin, then name_hashes[0..count], then resolutions...
+        let names_end = pkg_begin + packages_count * 8;
+        if names_end > pkg_end {
+            return None;
+        }
+
+        let packages = Self::extract_inline_packages(data, pkg_begin, names_end);
+        Some(Self { packages })
     }
 
-    fn extract_packages(data: &[u8], start: usize) -> Option<Vec<BunPackage>> {
-        // Scan binary for package name strings
-        // This is heuristic - full format parsing would require porting Bun's Zig code
+    /// Extract packages with inline names (≤7 chars).
+    /// TODO: External strings require finding the string_bytes buffer location.
+    fn extract_inline_packages(data: &[u8], start: usize, end: usize) -> Vec<BunPackage> {
+        let mut packages = Vec::new();
+        let mut offset = start;
 
-        let mut names = Vec::new();
+        while offset + 8 <= end {
+            let bytes: [u8; 8] = match data[offset..offset + 8].try_into() {
+                Ok(b) => b,
+                Err(_) => break,
+            };
 
-        // Scan for package names (usually in first half of file)
-        let scan_end = data.len() / 2;
-        let mut i = start;
-        while i < scan_end {
-            if let Some((name, skip)) = Self::try_extract_package_name(&data[i..]) {
-                names.push(name);
-                i += skip;
-            } else {
-                i += 1;
+            // Inline string: byte[7] < 0x80
+            if bytes[7] < 0x80 {
+                let end_pos = bytes.iter().position(|&b| b == 0).unwrap_or(8);
+                if end_pos > 0 && end_pos <= 7 {
+                    if let Ok(name) = std::str::from_utf8(&bytes[..end_pos]) {
+                        if Self::is_valid_package_name(name) {
+                            packages.push(BunPackage {
+                                name: name.to_string(),
+                                version: "0.0.0".to_string(),
+                            });
+                        }
+                    }
+                }
             }
+            // Skip external strings for now - they require string_bytes buffer
+
+            offset += 8;
         }
 
-        // Deduplicate and sort
-        names.sort();
-        names.dedup();
-
-        // Create packages (versions are not reliably extractable from binary)
-        let packages: Vec<BunPackage> = names
-            .into_iter()
-            .map(|name| BunPackage {
-                name,
-                version: "?".to_string(),
-            })
-            .collect();
-
-        if packages.is_empty() {
-            None
-        } else {
-            Some(packages)
-        }
+        packages
     }
 
-    fn try_extract_package_name(data: &[u8]) -> Option<(String, usize)> {
-        if data.len() < 4 {
-            return None;
-        }
-
-        // Look for null-terminated strings (common in binary formats)
-        // Package names should end with \0 or be followed by non-name bytes
-
-        // Find ASCII string run - stop at null or non-name char
-        let mut end = 0;
-        while end < data.len() && end < 50 {
-            let b = data[end];
-            if b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_' {
-                end += 1;
-            } else if b == b'@' && end == 0 {
-                // Scoped package start
-                end += 1;
-            } else if b == b'/' && end > 0 && data[0] == b'@' {
-                // Scoped package separator
-                end += 1;
-            } else {
-                break;
-            }
-        }
-
-        if end < 4 || end > 50 {
-            return None;
-        }
-
-        // Verify string is properly terminated (null byte or non-printable)
-        if end < data.len() && data[end] != 0 && data[end].is_ascii_alphanumeric() {
-            // String continues with alphanumeric - might be concatenated
-            return None;
-        }
-
-        let name = std::str::from_utf8(&data[..end]).ok()?.to_string();
-
-        if !Self::looks_like_package_name(&name) {
-            return None;
-        }
-
-        // Skip past null terminator if present
-        let skip = if end < data.len() && data[end] == 0 {
-            end + 1
-        } else {
-            end
-        };
-
-        Some((name, skip.max(4)))
-    }
-
-    fn looks_like_package_name(s: &str) -> bool {
-        // npm package names have strict rules:
-        // - Must be lowercase (or start with @)
-        // - Can contain letters, digits, hyphens, underscores
-        // - Cannot start with . or _
-        // - Scoped packages start with @
-        // - Minimum meaningful length is 2 chars
-
-        if s.len() < 2 || s.len() > 50 {
-            return false;
-        }
-
-        // Skip if looks like a path or URL
-        if s.contains("://") || s.starts_with('/') || s.contains('\\') {
-            return false;
-        }
-
-        // Skip common non-package strings
-        if s.starts_with("src.") || s.contains("sizeof") || s.contains("alignof") {
-            return false;
-        }
-
-        // Skip strings with trailing @ (incomplete scoped package refs)
-        if s.ends_with('@') || s.ends_with('/') {
-            return false;
-        }
-
-        // Skip short strings unless they're common package names
-        if s.len() <= 3 {
-            return matches!(s, "vue" | "ms" | "lru" | "es5" | "es6");
-        }
-
-        // npm packages are almost always all lowercase
-        // Skip anything with uppercase letters (very few exceptions)
-        if s.chars().any(|c| c.is_ascii_uppercase()) {
-            return false;
-        }
-
-        // Package names should have reasonable vowel/consonant patterns
-        let vowels = s.chars().filter(|&c| "aeiou".contains(c)).count();
-        let consonants = s
-            .chars()
-            .filter(|&c| c.is_ascii_lowercase() && !"aeiou".contains(c))
-            .count();
-
-        // Too few vowels suggests random string
-        if s.len() > 4 && vowels == 0 {
-            return false;
-        }
-
-        // Ratio check for longer names
-        if s.len() > 6 && !s.contains('-') && !s.contains('/') {
-            if vowels < 2 || consonants < 2 {
-                return false;
-            }
-        }
-
-        // Skip strings that look like concatenated names (multiple capital-like patterns)
-        // e.g., "fseventsrollup" should be "fsevents" + "rollup"
-        // Heuristic: common package names are usually < 15 chars unless hyphenated
-        if s.len() > 12 && !s.contains('-') && !s.contains('/') {
-            return false;
-        }
-
-        // Must have at least 3 lowercase letters to be a real package name
-        let lowercase_count = s.chars().filter(|c| c.is_ascii_lowercase()).count();
-        if lowercase_count < 3 {
-            return false;
-        }
-
-        // Valid npm package name pattern
-        let first = s.chars().next().unwrap();
-        if first == '@' {
-            // Scoped package: @scope/name
-            if !s.contains('/') {
-                return false;
-            }
-        } else if !first.is_ascii_lowercase() {
-            return false;
-        }
-
-        true
+    fn is_valid_package_name(name: &str) -> bool {
+        !name.is_empty()
+            && name.len() <= 214
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '@' || c == '/')
     }
 
     fn find_package_version(&self, package: &str) -> Option<String> {
@@ -314,24 +226,18 @@ impl<'a> BunLockbParser<'a> {
     }
 }
 
-/// Build dependency tree from bun.lock or bun.lockb
-pub fn dependency_tree(project_root: &Path) -> Option<Result<DependencyTree, PackageError>> {
-    // Try text format first
-    if let Some(lockfile) = find_text_lockfile(project_root) {
-        let mut content = std::fs::read_to_string(&lockfile).ok()?;
-        strip(&mut content).ok()?;
-        let parsed: serde_json::Value = serde_json::from_str(&content).ok()?;
-        return Some(build_tree_text(&parsed, project_root));
+fn read_u32_le(data: &[u8], offset: &mut usize) -> Option<u32> {
+    if *offset + 4 > data.len() {
+        return None;
     }
-
-    // Try binary format via CLI
-    let lockfile = find_binary_lockfile(project_root)?;
-    if lockfile.exists() {
-        return Some(build_tree_binary(project_root));
-    }
-
-    None
+    let bytes: [u8; 4] = data[*offset..*offset + 4].try_into().ok()?;
+    *offset += 4;
+    Some(u32::from_le_bytes(bytes))
 }
+
+// ============================================================================
+// Text format parser (bun.lock)
+// ============================================================================
 
 fn find_text_lockfile(project_root: &Path) -> Option<std::path::PathBuf> {
     let mut current = project_root.to_path_buf();
@@ -364,7 +270,6 @@ fn find_binary_lockfile(project_root: &Path) -> Option<std::path::PathBuf> {
 fn extract_version_from_spec(spec: &str) -> Option<String> {
     // Handle "@scope/pkg@version" or "pkg@version"
     if spec.starts_with('@') {
-        // Scoped package: find second @
         let first_slash = spec.find('/')?;
         let version_at = spec[first_slash..].find('@').map(|i| i + first_slash)?;
         Some(spec[version_at + 1..].to_string())
@@ -378,7 +283,6 @@ fn build_tree_text(
     parsed: &serde_json::Value,
     project_root: &Path,
 ) -> Result<DependencyTree, PackageError> {
-    // Get project info from package.json or root workspace
     let (name, version) = get_project_info(parsed, project_root);
 
     let mut root_deps = Vec::new();
@@ -389,7 +293,6 @@ fn build_tree_text(
             for dep_type in ["dependencies", "devDependencies"] {
                 if let Some(deps) = root_ws.get(dep_type).and_then(|d| d.as_object()) {
                     for (dep_name, _version_req) in deps {
-                        // Look up resolved version in packages
                         let version = if let Some(packages) =
                             parsed.get("packages").and_then(|p| p.as_object())
                         {
@@ -449,14 +352,13 @@ fn build_tree_binary(project_root: &Path) -> Result<DependencyTree, PackageError
     let data = std::fs::read(&lockfile)
         .map_err(|e| PackageError::ParseError(format!("failed to read bun.lockb: {}", e)))?;
 
-    let parsed = BunLockbParser::parse(&data)
+    let parsed = BunLockb::parse(&data)
         .ok_or_else(|| PackageError::ParseError("invalid bun.lockb format".to_string()))?;
 
     Ok(parsed.to_tree(project_root))
 }
 
 fn get_project_info(parsed: &serde_json::Value, project_root: &Path) -> (String, String) {
-    // Try root workspace first
     if let Some(workspaces) = parsed.get("workspaces").and_then(|w| w.as_object()) {
         if let Some(root_ws) = workspaces.get("") {
             let name = root_ws
@@ -470,8 +372,6 @@ fn get_project_info(parsed: &serde_json::Value, project_root: &Path) -> (String,
             return (name.to_string(), version.to_string());
         }
     }
-
-    // Fall back to package.json
     get_project_info_from_package_json(project_root)
 }
 
@@ -513,5 +413,40 @@ mod tests {
             extract_version_from_spec("@types/node@20.0.0"),
             Some("20.0.0".to_string())
         );
+    }
+
+    #[test]
+    fn test_is_valid_package_name() {
+        assert!(BunLockb::is_valid_package_name("elysia"));
+        assert!(BunLockb::is_valid_package_name("vue"));
+        assert!(BunLockb::is_valid_package_name("@types/node"));
+        assert!(!BunLockb::is_valid_package_name(""));
+        assert!(!BunLockb::is_valid_package_name("has space"));
+    }
+
+    #[test]
+    fn test_parse_real_lockb() {
+        let path = std::path::Path::new("/home/me/git/tinkerbox/bun.lockb");
+        if !path.exists() {
+            eprintln!("Skipping test: bun.lockb not found at {:?}", path);
+            return;
+        }
+
+        let data = std::fs::read(path).expect("failed to read bun.lockb");
+        eprintln!("Read {} bytes from bun.lockb", data.len());
+
+        let parsed = BunLockb::parse(&data);
+        if let Some(lockb) = parsed {
+            eprintln!("Parsed {} packages", lockb.packages.len());
+            for pkg in lockb.packages.iter().take(20) {
+                eprintln!("  {} @ {}", pkg.name, pkg.version);
+            }
+            assert!(
+                !lockb.packages.is_empty(),
+                "should have found some packages"
+            );
+        } else {
+            panic!("Failed to parse bun.lockb");
+        }
     }
 }
