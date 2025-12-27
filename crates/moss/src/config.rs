@@ -24,12 +24,13 @@
 //! show_all = true             # show all sections by default
 //! ```
 
+use crate::merge::Merge;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 
 /// Daemon configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Merge)]
 #[serde(default)]
 pub struct DaemonConfig {
     /// Whether to use the daemon for queries.
@@ -48,7 +49,7 @@ impl Default for DaemonConfig {
 }
 
 /// Index configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Merge)]
 #[serde(default)]
 pub struct IndexConfig {
     /// Whether to create and use the file index.
@@ -62,7 +63,7 @@ impl Default for IndexConfig {
 }
 
 /// Filter configuration for --exclude and --only flags.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
 #[serde(default)]
 pub struct FilterConfig {
     /// Custom filter aliases. Keys are alias names (without @), values are glob patterns.
@@ -71,7 +72,7 @@ pub struct FilterConfig {
 }
 
 /// Todo command configuration.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
 #[serde(default)]
 pub struct TodoConfig {
     /// Path to todo file (relative to project root).
@@ -85,7 +86,7 @@ pub struct TodoConfig {
 }
 
 /// Root configuration structure.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
 #[serde(default)]
 pub struct MossConfig {
     pub daemon: DaemonConfig,
@@ -136,33 +137,6 @@ impl MossConfig {
     fn load_file(path: &Path) -> Option<Self> {
         let content = std::fs::read_to_string(path).ok()?;
         toml::from_str(&content).ok()
-    }
-
-    /// Merge another config into this one.
-    /// `other` takes precedence (project config overrides global).
-    fn merge(self, other: Self) -> Self {
-        let mut merged_aliases = self.filter.aliases;
-        for (k, v) in other.filter.aliases {
-            merged_aliases.insert(k, v);
-        }
-
-        Self {
-            daemon: DaemonConfig {
-                enabled: other.daemon.enabled,
-                auto_start: other.daemon.auto_start,
-            },
-            index: IndexConfig {
-                enabled: other.index.enabled,
-            },
-            filter: FilterConfig {
-                aliases: merged_aliases,
-            },
-            todo: TodoConfig {
-                file: other.todo.file.or(self.todo.file),
-                primary_section: other.todo.primary_section.or(self.todo.primary_section),
-                show_all: other.todo.show_all,
-            },
-        }
     }
 }
 

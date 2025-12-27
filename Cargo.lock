@@ -1647,6 +1647,7 @@ dependencies = [
  "jaq-std",
  "libc",
  "mlua",
+ "moss-derive",
  "moss-jsonschema",
  "moss-languages",
  "moss-openapi",
@@ -1673,6 +1674,15 @@ dependencies = [
  "utoipa",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "moss-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

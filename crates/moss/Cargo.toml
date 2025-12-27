@@ -35,6 +35,7 @@ nucleo-matcher.workspace = true
 rusqlite.workspace = true
 tree-sitter = "0.24"
 dirs = "5"
+moss-derive = { path = "../moss-derive" }
 moss-languages = { path = "../moss-languages" }
 moss-jsonschema = { path = "../moss-jsonschema" }
 moss-openapi = { path = "../moss-openapi" }

@@ -29,6 +29,7 @@ pub mod filter;
 pub mod grep;
 pub mod health;
 pub mod index;
+pub mod merge;
 pub mod output;
 pub mod overview;
 pub mod parsers;
