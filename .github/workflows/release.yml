@@ -67,7 +67,7 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build CLI
-        run: cargo build --release --target ${{ matrix.target }} -p moss-cli
+        run: cargo build --release --target ${{ matrix.target }} -p moss
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 

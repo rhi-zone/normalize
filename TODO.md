@@ -28,10 +28,6 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - See `crates/moss-languages/src/grammar_loader.rs` for loader implementation
 - Remaining: ship .so files with releases, `moss grammars install` command
 
-**Crate Naming:**
-- Consider renaming `moss-cli` - it's also a library that exports commands, not just a CLI binary
-
-
 **Workflow Engine:**
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
@@ -39,7 +35,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 **Code Quality:**
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
-- Deduplicate SQL queries in moss-cli: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
+- Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Investigate moss binary size (~56MB) - profile with `cargo bloat`, check for LTO, strip symbols, unused deps
 
 **Daemon Design:**

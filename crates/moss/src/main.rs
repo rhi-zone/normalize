@@ -1,29 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-mod analyze;
-mod commands;
-mod complexity;
-mod config;
-mod daemon;
-mod deps;
-mod edit;
-mod extract;
-mod filter;
-mod grep;
-mod health;
-mod index;
-mod output;
-mod overview;
-mod parsers;
-mod path_resolve;
-mod paths;
-mod serve;
-mod sessions;
-mod skeleton;
-mod symbols;
-mod tree;
-mod workflow;
+use moss::commands;
+use moss::serve;
 
 #[derive(Parser)]
 #[command(name = "moss")]
@@ -311,7 +290,7 @@ enum Commands {
     /// Manage filter aliases
     Filter {
         #[command(subcommand)]
-        action: FilterAction,
+        action: commands::filter::FilterAction,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long, global = true)]
@@ -515,12 +494,6 @@ enum ServeProtocol {
 
     /// Start LSP server for IDE integration
     Lsp,
-}
-
-#[derive(Subcommand)]
-enum FilterAction {
-    /// List available filter aliases
-    Aliases,
 }
 
 /// Reset SIGPIPE to default behavior so piping to `head` etc. doesn't panic.

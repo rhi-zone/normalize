@@ -2,8 +2,14 @@
 
 use crate::config::MossConfig;
 use crate::filter::{list_aliases, AliasStatus};
-use crate::FilterAction;
+use clap::Subcommand;
 use std::path::Path;
+
+#[derive(Subcommand)]
+pub enum FilterAction {
+    /// List available filter aliases
+    Aliases,
+}
 
 /// Handle filter subcommands.
 pub fn cmd_filter(action: FilterAction, root: Option<&Path>, json: bool) -> i32 {

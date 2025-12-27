@@ -103,11 +103,11 @@ jobs:
           workspaces: "crates -> target"
 
       - name: Build release
-        run: cargo build --release -p moss-cli
+        run: cargo build --release -p moss
 
       - name: Run benchmarks
         run: |
-          ./crates/moss-cli/bench.sh --quick 2>&1 | tee benchmark-results.txt
+          ./crates/moss/bench.sh --quick 2>&1 | tee benchmark-results.txt
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4

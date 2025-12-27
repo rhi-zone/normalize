@@ -1,9 +1,13 @@
 [package]
-name = "moss-cli"
+name = "moss"
 version.workspace = true
 edition = "2021"
 license.workspace = true
-description = "Fast CLI for moss code intelligence"
+description = "Fast code intelligence CLI and library"
+
+[lib]
+name = "moss"
+path = "src/lib.rs"
 
 [[bin]]
 name = "moss"

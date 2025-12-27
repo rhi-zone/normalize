@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/moss-cli",
+    "crates/moss",
     "crates/moss-jsonschema",
     "crates/moss-languages",
     "crates/moss-openapi",
