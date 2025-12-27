@@ -142,21 +142,121 @@ fn has_language_support(path: &str) -> bool {
 
 /// Search for symbols in the index by name
 fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
-    let idx = match index::FileIndex::open_if_enabled(root) {
-        Some(i) => i,
-        None => return vec![],
-    };
-
-    // Check if call graph is populated
-    let stats = idx.call_graph_stats().unwrap_or_default();
-    if stats.symbols == 0 {
-        return vec![];
+    // Try index first
+    if let Some(idx) = index::FileIndex::open_if_enabled(root) {
+        let stats = idx.call_graph_stats().unwrap_or_default();
+        if stats.symbols > 0 {
+            if let Ok(symbols) = idx.find_symbols(query, None, true, 10) {
+                return symbols;
+            }
+        }
     }
 
-    // Query symbols with fuzzy matching, limit to 10
-    match idx.find_symbols(query, None, true, 10) {
-        Ok(symbols) => symbols,
-        Err(_) => vec![],
+    // Fallback: walk filesystem and parse files
+    search_symbols_unindexed(query, root)
+}
+
+/// Search for symbols by walking filesystem and parsing files
+fn search_symbols_unindexed(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
+    use ignore::WalkBuilder;
+    use nucleo_matcher::{Config, Matcher};
+
+    let query_lower = query.to_lowercase();
+    let mut matcher = Matcher::new(Config::DEFAULT);
+    let mut matches = Vec::new();
+
+    let walker = WalkBuilder::new(root).hidden(true).git_ignore(true).build();
+
+    let extractor = skeleton::SkeletonExtractor::new();
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+
+        // Only parse files with language support
+        let Some(lang) = support_for_path(path) else {
+            continue;
+        };
+        if !lang.has_symbols() {
+            continue;
+        }
+
+        let Ok(content) = std::fs::read_to_string(path) else {
+            continue;
+        };
+
+        let result = extractor.extract(path, &content);
+        let rel_path = path.strip_prefix(root).unwrap_or(path);
+
+        // Collect matching symbols
+        collect_matching_symbols(
+            &result.symbols,
+            &query_lower,
+            &mut matcher,
+            &rel_path.to_string_lossy(),
+            None,
+            &mut matches,
+        );
+
+        // Limit results
+        if matches.len() >= 20 {
+            break;
+        }
+    }
+
+    // Sort by score descending
+    matches.sort_by(|a, b| b.1.cmp(&a.1));
+    matches.into_iter().take(10).map(|(m, _)| m).collect()
+}
+
+fn collect_matching_symbols(
+    symbols: &[skeleton::SkeletonSymbol],
+    query: &str,
+    matcher: &mut nucleo_matcher::Matcher,
+    file: &str,
+    parent: Option<&str>,
+    matches: &mut Vec<(index::SymbolMatch, u32)>,
+) {
+    use nucleo_matcher::pattern::{AtomKind, CaseMatching, Normalization, Pattern};
+    use nucleo_matcher::Utf32Str;
+
+    let pattern = Pattern::new(
+        query,
+        CaseMatching::Ignore,
+        Normalization::Smart,
+        AtomKind::Fuzzy,
+    );
+
+    for sym in symbols {
+        let name_lower = sym.name.to_lowercase();
+        let mut buf = Vec::new();
+        let haystack = Utf32Str::new(&name_lower, &mut buf);
+
+        if let Some(score) = pattern.score(haystack, matcher) {
+            matches.push((
+                index::SymbolMatch {
+                    name: sym.name.clone(),
+                    kind: sym.kind.to_string(),
+                    file: file.to_string(),
+                    start_line: sym.start_line,
+                    end_line: sym.end_line,
+                    parent: parent.map(|s| s.to_string()),
+                },
+                score,
+            ));
+        }
+
+        // Recurse into children
+        collect_matching_symbols(
+            &sym.children,
+            query,
+            matcher,
+            file,
+            Some(&sym.name),
+            matches,
+        );
     }
 }
 
