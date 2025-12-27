@@ -4,8 +4,78 @@ use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
 use crate::grep;
+use crate::merge::Merge;
 use crate::output::{OutputFormat, OutputFormatter};
-use std::path::Path;
+use clap::Args;
+use serde::Deserialize;
+use std::path::{Path, PathBuf};
+
+/// Grep command configuration.
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct GrepConfig {
+    /// Default maximum number of matches
+    pub limit: Option<usize>,
+    /// Case-insensitive search by default
+    pub ignore_case: Option<bool>,
+}
+
+impl GrepConfig {
+    pub fn limit(&self) -> usize {
+        self.limit.unwrap_or(100)
+    }
+
+    pub fn ignore_case(&self) -> bool {
+        self.ignore_case.unwrap_or(false)
+    }
+}
+
+/// Grep command arguments.
+#[derive(Args, Debug)]
+pub struct GrepArgs {
+    /// Regex pattern to search for
+    pub pattern: String,
+
+    /// Root directory (defaults to current directory)
+    #[arg(short, long)]
+    pub root: Option<PathBuf>,
+
+    /// Maximum number of matches to return
+    #[arg(short, long)]
+    pub limit: Option<usize>,
+
+    /// Case-insensitive search
+    #[arg(short = 'i', long)]
+    pub ignore_case: bool,
+
+    /// Exclude files matching patterns or aliases
+    #[arg(long, value_delimiter = ',')]
+    pub exclude: Vec<String>,
+
+    /// Only include files matching patterns or aliases
+    #[arg(long, value_delimiter = ',')]
+    pub only: Vec<String>,
+}
+
+/// Run grep command with args.
+pub fn run(args: GrepArgs, json: bool, jq: Option<&str>) -> i32 {
+    let effective_root = args
+        .root
+        .clone()
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = MossConfig::load(&effective_root);
+
+    cmd_grep(
+        &args.pattern,
+        args.root.as_deref(),
+        args.limit.unwrap_or_else(|| config.grep.limit()),
+        args.ignore_case || config.grep.ignore_case(),
+        json,
+        jq,
+        &args.exclude,
+        &args.only,
+    )
+}
 
 /// Search file contents for a pattern
 pub fn cmd_grep(

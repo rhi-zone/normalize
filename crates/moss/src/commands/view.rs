@@ -3,10 +3,135 @@
 use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
+use crate::merge::Merge;
 use crate::tree::{DocstringDisplay, FormatOptions, ViewNode, ViewNodeKind};
 use crate::{daemon, deps, index, path_resolve, skeleton, symbols, tree};
+use clap::Args;
 use moss_languages::support_for_path;
+use serde::Deserialize;
 use std::path::{Path, PathBuf};
+
+/// View command configuration.
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct ViewConfig {
+    /// Default depth for tree expansion (0=names, 1=signatures, 2=children, -1=all)
+    pub depth: Option<i32>,
+    /// Show line numbers by default
+    pub line_numbers: Option<bool>,
+    /// Show full docstrings by default (vs summary)
+    pub show_docs: Option<bool>,
+}
+
+impl ViewConfig {
+    pub fn depth(&self) -> i32 {
+        self.depth.unwrap_or(1)
+    }
+
+    pub fn line_numbers(&self) -> bool {
+        self.line_numbers.unwrap_or(false)
+    }
+
+    pub fn show_docs(&self) -> bool {
+        self.show_docs.unwrap_or(false)
+    }
+}
+
+/// View command arguments.
+#[derive(Args, Debug)]
+pub struct ViewArgs {
+    /// Target to view (path like src/main.py/Foo/bar). Optional when using filters.
+    pub target: Option<String>,
+
+    /// Root directory (defaults to current directory)
+    #[arg(short, long)]
+    pub root: Option<PathBuf>,
+
+    /// Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
+    #[arg(short, long)]
+    pub depth: Option<i32>,
+
+    /// Show line numbers
+    #[arg(short = 'n', long)]
+    pub line_numbers: bool,
+
+    /// Show dependencies (imports/exports)
+    #[arg(long)]
+    pub deps: bool,
+
+    /// Filter by symbol type: class, function, method
+    #[arg(short = 't', long = "type")]
+    pub kind: Option<String>,
+
+    /// Show only type definitions (class, struct, enum, interface, type alias)
+    #[arg(long = "types-only")]
+    pub types_only: bool,
+
+    /// Disable smart display (no collapsing single-child dirs)
+    #[arg(long)]
+    pub raw: bool,
+
+    /// Focus view: show target at high detail, imports at signature level
+    #[arg(long, value_name = "MODULE", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
+    pub focus: Option<String>,
+
+    /// Resolve imports: inline signatures of specific imported symbols
+    #[arg(long)]
+    pub resolve_imports: bool,
+
+    /// Show all symbols including private ones
+    #[arg(long = "include-private")]
+    pub include_private: bool,
+
+    /// Show full source code
+    #[arg(long)]
+    pub full: bool,
+
+    /// Show full docstrings
+    #[arg(long)]
+    pub docs: bool,
+
+    /// Context view: skeleton + imports combined
+    #[arg(long)]
+    pub context: bool,
+
+    /// Exclude paths matching pattern or @alias
+    #[arg(long, value_name = "PATTERN")]
+    pub exclude: Vec<String>,
+
+    /// Include only paths matching pattern or @alias
+    #[arg(long, value_name = "PATTERN")]
+    pub only: Vec<String>,
+}
+
+/// Run view command with args.
+pub fn run(args: ViewArgs, json: bool) -> i32 {
+    let effective_root = args
+        .root
+        .clone()
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = MossConfig::load(&effective_root);
+
+    cmd_view(
+        args.target.as_deref(),
+        args.root.as_deref(),
+        args.depth.unwrap_or_else(|| config.view.depth()),
+        args.line_numbers || config.view.line_numbers(),
+        args.deps,
+        args.kind.as_deref(),
+        args.types_only,
+        args.raw,
+        args.focus.as_deref(),
+        args.resolve_imports,
+        args.include_private,
+        args.full,
+        args.docs || config.view.show_docs(),
+        args.context,
+        json,
+        &args.exclude,
+        &args.only,
+    )
+}
 
 /// Check if a file has language support (symbols can be extracted)
 fn has_language_support(path: &str) -> bool {

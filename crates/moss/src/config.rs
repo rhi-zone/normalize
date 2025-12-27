@@ -22,9 +22,25 @@
 //! file = "TASKS.md"           # custom todo file (default: auto-detect)
 //! primary_section = "Backlog" # default section for add/done/rm
 //! show_all = true             # show all sections by default
+//!
+//! [view]
+//! depth = 2                   # default tree depth (0=names, 1=signatures, 2=children)
+//! line_numbers = true         # show line numbers by default
+//! show_docs = true            # show full docstrings by default
+//!
+//! [analyze]
+//! threshold = 10              # only show functions with complexity >= 10
+//! compact = true              # use compact output for --overview
+//!
+//! [grep]
+//! limit = 50                  # default max results
+//! ignore_case = true          # case-insensitive by default
 //! ```
 
+use crate::commands::analyze::AnalyzeConfig;
+use crate::commands::grep::GrepConfig;
 use crate::commands::todo::TodoConfig;
+use crate::commands::view::ViewConfig;
 use crate::daemon::DaemonConfig;
 use crate::filter::FilterConfig;
 use crate::merge::Merge;
@@ -53,6 +69,9 @@ pub struct MossConfig {
     pub index: IndexConfig,
     pub filter: FilterConfig,
     pub todo: TodoConfig,
+    pub view: ViewConfig,
+    pub analyze: AnalyzeConfig,
+    pub grep: GrepConfig,
 }
 
 impl MossConfig {

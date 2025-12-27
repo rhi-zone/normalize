@@ -2,6 +2,9 @@ use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
 use moss::commands;
+use moss::commands::analyze::AnalyzeArgs;
+use moss::commands::grep::GrepArgs;
+use moss::commands::view::ViewArgs;
 use moss::serve;
 
 #[derive(Parser)]
@@ -23,76 +26,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// View a node in the codebase tree (directory, file, or symbol)
-    View {
-        /// Target to view (path like src/main.py/Foo/bar). Optional when using filters.
-        target: Option<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
-        #[arg(short, long, default_value = "1")]
-        depth: i32,
-
-        /// Show line numbers
-        #[arg(short = 'n', long)]
-        line_numbers: bool,
-
-        /// Show dependencies (imports/exports)
-        #[arg(long)]
-        deps: bool,
-
-        /// Filter by symbol type: class, function, method
-        #[arg(short = 't', long = "type")]
-        kind: Option<String>,
-
-        /// Show only type definitions (class, struct, enum, interface, type alias)
-        /// Filters out functions/methods for architectural overview
-        #[arg(long = "types-only")]
-        types_only: bool,
-
-        /// Disable smart display (no collapsing single-child dirs)
-        #[arg(long)]
-        raw: bool,
-
-        /// Focus view: show target at high detail, imports at signature level
-        /// Resolves local imports and shows their skeletons inline
-        /// Optionally filter to a specific module: --focus=models
-        #[arg(long, value_name = "MODULE", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
-        focus: Option<String>,
-
-        /// Resolve imports: inline signatures of specific imported symbols
-        /// More targeted than --focus (shows only what's actually imported)
-        #[arg(long)]
-        resolve_imports: bool,
-
-        /// Show all symbols including private ones (normally filtered by convention)
-        #[arg(long = "include-private")]
-        include_private: bool,
-
-        /// Show full source code (for symbols: complete implementation, for files: raw content)
-        #[arg(long)]
-        full: bool,
-
-        /// Show full docstrings (by default only summary up to double blank line is shown)
-        #[arg(long)]
-        docs: bool,
-
-        /// Context view: skeleton + imports combined (ideal for LLM context)
-        #[arg(long)]
-        context: bool,
-
-        /// Exclude paths matching pattern or @alias (repeatable)
-        /// Patterns: globs like "*.test.js", "**/tests/**"
-        /// Aliases: @tests, @config, @build, @docs, @generated
-        #[arg(long, value_name = "PATTERN")]
-        exclude: Vec<String>,
-
-        /// Include only paths matching pattern or @alias (repeatable)
-        #[arg(long, value_name = "PATTERN")]
-        only: Vec<String>,
-    },
+    View(ViewArgs),
 
     /// Edit a node in the codebase tree (structural code modification)
     Edit {
@@ -210,82 +144,7 @@ enum Commands {
     },
 
     /// Analyze codebase (unified health, complexity, security, overview)
-    Analyze {
-        /// Target to analyze (path, file, or directory). Defaults to current directory.
-        target: Option<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Run health analysis (codebase metrics)
-        #[arg(long)]
-        health: bool,
-
-        /// Run complexity analysis (cyclomatic complexity)
-        #[arg(long)]
-        complexity: bool,
-
-        /// Run security analysis (vulnerability scanning)
-        #[arg(long)]
-        security: bool,
-
-        /// Show comprehensive project overview
-        #[arg(long)]
-        overview: bool,
-
-        /// Show storage usage (index database, caches)
-        #[arg(long)]
-        storage: bool,
-
-        /// Compact one-line output (for --overview)
-        #[arg(short, long)]
-        compact: bool,
-
-        /// Complexity threshold - only show functions above this
-        #[arg(short, long)]
-        threshold: Option<usize>,
-
-        /// Filter by symbol kind: function, method
-        #[arg(long)]
-        kind: Option<String>,
-
-        /// Show what functions the target calls
-        #[arg(long)]
-        callees: bool,
-
-        /// Show what functions call the target
-        #[arg(long)]
-        callers: bool,
-
-        /// Run linters and include results in analysis
-        #[arg(long)]
-        lint: bool,
-
-        /// Show git history hotspots (high churn + high complexity)
-        #[arg(long)]
-        hotspots: bool,
-
-        /// Check documentation references (broken links in docs)
-        #[arg(long)]
-        check_refs: bool,
-
-        /// Find docs with stale code references (covered code changed since doc was modified)
-        #[arg(long)]
-        stale_docs: bool,
-
-        /// Check that all {{example: path#name}} references have matching markers
-        #[arg(long)]
-        check_examples: bool,
-
-        /// Exclude paths matching pattern or @alias (repeatable)
-        #[arg(long, value_name = "PATTERN")]
-        exclude: Vec<String>,
-
-        /// Include only paths matching pattern or @alias (repeatable)
-        #[arg(long, value_name = "PATTERN")]
-        only: Vec<String>,
-    },
+    Analyze(AnalyzeArgs),
 
     /// Manage filter aliases
     Filter {
@@ -298,30 +157,7 @@ enum Commands {
     },
 
     /// Search for text patterns in files (fast ripgrep-based search)
-    Grep {
-        /// Regex pattern to search for
-        pattern: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Maximum number of matches to return
-        #[arg(short, long, default_value = "100")]
-        limit: usize,
-
-        /// Case-insensitive search
-        #[arg(short = 'i', long)]
-        ignore_case: bool,
-
-        /// Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
-        #[arg(long, value_delimiter = ',')]
-        exclude: Vec<String>,
-
-        /// Only include files matching patterns or aliases (e.g., @docs, *.py)
-        #[arg(long, value_delimiter = ',')]
-        only: Vec<String>,
-    },
+    Grep(GrepArgs),
 
     /// Analyze Claude Code and other agent session logs
     Sessions {
@@ -526,42 +362,7 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
-        Commands::View {
-            target,
-            root,
-            depth,
-            line_numbers,
-            deps,
-            kind,
-            types_only,
-            raw,
-            focus,
-            resolve_imports,
-            include_private,
-            full,
-            docs,
-            context,
-            exclude,
-            only,
-        } => commands::view::cmd_view(
-            target.as_deref(),
-            root.as_deref(),
-            depth,
-            line_numbers,
-            deps,
-            kind.as_deref(),
-            types_only,
-            raw,
-            focus.as_deref(),
-            resolve_imports,
-            include_private,
-            full,
-            docs,
-            context,
-            cli.json,
-            &exclude,
-            &only,
-        ),
+        Commands::View(args) => commands::view::run(args, cli.json),
         Commands::Edit {
             target,
             root,
@@ -614,68 +415,11 @@ fn main() {
         }
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
-        Commands::Analyze {
-            target,
-            root,
-            health,
-            complexity,
-            security,
-            overview,
-            storage,
-            compact,
-            threshold,
-            kind,
-            callees,
-            callers,
-            lint,
-            hotspots,
-            check_refs,
-            stale_docs,
-            check_examples,
-            exclude,
-            only,
-        } => commands::analyze::cmd_analyze(
-            target.as_deref(),
-            root.as_deref(),
-            health,
-            complexity,
-            security,
-            overview,
-            storage,
-            compact,
-            threshold,
-            kind.as_deref(),
-            callees,
-            callers,
-            lint,
-            hotspots,
-            check_refs,
-            stale_docs,
-            check_examples,
-            cli.json,
-            &exclude,
-            &only,
-        ),
+        Commands::Analyze(args) => commands::analyze::run(args, cli.json),
         Commands::Filter { action, root } => {
             commands::filter::cmd_filter(action, root.as_deref(), cli.json)
         }
-        Commands::Grep {
-            pattern,
-            root,
-            limit,
-            ignore_case,
-            exclude,
-            only,
-        } => commands::grep::cmd_grep(
-            &pattern,
-            root.as_deref(),
-            limit,
-            ignore_case,
-            cli.json,
-            cli.jq.as_deref(),
-            &exclude,
-            &only,
-        ),
+        Commands::Grep(args) => commands::grep::run(args, cli.json, cli.jq.as_deref()),
         Commands::Sessions {
             session,
             project,

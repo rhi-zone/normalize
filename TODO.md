@@ -9,19 +9,14 @@ Test Status: 110 passing, 0 failing (moss-languages)
 ## Remaining Work
 
 **Configuration System:**
-Current: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]` in `.moss/config.toml`
+Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`
 
 Adding a new section (3 places):
-1. Define struct with `#[derive(Merge)]` in relevant module
+1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module
 2. Add field to MossConfig
-3. Add test
+3. Add `run(args, json)` function that loads config and merges
 
-Potential config candidates:
-- `[view]`: depth, skeleton vs full, syntax highlighting
-- `[analyze]`: checks to enable, thresholds
-- `[grep]`: context lines, case sensitivity
-- `[workflow]`: directory, auto-run
-- `[serve]`: port, host
+Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 **Workflow Engine:**
 - [x] Port LLM calling logic (streaming, tool use) as workflow component

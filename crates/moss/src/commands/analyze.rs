@@ -6,10 +6,144 @@ use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;
 use crate::index;
+use crate::merge::Merge;
 use crate::overview;
 use crate::path_resolve;
+use clap::Args;
 use moss_tools::registry_with_custom;
+use serde::Deserialize;
 use std::path::{Path, PathBuf};
+
+/// Analyze command configuration.
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct AnalyzeConfig {
+    /// Default complexity threshold for filtering
+    pub threshold: Option<usize>,
+    /// Use compact output by default (for --overview)
+    pub compact: Option<bool>,
+}
+
+impl AnalyzeConfig {
+    pub fn threshold(&self) -> Option<usize> {
+        self.threshold
+    }
+
+    pub fn compact(&self) -> bool {
+        self.compact.unwrap_or(false)
+    }
+}
+
+/// Analyze command arguments.
+#[derive(Args, Debug)]
+pub struct AnalyzeArgs {
+    /// Target to analyze (path, file, or directory)
+    pub target: Option<String>,
+
+    /// Root directory (defaults to current directory)
+    #[arg(short, long)]
+    pub root: Option<PathBuf>,
+
+    /// Run health analysis
+    #[arg(long)]
+    pub health: bool,
+
+    /// Run complexity analysis
+    #[arg(long)]
+    pub complexity: bool,
+
+    /// Run security analysis
+    #[arg(long)]
+    pub security: bool,
+
+    /// Show comprehensive project overview
+    #[arg(long)]
+    pub overview: bool,
+
+    /// Show storage usage
+    #[arg(long)]
+    pub storage: bool,
+
+    /// Compact one-line output (for --overview)
+    #[arg(short, long)]
+    pub compact: bool,
+
+    /// Complexity threshold - only show functions above this
+    #[arg(short, long)]
+    pub threshold: Option<usize>,
+
+    /// Filter by symbol kind: function, method
+    #[arg(long)]
+    pub kind: Option<String>,
+
+    /// Show what functions the target calls
+    #[arg(long)]
+    pub callees: bool,
+
+    /// Show what functions call the target
+    #[arg(long)]
+    pub callers: bool,
+
+    /// Run linters
+    #[arg(long)]
+    pub lint: bool,
+
+    /// Show git history hotspots
+    #[arg(long)]
+    pub hotspots: bool,
+
+    /// Check documentation references
+    #[arg(long)]
+    pub check_refs: bool,
+
+    /// Find docs with stale code references
+    #[arg(long)]
+    pub stale_docs: bool,
+
+    /// Check example references
+    #[arg(long)]
+    pub check_examples: bool,
+
+    /// Exclude paths matching pattern or @alias
+    #[arg(long, value_name = "PATTERN")]
+    pub exclude: Vec<String>,
+
+    /// Include only paths matching pattern or @alias
+    #[arg(long, value_name = "PATTERN")]
+    pub only: Vec<String>,
+}
+
+/// Run analyze command with args.
+pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
+    let effective_root = args
+        .root
+        .clone()
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = MossConfig::load(&effective_root);
+
+    cmd_analyze(
+        args.target.as_deref(),
+        args.root.as_deref(),
+        args.health,
+        args.complexity,
+        args.security,
+        args.overview,
+        args.storage,
+        args.compact || config.analyze.compact(),
+        args.threshold.or(config.analyze.threshold()),
+        args.kind.as_deref(),
+        args.callees,
+        args.callers,
+        args.lint,
+        args.hotspots,
+        args.check_refs,
+        args.stale_docs,
+        args.check_examples,
+        json,
+        &args.exclude,
+        &args.only,
+    )
+}
 
 /// Run analysis on a target (file or directory)
 #[allow(clippy::too_many_arguments)]
