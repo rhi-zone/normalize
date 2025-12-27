@@ -22,6 +22,13 @@ Test Status: 110 passing, 0 failing (moss-languages)
 **Language Support:** 98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
 
+**Grammar Loading:**
+- Dynamic WASM grammar loading: avoid recompiling grammars into binary each build
+- Upstream tree-sitter has `WasmStore` for loading `.wasm` grammars at runtime
+- arborium-tree-sitter's `wasm` feature is for compiling TO wasm, not loading FROM wasm
+- Options: use tree-sitter directly (bypass arborium), PR arborium, or fork
+- Would cache grammars in `~/.cache/moss/grammars/`, load on demand
+
 
 **Workflow Engine:**
 - Consider streaming output for `auto{}` driver
