@@ -218,39 +218,6 @@ impl MemoryStore {
         )?;
         Ok(count)
     }
-
-    /// Forget by ID.
-    pub fn forget_by_id(&self, id: i64) -> Result<bool, rusqlite::Error> {
-        let count = self
-            .conn
-            .execute("DELETE FROM memory WHERE id = ?1", params![id])?;
-        Ok(count > 0)
-    }
-
-    /// Get all items (for debugging).
-    pub fn all(&self, limit: usize) -> Result<Vec<MemoryItem>, rusqlite::Error> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, content, context, weight, created_at, accessed_at, metadata
-             FROM memory
-             ORDER BY weight DESC, accessed_at DESC
-             LIMIT ?1",
-        )?;
-
-        let result: Vec<MemoryItem> = stmt
-            .query_map(params![limit as i64], |row| {
-                Ok(MemoryItem {
-                    id: row.get(0)?,
-                    content: row.get(1)?,
-                    context: row.get(2)?,
-                    weight: row.get(3)?,
-                    created_at: row.get(4)?,
-                    accessed_at: row.get(5)?,
-                    metadata: row.get(6)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(result)
-    }
 }
 
 #[cfg(test)]
