@@ -63,6 +63,12 @@ Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_promp
 - If proposing a new dependency, ask: can stdlib/existing code do this?
 - HashMap > inventory crate. OnceLock > lazy_static. Functions > traits (until you need the trait).
 - "Going in circles" = signal to simplify, not add complexity.
+- Simple formats for simple data: line-based files > TOML/JSON when structure isn't needed.
+
+**Explicit over implicit.**
+- Location-based allowlists > hash-based (new occurrences shouldn't be silently ignored).
+- Log when skipping something (e.g., "entry commented out, skipping") - user should know why.
+- Respect user's file organization: insert near related content, don't blindly append.
 
 **Conversational architecture is flawed.**
 The chatbot model (user → assistant → user, appending to a growing log) is wrong for agents. It leads to:
