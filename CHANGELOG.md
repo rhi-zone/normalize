@@ -21,6 +21,7 @@ First release. See `docs/` for design docs and `README.md` for usage.
 - `--show-source`: display duplicate code inline
 - `--min-lines N`: filter trivial functions
 - Allowlist via `.moss/clone-allow` (format: `path:symbol`)
+- `--allow-group path:symbol` to approve clone groups (with `--reason` for new groups)
 - CI integration: fails if unallowed clones found
 
 ### Analyze Command
