@@ -58,6 +58,7 @@ Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_promp
 - Plugin/trait systems > hardcoded switches
 - Extend existing abstractions > create parallel ones
 - When user says "WTF is X" - ask: is this a naming issue or a design issue? Often the fix is unification, not renaming.
+- Example: No `--jsonl`/`--jql` flags. Use `--jq '.matches[]'` instead. Adding jsonl would require jql for consistency (same reasons we have --jq: discoverability, convenience, perf). Tiny discoverability gain isn't worth the complexity.
 
 **Simplicity over cleverness.**
 - If proposing a new dependency, ask: can stdlib/existing code do this?
