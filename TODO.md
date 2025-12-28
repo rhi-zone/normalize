@@ -87,6 +87,13 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 - Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
 
+**Session Analysis:**
+- Better `--compact` format: key:value pairs, no tables, all info preserved
+- Better `--pretty` format: bar charts for tools, progress bar for success rate
+- `moss sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
+- `moss sessions mark <id>`: mark as reviewed (store in `.moss/sessions-reviewed`)
+- Friction signal detection: correction patterns, tool chains, avoidance
+
 **Friction Signals:** (see `docs/research/agent-adaptation.md`)
 How do we know when tools aren't working? Implicit signals from agent behavior:
 - Correction patterns: "You're right", "Should have" after tool calls
