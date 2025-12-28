@@ -23,10 +23,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - [x] Memory system: `store()`, `recall()`, `forget()` Lua API with SQLite persistence
 
 **Token-Efficient Output:**
-Default output optimized for LLM context efficiency. Add `--pretty` for human-friendly display.
-- Default: minimal decoration, dense but scannable
-- `--pretty`: tables, colors, aligned columns for terminal use
-- Consider: elide common patterns (e.g., `pub fn` → `fn` in listing context)
+- [x] Default output optimized for LLM context (compact mode)
+- [x] `--pretty` for human-friendly display with colors
+- [x] Elide keywords in compact mode (`pub fn` → just signature)
 
 **Rust Redesign Candidates:**
 - Rules engine: consider semgrep/ruff integration instead of custom
