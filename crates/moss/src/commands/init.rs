@@ -45,6 +45,12 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
 # complexity = true
 # security = true
 # clones = false
+
+# [analyze.weights]
+# health = 1.0
+# complexity = 0.5
+# security = 2.0
+# clones = 0.3
 "#;
         if let Err(e) = fs::write(&config_path, default_config) {
             eprintln!("Failed to create config.toml: {}", e);

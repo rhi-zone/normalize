@@ -2,6 +2,7 @@
 
 use crate::analyze;
 use crate::commands::filter::detect_project_languages;
+use crate::complexity::ComplexityReport;
 use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;
@@ -30,6 +31,33 @@ pub struct AnalyzeConfig {
     pub security: Option<bool>,
     /// Run clone detection by default
     pub clones: Option<bool>,
+    /// Weights for final grade calculation
+    pub weights: Option<AnalyzeWeights>,
+}
+
+/// Weights for each analysis pass (higher = more impact on grade).
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct AnalyzeWeights {
+    pub health: Option<f64>,
+    pub complexity: Option<f64>,
+    pub security: Option<f64>,
+    pub clones: Option<f64>,
+}
+
+impl AnalyzeWeights {
+    pub fn health(&self) -> f64 {
+        self.health.unwrap_or(1.0)
+    }
+    pub fn complexity(&self) -> f64 {
+        self.complexity.unwrap_or(0.5)
+    }
+    pub fn security(&self) -> f64 {
+        self.security.unwrap_or(2.0)
+    }
+    pub fn clones(&self) -> f64 {
+        self.clones.unwrap_or(0.3)
+    }
 }
 
 impl AnalyzeConfig {
@@ -56,6 +84,10 @@ impl AnalyzeConfig {
     pub fn clones(&self) -> bool {
         self.clones.unwrap_or(false)
     }
+
+    pub fn weights(&self) -> AnalyzeWeights {
+        self.weights.clone().unwrap_or_default()
+    }
 }
 
 /// Analyze command arguments.
@@ -67,6 +99,10 @@ pub struct AnalyzeArgs {
     /// Root directory (defaults to current directory)
     #[arg(short, long)]
     pub root: Option<PathBuf>,
+
+    /// Run all analysis passes including clones
+    #[arg(long)]
+    pub all: bool,
 
     /// Run health analysis
     #[arg(long)]
@@ -165,19 +201,27 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
 
-    // If user explicitly requested specific passes, run only those
-    // Otherwise use config defaults
-    let any_pass_flag = args.health || args.complexity || args.security || args.clones;
-    let (health, complexity, security, clones) = if any_pass_flag {
-        (args.health, args.complexity, args.security, args.clones)
+    // Determine which passes to run:
+    // --all: run everything
+    // Specific flags: run only those
+    // No flags: use config defaults
+    let (health, complexity, security, clones) = if args.all {
+        (true, true, true, true)
     } else {
-        (
-            config.analyze.health(),
-            config.analyze.complexity(),
-            config.analyze.security(),
-            config.analyze.clones(),
-        )
+        let any_pass_flag = args.health || args.complexity || args.security || args.clones;
+        if any_pass_flag {
+            (args.health, args.complexity, args.security, args.clones)
+        } else {
+            (
+                config.analyze.health(),
+                config.analyze.complexity(),
+                config.analyze.security(),
+                config.analyze.clones(),
+            )
+        }
     };
+
+    let weights = config.analyze.weights();
 
     cmd_analyze(
         args.target.as_deref(),
@@ -202,6 +246,7 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         args.elide_literals,
         args.show_source,
         args.min_lines,
+        &weights,
         json,
         &args.exclude,
         &args.only,
@@ -233,6 +278,7 @@ pub fn cmd_analyze(
     elide_literals: bool,
     show_source: bool,
     min_lines: usize,
+    weights: &AnalyzeWeights,
     json: bool,
     exclude: &[String],
     only: &[String],
@@ -314,6 +360,7 @@ pub fn cmd_analyze(
     }
 
     let mut exit_code = 0;
+    let mut scores: Vec<(f64, f64)> = Vec::new(); // (score, weight)
 
     // Run main analysis if any of health/complexity/security enabled
     if health || complexity || security {
@@ -328,6 +375,16 @@ pub fn cmd_analyze(
             filter.as_ref(),
         );
 
+        // Collect scores from report
+        if let Some(ref complexity_report) = report.complexity {
+            let score = score_complexity(complexity_report);
+            scores.push((score, weights.complexity()));
+        }
+        if let Some(ref security_report) = report.security {
+            let score = score_security(security_report);
+            scores.push((score, weights.security()));
+        }
+
         if json {
             println!("{}", report.to_json());
         } else {
@@ -337,7 +394,7 @@ pub fn cmd_analyze(
 
     // Run clone detection if enabled
     if clones {
-        let clone_result = cmd_clones(
+        let (clone_result, clone_count) = cmd_clones_with_count(
             &root,
             elide_identifiers,
             elide_literals,
@@ -345,12 +402,63 @@ pub fn cmd_analyze(
             min_lines,
             json,
         );
+        scores.push((score_clones(clone_count), weights.clones()));
         if clone_result != 0 {
             exit_code = clone_result;
         }
     }
 
+    // Output final grade if we ran any passes
+    if !scores.is_empty() && !json {
+        let (grade, percentage) = calculate_grade(&scores);
+        println!();
+        println!("# Overall Grade: {} ({:.0}%)", grade, percentage);
+    }
+
     exit_code
+}
+
+/// Score complexity: 100 if no high-risk functions, decreases with complex code
+fn score_complexity(report: &ComplexityReport) -> f64 {
+    let high_risk = report.high_risk_count();
+    let total = report.functions.len();
+    if total == 0 {
+        return 100.0;
+    }
+    let ratio = high_risk as f64 / total as f64;
+    (100.0 * (1.0 - ratio)).max(0.0)
+}
+
+/// Score security: 100 if no findings, penalized by severity
+fn score_security(report: &analyze::SecurityReport) -> f64 {
+    let counts = report.count_by_severity();
+    let penalty =
+        counts["critical"] * 40 + counts["high"] * 20 + counts["medium"] * 10 + counts["low"] * 5;
+    (100.0 - penalty as f64).max(0.0)
+}
+
+/// Score clones: 100 if no clones, -5 per clone group
+fn score_clones(clone_groups: usize) -> f64 {
+    (100.0 - (clone_groups * 5) as f64).max(0.0)
+}
+
+/// Calculate weighted average grade from scores
+fn calculate_grade(scores: &[(f64, f64)]) -> (&'static str, f64) {
+    let total_weight: f64 = scores.iter().map(|(_, w)| w).sum();
+    if total_weight == 0.0 {
+        return ("N/A", 0.0);
+    }
+    let weighted_sum: f64 = scores.iter().map(|(s, w)| s * w).sum();
+    let percentage = weighted_sum / total_weight;
+
+    let grade = match percentage as u32 {
+        90..=100 => "A",
+        80..=89 => "B",
+        70..=79 => "C",
+        60..=69 => "D",
+        _ => "F",
+    };
+    (grade, percentage)
 }
 
 /// Run linter analysis on the codebase
@@ -1594,15 +1702,15 @@ fn load_clone_allowlist(root: &Path) -> std::collections::HashSet<String> {
     allowed
 }
 
-/// Detect code clones across the codebase
-fn cmd_clones(
+/// Detect code clones - returns (exit_code, clone_group_count)
+fn cmd_clones_with_count(
     root: &Path,
     elide_identifiers: bool,
     elide_literals: bool,
     show_source: bool,
     min_lines: usize,
     json: bool,
-) -> i32 {
+) -> (i32, usize) {
     let extractor = Extractor::new();
     let parsers = Parsers::new();
     let allowlist = load_clone_allowlist(root);
@@ -1800,11 +1908,9 @@ fn cmd_clones(
         }
     }
 
-    if clone_groups.is_empty() {
-        0
-    } else {
-        1
-    }
+    let count = clone_groups.len();
+    let exit_code = if count == 0 { 0 } else { 1 };
+    (exit_code, count)
 }
 
 /// Flatten nested symbols into a flat list
