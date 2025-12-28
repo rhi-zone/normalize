@@ -58,6 +58,7 @@ Do not:
 - **Return tuples from functions** - use structs with named fields. Tuples obscure meaning and cause ordering bugs. Only use tuples when names would be pure ceremony (e.g., `(x, y)` coordinates).
 - **Use trait default implementations** - defaults let you "implement" a trait without implementing it. That's a silent bug. Every method should be explicitly implemented; compiler enforces completeness, not convention.
 - **String-match on source content for AST properties** - use tree-sitter node structure, not `text.contains("async")` or `text.starts_with("enum")`. Check node kinds, child nodes, field names. String matching is fragile and misses the point of having a parsed AST.
+- **Replace content when editing lists** - when adding to TODO.md or similar, extend existing content, don't replace sections. Read carefully, add items, preserve what's there.
 
 ## Design Principles
 
