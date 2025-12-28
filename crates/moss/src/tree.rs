@@ -104,6 +104,8 @@ pub struct FormatOptions {
     pub skip_root: bool,
     /// Minimal mode: plain indentation, elide keywords (LLM-optimized).
     pub minimal: bool,
+    /// Use ANSI colors in output (respects NO_COLOR and config).
+    pub use_colors: bool,
 }
 
 /// Extract docstring summary (everything up to double blank line).
@@ -203,7 +205,7 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
                 let sig_display = if options.minimal {
                     elide_keywords(sig)
                 } else if let Some(grammar) = &node.grammar {
-                    highlight_signature_ast(sig, grammar)
+                    highlight_signature_ast(sig, grammar, options.use_colors)
                 } else {
                     sig.clone()
                 };
@@ -276,7 +278,12 @@ enum HighlightKind {
 }
 
 /// Highlight a signature using AST-based parsing.
-fn highlight_signature_ast(sig: &str, grammar: &str) -> String {
+fn highlight_signature_ast(sig: &str, grammar: &str, use_colors: bool) -> String {
+    // If colors disabled, just return the signature as-is
+    if !use_colors {
+        return sig.to_string();
+    }
+
     let parsers = Parsers::new();
     let tree = match parsers.parse_with_grammar(grammar, sig) {
         Some(t) => t,

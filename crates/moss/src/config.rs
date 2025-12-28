@@ -35,6 +35,11 @@
 //! [grep]
 //! limit = 50                  # default max results
 //! ignore_case = true          # case-insensitive by default
+//!
+//! [pretty]
+//! enabled = true              # auto-enable when TTY (default: auto)
+//! colors = "auto"             # "auto", "always", or "never"
+//! highlight = true            # syntax highlighting on signatures
 //! ```
 
 use crate::commands::analyze::AnalyzeConfig;
@@ -44,6 +49,7 @@ use crate::commands::view::ViewConfig;
 use crate::daemon::DaemonConfig;
 use crate::filter::FilterConfig;
 use crate::merge::Merge;
+use crate::output::PrettyConfig;
 use serde::Deserialize;
 use std::path::Path;
 
@@ -72,6 +78,7 @@ pub struct MossConfig {
     pub view: ViewConfig,
     pub analyze: AnalyzeConfig,
     pub grep: GrepConfig,
+    pub pretty: PrettyConfig,
 }
 
 impl MossConfig {
@@ -266,5 +273,33 @@ show_all = true
         assert!(!merged.daemon.enabled());
         // auto_start should be true (from project)
         assert!(merged.daemon.auto_start());
+    }
+
+    #[test]
+    fn test_pretty_config() {
+        use crate::output::ColorMode;
+
+        let dir = TempDir::new().unwrap();
+        let moss_dir = dir.path().join(".moss");
+        std::fs::create_dir_all(&moss_dir).unwrap();
+
+        let config_path = moss_dir.join("config.toml");
+        let mut file = std::fs::File::create(&config_path).unwrap();
+        writeln!(
+            file,
+            r#"
+[pretty]
+enabled = true
+colors = "always"
+highlight = false
+"#
+        )
+        .unwrap();
+
+        let config = MossConfig::load(dir.path());
+        assert_eq!(config.pretty.enabled, Some(true));
+        assert_eq!(config.pretty.colors, Some(ColorMode::Always));
+        assert_eq!(config.pretty.highlight, Some(false));
+        assert!(!config.pretty.highlight());
     }
 }

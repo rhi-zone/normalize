@@ -112,6 +112,11 @@ pub fn run(args: ViewArgs, json: bool, pretty: bool) -> i32 {
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
 
+    // --pretty flag forces pretty mode, otherwise use config (auto TTY detection)
+    let use_pretty = pretty || config.pretty.enabled();
+    // Colors only when pretty mode is enabled and config allows
+    let use_colors = use_pretty && config.pretty.use_colors();
+
     cmd_view(
         args.target.as_deref(),
         args.root.as_deref(),
@@ -128,7 +133,8 @@ pub fn run(args: ViewArgs, json: bool, pretty: bool) -> i32 {
         args.docs || config.view.show_docs(),
         args.context,
         json,
-        pretty,
+        use_pretty,
+        use_colors,
         &args.exclude,
         &args.only,
     )
@@ -271,6 +277,7 @@ fn cmd_view_symbol_direct(
     show_docs: bool,
     json: bool,
     pretty: bool,
+    use_colors: bool,
 ) -> i32 {
     cmd_view_symbol(
         file_path,
@@ -281,6 +288,7 @@ fn cmd_view_symbol_direct(
         show_docs,
         json,
         pretty,
+        use_colors,
     )
 }
 
@@ -302,6 +310,7 @@ pub fn cmd_view(
     context: bool,
     json: bool,
     pretty: bool,
+    use_colors: bool,
     exclude: &[String],
     only: &[String],
 ) -> i32 {
@@ -351,7 +360,16 @@ pub fn cmd_view(
 
     // Handle "." as current directory
     if target == "." {
-        return cmd_view_directory(&root, &root, depth, raw, json, pretty, filter.as_ref());
+        return cmd_view_directory(
+            &root,
+            &root,
+            depth,
+            raw,
+            json,
+            pretty,
+            use_colors,
+            filter.as_ref(),
+        );
     }
 
     // Use unified path resolution - get ALL matches
@@ -370,7 +388,7 @@ pub fn cmd_view(
             // Single symbol match - construct path to it
             let sym = &symbol_matches[0];
             return cmd_view_symbol_direct(
-                &sym.file, &sym.name, &root, depth, full, show_docs, json, pretty,
+                &sym.file, &sym.name, &root, depth, full, show_docs, json, pretty, use_colors,
             );
         }
         _ => {
@@ -434,6 +452,7 @@ pub fn cmd_view(
             raw,
             json,
             pretty,
+            use_colors,
             filter.as_ref(),
         )
     } else if unified.symbol_path.is_empty() {
@@ -453,6 +472,7 @@ pub fn cmd_view(
             context,
             json,
             pretty,
+            use_colors,
         )
     } else {
         // View symbol within file
@@ -465,6 +485,7 @@ pub fn cmd_view(
             show_docs,
             json,
             pretty,
+            use_colors,
         )
     }
 }
@@ -586,6 +607,7 @@ fn cmd_view_directory(
     raw: bool,
     json: bool,
     pretty: bool,
+    use_colors: bool,
     filter: Option<&Filter>,
 ) -> i32 {
     let effective_depth = if depth < 0 {
@@ -642,6 +664,7 @@ fn cmd_view_directory(
         // Format as text tree (minimal by default unless --pretty)
         let format_options = FormatOptions {
             minimal: !pretty,
+            use_colors,
             ..Default::default()
         };
         let lines = tree::format_view_node(&view_node, &format_options);
@@ -719,6 +742,7 @@ fn cmd_view_file(
     context: bool,
     json: bool,
     pretty: bool,
+    use_colors: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
@@ -842,6 +866,7 @@ fn cmd_view_file(
                 skip_root: true, // Skip file header, we already printed it
                 max_depth: None,
                 minimal: !pretty,
+                use_colors,
             };
             let lines = tree::format_view_node(&view_node, &format_options);
             if !lines.is_empty() {
@@ -898,6 +923,7 @@ fn cmd_view_file(
                             skip_root: true,
                             max_depth: None,
                             minimal: !pretty,
+                            use_colors,
                         };
                         let lines = tree::format_view_node(&view_node, &format_options);
                         if !lines.is_empty() {
@@ -934,6 +960,7 @@ fn cmd_view_file(
                                         skip_root: true,
                                         max_depth: None,
                                         minimal: !pretty,
+                                        use_colors,
                                     };
                                     let lines = tree::format_view_node(&view_node, &format_options);
                                     if !lines.is_empty() {
@@ -1039,6 +1066,7 @@ fn cmd_view_symbol(
     show_docs: bool,
     json: bool,
     pretty: bool,
+    use_colors: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
@@ -1133,6 +1161,7 @@ fn cmd_view_symbol(
                     skip_root: false,
                     max_depth: None,
                     minimal: !pretty,
+                    use_colors,
                 };
                 let lines = tree::format_view_node(&view_node, &format_options);
                 for line in lines {

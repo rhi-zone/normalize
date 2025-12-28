@@ -213,6 +213,9 @@ pub fn run(args: AnalyzeArgs, json: bool, pretty: bool) -> i32 {
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
 
+    // --pretty flag forces pretty mode, otherwise use config (auto TTY detection)
+    let use_pretty = pretty || config.pretty.enabled();
+
     // Handle --allow-group mode
     if let Some(ref location) = args.allow_group {
         return cmd_allow_clone_group(
@@ -281,7 +284,7 @@ pub fn run(args: AnalyzeArgs, json: bool, pretty: bool) -> i32 {
         args.min_lines,
         &weights,
         json,
-        pretty,
+        use_pretty,
         &args.exclude,
         &args.only,
     )
