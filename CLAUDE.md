@@ -36,7 +36,7 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 ```
 moss view [path[/symbol]] [--types-only]   # structure, skeleton, or symbol source
 moss analyze [--complexity] [path]          # find complex functions
-moss grep <pattern> [--only "*.rs"]         # search with context
+moss grep <pattern> [--only "*.rs"]         # search (real regex, not BRE: use | not \|)
 ```
 
 Fall back to Read only for exact line content needed by Edit. If moss isn't useful, add to TODO.md and fix it.
