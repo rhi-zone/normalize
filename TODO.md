@@ -83,12 +83,17 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Conversational loop pattern (vs hierarchical)
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
-- Claude Code over-reliance on Explore agents: spawns agents for direct tool tasks. Symptom of deeper issue?
-- Session analysis: detect correction patterns ("You're right", "Good point", "Fair point", "Should have", "Right -", "isn't working")
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
-- Analyze long chains of uninterrupted tool calls (friction indicator)
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
-- Rich links in LLM output: either LLM outputs structured links (file:line, TODO items, symbols) or cheap model postprocesses response to extract them. Would enable clickable references in terminal/IDE.
+- Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
+
+**Friction Signals:** (see `docs/research/agent-adaptation.md`)
+How do we know when tools aren't working? Implicit signals from agent behavior:
+- Correction patterns: "You're right", "Should have" after tool calls
+- Long tool chains: 5+ calls without acting
+- Tool avoidance: grep instead of moss, spawning Explore agents
+- Follow-up patterns: `--types-only` → immediately view symbol
+- Repeated queries: same file viewed multiple times
 
 **Distribution:**
 - Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.

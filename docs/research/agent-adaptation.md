@@ -100,7 +100,29 @@ This balances stability (don't break the base model) with responsiveness (tools 
 - "Generalization gaps" supports moss's approach of broad language support (98 languages)
 - Framework confirms moss's implicit strategy: invest in T1 (tool quality), outsource A1/A2 to model providers
 
-**Open questions:**
-- Should moss track tool usage patterns to identify misalignment?
-- Could moss provide feedback signals for A1 adaptation? (e.g., which tool calls succeeded/failed)
-- Is there value in T2-style adaptation where moss tools specialize to a specific agent's patterns?
+## Friction Signals (Usage Telemetry)
+
+The paper's "T2" (agent-supervised tool adaptation) maps to a practical question: how do we know when tools aren't working?
+
+**Implicit signals from agent behavior:**
+
+| Signal | What It Means | Example |
+|--------|---------------|---------|
+| Correction patterns | Agent struggled, user fixed | "You're right", "Should have", "Fair point" after tool call |
+| Long tool chains | Agent can't get what it needs | 5+ `moss view` calls without acting |
+| Tool avoidance | Agent works around the tool | Uses `grep` instead of `moss view`, spawns Explore agent |
+| Follow-up patterns | Output was incomplete | `view --types-only` → immediately `view <symbol>` |
+| Repeated queries | First result wasn't useful | Same file/symbol viewed multiple times |
+
+**What adaptation looks like (not LLM fine-tuning):**
+- Adjust defaults: if 80% of `--types-only` is followed by symbol lookup, include first lines
+- Change output format: if agents parse JSON more successfully, prefer structured output
+- Add context: if agents always need imports after viewing a function, include them
+
+**Data collection (not yet implemented):**
+- Log tool invocations with session ID
+- Capture next action (another tool call? user message? agent reasoning?)
+- Detect correction keywords in surrounding context
+- Track success/failure outcomes where measurable (edit applied? tests passed?)
+
+This is observational, not intrusive - agents don't change behavior, tools learn from patterns.
