@@ -144,17 +144,24 @@ fn has_language_support(path: &str) -> bool {
 
 /// Search for symbols in the index by name
 fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
-    // Try index first
-    if let Some(idx) = index::FileIndex::open_if_enabled(root) {
+    // Try index first - if enabled, use it (or build it if empty)
+    if let Some(mut idx) = index::FileIndex::open_if_enabled(root) {
         let stats = idx.call_graph_stats().unwrap_or_default();
-        if stats.symbols > 0 {
-            if let Ok(symbols) = idx.find_symbols(query, None, true, 10) {
-                return symbols;
+        if stats.symbols == 0 {
+            // Index exists but has no symbols - build call graph now
+            // This is a one-time cost that makes future lookups fast
+            eprintln!("Building symbol index...");
+            if let Err(e) = idx.refresh_call_graph() {
+                eprintln!("Warning: failed to build index: {}", e);
+                return search_symbols_unindexed(query, root);
             }
+        }
+        if let Ok(symbols) = idx.find_symbols(query, None, true, 10) {
+            return symbols;
         }
     }
 
-    // Fallback: walk filesystem and parse files
+    // Fallback: walk filesystem and parse files (only if index disabled)
     search_symbols_unindexed(query, root)
 }
 
@@ -370,8 +377,13 @@ pub fn cmd_view(
     // Use unified path resolution - get ALL matches
     let matches = path_resolve::resolve_unified_all(target, &root);
 
-    // Also search for symbols in the index
-    let symbol_matches = search_symbols(target, &root);
+    // Only search for symbols if no file/directory matches found
+    // This avoids expensive filesystem walks when we already have a match
+    let symbol_matches = if matches.is_empty() {
+        search_symbols(target, &root)
+    } else {
+        Vec::new()
+    };
 
     let unified = match (matches.len(), symbol_matches.len()) {
         (0, 0) => {
