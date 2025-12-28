@@ -292,7 +292,7 @@ mod tests {
         let count = store.forget("forget").unwrap();
         assert_eq!(count, 1);
 
-        let items = store.all(10).unwrap();
+        let items = store.recall("", 10).unwrap();
         assert_eq!(items.len(), 1);
         assert!(items[0].content.contains("remember"));
     }

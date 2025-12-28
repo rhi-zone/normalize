@@ -1,9 +1,8 @@
 //! Daemon management commands for moss CLI.
 
-use crate::daemon;
-use crate::paths::get_moss_dir;
+use crate::daemon::{self, global_socket_path, DaemonClient};
 use clap::Subcommand;
-use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Subcommand)]
 pub enum DaemonAction {
@@ -18,17 +17,29 @@ pub enum DaemonAction {
 
     /// Run the daemon in foreground (for debugging)
     Run,
+
+    /// Add a root to watch
+    Add {
+        /// Path to the project root
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+
+    /// Remove a root from watching
+    Remove {
+        /// Path to the project root
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+
+    /// List all watched roots
+    List,
 }
 
 /// Run a daemon management action
-pub fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+pub fn cmd_daemon(action: DaemonAction, json: bool) -> i32 {
+    let client = DaemonClient::new();
 
-    let client = daemon::DaemonClient::new(&root);
-
-    let moss_dir = get_moss_dir(&root);
     match action {
         DaemonAction::Status => {
             if !client.is_available() {
@@ -37,45 +48,41 @@ pub fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 
                         "{}",
                         serde_json::json!({
                             "running": false,
-                            "socket": moss_dir.join("daemon.sock").to_string_lossy()
+                            "socket": global_socket_path()
                         })
                     );
                 } else {
                     eprintln!("Daemon is not running");
-                    eprintln!("Socket: {}", moss_dir.join("daemon.sock").display());
+                    eprintln!("Socket: {}", global_socket_path().display());
                 }
                 return 1;
             }
 
             match client.status() {
-                Ok(status) => {
+                Ok(resp) if resp.ok => {
                     if json {
-                        println!(
-                            "{}",
-                            serde_json::json!({
-                                "running": true,
-                                "uptime_secs": status.uptime_secs,
-                                "files_indexed": status.files_indexed,
-                                "symbols_indexed": status.symbols_indexed,
-                                "queries_served": status.queries_served,
-                                "pid": status.pid
-                            })
-                        );
-                    } else {
+                        println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
+                    } else if let Some(data) = resp.data {
                         println!("Daemon Status");
                         println!("  Running: yes");
-                        if let Some(pid) = status.pid {
+                        if let Some(pid) = data.get("pid") {
                             println!("  PID: {}", pid);
                         }
-                        println!("  Uptime: {} seconds", status.uptime_secs);
-                        println!("  Files indexed: {}", status.files_indexed);
-                        println!("  Symbols indexed: {}", status.symbols_indexed);
-                        println!("  Queries served: {}", status.queries_served);
+                        if let Some(uptime) = data.get("uptime_secs") {
+                            println!("  Uptime: {} seconds", uptime);
+                        }
+                        if let Some(roots) = data.get("roots_watched") {
+                            println!("  Roots watched: {}", roots);
+                        }
                     }
                     0
                 }
+                Ok(resp) => {
+                    eprintln!("Error: {}", resp.error.unwrap_or_default());
+                    1
+                }
                 Err(e) => {
-                    eprintln!("Failed to get daemon status: {}", e);
+                    eprintln!("Failed to get status: {}", e);
                     1
                 }
             }
@@ -133,7 +140,6 @@ pub fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 
                 return 1;
             }
 
-            // Start the daemon process
             if client.ensure_running() {
                 if json {
                     println!("{}", serde_json::json!({"success": true}));
@@ -154,12 +160,117 @@ pub fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 
             }
         }
 
-        DaemonAction::Run => {
-            // Run daemon in foreground (blocking)
-            match daemon::run_daemon(&root) {
-                Ok(code) => code,
+        DaemonAction::Run => match daemon::run_daemon() {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("Daemon error: {}", e);
+                1
+            }
+        },
+
+        DaemonAction::Add { path } => {
+            let root = std::fs::canonicalize(&path).unwrap_or(path);
+
+            if !client.ensure_running() {
+                eprintln!("Failed to start daemon");
+                return 1;
+            }
+
+            match client.add_root(&root) {
+                Ok(resp) if resp.ok => {
+                    if json {
+                        println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
+                    } else if let Some(data) = &resp.data {
+                        if data.get("added") == Some(&serde_json::json!(true)) {
+                            println!("Added: {}", root.display());
+                        } else {
+                            println!(
+                                "Already watching: {}",
+                                data.get("reason").and_then(|r| r.as_str()).unwrap_or("")
+                            );
+                        }
+                    }
+                    0
+                }
+                Ok(resp) => {
+                    eprintln!("Error: {}", resp.error.unwrap_or_default());
+                    1
+                }
                 Err(e) => {
-                    eprintln!("Daemon error: {}", e);
+                    eprintln!("Failed: {}", e);
+                    1
+                }
+            }
+        }
+
+        DaemonAction::Remove { path } => {
+            let root = std::fs::canonicalize(&path).unwrap_or(path);
+
+            if !client.is_available() {
+                eprintln!("Daemon is not running");
+                return 1;
+            }
+
+            match client.remove_root(&root) {
+                Ok(resp) if resp.ok => {
+                    if json {
+                        println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
+                    } else if let Some(data) = &resp.data {
+                        if data.get("removed") == Some(&serde_json::json!(true)) {
+                            println!("Removed: {}", root.display());
+                        } else {
+                            println!("Was not watching: {}", root.display());
+                        }
+                    }
+                    0
+                }
+                Ok(resp) => {
+                    eprintln!("Error: {}", resp.error.unwrap_or_default());
+                    1
+                }
+                Err(e) => {
+                    eprintln!("Failed: {}", e);
+                    1
+                }
+            }
+        }
+
+        DaemonAction::List => {
+            if !client.is_available() {
+                if json {
+                    println!("{}", serde_json::json!([]));
+                } else {
+                    eprintln!("Daemon is not running");
+                }
+                return 1;
+            }
+
+            match client.list_roots() {
+                Ok(resp) if resp.ok => {
+                    if json {
+                        println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
+                    } else if let Some(data) = resp.data {
+                        if let Some(roots) = data.as_array() {
+                            if roots.is_empty() {
+                                println!("No roots being watched");
+                            } else {
+                                println!("Watched roots:");
+                                for root in roots {
+                                    if let Some(path) = root.as_str() {
+                                        println!("  {}", path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    0
+                }
+                Ok(resp) => {
+                    eprintln!("Error: {}", resp.error.unwrap_or_default());
+                    1
+                }
+                Err(e) => {
+                    eprintln!("Failed: {}", e);
                     1
                 }
             }
