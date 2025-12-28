@@ -7,6 +7,7 @@ use grep_regex::RegexMatcher;
 use grep_searcher::sinks::UTF8;
 use grep_searcher::Searcher;
 use ignore::WalkBuilder;
+use nu_ansi_term::Color::{Cyan, Red, Yellow};
 use std::fmt::Write;
 use std::io;
 use std::path::Path;
@@ -155,6 +156,38 @@ impl OutputFormatter for GrepResult {
         let mut out = String::new();
         for m in &self.matches {
             writeln!(out, "{}:{}:{}", m.file, m.line, m.content).unwrap();
+        }
+        write!(
+            out,
+            "\n{} matches in {} files",
+            self.total_matches, self.files_searched
+        )
+        .unwrap();
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        let mut out = String::new();
+        for m in &self.matches {
+            // Highlight the match within the content
+            let content = if m.start < m.end && m.end <= m.content.len() {
+                format!(
+                    "{}{}{}",
+                    &m.content[..m.start],
+                    Red.bold().paint(&m.content[m.start..m.end]),
+                    &m.content[m.end..]
+                )
+            } else {
+                m.content.clone()
+            };
+            writeln!(
+                out,
+                "{}:{}:{}",
+                Cyan.paint(&m.file),
+                Yellow.paint(m.line.to_string()),
+                content
+            )
+            .unwrap();
         }
         write!(
             out,

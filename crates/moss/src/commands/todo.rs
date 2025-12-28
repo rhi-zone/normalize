@@ -9,6 +9,8 @@ use std::fs;
 use std::path::Path;
 
 use clap::{Args, Subcommand};
+use nu_ansi_term::Color::{Green, Yellow};
+use nu_ansi_term::Style;
 use serde::Deserialize;
 
 use crate::config::MossConfig;
@@ -642,7 +644,13 @@ fn find_section_by_name<'a>(sections: &'a [Section], query: &str) -> Result<&'a 
 }
 
 /// Display sections with proper headers and filtering
-fn display_sections(sections: &[Section], filter: &ListFilter, config: &TodoConfig, json: bool) {
+fn display_sections(
+    sections: &[Section],
+    filter: &ListFilter,
+    config: &TodoConfig,
+    json: bool,
+    use_colors: bool,
+) {
     // Check if we should show all sections (from config or filter)
     let show_all = filter.all || config.show_all();
 
@@ -733,39 +741,55 @@ fn display_sections(sections: &[Section], filter: &ListFilter, config: &TodoConf
 
             for item in &filtered_items {
                 let marker = if item.done { "[x]" } else { "[ ]" };
+                // Color the marker if colors enabled
+                let marker_display = if use_colors {
+                    if item.done {
+                        Green.paint(marker).to_string()
+                    } else {
+                        Yellow.paint(marker).to_string()
+                    }
+                } else {
+                    marker.to_string()
+                };
+                // Dim done items if colors enabled
+                let text_display = if use_colors && item.done {
+                    Style::new().dimmed().paint(&item.text).to_string()
+                } else {
+                    item.text.clone()
+                };
                 // Use the original format for display
                 let prefix = match section.format {
-                    ItemFormat::Checkbox => format!("- {} ", marker),
+                    ItemFormat::Checkbox => format!("- {} ", marker_display),
                     ItemFormat::Numbered => {
                         if item.done {
-                            format!("- {} ", marker)
+                            format!("- {} ", marker_display)
                         } else {
                             "- ".to_string()
                         }
                     }
                     ItemFormat::Bullet => {
                         if item.done {
-                            format!("- {} ", marker)
+                            format!("- {} ", marker_display)
                         } else {
                             "- ".to_string()
                         }
                     }
                     ItemFormat::Asterisk => {
                         if item.done {
-                            format!("* {} ", marker)
+                            format!("* {} ", marker_display)
                         } else {
                             "* ".to_string()
                         }
                     }
                     ItemFormat::Plain => {
                         if item.done {
-                            format!("{} ", marker)
+                            format!("{} ", marker_display)
                         } else {
                             "".to_string()
                         }
                     }
                 };
-                println!("{}{}", prefix, item.text);
+                println!("{}{}", prefix, text_display);
             }
 
             any_output = true;
@@ -833,9 +857,19 @@ fn find_todo_file(root: &Path) -> Option<std::path::PathBuf> {
 }
 
 /// Main command handler
-pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, root: &Path) -> i32 {
+pub fn cmd_todo(
+    action: Option<TodoAction>,
+    file: Option<&Path>,
+    json: bool,
+    pretty: bool,
+    root: &Path,
+) -> i32 {
     // Load config
     let config = MossConfig::load(root);
+
+    // --pretty flag forces pretty mode, otherwise use config (auto TTY detection)
+    let use_pretty = pretty || config.pretty.enabled();
+    let use_colors = use_pretty && config.pretty.use_colors();
     let todo_config = &config.todo;
 
     // Determine the todo file path
@@ -992,7 +1026,13 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
 
         None => {
             let sections = parse_todo(&content);
-            display_sections(&sections, &ListFilter::default(), todo_config, json);
+            display_sections(
+                &sections,
+                &ListFilter::default(),
+                todo_config,
+                json,
+                use_colors,
+            );
             0
         }
 
@@ -1007,7 +1047,7 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
             }
 
             let sections = parse_todo(&content);
-            display_sections(&sections, &filter, todo_config, json);
+            display_sections(&sections, &filter, todo_config, json, use_colors);
             0
         }
     }

@@ -1,8 +1,11 @@
 //! Lint command - run linters, formatters, and type checkers.
 
+use crate::config::MossConfig;
 use crate::output::{OutputFormat, OutputFormatter};
 use moss_tools::{registry_with_custom, SarifReport, ToolCategory, ToolRegistry};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use nu_ansi_term::Color::{Blue, Red, Yellow};
+use nu_ansi_term::Style;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::fmt::Write;
@@ -56,8 +59,14 @@ pub fn cmd_lint_run(
     category: Option<&str>,
     sarif: bool,
     json: bool,
+    pretty: bool,
 ) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
+
+    // Load config for pretty mode
+    let config = MossConfig::load(root);
+    let use_pretty = pretty || config.pretty.enabled();
+    let use_colors = use_pretty && config.pretty.use_colors();
     // Load built-in tools + custom tools from .moss/tools.toml
     let registry = registry_with_custom(root);
 
@@ -193,11 +202,30 @@ pub fn cmd_lint_run(
         // Print diagnostics
         for result in &all_results {
             for diag in &result.diagnostics {
-                let severity = match diag.severity {
+                let severity_str = match diag.severity {
                     moss_tools::DiagnosticSeverity::Error => "error",
                     moss_tools::DiagnosticSeverity::Warning => "warning",
                     moss_tools::DiagnosticSeverity::Info => "info",
                     moss_tools::DiagnosticSeverity::Hint => "hint",
+                };
+
+                let severity_display = if use_colors {
+                    match diag.severity {
+                        moss_tools::DiagnosticSeverity::Error => {
+                            Red.bold().paint(severity_str).to_string()
+                        }
+                        moss_tools::DiagnosticSeverity::Warning => {
+                            Yellow.paint(severity_str).to_string()
+                        }
+                        moss_tools::DiagnosticSeverity::Info => {
+                            Blue.paint(severity_str).to_string()
+                        }
+                        moss_tools::DiagnosticSeverity::Hint => {
+                            Style::new().dimmed().paint(severity_str).to_string()
+                        }
+                    }
+                } else {
+                    severity_str.to_string()
                 };
 
                 println!(
@@ -205,7 +233,7 @@ pub fn cmd_lint_run(
                     diag.location.file.display(),
                     diag.location.line,
                     diag.location.column,
-                    severity,
+                    severity_display,
                     diag.rule_id,
                     diag.message
                 );

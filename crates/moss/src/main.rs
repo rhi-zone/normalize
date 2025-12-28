@@ -427,7 +427,7 @@ fn main() {
         Commands::Filter { action, root } => {
             commands::filter::cmd_filter(action, root.as_deref(), cli.json)
         }
-        Commands::Grep(args) => commands::grep::run(args, cli.json, cli.jq.as_deref()),
+        Commands::Grep(args) => commands::grep::run(args, cli.json, cli.jq.as_deref(), cli.pretty),
         Commands::Sessions {
             session,
             project,
@@ -454,7 +454,7 @@ fn main() {
         }
         Commands::Todo { action, file, root } => {
             let root = root.as_deref().unwrap_or(Path::new("."));
-            commands::todo::cmd_todo(action, file.as_deref(), cli.json, root)
+            commands::todo::cmd_todo(action, file.as_deref(), cli.json, cli.pretty, root)
         }
         Commands::Package {
             action,
@@ -462,7 +462,13 @@ fn main() {
             root,
         } => {
             let format = moss::output::OutputFormat::from_flags(cli.json, cli.jq.as_deref());
-            commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), &format)
+            commands::package::cmd_package(
+                action,
+                ecosystem.as_deref(),
+                root.as_deref(),
+                &format,
+                cli.pretty,
+            )
         }
         Commands::Workflow { action, root } => {
             commands::workflow::cmd_workflow(action, root.as_deref(), cli.json)
@@ -503,6 +509,7 @@ fn main() {
                             category.as_deref(),
                             sarif,
                             cli.json,
+                            cli.pretty,
                         )
                     }
                 }

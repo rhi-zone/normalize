@@ -1,11 +1,13 @@
 //! Package registry queries.
 
+use crate::config::MossConfig;
 use crate::output::OutputFormat;
 use clap::Subcommand;
 use moss_packages::{
     all_ecosystems, detect_all_ecosystems, AuditResult, PackageError, PackageInfo,
     VulnerabilitySeverity,
 };
+use nu_ansi_term::Color::Yellow;
 use std::path::Path;
 
 #[derive(Subcommand)]
@@ -35,14 +37,20 @@ pub fn cmd_package(
     ecosystem: Option<&str>,
     root: Option<&Path>,
     format: &OutputFormat,
+    pretty: bool,
 ) -> i32 {
     let project_root = root.unwrap_or(Path::new("."));
+
+    // Load config for pretty mode
+    let config = MossConfig::load(project_root);
+    let use_pretty = pretty || config.pretty.enabled();
+    let use_colors = use_pretty && config.pretty.use_colors();
 
     // Get ecosystem either by name or by detection
     if let Some(name) = ecosystem {
         // Explicit ecosystem specified
         match find_ecosystem_by_name(name) {
-            Some(eco) => run_for_ecosystem(eco, &action, project_root, format),
+            Some(eco) => run_for_ecosystem(eco, &action, project_root, format, use_colors),
             None => {
                 eprintln!("error: unknown ecosystem '{}'", name);
                 eprintln!("available: {}", available_ecosystems().join(", "));
@@ -72,7 +80,8 @@ pub fn cmd_package(
                         if i > 0 {
                             println!(); // Separator between ecosystems
                         }
-                        let result = run_for_ecosystem(*eco, &action, project_root, format);
+                        let result =
+                            run_for_ecosystem(*eco, &action, project_root, format, use_colors);
                         if result != 0 {
                             exit_code = result;
                         }
@@ -86,7 +95,7 @@ pub fn cmd_package(
                     eprintln!("note: multiple ecosystems detected: {}", names.join(", "));
                     eprintln!("hint: use --ecosystem to specify which one");
                 }
-                run_for_ecosystem(ecosystems[0], &action, project_root, format)
+                run_for_ecosystem(ecosystems[0], &action, project_root, format, use_colors)
             }
         }
     }
@@ -156,13 +165,14 @@ fn run_for_ecosystem(
     action: &PackageAction,
     project_root: &Path,
     format: &OutputFormat,
+    use_colors: bool,
 ) -> i32 {
     match action {
         PackageAction::Info { package } => cmd_info(eco, package, project_root, format),
-        PackageAction::List => cmd_list(eco, project_root, format),
-        PackageAction::Tree => cmd_tree(eco, project_root, format),
-        PackageAction::Why { package } => cmd_why(eco, package, project_root, format),
-        PackageAction::Outdated => cmd_outdated(eco, project_root, format),
+        PackageAction::List => cmd_list(eco, project_root, format, use_colors),
+        PackageAction::Tree => cmd_tree(eco, project_root, format, use_colors),
+        PackageAction::Why { package } => cmd_why(eco, package, project_root, format, use_colors),
+        PackageAction::Outdated => cmd_outdated(eco, project_root, format, use_colors),
         PackageAction::Audit => cmd_audit(eco, project_root, format),
     }
 }
@@ -200,7 +210,12 @@ fn cmd_info(
     }
 }
 
-fn cmd_list(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &OutputFormat) -> i32 {
+fn cmd_list(
+    eco: &dyn moss_packages::Ecosystem,
+    project_root: &Path,
+    format: &OutputFormat,
+    use_colors: bool,
+) -> i32 {
     match eco.list_dependencies(project_root) {
         Ok(deps) => {
             if format.is_json() {
@@ -218,8 +233,13 @@ fn cmd_list(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &Ou
                 println!();
                 for dep in &deps {
                     let version = dep.version_req.as_deref().unwrap_or("*");
+                    let version_display = if use_colors {
+                        Yellow.paint(version).to_string()
+                    } else {
+                        version.to_string()
+                    };
                     let optional = if dep.optional { " (optional)" } else { "" };
-                    println!("  {} {}{}", dep.name, version, optional);
+                    println!("  {} {}{}", dep.name, version_display, optional);
                 }
             }
             0
@@ -231,7 +251,12 @@ fn cmd_list(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &Ou
     }
 }
 
-fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &OutputFormat) -> i32 {
+fn cmd_tree(
+    eco: &dyn moss_packages::Ecosystem,
+    project_root: &Path,
+    format: &OutputFormat,
+    use_colors: bool,
+) -> i32 {
     match eco.dependency_tree(project_root) {
         Ok(tree) => {
             if format.is_json() {
@@ -241,7 +266,7 @@ fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &Ou
                 });
                 print_json_value(&value, format);
             } else {
-                print_tree(&tree);
+                print_tree(&tree, use_colors);
             }
             0
         }
@@ -252,21 +277,26 @@ fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &Ou
     }
 }
 
-fn print_tree(tree: &moss_packages::DependencyTree) {
+fn print_tree(tree: &moss_packages::DependencyTree, use_colors: bool) {
     for root in &tree.roots {
-        print_node(root, 0);
+        print_node(root, 0, use_colors);
     }
 }
 
-fn print_node(node: &moss_packages::TreeNode, depth: usize) {
+fn print_node(node: &moss_packages::TreeNode, depth: usize, use_colors: bool) {
     let indent = "  ".repeat(depth);
     if node.version.is_empty() {
         println!("{}{}", indent, node.name);
     } else {
-        println!("{}{} v{}", indent, node.name, node.version);
+        let version_display = if use_colors {
+            Yellow.paint(format!("v{}", node.version)).to_string()
+        } else {
+            format!("v{}", node.version)
+        };
+        println!("{}{} {}", indent, node.name, version_display);
     }
     for child in &node.dependencies {
-        print_node(child, depth + 1);
+        print_node(child, depth + 1, use_colors);
     }
 }
 
@@ -275,6 +305,7 @@ fn cmd_why(
     package: &str,
     project_root: &Path,
     format: &OutputFormat,
+    use_colors: bool,
 ) -> i32 {
     match eco.dependency_tree(project_root) {
         Ok(tree) => {
@@ -320,7 +351,12 @@ fn cmd_why(
                         if version.is_empty() {
                             println!("{}{}", indent, name);
                         } else {
-                            println!("{}{} v{}", indent, name, version);
+                            let version_display = if use_colors {
+                                Yellow.paint(format!("v{}", version)).to_string()
+                            } else {
+                                format!("v{}", version)
+                            };
+                            println!("{}{} {}", indent, name, version_display);
                         }
                     }
                 }
@@ -373,6 +409,7 @@ fn cmd_outdated(
     eco: &dyn moss_packages::Ecosystem,
     project_root: &Path,
     format: &OutputFormat,
+    use_colors: bool,
 ) -> i32 {
     // Get declared dependencies
     let deps = match eco.list_dependencies(project_root) {
@@ -437,7 +474,15 @@ fn cmd_outdated(
                 println!();
                 for pkg in &outdated {
                     let installed = pkg.installed.as_deref().unwrap_or("(not installed)");
-                    println!("  {} {} → {}", pkg.name, installed, pkg.latest);
+                    let (installed_display, latest_display) = if use_colors {
+                        (
+                            Yellow.paint(installed).to_string(),
+                            Yellow.paint(&pkg.latest).to_string(),
+                        )
+                    } else {
+                        (installed.to_string(), pkg.latest.clone())
+                    };
+                    println!("  {} {} → {}", pkg.name, installed_display, latest_display);
                 }
             }
             if !errors.is_empty() {
