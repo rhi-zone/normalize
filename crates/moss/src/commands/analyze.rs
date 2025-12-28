@@ -22,6 +22,14 @@ pub struct AnalyzeConfig {
     pub threshold: Option<usize>,
     /// Use compact output by default (for --overview)
     pub compact: Option<bool>,
+    /// Run health analysis by default
+    pub health: Option<bool>,
+    /// Run complexity analysis by default
+    pub complexity: Option<bool>,
+    /// Run security analysis by default
+    pub security: Option<bool>,
+    /// Run clone detection by default
+    pub clones: Option<bool>,
 }
 
 impl AnalyzeConfig {
@@ -31,6 +39,22 @@ impl AnalyzeConfig {
 
     pub fn compact(&self) -> bool {
         self.compact.unwrap_or(false)
+    }
+
+    pub fn health(&self) -> bool {
+        self.health.unwrap_or(true)
+    }
+
+    pub fn complexity(&self) -> bool {
+        self.complexity.unwrap_or(true)
+    }
+
+    pub fn security(&self) -> bool {
+        self.security.unwrap_or(true)
+    }
+
+    pub fn clones(&self) -> bool {
+        self.clones.unwrap_or(false)
     }
 }
 
@@ -141,12 +165,26 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
 
+    // If user explicitly requested specific passes, run only those
+    // Otherwise use config defaults
+    let any_pass_flag = args.health || args.complexity || args.security || args.clones;
+    let (health, complexity, security, clones) = if any_pass_flag {
+        (args.health, args.complexity, args.security, args.clones)
+    } else {
+        (
+            config.analyze.health(),
+            config.analyze.complexity(),
+            config.analyze.security(),
+            config.analyze.clones(),
+        )
+    };
+
     cmd_analyze(
         args.target.as_deref(),
         args.root.as_deref(),
-        args.health,
-        args.complexity,
-        args.security,
+        health,
+        complexity,
+        security,
         args.overview,
         args.storage,
         args.compact || config.analyze.compact(),
@@ -159,7 +197,7 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         args.check_refs,
         args.stale_docs,
         args.check_examples,
-        args.clones,
+        clones,
         args.elide_identifiers,
         args.elide_literals,
         args.show_source,
@@ -275,9 +313,31 @@ pub fn cmd_analyze(
         return cmd_check_examples(&root, json);
     }
 
-    // --clones detects duplicate code
+    let mut exit_code = 0;
+
+    // Run main analysis if any of health/complexity/security enabled
+    if health || complexity || security {
+        let report = analyze::analyze(
+            target,
+            &root,
+            health,
+            complexity,
+            security,
+            threshold,
+            kind_filter,
+            filter.as_ref(),
+        );
+
+        if json {
+            println!("{}", report.to_json());
+        } else {
+            println!("{}", report.format());
+        }
+    }
+
+    // Run clone detection if enabled
     if clones {
-        return cmd_clones(
+        let clone_result = cmd_clones(
             &root,
             elide_identifiers,
             elide_literals,
@@ -285,34 +345,12 @@ pub fn cmd_analyze(
             min_lines,
             json,
         );
+        if clone_result != 0 {
+            exit_code = clone_result;
+        }
     }
 
-    // If no specific flags, run all analyses
-    let any_flag = health || complexity || security;
-    let (run_health, run_complexity, run_security) = if !any_flag {
-        (true, true, true)
-    } else {
-        (health, complexity, security)
-    };
-
-    let report = analyze::analyze(
-        target,
-        &root,
-        run_health,
-        run_complexity,
-        run_security,
-        threshold,
-        kind_filter,
-        filter.as_ref(),
-    );
-
-    if json {
-        println!("{}", report.to_json());
-    } else {
-        println!("{}", report.format());
-    }
-
-    0
+    exit_code
 }
 
 /// Run linter analysis on the codebase

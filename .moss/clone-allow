@@ -41,3 +41,9 @@ crates/moss/src/sessions/analysis.rs:total_errors
 # Count wrappers (delegate to count_by_severity)
 crates/moss-tools/src/tools.rs:error_count
 crates/moss-tools/src/tools.rs:warning_count
+
+# AnalyzeConfig pass flags (trivial boolean accessors)
+crates/moss/src/commands/analyze.rs:health
+crates/moss/src/commands/analyze.rs:complexity
+crates/moss/src/commands/analyze.rs:security
+crates/moss/src/commands/analyze.rs:clones
