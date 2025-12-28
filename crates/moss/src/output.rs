@@ -4,6 +4,32 @@
 
 use serde::Serialize;
 
+/// Output display mode (affects text formatting style).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OutputMode {
+    /// LLM-optimized: minimal decoration, dense but scannable.
+    #[default]
+    Minimal,
+    /// Human-friendly: colors, aligned columns, box-drawing.
+    Pretty,
+}
+
+impl OutputMode {
+    /// Create from CLI flag.
+    pub fn from_flag(pretty: bool) -> Self {
+        if pretty {
+            OutputMode::Pretty
+        } else {
+            OutputMode::Minimal
+        }
+    }
+
+    /// Is this pretty mode?
+    pub fn is_pretty(&self) -> bool {
+        matches!(self, OutputMode::Pretty)
+    }
+}
+
 /// Output format mode.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -37,8 +63,14 @@ impl OutputFormat {
 /// Types implementing this trait can be printed as either JSON or text.
 /// JSON serialization uses serde, while text formatting is custom.
 pub trait OutputFormatter: Serialize {
-    /// Format as human-readable text.
+    /// Format as minimal text (LLM-optimized, default).
     fn format_text(&self) -> String;
+
+    /// Format as pretty text (human-friendly with colors).
+    /// Default implementation falls back to format_text().
+    fn format_pretty(&self) -> String {
+        self.format_text()
+    }
 
     /// Print to stdout in the specified format.
     fn print(&self, format: &OutputFormat) {

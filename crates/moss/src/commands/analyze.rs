@@ -202,7 +202,7 @@ pub struct AnalyzeArgs {
 }
 
 /// Run analyze command with args.
-pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
+pub fn run(args: AnalyzeArgs, json: bool, pretty: bool) -> i32 {
     let effective_root = args
         .root
         .clone()
@@ -268,6 +268,7 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         args.min_lines,
         &weights,
         json,
+        pretty,
         &args.exclude,
         &args.only,
     )
@@ -300,6 +301,7 @@ pub fn cmd_analyze(
     min_lines: usize,
     weights: &AnalyzeWeights,
     json: bool,
+    pretty: bool,
     exclude: &[String],
     only: &[String],
 ) -> i32 {
@@ -407,6 +409,8 @@ pub fn cmd_analyze(
 
         if json {
             println!("{}", report.to_json());
+        } else if pretty {
+            println!("{}", report.format_pretty());
         } else {
             println!("{}", report.format());
         }

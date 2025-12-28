@@ -162,22 +162,25 @@ impl AnalyzeReport {
             if !complexity.functions.is_empty() {
                 sections.push(String::new());
                 sections.push("## Top Complex Functions".to_string());
+
+                // Group by risk level (minimal format)
                 let mut sorted: Vec<_> = complexity.functions.iter().collect();
                 sorted.sort_by(|a, b| b.complexity.cmp(&a.complexity));
-                for func in sorted.iter().take(10) {
-                    // Use short_name for cleaner display (no file path prefix)
+                let top_funcs: Vec<_> = sorted.iter().take(10).collect();
+
+                let mut current_risk: Option<&str> = None;
+                for func in top_funcs {
+                    let risk = func.risk_level();
+                    if Some(risk) != current_risk {
+                        sections.push(format!("### {}", risk.to_uppercase()));
+                        current_risk = Some(risk);
+                    }
                     let display_name = if func.file_path.is_some() {
-                        // For codebase-wide reports, show file:short_name
                         format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
                     } else {
                         func.short_name()
                     };
-                    sections.push(format!(
-                        "  {:3} {} ({})",
-                        func.complexity,
-                        display_name,
-                        func.risk_level()
-                    ));
+                    sections.push(format!("{} {}", func.complexity, display_name));
                 }
             }
             sections.push(String::new());
@@ -300,6 +303,72 @@ impl AnalyzeReport {
         }
 
         serde_json::Value::Object(obj)
+    }
+
+    /// Format as pretty text with colors (human-friendly).
+    pub fn format_pretty(&self) -> String {
+        use nu_ansi_term::Color::{Cyan, Red, Yellow};
+
+        let mut sections = Vec::new();
+
+        sections.push(format!("# Analysis: {}", self.target_path));
+        sections.push(String::new());
+
+        if let Some(ref health) = self.health {
+            sections.push(health.format());
+            sections.push(String::new());
+        }
+
+        if let Some(ref complexity) = self.complexity {
+            sections.push("# Complexity Analysis".to_string());
+            sections.push(String::new());
+            sections.push(format!("Functions: {}", complexity.functions.len()));
+            sections.push(format!("Average: {:.1}", complexity.avg_complexity()));
+            sections.push(format!("Maximum: {}", complexity.max_complexity()));
+            sections.push(format!("High risk (>10): {}", complexity.high_risk_count()));
+
+            if !complexity.functions.is_empty() {
+                sections.push(String::new());
+                sections.push("## Top Complex Functions".to_string());
+
+                let mut sorted: Vec<_> = complexity.functions.iter().collect();
+                sorted.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+
+                for func in sorted.iter().take(10) {
+                    let display_name = if func.file_path.is_some() {
+                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+
+                    let risk = func.risk_level();
+                    let risk_colored = match risk {
+                        "high" => Red.bold().paint("HIGH").to_string(),
+                        "moderate" => Yellow.paint("MOD ").to_string(),
+                        _ => Cyan.paint("    ").to_string(),
+                    };
+                    sections.push(format!(
+                        "{}  {:3}  {}",
+                        risk_colored, func.complexity, display_name
+                    ));
+                }
+            }
+            sections.push(String::new());
+        }
+
+        if let Some(ref security) = self.security {
+            sections.push(security.format());
+        }
+
+        if !self.skipped.is_empty() {
+            sections.push(String::new());
+            sections.push("## Skipped".to_string());
+            for s in &self.skipped {
+                sections.push(format!("- {}", s));
+            }
+        }
+
+        sections.join("\n")
     }
 }
 

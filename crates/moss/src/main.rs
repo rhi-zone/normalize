@@ -21,6 +21,10 @@ struct Cli {
     /// Filter JSON output with jq expression (implies --json)
     #[arg(long, global = true, value_name = "EXPR")]
     jq: Option<String>,
+
+    /// Human-friendly output with colors and formatting
+    #[arg(long, global = true)]
+    pretty: bool,
 }
 
 #[derive(Subcommand)]
@@ -419,7 +423,7 @@ fn main() {
         }
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
-        Commands::Analyze(args) => commands::analyze::run(args, cli.json),
+        Commands::Analyze(args) => commands::analyze::run(args, cli.json, cli.pretty),
         Commands::Filter { action, root } => {
             commands::filter::cmd_filter(action, root.as_deref(), cli.json)
         }
