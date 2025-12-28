@@ -12,7 +12,7 @@ use std::sync::Mutex;
 
 use rayon::prelude::*;
 
-use crate::complexity::ComplexityAnalyzer;
+use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::deps::DepsExtractor;
 use crate::path_resolve;
 use crate::skeleton::SkeletonExtractor;

@@ -8,6 +8,39 @@ use moss_languages::{support_for_path, Language};
 use std::path::Path;
 use tree_sitter;
 
+/// Risk classification based on McCabe cyclomatic complexity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RiskLevel {
+    /// 1-5: Simple, easy to test
+    Low,
+    /// 6-10: Manageable, may need review
+    Moderate,
+    /// 11-20: Complex, harder to test and maintain
+    High,
+    /// 21+: Should be refactored, often untestable
+    Critical,
+}
+
+impl RiskLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RiskLevel::Low => "low",
+            RiskLevel::Moderate => "moderate",
+            RiskLevel::High => "high",
+            RiskLevel::Critical => "critical",
+        }
+    }
+
+    pub fn as_title(&self) -> &'static str {
+        match self {
+            RiskLevel::Low => "Low",
+            RiskLevel::Moderate => "Moderate",
+            RiskLevel::High => "High",
+            RiskLevel::Critical => "Critical",
+        }
+    }
+}
+
 /// Complexity data for a function
 #[derive(Debug, Clone)]
 pub struct FunctionComplexity {
@@ -42,6 +75,11 @@ impl FunctionComplexity {
         }
     }
 
+    /// Line count of the function
+    pub fn line_count(&self) -> usize {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+
     /// Risk classification based on McCabe cyclomatic complexity thresholds.
     ///
     /// Industry-standard ranges (similar to SonarQube, Code Climate):
@@ -51,12 +89,12 @@ impl FunctionComplexity {
     /// - 21+: Very high risk - should be refactored, often untestable
     ///
     /// McCabe's original paper (1976) suggested 10 as the upper limit.
-    pub fn risk_level(&self) -> &'static str {
+    pub fn risk_level(&self) -> RiskLevel {
         match self.complexity {
-            1..=5 => "low",
-            6..=10 => "moderate",
-            11..=20 => "high",
-            _ => "very-high",
+            1..=5 => RiskLevel::Low,
+            6..=10 => RiskLevel::Moderate,
+            11..=20 => RiskLevel::High,
+            _ => RiskLevel::Critical,
         }
     }
 }
@@ -86,8 +124,20 @@ impl ComplexityReport {
             .unwrap_or(0)
     }
 
+    /// Count of high risk functions (complexity 11-20)
     pub fn high_risk_count(&self) -> usize {
-        self.functions.iter().filter(|f| f.complexity > 10).count()
+        self.functions
+            .iter()
+            .filter(|f| f.risk_level() == RiskLevel::High)
+            .count()
+    }
+
+    /// Count of critical risk functions (complexity 21+)
+    pub fn critical_risk_count(&self) -> usize {
+        self.functions
+            .iter()
+            .filter(|f| f.risk_level() == RiskLevel::Critical)
+            .count()
     }
 }
 

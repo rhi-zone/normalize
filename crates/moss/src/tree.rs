@@ -90,6 +90,8 @@ pub struct FormatOptions {
     pub line_numbers: bool,
     /// Skip the root node and only show children (useful for file views).
     pub skip_root: bool,
+    /// Minimal mode: plain indentation, elide keywords (LLM-optimized).
+    pub minimal: bool,
 }
 
 /// Extract docstring summary (everything up to double blank line).
@@ -185,7 +187,13 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
     let base = match &node.kind {
         ViewNodeKind::Symbol(_) => {
             if let Some(sig) = &node.signature {
-                format!("{}:", sig)
+                // Minimal: elide keywords; Pretty: keep them (highlighting TODO: use AST)
+                let sig_display = if options.minimal {
+                    elide_keywords(sig)
+                } else {
+                    sig.clone()
+                };
+                format!("{}:", sig_display)
             } else {
                 format!("{}:", node.name)
             }
@@ -196,12 +204,47 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
     // Add line info for symbols if requested
     if options.line_numbers {
         if let Some((start, end)) = node.line_range {
-            let size = end.saturating_sub(start) + 1;
-            return format!("{} L{}-{} ({} lines)", base, start, end, size);
+            return format!("{} L{}-{}", base, start, end);
         }
     }
 
     base
+}
+
+/// Elide visibility and declaration keywords for minimal output.
+fn elide_keywords(sig: &str) -> String {
+    let mut s = sig.to_string();
+    // Visibility
+    for kw in [
+        "pub ",
+        "pub(crate) ",
+        "pub(super) ",
+        "pub(self) ",
+        "private ",
+    ] {
+        s = s.replacen(kw, "", 1);
+    }
+    // Declaration keywords (keep the name/signature, remove the keyword)
+    for kw in [
+        "fn ",
+        "async fn ",
+        "const fn ",
+        "unsafe fn ",
+        "struct ",
+        "enum ",
+        "trait ",
+        "impl ",
+        "type ",
+        "const ",
+        "static ",
+        "mod ",
+        "class ",
+        "def ",
+        "async def ",
+    ] {
+        s = s.replacen(kw, "", 1);
+    }
+    s
 }
 
 /// Check if a docstring is useless (just repeats the name).
@@ -241,13 +284,14 @@ fn format_children(
 
     let count = children.len();
     for (i, child) in children.iter().enumerate() {
-        let is_last = i == count - 1;
-        let connector = if is_last { "└── " } else { "├── " };
-        let child_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
+        let _is_last = i == count - 1;
+
+        // Always use plain indentation (no box-drawing chars)
+        let child_prefix = format!("{}  ", prefix);
 
         // Format child line using shared formatter
         let child_line = format_node_line(child, options);
-        lines.push(format!("{}{}{}", prefix, connector, child_line));
+        lines.push(format!("{}{}", prefix, child_line));
 
         // Add docstring based on display mode
         if let Some(doc) = &child.docstring {

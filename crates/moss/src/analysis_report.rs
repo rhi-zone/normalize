@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
-use crate::complexity::{ComplexityAnalyzer, ComplexityReport};
+use crate::analyze::complexity::{ComplexityAnalyzer, ComplexityReport, RiskLevel};
+use crate::analyze::function_length::{LengthAnalyzer, LengthCategory, LengthReport};
 use crate::filter::Filter;
 use crate::health::{analyze_health, HealthReport};
 use crate::path_resolve;
@@ -134,6 +135,7 @@ impl SecurityReport {
 pub struct AnalyzeReport {
     pub health: Option<HealthReport>,
     pub complexity: Option<ComplexityReport>,
+    pub length: Option<LengthReport>,
     pub security: Option<SecurityReport>,
     pub target_path: String,
     pub skipped: Vec<String>,
@@ -157,7 +159,14 @@ impl AnalyzeReport {
             sections.push(format!("Functions: {}", complexity.functions.len()));
             sections.push(format!("Average: {:.1}", complexity.avg_complexity()));
             sections.push(format!("Maximum: {}", complexity.max_complexity()));
-            sections.push(format!("High risk (>10): {}", complexity.high_risk_count()));
+            let crit = complexity.critical_risk_count();
+            let high = complexity.high_risk_count();
+            if crit > 0 {
+                sections.push(format!("Critical (>20): {}", crit));
+            }
+            if high > 0 || crit == 0 {
+                sections.push(format!("High risk (11-20): {}", high));
+            }
 
             if !complexity.functions.is_empty() {
                 sections.push(String::new());
@@ -168,11 +177,11 @@ impl AnalyzeReport {
                 sorted.sort_by(|a, b| b.complexity.cmp(&a.complexity));
                 let top_funcs: Vec<_> = sorted.iter().take(10).collect();
 
-                let mut current_risk: Option<&str> = None;
+                let mut current_risk: Option<RiskLevel> = None;
                 for func in top_funcs {
                     let risk = func.risk_level();
                     if Some(risk) != current_risk {
-                        sections.push(format!("### {}", risk.to_uppercase()));
+                        sections.push(format!("### {}", risk.as_title()));
                         current_risk = Some(risk);
                     }
                     let display_name = if func.file_path.is_some() {
@@ -181,6 +190,47 @@ impl AnalyzeReport {
                         func.short_name()
                     };
                     sections.push(format!("{} {}", func.complexity, display_name));
+                }
+            }
+            sections.push(String::new());
+        }
+
+        if let Some(ref length) = self.length {
+            sections.push("# Function Length Analysis".to_string());
+            sections.push(String::new());
+            sections.push(format!("Functions: {}", length.functions.len()));
+            sections.push(format!("Average: {:.1} lines", length.avg_length()));
+            sections.push(format!("Maximum: {} lines", length.max_length()));
+            let too_long = length.too_long_count();
+            let long = length.long_count();
+            if too_long > 0 {
+                sections.push(format!("Too Long (>100): {}", too_long));
+            }
+            if long > 0 || too_long == 0 {
+                sections.push(format!("Long (51-100): {}", long));
+            }
+
+            if !length.functions.is_empty() {
+                sections.push(String::new());
+                sections.push("## Longest Functions".to_string());
+
+                let mut sorted: Vec<_> = length.functions.iter().collect();
+                sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
+                let top_funcs: Vec<_> = sorted.iter().take(10).collect();
+
+                let mut current_cat: Option<LengthCategory> = None;
+                for func in top_funcs {
+                    let cat = func.category();
+                    if Some(cat) != current_cat {
+                        sections.push(format!("### {}", cat.as_title()));
+                        current_cat = Some(cat);
+                    }
+                    let display_name = if func.file_path.is_some() {
+                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    sections.push(format!("{} {}", func.lines, display_name));
                 }
             }
             sections.push(String::new());
@@ -246,7 +296,7 @@ impl AnalyzeReport {
                         "qualified_name": f.qualified_name(),
                         "complexity": f.complexity,
                         "line": f.start_line,
-                        "risk_level": f.risk_level(),
+                        "risk_level": f.risk_level().as_str(),
                     })
                 })
                 .collect();
@@ -259,6 +309,36 @@ impl AnalyzeReport {
                     "avg_complexity": complexity.avg_complexity(),
                     "max_complexity": complexity.max_complexity(),
                     "high_risk_count": complexity.high_risk_count(),
+                }),
+            );
+        }
+
+        if let Some(ref length) = self.length {
+            let functions: Vec<_> = length
+                .functions
+                .iter()
+                .map(|f| {
+                    serde_json::json!({
+                        "name": f.name,
+                        "parent": f.parent,
+                        "short_name": f.short_name(),
+                        "lines": f.lines,
+                        "start_line": f.start_line,
+                        "end_line": f.end_line,
+                        "category": f.category().as_str(),
+                    })
+                })
+                .collect();
+
+            obj.insert(
+                "length".to_string(),
+                serde_json::json!({
+                    "file": length.file_path,
+                    "functions": functions,
+                    "avg_length": length.avg_length(),
+                    "max_length": length.max_length(),
+                    "long_count": length.long_count(),
+                    "too_long_count": length.too_long_count(),
                 }),
             );
         }
@@ -307,7 +387,7 @@ impl AnalyzeReport {
 
     /// Format as pretty text with colors (human-friendly).
     pub fn format_pretty(&self) -> String {
-        use nu_ansi_term::Color::{Cyan, Red, Yellow};
+        use nu_ansi_term::Color::{Red, Yellow};
 
         let mut sections = Vec::new();
 
@@ -325,7 +405,14 @@ impl AnalyzeReport {
             sections.push(format!("Functions: {}", complexity.functions.len()));
             sections.push(format!("Average: {:.1}", complexity.avg_complexity()));
             sections.push(format!("Maximum: {}", complexity.max_complexity()));
-            sections.push(format!("High risk (>10): {}", complexity.high_risk_count()));
+            let crit = complexity.critical_risk_count();
+            let high = complexity.high_risk_count();
+            if crit > 0 {
+                sections.push(format!("Critical (>20): {}", crit));
+            }
+            if high > 0 || crit == 0 {
+                sections.push(format!("High risk (11-20): {}", high));
+            }
 
             if !complexity.functions.is_empty() {
                 sections.push(String::new());
@@ -343,13 +430,61 @@ impl AnalyzeReport {
 
                     let risk = func.risk_level();
                     let risk_colored = match risk {
-                        "high" => Red.bold().paint("HIGH").to_string(),
-                        "moderate" => Yellow.paint("MOD ").to_string(),
-                        _ => Cyan.paint("    ").to_string(),
+                        RiskLevel::Critical => Red.bold().paint("CRIT").to_string(),
+                        RiskLevel::High => Red.paint("HIGH").to_string(),
+                        RiskLevel::Moderate => Yellow.paint(" MOD").to_string(),
+                        RiskLevel::Low => "    ".to_string(),
                     };
                     sections.push(format!(
                         "{}  {:3}  {}",
                         risk_colored, func.complexity, display_name
+                    ));
+                }
+            }
+            sections.push(String::new());
+        }
+
+        if let Some(ref length) = self.length {
+            use nu_ansi_term::Color::Cyan;
+
+            sections.push("# Function Length Analysis".to_string());
+            sections.push(String::new());
+            sections.push(format!("Functions: {}", length.functions.len()));
+            sections.push(format!("Average: {:.1} lines", length.avg_length()));
+            sections.push(format!("Maximum: {} lines", length.max_length()));
+            let too_long = length.too_long_count();
+            let long = length.long_count();
+            if too_long > 0 {
+                sections.push(format!("Too Long (>100): {}", too_long));
+            }
+            if long > 0 || too_long == 0 {
+                sections.push(format!("Long (51-100): {}", long));
+            }
+
+            if !length.functions.is_empty() {
+                sections.push(String::new());
+                sections.push("## Longest Functions".to_string());
+
+                let mut sorted: Vec<_> = length.functions.iter().collect();
+                sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
+
+                for func in sorted.iter().take(10) {
+                    let display_name = if func.file_path.is_some() {
+                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+
+                    let cat = func.category();
+                    let cat_colored = match cat {
+                        LengthCategory::TooLong => Red.bold().paint("LONG").to_string(),
+                        LengthCategory::Long => Yellow.paint("LONG").to_string(),
+                        LengthCategory::Medium => Cyan.paint(" MED").to_string(),
+                        LengthCategory::Short => "    ".to_string(),
+                    };
+                    sections.push(format!(
+                        "{}  {:3}  {}",
+                        cat_colored, func.lines, display_name
                     ));
                 }
             }
@@ -542,12 +677,75 @@ pub fn analyze_codebase_complexity(
     }
 }
 
+/// Analyze function length of a single file
+pub fn analyze_file_length(file_path: &Path) -> Option<LengthReport> {
+    let content = std::fs::read_to_string(file_path).ok()?;
+    let analyzer = LengthAnalyzer::new();
+    Some(analyzer.analyze(file_path, &content))
+}
+
+/// Analyze function length across entire codebase, returning top N functions
+pub fn analyze_codebase_length(root: &Path, limit: usize, filter: Option<&Filter>) -> LengthReport {
+    use crate::analyze::function_length::FunctionLength;
+    use rayon::prelude::*;
+
+    let all_files = path_resolve::all_files(root);
+    let code_files: Vec<_> = all_files
+        .iter()
+        .filter(|f| {
+            f.kind == "file" && {
+                let ext = std::path::Path::new(&f.path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                matches!(ext, "py" | "rs")
+            }
+        })
+        .filter(|f| {
+            filter
+                .map(|flt| flt.matches(Path::new(&f.path)))
+                .unwrap_or(true)
+        })
+        .collect();
+
+    let all_functions: Vec<FunctionLength> = code_files
+        .par_iter()
+        .filter_map(|file| {
+            let path = root.join(&file.path);
+            let content = std::fs::read_to_string(&path).ok()?;
+            let analyzer = LengthAnalyzer::new();
+            let report = analyzer.analyze(&path, &content);
+            Some(
+                report
+                    .functions
+                    .into_iter()
+                    .map(|mut f| {
+                        f.file_path = Some(file.path.clone());
+                        f
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten()
+        .collect();
+
+    let mut sorted = all_functions;
+    sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
+    sorted.truncate(limit);
+
+    LengthReport {
+        functions: sorted,
+        file_path: root.to_string_lossy().to_string(),
+    }
+}
+
 /// Run unified analysis on a path
 pub fn analyze(
     target: Option<&str>,
     root: &Path,
     run_health: bool,
     run_complexity: bool,
+    run_length: bool,
     run_security: bool,
     complexity_threshold: Option<usize>,
     kind_filter: Option<&str>,
@@ -671,6 +869,29 @@ pub fn analyze(
         None
     };
 
+    let length = if run_length {
+        if !is_file {
+            // Codebase-wide length: show top 10 longest functions
+            let analysis_root = if let Some(ref fp) = file_path {
+                root.join(fp)
+            } else {
+                root.to_path_buf()
+            };
+            if analysis_root.is_dir() {
+                Some(analyze_codebase_length(&analysis_root, 10, filter))
+            } else {
+                None
+            }
+        } else if let Some(ref fp) = file_path {
+            let full_path = root.join(fp);
+            analyze_file_length(&full_path)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let security = if run_security && !has_symbol_target {
         // Security doesn't apply to single symbols
         let analysis_root = if let Some(ref fp) = file_path {
@@ -686,6 +907,7 @@ pub fn analyze(
     AnalyzeReport {
         health,
         complexity,
+        length,
         security,
         target_path: target_path.to_string(),
         skipped,

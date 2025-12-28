@@ -105,7 +105,7 @@ pub struct ViewArgs {
 }
 
 /// Run view command with args.
-pub fn run(args: ViewArgs, json: bool) -> i32 {
+pub fn run(args: ViewArgs, json: bool, pretty: bool) -> i32 {
     let effective_root = args
         .root
         .clone()
@@ -128,6 +128,7 @@ pub fn run(args: ViewArgs, json: bool) -> i32 {
         args.docs || config.view.show_docs(),
         args.context,
         json,
+        pretty,
         &args.exclude,
         &args.only,
     )
@@ -269,6 +270,7 @@ fn cmd_view_symbol_direct(
     full: bool,
     show_docs: bool,
     json: bool,
+    pretty: bool,
 ) -> i32 {
     cmd_view_symbol(
         file_path,
@@ -278,6 +280,7 @@ fn cmd_view_symbol_direct(
         full,
         show_docs,
         json,
+        pretty,
     )
 }
 
@@ -298,6 +301,7 @@ pub fn cmd_view(
     show_docs: bool,
     context: bool,
     json: bool,
+    pretty: bool,
     exclude: &[String],
     only: &[String],
 ) -> i32 {
@@ -347,7 +351,7 @@ pub fn cmd_view(
 
     // Handle "." as current directory
     if target == "." {
-        return cmd_view_directory(&root, &root, depth, raw, json, filter.as_ref());
+        return cmd_view_directory(&root, &root, depth, raw, json, pretty, filter.as_ref());
     }
 
     // Use unified path resolution - get ALL matches
@@ -366,7 +370,7 @@ pub fn cmd_view(
             // Single symbol match - construct path to it
             let sym = &symbol_matches[0];
             return cmd_view_symbol_direct(
-                &sym.file, &sym.name, &root, depth, full, show_docs, json,
+                &sym.file, &sym.name, &root, depth, full, show_docs, json, pretty,
             );
         }
         _ => {
@@ -429,6 +433,7 @@ pub fn cmd_view(
             depth,
             raw,
             json,
+            pretty,
             filter.as_ref(),
         )
     } else if unified.symbol_path.is_empty() {
@@ -447,6 +452,7 @@ pub fn cmd_view(
             show_docs,
             context,
             json,
+            pretty,
         )
     } else {
         // View symbol within file
@@ -458,6 +464,7 @@ pub fn cmd_view(
             full,
             show_docs,
             json,
+            pretty,
         )
     }
 }
@@ -578,6 +585,7 @@ fn cmd_view_directory(
     depth: i32,
     raw: bool,
     json: bool,
+    pretty: bool,
     filter: Option<&Filter>,
 ) -> i32 {
     let effective_depth = if depth < 0 {
@@ -631,8 +639,12 @@ fn cmd_view_directory(
         // Serialize the ViewNode directly for structured output
         println!("{}", serde_json::to_string(&view_node).unwrap());
     } else {
-        // Format as text tree
-        let lines = tree::format_view_node(&view_node, &FormatOptions::default());
+        // Format as text tree (minimal by default unless --pretty)
+        let format_options = FormatOptions {
+            minimal: !pretty,
+            ..Default::default()
+        };
+        let lines = tree::format_view_node(&view_node, &format_options);
         for line in &lines {
             println!("{}", line);
         }
@@ -706,6 +718,7 @@ fn cmd_view_file(
     show_docs: bool,
     context: bool,
     json: bool,
+    pretty: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
@@ -824,6 +837,7 @@ fn cmd_view_file(
                 line_numbers: true,
                 skip_root: true, // Skip file header, we already printed it
                 max_depth: None,
+                minimal: !pretty,
             };
             let lines = tree::format_view_node(&view_node, &format_options);
             if !lines.is_empty() {
@@ -877,6 +891,7 @@ fn cmd_view_file(
                             line_numbers: true,
                             skip_root: true,
                             max_depth: None,
+                            minimal: !pretty,
                         };
                         let lines = tree::format_view_node(&view_node, &format_options);
                         if !lines.is_empty() {
@@ -908,6 +923,7 @@ fn cmd_view_file(
                                         line_numbers: true,
                                         skip_root: true,
                                         max_depth: None,
+                                        minimal: !pretty,
                                     };
                                     let lines = tree::format_view_node(&view_node, &format_options);
                                     if !lines.is_empty() {
@@ -1012,6 +1028,7 @@ fn cmd_view_symbol(
     full: bool,
     show_docs: bool,
     json: bool,
+    pretty: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
@@ -1101,6 +1118,7 @@ fn cmd_view_symbol(
                     line_numbers: true,
                     skip_root: false,
                     max_depth: None,
+                    minimal: !pretty,
                 };
                 let lines = tree::format_view_node(&view_node, &format_options);
                 for line in lines {

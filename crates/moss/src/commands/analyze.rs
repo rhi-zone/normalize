@@ -1,8 +1,8 @@
 //! Analyze command - run analysis on target.
 
-use crate::analyze;
+use crate::analysis_report;
+use crate::analyze::complexity::ComplexityReport;
 use crate::commands::filter::detect_project_languages;
-use crate::complexity::ComplexityReport;
 use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;
@@ -111,6 +111,10 @@ pub struct AnalyzeArgs {
     /// Run complexity analysis
     #[arg(long)]
     pub complexity: bool,
+
+    /// Run function length analysis
+    #[arg(long)]
+    pub length: bool,
 
     /// Run security analysis
     #[arg(long)]
@@ -225,16 +229,24 @@ pub fn run(args: AnalyzeArgs, json: bool, pretty: bool) -> i32 {
     // --all: run everything
     // Specific flags: run only those
     // No flags: use config defaults
-    let (health, complexity, security, clones) = if args.all {
-        (true, true, true, true)
+    let (health, complexity, length, security, clones) = if args.all {
+        (true, true, true, true, true)
     } else {
-        let any_pass_flag = args.health || args.complexity || args.security || args.clones;
+        let any_pass_flag =
+            args.health || args.complexity || args.length || args.security || args.clones;
         if any_pass_flag {
-            (args.health, args.complexity, args.security, args.clones)
+            (
+                args.health,
+                args.complexity,
+                args.length,
+                args.security,
+                args.clones,
+            )
         } else {
             (
                 config.analyze.health(),
                 config.analyze.complexity(),
+                false, // length off by default
                 config.analyze.security(),
                 config.analyze.clones(),
             )
@@ -248,6 +260,7 @@ pub fn run(args: AnalyzeArgs, json: bool, pretty: bool) -> i32 {
         args.root.as_deref(),
         health,
         complexity,
+        length,
         security,
         args.overview,
         args.storage,
@@ -281,6 +294,7 @@ pub fn cmd_analyze(
     root: Option<&Path>,
     health: bool,
     complexity: bool,
+    length: bool,
     security: bool,
     show_overview: bool,
     show_storage: bool,
@@ -384,13 +398,14 @@ pub fn cmd_analyze(
     let mut exit_code = 0;
     let mut scores: Vec<(f64, f64)> = Vec::new(); // (score, weight)
 
-    // Run main analysis if any of health/complexity/security enabled
-    if health || complexity || security {
-        let report = analyze::analyze(
+    // Run main analysis if any of health/complexity/length/security enabled
+    if health || complexity || length || security {
+        let report = analysis_report::analyze(
             target,
             &root,
             health,
             complexity,
+            length,
             security,
             threshold,
             kind_filter,
@@ -454,7 +469,7 @@ fn score_complexity(report: &ComplexityReport) -> f64 {
 }
 
 /// Score security: 100 if no findings, penalized by severity
-fn score_security(report: &analyze::SecurityReport) -> f64 {
+fn score_security(report: &analysis_report::SecurityReport) -> f64 {
     let counts = report.count_by_severity();
     let penalty =
         counts["critical"] * 40 + counts["high"] * 20 + counts["medium"] * 10 + counts["low"] * 5;

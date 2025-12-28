@@ -369,7 +369,7 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
-        Commands::View(args) => commands::view::run(args, cli.json),
+        Commands::View(args) => commands::view::run(args, cli.json, cli.pretty),
         Commands::Edit {
             target,
             root,

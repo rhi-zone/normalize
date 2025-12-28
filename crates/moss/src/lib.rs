@@ -17,9 +17,9 @@
 //! let parsers = Parsers::new();
 //! ```
 
+pub mod analysis_report;
 pub mod analyze;
 pub mod commands;
-pub mod complexity;
 pub mod config;
 pub mod daemon;
 pub mod deps;
