@@ -88,6 +88,39 @@ jobs:
         env:
           MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
+  clones:
+    name: Clone Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates -> target"
+
+      - name: Cache grammars
+        id: grammar-cache
+        uses: actions/cache@v4
+        with:
+          path: target/grammars
+          key: grammars-linux-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build grammars
+        if: steps.grammar-cache.outputs.cache-hit != 'true'
+        run: cargo xtask build-grammars
+
+      - name: Build moss
+        run: cargo build --release -p moss
+
+      - name: Check for code clones
+        run: ./target/release/moss analyze --clones --fail-on-clones
+        env:
+          MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
+
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest

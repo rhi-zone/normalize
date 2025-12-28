@@ -124,6 +124,10 @@ pub struct AnalyzeArgs {
     #[arg(long, default_value = "1")]
     pub min_lines: usize,
 
+    /// Exit with error if any clones are detected (for CI)
+    #[arg(long)]
+    pub fail_on_clones: bool,
+
     /// Exclude paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN")]
     pub exclude: Vec<String>,
@@ -164,6 +168,7 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         args.elide_literals,
         args.show_source,
         args.min_lines,
+        args.fail_on_clones,
         json,
         &args.exclude,
         &args.only,
@@ -195,6 +200,7 @@ pub fn cmd_analyze(
     elide_literals: bool,
     show_source: bool,
     min_lines: usize,
+    fail_on_clones: bool,
     json: bool,
     exclude: &[String],
     only: &[String],
@@ -283,6 +289,7 @@ pub fn cmd_analyze(
             elide_literals,
             show_source,
             min_lines,
+            fail_on_clones,
             json,
         );
     }
@@ -1563,6 +1570,7 @@ fn cmd_clones(
     elide_literals: bool,
     show_source: bool,
     min_lines: usize,
+    fail_on_clones: bool,
     json: bool,
 ) -> i32 {
     let extractor = Extractor::new();
@@ -1762,7 +1770,11 @@ fn cmd_clones(
         }
     }
 
-    0
+    if fail_on_clones && !clone_groups.is_empty() {
+        1
+    } else {
+        0
+    }
 }
 
 /// Flatten nested symbols into a flat list

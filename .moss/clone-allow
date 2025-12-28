@@ -1,0 +1,43 @@
+# Legitimate parallel structures in openapi/jsonschema crates
+crates/moss-openapi/src/lib.rs:find_generator
+crates/moss-openapi/src/lib.rs:generators
+crates/moss-jsonschema/src/lib.rs:find_generator
+crates/moss-jsonschema/src/lib.rs:generators
+
+# Diagnostic constructors (intentionally parallel error/warning)
+crates/moss-tools/src/diagnostic.rs:error
+crates/moss-tools/src/diagnostic.rs:warning
+
+# Parser/extractor constructors (common pattern)
+crates/moss/src/complexity.rs:new
+crates/moss/src/deps.rs:new
+crates/moss/src/edit.rs:new
+crates/moss/src/skeleton.rs:new
+
+# Python stdlib lookup (similar but distinct)
+crates/moss-languages/src/python.rs:get_python_version
+crates/moss-languages/src/python.rs:find_python_stdlib
+
+# FFI bindings and tool registry (parallel registration patterns)
+crates/moss-languages/src/ffi.rs:bindings
+crates/moss-languages/src/ffi.rs:add_binding
+crates/moss-tools/src/registry.rs:tools
+crates/moss-tools/src/registry.rs:register
+
+# Config getters (trivial boolean accessors)
+crates/moss/src/commands/todo.rs:show_all
+crates/moss/src/commands/grep.rs:ignore_case
+crates/moss/src/commands/view.rs:line_numbers
+crates/moss/src/commands/view.rs:show_docs
+crates/moss/src/commands/analyze.rs:compact
+crates/moss/src/config.rs:enabled
+crates/moss/src/daemon.rs:enabled
+crates/moss/src/daemon.rs:auto_start
+
+# Session analysis counters (trivial sum accessors)
+crates/moss/src/sessions/analysis.rs:total_tool_calls
+crates/moss/src/sessions/analysis.rs:total_errors
+
+# Count wrappers (delegate to count_by_severity)
+crates/moss-tools/src/tools.rs:error_count
+crates/moss-tools/src/tools.rs:warning_count

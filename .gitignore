@@ -3,8 +3,7 @@ site/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 
-# Moss runtime data
-.moss/
+# Moss runtime data (see bottom for exceptions)
 
 # Python
 __pycache__/
@@ -69,4 +68,8 @@ cache/
 !src/moss/prompts/*.txt
 
 *.cpuprofile
-.moss/lessons.md
+
+# Moss
+.moss
+!.moss/config.toml
+!.moss/clone-allow
