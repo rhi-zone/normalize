@@ -6,7 +6,7 @@ use crate::parsers::Parsers;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
-use nu_ansi_term::Color::{Cyan, Red};
+use nu_ansi_term::Color::{LightCyan, Red};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -326,7 +326,7 @@ fn highlight_signature_ast(sig: &str, grammar: &str, use_colors: bool) -> String
         let text = &sig[span.start..span.end];
         let styled = match span.kind {
             HighlightKind::Keyword => Red.paint(text).to_string(), // Red/pink for keywords
-            HighlightKind::Type => Cyan.paint(text).to_string(),   // Cyan for types
+            HighlightKind::Type => LightCyan.paint(text).to_string(), // Light cyan for types
             HighlightKind::Default => text.to_string(),
         };
         result.push_str(&styled);

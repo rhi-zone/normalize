@@ -9,7 +9,7 @@ use std::fs;
 use std::path::Path;
 
 use clap::{Args, Subcommand};
-use nu_ansi_term::Color::{Green, Yellow};
+use nu_ansi_term::Color::LightCyan;
 use nu_ansi_term::Style;
 use serde::Deserialize;
 
@@ -69,6 +69,8 @@ pub enum TodoAction {
     },
     /// Remove all completed items
     Clean,
+    /// Add [ ] to all items without markers
+    Normalize,
 }
 
 #[derive(Args, Default)]
@@ -495,7 +497,11 @@ fn mark_item_done(
     Ok((result, item.text.clone()))
 }
 
-/// Transform a line to mark it as done
+/// Transform a line to mark it as done.
+/// Handles both checkbox and non-checkbox formats:
+/// - `- [ ] item` → `- [x] item`
+/// - `- item` → `- [x] item`
+/// - `1. item` → `1. [x] item`
 fn mark_line_done(line: &str) -> String {
     let trimmed = line.trim();
 
@@ -736,60 +742,55 @@ fn display_sections(
                 println!(); // blank line between sections
             }
 
-            // Print header with proper level
-            println!("{} {}", "#".repeat(section.header_level), section.name);
+            // Print header with proper level (light cyan if colors enabled)
+            let header_hashes = "#".repeat(section.header_level);
+            if use_colors {
+                println!(
+                    "{} {}",
+                    LightCyan.bold().paint(&header_hashes),
+                    LightCyan.bold().paint(&section.name)
+                );
+            } else {
+                println!("{} {}", header_hashes, section.name);
+            }
 
             for item in &filtered_items {
-                let marker = if item.done { "[x]" } else { "[ ]" };
-                // Color the marker if colors enabled
-                let marker_display = if use_colors {
-                    if item.done {
-                        Green.paint(marker).to_string()
-                    } else {
-                        Yellow.paint(marker).to_string()
-                    }
-                } else {
-                    marker.to_string()
-                };
+                let has_original_marker = section.format == ItemFormat::Checkbox;
+
                 // Dim done items if colors enabled
                 let text_display = if use_colors && item.done {
                     Style::new().dimmed().paint(&item.text).to_string()
                 } else {
                     item.text.clone()
                 };
-                // Use the original format for display
-                let prefix = match section.format {
-                    ItemFormat::Checkbox => format!("- {} ", marker_display),
-                    ItemFormat::Numbered => {
-                        if item.done {
-                            format!("- {} ", marker_display)
-                        } else {
-                            "- ".to_string()
-                        }
-                    }
-                    ItemFormat::Bullet => {
-                        if item.done {
-                            format!("- {} ", marker_display)
-                        } else {
-                            "- ".to_string()
-                        }
-                    }
-                    ItemFormat::Asterisk => {
-                        if item.done {
-                            format!("* {} ", marker_display)
-                        } else {
-                            "* ".to_string()
-                        }
-                    }
-                    ItemFormat::Plain => {
-                        if item.done {
-                            format!("{} ", marker_display)
-                        } else {
-                            "".to_string()
-                        }
-                    }
-                };
-                println!("{}{}", prefix, text_display);
+
+                if item.done {
+                    // Done: green background with checkmark
+                    let marker = if use_colors {
+                        Style::new()
+                            .on(nu_ansi_term::Color::Green)
+                            .fg(nu_ansi_term::Color::Black)
+                            .paint(" ✓ ")
+                            .to_string()
+                    } else {
+                        "[x]".to_string()
+                    };
+                    println!("{} {}", marker, text_display);
+                } else if has_original_marker {
+                    // Pending with checkbox: green background empty
+                    let marker = if use_colors {
+                        Style::new()
+                            .on(nu_ansi_term::Color::Green)
+                            .paint("   ")
+                            .to_string()
+                    } else {
+                        "[ ]".to_string()
+                    };
+                    println!("{} {}", marker, text_display);
+                } else {
+                    // Unmarked: blank space for alignment
+                    println!("    {}", text_display);
+                }
             }
 
             any_output = true;
@@ -827,6 +828,69 @@ fn clean_done_items(content: &str) -> String {
     }
 
     result
+}
+
+/// Add [ ] to all items that don't have markers
+fn normalize_items(content: &str) -> (String, usize) {
+    let sections = parse_todo(content);
+
+    // Collect line numbers of items that need markers added
+    let unmarked_lines: std::collections::HashSet<usize> = sections
+        .iter()
+        .filter(|s| s.format != ItemFormat::Checkbox) // Only non-checkbox sections
+        .flat_map(|s| s.items.iter().filter(|i| !i.done).map(|i| i.line_num))
+        .collect();
+
+    let count = unmarked_lines.len();
+    if count == 0 {
+        return (content.to_string(), 0);
+    }
+
+    let mut result = String::new();
+    for (i, line) in content.lines().enumerate() {
+        if unmarked_lines.contains(&i) {
+            // Add [ ] after the bullet
+            let trimmed = line.trim_start();
+            let indent = &line[..line.len() - trimmed.len()];
+
+            if let Some(rest) = trimmed.strip_prefix("- ") {
+                result.push_str(indent);
+                result.push_str("- [ ] ");
+                result.push_str(rest);
+            } else if let Some(rest) = trimmed.strip_prefix("* ") {
+                result.push_str(indent);
+                result.push_str("* [ ] ");
+                result.push_str(rest);
+            } else if let Some(dot_pos) = trimmed.find(". ") {
+                // Check if everything before ". " is digits (numbered list)
+                let prefix = &trimmed[..dot_pos];
+                if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
+                    // Numbered: "10. item" -> "10. [ ] item"
+                    result.push_str(indent);
+                    result.push_str(&trimmed[..dot_pos + 2]); // "10. "
+                    result.push_str("[ ] ");
+                    result.push_str(&trimmed[dot_pos + 2..]);
+                } else {
+                    result.push_str(line);
+                }
+            } else {
+                // Plain: just add "- [ ] " prefix
+                result.push_str(indent);
+                result.push_str("- [ ] ");
+                result.push_str(trimmed);
+            }
+        } else {
+            result.push_str(line);
+        }
+        result.push('\n');
+    }
+
+    // Preserve trailing newline behavior
+    if !content.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
+
+    (result, count)
 }
 
 /// Common todo file names to auto-detect (in priority order)
@@ -1048,6 +1112,37 @@ pub fn cmd_todo(
 
             let sections = parse_todo(&content);
             display_sections(&sections, &filter, todo_config, json, use_colors);
+            0
+        }
+
+        Some(TodoAction::Normalize) => {
+            let (new_content, count) = normalize_items(&content);
+
+            if count == 0 {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({"status": "normalized", "modified": 0})
+                    );
+                } else {
+                    println!("All items already have markers");
+                }
+                return 0;
+            }
+
+            if let Err(e) = fs::write(&todo_path, &new_content) {
+                eprintln!("Error writing TODO.md: {}", e);
+                return 1;
+            }
+
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"status": "normalized", "modified": count})
+                );
+            } else {
+                println!("Added [ ] to {} item(s)", count);
+            }
             0
         }
     }
