@@ -68,11 +68,14 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 **Tooling:**
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 - Interactive config editor: `moss config` TUI for editing `.moss/config.toml`
-- Todo archive workflow: `moss todo list --done` → write to CHANGELOG → `moss todo clean`. Options:
-  - `moss todo archive` command: formats done items for changelog, removes them
-  - Lua script works locally but not with external agents (Claude Code, etc.)
-  - MCP tool could expose archive action for agent integration
-  - Consider: `--format=changelog` to output in changelog format for review before commit
+- Todo improvements:
+  - `moss todo add --section <name>`: add to specific section (not just primary)
+  - `moss todo sections`: list available sections
+  - `moss todo add --after <text>`: positional insert
+  - `moss todo archive`: format done items for changelog, remove them
+    - Lua script works locally but not with external agents (Claude Code, etc.)
+    - MCP tool could expose archive action for agent integration
+    - Consider: `--format=changelog` to output in changelog format for review before commit
 
 **Workspace/Context Management:**
 - Persistent workspace concept (like Notion): files, tool results, context stored permanently
