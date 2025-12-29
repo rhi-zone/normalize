@@ -26,6 +26,8 @@ Query-based highlighting using tree-sitter .scm files:
 ### View Command
 
 `moss view` improvements:
+- Smart Header (partial): symbol view shows imports filtered by used modules
+- Line ranges: `moss view file.rs:30-55` for arbitrary sections
 - Symbol output includes line ranges (e.g., `foo: L10-25`) - enabled by default
 - `--full` mode outputs raw/highlighted content without line number prefixes
 - Data format support: TOML, JSON syntax highlighting with `--pretty`

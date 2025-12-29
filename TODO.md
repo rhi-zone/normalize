@@ -3,8 +3,6 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- Smart Header as default view output for symbols
-- View line ranges: `moss view file.rs:30-55` for arbitrary sections
 - `analyze --trace`: start with intra-function, expand to cross-function
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus
 
@@ -23,14 +21,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Stop conditions: literals, external calls (show signature)
   - `--max-depth N` or `--max-items N` to limit output
   - Example: `y = f(x, z)` → trace y ← f ← (x, z), showing f's signature
-- "Smart Header" as default view output (not a flag):
-  - Problem: bare skeletons strip semantic intent (imports, comments, deprecation notices)
-  - Default output should synthesize context:
-    - File path
-    - Filtered imports (only what the target uses)
-    - Parent context (class/impl with siblings hidden)
-    - Target node with full body
-  - Balance: hyper-local (AST) + hyper-global (imports) in one view
 
 ### Configuration System
 Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`
@@ -65,10 +55,10 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - JSON Schema for complex action parameters (currently string-only)
 
 ### View Command
-- `moss view file.rs:42-60` fails - line ranges not supported as targets
-  - Use case: view specific section without knowing symbol name
-  - Tension: structural (symbols) vs text-based (lines) addressing
-  - Could be useful after grep shows `(symbol L30-55)` context
+- Smart Header improvements:
+  - Filter names within multi-imports (e.g., `use foo::{A, B, C}` → `use foo::{A}` if only A is used)
+  - Parent context: show class/impl/module containing target, with siblings collapsed
+    - e.g., viewing `Foo::bar()` shows `impl Foo { fn bar() { ... } /* 3 other methods */ }`
 
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
