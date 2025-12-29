@@ -199,16 +199,19 @@ impl Language for Groovy {
     }
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
-        // Default: use format_summary for display
+        // Groovy: import pkg.Class or import pkg.*
         let names_to_use: Vec<&str> = names
             .map(|n| n.to_vec())
             .unwrap_or_else(|| import.names.iter().map(|s| s.as_str()).collect());
-        if names_to_use.is_empty() {
-            import.module.clone()
+        if import.is_wildcard {
+            format!("import {}.*", import.module)
+        } else if names_to_use.is_empty() {
+            format!("import {}", import.module)
         } else if names_to_use.len() == 1 {
-            format!("{}::{}", import.module, names_to_use[0])
+            format!("import {}.{}", import.module, names_to_use[0])
         } else {
-            format!("{}::{{{}}}", import.module, names_to_use.join(", "))
+            // Groovy doesn't have multi-import syntax, so format as module
+            format!("import {}", import.module)
         }
     }
 

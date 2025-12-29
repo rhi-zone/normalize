@@ -41,6 +41,10 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - PR/diff analysis: `moss analyze --pr` or similar
 ## Backlog
 
+### View Command
+- `moss view <function_name>` returns no matches for functions - only finds types/classes
+  - Need to investigate why function symbol search fails
+
 ### Language Support
 98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.

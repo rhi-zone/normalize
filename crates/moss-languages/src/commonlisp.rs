@@ -217,16 +217,19 @@ impl Language for CommonLisp {
     }
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
-        // Default: use format_summary for display
+        // Common Lisp: (use-package :package) or (use-package :package (:import-from #:a #:b))
         let names_to_use: Vec<&str> = names
             .map(|n| n.to_vec())
             .unwrap_or_else(|| import.names.iter().map(|s| s.as_str()).collect());
         if names_to_use.is_empty() {
-            import.module.clone()
-        } else if names_to_use.len() == 1 {
-            format!("{}::{}", import.module, names_to_use[0])
+            format!("(use-package :{})", import.module)
         } else {
-            format!("{}::{{{}}}", import.module, names_to_use.join(", "))
+            let symbols: Vec<String> = names_to_use.iter().map(|n| format!("#:{}", n)).collect();
+            format!(
+                "(use-package :{} (:import-from {}))",
+                import.module,
+                symbols.join(" ")
+            )
         }
     }
 

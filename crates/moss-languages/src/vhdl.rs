@@ -175,16 +175,20 @@ impl Language for Vhdl {
     }
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
-        // Default: use format_summary for display
+        // VHDL: use library.package.all; or use library.package.item;
         let names_to_use: Vec<&str> = names
             .map(|n| n.to_vec())
             .unwrap_or_else(|| import.names.iter().map(|s| s.as_str()).collect());
-        if names_to_use.is_empty() {
-            import.module.clone()
+        if import.is_wildcard || names_to_use.is_empty() {
+            format!("use {}.all;", import.module)
         } else if names_to_use.len() == 1 {
-            format!("{}::{}", import.module, names_to_use[0])
+            format!("use {}.{};", import.module, names_to_use[0])
         } else {
-            format!("{}::{{{}}}", import.module, names_to_use.join(", "))
+            names_to_use
+                .iter()
+                .map(|n| format!("use {}.{};", import.module, n))
+                .collect::<Vec<_>>()
+                .join("\n")
         }
     }
 

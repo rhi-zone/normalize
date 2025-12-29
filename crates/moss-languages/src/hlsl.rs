@@ -197,17 +197,12 @@ impl Language for Hlsl {
         Vec::new()
     }
 
-    fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
-        // Default: use format_summary for display
-        let names_to_use: Vec<&str> = names
-            .map(|n| n.to_vec())
-            .unwrap_or_else(|| import.names.iter().map(|s| s.as_str()).collect());
-        if names_to_use.is_empty() {
-            import.module.clone()
-        } else if names_to_use.len() == 1 {
-            format!("{}::{}", import.module, names_to_use[0])
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // HLSL: #include "file.hlsl" or #include <file.hlsl>
+        if import.is_relative {
+            format!("#include \"{}\"", import.module)
         } else {
-            format!("{}::{{{}}}", import.module, names_to_use.join(", "))
+            format!("#include <{}>", import.module)
         }
     }
 
