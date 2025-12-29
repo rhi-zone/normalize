@@ -3,8 +3,12 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
+- WebFetch fails on large pages - need chunked/streaming fetch or headless browser
 
 ## Remaining Work
+- Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
+- Shadow worktree isolation: git worktree or overlayfs for parallel validation
+- view: add 'Did You Mean?' bridge - if symbol not found but text exists, suggest grep
 
 ### Configuration System
 Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`
