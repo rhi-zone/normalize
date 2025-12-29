@@ -528,7 +528,11 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "interpreted_string_literal"
         | "char_literal"
         | "template_string"
-        | "template_literal" => HighlightKind::String,
+        | "template_literal"
+        // YAML strings
+        | "string_scalar"
+        | "double_quote_scalar"
+        | "single_quote_scalar" => HighlightKind::String,
 
         // Numbers
         "number"
@@ -538,12 +542,27 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "float_literal"
         | "int_literal"
         | "imaginary_literal"
-        | "rune_literal" => HighlightKind::Number,
+        | "rune_literal"
+        // C/C++ numbers
+        | "number_literal"
+        // YAML numbers
+        | "integer_scalar"
+        | "float_scalar" => HighlightKind::Number,
 
         // Constants (booleans, nil/null, special values)
-        "true" | "false" | "boolean_literal" | "nil" | "null" | "none" | "undefined" => {
-            HighlightKind::Constant
-        }
+        "true"
+        | "false"
+        | "boolean_literal"
+        | "nil"
+        | "null"
+        | "none"
+        | "undefined"
+        // Java null
+        | "null_literal"
+        // TOML booleans
+        | "boolean"
+        // YAML booleans
+        | "boolean_scalar" => HighlightKind::Constant,
 
         // Types (check first - more specific)
         "type_identifier"
@@ -569,7 +588,9 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "continue" | "debugger" | "delete" | "instanceof" | "typeof" | "void"
         // Go keywords
         | "package" | "func" | "defer" | "go" | "chan" | "select" | "fallthrough"
-        | "range" | "map" => HighlightKind::Keyword,
+        | "range" | "map"
+        // Bash keywords (then/elif already covered above)
+        | "fi" | "esac" | "done" => HighlightKind::Keyword,
 
         _ => HighlightKind::Default,
     }

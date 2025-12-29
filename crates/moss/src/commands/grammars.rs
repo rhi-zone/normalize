@@ -54,7 +54,7 @@ fn cmd_list(json: bool) -> i32 {
     } else {
         println!("Installed grammars ({}):", grammars.len());
         for name in &grammars {
-            println!("  {}", name);
+            println!("{}", name);
         }
     }
 
