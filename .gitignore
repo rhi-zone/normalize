@@ -64,8 +64,6 @@ cache/
 
 # debugging text files
 *.txt
-# but keep prompt files
-!src/moss/prompts/*.txt
 
 *.cpuprofile
 
@@ -73,3 +71,4 @@ cache/
 .moss/*
 !.moss/config.toml
 !.moss/clone-allow
+**/.moss/

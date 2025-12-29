@@ -136,7 +136,7 @@ fn detect_todo_files(root: &Path) -> Vec<String> {
 }
 
 /// Entries we want in .gitignore
-const GITIGNORE_ENTRIES: &[&str] = &[".moss", "!.moss/config.toml", "!.moss/clone-allow"];
+const GITIGNORE_ENTRIES: &[&str] = &[".moss/*", "!.moss/config.toml", "!.moss/clone-allow"];
 
 /// Update .gitignore with moss entries. Returns list of changes made.
 fn update_gitignore(path: &Path) -> Vec<String> {
@@ -263,7 +263,7 @@ mod tests {
         cmd_init(tmp.path(), false);
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
-        assert!(content.contains(".moss"));
+        assert!(content.contains(".moss/*"));
         assert!(content.contains("!.moss/config.toml"));
     }
 
@@ -291,7 +291,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         fs::write(
             tmp.path().join(".gitignore"),
-            "node_modules\n.moss\nother_stuff\n",
+            "node_modules\n.moss/*\nother_stuff\n",
         )
         .unwrap();
 
@@ -300,8 +300,8 @@ mod tests {
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
 
-        // !.moss/config.toml should be right after .moss, not at the end
-        let moss_idx = lines.iter().position(|l| *l == ".moss").unwrap();
+        // !.moss/config.toml should be right after .moss/*, not at the end
+        let moss_idx = lines.iter().position(|l| *l == ".moss/*").unwrap();
         let config_idx = lines
             .iter()
             .position(|l| *l == "!.moss/config.toml")
