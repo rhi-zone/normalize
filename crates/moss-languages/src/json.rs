@@ -24,8 +24,9 @@ impl Language for Json {
     }
 
     // JSON is data, not code - no functions/types/control flow
+    // "pair" nodes are key-value pairs that we extract as symbols
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["object"]
+        &["pair"]
     }
     fn function_kinds(&self) -> &'static [&'static str] {
         &[]
@@ -65,23 +66,21 @@ impl Language for Json {
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // Extract top-level object keys
-        if node.kind() == "pair" {
-            let key = node.child_by_field_name("key")?;
-            let key_text = content[key.byte_range()].trim_matches('"');
+        // Extract JSON key-value pairs as symbols
+        // node.kind() is already "pair" from container_kinds()
+        let key = node.child_by_field_name("key")?;
+        let key_text = content[key.byte_range()].trim_matches('"');
 
-            return Some(Symbol {
-                name: key_text.to_string(),
-                kind: SymbolKind::Variable,
-                signature: key_text.to_string(),
-                docstring: None,
-                start_line: node.start_position().row + 1,
-                end_line: node.end_position().row + 1,
-                visibility: Visibility::Public,
-                children: Vec::new(),
-            });
-        }
-        None
+        Some(Symbol {
+            name: key_text.to_string(),
+            kind: SymbolKind::Variable,
+            signature: key_text.to_string(),
+            docstring: None,
+            start_line: node.start_position().row + 1,
+            end_line: node.end_position().row + 1,
+            visibility: Visibility::Public,
+            children: Vec::new(),
+        })
     }
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {

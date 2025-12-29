@@ -6,7 +6,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] `moss view` symbol output should include line range (e.g., `foo: L10-25`) - enabled by default
 - [x] `moss view --full` line number prefixes removed, now outputs raw/highlighted content
 - [x] Data formats (TOML, JSON) syntax highlighting - works with `--pretty`
-- `moss view` for JSON files returns useless output (just filename + line count, no structure)
+- `cargo xtask build-grammars` doesn't copy .scm files for already-built grammars (need --force or separate copy step)
+- [x] `moss view` for JSON files now shows key structure with line ranges
 - Consolidate SkeletonSymbol: could use moss_languages::Symbol directly (just ignoring visibility field)
 
 ## Remaining Work
@@ -48,6 +49,9 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 ### Workflow Engine
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
+
+### Highlighting
+- Markdown code blocks: highlight embedded code with language-specific highlighting (tree-sitter injections.scm)
 
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
