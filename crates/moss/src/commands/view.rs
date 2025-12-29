@@ -29,7 +29,7 @@ impl ViewConfig {
     }
 
     pub fn line_numbers(&self) -> bool {
-        self.line_numbers.unwrap_or(false)
+        self.line_numbers.unwrap_or(true)
     }
 
     pub fn show_docs(&self) -> bool {
