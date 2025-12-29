@@ -383,6 +383,23 @@ impl Language for Rust {
         }
     }
 
+    fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
+        let names_to_use: Vec<&str> = names
+            .map(|n| n.to_vec())
+            .unwrap_or_else(|| import.names.iter().map(|s| s.as_str()).collect());
+
+        if import.is_wildcard {
+            // Module already contains ::* from parsing
+            format!("use {};", import.module)
+        } else if names_to_use.is_empty() {
+            format!("use {};", import.module)
+        } else if names_to_use.len() == 1 {
+            format!("use {}::{};", import.module, names_to_use[0])
+        } else {
+            format!("use {}::{{{}}};", import.module, names_to_use.join(", "))
+        }
+    }
+
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let line = node.start_position().row + 1;
 

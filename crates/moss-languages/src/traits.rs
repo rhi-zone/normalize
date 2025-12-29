@@ -203,6 +203,11 @@ pub trait Language: Send + Sync {
     /// Extract imports from an import node (may return multiple)
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import>;
 
+    /// Format an import as source code.
+    /// If `names` is Some, only include those names (for multi-import filtering).
+    /// If `names` is None, format the complete import.
+    fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String;
+
     /// Extract public symbols from a node.
     /// The node is one of the kinds from public_symbol_kinds().
     /// For JS/TS: extracts exported names from export statements.

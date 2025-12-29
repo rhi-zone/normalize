@@ -271,6 +271,11 @@ impl Language for Php {
         imports
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // PHP: use Namespace\Class;
+        format!("use {};", import.module)
+    }
+
     fn is_public(&self, node: &Node, content: &str) -> bool {
         self.get_visibility(node, content) == Visibility::Public
     }

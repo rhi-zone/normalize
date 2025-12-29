@@ -194,6 +194,27 @@ pub fn extract_imports(node: &Node, content: &str) -> Vec<Import> {
     }]
 }
 
+/// Format an import as JavaScript/TypeScript source code.
+pub fn format_import(import: &Import, names: Option<&[&str]>) -> String {
+    let names_to_use: Vec<&str> = names
+        .map(|n| n.to_vec())
+        .unwrap_or_else(|| import.names.iter().map(|s| s.as_str()).collect());
+
+    if import.is_wildcard {
+        format!("import * from '{}';", import.module)
+    } else if names_to_use.is_empty() {
+        format!("import '{}';", import.module)
+    } else if names_to_use.len() == 1 {
+        format!("import {{ {} }} from '{}';", names_to_use[0], import.module)
+    } else {
+        format!(
+            "import {{ {} }} from '{}';",
+            names_to_use.join(", "),
+            import.module
+        )
+    }
+}
+
 fn collect_import_names(import_clause: &Node, content: &str, names: &mut Vec<String>) {
     let mut cursor = import_clause.walk();
     for child in import_clause.children(&mut cursor) {

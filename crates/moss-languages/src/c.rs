@@ -158,6 +158,15 @@ impl Language for C {
         Vec::new()
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // C doesn't have multi-imports; each #include is a single header
+        if import.module.starts_with('<') || import.module.ends_with('>') {
+            format!("#include {}", import.module)
+        } else {
+            format!("#include \"{}\"", import.module)
+        }
+    }
+
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "function_definition" {
             return Vec::new();

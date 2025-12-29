@@ -187,6 +187,15 @@ impl Language for Cpp {
         Vec::new()
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // C++ uses #include, no multi-imports
+        if import.module.starts_with('<') || import.module.ends_with('>') {
+            format!("#include {}", import.module)
+        } else {
+            format!("#include \"{}\"", import.module)
+        }
+    }
+
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let kind = match node.kind() {
             "function_definition" => SymbolKind::Function,

@@ -1148,16 +1148,18 @@ fn cmd_view_symbol(
             if !deps_result.imports.is_empty() {
                 if let Some(ref g) = grammar {
                     let used_ids = extract_identifiers(&source, g);
+                    let lang = support_for_path(&full_path);
                     let lines: Vec<&str> = content.lines().collect();
                     let mut seen_imports = HashSet::new();
                     let mut has_imports = false;
 
                     for import in &deps_result.imports {
                         // Filter to only used names
-                        let used_names: Vec<&String> = import
+                        let used_names: Vec<&str> = import
                             .names
                             .iter()
                             .filter(|n| used_ids.contains(*n))
+                            .map(|s| s.as_str())
                             .collect();
 
                         // Check if module itself is used (for bare imports like `use std::fs`)
@@ -1179,20 +1181,18 @@ fn cmd_view_symbol(
                                 // All names used or no names (bare import) - show original line
                                 if import.line > 0 && import.line <= lines.len() {
                                     lines[import.line - 1].trim().to_string()
+                                } else if let Some(ref l) = lang {
+                                    l.format_import(import, None)
                                 } else {
                                     import.format_summary()
                                 }
                             } else {
-                                // Partial - synthesize filtered import
-                                let filtered = moss_languages::Import {
-                                    module: import.module.clone(),
-                                    names: used_names.into_iter().cloned().collect(),
-                                    alias: import.alias.clone(),
-                                    is_wildcard: import.is_wildcard,
-                                    is_relative: import.is_relative,
-                                    line: import.line,
-                                };
-                                format!("use {};", filtered.format_summary())
+                                // Partial - synthesize filtered import using Language trait
+                                if let Some(ref l) = lang {
+                                    l.format_import(import, Some(&used_names))
+                                } else {
+                                    import.format_summary()
+                                }
                             };
 
                         if seen_imports.insert(import_text.clone()) {

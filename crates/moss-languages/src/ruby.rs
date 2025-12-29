@@ -134,6 +134,16 @@ impl Language for Ruby {
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()
     }
+
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // Ruby: require 'x' or require_relative 'x'
+        if import.is_relative {
+            format!("require_relative '{}'", import.module)
+        } else {
+            format!("require '{}'", import.module)
+        }
+    }
+
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let name = match self.node_name(node, content) {
             Some(n) => n.to_string(),

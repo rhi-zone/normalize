@@ -67,6 +67,7 @@ Do not:
 - **Use trait default implementations** - defaults let you "implement" a trait without implementing it. That's a silent bug. Every method should be explicitly implemented; compiler enforces completeness, not convention.
 - **String-match on source content for AST properties** - use tree-sitter node structure, not `text.contains("async")` or `text.starts_with("enum")`. Check node kinds, child nodes, field names. String matching is fragile and misses the point of having a parsed AST.
 - **Replace content when editing lists** - when adding to TODO.md or similar, extend existing content, don't replace sections. Read carefully, add items, preserve what's there.
+- **Cut corners or use fallbacks** - implement features properly for each case. No "just use format_summary() for now" or generic fallbacks. If implementing for 98 languages, implement properly for each one - data languages return empty, each programming language uses its actual syntax.
 - **Dismiss tooling needs for "rare" operations** - error-prone manual operations need safety rails regardless of frequency. Build the tool.
 
 ## Design Principles

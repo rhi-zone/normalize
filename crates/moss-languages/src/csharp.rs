@@ -305,6 +305,15 @@ impl Language for CSharp {
         Vec::new()
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // C#: using Namespace; or using Alias = Namespace;
+        if let Some(ref alias) = import.alias {
+            format!("using {} = {};", alias, import.module)
+        } else {
+            format!("using {};", import.module)
+        }
+    }
+
     fn is_public(&self, node: &Node, content: &str) -> bool {
         self.get_visibility(node, content) == Visibility::Public
     }

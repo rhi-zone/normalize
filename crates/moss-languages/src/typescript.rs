@@ -82,6 +82,10 @@ impl Language for TypeScript {
         ecmascript::extract_imports(node, content)
     }
 
+    fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
+        ecmascript::format_import(import, names)
+    }
+
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         ecmascript::extract_public_symbols(node, content)
     }
@@ -291,6 +295,10 @@ impl Language for Tsx {
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         ecmascript::extract_imports(node, content)
+    }
+
+    fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
+        ecmascript::format_import(import, names)
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

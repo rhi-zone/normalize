@@ -199,6 +199,20 @@ impl Language for VB {
         }]
     }
 
+    fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
+        // Default: use format_summary for display
+        let names_to_use: Vec<&str> = names
+            .map(|n| n.to_vec())
+            .unwrap_or_else(|| import.names.iter().map(|s| s.as_str()).collect());
+        if names_to_use.is_empty() {
+            import.module.clone()
+        } else if names_to_use.len() == 1 {
+            format!("{}::{}", import.module, names_to_use[0])
+        } else {
+            format!("{}::{{{}}}", import.module, names_to_use.join(", "))
+        }
+    }
+
     fn is_public(&self, node: &Node, content: &str) -> bool {
         let text = &content[node.byte_range()];
         text.to_lowercase().contains("public") || !text.to_lowercase().contains("private")

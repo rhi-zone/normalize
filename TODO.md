@@ -56,7 +56,6 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 
 ### View Command
 - Smart Header improvements:
-  - Filter names within multi-imports (e.g., `use foo::{A, B, C}` → `use foo::{A}` if only A is used)
   - Parent context: show class/impl/module containing target, with siblings collapsed
     - e.g., viewing `Foo::bar()` shows `impl Foo { fn bar() { ... } /* 3 other methods */ }`
   - Optionally pull in referenced types as context (show type definitions used by the symbol)

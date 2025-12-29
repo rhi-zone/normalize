@@ -278,6 +278,11 @@ impl Language for Swift {
         Vec::new()
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // Swift: import Module
+        format!("import {}", import.module)
+    }
+
     fn is_public(&self, node: &Node, content: &str) -> bool {
         self.get_visibility(node, content) == Visibility::Public
     }

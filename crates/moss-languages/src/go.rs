@@ -481,6 +481,15 @@ impl Language for Go {
         imports
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // Go: import "pkg" or import alias "pkg"
+        if let Some(ref alias) = import.alias {
+            format!("import {} \"{}\"", alias, import.module)
+        } else {
+            format!("import \"{}\"", import.module)
+        }
+    }
+
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Go exports are determined by uppercase first letter
         let name = match self.node_name(node, content) {

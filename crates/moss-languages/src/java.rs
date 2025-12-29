@@ -532,6 +532,15 @@ impl Language for Java {
         Vec::new()
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        // Java: import pkg.Class; or import pkg.*;
+        if import.is_wildcard {
+            format!("import {}.*;", import.module)
+        } else {
+            format!("import {};", import.module)
+        }
+    }
+
     fn is_public(&self, node: &Node, content: &str) -> bool {
         self.get_visibility(node, content) == Visibility::Public
     }
