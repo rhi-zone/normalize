@@ -3,7 +3,10 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- [x] `moss grep` containing symbol: show symbol name + line range in output
+- Smart Header as default view output for symbols
+- View line ranges: `moss view file.rs:30-55` for arbitrary sections
+- `analyze --trace`: start with intra-function, expand to cross-function
+- PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
