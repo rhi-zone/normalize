@@ -57,6 +57,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
+- Detect duplicate types: structs with similar fields across modules (e.g., Symbol in 3 places, Import in 3 places). Could use structural hashing of type definitions, flag when >70% field overlap. Caught Symbol/Import/SymbolKind duplication manually - tooling should surface this proactively.
 
 ### `@` Sigil
 - As target prefix, expands to well-known paths:
