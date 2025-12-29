@@ -6,12 +6,21 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] `moss grep` containing symbol: show symbol name + line range in output
 
 ## Remaining Work
-- Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
+- Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
+  - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
+  - Requires language-specific namespace semantics - low priority
 - Shadow worktree isolation: git worktree or overlayfs for parallel validation
   - Store diffs in memory, use worktree as "materialized view"
   - Apply patch to worktree → run validator → if pass, apply to user dir
   - Zero user interruption (user can edit while agent tests in background)
-- "Hoisted Context": Body + Used Imports (not just skeleton) for agent context
+- "Smart Header" context for LLM (Gemini's term for "Hoisted Context"):
+  - Problem: bare skeletons strip semantic intent (imports, comments, deprecation notices)
+  - Solution: synthesize context header per snippet:
+    - File path
+    - Filtered imports (only what the target uses)
+    - Parent context (class/impl with siblings hidden)
+    - Target node with full body
+  - Balance: hyper-local (AST) + hyper-global (imports) in one view
 
 ### Configuration System
 Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`
