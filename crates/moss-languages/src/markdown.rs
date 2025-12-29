@@ -77,16 +77,18 @@ impl Language for Markdown {
             return None;
         }
 
-        // Determine heading level
+        // Determine heading level from marker node
+        let mut cursor2 = node.walk();
         let level = node
-            .children(&mut cursor)
-            .find(|c| c.kind().starts_with("atx_h"))
-            .map(|c| {
-                c.kind()
-                    .chars()
-                    .last()
-                    .and_then(|c| c.to_digit(10))
-                    .unwrap_or(1) as usize
+            .children(&mut cursor2)
+            .find_map(|c| match c.kind() {
+                "atx_h1_marker" => Some(1),
+                "atx_h2_marker" => Some(2),
+                "atx_h3_marker" => Some(3),
+                "atx_h4_marker" => Some(4),
+                "atx_h5_marker" => Some(5),
+                "atx_h6_marker" => Some(6),
+                _ => None,
             })
             .unwrap_or(1);
 

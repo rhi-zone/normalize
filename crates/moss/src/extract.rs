@@ -77,6 +77,11 @@ impl Extractor {
             Self::merge_rust_impl_blocks(&mut symbols);
         }
 
+        // Post-process for Markdown: fix section ranges
+        if support.grammar_name() == "markdown" {
+            Self::fix_markdown_section_ranges(&mut symbols, content);
+        }
+
         symbols
     }
 
@@ -231,6 +236,29 @@ impl Extractor {
                     children: methods,
                 });
             }
+        }
+    }
+
+    /// Fix markdown section ranges: each heading extends to the next heading of same/higher level or EOF.
+    fn fix_markdown_section_ranges(symbols: &mut [Symbol], content: &str) {
+        let total_lines = content.lines().count();
+
+        // Extract heading level from signature (e.g., "## Foo" -> 2)
+        fn heading_level(sym: &Symbol) -> usize {
+            sym.signature.chars().take_while(|&c| c == '#').count()
+        }
+
+        for i in 0..symbols.len() {
+            let current_level = heading_level(&symbols[i]);
+
+            // Find next heading of same or higher level (lower number)
+            let next_start = symbols[i + 1..]
+                .iter()
+                .find(|s| heading_level(s) <= current_level)
+                .map(|s| s.start_line.saturating_sub(1))
+                .unwrap_or(total_lines);
+
+            symbols[i].end_line = next_start;
         }
     }
 }
