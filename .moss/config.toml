@@ -1,0 +1,12 @@
+# Moss configuration
+# See: https://github.com/pterror/moss
+
+[daemon]
+# enabled = true
+# auto_start = true
+
+[analyze]
+clones = true
+
+[sigil]
+todo = ["TODO.md"]

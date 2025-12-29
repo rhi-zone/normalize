@@ -70,6 +70,6 @@ cache/
 *.cpuprofile
 
 # Moss
-.moss
+.moss/*
 !.moss/config.toml
 !.moss/clone-allow
