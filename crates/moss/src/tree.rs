@@ -497,6 +497,16 @@ pub fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<Highligh
                     }
                 }
             }
+
+            // XML: Anonymous Name nodes in tag/attribute context
+            // STag > Name (tag name), ETag > Name (closing tag), Attribute > Name (attr name)
+            if kind == "Name" && matches!(parent_kind, "STag" | "ETag" | "Attribute") {
+                spans.push(HighlightSpan {
+                    start: node.start_byte(),
+                    end: node.end_byte(),
+                    kind: HighlightKind::Keyword,
+                });
+            }
         }
     }
 
@@ -539,7 +549,9 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "single_quote_scalar"
         // HTML/CSS strings
         | "quoted_attribute_value"
-        | "string_value" => HighlightKind::String,
+        | "string_value"
+        // XML attribute values
+        | "AttValue" => HighlightKind::String,
 
         // Numbers
         "number"

@@ -1257,11 +1257,22 @@ fn test_highlight_elisp() {
 }
 
 #[test]
-fn test_highlight_xml() {
-    // NOTE: XML grammar uses anonymous nodes for names (Name*)
+fn test_highlight_xml_tags() {
     let code = "<root><child>text</child></root>";
-    let _spans = get_spans(code, "xml");
-    assert!(code.len() > 0);
+    let spans = get_spans(code, "xml");
+    // XML Name nodes in STag/ETag context are now highlighted
+    assert!(has_span(&spans, "root", HighlightKind::Keyword));
+    assert!(has_span(&spans, "child", HighlightKind::Keyword));
+}
+
+#[test]
+fn test_highlight_xml_attributes() {
+    let code = "<div class=\"foo\">text</div>";
+    let spans = get_spans(code, "xml");
+    // Attribute names and values
+    assert!(has_span(&spans, "div", HighlightKind::Keyword));
+    assert!(has_span(&spans, "class", HighlightKind::Keyword));
+    assert!(has_span(&spans, "\"foo\"", HighlightKind::String));
 }
 
 #[test]
