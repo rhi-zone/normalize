@@ -180,6 +180,10 @@ pub struct AnalyzeArgs {
     #[arg(long, default_value = "70")]
     pub min_overlap: usize,
 
+    /// Allow a duplicate type pair (add to .moss/duplicate-types-allow). Format: Type1~Type2
+    #[arg(long, value_name = "PAIR")]
+    pub allow_type: Option<String>,
+
     /// Elide identifier names when detecting clones (default: true)
     #[arg(long, default_value = "true")]
     pub elide_identifiers: bool,
@@ -200,8 +204,8 @@ pub struct AnalyzeArgs {
     #[arg(long, value_name = "LOCATION")]
     pub allow_group: Option<String>,
 
-    /// Reason for allowing the clone group (required for new groups)
-    #[arg(long, value_name = "REASON", requires = "allow_group")]
+    /// Reason for allowing (required for new clone groups or type pairs)
+    #[arg(long, value_name = "REASON")]
     pub reason: Option<String>,
 
     /// Exclude paths matching pattern or @alias
@@ -263,6 +267,11 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
     let weights = config.analyze.weights();
 
+    // Handle --allow-type mode
+    if let Some(ref pair) = args.allow_type {
+        return cmd_allow_duplicate_type(&effective_root, pair, args.reason.as_deref());
+    }
+
     // Handle --duplicate-types as standalone pass
     if args.duplicate_types {
         let scan_root = args
@@ -270,7 +279,12 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             .as_ref()
             .map(PathBuf::from)
             .unwrap_or_else(|| effective_root.clone());
-        return cmd_duplicate_types(&scan_root, args.min_overlap, format.is_json());
+        return cmd_duplicate_types(
+            &scan_root,
+            &effective_root,
+            args.min_overlap,
+            format.is_json(),
+        );
     }
 
     cmd_analyze(
@@ -2180,10 +2194,38 @@ fn cmd_clones_with_count(
 }
 
 /// Detect duplicate type definitions (structs with similar fields)
-fn cmd_duplicate_types(root: &Path, min_overlap_percent: usize, json: bool) -> i32 {
+fn cmd_duplicate_types(
+    root: &Path,
+    config_root: &Path,
+    min_overlap_percent: usize,
+    json: bool,
+) -> i32 {
     use regex::Regex;
+    use std::collections::HashSet;
 
     let extractor = Extractor::new();
+
+    // Load allowlist
+    let allowlist_path = config_root.join(".moss/duplicate-types-allow");
+    let allowed_pairs: HashSet<(String, String)> = std::fs::read_to_string(&allowlist_path)
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
+        .filter_map(|l| {
+            let parts: Vec<&str> = l.trim().split('~').collect();
+            if parts.len() == 2 {
+                // Store in sorted order for consistent matching
+                let (a, b) = if parts[0] < parts[1] {
+                    (parts[0].to_string(), parts[1].to_string())
+                } else {
+                    (parts[1].to_string(), parts[0].to_string())
+                };
+                Some((a, b))
+            } else {
+                None
+            }
+        })
+        .collect();
 
     // Type location info
     #[derive(Debug, Clone)]
@@ -2297,6 +2339,16 @@ fn cmd_duplicate_types(root: &Path, min_overlap_percent: usize, json: bool) -> i
                 continue;
             }
 
+            // Skip if pair is in allowlist
+            let pair_key = if t1.name < t2.name {
+                (t1.name.clone(), t2.name.clone())
+            } else {
+                (t2.name.clone(), t1.name.clone())
+            };
+            if allowed_pairs.contains(&pair_key) {
+                continue;
+            }
+
             // Calculate field overlap
             let set1: std::collections::HashSet<_> = t1.fields.iter().collect();
             let set2: std::collections::HashSet<_> = t2.fields.iter().collect();
@@ -2402,6 +2454,73 @@ fn cmd_duplicate_types(root: &Path, min_overlap_percent: usize, json: bool) -> i
     } else {
         1
     }
+}
+
+/// Allow a duplicate type pair by adding to .moss/duplicate-types-allow
+fn cmd_allow_duplicate_type(root: &Path, pair: &str, reason: Option<&str>) -> i32 {
+    // Parse pair format: Type1~Type2
+    let parts: Vec<&str> = pair.split('~').collect();
+    if parts.len() != 2 {
+        eprintln!("Invalid pair format. Use: Type1~Type2");
+        return 1;
+    }
+
+    // Normalize to sorted order
+    let (type1, type2) = if parts[0] < parts[1] {
+        (parts[0], parts[1])
+    } else {
+        (parts[1], parts[0])
+    };
+    let entry = format!("{}~{}", type1, type2);
+
+    // Load existing allowlist
+    let allowlist_path = root.join(".moss/duplicate-types-allow");
+    let existing_content = std::fs::read_to_string(&allowlist_path).unwrap_or_default();
+    let existing_lines: Vec<&str> = existing_content.lines().collect();
+
+    // Check if already exists
+    for line in &existing_lines {
+        let trimmed = line.trim();
+        if trimmed == entry || trimmed == format!("{}~{}", type2, type1) {
+            println!("Pair already allowed: {}", entry);
+            return 0;
+        }
+    }
+
+    // Require reason for new entries
+    if reason.is_none() {
+        eprintln!("Reason required for new type pairs. Use --reason \"...\"");
+        return 1;
+    }
+
+    // Build new content
+    let mut new_lines: Vec<String> = existing_lines.iter().map(|s| s.to_string()).collect();
+    if !new_lines.is_empty() && !new_lines.last().map_or(true, |l| l.is_empty()) {
+        new_lines.push(String::new());
+    }
+    if let Some(r) = reason {
+        new_lines.push(format!("# {}", r));
+    }
+    new_lines.push(entry.clone());
+
+    // Ensure .moss directory exists
+    let moss_dir = root.join(".moss");
+    if !moss_dir.exists() {
+        if let Err(e) = std::fs::create_dir_all(&moss_dir) {
+            eprintln!("Failed to create .moss directory: {}", e);
+            return 1;
+        }
+    }
+
+    // Write back
+    let new_content = new_lines.join("\n") + "\n";
+    if let Err(e) = std::fs::write(&allowlist_path, new_content) {
+        eprintln!("Failed to write .moss/duplicate-types-allow: {}", e);
+        return 1;
+    }
+
+    println!("Added to .moss/duplicate-types-allow: {}", entry);
+    0
 }
 
 /// Flatten nested symbols into a flat list
