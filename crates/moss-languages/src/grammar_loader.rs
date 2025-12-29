@@ -1,6 +1,7 @@
 //! Dynamic grammar loading for tree-sitter.
 //!
 //! Loads tree-sitter grammars from shared libraries (.so/.dylib/.dll).
+//! Also loads highlight queries (.scm files) for syntax highlighting.
 //! Grammars are compiled from arborium sources via `cargo xtask build-grammars`.
 
 use libloading::{Library, Symbol};
@@ -24,6 +25,8 @@ pub struct GrammarLoader {
     search_paths: Vec<PathBuf>,
     /// Cached loaded grammars.
     cache: RwLock<HashMap<String, Arc<LoadedGrammar>>>,
+    /// Cached highlight queries.
+    highlight_cache: RwLock<HashMap<String, Arc<String>>>,
 }
 
 impl GrammarLoader {
@@ -52,6 +55,7 @@ impl GrammarLoader {
         Self {
             search_paths: paths,
             cache: RwLock::new(HashMap::new()),
+            highlight_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -60,6 +64,7 @@ impl GrammarLoader {
         Self {
             search_paths: paths,
             cache: RwLock::new(HashMap::new()),
+            highlight_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -78,6 +83,42 @@ impl GrammarLoader {
         }
 
         self.load_external(name)
+    }
+
+    /// Get the highlight query for a grammar.
+    ///
+    /// Returns None if no highlight query found for the grammar.
+    /// Query files are {name}.highlights.scm in the grammar search paths.
+    pub fn get_highlights(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.highlight_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        self.load_highlights(name)
+    }
+
+    /// Load highlight query from external .scm file.
+    fn load_highlights(&self, name: &str) -> Option<Arc<String>> {
+        let scm_name = format!("{name}.highlights.scm");
+
+        for search_path in &self.search_paths {
+            let scm_path = search_path.join(&scm_name);
+            if scm_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&scm_path) {
+                    let query = Arc::new(content);
+
+                    // Cache it
+                    if let Ok(mut cache) = self.highlight_cache.write() {
+                        cache.insert(name.to_string(), Arc::clone(&query));
+                    }
+
+                    return Some(query);
+                }
+            }
+        }
+
+        None
     }
 
     /// Load a grammar from external .so file.

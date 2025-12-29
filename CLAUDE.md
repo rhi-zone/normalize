@@ -80,6 +80,7 @@ Do not:
 - If proposing a new dependency, ask: can stdlib/existing code do this?
 - HashMap > inventory crate. OnceLock > lazy_static. Functions > traits (until you need the trait).
 - "Going in circles" = signal to simplify, not add complexity.
+- **Don't reinvent the wheel**: if ecosystem tooling exists (e.g., tree-sitter highlight queries), use it. Arborium ships `.scm` query files for every grammar - use those rather than hand-rolling node kind classifications.
 
 **Explicit over implicit.**
 - Convenience = zero-config. Hiding information = pretending everything is okay.

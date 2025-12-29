@@ -177,6 +177,13 @@ fn compile_grammar(lang: &str, crate_dir: &Path, out_dir: &Path) -> Result<u64, 
         return Err(format!("Compilation failed: {stderr}"));
     }
 
+    // Copy highlight queries if available
+    let highlights_scm = crate_dir.join("queries/highlights.scm");
+    if highlights_scm.exists() {
+        let dest = out_dir.join(format!("{lang}.highlights.scm"));
+        let _ = fs::copy(&highlights_scm, &dest);
+    }
+
     let size = fs::metadata(&out_file).map(|m| m.len()).unwrap_or(0);
     Ok(size)
 }
