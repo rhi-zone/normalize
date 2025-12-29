@@ -1149,13 +1149,19 @@ fn cmd_view_symbol(
                 if let Some(ref g) = grammar {
                     let used_ids = extract_identifiers(&source, g);
                     let lines: Vec<&str> = content.lines().collect();
-                    let mut seen_lines = HashSet::new();
+                    let mut seen_imports = HashSet::new();
                     let mut has_imports = false;
 
                     for import in &deps_result.imports {
-                        // Check if any imported name is used
-                        let is_used = import.names.iter().any(|n| used_ids.contains(n))
-                            || used_ids.contains(&import.module)
+                        // Filter to only used names
+                        let used_names: Vec<&String> = import
+                            .names
+                            .iter()
+                            .filter(|n| used_ids.contains(*n))
+                            .collect();
+
+                        // Check if module itself is used (for bare imports like `use std::fs`)
+                        let module_used = used_ids.contains(&import.module)
                             || import
                                 .module
                                 .rsplit("::")
@@ -1163,17 +1169,38 @@ fn cmd_view_symbol(
                                 .map(|last| used_ids.contains(last))
                                 .unwrap_or(false);
 
-                        if is_used {
-                            if import.line > 0 && import.line <= lines.len() {
-                                let line_content = lines[import.line - 1].trim();
-                                if seen_lines.insert(line_content.to_string()) {
-                                    if !has_imports {
-                                        println!();
-                                        has_imports = true;
-                                    }
-                                    println!("{}", line_content);
+                        if used_names.is_empty() && !module_used && !import.is_wildcard {
+                            continue;
+                        }
+
+                        // Decide what to show
+                        let import_text =
+                            if used_names.len() == import.names.len() || import.names.is_empty() {
+                                // All names used or no names (bare import) - show original line
+                                if import.line > 0 && import.line <= lines.len() {
+                                    lines[import.line - 1].trim().to_string()
+                                } else {
+                                    import.format_summary()
                                 }
+                            } else {
+                                // Partial - synthesize filtered import
+                                let filtered = moss_languages::Import {
+                                    module: import.module.clone(),
+                                    names: used_names.into_iter().cloned().collect(),
+                                    alias: import.alias.clone(),
+                                    is_wildcard: import.is_wildcard,
+                                    is_relative: import.is_relative,
+                                    line: import.line,
+                                };
+                                format!("use {};", filtered.format_summary())
+                            };
+
+                        if seen_imports.insert(import_text.clone()) {
+                            if !has_imports {
+                                println!();
+                                has_imports = true;
                             }
+                            println!("{}", import_text);
                         }
                     }
 
