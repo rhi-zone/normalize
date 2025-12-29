@@ -140,20 +140,10 @@ fn cmd_script_show(script: &str, root: Option<&Path>, json: bool) -> i32 {
     1
 }
 
-/// Print Lua code with basic syntax highlighting (comments in dim)
+/// Print Lua code with syntax highlighting via tree-sitter.
 fn print_lua_highlighted(code: &str) {
-    for line in code.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("--") {
-            // Comment - print dim
-            println!("\x1b[2m{}\x1b[0m", line);
-        } else if trimmed.starts_with("local ") || trimmed.starts_with("function ") {
-            // Keywords - print bold
-            println!("\x1b[1m{}\x1b[0m", line);
-        } else {
-            println!("{}", line);
-        }
-    }
+    use crate::tree::highlight_source;
+    println!("{}", highlight_source(code, "lua", true));
 }
 
 #[cfg(feature = "lua")]

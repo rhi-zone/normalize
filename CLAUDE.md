@@ -37,6 +37,12 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 moss view [path[/symbol]] [--types-only]   # structure, skeleton, or symbol source
 moss analyze [--complexity] [path]          # find complex functions
 moss grep <pattern> [--only "*.rs"]         # search (real regex, not BRE: use | not \|)
+moss @todo [list|add|done|rm]              # manage TODO.md via Lua script
+```
+
+For debugging tree-sitter grammars and node kinds:
+```
+cargo run --bin debug_ast -- <language> '<code>'   # dump AST with node kinds
 ```
 
 Fall back to Read only for exact line content needed by Edit. If moss isn't useful, add to TODO.md and fix it.

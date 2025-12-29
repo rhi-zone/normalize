@@ -6,7 +6,9 @@ use crate::parsers::Parsers;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
-use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
+use nu_ansi_term::Color::{
+    LightCyan, LightGreen, LightMagenta, LightRed, White as LightGray, Yellow,
+};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -276,6 +278,8 @@ enum HighlightKind {
     Type,
     Comment,
     String,
+    Number,
+    Constant, // true, false, nil, null, undefined, NaN, Infinity
     Attribute,
     FunctionName,
     Default,
@@ -329,12 +333,14 @@ pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
         // Add highlighted span (Monokai-inspired colors)
         let text = &sig[span.start..span.end];
         let styled = match span.kind {
-            HighlightKind::Keyword => Red.paint(text).to_string(), // Red/pink for keywords
-            HighlightKind::Type => LightCyan.paint(text).to_string(), // Light cyan for types
+            HighlightKind::Keyword => LightRed.paint(text).to_string(), // Light red for keywords
+            HighlightKind::Type => LightCyan.paint(text).to_string(),   // Light cyan for types
             HighlightKind::Comment => LightGray.paint(text).to_string(), // Grey for comments
             HighlightKind::String => LightGreen.paint(text).to_string(), // Light green for strings
-            HighlightKind::Attribute => LightMagenta.paint(text).to_string(), // Magenta for attributes
-            HighlightKind::FunctionName => Yellow.paint(text).to_string(), // Yellow for functions
+            HighlightKind::Number => LightMagenta.paint(text).to_string(), // Magenta for numbers
+            HighlightKind::Constant => LightMagenta.paint(text).to_string(), // Magenta for constants
+            HighlightKind::Attribute => LightCyan.paint(text).to_string(),   // Cyan for attributes
+            HighlightKind::FunctionName => Yellow.paint(text).to_string(),   // Yellow for functions
             HighlightKind::Default => text.to_string(),
         };
         result.push_str(&styled);
@@ -401,9 +407,12 @@ fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<HighlightSpa
                 });
             }
 
-            // Function/macro calls: foo() - Rust: call_expression/macro_invocation, JS: call_expression, Python: call
+            // Function/macro calls: foo() - Rust: call_expression/macro_invocation, JS: call_expression, Python: call, Lua: function_call
             if kind == "identifier"
-                && matches!(parent_kind, "call_expression" | "call" | "macro_invocation")
+                && matches!(
+                    parent_kind,
+                    "call_expression" | "call" | "macro_invocation" | "function_call"
+                )
             {
                 spans.push(HighlightSpan {
                     start: node.start_byte(),
@@ -435,15 +444,32 @@ fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<HighlightSpa
             // - Rust: field_identifier → field_expression → call_expression
             // - JS/TS: property_identifier → member_expression → call_expression
             // - Python: identifier → attribute → call
+            // - Lua: identifier → dot_index_expression/method_index_expression → function_call
+            //   For Lua, only the second identifier (after . or :) is the method name
             let is_method_id = matches!(kind, "field_identifier" | "property_identifier")
                 || (kind == "identifier" && parent_kind == "attribute");
+            let is_lua_method = kind == "identifier"
+                && matches!(
+                    parent_kind,
+                    "dot_index_expression" | "method_index_expression"
+                )
+                && node
+                    .prev_sibling()
+                    .map_or(false, |s| matches!(s.kind(), "." | ":"));
             let is_method_parent = matches!(
                 parent_kind,
-                "field_expression" | "member_expression" | "attribute"
+                "field_expression"
+                    | "member_expression"
+                    | "attribute"
+                    | "dot_index_expression"
+                    | "method_index_expression"
             );
-            if is_method_id && is_method_parent {
+            if (is_method_id || is_lua_method) && is_method_parent {
                 if let Some(grandparent) = parent.parent() {
-                    if matches!(grandparent.kind(), "call_expression" | "call") {
+                    if matches!(
+                        grandparent.kind(),
+                        "call_expression" | "call" | "function_call"
+                    ) {
                         spans.push(HighlightSpan {
                             start: node.start_byte(),
                             end: node.end_byte(),
@@ -498,12 +524,28 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         // Strings (including template/interpolated strings)
         "string_literal"
         | "raw_string_literal"
+        | "string"
         | "string_content"
         | "string_fragment"
         | "interpreted_string_literal"
         | "char_literal"
         | "template_string"
         | "template_literal" => HighlightKind::String,
+
+        // Numbers
+        "number"
+        | "integer"
+        | "float"
+        | "integer_literal"
+        | "float_literal"
+        | "int_literal"
+        | "imaginary_literal"
+        | "rune_literal" => HighlightKind::Number,
+
+        // Constants (booleans, nil/null, special values)
+        "true" | "false" | "boolean_literal" | "nil" | "null" | "none" | "undefined" => {
+            HighlightKind::Constant
+        }
 
         // Types (check first - more specific)
         "type_identifier"
@@ -512,12 +554,24 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "scoped_type_identifier"
         | "builtin_type" => HighlightKind::Type,
 
-        // Keywords
+        // Keywords (cross-language)
         "fn" | "function" | "def" | "async" | "await" | "pub" | "struct" | "enum" | "trait"
         | "impl" | "type" | "const" | "static" | "let" | "mut" | "ref" | "class" | "interface"
         | "extends" | "implements" | "import" | "from" | "export" | "return" | "if" | "else"
         | "for" | "while" | "loop" | "match" | "where" | "self" | "Self" | "super" | "crate"
-        | "mod" | "use" | "as" | "in" | "unsafe" | "extern" | "dyn" => HighlightKind::Keyword,
+        | "mod" | "use" | "as" | "in" | "unsafe" | "extern" | "dyn"
+        // Lua keywords
+        | "local" | "end" | "then" | "do" | "elseif" | "repeat" | "until" | "and" | "or"
+        | "not" | "break" | "goto"
+        // Python keywords
+        | "elif" | "except" | "finally" | "try" | "with" | "yield" | "lambda" | "pass"
+        | "raise" | "assert" | "global" | "nonlocal" | "del" | "is"
+        // JS/TS keywords
+        | "var" | "new" | "this" | "throw" | "catch" | "switch" | "case" | "default"
+        | "continue" | "debugger" | "delete" | "instanceof" | "typeof" | "void"
+        // Go keywords
+        | "package" | "func" | "defer" | "go" | "chan" | "select" | "fallthrough"
+        | "range" | "map" => HighlightKind::Keyword,
 
         _ => HighlightKind::Default,
     }

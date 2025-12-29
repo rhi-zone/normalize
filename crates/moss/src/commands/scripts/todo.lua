@@ -190,8 +190,38 @@ local function write_lines(path, lines)
     write_file(path, table.concat(lines, "\n"))
 end
 
+-- Help text
+local function print_help()
+    print([[moss @todo - TODO file management
+
+Usage: moss @todo [command] [args...]
+
+Commands:
+  list          Show todo items (default)
+  add <text>    Add a new todo item to the primary section
+  done <query>  Mark an item as done (matches by text)
+  rm <query>    Remove an item (matches by text)
+  clean         Remove all completed items
+
+Examples:
+  moss @todo                    # list all todos
+  moss @todo add Fix the bug    # add "Fix the bug" to Next Up
+  moss @todo done bug           # mark item containing "bug" as done
+  moss @todo rm bug             # remove item containing "bug"
+  moss @todo clean              # remove all [x] items
+
+The script looks for: TODO.md, TASKS.md, todo.md, tasks.md, etc.
+Items are added to the first "priority" section (Next Up, TODO, Tasks, etc.)]])
+end
+
 -- Main
 local action = args[1] or "list"
+
+if action == "--help" or action == "-h" or action == "help" then
+    print_help()
+    os.exit(0)
+end
+
 local todo_file = find_todo_file()
 
 if not todo_file then
