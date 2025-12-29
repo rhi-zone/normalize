@@ -48,32 +48,38 @@ Grammar build tooling:
 - Supports single file or directory scanning
 - JSON output with `--json`
 
+### Grep Command
+
+`moss grep` improvements:
+- Shows containing symbol with line range in output (e.g., `42 (process_request L30-55): ...`)
+- Semantic context is more useful than arbitrary surrounding lines
+
 ### Init Command
 
 `moss init` for idempotent project setup:
 - Creates `.moss/` directory and default `config.toml`
-- Updates `.gitignore` with moss entries (`.moss`, `!.moss/config.toml`, `!.moss/clone-allow`)
+- Updates `.gitignore` with moss entries (`.moss/*`, `!.moss/config.toml`, `!.moss/duplicate-functions-allow`, `!.moss/duplicate-types-allow`)
 - Logs when commented-out entries are skipped
 - `--index` flag to index codebase after init
 
-### Clone Detection
+### Duplicate Function Detection
 
-`moss analyze --clones` for finding structural code duplicates:
+`moss analyze --duplicate-functions` for finding structural code duplicates:
 - On-demand AST hashing (no index storage)
 - `--elide-identifiers` (default true): ignore variable/function names
 - `--elide-literals` (default false): ignore literal values
 - `--show-source`: display duplicate code inline
 - `--min-lines N`: filter trivial functions
-- Allowlist via `.moss/clone-allow` (format: `path:symbol`)
-- `--allow-group path:symbol` to approve clone groups (with `--reason` for new groups)
-- CI integration: fails if unallowed clones found
+- Allowlist via `.moss/duplicate-functions-allow` (format: `path:symbol`)
+- `--allow-function path:symbol` to approve duplicate groups (with `--reason` for new groups)
+- CI integration: fails if unallowed duplicates found
 
-### Analyze Command
+### Analyze Grading
 
 Configurable analysis passes with weighted grading:
-- `--all` flag runs all passes including clones
-- `[analyze]` config section: `health`, `complexity`, `security`, `clones`
-- `[analyze.weights]` for custom grade weights (security=2.0 default, clones=0.3)
+- `--all` flag runs all passes including duplicate-functions
+- `[analyze]` config section: `health`, `complexity`, `security`, `duplicate_functions`
+- `[analyze.weights]` for custom grade weights (security=2.0 default, duplicate_functions=0.3)
 - Letter grade output: "Overall Grade: B (82%)"
 
 ### Index-Free Operation

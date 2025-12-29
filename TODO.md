@@ -3,7 +3,7 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- `moss grep` containing symbol: show symbol name + line range in output (e.g., `src/foo.rs:42 (process_request L30-55): ...`)
+- [x] `moss grep` containing symbol: show symbol name + line range in output
 
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
