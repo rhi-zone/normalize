@@ -6,10 +6,11 @@ use crate::filter::Filter;
 use crate::merge::Merge;
 use crate::skeleton::SymbolExt;
 use crate::tree::{DocstringDisplay, FormatOptions, ViewNode, ViewNodeKind};
-use crate::{daemon, deps, index, path_resolve, skeleton, symbols, tree};
+use crate::{daemon, deps, index, parsers, path_resolve, skeleton, symbols, tree};
 use clap::Args;
 use moss_languages::support_for_path;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 /// View command configuration.
@@ -1138,21 +1139,43 @@ fn cmd_view_symbol(
                 }
             }
 
-            // Smart Header: show imports (actual lines from source)
+            // Smart Header: show only imports used by this symbol
             if !deps_result.imports.is_empty() {
-                let lines: Vec<&str> = content.lines().collect();
-                let mut seen_lines = std::collections::HashSet::new();
-                println!();
-                for import in &deps_result.imports {
-                    if import.line > 0 && import.line <= lines.len() {
-                        let line_content = lines[import.line - 1].trim();
-                        // Deduplicate
-                        if seen_lines.insert(line_content.to_string()) {
-                            println!("{}", line_content);
+                if let Some(ref g) = grammar {
+                    let used_ids = extract_identifiers(&source, g);
+                    let lines: Vec<&str> = content.lines().collect();
+                    let mut seen_lines = HashSet::new();
+                    let mut has_imports = false;
+
+                    for import in &deps_result.imports {
+                        // Check if any imported name is used
+                        let is_used = import.names.iter().any(|n| used_ids.contains(n))
+                            || used_ids.contains(&import.module)
+                            || import
+                                .module
+                                .rsplit("::")
+                                .next()
+                                .map(|last| used_ids.contains(last))
+                                .unwrap_or(false);
+
+                        if is_used {
+                            if import.line > 0 && import.line <= lines.len() {
+                                let line_content = lines[import.line - 1].trim();
+                                if seen_lines.insert(line_content.to_string()) {
+                                    if !has_imports {
+                                        println!();
+                                        has_imports = true;
+                                    }
+                                    println!("{}", line_content);
+                                }
+                            }
                         }
                     }
+
+                    if has_imports {
+                        println!();
+                    }
                 }
-                println!();
             }
 
             // Apply syntax highlighting in pretty mode
@@ -1258,6 +1281,63 @@ fn cmd_view_symbol(
                 eprintln!("Did you mean: moss grep '{}' {}", symbol_name, file_path);
             }
             1
+        }
+    }
+}
+
+/// Extract all identifiers used in source code.
+fn extract_identifiers(source: &str, grammar: &str) -> HashSet<String> {
+    let mut identifiers = HashSet::new();
+    let parsers = parsers::Parsers::new();
+
+    if let Some(tree) = parsers.parse_with_grammar(grammar, source) {
+        let mut cursor = tree.walk();
+        collect_identifiers(&mut cursor, source.as_bytes(), &mut identifiers);
+    }
+
+    identifiers
+}
+
+/// Recursively collect identifiers from AST.
+fn collect_identifiers(
+    cursor: &mut tree_sitter::TreeCursor,
+    source: &[u8],
+    identifiers: &mut HashSet<String>,
+) {
+    loop {
+        let node = cursor.node();
+        let kind = node.kind();
+
+        // Collect identifier-like nodes
+        if kind == "identifier"
+            || kind == "type_identifier"
+            || kind == "field_identifier"
+            || kind == "property_identifier"
+            || kind.ends_with("_identifier")
+        {
+            if let Ok(text) = node.utf8_text(source) {
+                identifiers.insert(text.to_string());
+            }
+        }
+
+        // For scoped identifiers (path::to::Thing), also collect the segments
+        if kind == "scoped_identifier" || kind == "scoped_type_identifier" {
+            // Get the rightmost identifier (the actual name being used)
+            if let Some(last_child) = node.child(node.child_count().saturating_sub(1)) {
+                if let Ok(text) = last_child.utf8_text(source) {
+                    identifiers.insert(text.to_string());
+                }
+            }
+        }
+
+        // Recurse into children
+        if cursor.goto_first_child() {
+            collect_identifiers(cursor, source, identifiers);
+            cursor.goto_parent();
+        }
+
+        if !cursor.goto_next_sibling() {
+            break;
         }
     }
 }
