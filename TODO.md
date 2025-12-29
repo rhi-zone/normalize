@@ -3,10 +3,11 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- Consolidate SkeletonSymbol: could use moss_languages::Symbol directly (just ignoring visibility field)
-- `moss view` symbol output should include line numbers
-- `moss view` for JSON files returns useless output (just filename + line count, no structure)
+- [x] `moss view` symbol output should include line range (e.g., `foo: L10-25`) - enabled by default
+- `moss view --full` incorrectly prefixes every line with line numbers (pre-existing bug)
 - Data formats (TOML, JSON) don't have syntax highlighting in view output
+- `moss view` for JSON files returns useless output (just filename + line count, no structure)
+- Consolidate SkeletonSymbol: could use moss_languages::Symbol directly (just ignoring visibility field)
 
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees

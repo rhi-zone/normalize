@@ -1108,7 +1108,15 @@ fn cmd_view_symbol(
             );
         } else {
             if depth >= 0 {
-                println!("# {}", full_symbol_path);
+                // Get line numbers from the symbol if available
+                if let Some(sym) = parser.find_symbol(&full_path, &content, symbol_name) {
+                    println!(
+                        "# {} (L{}-{})",
+                        full_symbol_path, sym.start_line, sym.end_line
+                    );
+                } else {
+                    println!("# {}", full_symbol_path);
+                }
             }
             // Apply syntax highlighting in pretty mode
             let highlighted = if let Some(ref g) = grammar {
@@ -1149,7 +1157,10 @@ fn cmd_view_symbol(
                     );
                 } else {
                     if depth >= 0 {
-                        println!("# {}", full_symbol_path);
+                        println!(
+                            "# {} (L{}-{})",
+                            full_symbol_path, sym.start_line, sym.end_line
+                        );
                     }
                     // Apply syntax highlighting in pretty mode
                     let highlighted = if let Some(ref g) = grammar {
@@ -1169,7 +1180,10 @@ fn cmd_view_symbol(
                 println!("{}", serde_json::to_string(&view_node).unwrap());
             } else {
                 // Use ViewNode for consistent text formatting
-                println!("# {} ({})", full_symbol_path, sym.kind);
+                println!(
+                    "# {} ({}, L{}-{})",
+                    full_symbol_path, sym.kind, sym.start_line, sym.end_line
+                );
                 let format_options = FormatOptions {
                     docstrings: if show_docs {
                         DocstringDisplay::Full
