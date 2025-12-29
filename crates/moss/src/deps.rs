@@ -3,32 +3,9 @@
 //! Extracts imports and exports from source files.
 
 use crate::parsers::Parsers;
-use moss_languages::Export as LangExport;
-use moss_languages::Import as LangImport;
-use moss_languages::{
-    support_for_grammar, support_for_path, Language, SymbolKind as LangSymbolKind,
-};
+use moss_languages::{support_for_grammar, support_for_path, Export, Import, Language, SymbolKind};
 use std::path::Path;
 use tree_sitter;
-
-/// An import statement
-#[derive(Debug, Clone)]
-pub struct Import {
-    pub module: String,
-    pub names: Vec<String>, // Names imported (empty for "import x")
-    pub alias: Option<String>,
-    pub line: usize,
-    pub is_relative: bool,
-}
-
-/// An exported symbol
-#[derive(Debug, Clone)]
-pub struct Export {
-    pub name: String,
-    pub kind: &'static str, // "function", "class", "variable"
-    #[allow(dead_code)] // Part of public API
-    pub line: usize,
-}
 
 /// A re-export statement (export * from './module' or export { foo } from './module')
 #[derive(Debug, Clone)]
@@ -88,8 +65,8 @@ impl DepsResult {
         if !self.exports.is_empty() {
             lines.push("# Exports".to_string());
             for exp in &self.exports {
-                if exp.kind != "variable" {
-                    lines.push(format!("{}: {}", exp.kind, exp.name));
+                if exp.kind != SymbolKind::Variable {
+                    lines.push(format!("{}: {}", exp.kind.as_str(), exp.name));
                 }
             }
             lines.push(String::new());
@@ -116,40 +93,6 @@ impl DepsResult {
 
 pub struct DepsExtractor {
     parsers: Parsers,
-}
-
-/// Convert trait Import to deps Import
-fn convert_import(imp: &LangImport) -> Import {
-    Import {
-        module: imp.module.clone(),
-        names: imp.names.clone(),
-        alias: imp.alias.clone(),
-        line: imp.line,
-        is_relative: imp.is_relative,
-    }
-}
-
-/// Convert trait Export to deps Export
-fn convert_export(exp: &LangExport) -> Export {
-    let kind = match exp.kind {
-        LangSymbolKind::Function => "function",
-        LangSymbolKind::Method => "method",
-        LangSymbolKind::Class => "class",
-        LangSymbolKind::Struct => "struct",
-        LangSymbolKind::Enum => "enum",
-        LangSymbolKind::Trait => "trait",
-        LangSymbolKind::Interface => "interface",
-        LangSymbolKind::Module => "module",
-        LangSymbolKind::Type => "type",
-        LangSymbolKind::Constant => "constant",
-        LangSymbolKind::Variable => "variable",
-        LangSymbolKind::Heading => "heading",
-    };
-    Export {
-        name: exp.name.clone(),
-        kind,
-        line: exp.line,
-    }
 }
 
 impl DepsExtractor {
@@ -268,13 +211,13 @@ impl DepsExtractor {
             // Check for import nodes
             if support.import_kinds().contains(&kind) {
                 let lang_imports = support.extract_imports(&node, content);
-                imports.extend(lang_imports.iter().map(convert_import));
+                imports.extend(lang_imports);
             }
 
             // Check for public symbol nodes
             if support.public_symbol_kinds().contains(&kind) {
                 let lang_exports = support.extract_public_symbols(&node, content);
-                exports.extend(lang_exports.iter().map(convert_export));
+                exports.extend(lang_exports);
             }
 
             // Recurse into children
@@ -397,8 +340,9 @@ impl DepsExtractor {
                             module,
                             names,
                             alias: None,
-                            line: node.start_position().row + 1,
+                            is_wildcard: false,
                             is_relative,
+                            line: node.start_position().row + 1,
                         });
                     }
                 }
@@ -444,7 +388,7 @@ impl DepsExtractor {
                                     if let Some(name_node) = child.child_by_field_name("name") {
                                         exports.push(Export {
                                             name: content[name_node.byte_range()].to_string(),
-                                            kind: "function",
+                                            kind: SymbolKind::Function,
                                             line: node.start_position().row + 1,
                                         });
                                     }
@@ -453,7 +397,7 @@ impl DepsExtractor {
                                     if let Some(name_node) = child.child_by_field_name("name") {
                                         exports.push(Export {
                                             name: content[name_node.byte_range()].to_string(),
-                                            kind: "class",
+                                            kind: SymbolKind::Class,
                                             line: node.start_position().row + 1,
                                         });
                                     }
@@ -489,7 +433,7 @@ impl DepsExtractor {
                         if !name.starts_with('_') {
                             exports.push(Export {
                                 name,
-                                kind: "function",
+                                kind: SymbolKind::Function,
                                 line: node.start_position().row + 1,
                             });
                         }
@@ -501,7 +445,7 @@ impl DepsExtractor {
                         if !name.starts_with('_') {
                             exports.push(Export {
                                 name,
-                                kind: "class",
+                                kind: SymbolKind::Class,
                                 line: node.start_position().row + 1,
                             });
                         }
@@ -617,7 +561,7 @@ impl DepsExtractor {
                     if name_node.kind() == "identifier" {
                         exports.push(Export {
                             name: content[name_node.byte_range()].to_string(),
-                            kind: "variable",
+                            kind: SymbolKind::Variable,
                             line,
                         });
                     }

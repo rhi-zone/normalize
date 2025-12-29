@@ -3,7 +3,7 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- WebFetch fails on large pages - need chunked/streaming fetch or headless browser
+- Consolidate SkeletonSymbol: could use moss_languages::Symbol directly (just ignoring visibility field)
 
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
@@ -91,6 +91,8 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Fuzzy glob in paths: `moss edit "TODO.md/**/feature*" delete` for item matching
 
 ### Tooling
+- `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
+- `moss grep` context flags: add `-C`, `-A`, `-B` for context lines (like ripgrep)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 - Structured config crate (`moss-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
   - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml

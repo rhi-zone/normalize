@@ -7,7 +7,7 @@ use rusqlite::{params, Connection};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::symbols::{Import, Symbol, SymbolParser};
+use crate::symbols::{FlatImport, FlatSymbol, SymbolParser};
 
 /// Parsed data for a single file, ready for database insertion
 struct ParsedFileData {
@@ -17,7 +17,7 @@ struct ParsedFileData {
     /// (caller_symbol, callee_name, callee_qualifier, line)
     calls: Vec<(String, String, Option<String>, usize)>,
     /// imports (for Python files only)
-    imports: Vec<Import>,
+    imports: Vec<FlatImport>,
 }
 
 // Not yet public - just delete .moss/index.sqlite on schema changes
@@ -582,7 +582,7 @@ impl FileIndex {
     pub fn index_file_symbols(
         &self,
         path: &str,
-        symbols: &[Symbol],
+        symbols: &[FlatSymbol],
         calls: &[(String, String, usize)],
     ) -> rusqlite::Result<()> {
         // Insert symbols

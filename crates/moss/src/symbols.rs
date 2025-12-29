@@ -1,14 +1,14 @@
 use crate::extract::{ExtractOptions, Extractor};
 use crate::parsers::Parsers;
 use moss_languages::{
-    support_for_grammar, support_for_path, Language, Symbol as LangSymbol,
-    SymbolKind as LangSymbolKind,
+    support_for_grammar, support_for_path, Language, Symbol as LangSymbol, SymbolKind,
 };
 use std::path::Path;
 use tree_sitter;
 
+/// A flattened symbol for indexing (parent reference instead of nested children)
 #[derive(Debug, Clone)]
-pub struct Symbol {
+pub struct FlatSymbol {
     pub name: String,
     pub kind: SymbolKind,
     pub start_line: usize,
@@ -16,9 +16,9 @@ pub struct Symbol {
     pub parent: Option<String>,
 }
 
-/// An import statement (from X import Y as Z)
+/// A flattened import for indexing (one entry per imported name)
 #[derive(Debug, Clone)]
-pub struct Import {
+pub struct FlatImport {
     /// The module being imported from (None for "import X")
     pub module: Option<String>,
     /// The name being imported
@@ -27,45 +27,6 @@ pub struct Import {
     pub alias: Option<String>,
     /// Line number
     pub line: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)] // Import variant reserved for import tracking
-pub enum SymbolKind {
-    Function,
-    Class,
-    Method,
-    Variable,
-    Import,
-}
-
-impl SymbolKind {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            SymbolKind::Function => "function",
-            SymbolKind::Class => "class",
-            SymbolKind::Method => "method",
-            SymbolKind::Variable => "variable",
-            SymbolKind::Import => "import",
-        }
-    }
-}
-
-fn convert_symbol_kind(kind: LangSymbolKind) -> SymbolKind {
-    match kind {
-        LangSymbolKind::Function => SymbolKind::Function,
-        LangSymbolKind::Class
-        | LangSymbolKind::Struct
-        | LangSymbolKind::Enum
-        | LangSymbolKind::Interface
-        | LangSymbolKind::Trait
-        | LangSymbolKind::Type => SymbolKind::Class,
-        LangSymbolKind::Method => SymbolKind::Method,
-        LangSymbolKind::Variable
-        | LangSymbolKind::Constant
-        | LangSymbolKind::Module
-        | LangSymbolKind::Heading => SymbolKind::Variable,
-    }
 }
 
 pub struct SymbolParser {
@@ -83,7 +44,7 @@ impl SymbolParser {
         }
     }
 
-    pub fn parse_file(&self, path: &Path, content: &str) -> Vec<Symbol> {
+    pub fn parse_file(&self, path: &Path, content: &str) -> Vec<FlatSymbol> {
         if support_for_path(path).is_none() {
             return Vec::new();
         }
@@ -100,12 +61,15 @@ impl SymbolParser {
     }
 
     /// Flatten a nested symbol into the flat list with parent references
-    fn flatten_symbol(&self, sym: &LangSymbol, parent: Option<&str>, symbols: &mut Vec<Symbol>) {
-        let kind = convert_symbol_kind(sym.kind);
-
-        symbols.push(Symbol {
+    fn flatten_symbol(
+        &self,
+        sym: &LangSymbol,
+        parent: Option<&str>,
+        symbols: &mut Vec<FlatSymbol>,
+    ) {
+        symbols.push(FlatSymbol {
             name: sym.name.clone(),
-            kind,
+            kind: sym.kind,
             start_line: sym.start_line,
             end_line: sym.end_line,
             parent: parent.map(String::from),
@@ -118,8 +82,8 @@ impl SymbolParser {
     }
 
     /// Parse imports from any supported language file using trait-based extraction.
-    /// Returns a flattened list where each imported name gets its own Import entry.
-    pub fn parse_imports(&self, path: &Path, content: &str) -> Vec<Import> {
+    /// Returns a flattened list where each imported name gets its own FlatImport entry.
+    pub fn parse_imports(&self, path: &Path, content: &str) -> Vec<FlatImport> {
         let support = match support_for_path(path) {
             Some(s) => s,
             None => return Vec::new(),
@@ -150,7 +114,7 @@ impl SymbolParser {
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         support: &dyn Language,
-        imports: &mut Vec<Import>,
+        imports: &mut Vec<FlatImport>,
     ) {
         loop {
             let node = cursor.node();
@@ -190,10 +154,10 @@ impl SymbolParser {
             // Check for import nodes
             if support.import_kinds().contains(&kind) {
                 let lang_imports = support.extract_imports(&node, content);
-                // Flatten: each name in the import becomes a separate Import entry
+                // Flatten: each name in the import becomes a separate FlatImport entry
                 for lang_imp in lang_imports {
                     if lang_imp.is_wildcard {
-                        imports.push(Import {
+                        imports.push(FlatImport {
                             module: Some(lang_imp.module.clone()),
                             name: "*".to_string(),
                             alias: lang_imp.alias.clone(),
@@ -201,7 +165,7 @@ impl SymbolParser {
                         });
                     } else if lang_imp.names.is_empty() {
                         // import X (no specific names) - module is the imported thing
-                        imports.push(Import {
+                        imports.push(FlatImport {
                             module: None,
                             name: lang_imp.module.clone(),
                             alias: lang_imp.alias.clone(),
@@ -210,7 +174,7 @@ impl SymbolParser {
                     } else {
                         // from X import a, b, c - each name gets an entry
                         for name in &lang_imp.names {
-                            imports.push(Import {
+                            imports.push(FlatImport {
                                 module: Some(lang_imp.module.clone()),
                                 name: name.clone(),
                                 alias: None, // alias applies to whole import, not individual names
@@ -234,7 +198,7 @@ impl SymbolParser {
     }
 
     /// Find a symbol by name in a file
-    pub fn find_symbol(&mut self, path: &Path, content: &str, name: &str) -> Option<Symbol> {
+    pub fn find_symbol(&mut self, path: &Path, content: &str, name: &str) -> Option<FlatSymbol> {
         let symbols = self.parse_file(path, content);
         symbols.into_iter().find(|s| s.name == name)
     }
@@ -339,12 +303,12 @@ impl SymbolParser {
     }
 
     /// Find callees for a pre-parsed symbol (avoids re-parsing the file)
-    /// Use this when you already have the Symbol from parse_file()
+    /// Use this when you already have the FlatSymbol from parse_file()
     pub fn find_callees_for_symbol(
         &mut self,
         path: &Path,
         content: &str,
-        symbol: &Symbol,
+        symbol: &FlatSymbol,
     ) -> Vec<(String, usize, Option<String>)> {
         let lines: Vec<&str> = content.lines().collect();
         let start = symbol.start_line.saturating_sub(1);

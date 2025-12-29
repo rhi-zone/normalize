@@ -4,6 +4,13 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Type Consolidation
+
+Reduced duplicate type definitions across crates:
+- `symbols.rs`: Symbol → FlatSymbol, Import → FlatImport, deleted SymbolKind (uses moss_languages::SymbolKind)
+- `deps.rs`: Uses moss_languages::Import/Export directly, removed conversion functions
+- Remaining: SkeletonSymbol could be consolidated with moss_languages::Symbol
+
 ### Syntax Highlighting
 
 Query-based highlighting using tree-sitter .scm files:

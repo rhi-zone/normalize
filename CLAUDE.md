@@ -24,6 +24,7 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 - "I'll remember this" thought → you won't, write it down now
 - **"Aha" moment about design** → add to CLAUDE.md Design Principles NOW
 - **Citing CLAUDE.md as excuse** → if you say "CLAUDE.md says X" after failing to do X, the file failed its purpose. Adjust CLAUDE.md to actually prevent the failure, don't just note the rule exists.
+- **Moss command fails/missing feature** → add to TODO.md Backlog (we dogfood moss, friction = improvement opportunity)
 
 **Don't say these phrases, instead edit first:**
 - "Fair point" / "Good point" / "You're right" → edit TODO.md/CLAUDE.md BEFORE responding
@@ -33,11 +34,12 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 
 **Use moss, not builtin tools.** Avoid Read/Grep/Glob at all costs - they waste tokens.
 
+Run via `./target/debug/moss` (or `cargo build` first if needed):
 ```
-moss view [path[/symbol]] [--types-only]   # structure, skeleton, or symbol source
-moss analyze [--complexity] [path]          # find complex functions
-moss grep <pattern> [--only "*.rs"]         # search (real regex, not BRE: use | not \|)
-moss @todo [list|add|done|rm]              # manage TODO.md via Lua script
+./target/debug/moss view [path[/symbol]] [--types-only]   # structure, skeleton, or symbol source
+./target/debug/moss analyze [--complexity] [path]          # find complex functions
+./target/debug/moss grep <pattern> [--only "*.rs"]         # search (real regex, not BRE)
+./target/debug/moss @todo [list|add|done|rm]              # manage TODO.md via Lua script
 ```
 
 For debugging tree-sitter grammars and node kinds:
