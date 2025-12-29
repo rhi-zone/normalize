@@ -48,7 +48,12 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - [x] Highlighting test coverage: 144 tests across 59 languages (see `highlight_tests.rs`)
-  - Note: Many grammars use anonymous nodes, limiting highlighting but grammar loading is verified
+- Per-language highlighting in `moss-languages` (no defaults, explicit per language):
+  - Add to Language trait: `highlight_config() -> HighlightConfig`
+  - HighlightConfig: `keyword_kinds`, `string_kinds`, `number_kinds`, `comment_kinds`, `type_kinds`, `constant_kinds`
+  - For anonymous nodes: `anonymous_rules: Vec<(parent_kind, node_kind, highlight)>` (like XML Name in STag)
+  - Move `classify_node_kind()` logic from tree.rs to per-language configs
+  - Alternative: use arborium's `HIGHLIGHTS_QUERY` (tree-sitter .scm files) - more accurate but heavier
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
