@@ -1,8 +1,7 @@
 [alias]
 xtask = "run --package xtask --"
 
-# Use mold linker for faster incremental builds
-# Enabled via flake.nix - requires nix shell reload after flake update
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+# For faster builds with mold linker (local only), add to the end of this file:
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
