@@ -4,6 +4,15 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Syntax Highlighting
+
+Query-based highlighting using tree-sitter .scm files:
+- Uses arborium highlight queries for accurate, grammar-author-defined highlighting
+- 98 languages with highlight queries (copied alongside grammar .so files)
+- Document format support: headings, code blocks, links, emphasis, punctuation
+- Falls back to manual node classification when no .scm file available
+- 145 highlighting tests across 59 languages
+
 ### Init Command
 
 `moss init` for idempotent project setup:
