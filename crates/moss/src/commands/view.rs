@@ -40,9 +40,23 @@ impl ViewConfig {
 }
 
 /// View command arguments.
+///
+/// # Target Syntax
+///
+/// | Syntax | Description |
+/// |--------|-------------|
+/// | `.` | Current directory tree |
+/// | `path/to/file` | File skeleton (symbols) |
+/// | `path/to/dir` | Directory tree |
+/// | `file/Symbol` | Symbol in file |
+/// | `file/Parent/method` | Nested symbol |
+/// | `Parent/method` | Symbol search (when Parent isn't a path) |
+/// | `file:123` | Symbol containing line 123 |
+/// | `file:10-20` | Lines 10-20 (raw) |
+/// | `SymbolName` | Symbol search across codebase |
 #[derive(Args, Debug)]
 pub struct ViewArgs {
-    /// Target to view (path like src/main.py/Foo/bar). Optional when using filters.
+    /// Target: path, path/Symbol, Parent/method, file:line, or SymbolName
     pub target: Option<String>,
 
     /// Root directory (defaults to current directory)
@@ -357,6 +371,134 @@ fn cmd_view_symbol_direct(
     )
 }
 
+/// View the symbol containing a specific line number
+fn cmd_view_symbol_at_line(
+    file_path: &str,
+    line: usize,
+    root: &Path,
+    depth: i32,
+    show_docs: bool,
+    show_parent: bool,
+    json: bool,
+    pretty: bool,
+    use_colors: bool,
+) -> i32 {
+    // Resolve the file path
+    let matches = path_resolve::resolve_unified_all(file_path, root);
+    let resolved = match matches.len() {
+        0 => {
+            eprintln!("File not found: {}", file_path);
+            return 1;
+        }
+        1 => &matches[0],
+        _ => {
+            eprintln!("Multiple matches for '{}' - be more specific:", file_path);
+            for m in &matches {
+                println!("  {}", m.file_path);
+            }
+            return 1;
+        }
+    };
+
+    if resolved.is_directory {
+        eprintln!("Cannot use line number with directory: {}", file_path);
+        return 1;
+    }
+
+    let full_path = root.join(&resolved.file_path);
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading {}: {}", resolved.file_path, e);
+            return 1;
+        }
+    };
+
+    // Extract symbols and find one containing the line
+    let extractor = skeleton::SkeletonExtractor::new();
+    let skeleton_result = extractor.extract(&full_path, &content);
+
+    // Find symbol containing this line (recursive search)
+    fn find_symbol_at_line<'a>(
+        symbols: &'a [skeleton::SkeletonSymbol],
+        line: usize,
+    ) -> Option<(
+        &'a skeleton::SkeletonSymbol,
+        Vec<&'a skeleton::SkeletonSymbol>,
+    )> {
+        for sym in symbols {
+            if line >= sym.start_line && line <= sym.end_line {
+                // Check children first for more specific match
+                if let Some((child, mut ancestors)) = find_symbol_at_line(&sym.children, line) {
+                    ancestors.insert(0, sym);
+                    return Some((child, ancestors));
+                }
+                // This symbol contains the line
+                return Some((sym, Vec::new()));
+            }
+        }
+        None
+    }
+
+    let Some((sym, ancestors)) = find_symbol_at_line(&skeleton_result.symbols, line) else {
+        eprintln!("No symbol found at line {} in {}", line, resolved.file_path);
+        return 1;
+    };
+
+    // Build symbol path from ancestors
+    let mut symbol_path: Vec<String> = ancestors.iter().map(|a| a.name.clone()).collect();
+    symbol_path.push(sym.name.clone());
+    let full_symbol_path = format!("{}/{}", resolved.file_path, symbol_path.join("/"));
+
+    let grammar =
+        moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+
+    // Use semantic view (ViewNode) - respects show_docs, pretty, etc.
+    let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
+
+    if json {
+        println!("{}", serde_json::to_string(&view_node).unwrap());
+    } else {
+        if depth >= 0 {
+            println!(
+                "# {} ({}, L{}-{})",
+                full_symbol_path,
+                sym.kind.as_str(),
+                sym.start_line,
+                sym.end_line
+            );
+        }
+
+        // Show ancestor signatures if requested
+        if show_parent {
+            for ancestor in &ancestors {
+                println!("{}", ancestor.signature);
+            }
+            if !ancestors.is_empty() {
+                println!();
+            }
+        }
+
+        let format_options = FormatOptions {
+            docstrings: if show_docs {
+                DocstringDisplay::Full
+            } else {
+                DocstringDisplay::Summary
+            },
+            line_numbers: true,
+            skip_root: false,
+            max_depth: None,
+            minimal: !pretty,
+            use_colors,
+        };
+        let lines = tree::format_view_node(&view_node, &format_options);
+        for line in lines {
+            println!("{}", line);
+        }
+    }
+    0
+}
+
 /// Unified view command
 pub fn cmd_view(
     target: Option<&str>,
@@ -437,9 +579,25 @@ pub fn cmd_view(
         );
     }
 
-    // Handle line ranges: file.rs:30-55
-    if let Some((file_path, start, end)) = parse_line_range(target) {
-        return cmd_view_line_range(&file_path, start, end, &root, line_numbers, json, pretty);
+    // Handle line targets: file.rs:30 (symbol at line) or file.rs:30-55 (range)
+    if let Some((file_path, line, end_opt)) = parse_line_target(target) {
+        if let Some(end) = end_opt {
+            // Line range: show highlighted source
+            return cmd_view_line_range(&file_path, line, end, &root, json, pretty, use_colors);
+        } else {
+            // Single line: find symbol containing this line
+            return cmd_view_symbol_at_line(
+                &file_path,
+                line,
+                &root,
+                depth,
+                show_docs,
+                show_parent,
+                json,
+                pretty,
+                use_colors,
+            );
+        }
     }
 
     // Check if query looks like a symbol path (contains / but first segment isn't a real path)
@@ -1530,23 +1688,30 @@ fn cmd_view_symbol(
     }
 }
 
-/// Parse a line range target like "file.rs:30-55" into (file_path, start, end).
-fn parse_line_range(target: &str) -> Option<(String, usize, usize)> {
+/// Parse a line target like "file.rs:30" or "file.rs:30-55".
+/// Returns (file_path, start, end) where end == start for single line.
+fn parse_line_target(target: &str) -> Option<(String, usize, Option<usize>)> {
     // Find the last colon (to handle paths like C:\foo on Windows)
     let colon_pos = target.rfind(':')?;
     let (path, range) = target.split_at(colon_pos);
     let range = &range[1..]; // Skip the colon
 
-    // Parse the range as start-end
-    let (start_str, end_str) = range.split_once('-')?;
-    let start: usize = start_str.parse().ok()?;
-    let end: usize = end_str.parse().ok()?;
-
-    if start == 0 || end == 0 || start > end {
-        return None;
+    // Try to parse as range first (start-end)
+    if let Some((start_str, end_str)) = range.split_once('-') {
+        let start: usize = start_str.parse().ok()?;
+        let end: usize = end_str.parse().ok()?;
+        if start == 0 || end == 0 || start > end {
+            return None;
+        }
+        return Some((path.to_string(), start, Some(end)));
     }
 
-    Some((path.to_string(), start, end))
+    // Try to parse as single line number
+    let line: usize = range.parse().ok()?;
+    if line == 0 {
+        return None;
+    }
+    Some((path.to_string(), line, None))
 }
 
 /// View a range of lines from a file.
@@ -1555,9 +1720,9 @@ fn cmd_view_line_range(
     start: usize,
     end: usize,
     root: &Path,
-    line_numbers: bool,
     json: bool,
     pretty: bool,
+    use_colors: bool,
 ) -> i32 {
     // Resolve the file path
     let full_path = root.join(file_path);
@@ -1586,24 +1751,19 @@ fn cmd_view_line_range(
         return 1;
     }
 
+    // Extract the range as source
+    let range_start = actual_start.saturating_sub(1);
+    let range_end = actual_end.min(lines.len());
+    let source: String = lines[range_start..range_end].join("\n");
+
     if json {
-        let range_lines: Vec<serde_json::Value> = (actual_start..=actual_end)
-            .filter_map(|i| {
-                lines.get(i - 1).map(|line| {
-                    serde_json::json!({
-                        "line": i,
-                        "content": line
-                    })
-                })
-            })
-            .collect();
         println!(
             "{}",
             serde_json::json!({
                 "file": file_path,
                 "start": actual_start,
                 "end": actual_end,
-                "lines": range_lines
+                "content": source
             })
         );
         return 0;
@@ -1613,25 +1773,21 @@ fn cmd_view_line_range(
     println!("# {}:{}-{}", file_path, actual_start, actual_end);
     println!();
 
-    // Output lines
-    let width = actual_end.to_string().len();
-    for i in actual_start..=actual_end {
-        if let Some(line) = lines.get(i - 1) {
-            if line_numbers {
-                if pretty {
-                    println!(
-                        "{:>width$} │ {}",
-                        nu_ansi_term::Color::DarkGray.paint(i.to_string()),
-                        line,
-                        width = width
-                    );
-                } else {
-                    println!("{:>width$} │ {}", i, line, width = width);
-                }
-            } else {
-                println!("{}", line);
-            }
+    // Apply syntax highlighting
+    let grammar =
+        moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+    let output = if pretty {
+        if let Some(ref g) = grammar {
+            tree::highlight_source(&source, g, use_colors)
+        } else {
+            source
         }
+    } else {
+        source
+    };
+    print!("{}", output);
+    if !output.ends_with('\n') {
+        println!();
     }
 
     0
