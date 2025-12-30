@@ -3,8 +3,6 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus
-- [x] Investigate: `moss view <function_name>` returns no matches (only finds types/classes)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -58,6 +56,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
 
 ### Code Quality
+- PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
