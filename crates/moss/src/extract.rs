@@ -17,10 +17,20 @@ pub struct ExtractResult {
 }
 
 /// Options for symbol extraction.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ExtractOptions {
-    /// Include private/non-public symbols
+    /// Include private/non-public symbols (default: true for code exploration)
     pub include_private: bool,
+}
+
+impl Default for ExtractOptions {
+    fn default() -> Self {
+        Self {
+            // Default to including all symbols - moss is for code exploration,
+            // not API documentation. This ensures trait impl methods are visible.
+            include_private: true,
+        }
+    }
 }
 
 /// Shared symbol extractor using the Language trait.

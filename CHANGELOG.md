@@ -4,6 +4,10 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Bug Fixes
+
+- **Fixed symbol search for trait impl methods**: `moss view <function_name>` now correctly finds methods in trait implementations. Previously, methods without explicit `pub` modifiers (like trait impl methods) were filtered out by default. Changed `ExtractOptions::include_private` to default to `true` since moss is for code exploration, not API documentation. Also removed the now-redundant `--include-private` flag.
+
 ### Type Consolidation
 
 Reduced duplicate type definitions across crates:

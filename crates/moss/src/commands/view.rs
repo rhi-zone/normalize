@@ -81,10 +81,6 @@ pub struct ViewArgs {
     #[arg(long)]
     pub resolve_imports: bool,
 
-    /// Show all symbols including private ones
-    #[arg(long = "include-private")]
-    pub include_private: bool,
-
     /// Show full source code
     #[arg(long)]
     pub full: bool,
@@ -129,7 +125,6 @@ pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
         args.raw,
         args.focus.as_deref(),
         args.resolve_imports,
-        args.include_private,
         args.full,
         args.docs || config.view.show_docs(),
         args.context,
@@ -315,7 +310,6 @@ pub fn cmd_view(
     raw: bool,
     focus: Option<&str>,
     resolve_imports: bool,
-    include_private: bool,
     full: bool,
     show_docs: bool,
     context: bool,
@@ -498,7 +492,6 @@ pub fn cmd_view(
             types_only,
             focus,
             resolve_imports,
-            include_private,
             show_docs,
             context,
             json,
@@ -769,7 +762,6 @@ fn cmd_view_file(
     types_only: bool,
     focus: Option<&str>,
     resolve_imports: bool,
-    include_private: bool,
     show_docs: bool,
     context: bool,
     json: bool,
@@ -823,12 +815,8 @@ fn cmd_view_file(
     let grammar =
         moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
 
-    // Skeleton view
-    let extractor = if include_private {
-        skeleton::SkeletonExtractor::with_all()
-    } else {
-        skeleton::SkeletonExtractor::new()
-    };
+    // Skeleton view (always includes all symbols - private filtering was removed)
+    let extractor = skeleton::SkeletonExtractor::new();
     let skeleton_result = extractor.extract(&full_path, &content);
 
     // Filter to types only if requested

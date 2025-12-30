@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus
-- Investigate: `moss view <function_name>` returns no matches (only finds types/classes)
+- [x] Investigate: `moss view <function_name>` returns no matches (only finds types/classes)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)

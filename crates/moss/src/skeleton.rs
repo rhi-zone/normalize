@@ -3,7 +3,7 @@
 //! Extracts function/class signatures with optional docstrings.
 //! Uses the shared Extractor from extract.rs for tree traversal.
 
-use crate::extract::{ExtractOptions, Extractor};
+use crate::extract::Extractor;
 use crate::tree::{ViewNode, ViewNodeKind};
 use moss_languages::{Symbol, SymbolKind};
 use std::path::Path;
@@ -126,15 +126,6 @@ impl SkeletonExtractor {
     pub fn new() -> Self {
         Self {
             extractor: Extractor::new(),
-        }
-    }
-
-    /// Create an extractor that shows all symbols including private ones
-    pub fn with_all() -> Self {
-        Self {
-            extractor: Extractor::with_options(ExtractOptions {
-                include_private: true,
-            }),
         }
     }
 
