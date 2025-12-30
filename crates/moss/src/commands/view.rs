@@ -419,28 +419,39 @@ fn cmd_view_symbol_at_line(
     let skeleton_result = extractor.extract(&full_path, &content);
 
     // Find symbol containing this line (recursive search)
+    // Note: In Rust, struct and impl blocks are separate, so parent line ranges
+    // may not encompass children. We search all children regardless.
     fn find_symbol_at_line<'a>(
         symbols: &'a [skeleton::SkeletonSymbol],
         line: usize,
+        parent: Option<&'a skeleton::SkeletonSymbol>,
     ) -> Option<(
         &'a skeleton::SkeletonSymbol,
         Vec<&'a skeleton::SkeletonSymbol>,
     )> {
         for sym in symbols {
-            if line >= sym.start_line && line <= sym.end_line {
-                // Check children first for more specific match
-                if let Some((child, mut ancestors)) = find_symbol_at_line(&sym.children, line) {
-                    ancestors.insert(0, sym);
-                    return Some((child, ancestors));
+            // First check children (they might contain the line even if parent doesn't)
+            if let Some((child, mut ancestors)) =
+                find_symbol_at_line(&sym.children, line, Some(sym))
+            {
+                if let Some(p) = parent {
+                    ancestors.insert(0, p);
                 }
-                // This symbol contains the line
-                return Some((sym, Vec::new()));
+                return Some((child, ancestors));
+            }
+            // Then check this symbol
+            if line >= sym.start_line && line <= sym.end_line {
+                let mut ancestors = Vec::new();
+                if let Some(p) = parent {
+                    ancestors.push(p);
+                }
+                return Some((sym, ancestors));
             }
         }
         None
     }
 
-    let Some((sym, ancestors)) = find_symbol_at_line(&skeleton_result.symbols, line) else {
+    let Some((sym, ancestors)) = find_symbol_at_line(&skeleton_result.symbols, line, None) else {
         eprintln!("No symbol found at line {} in {}", line, resolved.file_path);
         return 1;
     };
@@ -583,7 +594,9 @@ pub fn cmd_view(
     if let Some((file_path, line, end_opt)) = parse_line_target(target) {
         if let Some(end) = end_opt {
             // Line range: show highlighted source
-            return cmd_view_line_range(&file_path, line, end, &root, json, pretty, use_colors);
+            return cmd_view_line_range(
+                &file_path, line, end, &root, show_docs, json, pretty, use_colors,
+            );
         } else {
             // Single line: find symbol containing this line
             return cmd_view_symbol_at_line(
@@ -1720,16 +1733,35 @@ fn cmd_view_line_range(
     start: usize,
     end: usize,
     root: &Path,
+    show_docs: bool,
     json: bool,
     pretty: bool,
     use_colors: bool,
 ) -> i32 {
-    // Resolve the file path
-    let full_path = root.join(file_path);
-    if !full_path.exists() {
-        eprintln!("File not found: {}", file_path);
+    // Resolve the file path with fuzzy matching
+    let matches = path_resolve::resolve_unified_all(file_path, root);
+    let resolved = match matches.len() {
+        0 => {
+            eprintln!("File not found: {}", file_path);
+            return 1;
+        }
+        1 => &matches[0],
+        _ => {
+            eprintln!("Multiple matches for '{}' - be more specific:", file_path);
+            for m in &matches {
+                println!("  {}", m.file_path);
+            }
+            return 1;
+        }
+    };
+
+    if resolved.is_directory {
+        eprintln!("Cannot use line range with directory: {}", file_path);
         return 1;
     }
+
+    let full_path = root.join(&resolved.file_path);
+    let display_path = &resolved.file_path;
 
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
@@ -1754,13 +1786,32 @@ fn cmd_view_line_range(
     // Extract the range as source
     let range_start = actual_start.saturating_sub(1);
     let range_end = actual_end.min(lines.len());
-    let source: String = lines[range_start..range_end].join("\n");
+
+    // Filter out doc comments if --docs not specified
+    let grammar =
+        moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+    let source: String = if !show_docs {
+        if let Some(ref g) = grammar {
+            let doc_lines = find_doc_comment_lines(&content, g, actual_start, actual_end);
+            lines[range_start..range_end]
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !doc_lines.contains(&(actual_start + i)))
+                .map(|(_, line)| *line)
+                .collect::<Vec<_>>()
+                .join("\n")
+        } else {
+            lines[range_start..range_end].join("\n")
+        }
+    } else {
+        lines[range_start..range_end].join("\n")
+    };
 
     if json {
         println!(
             "{}",
             serde_json::json!({
-                "file": file_path,
+                "file": display_path,
                 "start": actual_start,
                 "end": actual_end,
                 "content": source
@@ -1770,12 +1821,10 @@ fn cmd_view_line_range(
     }
 
     // Header
-    println!("# {}:{}-{}", file_path, actual_start, actual_end);
+    println!("# {}:{}-{}", display_path, actual_start, actual_end);
     println!();
 
     // Apply syntax highlighting
-    let grammar =
-        moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
     let output = if pretty {
         if let Some(ref g) = grammar {
             tree::highlight_source(&source, g, use_colors)
@@ -1791,6 +1840,74 @@ fn cmd_view_line_range(
     }
 
     0
+}
+
+/// Find line numbers that contain doc comments within a range.
+fn find_doc_comment_lines(
+    content: &str,
+    grammar: &str,
+    start_line: usize,
+    end_line: usize,
+) -> HashSet<usize> {
+    let mut doc_lines = HashSet::new();
+    let parsers = parsers::Parsers::new();
+
+    if let Some(tree) = parsers.parse_with_grammar(grammar, content) {
+        let mut cursor = tree.walk();
+        collect_doc_comment_lines(&mut cursor, start_line, end_line, &mut doc_lines);
+    }
+
+    doc_lines
+}
+
+/// Recursively collect doc comment line numbers.
+fn collect_doc_comment_lines(
+    cursor: &mut tree_sitter::TreeCursor,
+    start_line: usize,
+    end_line: usize,
+    doc_lines: &mut HashSet<usize>,
+) {
+    loop {
+        let node = cursor.node();
+        let kind = node.kind();
+
+        // Check if this is a comment node
+        let is_comment = kind == "comment"
+            || kind == "line_comment"
+            || kind == "block_comment"
+            || kind == "doc_comment"
+            || kind.contains("comment");
+
+        if is_comment {
+            // Get line range (tree-sitter uses 0-indexed lines)
+            let node_start = node.start_position().row + 1;
+            // If end column is 0, the node ends at the start of that row (trailing newline)
+            // so the actual content ends on the previous row
+            let end_pos = node.end_position();
+            let node_end = if end_pos.column == 0 {
+                end_pos.row // 0-indexed row, but that's the row AFTER content
+            } else {
+                end_pos.row + 1 // Content ends on this row (1-indexed)
+            };
+
+            // Only include comments within our range
+            for line in node_start..=node_end {
+                if line >= start_line && line <= end_line {
+                    doc_lines.insert(line);
+                }
+            }
+        }
+
+        // Recurse into children
+        if cursor.goto_first_child() {
+            collect_doc_comment_lines(cursor, start_line, end_line, doc_lines);
+            cursor.goto_parent();
+        }
+
+        if !cursor.goto_next_sibling() {
+            break;
+        }
+    }
 }
 
 /// Extract all identifiers used in source code.
