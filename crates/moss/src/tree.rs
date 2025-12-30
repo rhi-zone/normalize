@@ -7,10 +7,66 @@ use ignore::WalkBuilder;
 use moss_languages::{support_for_path, GrammarLoader};
 use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
+use std::sync::{Arc, OnceLock, RwLock};
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Query, QueryCursor};
+
+/// Global grammar loader singleton - avoids reloading grammars for each highlight call.
+static GRAMMAR_LOADER: OnceLock<GrammarLoader> = OnceLock::new();
+
+fn grammar_loader() -> &'static GrammarLoader {
+    GRAMMAR_LOADER.get_or_init(GrammarLoader::new)
+}
+
+/// Cached compiled queries for highlighting - Query::new is expensive (~100ms).
+static HIGHLIGHT_QUERY_CACHE: OnceLock<RwLock<HashMap<String, Arc<Query>>>> = OnceLock::new();
+static INJECTION_QUERY_CACHE: OnceLock<RwLock<HashMap<String, Arc<Query>>>> = OnceLock::new();
+
+fn get_highlight_query(grammar: &str, language: &tree_sitter::Language) -> Option<Arc<Query>> {
+    let cache = HIGHLIGHT_QUERY_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+
+    // Check cache first
+    if let Ok(read_guard) = cache.read() {
+        if let Some(query) = read_guard.get(grammar) {
+            return Some(Arc::clone(query));
+        }
+    }
+
+    // Not cached - compile and store
+    let loader = grammar_loader();
+    let query_str = loader.get_highlights(grammar)?;
+    let query = Arc::new(Query::new(language, &query_str).ok()?);
+
+    if let Ok(mut write_guard) = cache.write() {
+        write_guard.insert(grammar.to_string(), Arc::clone(&query));
+    }
+
+    Some(query)
+}
+
+fn get_injection_query(grammar: &str, language: &tree_sitter::Language) -> Option<Arc<Query>> {
+    let cache = INJECTION_QUERY_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+
+    // Check cache first
+    if let Ok(read_guard) = cache.read() {
+        if let Some(query) = read_guard.get(grammar) {
+            return Some(Arc::clone(query));
+        }
+    }
+
+    // Not cached - compile and store
+    let loader = grammar_loader();
+    let query_str = loader.get_injections(grammar)?;
+    let query = Arc::new(Query::new(language, &query_str).ok()?);
+
+    if let Ok(mut write_guard) = cache.write() {
+        write_guard.insert(grammar.to_string(), Arc::clone(&query));
+    }
+
+    Some(query)
+}
 
 /// Unified node for viewing directories, files, and symbols.
 ///
@@ -295,7 +351,7 @@ pub fn highlight_source(source: &str, grammar: &str, use_colors: bool) -> String
         return source.to_string();
     }
 
-    let loader = GrammarLoader::new();
+    let loader = grammar_loader();
     let language = match loader.get(grammar) {
         Some(lang) => lang,
         None => return source.to_string(),
@@ -311,25 +367,19 @@ pub fn highlight_source(source: &str, grammar: &str, use_colors: bool) -> String
         None => return source.to_string(),
     };
 
-    // Collect base highlight spans
-    let mut spans = if let Some(query_str) = loader.get_highlights(grammar) {
-        if let Ok(query) = Query::new(&language, &query_str) {
-            collect_query_spans(&query, tree.root_node(), source)
-        } else {
-            collect_manual_spans(tree.root_node())
-        }
+    // Collect base highlight spans (use cached queries)
+    let mut spans = if let Some(query) = get_highlight_query(grammar, &language) {
+        collect_query_spans(&query, tree.root_node(), source)
     } else {
         collect_manual_spans(tree.root_node())
     };
 
     // Process injections (embedded languages like code blocks in markdown)
-    if let Some(injection_query_str) = loader.get_injections(grammar) {
-        if let Ok(injection_query) = Query::new(&language, &injection_query_str) {
-            let injection_spans =
-                collect_injection_spans(&injection_query, tree.root_node(), source, &loader);
-            // Injection spans take precedence - remove base spans that overlap
-            spans = merge_injection_spans(spans, injection_spans);
-        }
+    if let Some(injection_query) = get_injection_query(grammar, &language) {
+        let injection_spans =
+            collect_injection_spans(&injection_query, tree.root_node(), source, grammar_loader());
+        // Injection spans take precedence - remove base spans that overlap
+        spans = merge_injection_spans(spans, injection_spans);
     }
 
     render_highlighted(source, spans)
