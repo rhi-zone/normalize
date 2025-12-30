@@ -1238,7 +1238,7 @@ fn cmd_view_symbol(
     symbol_path: &[String],
     root: &Path,
     depth: i32,
-    full: bool,
+    _full: bool,
     show_docs: bool,
     show_parent: bool,
     json: bool,
@@ -1429,8 +1429,8 @@ fn cmd_view_symbol(
         if let Some(sym) = found_sym {
             let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
 
-            // When --full is requested, extract source using line numbers
-            if full && sym.start_line > 0 && sym.end_line > 0 {
+            // Extract source using line numbers (always, not just for --full)
+            if sym.start_line > 0 && sym.end_line > 0 {
                 let lines: Vec<&str> = content.lines().collect();
                 let start = sym.start_line - 1;
                 let end = std::cmp::min(sym.end_line, lines.len());
@@ -1456,6 +1456,17 @@ fn cmd_view_symbol(
                             full_symbol_path, sym.start_line, sym.end_line
                         );
                     }
+
+                    // Show ancestor context (unless --no-parent)
+                    if show_parent && symbol_path.len() > 1 {
+                        // Get parent signature from skeleton
+                        if let Some(parent_sym) =
+                            find_symbol(&skeleton_result.symbols, &symbol_path[0])
+                        {
+                            println!("\n{}\n", parent_sym.signature);
+                        }
+                    }
+
                     // Apply syntax highlighting in pretty mode
                     let highlighted = if let Some(ref g) = grammar {
                         tree::highlight_source(&source, g, use_colors)
@@ -1467,7 +1478,7 @@ fn cmd_view_symbol(
                 return 0;
             }
 
-            // Default: show skeleton (signature + docstring + children)
+            // Fallback: show skeleton (signature + docstring + children)
             let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
             if json {
                 // Use ViewNode for consistent structured output
