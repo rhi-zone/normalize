@@ -458,9 +458,14 @@ pub fn cmd_view(
                         Some(p) => format!("{}/{}", p, sym.name),
                         None => sym.name.clone(),
                     };
+                    // Show just filename (not full path) so users can copy it directly
+                    let file_name = std::path::Path::new(&sym.file)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| sym.file.clone());
                     println!(
                         "  {}/{} ({}, line {})",
-                        sym.file, symbol_path, sym.kind, sym.start_line
+                        file_name, symbol_path, sym.kind, sym.start_line
                     );
                 }
             }
