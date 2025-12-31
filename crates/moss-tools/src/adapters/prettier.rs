@@ -9,7 +9,7 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn prettier_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn prettier_command() -> Option<(String, Vec<String>)> {
     crate::tools::find_js_tool("prettier", None)
 }
 

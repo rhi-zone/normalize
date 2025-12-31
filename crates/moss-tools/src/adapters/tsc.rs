@@ -9,7 +9,7 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn tsc_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn tsc_command() -> Option<(String, Vec<String>)> {
     // tsc binary comes from the "typescript" package
     crate::tools::find_js_tool("tsc", Some("typescript"))
 }

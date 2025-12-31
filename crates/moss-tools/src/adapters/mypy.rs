@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn mypy_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn mypy_command() -> Option<(String, Vec<String>)> {
     crate::tools::find_python_tool("mypy")
 }
 

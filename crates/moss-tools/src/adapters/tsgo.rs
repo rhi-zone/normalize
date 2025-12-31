@@ -10,7 +10,7 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn tsgo_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn tsgo_command() -> Option<(String, Vec<String>)> {
     // @typescript/native-preview provides the tsgo binary
     crate::tools::find_js_tool("tsgo", Some("@typescript/native-preview"))
 }

@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn biome_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn biome_command() -> Option<(String, Vec<String>)> {
     // biome binary comes from the "@biomejs/biome" package
     crate::tools::find_js_tool("biome", Some("@biomejs/biome"))
 }

@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn eslint_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn eslint_command() -> Option<(String, Vec<String>)> {
     crate::tools::find_js_tool("eslint", None)
 }
 

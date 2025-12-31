@@ -160,16 +160,13 @@ pub fn has_config_file(root: &Path, names: &[&str]) -> bool {
 /// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
-pub fn find_js_tool(
-    bin_name: &str,
-    _pkg_name: Option<&str>,
-) -> Option<(&'static str, Vec<&'static str>)> {
+pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<(String, Vec<String>)> {
     use std::process::Command;
 
     // Check node_modules/.bin/ first (no process spawn needed)
     let local_bin = std::path::Path::new("node_modules/.bin").join(bin_name);
     if local_bin.exists() {
-        return Some((leak_str(&local_bin.to_string_lossy()), vec![]));
+        return Some((local_bin.to_string_lossy().into_owned(), vec![]));
     }
 
     // pnpm exec (local install only, not remote)
@@ -179,7 +176,7 @@ pub fn find_js_tool(
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some(("pnpm", vec!["exec", leak_str(bin_name)]));
+        return Some(("pnpm".into(), vec!["exec".into(), bin_name.into()]));
     }
 
     // Global install
@@ -189,16 +186,10 @@ pub fn find_js_tool(
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some((leak_str(bin_name), vec![]));
+        return Some((bin_name.into(), vec![]));
     }
 
     None
-}
-
-/// Leak a string to get a static reference (for lifetime requirements).
-/// These strings are effectively static since they come from tool names.
-fn leak_str(s: &str) -> &'static str {
-    Box::leak(s.to_string().into_boxed_str())
 }
 
 /// Find a Python ecosystem tool (local installs only, no remote downloads).
@@ -209,13 +200,13 @@ fn leak_str(s: &str) -> &'static str {
 /// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
-pub fn find_python_tool(tool: &str) -> Option<(&'static str, Vec<&'static str>)> {
+pub fn find_python_tool(tool: &str) -> Option<(String, Vec<String>)> {
     use std::process::Command;
 
     // Check .venv/bin/ first (no process spawn needed)
     let local_bin = std::path::Path::new(".venv/bin").join(tool);
     if local_bin.exists() {
-        return Some((leak_str(&local_bin.to_string_lossy()), vec![]));
+        return Some((local_bin.to_string_lossy().into_owned(), vec![]));
     }
 
     // uv run (uv project - uses local deps from pyproject.toml)
@@ -225,7 +216,7 @@ pub fn find_python_tool(tool: &str) -> Option<(&'static str, Vec<&'static str>)>
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some(("uv", vec!["run", leak_str(tool)]));
+        return Some(("uv".into(), vec!["run".into(), tool.into()]));
     }
 
     // Global install
@@ -235,7 +226,7 @@ pub fn find_python_tool(tool: &str) -> Option<(&'static str, Vec<&'static str>)>
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some((leak_str(tool), vec![]));
+        return Some((tool.into(), vec![]));
     }
 
     None

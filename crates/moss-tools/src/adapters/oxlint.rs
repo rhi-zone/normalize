@@ -36,7 +36,7 @@ impl Default for Oxlint {
     }
 }
 
-fn oxlint_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn oxlint_command() -> Option<(String, Vec<String>)> {
     crate::tools::find_js_tool("oxlint", None)
 }
 

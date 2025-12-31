@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn pyright_command() -> Option<(&'static str, Vec<&'static str>)> {
+fn pyright_command() -> Option<(String, Vec<String>)> {
     // Pyright can be installed via npm or pip
     // Try Python first (more common in Python projects), then npm
     if let Some(cmd) = crate::tools::find_python_tool("pyright") {
