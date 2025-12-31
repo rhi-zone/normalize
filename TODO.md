@@ -4,6 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Test discovery: `moss @test` runs `.moss/tests/*.lua` files with test framework
+- Type serialization: `T.serialize(schema)` / `T.deserialize(str, schema)` for config files
+- Lua docs: create `docs/design/lua-test.md` documenting test + test.property modules
+
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
