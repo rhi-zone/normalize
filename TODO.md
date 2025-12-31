@@ -4,7 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Test discovery: `moss @test` runs `.moss/tests/*.lua` files with test framework
+- Test subcommand: `moss test` runs `.moss/tests/*.lua` project tests (like cargo/npm test)
+- Colorized --help: when pretty output + colors enabled, colorize help output
 - Type serialization: `T.serialize(schema)` / `T.deserialize(str, schema)` for config files
 - Lua docs: create `docs/design/lua-test.md` documenting test + test.property modules
 
