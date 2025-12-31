@@ -492,7 +492,7 @@ fn collect_injection_spans(
 
 /// Collect spans for injected content, adjusting offsets.
 fn collect_inner_spans(content: &str, grammar: &str, offset: usize) -> Vec<HighlightSpan> {
-    let loader = GrammarLoader::new();
+    let loader = grammar_loader();
     let language = match loader.get(grammar) {
         Some(lang) => lang,
         None => return Vec::new(),
@@ -508,12 +508,9 @@ fn collect_inner_spans(content: &str, grammar: &str, offset: usize) -> Vec<Highl
         None => return Vec::new(),
     };
 
-    let mut spans = if let Some(query_str) = loader.get_highlights(grammar) {
-        if let Ok(query) = Query::new(&language, &query_str) {
-            collect_query_spans(&query, tree.root_node(), content)
-        } else {
-            collect_manual_spans(tree.root_node())
-        }
+    // Use cached queries
+    let mut spans = if let Some(query) = get_highlight_query(grammar, &language) {
+        collect_query_spans(&query, tree.root_node(), content)
     } else {
         collect_manual_spans(tree.root_node())
     };
@@ -525,21 +522,19 @@ fn collect_inner_spans(content: &str, grammar: &str, offset: usize) -> Vec<Highl
     }
 
     // Recursively process injections in the injected content
-    if let Some(injection_query_str) = loader.get_injections(grammar) {
-        if let Ok(injection_query) = Query::new(&language, &injection_query_str) {
-            let nested_spans =
-                collect_injection_spans(&injection_query, tree.root_node(), content, &loader);
-            // Adjust nested span offsets
-            let adjusted: Vec<_> = nested_spans
-                .into_iter()
-                .map(|mut s| {
-                    s.start += offset;
-                    s.end += offset;
-                    s
-                })
-                .collect();
-            spans = merge_injection_spans(spans, adjusted);
-        }
+    if let Some(injection_query) = get_injection_query(grammar, &language) {
+        let nested_spans =
+            collect_injection_spans(&injection_query, tree.root_node(), content, loader);
+        // Adjust nested span offsets
+        let adjusted: Vec<_> = nested_spans
+            .into_iter()
+            .map(|mut s| {
+                s.start += offset;
+                s.end += offset;
+                s
+            })
+            .collect();
+        spans = merge_injection_spans(spans, adjusted);
     }
 
     spans
