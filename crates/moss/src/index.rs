@@ -464,6 +464,11 @@ impl FileIndex {
         Ok(total_changes)
     }
 
+    /// Execute a raw SQL statement (for maintenance operations).
+    pub fn execute(&self, sql: &str) -> rusqlite::Result<usize> {
+        self.conn.execute(sql, [])
+    }
+
     /// Refresh the index by walking the filesystem
     pub fn refresh(&mut self) -> rusqlite::Result<usize> {
         let walker = WalkBuilder::new(&self.root)

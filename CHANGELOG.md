@@ -27,6 +27,11 @@ See `docs/` for design docs and `README.md` for usage.
   - Cross-file tracing via index lookup (shows file path for external functions)
 - `analyze files` subcommand: shows longest files by line count, with totals by language
 
+### Index Command
+- `index rebuild` now includes call graph by default (symbols needed for most features)
+  - Use `--include none` for files-only mode (faster)
+  - Use `--include symbols,calls` to selectively extract content types
+
 ### View Command
 - Path suffix matching: `moss view analyze/report.rs` now finds `crates/moss/src/commands/analyze/report.rs`
 - Glob pattern support: `moss view '**/*.lua'` and `moss view 'src/**/*.rs'`

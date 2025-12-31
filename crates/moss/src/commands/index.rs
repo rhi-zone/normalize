@@ -7,13 +7,37 @@ use clap::Subcommand;
 use moss_languages::external_packages;
 use std::path::{Path, PathBuf};
 
+/// What to extract during indexing (files are always indexed).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum IndexContent {
+    /// Skip content extraction (files only)
+    None,
+    /// Function and type definitions
+    Symbols,
+    /// Function call relationships
+    Calls,
+    /// Import statements
+    Imports,
+}
+
+impl std::fmt::Display for IndexContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndexContent::None => write!(f, "none"),
+            IndexContent::Symbols => write!(f, "symbols"),
+            IndexContent::Calls => write!(f, "calls"),
+            IndexContent::Imports => write!(f, "imports"),
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum IndexAction {
     /// Rebuild the file index
     Rebuild {
-        /// Also rebuild the call graph (slower, parses all files)
-        #[arg(short, long = "call-graph")]
-        call_graph: bool,
+        /// What to extract: symbols, calls, imports (default: all)
+        #[arg(long, value_delimiter = ',', default_values_t = vec![IndexContent::Symbols, IndexContent::Calls, IndexContent::Imports])]
+        include: Vec<IndexContent>,
     },
 
     /// Show index statistics (DB size vs codebase size)
@@ -48,7 +72,7 @@ pub enum IndexAction {
 /// Run an index management action
 pub fn cmd_index(action: IndexAction, root: Option<&Path>, json: bool) -> i32 {
     match action {
-        IndexAction::Rebuild { call_graph } => cmd_rebuild(root, call_graph),
+        IndexAction::Rebuild { include } => cmd_rebuild(root, &include),
         IndexAction::Stats { storage } => cmd_stats(root, json, storage),
         IndexAction::Files { prefix, limit } => {
             cmd_list_files(prefix.as_deref(), root, limit, json)
@@ -61,7 +85,7 @@ pub fn cmd_index(action: IndexAction, root: Option<&Path>, json: bool) -> i32 {
 // Rebuild
 // =============================================================================
 
-fn cmd_rebuild(root: Option<&Path>, call_graph: bool) -> i32 {
+fn cmd_rebuild(root: Option<&Path>, include: &[IndexContent]) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -71,13 +95,38 @@ fn cmd_rebuild(root: Option<&Path>, call_graph: bool) -> i32 {
             Ok(count) => {
                 println!("Indexed {} files", count);
 
-                if call_graph {
+                // Any content type requires call graph extraction (parsed together)
+                // "none" means files only - skip call graph
+                if !include.is_empty() && !include.contains(&IndexContent::None) {
                     match idx.refresh_call_graph() {
-                        Ok(stats) => {
-                            println!(
-                                "Indexed {} symbols, {} calls, {} imports",
-                                stats.symbols, stats.calls, stats.imports
-                            );
+                        Ok(mut stats) => {
+                            // Delete content types that weren't requested
+                            if !include.contains(&IndexContent::Symbols) {
+                                let _ = idx.execute("DELETE FROM symbols");
+                                stats.symbols = 0;
+                            }
+                            if !include.contains(&IndexContent::Calls) {
+                                let _ = idx.execute("DELETE FROM calls");
+                                stats.calls = 0;
+                            }
+                            if !include.contains(&IndexContent::Imports) {
+                                let _ = idx.execute("DELETE FROM imports");
+                                stats.imports = 0;
+                            }
+
+                            let mut parts = Vec::new();
+                            if stats.symbols > 0 {
+                                parts.push(format!("{} symbols", stats.symbols));
+                            }
+                            if stats.calls > 0 {
+                                parts.push(format!("{} calls", stats.calls));
+                            }
+                            if stats.imports > 0 {
+                                parts.push(format!("{} imports", stats.imports));
+                            }
+                            if !parts.is_empty() {
+                                println!("Indexed {}", parts.join(", "));
+                            }
                         }
                         Err(e) => {
                             eprintln!("Error indexing call graph: {}", e);
