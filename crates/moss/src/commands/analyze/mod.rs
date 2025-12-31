@@ -123,7 +123,22 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
     // Dispatch based on subcommand
     match args.command {
-        Some(AnalyzeCommand::Health { compact }) => health::cmd_overview(
+        Some(AnalyzeCommand::Health { target }) => {
+            let report = analysis_report::analyze(
+                target.as_deref(),
+                &effective_root,
+                true,  // health
+                false, // complexity
+                false, // length
+                false, // security
+                None,
+                None,
+                filter.as_ref(),
+            );
+            print_report(&report, json, pretty)
+        }
+
+        Some(AnalyzeCommand::Overview { compact }) => health::cmd_overview(
             Some(&effective_root),
             compact || config.analyze.compact(),
             json,
@@ -281,8 +296,21 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             )
         }
 
-        // No subcommand: default to health overview
-        None => health::cmd_overview(Some(&effective_root), config.analyze.compact(), json),
+        // No subcommand: default to health analysis
+        None => {
+            let report = analysis_report::analyze(
+                None,
+                &effective_root,
+                true,  // health
+                false, // complexity
+                false, // length
+                false, // security
+                None,
+                None,
+                filter.as_ref(),
+            );
+            print_report(&report, json, pretty)
+        }
     }
 }
 

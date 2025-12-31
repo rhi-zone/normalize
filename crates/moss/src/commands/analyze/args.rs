@@ -36,8 +36,14 @@ pub struct AnalyzeArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum AnalyzeCommand {
-    /// Run health analysis with project overview
+    /// Run health analysis (file counts, complexity stats, large file warnings)
     Health {
+        /// Target file or directory
+        target: Option<String>,
+    },
+
+    /// Show comprehensive project overview (compact summary with grade)
+    Overview {
         /// Compact one-line output
         #[arg(short, long)]
         compact: bool,
