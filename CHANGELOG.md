@@ -12,6 +12,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Was: 0% (18 of 6217), Now: 39% (590 of 1526)
 - Exclude interface/trait implementations from doc coverage (configurable via `[analyze] exclude_interface_impls`)
   - Trait impl methods don't need docs - the trait defines the contract
+  - Detects: Rust `impl Trait for`, Java `@Override`, Kotlin/C#/Swift/TypeScript `override` keyword
 - Consolidated analysis pass scoring into `report.rs`: `ComplexityReport::score()`, `SecurityReport::score()`, `calculate_grade()`
 - `--trace` now supports unified path format (`file.rs/symbol` like view command)
 - `--trace` enhanced with value provenance tracking:
