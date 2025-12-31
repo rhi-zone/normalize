@@ -2751,16 +2751,32 @@ fn cmd_trace(
 ) -> i32 {
     use crate::index;
     use crate::parsers;
+    use crate::path_resolve::resolve_unified;
+
+    // Parse the symbol argument as a unified path (file/symbol)
+    let (file_path, symbol_name) = if let Some(unified) = resolve_unified(symbol, root) {
+        if unified.symbol_path.is_empty() {
+            eprintln!("No symbol specified in path: {}", symbol);
+            return 1;
+        }
+        (Some(unified.file_path), unified.symbol_path.join("."))
+    } else if let Some(t) = target {
+        // Legacy: separate --target and symbol args
+        (Some(t.to_string()), symbol.to_string())
+    } else {
+        // Try as a global symbol name (index lookup)
+        (None, symbol.to_string())
+    };
 
     // Find the symbol - try index first, fall back to file parsing
     let symbol_matches = if let Some(mut idx) = index::FileIndex::open_if_enabled(root) {
         let _ = idx.incremental_refresh();
-        match idx.find_symbols(symbol, None, false, 10) {
+        match idx.find_symbols(&symbol_name, None, false, 10) {
             Ok(matches) if !matches.is_empty() => matches,
-            _ => fallback_parse_symbol(symbol, target, root),
+            _ => fallback_parse_symbol(&symbol_name, file_path.as_deref(), root),
         }
     } else {
-        fallback_parse_symbol(symbol, target, root)
+        fallback_parse_symbol(&symbol_name, file_path.as_deref(), root)
     };
 
     if symbol_matches.is_empty() {
