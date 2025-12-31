@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Index bug: symbols not being stored during rebuild (0 symbols in index despite 390 files)
+- `index rebuild` should include `--call-graph` by default (symbols needed for most features)
 - Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
 
 ## Remaining Work

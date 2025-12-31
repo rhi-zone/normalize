@@ -24,6 +24,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Branch context for conditionals (if/else/match)
   - Same-file function locations shown (`@L<line>`)
   - `--recursive` traces into called functions, showing their return statements
+  - Cross-file tracing via index lookup (shows file path for external functions)
 - `analyze files` subcommand: shows longest files by line count, with totals by language
 
 ### View Command
