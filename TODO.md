@@ -52,6 +52,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 ### View Command
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
+- `moss grep` naming collision with shell grep: CLAUDE.md says use `|` not `\|` but `moss grep 'a|b'` looks like shell grep syntax. Consider renaming (not `search`/`find` - those should be semantic)
 
 ### Code Quality
 - Large file analysis: run `./target/debug/moss analyze` on very large files (1000+ functions) - assess performance, output format, usefulness
@@ -134,6 +135,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 - Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
+- Large file edits: agentic tools (Claude Code) struggle with large deletions/replacements - Edit tool fails when strings don't match exactly, requiring shell workarounds
 
 ### Session Analysis
 - Better `--compact` format: key:value pairs, no tables, all info preserved
