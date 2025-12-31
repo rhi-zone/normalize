@@ -4,10 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Rename `moss grep` → `moss text-search` (search/find imply semantic). Document reasoning in `docs/decisions.md`.
 - Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
-- Edit `--item` flag: format-aware insertion for lists (checkbox/bullet/numbered)
-- [x] Analyze `--trace`: recursive cross-function tracing (trace INTO called functions)
+- `analyze --trace`: cross-file function lookup via index
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -17,18 +15,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Store diffs in memory, use worktree as "materialized view"
   - Apply patch to worktree → run validator → if pass, apply to user dir
   - Zero user interruption (user can edit while agent tests in background)
-- `analyze --trace <symbol>`: backward data flow / value provenance
-  - [x] Trace where a value comes from (like "blame" for values, not lines)
-  - [x] Same-file function signatures at call boundaries
-  - [x] Conditionals: branch context shown (if/else/match)
-  - [x] Stop conditions: literals marked as (terminal)
-  - [x] Stop conditions: same-file calls show signature + @L<line>
-  - [x] `--max-depth N` limits output
-  - [x] Recursive cross-function tracing (trace INTO called functions) - `--recursive` flag
-  - [ ] Cross-file function lookup via index
+- `analyze --trace <symbol>`: cross-file function lookup via index (same-file recursive done)
 
 ### Configuration System
-Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`
+Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[text-search]`
 
 Adding a new section (3 places):
 1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module
@@ -55,7 +45,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
 
 ### Code Quality
-- [x] Interface impl detection: TypeScript/JS semantic analysis with cross-file resolution via InterfaceResolver trait (IndexedResolver for index-based, OnDemandResolver for on-demand file parsing)
 - `is_source_file` function: hardcoded extension list duplicated in analyze modules - use `moss-languages` support detection instead
 - Git hotspot allowlist: `.moss/hotspot-allow` file to filter expected hotspots (generated code, vendored deps) from `--hotspots`
 - Large file analysis: run `./target/debug/moss analyze` on very large files (1000+ functions) - assess performance, output format, usefulness
@@ -105,8 +94,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
 
 ### Edit Improvements
-- `--at primary`: explicit opt-in to primary section detection (discoverable via error message)
-- `--item` flag: format-aware insertion (detects checkbox/bullet/numbered, wraps content)
 - Fuzzy glob in paths: `moss edit "TODO.md/**/feature*" delete` for item matching
 
 ### Tooling
