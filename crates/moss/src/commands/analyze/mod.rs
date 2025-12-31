@@ -4,22 +4,24 @@ mod args;
 mod call_graph;
 mod check_examples;
 mod check_refs;
+pub mod complexity;
 mod duplicates;
 mod health;
 mod hotspots;
+pub mod length;
 mod lint;
+pub mod report;
+pub mod security;
 mod stale_docs;
 mod trace;
 
-pub use args::{AnalyzeArgs, AnalyzeCommand};
-
-use crate::analysis_report;
 use crate::analyze::complexity::ComplexityReport;
 use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;
 use crate::merge::Merge;
+pub use args::{AnalyzeArgs, AnalyzeCommand};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -124,7 +126,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     // Dispatch based on subcommand
     match args.command {
         Some(AnalyzeCommand::Health { target }) => {
-            let report = analysis_report::analyze(
+            let report = report::analyze(
                 target.as_deref(),
                 &effective_root,
                 true,  // health
@@ -149,7 +151,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             threshold,
             kind,
         }) => {
-            let report = analysis_report::analyze(
+            let report = report::analyze(
                 target.as_deref(),
                 &effective_root,
                 false, // health
@@ -164,7 +166,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         }
 
         Some(AnalyzeCommand::Length { target }) => {
-            let report = analysis_report::analyze(
+            let report = report::analyze(
                 target.as_deref(),
                 &effective_root,
                 false, // health
@@ -179,7 +181,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         }
 
         Some(AnalyzeCommand::Security { target }) => {
-            let report = analysis_report::analyze(
+            let report = report::analyze(
                 target.as_deref(),
                 &effective_root,
                 false, // health
@@ -298,7 +300,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
         // No subcommand: default to health analysis
         None => {
-            let report = analysis_report::analyze(
+            let report = report::analyze(
                 None,
                 &effective_root,
                 true,  // health
@@ -339,7 +341,7 @@ fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<Filt
 }
 
 /// Print analysis report in appropriate format
-fn print_report(report: &analysis_report::AnalyzeReport, json: bool, pretty: bool) -> i32 {
+fn print_report(report: &report::AnalyzeReport, json: bool, pretty: bool) -> i32 {
     if json {
         println!("{}", report.to_json());
     } else if pretty {
@@ -363,7 +365,7 @@ fn run_all_passes(
     let mut scores: Vec<(f64, f64)> = Vec::new();
 
     // Run main analysis
-    let report = analysis_report::analyze(
+    let report = report::analyze(
         target, root, true, // health
         true, // complexity
         true, // length
@@ -431,7 +433,7 @@ fn score_complexity(report: &ComplexityReport) -> f64 {
 }
 
 /// Score security: 100 if no findings, penalized by severity
-fn score_security(report: &analysis_report::SecurityReport) -> f64 {
+fn score_security(report: &report::SecurityReport) -> f64 {
     let counts = report.count_by_severity();
     let penalty =
         counts["critical"] * 40 + counts["high"] * 20 + counts["medium"] * 10 + counts["low"] * 5;

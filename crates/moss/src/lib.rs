@@ -17,7 +17,6 @@
 //! let tree = parsers::parse_with_grammar("rust", "fn main() {}");
 //! ```
 
-pub mod analysis_report;
 pub mod analyze;
 pub mod commands;
 pub mod config;
