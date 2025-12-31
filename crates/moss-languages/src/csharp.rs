@@ -185,6 +185,15 @@ impl Language for CSharp {
             None => format!("{}{}", name, params),
         };
 
+        // Check for override modifier
+        let is_override = {
+            let mut cursor = node.walk();
+            let children: Vec<_> = node.children(&mut cursor).collect();
+            children.iter().any(|child| {
+                child.kind() == "modifier" && child.child(0).map(|c| c.kind()) == Some("override")
+            })
+        };
+
         Some(Symbol {
             name: name.to_string(),
             kind: if node.kind() == "property_declaration" {
@@ -199,7 +208,7 @@ impl Language for CSharp {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
-            is_interface_impl: false,
+            is_interface_impl: is_override,
         })
     }
 

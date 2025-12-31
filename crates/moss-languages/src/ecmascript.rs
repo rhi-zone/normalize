@@ -100,6 +100,15 @@ pub fn extract_function(node: &Node, content: &str, in_container: bool, name: &s
         format!("function {}{}", name, params)
     };
 
+    // Check for explicit override modifier (TypeScript)
+    let is_override = {
+        let mut cursor = node.walk();
+        let children: Vec<_> = node.children(&mut cursor).collect();
+        children
+            .iter()
+            .any(|child| child.kind() == "override_modifier")
+    };
+
     Symbol {
         name: name.to_string(),
         kind: if in_container {
@@ -114,7 +123,7 @@ pub fn extract_function(node: &Node, content: &str, in_container: bool, name: &s
         end_line: node.end_position().row + 1,
         visibility: Visibility::Public,
         children: Vec::new(),
-        is_interface_impl: false,
+        is_interface_impl: is_override,
     }
 }
 

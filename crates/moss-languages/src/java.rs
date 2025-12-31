@@ -460,6 +460,21 @@ impl Language for Java {
             .map(|p| content[p.byte_range()].to_string())
             .unwrap_or_else(|| "()".to_string());
 
+        // Check for @Override annotation
+        let is_override = if let Some(mods) = node.child_by_field_name("modifiers") {
+            let mut cursor = mods.walk();
+            let children: Vec<_> = mods.children(&mut cursor).collect();
+            children.iter().any(|child| {
+                child.kind() == "marker_annotation"
+                    && child
+                        .child(1)
+                        .map(|id| &content[id.byte_range()] == "Override")
+                        .unwrap_or(false)
+            })
+        } else {
+            false
+        };
+
         Some(Symbol {
             name: name.to_string(),
             kind: SymbolKind::Method,
@@ -470,7 +485,7 @@ impl Language for Java {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
-            is_interface_impl: false,
+            is_interface_impl: is_override,
         })
     }
 
