@@ -82,6 +82,13 @@ pub enum AnalyzeCommand {
         top: usize,
     },
 
+    /// Show longest files in codebase
+    Files {
+        /// Number of files to show
+        #[arg(short = 'n', long, default_value = "20")]
+        top: usize,
+    },
+
     /// Trace value provenance for a symbol
     Trace {
         /// Symbol to trace (format: symbol or file:line or file/symbol)

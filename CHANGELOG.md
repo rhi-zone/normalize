@@ -23,6 +23,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Function calls detected with signatures shown
   - Branch context for conditionals (if/else/match)
   - Same-file function locations shown (`@L<line>`)
+- `analyze files` subcommand: shows longest files by line count, with totals by language
 
 ### View Command
 - Path suffix matching: `moss view analyze/report.rs` now finds `crates/moss/src/commands/analyze/report.rs`

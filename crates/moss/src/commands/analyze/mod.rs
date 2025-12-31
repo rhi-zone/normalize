@@ -7,6 +7,7 @@ mod check_refs;
 pub mod complexity;
 mod docs;
 mod duplicates;
+mod files;
 mod health;
 mod hotspots;
 pub mod length;
@@ -204,6 +205,8 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         }
 
         Some(AnalyzeCommand::Docs { top }) => docs::cmd_docs(&effective_root, top, json),
+
+        Some(AnalyzeCommand::Files { top }) => files::cmd_files(&effective_root, top, json),
 
         Some(AnalyzeCommand::Trace {
             symbol,
