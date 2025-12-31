@@ -83,6 +83,10 @@ pub struct ViewArgs {
     #[arg(long = "types-only")]
     pub types_only: bool,
 
+    /// Include test functions and test modules (hidden by default)
+    #[arg(long)]
+    pub tests: bool,
+
     /// Disable smart display (no collapsing single-child dirs)
     #[arg(long)]
     pub raw: bool,
@@ -136,6 +140,7 @@ pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
         args.deps,
         args.kind.as_deref(),
         args.types_only,
+        args.tests,
         args.raw,
         args.focus.as_deref(),
         args.resolve_imports,
@@ -519,6 +524,7 @@ pub fn cmd_view(
     show_deps: bool,
     kind_filter: Option<&str>,
     types_only: bool,
+    show_tests: bool,
     raw: bool,
     focus: Option<&str>,
     resolve_imports: bool,
@@ -731,6 +737,7 @@ pub fn cmd_view(
             line_numbers,
             show_deps,
             types_only,
+            show_tests,
             focus,
             resolve_imports,
             show_docs,
@@ -1001,6 +1008,7 @@ fn cmd_view_file(
     _line_numbers: bool, // Reserved for future use (e.g., line number gutter)
     show_deps: bool,
     types_only: bool,
+    show_tests: bool,
     focus: Option<&str>,
     resolve_imports: bool,
     show_docs: bool,
@@ -1060,9 +1068,11 @@ fn cmd_view_file(
     let extractor = skeleton::SkeletonExtractor::new();
     let skeleton_result = extractor.extract(&full_path, &content);
 
-    // Filter to types only if requested
+    // Filter tests (hidden by default) and types-only if requested
     let skeleton_result = if types_only {
         skeleton_result.filter_types()
+    } else if !show_tests {
+        skeleton_result.filter_tests()
     } else {
         skeleton_result
     };

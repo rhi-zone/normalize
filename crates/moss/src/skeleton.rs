@@ -115,6 +115,55 @@ impl SkeletonResult {
             file_path: self.file_path.clone(),
         }
     }
+
+    /// Filter out test functions and test modules.
+    /// Removes: functions starting with test_/Test, modules named tests/test/__tests__
+    pub fn filter_tests(&self) -> SkeletonResult {
+        fn is_test_symbol(sym: &Symbol) -> bool {
+            let name = sym.name.as_str();
+            match sym.kind {
+                SymbolKind::Function | SymbolKind::Method => {
+                    name.starts_with("test_") || name.starts_with("Test")
+                }
+                SymbolKind::Module | SymbolKind::Class => {
+                    name == "tests" || name == "test" || name == "__tests__"
+                }
+                _ => false,
+            }
+        }
+
+        fn filter_symbol(sym: &Symbol) -> Option<Symbol> {
+            if is_test_symbol(sym) {
+                return None;
+            }
+            let filtered_children: Vec<_> = sym
+                .children
+                .iter()
+                .filter_map(|c| filter_symbol(c))
+                .collect();
+            Some(Symbol {
+                name: sym.name.clone(),
+                kind: sym.kind,
+                signature: sym.signature.clone(),
+                docstring: sym.docstring.clone(),
+                start_line: sym.start_line,
+                end_line: sym.end_line,
+                visibility: sym.visibility,
+                children: filtered_children,
+            })
+        }
+
+        let filtered_symbols: Vec<_> = self
+            .symbols
+            .iter()
+            .filter_map(|s| filter_symbol(s))
+            .collect();
+
+        SkeletonResult {
+            symbols: filtered_symbols,
+            file_path: self.file_path.clone(),
+        }
+    }
 }
 
 /// Skeleton extractor using shared Extractor from extract.rs

@@ -54,6 +54,9 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 
 ### View Command
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
+- Attributes field in Symbol: extract `#[test]`, `#[cfg(test)]`, `@Test`, decorators - use for test filtering, optionally display like imports/docstrings
+- Module extraction: Rust `mod` blocks should be in skeleton and count as parents for smart context
+- `--full --pretty` performance: 250ms for 109 lines is too slow (parsing each signature)
 
 ### Code Quality
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
