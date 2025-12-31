@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### CLI
+- Colorized `--help` output when colors enabled (respects --pretty, --compact, NO_COLOR, config)
+
+### View Command
+- Signature highlighting fix: Lua, Ruby, Elixir signatures now highlight correctly
+  - Added `Language::signature_suffix()` trait method for language-specific closing tokens
+  - Replaces hardcoded Rust special case with proper trait-based solution
+
 ## v0.1.0 (Dec 2025)
 
 First release. See `docs/` for design docs and `README.md` for usage.
