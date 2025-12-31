@@ -6,6 +6,7 @@ Declarative type schemas with validation and generation.
 
 ```
 type              -- Schema definitions (T.string, T.struct, etc.)
+type.describe     -- Human-readable schema descriptions
 type.validate     -- Validation (check values against schemas)
 type.generate     -- Generation (random values from schemas)
 ```
@@ -240,25 +241,26 @@ cli.run {
 2. **Shorthand constructors are plain functions.** `T.array(item)` just returns
    `{ type = "array", item = item }`. No magic, no metatables.
 
-## Schema Introspection (`T.describe`)
+## Schema Introspection (`type.describe`)
 
 Generate human-readable descriptions of schemas:
 
 ```lua
 local T = require("type")
+local describe = require("type.describe")
 
-T.describe(T.string)                    -- "string"
-T.describe(T.port)                      -- "integer (>= 1, <= 65535)"
-T.describe(T.array(T.number))           -- "array of number"
-T.describe(T.optional(T.string))        -- "string?"
-T.describe(T.any_of(T.string, T.number)) -- "string | number"
+describe(T.string)                    -- "string"
+describe(T.port)                      -- "integer (>= 1, <= 65535)"
+describe(T.array(T.number))           -- "array of number"
+describe(T.optional(T.string))        -- "string?"
+describe(T.any_of(T.string, T.number)) -- "string | number"
 
 -- Struct shows fields
-T.describe(T.struct({ name = T.string, age = T.integer }))
+describe(T.struct({ name = T.string, age = T.integer }))
 -- "struct {\n  age: integer\n  name: string\n}"
 
 -- Custom descriptions take priority
-T.describe({ type = "string", description = "User's email" })
+describe({ type = "string", description = "User's email" })
 -- "User's email"
 ```
 

@@ -34,7 +34,15 @@ Test framework modules:
 - `test` - busted-style assertions (equals, same, is_true, throws, etc.)
 - `test.property` - property-based testing using type.generate
 
-See `docs/design/lua-cli.md` and `docs/design/lua-type.md`.
+See `docs/design/lua-cli.md`, `docs/design/lua-type.md`, and `docs/design/lua-test.md`.
+
+### Test Command
+
+`moss test` - proxy to native test runners:
+- Auto-detects project type (Cargo.toml, go.mod, package.json, etc.)
+- Supported runners: cargo, go, bun, npm, pytest
+- Pass-through args: `moss test -- --nocapture`
+- List available runners: `moss test list`
 
 ### Bug Fixes
 

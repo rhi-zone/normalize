@@ -101,13 +101,14 @@ fn describe_primitives() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
+        local describe = require("type.describe")
 
-        assert(T.describe(T.string) == "string", "describe string")
-        assert(T.describe(T.number) == "number", "describe number")
-        assert(T.describe(T.integer) == "integer", "describe integer")
-        assert(T.describe(T.boolean) == "boolean", "describe boolean")
-        assert(T.describe(T.any) == "any", "describe any")
-        assert(T.describe(T["nil"]) == "nil", "describe nil")
+        assert(describe(T.string) == "string", "describe string")
+        assert(describe(T.number) == "number", "describe number")
+        assert(describe(T.integer) == "integer", "describe integer")
+        assert(describe(T.boolean) == "boolean", "describe boolean")
+        assert(describe(T.any) == "any", "describe any")
+        assert(describe(T["nil"]) == "nil", "describe nil")
         "#,
     );
     assert!(result.is_ok(), "describe primitives failed: {:?}", result);
@@ -119,26 +120,27 @@ fn describe_with_constraints() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
+        local describe = require("type.describe")
 
         -- String constraints
-        local s1 = T.describe({ type = "string", min_len = 1, max_len = 10 })
+        local s1 = describe({ type = "string", min_len = 1, max_len = 10 })
         assert(s1:find("1%-10 chars"), "string length range: " .. s1)
 
-        local s2 = T.describe({ type = "string", pattern = "^[a-z]+$" })
+        local s2 = describe({ type = "string", pattern = "^[a-z]+$" })
         assert(s2:find("/^%[a%-z%]"), "string pattern: " .. s2)
 
-        local s3 = T.describe({ type = "string", one_of = { "a", "b", "c" } })
+        local s3 = describe({ type = "string", one_of = { "a", "b", "c" } })
         assert(s3:find("one of"), "string one_of: " .. s3)
 
         -- Number constraints
-        local n1 = T.describe({ type = "number", min = 0, max = 100 })
+        local n1 = describe({ type = "number", min = 0, max = 100 })
         assert(n1:find(">= 0") and n1:find("<= 100"), "number range: " .. n1)
 
-        local n2 = T.describe({ type = "number", min = 0, exclusive_min = true })
+        local n2 = describe({ type = "number", min = 0, exclusive_min = true })
         assert(n2:find("> 0"), "number exclusive min: " .. n2)
 
         -- Port alias
-        local p = T.describe(T.port)
+        local p = describe(T.port)
         assert(p:find("integer") and p:find("1") and p:find("65535"), "port: " .. p)
         "#,
     );
@@ -155,40 +157,41 @@ fn describe_composite() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
+        local describe = require("type.describe")
 
         -- Array
-        local a = T.describe(T.array(T.number))
+        local a = describe(T.array(T.number))
         assert(a == "array of number", "array: " .. a)
 
         -- Optional
-        local o = T.describe(T.optional(T.string))
+        local o = describe(T.optional(T.string))
         assert(o == "string?", "optional: " .. o)
 
         -- Tuple
-        local t = T.describe(T.tuple({ T.string, T.number }))
+        local t = describe(T.tuple({ T.string, T.number }))
         assert(t == "tuple(string, number)", "tuple: " .. t)
 
         -- Dictionary
-        local d = T.describe(T.dictionary(T.string, T.number))
+        local d = describe(T.dictionary(T.string, T.number))
         assert(d == "dict<string, number>", "dictionary: " .. d)
 
         -- Union
-        local u = T.describe(T.any_of(T.string, T.number))
+        local u = describe(T.any_of(T.string, T.number))
         assert(u == "string | number", "any_of: " .. u)
 
         -- Intersection
-        local i = T.describe(T.all_of(T.string, { type = "string", min_len = 1 }))
+        local i = describe(T.all_of(T.string, { type = "string", min_len = 1 }))
         assert(i:find("&"), "all_of: " .. i)
 
         -- Literal
-        local l = T.describe(T.literal("foo"))
+        local l = describe(T.literal("foo"))
         assert(l == '"foo"', "literal string: " .. l)
 
-        local ln = T.describe(T.literal(42))
+        local ln = describe(T.literal(42))
         assert(ln == "42", "literal number: " .. ln)
 
         -- Struct
-        local s = T.describe(T.struct({ name = T.string, age = T.integer }))
+        local s = describe(T.struct({ name = T.string, age = T.integer }))
         assert(s:find("struct") and s:find("name") and s:find("age"), "struct: " .. s)
         "#,
     );
@@ -201,17 +204,18 @@ fn describe_custom_description() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
+        local describe = require("type.describe")
 
         -- Custom description takes priority
         local schema = { type = "string", description = "User's email address" }
-        assert(T.describe(schema) == "User's email address", "custom description")
+        assert(describe(schema) == "User's email address", "custom description")
 
         -- Nested custom description
         local nested = T.struct({
             email = { type = "string", description = "Email address" },
             age = T.integer,
         })
-        local desc = T.describe(nested)
+        local desc = describe(nested)
         assert(desc:find("Email address"), "nested custom: " .. desc)
         "#,
     );

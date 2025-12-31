@@ -182,6 +182,16 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
+    /// Run native test runners (cargo test, go test, bun test, etc.)
+    Test {
+        #[command(subcommand)]
+        action: Option<TestAction>,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long, global = true)]
+        root: Option<PathBuf>,
+    },
+
     /// Start a moss server (MCP, HTTP, LSP)
     Serve {
         #[command(subcommand)]
@@ -262,6 +272,23 @@ enum LintAction {
     },
 
     /// List available linting tools
+    List,
+}
+
+#[derive(Subcommand)]
+enum TestAction {
+    /// Run tests (default when no subcommand given)
+    Run {
+        /// Specific test runner to use (cargo, go, bun, npm, pytest)
+        #[arg(short = 'R', long)]
+        runner: Option<String>,
+
+        /// Additional arguments to pass to the test runner
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// List available test runners
     List,
 }
 
@@ -486,6 +513,18 @@ fn main() {
                     }
                 }
                 LintAction::List => commands::lint::cmd_lint_list(root.as_deref(), &format),
+            }
+        }
+        Commands::Test { action, root } => {
+            let action = action.unwrap_or(TestAction::Run {
+                runner: None,
+                args: vec![],
+            });
+            match action {
+                TestAction::Run { runner, args } => {
+                    commands::test::cmd_test_run(root.as_deref(), runner.as_deref(), &args)
+                }
+                TestAction::List => commands::test::cmd_test_list(root.as_deref()),
             }
         }
         Commands::Serve { protocol, root } => match protocol {

@@ -13,6 +13,7 @@ pub mod package;
 pub mod plans;
 pub mod script;
 pub mod sessions;
+pub mod test;
 pub mod todo;
 pub mod update;
 pub mod view;

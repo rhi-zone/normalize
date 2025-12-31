@@ -4,9 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Test subcommand: `moss test` proxies to native test runners (cargo test, bun test, go test, etc.)
-- Type serialization: `T.serialize(schema)` / `T.deserialize(str, schema)` for config files
-- Lua docs: create `docs/design/lua-test.md` documenting test + test.property modules
+(pick from Remaining Work or Backlog)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -89,9 +87,12 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Lua test framework: test discovery for `.moss/tests/` (test + test.property modules done)
   - Command naming: must clearly indicate "moss Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
   - Alternative: no special command, just run test files directly via `moss <file>`
-- Type system uses beyond validation: serialization
+- Type system uses beyond validation
   - Done: `T.describe(schema)` for introspection, `type.generate` for property testing
   - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
+- Format libraries (Lua): json, yaml, toml, kdl - **very low priority, defer until concrete use case**
+  - Pure Lua implementations preferred (simple, no deps)
+  - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
 
 ### Edit Improvements
 - `--at primary`: explicit opt-in to primary section detection (discoverable via error message)

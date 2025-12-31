@@ -39,6 +39,7 @@ mod custom;
 mod diagnostic;
 mod registry;
 mod sarif;
+pub mod test_runners;
 mod tools;
 
 pub use custom::{load_custom_tools, CustomTool, CustomToolConfig, ToolsConfig};

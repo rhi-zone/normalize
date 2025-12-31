@@ -35,6 +35,7 @@ pub mod builtins {
 pub mod modules {
     pub const CLI: &str = include_str!("scripts/cli.lua");
     pub const TYPE: &str = include_str!("scripts/type.lua");
+    pub const TYPE_DESCRIBE: &str = include_str!("scripts/type/describe.lua");
     pub const TYPE_VALIDATE: &str = include_str!("scripts/type/validate.lua");
     pub const TYPE_GENERATE: &str = include_str!("scripts/type/generate.lua");
     pub const TEST: &str = include_str!("scripts/test.lua");
@@ -45,6 +46,7 @@ pub mod modules {
         match name {
             "cli" => Some(CLI),
             "type" => Some(TYPE),
+            "type.describe" => Some(TYPE_DESCRIBE),
             "type.validate" => Some(TYPE_VALIDATE),
             "type.generate" => Some(TYPE_GENERATE),
             "test" => Some(TEST),

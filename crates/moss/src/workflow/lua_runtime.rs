@@ -817,6 +817,7 @@ impl LuaRuntime {
         for name in &[
             "cli",
             "type",
+            "type.describe",
             "type.validate",
             "type.generate",
             "test",

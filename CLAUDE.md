@@ -37,10 +37,13 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 Run via `./target/debug/moss` (or `cargo build` first if needed):
 ```
 ./target/debug/moss view [path[/symbol]] [--types-only]   # structure, skeleton, or symbol source
+./target/debug/moss view path:start-end                    # view specific line range
 ./target/debug/moss analyze [--complexity] [path]          # find complex functions
 ./target/debug/moss grep <pattern> [--only "*.rs"]         # search (real regex: use | not \|)
 ./target/debug/moss @todo [list|add|done|rm]              # manage TODO.md via Lua script
 ```
+
+**Don't invent CLI flags.** When unsure of moss syntax, run `moss <cmd> --help` and add the correct syntax to CLAUDE.md immediately before proceeding.
 
 For debugging tree-sitter grammars and node kinds:
 ```
@@ -69,6 +72,7 @@ Do not:
 - **Replace content when editing lists** - when adding to TODO.md or similar, extend existing content, don't replace sections. Read carefully, add items, preserve what's there.
 - **Cut corners or use fallbacks** - implement features properly for each case. No "just use format_summary() for now" or generic fallbacks. If implementing for 98 languages, implement properly for each one - data languages return empty, each programming language uses its actual syntax.
 - **Dismiss tooling needs for "rare" operations** - error-prone manual operations need safety rails regardless of frequency. Build the tool.
+- **Fear "over-modularization"** - if code has its own dispatch table or is a self-contained unit, split it out. 100 lines is not "too small" for a module. Consistency with existing patterns trumps subjective size thresholds.
 
 ## Design Principles
 
