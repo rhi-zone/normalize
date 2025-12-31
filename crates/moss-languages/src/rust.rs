@@ -324,36 +324,27 @@ impl Language for Rust {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Look for doc comments before the node
-        let lines: Vec<&str> = content.lines().collect();
-        let start_line = node.start_position().row;
-
-        if start_line == 0 {
-            return None;
-        }
-
-        let mut doc_lines = Vec::new();
-        for i in (0..start_line).rev() {
-            let line = lines.get(i)?.trim();
-            if line.starts_with("///") {
-                let doc = line.trim_start_matches("///").trim();
-                doc_lines.insert(0, doc.to_string());
-            } else if line.starts_with("//!") {
-                break; // Module-level doc
-            } else if line.is_empty() {
-                if !doc_lines.is_empty() {
-                    break;
+        // Look for doc comments in the attributes child
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "attributes" {
+                let mut doc_lines = Vec::new();
+                let mut attr_cursor = child.walk();
+                for attr_child in child.children(&mut attr_cursor) {
+                    if attr_child.kind() == "line_outer_doc_comment" {
+                        let text = &content[attr_child.byte_range()];
+                        let doc = text.trim_start_matches("///").trim();
+                        if !doc.is_empty() {
+                            doc_lines.push(doc.to_string());
+                        }
+                    }
                 }
-            } else {
-                break;
+                if !doc_lines.is_empty() {
+                    return Some(doc_lines.join("\n"));
+                }
             }
         }
-
-        if doc_lines.is_empty() {
-            None
-        } else {
-            Some(doc_lines.join("\n"))
-        }
+        None
     }
 
     fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
