@@ -55,6 +55,8 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - `moss grep` naming collision with shell grep: CLAUDE.md says use `|` not `\|` but `moss grep 'a|b'` looks like shell grep syntax. Consider renaming (not `search`/`find` - those should be semantic)
 
 ### Code Quality
+- `is_source_file` function: hardcoded extension list duplicated in analyze modules - use `moss-languages` support detection instead
+- Git hotspot allowlist: `.moss/hotspot-allow` file to filter expected hotspots (generated code, vendored deps) from `--hotspots`
 - Large file analysis: run `./target/debug/moss analyze` on very large files (1000+ functions) - assess performance, output format, usefulness
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
