@@ -7,6 +7,15 @@ See `docs/` for design docs and `README.md` for usage.
 ### CLI
 - Colorized `--help` output when colors enabled (respects --pretty, --compact, NO_COLOR, config)
 
+### Analyze Command
+- `--trace` now supports unified path format (`file.rs/symbol` like view command)
+- `--trace` enhanced with value provenance tracking:
+  - `--max-depth` limits output entries
+  - Literals marked as `(terminal)` - no further tracing needed
+  - Function calls detected with signatures shown
+  - Branch context for conditionals (if/else/match)
+  - Same-file function locations shown (`@L<line>`)
+
 ### View Command
 - Signature highlighting fix: Lua, Ruby, Elixir signatures now highlight correctly
   - Added `Language::signature_suffix()` trait method for language-specific closing tokens
