@@ -17,7 +17,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Zero user interruption (user can edit while agent tests in background)
 
 ### Configuration System
-Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[text-search]`
+Sections: `[daemon]`, `[index]`, `[aliases]`, `[todo]`, `[view]`, `[analyze]`, `[text-search]`, `[pretty]`
 
 Adding a new section (3 places):
 1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module

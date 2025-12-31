@@ -29,6 +29,11 @@ See `docs/` for design docs and `README.md` for usage.
 - `analyze hotspots` now supports config-based exclusions via `[analyze] hotspots_exclude`
   - Example: `hotspots_exclude = ["*.md", "*.lock", "generated/**"]`
 
+### Configuration
+- Unified `[sigil]` and `[filter.aliases]` config sections into single `[aliases]`
+  - Used for both path targets (`@todo`) and filter patterns (`--only @tests`)
+  - Supports all path separators: `/`, `:`, `::`, `#` (e.g., `@todo/Section`, `@todo:Section`)
+
 ### Index Command
 - `index rebuild` now includes call graph by default (symbols needed for most features)
   - Use `--include none` for files-only mode (faster)
