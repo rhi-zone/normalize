@@ -5,7 +5,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 - Smart Header: `moss view --context` pulls in referenced type definitions
-- Run `moss health` and address large files
+- [x] Run `moss health` and address large files
+- Split view.rs into submodules (search, tree, file, symbol, lines)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -42,6 +43,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 ### View Command
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
+- Review view.rs scope: 1990 lines doing search, tree, file, symbol, line-range viewing. Consider consolidating before splitting into submodules.
 
 ### Code Quality
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)

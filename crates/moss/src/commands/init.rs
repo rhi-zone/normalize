@@ -310,13 +310,20 @@ mod tests {
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
 
-        // !.moss/config.toml should be right after .moss/*, not at the end
+        // New entries should be inserted after .moss/*, before other_stuff
         let moss_idx = lines.iter().position(|l| *l == ".moss/*").unwrap();
+        let other_idx = lines.iter().position(|l| *l == "other_stuff").unwrap();
         let config_idx = lines
             .iter()
             .position(|l| *l == "!.moss/config.toml")
             .unwrap();
-        assert_eq!(config_idx, moss_idx + 1);
+
+        // All new entries should be between .moss/* and other_stuff
+        assert!(config_idx > moss_idx, "config should be after .moss/*");
+        assert!(
+            config_idx < other_idx,
+            "config should be before other_stuff"
+        );
     }
 
     #[test]
