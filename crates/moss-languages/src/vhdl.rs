@@ -113,6 +113,7 @@ impl Language for Vhdl {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -139,6 +140,7 @@ impl Language for Vhdl {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -161,6 +163,7 @@ impl Language for Vhdl {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

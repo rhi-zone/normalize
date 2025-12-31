@@ -145,6 +145,7 @@ impl Language for Ada {
                     visibility: Visibility::Public,
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,
@@ -169,6 +170,7 @@ impl Language for Ada {
                     visibility: Visibility::Public,
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,
@@ -195,6 +197,7 @@ impl Language for Ada {
                     visibility: Visibility::Public,
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,

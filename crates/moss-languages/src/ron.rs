@@ -111,6 +111,7 @@ impl Language for Ron {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

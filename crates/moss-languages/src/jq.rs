@@ -100,6 +100,7 @@ impl Language for Jq {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

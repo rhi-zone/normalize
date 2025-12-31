@@ -191,6 +191,7 @@ impl Language for Dart {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -229,6 +230,7 @@ impl Language for Dart {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

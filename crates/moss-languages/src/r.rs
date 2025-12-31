@@ -144,6 +144,7 @@ impl Language for R {
             },
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

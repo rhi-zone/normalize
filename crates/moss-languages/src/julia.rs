@@ -143,6 +143,7 @@ impl Language for Julia {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -167,6 +168,7 @@ impl Language for Julia {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

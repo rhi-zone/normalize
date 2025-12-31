@@ -240,6 +240,7 @@ impl Language for Rust {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -270,6 +271,7 @@ impl Language for Rust {
                     visibility: Visibility::Public,
                     children: Vec::new(),
                     is_interface_impl: is_trait_impl,
+                    implements: Vec::new(),
                 })
             }
             "trait_item" => {
@@ -287,6 +289,7 @@ impl Language for Rust {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             "mod_item" => {
@@ -306,6 +309,7 @@ impl Language for Rust {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,
@@ -335,6 +339,7 @@ impl Language for Rust {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

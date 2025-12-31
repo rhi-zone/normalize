@@ -100,6 +100,7 @@ impl SkeletonResult {
                     visibility: sym.visibility,
                     children: type_children,
                     is_interface_impl: sym.is_interface_impl,
+                    implements: sym.implements.clone(),
                 })
             } else {
                 None
@@ -162,6 +163,7 @@ impl SkeletonResult {
                 visibility: sym.visibility,
                 children: filtered_children,
                 is_interface_impl: sym.is_interface_impl,
+                implements: sym.implements.clone(),
             })
         }
 
@@ -192,6 +194,22 @@ impl SkeletonExtractor {
 
     pub fn extract(&self, path: &Path, content: &str) -> SkeletonResult {
         let result = self.extractor.extract(path, content);
+        SkeletonResult {
+            symbols: result.symbols,
+            file_path: result.file_path,
+        }
+    }
+
+    /// Extract with optional cross-file interface resolver.
+    pub fn extract_with_resolver(
+        &self,
+        path: &Path,
+        content: &str,
+        resolver: Option<&dyn crate::extract::InterfaceResolver>,
+    ) -> SkeletonResult {
+        let result = self
+            .extractor
+            .extract_with_resolver(path, content, resolver);
         SkeletonResult {
             symbols: result.symbols,
             file_path: result.file_path,

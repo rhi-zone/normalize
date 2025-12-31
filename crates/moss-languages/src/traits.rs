@@ -81,6 +81,8 @@ pub struct Symbol {
     pub children: Vec<Symbol>,
     /// True if this symbol implements an interface/trait (e.g., method in `impl Trait for Type`)
     pub is_interface_impl: bool,
+    /// Parent interfaces/classes this symbol extends or implements (for semantic matching)
+    pub implements: Vec<String>,
 }
 
 /// An import statement

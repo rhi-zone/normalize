@@ -209,6 +209,7 @@ impl Language for CSharp {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: is_override,
+            implements: Vec::new(),
         })
     }
 
@@ -234,6 +235,7 @@ impl Language for CSharp {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

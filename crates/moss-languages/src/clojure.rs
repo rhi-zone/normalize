@@ -125,6 +125,7 @@ impl Language for Clojure {
             },
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -153,6 +154,7 @@ impl Language for Clojure {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

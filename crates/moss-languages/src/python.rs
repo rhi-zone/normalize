@@ -542,6 +542,7 @@ impl Language for Python {
             visibility,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -570,6 +571,7 @@ impl Language for Python {
             visibility: self.get_visibility(node, content),
             children: Vec::new(), // Caller fills this in
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

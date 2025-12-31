@@ -18,10 +18,12 @@ struct ParsedFileData {
     calls: Vec<(String, String, Option<String>, usize)>,
     /// imports (for Python files only)
     imports: Vec<FlatImport>,
+    /// (type_name, method_name) for interface/class method signatures
+    type_methods: Vec<(String, String)>,
 }
 
 // Not yet public - just delete .moss/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 /// Supported source file extensions for call graph indexing
 const SOURCE_EXTENSIONS: &[&str] = &[
@@ -203,6 +205,17 @@ impl FileIndex {
             CREATE INDEX IF NOT EXISTS idx_imports_name ON imports(name);
             CREATE INDEX IF NOT EXISTS idx_imports_module ON imports(module);
 
+            -- Type method signatures for cross-file interface resolution
+            -- Stores method names for each interface/class to enable matching
+            -- when a class implements an interface from another file
+            CREATE TABLE IF NOT EXISTS type_methods (
+                file TEXT NOT NULL,
+                type_name TEXT NOT NULL,
+                method_name TEXT NOT NULL,
+                PRIMARY KEY (file, type_name, method_name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_type_methods_type ON type_methods(type_name);
+
             ",
         )?;
 
@@ -221,6 +234,7 @@ impl FileIndex {
             conn.execute("DELETE FROM calls", []).ok();
             conn.execute("DELETE FROM symbols", []).ok();
             conn.execute("DELETE FROM imports", []).ok();
+            conn.execute("DELETE FROM type_methods", []).ok();
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
@@ -993,6 +1007,30 @@ impl FileIndex {
         Ok(importers)
     }
 
+    /// Get method names for a type (interface/class) in a specific file.
+    /// Used for cross-file interface implementation detection.
+    pub fn get_type_methods(&self, file: &str, type_name: &str) -> rusqlite::Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT method_name FROM type_methods WHERE file = ?1 AND type_name = ?2")?;
+        let methods = stmt
+            .query_map(params![file, type_name], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(methods)
+    }
+
+    /// Find files that define a type by name.
+    /// Returns all files that have a type (interface/class) with the given name.
+    pub fn find_type_definitions(&self, type_name: &str) -> rusqlite::Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT file FROM type_methods WHERE type_name = ?1")?;
+        let files = stmt
+            .query_map(params![type_name], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(files)
+    }
+
     /// Refresh the call graph by parsing all supported source files
     /// This is more expensive than file refresh since it parses every file
     /// Uses parallel processing for parsing, sequential insertion for SQLite
@@ -1051,11 +1089,34 @@ impl FileIndex {
                 // Parse imports using trait-based extraction (works for all supported languages)
                 let imports = parser.parse_imports(&full_path, &content);
 
+                // Extract type methods for cross-file interface resolution
+                // We need to use the full symbol extraction to get hierarchy
+                let extractor = crate::extract::Extractor::new();
+                let extract_result = extractor.extract(&full_path, &content);
+                let mut type_methods = Vec::new();
+                for sym in &extract_result.symbols {
+                    if matches!(
+                        sym.kind,
+                        moss_languages::SymbolKind::Interface | moss_languages::SymbolKind::Class
+                    ) {
+                        for child in &sym.children {
+                            if matches!(
+                                child.kind,
+                                moss_languages::SymbolKind::Method
+                                    | moss_languages::SymbolKind::Function
+                            ) {
+                                type_methods.push((sym.name.clone(), child.name.clone()));
+                            }
+                        }
+                    }
+                }
+
                 Some(ParsedFileData {
                     file_path: file_path.clone(),
                     symbols: sym_data,
                     calls: call_data,
                     imports,
+                    type_methods,
                 })
             })
             .collect();
@@ -1065,10 +1126,12 @@ impl FileIndex {
         tx.execute("DELETE FROM symbols", [])?;
         tx.execute("DELETE FROM calls", [])?;
         tx.execute("DELETE FROM imports", [])?;
+        tx.execute("DELETE FROM type_methods", [])?;
 
         let mut symbol_count = 0;
         let mut call_count = 0;
         let mut import_count = 0;
+        let mut _type_method_count = 0;
 
         // Pre-compile statements for batch insertion (much faster than tx.execute per row)
         {
@@ -1080,6 +1143,9 @@ impl FileIndex {
             )?;
             let mut import_stmt = tx.prepare_cached(
                 "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            let mut type_method_stmt = tx.prepare_cached(
+                "INSERT OR IGNORE INTO type_methods (file, type_name, method_name) VALUES (?1, ?2, ?3)",
             )?;
 
             for data in &parsed_data {
@@ -1115,6 +1181,11 @@ impl FileIndex {
                         imp.line
                     ])?;
                     import_count += 1;
+                }
+
+                for (type_name, method_name) in &data.type_methods {
+                    type_method_stmt.execute(params![data.file_path, type_name, method_name])?;
+                    _type_method_count += 1;
                 }
             }
         }

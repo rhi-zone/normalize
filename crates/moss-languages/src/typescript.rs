@@ -74,7 +74,7 @@ impl Language for TypeScript {
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(ecmascript::extract_container(node, name))
+        Some(ecmascript::extract_container(node, content, name))
     }
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -115,7 +115,19 @@ impl Language for TypeScript {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // Try 'body' field first, then look for interface_body or class_body child
+        if let Some(body) = node.child_by_field_name("body") {
+            return Some(body);
+        }
+        // Fallback: find interface_body or class_body child
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i) {
+                if child.kind() == "interface_body" || child.kind() == "class_body" {
+                    return Some(child);
+                }
+            }
+        }
+        None
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -297,7 +309,7 @@ impl Language for Tsx {
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(ecmascript::extract_container(node, name))
+        Some(ecmascript::extract_container(node, content, name))
     }
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -338,7 +350,19 @@ impl Language for Tsx {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // Try 'body' field first, then look for interface_body or class_body child
+        if let Some(body) = node.child_by_field_name("body") {
+            return Some(body);
+        }
+        // Fallback: find interface_body or class_body child
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i) {
+                if child.kind() == "interface_body" || child.kind() == "class_body" {
+                    return Some(child);
+                }
+            }
+        }
+        None
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {

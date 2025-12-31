@@ -107,6 +107,7 @@ impl Language for Vim {
             visibility,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -129,6 +130,7 @@ impl Language for Vim {
                 visibility: Visibility::Public,
                 children: Vec::new(),
                 is_interface_impl: false,
+                implements: Vec::new(),
             });
         }
         self.extract_function(node, content, false)

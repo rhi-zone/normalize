@@ -162,6 +162,7 @@ impl Language for D {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,
@@ -183,6 +184,7 @@ impl Language for D {
                     visibility: Visibility::Public,
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             "class_declaration" | "struct_declaration" | "interface_declaration" => {
@@ -201,6 +203,7 @@ impl Language for D {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,
@@ -225,6 +228,7 @@ impl Language for D {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,

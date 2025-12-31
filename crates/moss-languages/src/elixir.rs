@@ -145,6 +145,7 @@ impl Language for Elixir {
             },
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -171,6 +172,7 @@ impl Language for Elixir {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

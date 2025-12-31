@@ -117,93 +117,31 @@ pub fn cmd_docs(root: &Path, top: usize, json: bool) -> i32 {
 
 /// Analyze documentation coverage
 pub fn analyze_docs(root: &Path, top: usize, exclude_interface_impls: bool) -> DocCoverageReport {
+    use crate::extract::IndexedResolver;
+    use crate::index::FileIndex;
     use crate::path_resolve;
-    use crate::skeleton::SkeletonExtractor;
-    use moss_languages::SymbolKind;
-    use rayon::prelude::*;
-    use std::sync::Mutex;
 
     let all_files = path_resolve::all_files(root);
     let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
 
-    let by_language: Mutex<HashMap<String, (usize, usize)>> = Mutex::new(HashMap::new());
-    let file_coverages: Mutex<Vec<FileDocCoverage>> = Mutex::new(Vec::new());
+    // Try to load index for cross-file resolution
+    let index = FileIndex::open(root).ok();
+    let resolver = index.as_ref().map(IndexedResolver::new);
 
-    // Process files in parallel
-    files.par_iter().for_each(|file| {
-        let path = root.join(&file.path);
-        let lang = moss_languages::support_for_path(&path);
+    let mut by_language: HashMap<String, (usize, usize)> = HashMap::new();
+    let mut file_coverages: Vec<FileDocCoverage> = Vec::new();
 
-        if lang.is_none() || !lang.unwrap().has_symbols() {
-            return;
-        }
-
-        let lang = lang.unwrap();
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => return,
-        };
-
-        let skeleton_extractor = SkeletonExtractor::new();
-        let skeleton = skeleton_extractor.extract(&path, &content);
-
-        let mut documented = 0;
-        let mut total = 0;
-
-        fn count_docs(
-            symbols: &[crate::skeleton::SkeletonSymbol],
-            documented: &mut usize,
-            total: &mut usize,
-            exclude_interface_impls: bool,
-        ) {
-            for sym in symbols {
-                // Skip interface implementations if configured
-                if exclude_interface_impls && sym.is_interface_impl {
-                    continue;
-                }
-                match sym.kind {
-                    SymbolKind::Function | SymbolKind::Method => {
-                        *total += 1;
-                        if sym.docstring.is_some() {
-                            *documented += 1;
-                        }
-                    }
-                    _ => {}
-                }
-                count_docs(&sym.children, documented, total, exclude_interface_impls);
-            }
-        }
-
-        count_docs(
-            &skeleton.symbols,
-            &mut documented,
-            &mut total,
+    // Process files sequentially (SQLite isn't thread-safe)
+    for file in &files {
+        process_file(
+            file,
+            root,
             exclude_interface_impls,
+            resolver.as_ref(),
+            &mut by_language,
+            &mut file_coverages,
         );
-
-        if total > 0 {
-            // Update language stats
-            {
-                let mut langs = by_language.lock().unwrap();
-                let entry = langs.entry(lang.name().to_string()).or_insert((0, 0));
-                entry.0 += documented;
-                entry.1 += total;
-            }
-
-            // Add file coverage
-            {
-                let mut files = file_coverages.lock().unwrap();
-                files.push(FileDocCoverage {
-                    file_path: file.path.clone(),
-                    documented,
-                    total,
-                });
-            }
-        }
-    });
-
-    let by_language = by_language.into_inner().unwrap();
-    let mut file_coverages = file_coverages.into_inner().unwrap();
+    }
 
     // Sort by Bayesian coverage (worst first)
     file_coverages.sort_by(|a, b| {
@@ -229,5 +167,85 @@ pub fn analyze_docs(root: &Path, top: usize, exclude_interface_impls: bool) -> D
         coverage_percent,
         by_language,
         worst_files,
+    }
+}
+
+fn process_file(
+    file: &crate::path_resolve::PathMatch,
+    root: &Path,
+    exclude_interface_impls: bool,
+    resolver: Option<&crate::extract::IndexedResolver>,
+    by_language: &mut HashMap<String, (usize, usize)>,
+    file_coverages: &mut Vec<FileDocCoverage>,
+) {
+    use crate::skeleton::SkeletonExtractor;
+    use moss_languages::SymbolKind;
+
+    let path = root.join(&file.path);
+    let lang = moss_languages::support_for_path(&path);
+
+    if lang.is_none() || !lang.unwrap().has_symbols() {
+        return;
+    }
+
+    let lang = lang.unwrap();
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    let skeleton_extractor = SkeletonExtractor::new();
+    let skeleton = skeleton_extractor.extract_with_resolver(
+        &path,
+        &content,
+        resolver.map(|r| r as &dyn crate::extract::InterfaceResolver),
+    );
+
+    let mut documented = 0;
+    let mut total = 0;
+
+    fn count_docs(
+        symbols: &[crate::skeleton::SkeletonSymbol],
+        documented: &mut usize,
+        total: &mut usize,
+        exclude_interface_impls: bool,
+    ) {
+        for sym in symbols {
+            // Skip interface implementations if configured
+            if exclude_interface_impls && sym.is_interface_impl {
+                continue;
+            }
+            match sym.kind {
+                SymbolKind::Function | SymbolKind::Method => {
+                    *total += 1;
+                    if sym.docstring.is_some() {
+                        *documented += 1;
+                    }
+                }
+                _ => {}
+            }
+            count_docs(&sym.children, documented, total, exclude_interface_impls);
+        }
+    }
+
+    count_docs(
+        &skeleton.symbols,
+        &mut documented,
+        &mut total,
+        exclude_interface_impls,
+    );
+
+    if total > 0 {
+        // Update language stats
+        let entry = by_language.entry(lang.name().to_string()).or_insert((0, 0));
+        entry.0 += documented;
+        entry.1 += total;
+
+        // Add file coverage
+        file_coverages.push(FileDocCoverage {
+            file_path: file.path.clone(),
+            documented,
+            total,
+        });
     }
 }

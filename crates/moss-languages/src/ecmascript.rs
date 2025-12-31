@@ -13,14 +13,18 @@ use tree_sitter::Node;
 // Node kind constants
 // ============================================================================
 
-pub const CONTAINER_KINDS: &[&str] = &["class_declaration", "class"];
+pub const CONTAINER_KINDS: &[&str] = &["class_declaration", "class", "interface_declaration"];
 
 pub const JS_FUNCTION_KINDS: &[&str] = &[
     "function_declaration",
     "method_definition",
     "generator_function_declaration",
 ];
-pub const TS_FUNCTION_KINDS: &[&str] = &["function_declaration", "method_definition"];
+pub const TS_FUNCTION_KINDS: &[&str] = &[
+    "function_declaration",
+    "method_definition",
+    "method_signature", // Interface methods
+];
 
 pub const JS_TYPE_KINDS: &[&str] = &["class_declaration"];
 pub const TS_TYPE_KINDS: &[&str] = &[
@@ -124,15 +128,51 @@ pub fn extract_function(node: &Node, content: &str, in_container: bool, name: &s
         visibility: Visibility::Public,
         children: Vec::new(),
         is_interface_impl: is_override,
+        implements: Vec::new(),
     }
 }
 
-/// Extract a class container symbol from a node.
-pub fn extract_container(node: &Node, name: &str) -> Symbol {
+/// Extract a class or interface container symbol from a node.
+pub fn extract_container(node: &Node, content: &str, name: &str) -> Symbol {
+    let (kind, keyword) = if node.kind() == "interface_declaration" {
+        (SymbolKind::Interface, "interface")
+    } else {
+        (SymbolKind::Class, "class")
+    };
+
+    // Extract implements/extends clauses for semantic interface detection
+    let mut implements = Vec::new();
+    // Find class_heritage child node (not a field)
+    for i in 0..node.child_count() {
+        if let Some(heritage) = node.child(i) {
+            if heritage.kind() == "class_heritage" {
+                // heritage can contain extends_clause and/or implements_clause
+                for j in 0..heritage.child_count() {
+                    if let Some(clause) = heritage.child(j) {
+                        if clause.kind() == "extends_clause" || clause.kind() == "implements_clause"
+                        {
+                            // Each clause contains type identifiers
+                            for k in 0..clause.child_count() {
+                                if let Some(type_node) = clause.child(k) {
+                                    if type_node.kind() == "type_identifier"
+                                        || type_node.kind() == "identifier"
+                                    {
+                                        implements
+                                            .push(content[type_node.byte_range()].to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Symbol {
         name: name.to_string(),
-        kind: SymbolKind::Class,
-        signature: format!("class {}", name),
+        kind,
+        signature: format!("{} {}", keyword, name),
         docstring: None,
         attributes: Vec::new(),
         start_line: node.start_position().row + 1,
@@ -140,6 +180,7 @@ pub fn extract_container(node: &Node, name: &str) -> Symbol {
         visibility: Visibility::Public,
         children: Vec::new(),
         is_interface_impl: false,
+        implements,
     }
 }
 
@@ -164,6 +205,7 @@ pub fn extract_type(node: &Node, name: &str) -> Option<Symbol> {
         visibility: Visibility::Public,
         children: Vec::new(),
         is_interface_impl: false,
+        implements: Vec::new(),
     })
 }
 

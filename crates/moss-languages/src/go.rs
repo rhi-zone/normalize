@@ -410,6 +410,7 @@ impl Language for Go {
             },
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 
@@ -451,6 +452,7 @@ impl Language for Go {
             },
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

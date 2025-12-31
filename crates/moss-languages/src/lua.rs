@@ -142,6 +142,7 @@ impl Language for Lua {
             },
             children: Vec::new(),
             is_interface_impl: false,
+            implements: Vec::new(),
         })
     }
 

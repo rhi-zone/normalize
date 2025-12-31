@@ -135,6 +135,7 @@ impl Language for VB {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,
@@ -159,6 +160,7 @@ impl Language for VB {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,
@@ -183,6 +185,7 @@ impl Language for VB {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
+                    implements: Vec::new(),
                 })
             }
             _ => None,

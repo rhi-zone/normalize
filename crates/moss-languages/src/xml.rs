@@ -91,6 +91,7 @@ impl Language for Xml {
                             visibility: Visibility::Public,
                             children: Vec::new(),
                             is_interface_impl: false,
+                            implements: Vec::new(),
                         });
                     }
                 }

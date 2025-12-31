@@ -71,7 +71,7 @@ impl Language for JavaScript {
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(ecmascript::extract_container(node, name))
+        Some(ecmascript::extract_container(node, content, name))
     }
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
