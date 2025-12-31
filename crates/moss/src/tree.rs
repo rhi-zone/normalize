@@ -185,25 +185,80 @@ pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String>
 
         // Add docstring based on display mode
         if let Some(doc) = &node.docstring {
-            format_docstring(doc, &node.name, "    ", options.docstrings, &mut lines);
+            format_docstring(
+                doc,
+                &node.name,
+                "    ",
+                options.docstrings,
+                node.grammar.as_deref(),
+                &mut lines,
+            );
         }
     }
 
     // Render children
     let prefix = if options.skip_root { "" } else { "" };
-    format_children(&node.children, prefix, &mut lines, options, 0);
+    format_children(
+        &node.children,
+        prefix,
+        &mut lines,
+        options,
+        0,
+        node.grammar.as_deref(),
+    );
 
     lines
 }
 
-/// Format a docstring according to the display mode.
+/// Docstring display style based on language.
+enum DocstringStyle {
+    /// Line-prefix style: each line prefixed (e.g., `/// ` for Rust)
+    LinePrefix(&'static str),
+    /// Block style: open delimiter, close delimiter (e.g., `"""` for Python)
+    Block(&'static str, &'static str),
+}
+
+/// Get appropriate docstring style for a grammar.
+fn docstring_style_for_grammar(grammar: Option<&str>) -> DocstringStyle {
+    match grammar {
+        // Line-prefix languages
+        Some("rust") => DocstringStyle::LinePrefix("/// "),
+        Some("go") => DocstringStyle::LinePrefix("// "),
+        Some("c" | "cpp") => DocstringStyle::LinePrefix("// "),
+        Some("ruby") => DocstringStyle::LinePrefix("# "),
+        Some("bash" | "fish" | "zsh") => DocstringStyle::LinePrefix("# "),
+        Some("perl") => DocstringStyle::LinePrefix("# "),
+        Some("r") => DocstringStyle::LinePrefix("# "),
+        Some("nim") => DocstringStyle::LinePrefix("## "),
+        Some("haskell") => DocstringStyle::LinePrefix("-- "),
+        Some("lua") => DocstringStyle::LinePrefix("--- "),
+        Some("sql") => DocstringStyle::LinePrefix("-- "),
+        Some("elisp" | "commonlisp" | "scheme" | "clojure") => DocstringStyle::LinePrefix("; "),
+
+        // Block-style languages
+        Some("python") => DocstringStyle::Block("\"\"\"", "\"\"\""),
+        Some("javascript" | "typescript" | "tsx" | "jsx") => DocstringStyle::Block("/** ", " */"),
+        Some("java" | "kotlin" | "scala") => DocstringStyle::Block("/** ", " */"),
+        Some("swift") => DocstringStyle::Block("/** ", " */"),
+        Some("php") => DocstringStyle::Block("/** ", " */"),
+        Some("css") => DocstringStyle::Block("/* ", " */"),
+
+        // Default to Python-style for unknown
+        _ => DocstringStyle::Block("\"\"\"", "\"\"\""),
+    }
+}
+
+/// Format a docstring according to the display mode and language.
 fn format_docstring(
     doc: &str,
     name: &str,
     prefix: &str,
     mode: DocstringDisplay,
+    grammar: Option<&str>,
     lines: &mut Vec<String>,
 ) {
+    let style = docstring_style_for_grammar(grammar);
+
     match mode {
         DocstringDisplay::None => {}
         DocstringDisplay::Summary => {
@@ -213,17 +268,7 @@ fn format_docstring(
             {
                 return;
             }
-            // Show entire summary paragraph
-            let summary_lines: Vec<&str> = summary.lines().collect();
-            if summary_lines.len() == 1 {
-                lines.push(format!("{}\"\"\"{}\"\"\"", prefix, summary_lines[0]));
-            } else {
-                lines.push(format!("{}\"\"\"", prefix));
-                for line in summary_lines {
-                    lines.push(format!("{}{}", prefix, line));
-                }
-                lines.push(format!("{}\"\"\"", prefix));
-            }
+            format_docstring_lines(&summary.lines().collect::<Vec<_>>(), prefix, &style, lines);
         }
         DocstringDisplay::Full => {
             let trimmed = doc.trim();
@@ -232,16 +277,33 @@ fn format_docstring(
             {
                 return;
             }
-            // Multi-line docstring
-            let doc_lines: Vec<&str> = trimmed.lines().collect();
+            format_docstring_lines(&trimmed.lines().collect::<Vec<_>>(), prefix, &style, lines);
+        }
+    }
+}
+
+/// Format docstring lines with the appropriate style.
+fn format_docstring_lines(
+    doc_lines: &[&str],
+    prefix: &str,
+    style: &DocstringStyle,
+    lines: &mut Vec<String>,
+) {
+    match style {
+        DocstringStyle::LinePrefix(line_prefix) => {
+            for line in doc_lines {
+                lines.push(format!("{}{}{}", prefix, line_prefix, line));
+            }
+        }
+        DocstringStyle::Block(open, close) => {
             if doc_lines.len() == 1 {
-                lines.push(format!("{}\"\"\"{}\"\"\"", prefix, doc_lines[0]));
+                lines.push(format!("{}{}{}{}", prefix, open, doc_lines[0], close));
             } else {
-                lines.push(format!("{}\"\"\"", prefix));
+                lines.push(format!("{}{}", prefix, open));
                 for line in doc_lines {
                     lines.push(format!("{}{}", prefix, line));
                 }
-                lines.push(format!("{}\"\"\"", prefix));
+                lines.push(format!("{}{}", prefix, close));
             }
         }
     }
@@ -1058,6 +1120,7 @@ fn format_children(
     lines: &mut Vec<String>,
     options: &FormatOptions,
     depth: usize,
+    grammar: Option<&str>,
 ) {
     // Check depth limit
     if let Some(max) = options.max_depth {
@@ -1077,15 +1140,32 @@ fn format_children(
         let child_line = format_node_line(child, options);
         lines.push(format!("{}{}", prefix, child_line));
 
+        // Use child's grammar if available, otherwise inherit from parent
+        let child_grammar = child.grammar.as_deref().or(grammar);
+
         // Add docstring based on display mode
         if let Some(doc) = &child.docstring {
             let doc_prefix = format!("{}    ", child_prefix);
-            format_docstring(doc, &child.name, &doc_prefix, options.docstrings, lines);
+            format_docstring(
+                doc,
+                &child.name,
+                &doc_prefix,
+                options.docstrings,
+                child_grammar,
+                lines,
+            );
         }
 
         // Recurse into children
         if !child.children.is_empty() {
-            format_children(&child.children, &child_prefix, lines, options, depth + 1);
+            format_children(
+                &child.children,
+                &child_prefix,
+                lines,
+                options,
+                depth + 1,
+                child_grammar,
+            );
         }
     }
 }
