@@ -25,23 +25,23 @@ struct ParsedFileData {
 // Not yet public - just delete .moss/index.sqlite on schema changes
 const SCHEMA_VERSION: i64 = 1;
 
-/// Supported source file extensions for call graph indexing
-const SOURCE_EXTENSIONS: &[&str] = &[
-    ".py", ".rs", ".java", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".go", ".json", ".yaml", ".yml",
-    ".toml",
-];
-
-/// Check if a file path has a supported source extension
+/// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
-    SOURCE_EXTENSIONS.iter().any(|ext| path.ends_with(ext))
+    moss_languages::support_for_path(std::path::Path::new(path)).is_some()
 }
 
-/// Generate SQL WHERE clause for filtering source files
+/// Generate SQL WHERE clause for filtering source files.
 /// Returns: "path LIKE '%.py' OR path LIKE '%.rs' OR ..."
 fn source_extensions_sql_filter() -> String {
-    SOURCE_EXTENSIONS
+    let mut extensions: Vec<&str> = moss_languages::supported_languages()
         .iter()
-        .map(|ext| format!("path LIKE '%{}'", ext))
+        .flat_map(|lang| lang.extensions().iter().copied())
+        .collect();
+    extensions.sort_unstable();
+    extensions.dedup();
+    extensions
+        .iter()
+        .map(|ext| format!("path LIKE '%.{}'", ext))
         .collect::<Vec<_>>()
         .join(" OR ")
 }

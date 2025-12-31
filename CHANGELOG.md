@@ -31,6 +31,8 @@ See `docs/` for design docs and `README.md` for usage.
 - `index rebuild` now includes call graph by default (symbols needed for most features)
   - Use `--include none` for files-only mode (faster)
   - Use `--include symbols,calls` to selectively extract content types
+- Source file detection now uses `moss-languages` registry instead of hardcoded lists
+  - All supported languages are automatically included (Lua, Shell, etc. now indexed)
 
 ### View Command
 - Path suffix matching: `moss view analyze/report.rs` now finds `crates/moss/src/commands/analyze/report.rs`

@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- `is_source_file` cleanup: use `moss-languages` support detection instead of hardcoded extension lists
 - Smart Header: `moss view --context` pulls in referenced type definitions
 - Git hotspot allowlist: `.moss/hotspot-allow` to filter expected hotspots
 - Large file analysis: test `moss analyze` on 1000+ function files, assess performance
@@ -46,7 +45,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
 
 ### Code Quality
-- `is_source_file` function: hardcoded extension list duplicated in analyze modules - use `moss-languages` support detection instead
 - Git hotspot allowlist: `.moss/hotspot-allow` file to filter expected hotspots (generated code, vendored deps) from `--hotspots`
 - Large file analysis: run `./target/debug/moss analyze` on very large files (1000+ functions) - assess performance, output format, usefulness
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
@@ -59,12 +57,14 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Example: `Query::new` restricted except in cached getters
   - Define patterns via tree-sitter queries, whitelist locations
 
-### `@` Sigil
+### `@` Aliases
+- **Design issue**: `[sigil]` and `[filter.aliases]` are confusingly separate
+  - `[sigil].todo = ["TODO.md"]` for command targets
+  - `[filter.aliases].config = ["*.toml", ...]` for `--only`/`--exclude`
+  - Should unify: one `[aliases]` section, context determines behavior
 - Target prefix: ✅ Done (`moss view @todo`, `moss edit @config`)
-  - Configured via `[sigil]` in config.toml, `moss init` detects TODO files
 - Command prefix: `moss @script-name args` → runs script with args
   - Needs: `moss script run` to pass trailing args to scripts
-  - Builtin scripts (todo.lua, config.lua) expect args but can't receive them
 
 ### `moss todo` Future
 - Currently: Rust implementation with file/section detection, format preservation

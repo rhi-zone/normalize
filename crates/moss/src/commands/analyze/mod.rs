@@ -434,31 +434,7 @@ fn run_all_passes(
     exit_code
 }
 
-/// Check if a path is a source file we care about
+/// Check if a path is a source file we can analyze.
 pub(crate) fn is_source_file(path: &Path) -> bool {
-    match path.extension().and_then(|e| e.to_str()) {
-        Some(ext) => matches!(
-            ext,
-            "rs" | "py"
-                | "js"
-                | "ts"
-                | "tsx"
-                | "jsx"
-                | "go"
-                | "java"
-                | "c"
-                | "cpp"
-                | "h"
-                | "hpp"
-                | "rb"
-                | "php"
-                | "swift"
-                | "kt"
-                | "scala"
-                | "cs"
-                | "ex"
-                | "exs"
-        ),
-        None => false,
-    }
+    moss_languages::support_for_path(path).is_some()
 }
