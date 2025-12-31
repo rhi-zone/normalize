@@ -92,6 +92,9 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
   - TOML workflow format: structured definition (steps, actions)
   - Builtin `workflow` runner script interprets TOML files
   - Users can also write pure Lua scripts directly
+- Lua CLI parsing library: opinionated arg parsing for scripts
+  - Add as new template (`moss script new foo --template cli`)
+  - Keep `basic` template for simple scripts
 
 ### Edit Improvements
 - `--at primary`: explicit opt-in to primary section detection (discoverable via error message)
