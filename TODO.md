@@ -111,6 +111,10 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Insert method before/after another method across multiple files
   - Uses tree-sitter for semantic targeting (not regex)
   - `--batch` flag for multiple targets in one invocation
+- Cross-file refactors: `moss move src/foo.rs/my_func src/bar.rs`
+  - Move functions/types between files with import updates
+  - Handles visibility changes (pub when crossing module boundaries)
+  - Updates callers to use new path
 - Structured config crate (`moss-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
   - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml
   - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `moss-build`
