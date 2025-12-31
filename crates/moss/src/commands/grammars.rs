@@ -1,7 +1,7 @@
 //! Grammar management commands.
 
+use crate::parsers;
 use clap::Subcommand;
-use moss_languages::GrammarLoader;
 use std::io::Read;
 use std::path::PathBuf;
 
@@ -35,8 +35,7 @@ pub fn cmd_grammars(action: GrammarAction, json: bool) -> i32 {
 }
 
 fn cmd_list(json: bool) -> i32 {
-    let loader = GrammarLoader::new();
-    let grammars = loader.available_external();
+    let grammars = parsers::available_external_grammars();
 
     if json {
         println!(

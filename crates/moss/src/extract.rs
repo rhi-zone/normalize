@@ -3,7 +3,7 @@
 //! This module provides the core AST traversal logic used by both
 //! skeleton.rs (for viewing) and symbols.rs (for indexing).
 
-use crate::parsers::Parsers;
+use crate::parsers;
 use moss_languages::{support_for_grammar, support_for_path, Language, Symbol, Visibility};
 use std::path::Path;
 use tree_sitter;
@@ -35,23 +35,18 @@ impl Default for ExtractOptions {
 
 /// Shared symbol extractor using the Language trait.
 pub struct Extractor {
-    parsers: Parsers,
     options: ExtractOptions,
 }
 
 impl Extractor {
     pub fn new() -> Self {
         Self {
-            parsers: Parsers::new(),
             options: ExtractOptions::default(),
         }
     }
 
     pub fn with_options(options: ExtractOptions) -> Self {
-        Self {
-            parsers: Parsers::new(),
-            options,
-        }
+        Self { options }
     }
 
     /// Extract symbols from a file.
@@ -68,10 +63,7 @@ impl Extractor {
     }
 
     fn extract_with_support(&self, content: &str, support: &dyn Language) -> Vec<Symbol> {
-        let tree = match self
-            .parsers
-            .parse_with_grammar(support.grammar_name(), content)
-        {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -110,9 +102,8 @@ impl Extractor {
             // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
             if let Some(embedded) = support.embedded_content(&node, content) {
                 if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
-                    if let Some(sub_tree) = self
-                        .parsers
-                        .parse_with_grammar(embedded.grammar, &embedded.content)
+                    if let Some(sub_tree) =
+                        parsers::parse_with_grammar(embedded.grammar, &embedded.content)
                     {
                         let mut sub_symbols = Vec::new();
                         let sub_root = sub_tree.root_node();

@@ -1,11 +1,9 @@
 //! Function length analysis.
 //!
 //! Identifies long functions that may be candidates for refactoring.
-
-use crate::parsers::Parsers;
+use crate::parsers;
 use moss_languages::{support_for_path, Language};
 use std::path::Path;
-
 /// Length classification for functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LengthCategory {
@@ -18,7 +16,6 @@ pub enum LengthCategory {
     /// 100+ lines: should be split
     TooLong,
 }
-
 impl LengthCategory {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -28,7 +25,6 @@ impl LengthCategory {
             LengthCategory::TooLong => "too-long",
         }
     }
-
     pub fn as_title(&self) -> &'static str {
         match self {
             LengthCategory::Short => "Short",
@@ -38,7 +34,6 @@ impl LengthCategory {
         }
     }
 }
-
 /// Function length data.
 #[derive(Debug, Clone)]
 pub struct FunctionLength {
@@ -49,7 +44,6 @@ pub struct FunctionLength {
     pub parent: Option<String>,
     pub file_path: Option<String>,
 }
-
 impl FunctionLength {
     pub fn qualified_name(&self) -> String {
         let base = if let Some(parent) = &self.parent {
@@ -63,7 +57,6 @@ impl FunctionLength {
             base
         }
     }
-
     pub fn short_name(&self) -> String {
         if let Some(parent) = &self.parent {
             format!("{}.{}", parent, self.name)
@@ -71,7 +64,6 @@ impl FunctionLength {
             self.name.clone()
         }
     }
-
     pub fn category(&self) -> LengthCategory {
         match self.lines {
             1..=20 => LengthCategory::Short,
@@ -81,10 +73,8 @@ impl FunctionLength {
         }
     }
 }
-
 /// Length report for a file.
 pub type LengthReport = super::FileReport<FunctionLength>;
-
 impl LengthReport {
     pub fn avg_length(&self) -> f64 {
         if self.functions.is_empty() {
@@ -94,18 +84,15 @@ impl LengthReport {
             total as f64 / self.functions.len() as f64
         }
     }
-
     pub fn max_length(&self) -> usize {
         self.functions.iter().map(|f| f.lines).max().unwrap_or(0)
     }
-
     pub fn long_count(&self) -> usize {
         self.functions
             .iter()
             .filter(|f| f.category() == LengthCategory::Long)
             .count()
     }
-
     pub fn too_long_count(&self) -> usize {
         self.functions
             .iter()
@@ -113,47 +100,32 @@ impl LengthReport {
             .count()
     }
 }
-
-pub struct LengthAnalyzer {
-    parsers: Parsers,
-}
-
+pub struct LengthAnalyzer {}
 impl LengthAnalyzer {
     pub fn new() -> Self {
-        Self {
-            parsers: Parsers::new(),
-        }
+        Self {}
     }
-
     pub fn analyze(&self, path: &Path, content: &str) -> LengthReport {
         let functions = match support_for_path(path) {
             Some(support) => self.analyze_with_trait(content, support),
             None => Vec::new(),
         };
-
         LengthReport {
             functions,
             file_path: path.to_string_lossy().to_string(),
         }
     }
-
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionLength> {
-        let tree = match self
-            .parsers
-            .parse_with_grammar(support.grammar_name(), content)
-        {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
             Some(t) => t,
             None => return Vec::new(),
         };
-
         let mut functions = Vec::new();
         let root = tree.root_node();
         let mut cursor = root.walk();
-
         self.collect_functions(&mut cursor, content, support, &mut functions, None);
         functions
     }
-
     fn collect_functions(
         &self,
         cursor: &mut tree_sitter::TreeCursor,
@@ -165,14 +137,12 @@ impl LengthAnalyzer {
         loop {
             let node = cursor.node();
             let kind = node.kind();
-
             // Check if this is a function
             if support.function_kinds().contains(&kind) {
                 if let Some(name) = support.node_name(&node, content) {
                     let start_line = node.start_position().row + 1;
                     let end_line = node.end_position().row + 1;
                     let lines = end_line.saturating_sub(start_line) + 1;
-
                     functions.push(FunctionLength {
                         name: name.to_string(),
                         lines,
@@ -183,27 +153,23 @@ impl LengthAnalyzer {
                     });
                 }
             }
-
             // Check for container (class, impl, module) holding methods
             let new_parent = if support.container_kinds().contains(&kind) {
                 support.node_name(&node, content).map(|s| s.to_string())
             } else {
                 parent.map(String::from)
             };
-
             // Recurse into children
             if cursor.goto_first_child() {
                 self.collect_functions(cursor, content, support, functions, new_parent.as_deref());
                 cursor.goto_parent();
             }
-
             if !cursor.goto_next_sibling() {
                 break;
             }
         }
     }
 }
-
 impl Default for LengthAnalyzer {
     fn default() -> Self {
         Self::new()

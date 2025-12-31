@@ -3,13 +3,12 @@
 //! Tests each highlight kind (keywords, numbers, strings, constants, comments,
 //! types, function names, attributes) across multiple languages.
 
-use crate::parsers::Parsers;
+use crate::parsers;
 use crate::tree::{collect_highlight_spans, HighlightKind};
 
 /// Helper to extract highlight spans from code
 fn get_spans(code: &str, grammar: &str) -> Vec<(String, HighlightKind)> {
-    let parsers = Parsers::new();
-    let tree = parsers.parse_with_grammar(grammar, code).unwrap();
+    let tree = parsers::parse_with_grammar(grammar, code).unwrap();
     let mut spans = Vec::new();
     collect_highlight_spans(tree.root_node(), &mut spans);
     spans

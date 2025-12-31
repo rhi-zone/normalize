@@ -3,7 +3,7 @@
 //! Calculates McCabe cyclomatic complexity for functions.
 //! Complexity = number of decision points + 1
 
-use crate::parsers::Parsers;
+use crate::parsers;
 use moss_languages::{support_for_path, Language};
 use std::path::Path;
 use tree_sitter;
@@ -137,15 +137,11 @@ impl ComplexityReport {
     }
 }
 
-pub struct ComplexityAnalyzer {
-    parsers: Parsers,
-}
+pub struct ComplexityAnalyzer {}
 
 impl ComplexityAnalyzer {
     pub fn new() -> Self {
-        Self {
-            parsers: Parsers::new(),
-        }
+        Self {}
     }
 
     pub fn analyze(&self, path: &Path, content: &str) -> ComplexityReport {
@@ -162,10 +158,7 @@ impl ComplexityAnalyzer {
 
     /// Analyze using the Language trait
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionComplexity> {
-        let tree = match self
-            .parsers
-            .parse_with_grammar(support.grammar_name(), content)
-        {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
             Some(t) => t,
             None => return Vec::new(),
         };

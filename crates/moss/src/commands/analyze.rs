@@ -1769,7 +1769,7 @@ fn cmd_check_examples(root: &Path, json: bool) -> i32 {
 // ============================================================================
 
 use crate::extract::Extractor;
-use crate::parsers::Parsers;
+use crate::parsers;
 use moss_languages::support_for_path;
 use std::hash::{Hash, Hasher};
 
@@ -1814,7 +1814,6 @@ fn detect_duplicate_function_groups(
     min_lines: usize,
 ) -> Vec<DuplicateFunctionGroup> {
     let extractor = Extractor::new();
-    let parsers = Parsers::new();
 
     let mut hash_groups: std::collections::HashMap<u64, Vec<DuplicateFunctionLocation>> =
         std::collections::HashMap::new();
@@ -1841,7 +1840,7 @@ fn detect_duplicate_function_groups(
             None => continue,
         };
 
-        let tree = match parsers.parse_with_grammar(support.grammar_name(), &content) {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
             Some(t) => t,
             None => continue,
         };
@@ -2032,7 +2031,7 @@ fn cmd_duplicate_functions_with_count(
     json: bool,
 ) -> (i32, usize) {
     let extractor = Extractor::new();
-    let parsers = Parsers::new();
+
     let allowlist = load_duplicate_functions_allowlist(root);
 
     // Collect function hashes: hash -> [(file, symbol, start, end)]
@@ -2065,7 +2064,7 @@ fn cmd_duplicate_functions_with_count(
         };
 
         // Parse the file
-        let tree = match parsers.parse_with_grammar(support.grammar_name(), &content) {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
             Some(t) => t,
             None => continue,
         };
@@ -2787,8 +2786,7 @@ fn cmd_trace(
             return 1;
         }
     };
-    let parsers = parsers::Parsers::new();
-    let tree = match parsers.parse_with_grammar(lang.grammar_name(), &content) {
+    let tree = match parsers::parse_with_grammar(lang.grammar_name(), &content) {
         Some(t) => t,
         None => {
             eprintln!("Failed to parse file");

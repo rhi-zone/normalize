@@ -11,10 +11,10 @@
 //!
 //! ```ignore
 //! use moss::index::Index;
-//! use moss::parsers::Parsers;
+//! use moss::parsers;
 //!
 //! let index = Index::open("path/to/codebase")?;
-//! let parsers = Parsers::new();
+//! let tree = parsers::parse_with_grammar("rust", "fn main() {}");
 //! ```
 
 pub mod analysis_report;

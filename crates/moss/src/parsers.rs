@@ -1,4 +1,6 @@
 //! Tree-sitter parser initialization and management.
+//!
+//! Provides free functions for parsing using a global singleton GrammarLoader.
 
 use moss_languages::GrammarLoader;
 use std::sync::{Arc, OnceLock};
@@ -14,50 +16,25 @@ pub fn grammar_loader() -> Arc<GrammarLoader> {
         .clone()
 }
 
-/// Collection of tree-sitter parsers using dynamic grammar loading.
+/// Create a parser for a specific grammar.
 ///
-/// Grammars are loaded from:
-/// 1. `MOSS_GRAMMAR_PATH` environment variable (colon-separated paths)
-/// 2. `~/.config/moss/grammars/`
-pub struct Parsers {
-    loader: Arc<GrammarLoader>,
+/// The grammar name should match tree-sitter grammar names (e.g., "python", "rust", "typescript").
+pub fn parser_for(grammar: &str) -> Option<Parser> {
+    let language = grammar_loader().get(grammar)?;
+    let mut parser = Parser::new();
+    parser.set_language(&language).ok()?;
+    Some(parser)
 }
 
-impl Parsers {
-    /// Create new parser collection with dynamic grammar loading.
-    /// Uses the global singleton loader.
-    pub fn new() -> Self {
-        Self {
-            loader: grammar_loader(),
-        }
-    }
-
-    /// Create a parser for a specific grammar.
-    ///
-    /// The grammar name should match tree-sitter grammar names (e.g., "python", "rust", "typescript").
-    pub fn parser_for(&self, grammar: &str) -> Option<Parser> {
-        let language = self.loader.get(grammar)?;
-        let mut parser = Parser::new();
-        parser.set_language(&language).ok()?;
-        Some(parser)
-    }
-
-    /// Parse source code with a specific grammar.
-    ///
-    /// The grammar name should match tree-sitter grammar names (e.g., "python", "rust", "typescript").
-    pub fn parse_with_grammar(&self, grammar: &str, source: &str) -> Option<tree_sitter::Tree> {
-        let mut parser = self.parser_for(grammar)?;
-        parser.parse(source, None)
-    }
-
-    /// List grammars available in external search paths.
-    pub fn available_external_grammars(&self) -> Vec<String> {
-        self.loader.available_external()
-    }
+/// Parse source code with a specific grammar.
+///
+/// The grammar name should match tree-sitter grammar names (e.g., "python", "rust", "typescript").
+pub fn parse_with_grammar(grammar: &str, source: &str) -> Option<tree_sitter::Tree> {
+    let mut parser = parser_for(grammar)?;
+    parser.parse(source, None)
 }
 
-impl Default for Parsers {
-    fn default() -> Self {
-        Self::new()
-    }
+/// List grammars available in external search paths.
+pub fn available_external_grammars() -> Vec<String> {
+    grammar_loader().available_external()
 }

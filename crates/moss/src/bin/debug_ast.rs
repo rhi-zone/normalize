@@ -32,7 +32,7 @@
 //! Useful for understanding tree-sitter node kinds when implementing
 //! syntax highlighting or AST-based analysis.
 
-use moss::parsers::Parsers;
+use moss::parsers;
 use std::env;
 
 fn main() {
@@ -50,8 +50,7 @@ fn main() {
     let grammar = &args[1];
     let code = &args[2];
 
-    let parsers = Parsers::new();
-    match parsers.parse_with_grammar(grammar, code) {
+    match parsers::parse_with_grammar(grammar, code) {
         Some(tree) => {
             println!("Code: {:?}\n", code);
             print_tree(tree.root_node(), code.as_bytes(), 0);

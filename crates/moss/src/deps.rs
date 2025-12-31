@@ -2,7 +2,7 @@
 //!
 //! Extracts imports and exports from source files.
 
-use crate::parsers::Parsers;
+use crate::parsers;
 use moss_languages::{support_for_grammar, support_for_path, Export, Import, Language, SymbolKind};
 use std::path::Path;
 use tree_sitter;
@@ -91,15 +91,11 @@ impl DepsResult {
     }
 }
 
-pub struct DepsExtractor {
-    parsers: Parsers,
-}
+pub struct DepsExtractor {}
 
 impl DepsExtractor {
     pub fn new() -> Self {
-        Self {
-            parsers: Parsers::new(),
-        }
+        Self {}
     }
 
     pub fn extract(&self, path: &Path, content: &str) -> DepsResult {
@@ -132,10 +128,7 @@ impl DepsExtractor {
 
     /// Extract using the Language trait
     fn extract_with_trait(&self, content: &str, support: &dyn Language) -> ExtractedDeps {
-        let tree = match self
-            .parsers
-            .parse_with_grammar(support.grammar_name(), content)
-        {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
             Some(t) => t,
             None => {
                 return ExtractedDeps {
@@ -174,9 +167,8 @@ impl DepsExtractor {
             // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
             if let Some(embedded) = support.embedded_content(&node, content) {
                 if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
-                    if let Some(sub_tree) = self
-                        .parsers
-                        .parse_with_grammar(embedded.grammar, &embedded.content)
+                    if let Some(sub_tree) =
+                        parsers::parse_with_grammar(embedded.grammar, &embedded.content)
                     {
                         let mut sub_imports = Vec::new();
                         let mut sub_exports = Vec::new();
@@ -233,7 +225,7 @@ impl DepsExtractor {
     }
 
     fn extract_typescript(&self, content: &str) -> ExtractedDeps {
-        let tree = match self.parsers.parse_with_grammar("typescript", content) {
+        let tree = match parsers::parse_with_grammar("typescript", content) {
             Some(t) => t,
             None => {
                 return ExtractedDeps {
@@ -247,7 +239,7 @@ impl DepsExtractor {
     }
 
     fn extract_tsx(&self, content: &str) -> ExtractedDeps {
-        let tree = match self.parsers.parse_with_grammar("tsx", content) {
+        let tree = match parsers::parse_with_grammar("tsx", content) {
             Some(t) => t,
             None => {
                 return ExtractedDeps {
@@ -261,7 +253,7 @@ impl DepsExtractor {
     }
 
     fn extract_javascript(&self, content: &str) -> ExtractedDeps {
-        let tree = match self.parsers.parse_with_grammar("javascript", content) {
+        let tree = match parsers::parse_with_grammar("javascript", content) {
             Some(t) => t,
             None => {
                 return ExtractedDeps {

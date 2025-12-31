@@ -1,4 +1,4 @@
-use crate::parsers::Parsers;
+use crate::parsers;
 use crate::skeleton::SkeletonExtractor;
 use moss_languages::{support_for_path, Language, SymbolKind};
 use std::path::Path;
@@ -30,15 +30,11 @@ pub struct ContainerBody {
 }
 
 /// Editor for structural code modifications
-pub struct Editor {
-    parsers: Parsers,
-}
+pub struct Editor {}
 
 impl Editor {
     pub fn new() -> Self {
-        Self {
-            parsers: Parsers::new(),
-        }
+        Self {}
     }
 
     /// Find a symbol by name in a file (uses skeleton extractor)
@@ -279,7 +275,7 @@ impl Editor {
         // Fall back to AST-based lookup for languages with explicit body nodes
         let support = support_for_path(path)?;
         let grammar = support.grammar_name();
-        let tree = self.parsers.parse_with_grammar(grammar, content)?;
+        let tree = parsers::parse_with_grammar(grammar, content)?;
         let root = tree.root_node();
         self.find_container_body_with_trait(root, content, name, grammar, support)
     }

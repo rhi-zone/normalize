@@ -1860,9 +1860,8 @@ fn find_doc_comment_lines(
     end_line: usize,
 ) -> HashSet<usize> {
     let mut doc_lines = HashSet::new();
-    let parsers = parsers::Parsers::new();
 
-    if let Some(tree) = parsers.parse_with_grammar(grammar, content) {
+    if let Some(tree) = parsers::parse_with_grammar(grammar, content) {
         let mut cursor = tree.walk();
         collect_doc_comment_lines(&mut cursor, start_line, end_line, &mut doc_lines);
     }
@@ -1923,9 +1922,8 @@ fn collect_doc_comment_lines(
 /// Extract all identifiers used in source code.
 fn extract_identifiers(source: &str, grammar: &str) -> HashSet<String> {
     let mut identifiers = HashSet::new();
-    let parsers = parsers::Parsers::new();
 
-    if let Some(tree) = parsers.parse_with_grammar(grammar, source) {
+    if let Some(tree) = parsers::parse_with_grammar(grammar, source) {
         let mut cursor = tree.walk();
         collect_identifiers(&mut cursor, source.as_bytes(), &mut identifiers);
     }

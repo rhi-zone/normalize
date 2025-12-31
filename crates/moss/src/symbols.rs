@@ -1,5 +1,5 @@
 use crate::extract::{ExtractOptions, Extractor};
-use crate::parsers::Parsers;
+use crate::parsers;
 use moss_languages::{
     support_for_grammar, support_for_path, Language, Symbol as LangSymbol, SymbolKind,
 };
@@ -31,7 +31,7 @@ pub struct FlatImport {
 
 pub struct SymbolParser {
     extractor: Extractor,
-    parsers: Parsers, // Keep for import parsing and call graph analysis
+    // Keep for import parsing and call graph analysis
 }
 
 impl SymbolParser {
@@ -40,7 +40,6 @@ impl SymbolParser {
             extractor: Extractor::with_options(ExtractOptions {
                 include_private: true, // symbols.rs includes all symbols for indexing
             }),
-            parsers: Parsers::new(),
         }
     }
 
@@ -94,10 +93,7 @@ impl SymbolParser {
             return Vec::new();
         }
 
-        let tree = match self
-            .parsers
-            .parse_with_grammar(support.grammar_name(), content)
-        {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -123,9 +119,8 @@ impl SymbolParser {
             // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
             if let Some(embedded) = support.embedded_content(&node, content) {
                 if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
-                    if let Some(sub_tree) = self
-                        .parsers
-                        .parse_with_grammar(embedded.grammar, &embedded.content)
+                    if let Some(sub_tree) =
+                        parsers::parse_with_grammar(embedded.grammar, &embedded.content)
                     {
                         let mut sub_imports = Vec::new();
                         let sub_root = sub_tree.root_node();
@@ -240,7 +235,7 @@ impl SymbolParser {
     }
 
     fn find_python_calls(&self, source: &str) -> Vec<String> {
-        let tree = match self.parsers.parse_with_grammar("python", source) {
+        let tree = match parsers::parse_with_grammar("python", source) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -336,7 +331,7 @@ impl SymbolParser {
         source: &str,
         base_line: usize,
     ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match self.parsers.parse_with_grammar("python", source) {
+        let tree = match parsers::parse_with_grammar("python", source) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -389,7 +384,7 @@ impl SymbolParser {
         source: &str,
         base_line: usize,
     ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match self.parsers.parse_with_grammar("rust", source) {
+        let tree = match parsers::parse_with_grammar("rust", source) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -450,7 +445,7 @@ impl SymbolParser {
         is_tsx: bool,
     ) -> Vec<(String, usize, Option<String>)> {
         let grammar = if is_tsx { "tsx" } else { "typescript" };
-        let tree = match self.parsers.parse_with_grammar(grammar, source) {
+        let tree = match parsers::parse_with_grammar(grammar, source) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -466,7 +461,7 @@ impl SymbolParser {
         source: &str,
         base_line: usize,
     ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match self.parsers.parse_with_grammar("javascript", source) {
+        let tree = match parsers::parse_with_grammar("javascript", source) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -520,7 +515,7 @@ impl SymbolParser {
         source: &str,
         base_line: usize,
     ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match self.parsers.parse_with_grammar("java", source) {
+        let tree = match parsers::parse_with_grammar("java", source) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -572,7 +567,7 @@ impl SymbolParser {
         source: &str,
         base_line: usize,
     ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match self.parsers.parse_with_grammar("go", source) {
+        let tree = match parsers::parse_with_grammar("go", source) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -621,7 +616,7 @@ impl SymbolParser {
     }
 
     fn find_rust_calls(&self, source: &str) -> Vec<String> {
-        let tree = match self.parsers.parse_with_grammar("rust", source) {
+        let tree = match parsers::parse_with_grammar("rust", source) {
             Some(t) => t,
             None => return Vec::new(),
         };

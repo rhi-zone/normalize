@@ -1,5 +1,6 @@
 //! Lua-based workflow runtime using LuaJIT.
 
+use crate::parsers;
 use std::path::Path;
 #[cfg(feature = "llm")]
 use std::path::PathBuf;
@@ -14,7 +15,6 @@ use super::llm::{parse_agent_response, AgentAction, LlmClient, AGENT_SYSTEM_PROM
 
 use super::memory::MemoryStore;
 use super::shadow::ShadowGit;
-use crate::parsers::Parsers;
 
 /// What the runtime is waiting for from the frontend.
 #[derive(Debug, Clone)]
@@ -781,23 +781,15 @@ impl LuaRuntime {
     }
 
     fn register_treesitter(lua: &Lua, globals: &Table) -> LuaResult<()> {
-        // Store parsers in registry so it stays alive
-        let parsers = std::sync::Arc::new(Parsers::new());
-        lua.set_named_registry_value("_ts_parsers", LuaParsers(parsers))?;
-
         let ts_table = lua.create_table()?;
 
         // ts.parse(source, grammar) -> LuaTree
         ts_table.set(
             "parse",
             lua.create_function(|lua, (source, grammar): (String, String)| {
-                let parsers: LuaParsers = lua.named_registry_value("_ts_parsers")?;
-                let tree = parsers
-                    .0
-                    .parse_with_grammar(&grammar, &source)
-                    .ok_or_else(|| {
-                        mlua::Error::external(format!("Failed to parse with grammar '{}'", grammar))
-                    })?;
+                let tree = parsers::parse_with_grammar(&grammar, &source).ok_or_else(|| {
+                    mlua::Error::external(format!("Failed to parse with grammar '{}'", grammar))
+                })?;
 
                 // Store source alongside tree for text extraction
                 let lua_tree = LuaTree {
@@ -810,30 +802,6 @@ impl LuaRuntime {
 
         globals.set("ts", ts_table)?;
         Ok(())
-    }
-}
-
-/// Wrapper for Parsers to store in Lua registry.
-struct LuaParsers(std::sync::Arc<Parsers>);
-
-impl Clone for LuaParsers {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl UserData for LuaParsers {}
-
-impl FromLua for LuaParsers {
-    fn from_lua(value: Value, _lua: &Lua) -> LuaResult<Self> {
-        match value {
-            Value::UserData(ud) => Ok(ud.borrow::<LuaParsers>()?.clone()),
-            _ => Err(mlua::Error::FromLuaConversionError {
-                from: value.type_name(),
-                to: "LuaParsers".to_string(),
-                message: Some("expected Parsers userdata".to_string()),
-            }),
-        }
     }
 }
 
