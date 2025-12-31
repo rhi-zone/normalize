@@ -1,0 +1,263 @@
+# Lua Validation Library Design
+
+Declarative validation using plain data structures.
+
+## Goals
+
+1. Types as data (tables), not method chains
+2. Composable via nesting
+3. Clear error messages with field paths
+4. Type coercion where sensible
+5. Works with CLI library's parsed args
+
+## API Sketch
+
+### Basic Usage
+
+```lua
+local T = require("validate")
+
+local schema = {
+    name = T.string,
+    count = { type = "number", min = 1, max = 100, default = 10 },
+    verbose = { type = "boolean", default = false },
+}
+
+local result, err = T.check(args, schema)
+if err then
+    print("Error: " .. err)
+    os.exit(1)
+end
+```
+
+### Primitive Types
+
+```lua
+T.string              -- { type = "string" }
+T.number              -- { type = "number" }
+T.integer             -- { type = "integer" }
+T.boolean             -- { type = "boolean" }
+T.any                 -- { type = "any" }
+```
+
+### Type with Constraints
+
+```lua
+-- Inline constraints
+{ type = "string", min_len = 1, max_len = 100 }
+{ type = "number", min = 0, max = 100 }
+{ type = "integer", min = 1 }
+{ type = "string", pattern = "^[a-z]+$" }
+{ type = "string", one_of = { "red", "green", "blue" } }
+
+-- Required/optional/default
+{ type = "string", required = true }
+{ type = "number", default = 10 }
+```
+
+### Composite Types
+
+```lua
+-- Struct (nested object)
+{
+    type = "struct",
+    shape = {
+        name = T.string,
+        email = { type = "string", pattern = "@" },
+    },
+}
+
+-- Array
+{ type = "array", item = T.string }
+{ type = "array", item = { type = "number", min = 0 } }
+
+-- Optional wrapper
+{ type = "optional", inner = T.string }
+-- or shorthand:
+T.optional(T.string)
+
+-- Union
+{ type = "any_of", types = { T.string, T.number } }
+-- or shorthand:
+T.any_of(T.string, T.number)
+
+-- Literal value
+{ type = "literal", value = "production" }
+-- or shorthand:
+T.literal("production")
+```
+
+### Shorthand Constructors
+
+For common patterns:
+
+```lua
+T.optional(inner)           -- { type = "optional", inner = inner }
+T.array(item)               -- { type = "array", item = item }
+T.any_of(...)               -- { type = "any_of", types = {...} }
+T.literal(value)            -- { type = "literal", value = value }
+T.struct(shape)             -- { type = "struct", shape = shape }
+```
+
+### Built-in Validators
+
+```lua
+T.file_exists             -- { type = "string", file_exists = true }
+T.dir_exists              -- { type = "string", dir_exists = true }
+T.port                    -- { type = "integer", min = 1, max = 65535 }
+T.positive                -- { type = "number", min = 0, exclusive_min = true }
+T.non_empty_string        -- { type = "string", min_len = 1 }
+```
+
+### Custom Validation
+
+```lua
+{
+    type = "string",
+    check = function(v)
+        if not v:match("^[a-z]+$") then
+            return nil, "must be lowercase letters"
+        end
+        return v
+    end,
+}
+```
+
+### Full Example
+
+```lua
+local T = require("validate")
+
+local schema = {
+    name = { type = "string", required = true, min_len = 1 },
+    port = T.port,
+    mode = { type = "string", one_of = { "dev", "prod" }, default = "dev" },
+    tags = { type = "array", item = T.non_empty_string, default = {} },
+    config = {
+        type = "struct",
+        shape = {
+            timeout = { type = "number", min = 0, default = 30 },
+            retries = { type = "integer", min = 0, max = 10, default = 3 },
+        },
+    },
+}
+
+local result, err = T.check(args, schema)
+```
+
+### Error Messages
+
+```
+name: required field missing
+port: must be between 1 and 65535, got 70000
+mode: must be one of [dev, prod], got "test"
+config.timeout: must be number, got string
+tags[2]: must be non-empty string
+```
+
+## Implementation Notes
+
+### Reference Implementation
+
+See https://github.com/pterror/lua/blob/master/lib/type/check.lua
+
+Dispatcher pattern:
+```lua
+mod.checkers = {}
+mod.check = function(schema, x)
+    return mod.checkers[schema.type](schema, x)
+end
+mod.checkers.string = function(_, x) return type(x) == "string" end
+mod.checkers.struct = function(s, x)
+    for k, s2 in pairs(s.shape) do
+        if not mod.check(s2, x[k]) then return false end
+    end
+    return true
+end
+```
+
+Our version extends this with:
+- Return `(result, err)` not just boolean
+- Constraint checking (min, max, pattern)
+- Coercion (string → number)
+- Default values
+- Error paths ("config.timeout: must be number")
+
+### No Normalization Needed
+
+`T.string` is already `{ type = "string" }` - no runtime normalization.
+Tables without `type` field are errors.
+
+### Coercion
+
+- String "123" → number 123 (for number/integer types)
+- String "true"/"false" → boolean
+- Coercion happens before constraint checking
+
+### Required vs Optional
+
+- Fields are **optional by default** (nil allowed)
+- Use `required = true` for mandatory fields
+- `default = value` provides fallback for nil
+
+## Integration with CLI
+
+```lua
+local cli = require("cli")
+local T = require("validate")
+
+cli.run {
+    name = "deploy",
+    commands = {
+        { name = "run", args = { "env", "port?" },
+          run = function(args)
+              local validated, err = T.check(args, {
+                  env = { type = "string", one_of = { "dev", "staging", "prod" }, required = true },
+                  port = T.port,
+              })
+              if err then
+                  print("Error: " .. err)
+                  os.exit(1)
+              end
+              deploy(validated.env, validated.port or 8080)
+          end },
+    },
+}
+```
+
+## Design Decisions
+
+1. **No implicit struct inference.** `{ name = T.string }` does NOT auto-become struct.
+   Explicit > implicit. Use `T.struct({ name = T.string })` or `{ type = "struct", shape = ... }`.
+
+2. **Shorthand constructors are plain functions.** `T.array(item)` just returns
+   `{ type = "array", item = item }`. No magic, no metatables.
+
+## Open Questions
+
+1. **Transform/coerce hook?**
+   `{ type = "string", transform = string.lower }` to normalize values?
+
+2. **LuaLS type annotations?**
+   Reference: https://github.com/pterror/lua/blob/master/lib/type.lua
+
+   Trick: annotate `T.string` as `--[[@type string]]` even though it's a table,
+   with `--[[@diagnostic disable-next-line: assign-type-mismatch]]` to suppress errors.
+
+   ```lua
+   --[[@type string]]
+   --[[@diagnostic disable-next-line: assign-type-mismatch]]
+   T.string = { type = "string" }
+
+   --[[@generic t]]
+   --[[@return t?]]
+   --[[@param t t]]
+   T.optional = function(t) return { type = "optional", inner = t } end
+   ```
+
+   Tradeoffs:
+   - Pro: IDE autocomplete, type checking on validated results
+   - Con: Hacky diagnostic suppression, LuaLS can't do mapped types like TS
+   - Con: Annotations are lies (the value IS a table, not the type it claims)
+
+   Decision: TBD. Could start without annotations, add later if valuable.
