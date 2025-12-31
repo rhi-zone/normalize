@@ -2,6 +2,7 @@
 
 use super::is_source_file;
 use crate::index;
+use glob::Pattern;
 use std::path::Path;
 
 /// Hotspot data for a file
@@ -15,7 +16,12 @@ struct FileHotspot {
 }
 
 /// Analyze git history hotspots
-pub fn cmd_hotspots(root: &Path, json: bool) -> i32 {
+pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], json: bool) -> i32 {
+    // Compile exclusion patterns
+    let excludes: Vec<Pattern> = exclude_patterns
+        .iter()
+        .filter_map(|p| Pattern::new(p).ok())
+        .collect();
     // Check if git repo
     let git_dir = root.join(".git");
     if !git_dir.exists() {
@@ -73,9 +79,9 @@ pub fn cmd_hotspots(root: &Path, json: bool) -> i32 {
             let mut hotspots: Vec<FileHotspot> = file_stats
                 .into_iter()
                 .filter(|(path, _)| {
-                    // Filter to source files only
+                    // Filter to source files, skip excluded
                     let p = Path::new(path);
-                    p.exists() && is_source_file(p)
+                    p.exists() && is_source_file(p) && !excludes.iter().any(|pat| pat.matches(path))
                 })
                 .map(|(path, (commits, added, deleted))| {
                     let churn = added + deleted;
@@ -103,6 +109,10 @@ pub fn cmd_hotspots(root: &Path, json: bool) -> i32 {
     for (path, (commits, added, deleted)) in file_stats {
         let p = Path::new(&path);
         if !p.exists() || !is_source_file(p) {
+            continue;
+        }
+        // Skip excluded patterns
+        if excludes.iter().any(|pat| pat.matches(&path)) {
             continue;
         }
 

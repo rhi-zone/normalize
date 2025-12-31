@@ -26,6 +26,8 @@ See `docs/` for design docs and `README.md` for usage.
   - `--recursive` traces into called functions, showing their return statements
   - Cross-file tracing via index lookup (shows file path for external functions)
 - `analyze files` subcommand: shows longest files by line count, with totals by language
+- `analyze hotspots` now supports config-based exclusions via `[analyze] hotspots_exclude`
+  - Example: `hotspots_exclude = ["*.md", "*.lock", "generated/**"]`
 
 ### Index Command
 - `index rebuild` now includes call graph by default (symbols needed for most features)

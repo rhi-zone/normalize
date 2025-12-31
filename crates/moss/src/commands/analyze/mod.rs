@@ -48,6 +48,9 @@ pub struct AnalyzeConfig {
     /// Exclude interface implementations from doc coverage (default: true)
     /// This excludes trait impl methods in Rust, @Override methods in Java, etc.
     pub exclude_interface_impls: Option<bool>,
+    /// Patterns to exclude from hotspots analysis (e.g., generated code, lock files)
+    #[serde(default)]
+    pub hotspots_exclude: Vec<String>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -235,7 +238,9 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             lint::cmd_lint_analyze(&effective_root, target.as_deref(), json)
         }
 
-        Some(AnalyzeCommand::Hotspots) => hotspots::cmd_hotspots(&effective_root, json),
+        Some(AnalyzeCommand::Hotspots) => {
+            hotspots::cmd_hotspots(&effective_root, &config.analyze.hotspots_exclude, json)
+        }
 
         Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, json),
 

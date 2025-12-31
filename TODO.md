@@ -5,8 +5,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 - Smart Header: `moss view --context` pulls in referenced type definitions
-- Git hotspot allowlist: `.moss/hotspot-allow` to filter expected hotspots
-- Large file analysis: test `moss analyze` on 1000+ function files, assess performance
+- Run `moss health` and address large files
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -45,8 +44,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
 
 ### Code Quality
-- Git hotspot allowlist: `.moss/hotspot-allow` file to filter expected hotspots (generated code, vendored deps) from `--hotspots`
-- Large file analysis: run `./target/debug/moss analyze` on very large files (1000+ functions) - assess performance, output format, usefulness
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
