@@ -4,7 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
+- `is_source_file` cleanup: use `moss-languages` support detection instead of hardcoded extension lists
+- Smart Header: `moss view --context` pulls in referenced type definitions
+- Git hotspot allowlist: `.moss/hotspot-allow` to filter expected hotspots
+- Large file analysis: test `moss analyze` on 1000+ function files, assess performance
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -57,16 +60,11 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Define patterns via tree-sitter queries, whitelist locations
 
 ### `@` Sigil
-- As target prefix, expands to well-known paths:
-  - `@todo` → detected TODO file(s), maybe `["TODO.md", "TASKS.md"]`
-  - `@config` → `.moss/config.toml`
-  - Works with any command: `moss view @todo`, `moss edit @config`
-  - Need to figure out: what happens when some items don't match?
-  - `moss init` can detect and configure this (prints "detected TODO file at TASKS.md")
-- As command prefix, runs scripts:
-  - `moss @script-name args` → runs `.moss/scripts/script-name.lua`
-  - First scripts: `@todo` (todo viewer/editor), `@config` (config viewer/editor)
-- Partial fix for file/section detection (explicit opt-in to heuristics)
+- Target prefix: ✅ Done (`moss view @todo`, `moss edit @config`)
+  - Configured via `[sigil]` in config.toml, `moss init` detects TODO files
+- Command prefix: `moss @script-name args` → runs script with args
+  - Needs: `moss script run` to pass trailing args to scripts
+  - Builtin scripts (todo.lua, config.lua) expect args but can't receive them
 
 ### `moss todo` Future
 - Currently: Rust implementation with file/section detection, format preservation
