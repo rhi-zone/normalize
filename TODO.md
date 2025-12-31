@@ -53,6 +53,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
 
 ### Code Quality
+- Large file analysis: run `./target/debug/moss analyze` on very large files (1000+ functions) - assess performance, output format, usefulness
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
