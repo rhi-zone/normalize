@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - Smart Header: `moss view --context` pulls in referenced type definitions
 - [x] Run `moss health` and address large files
-- Split view.rs into submodules (search, tree, file, symbol, lines)
+- [x] Split view.rs into submodules (search, tree, file, symbol, lines)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
