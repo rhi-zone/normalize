@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Rename `moss grep` → `moss text-search` (search/find imply semantic). Document reasoning in `docs/decisions.md`: grep conflicts with unix mental model (Opus 4.5 in Claude Code constantly tries unix grep syntax), "search" implies semantic search in AI-era.
 - Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
 - Edit `--item` flag: format-aware insertion for lists (checkbox/bullet/numbered)
-- Analyze `--trace`: recursive cross-function tracing (trace INTO called functions)
+- [x] Analyze `--trace`: recursive cross-function tracing (trace INTO called functions)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -23,7 +24,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - [x] Stop conditions: literals marked as (terminal)
   - [x] Stop conditions: same-file calls show signature + @L<line>
   - [x] `--max-depth N` limits output
-  - [ ] Recursive cross-function tracing (trace INTO called functions)
+  - [x] Recursive cross-function tracing (trace INTO called functions) - `--recursive` flag
   - [ ] Cross-file function lookup via index
 
 ### Configuration System

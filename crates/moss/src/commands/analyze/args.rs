@@ -101,6 +101,10 @@ pub enum AnalyzeCommand {
         /// Maximum trace depth
         #[arg(long, default_value = "10")]
         max_depth: usize,
+
+        /// Trace into called functions (show what they return)
+        #[arg(long)]
+        recursive: bool,
     },
 
     /// Show what functions call a symbol

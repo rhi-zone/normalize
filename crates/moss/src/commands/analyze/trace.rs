@@ -12,6 +12,7 @@ pub fn cmd_trace(
     target: Option<&str>,
     root: &Path,
     max_depth: usize,
+    recursive: bool,
     json: bool,
     pretty: bool,
 ) -> i32 {
@@ -77,16 +78,20 @@ pub fn cmd_trace(
     let start_line = sym.start_line;
     let end_line = sym.end_line;
 
-    // Build signature map for same-file function lookups (name -> (signature, line))
+    // Build signature map for same-file function lookups
     let extractor = crate::extract::Extractor::new();
     let extract_result = extractor.extract(&full_path, &content);
-    let mut signature_map: HashMap<String, (String, usize)> = HashMap::new();
-    fn collect_signatures(
-        sym: &moss_languages::Symbol,
-        map: &mut HashMap<String, (String, usize)>,
-    ) {
+    let mut signature_map: HashMap<String, FunctionInfo> = HashMap::new();
+    fn collect_signatures(sym: &moss_languages::Symbol, map: &mut HashMap<String, FunctionInfo>) {
         if !sym.signature.is_empty() {
-            map.insert(sym.name.clone(), (sym.signature.clone(), sym.start_line));
+            map.insert(
+                sym.name.clone(),
+                FunctionInfo {
+                    signature: sym.signature.clone(),
+                    start_line: sym.start_line,
+                    end_line: sym.end_line,
+                },
+            );
         }
         for child in &sym.children {
             collect_signatures(child, map);
@@ -212,6 +217,51 @@ pub fn cmd_trace(
                     t.line, t.variable, t.source, flows, calls_info, branch_info
                 );
             }
+
+            // Recursive tracing: show what called functions return
+            if recursive {
+                let mut seen_funcs: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
+                for call in &t.calls {
+                    // Skip if we've already shown returns for this function
+                    if seen_funcs.contains(&call.name) {
+                        continue;
+                    }
+                    if let (Some(start), Some(end)) = (call.defined_at, call.defined_end) {
+                        let returns = trace_returns(&tree.root_node(), source_bytes, start, end);
+                        if !returns.is_empty() {
+                            seen_funcs.insert(call.name.clone());
+                            if pretty {
+                                println!(
+                                    "    {} returns:",
+                                    nu_ansi_term::Color::Magenta.paint(&call.name)
+                                );
+                            } else {
+                                println!("    {} returns:", call.name);
+                            }
+                            for ret in &returns {
+                                let branch_info = ret
+                                    .branch_context
+                                    .as_ref()
+                                    .map(|b| format!(" ({})", b))
+                                    .unwrap_or_default();
+                                if pretty {
+                                    let branch_colored =
+                                        nu_ansi_term::Color::Blue.paint(&branch_info).to_string();
+                                    println!(
+                                        "      L{}: {}{}",
+                                        nu_ansi_term::Color::Yellow.paint(ret.line.to_string()),
+                                        ret.value,
+                                        branch_colored
+                                    );
+                                } else {
+                                    println!("      L{}: {}{}", ret.line, ret.value, branch_info);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -258,6 +308,14 @@ fn fallback_parse_symbol(
         .collect()
 }
 
+/// Function signature info for cross-function tracing.
+#[derive(Debug, Clone)]
+struct FunctionInfo {
+    signature: String,
+    start_line: usize,
+    end_line: usize,
+}
+
 /// A traced assignment.
 #[derive(Debug)]
 struct TraceEntry {
@@ -273,12 +331,22 @@ struct TraceEntry {
     branch_context: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CallInfo {
     name: String,
     signature: Option<String>,
     /// Line where the called function is defined (for cross-function tracing)
     defined_at: Option<usize>,
+    /// End line of the called function (for recursive tracing)
+    defined_end: Option<usize>,
+}
+
+/// A return statement found during recursive tracing.
+#[derive(Debug)]
+struct ReturnTrace {
+    line: usize,
+    value: String,
+    branch_context: Option<String>,
 }
 
 /// Trace assignments within a function.
@@ -288,7 +356,7 @@ fn trace_assignments(
     start_line: usize,
     end_line: usize,
     max_depth: usize,
-    signature_map: &HashMap<String, (String, usize)>,
+    signature_map: &HashMap<String, FunctionInfo>,
 ) -> Vec<TraceEntry> {
     let mut entries = Vec::new();
     let mut cursor = root.walk();
@@ -364,7 +432,7 @@ fn trace_node(
     start_line: usize,
     end_line: usize,
     entries: &mut Vec<TraceEntry>,
-    signature_map: &HashMap<String, (String, usize)>,
+    signature_map: &HashMap<String, FunctionInfo>,
     branch_context: Option<&str>,
 ) {
     loop {
@@ -417,7 +485,7 @@ fn extract_assignment(
     node: &tree_sitter::Node,
     source: &[u8],
     line: usize,
-    signature_map: &HashMap<String, (String, usize)>,
+    signature_map: &HashMap<String, FunctionInfo>,
 ) -> Option<TraceEntry> {
     // Try to find left and right sides
     let lhs = node
@@ -487,7 +555,7 @@ fn is_literal_node(node: &tree_sitter::Node) -> bool {
 fn extract_calls_from_node(
     node: &tree_sitter::Node,
     source: &[u8],
-    signature_map: &HashMap<String, (String, usize)>,
+    signature_map: &HashMap<String, FunctionInfo>,
 ) -> Vec<CallInfo> {
     let mut calls = Vec::new();
     let mut cursor = node.walk();
@@ -496,7 +564,7 @@ fn extract_calls_from_node(
         cursor: &mut tree_sitter::TreeCursor,
         source: &[u8],
         calls: &mut Vec<CallInfo>,
-        signature_map: &HashMap<String, (String, usize)>,
+        signature_map: &HashMap<String, FunctionInfo>,
     ) {
         loop {
             let node = cursor.node();
@@ -519,14 +587,12 @@ fn extract_calls_from_node(
                 if let Some(name) = func_name {
                     // Try to look up signature and location
                     let simple_name = name.split(&['.', ':'][..]).last().unwrap_or(&name);
-                    let (signature, defined_at) = signature_map
-                        .get(simple_name)
-                        .map(|(sig, line)| (Some(sig.clone()), Some(*line)))
-                        .unwrap_or((None, None));
+                    let info = signature_map.get(simple_name);
                     calls.push(CallInfo {
                         name,
-                        signature,
-                        defined_at,
+                        signature: info.map(|i| i.signature.clone()),
+                        defined_at: info.map(|i| i.start_line),
+                        defined_end: info.map(|i| i.end_line),
                     });
                 }
             }
@@ -587,4 +653,88 @@ fn extract_identifiers_from_node(node: &tree_sitter::Node, source: &[u8]) -> Vec
     identifiers.sort();
     identifiers.dedup();
     identifiers
+}
+
+/// Trace return statements within a function (for recursive tracing).
+fn trace_returns(
+    root: &tree_sitter::Node,
+    source: &[u8],
+    start_line: usize,
+    end_line: usize,
+) -> Vec<ReturnTrace> {
+    let mut returns = Vec::new();
+    let mut cursor = root.walk();
+
+    fn collect_returns(
+        cursor: &mut tree_sitter::TreeCursor,
+        source: &[u8],
+        start_line: usize,
+        end_line: usize,
+        returns: &mut Vec<ReturnTrace>,
+        branch_context: Option<&str>,
+        skip_children: bool,
+    ) {
+        loop {
+            let node = cursor.node();
+            let line = node.start_position().row + 1;
+            let kind = node.kind();
+
+            // Check for branch context
+            let child_context =
+                detect_branch_context(&node, source).or(branch_context.map(|s| s.to_string()));
+            let child_context_ref = child_context.as_deref();
+
+            let mut found_return = false;
+
+            // Only look at nodes within our range
+            if line >= start_line && line <= end_line && !skip_children {
+                // Look for return statements (prefer return_expression for Rust)
+                if kind == "return_expression" || kind == "return_statement" {
+                    // Get the return value - skip the "return" keyword (child 0)
+                    let value = node
+                        .child(1)
+                        .or_else(|| node.child_by_field_name("value"))
+                        .and_then(|n| n.utf8_text(source).ok())
+                        .map(|s| s.trim().to_string())
+                        .unwrap_or_else(|| "(void)".to_string());
+
+                    returns.push(ReturnTrace {
+                        line,
+                        value,
+                        branch_context: branch_context.map(|s| s.to_string()),
+                    });
+                    found_return = true;
+                }
+            }
+
+            // Don't descend into children of return expressions (avoid duplicates)
+            if cursor.goto_first_child() && !found_return {
+                collect_returns(
+                    cursor,
+                    source,
+                    start_line,
+                    end_line,
+                    returns,
+                    child_context_ref,
+                    false,
+                );
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    collect_returns(
+        &mut cursor,
+        source,
+        start_line,
+        end_line,
+        &mut returns,
+        None,
+        false,
+    );
+    returns
 }

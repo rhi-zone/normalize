@@ -23,6 +23,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Function calls detected with signatures shown
   - Branch context for conditionals (if/else/match)
   - Same-file function locations shown (`@L<line>`)
+  - `--recursive` traces into called functions, showing their return statements
 - `analyze files` subcommand: shows longest files by line count, with totals by language
 
 ### View Command

@@ -212,11 +212,13 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             symbol,
             target,
             max_depth,
+            recursive,
         }) => trace::cmd_trace(
             &symbol,
             target.as_deref(),
             &effective_root,
             max_depth,
+            recursive,
             json,
             pretty,
         ),
