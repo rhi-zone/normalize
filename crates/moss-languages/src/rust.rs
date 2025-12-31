@@ -123,7 +123,7 @@ impl Language for Rust {
     }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["impl_item", "trait_item"]
+        &["impl_item", "trait_item", "mod_item"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -262,6 +262,23 @@ impl Language for Rust {
                     name: name.to_string(),
                     kind: SymbolKind::Trait,
                     signature: format!("{}trait {}", vis, name),
+                    docstring: self.extract_docstring(node, content),
+                    start_line: node.start_position().row + 1,
+                    end_line: node.end_position().row + 1,
+                    visibility: self.get_visibility(node, content),
+                    children: Vec::new(),
+                })
+            }
+            "mod_item" => {
+                // Only extract inline mod blocks (with declaration_list), not `mod foo;` declarations
+                node.child_by_field_name("body")?;
+                let name = self.node_name(node, content)?;
+                let vis = self.extract_visibility_prefix(node, content);
+
+                Some(Symbol {
+                    name: name.to_string(),
+                    kind: SymbolKind::Module,
+                    signature: format!("{}mod {}", vis, name),
                     docstring: self.extract_docstring(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
