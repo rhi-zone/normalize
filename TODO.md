@@ -4,7 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-(pick from Remaining Work or Backlog)
+- Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
+- Edit `--item` flag: format-aware insertion for lists (checkbox/bullet/numbered)
+- Analyze `--trace <symbol>`: backward data flow / value provenance
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
