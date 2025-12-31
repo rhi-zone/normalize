@@ -240,6 +240,30 @@ cli.run {
 2. **Shorthand constructors are plain functions.** `T.array(item)` just returns
    `{ type = "array", item = item }`. No magic, no metatables.
 
+## Schema Introspection (`T.describe`)
+
+Generate human-readable descriptions of schemas:
+
+```lua
+local T = require("type")
+
+T.describe(T.string)                    -- "string"
+T.describe(T.port)                      -- "integer (>= 1, <= 65535)"
+T.describe(T.array(T.number))           -- "array of number"
+T.describe(T.optional(T.string))        -- "string?"
+T.describe(T.any_of(T.string, T.number)) -- "string | number"
+
+-- Struct shows fields
+T.describe(T.struct({ name = T.string, age = T.integer }))
+-- "struct {\n  age: integer\n  name: string\n}"
+
+-- Custom descriptions take priority
+T.describe({ type = "string", description = "User's email" })
+-- "User's email"
+```
+
+Useful for error messages, help text, and debugging.
+
 ## Random Value Generation (`type.generate`)
 
 The `generate` function produces random values matching a schema.

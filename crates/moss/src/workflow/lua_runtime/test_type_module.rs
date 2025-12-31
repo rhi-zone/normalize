@@ -94,3 +94,130 @@ fn aliases() {
     );
     assert!(result.is_ok(), "type aliases failed: {:?}", result);
 }
+
+#[test]
+fn describe_primitives() {
+    let runtime = LuaRuntime::new(Path::new(".")).unwrap();
+    let result = runtime.run_string(
+        r#"
+        local T = require("type")
+
+        assert(T.describe(T.string) == "string", "describe string")
+        assert(T.describe(T.number) == "number", "describe number")
+        assert(T.describe(T.integer) == "integer", "describe integer")
+        assert(T.describe(T.boolean) == "boolean", "describe boolean")
+        assert(T.describe(T.any) == "any", "describe any")
+        assert(T.describe(T["nil"]) == "nil", "describe nil")
+        "#,
+    );
+    assert!(result.is_ok(), "describe primitives failed: {:?}", result);
+}
+
+#[test]
+fn describe_with_constraints() {
+    let runtime = LuaRuntime::new(Path::new(".")).unwrap();
+    let result = runtime.run_string(
+        r#"
+        local T = require("type")
+
+        -- String constraints
+        local s1 = T.describe({ type = "string", min_len = 1, max_len = 10 })
+        assert(s1:find("1%-10 chars"), "string length range: " .. s1)
+
+        local s2 = T.describe({ type = "string", pattern = "^[a-z]+$" })
+        assert(s2:find("/^%[a%-z%]"), "string pattern: " .. s2)
+
+        local s3 = T.describe({ type = "string", one_of = { "a", "b", "c" } })
+        assert(s3:find("one of"), "string one_of: " .. s3)
+
+        -- Number constraints
+        local n1 = T.describe({ type = "number", min = 0, max = 100 })
+        assert(n1:find(">= 0") and n1:find("<= 100"), "number range: " .. n1)
+
+        local n2 = T.describe({ type = "number", min = 0, exclusive_min = true })
+        assert(n2:find("> 0"), "number exclusive min: " .. n2)
+
+        -- Port alias
+        local p = T.describe(T.port)
+        assert(p:find("integer") and p:find("1") and p:find("65535"), "port: " .. p)
+        "#,
+    );
+    assert!(
+        result.is_ok(),
+        "describe with constraints failed: {:?}",
+        result
+    );
+}
+
+#[test]
+fn describe_composite() {
+    let runtime = LuaRuntime::new(Path::new(".")).unwrap();
+    let result = runtime.run_string(
+        r#"
+        local T = require("type")
+
+        -- Array
+        local a = T.describe(T.array(T.number))
+        assert(a == "array of number", "array: " .. a)
+
+        -- Optional
+        local o = T.describe(T.optional(T.string))
+        assert(o == "string?", "optional: " .. o)
+
+        -- Tuple
+        local t = T.describe(T.tuple({ T.string, T.number }))
+        assert(t == "tuple(string, number)", "tuple: " .. t)
+
+        -- Dictionary
+        local d = T.describe(T.dictionary(T.string, T.number))
+        assert(d == "dict<string, number>", "dictionary: " .. d)
+
+        -- Union
+        local u = T.describe(T.any_of(T.string, T.number))
+        assert(u == "string | number", "any_of: " .. u)
+
+        -- Intersection
+        local i = T.describe(T.all_of(T.string, { type = "string", min_len = 1 }))
+        assert(i:find("&"), "all_of: " .. i)
+
+        -- Literal
+        local l = T.describe(T.literal("foo"))
+        assert(l == '"foo"', "literal string: " .. l)
+
+        local ln = T.describe(T.literal(42))
+        assert(ln == "42", "literal number: " .. ln)
+
+        -- Struct
+        local s = T.describe(T.struct({ name = T.string, age = T.integer }))
+        assert(s:find("struct") and s:find("name") and s:find("age"), "struct: " .. s)
+        "#,
+    );
+    assert!(result.is_ok(), "describe composite failed: {:?}", result);
+}
+
+#[test]
+fn describe_custom_description() {
+    let runtime = LuaRuntime::new(Path::new(".")).unwrap();
+    let result = runtime.run_string(
+        r#"
+        local T = require("type")
+
+        -- Custom description takes priority
+        local schema = { type = "string", description = "User's email address" }
+        assert(T.describe(schema) == "User's email address", "custom description")
+
+        -- Nested custom description
+        local nested = T.struct({
+            email = { type = "string", description = "Email address" },
+            age = T.integer,
+        })
+        local desc = T.describe(nested)
+        assert(desc:find("Email address"), "nested custom: " .. desc)
+        "#,
+    );
+    assert!(
+        result.is_ok(),
+        "describe custom description failed: {:?}",
+        result
+    );
+}
