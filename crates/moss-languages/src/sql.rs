@@ -97,6 +97,7 @@ impl Language for Sql {
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
             docstring: self.extract_docstring(node, content),
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: Visibility::Public,
@@ -117,6 +118,7 @@ impl Language for Sql {
             kind,
             signature: format!("CREATE {} {}", keyword, name),
             docstring: self.extract_docstring(node, content),
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: Visibility::Public,
@@ -132,6 +134,7 @@ impl Language for Sql {
             kind: SymbolKind::Type,
             signature: format!("CREATE TYPE {}", name),
             docstring: None,
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: Visibility::Public,
@@ -161,6 +164,10 @@ impl Language for Sql {
 
         doc_lines.reverse();
         Some(doc_lines.join(" "))
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {

@@ -42,6 +42,9 @@ Query-based highlighting using tree-sitter .scm files:
 - Line targets: `moss view file.rs:300` finds symbol containing that line
 - Fuzzy path resolution: `typescript.rs:300` works like `typescript.rs` (partial names supported)
 - Doc filtering: line ranges respect `--docs` flag (hides comments when false)
+- Test filtering: `--tests` flag shows test functions (hidden by default)
+  - Uses attributes (`#[test]`, `#[cfg(test)]`, `@Test`) and name patterns
+- Module extraction: Rust `mod` blocks appear in skeleton as containers
 - Symbol output includes line ranges (e.g., `foo: L10-25`) - enabled by default
 - `--full` mode outputs raw/highlighted content without line number prefixes
 - Data format support: TOML, JSON syntax highlighting with `--pretty`

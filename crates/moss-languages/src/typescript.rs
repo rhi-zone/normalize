@@ -94,6 +94,10 @@ impl Language for TypeScript {
         None
     }
 
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
+    }
+
     fn is_public(&self, _node: &Node, _content: &str) -> bool {
         true
     }
@@ -307,6 +311,10 @@ impl Language for Tsx {
 
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
         None
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn is_public(&self, _node: &Node, _content: &str) -> bool {

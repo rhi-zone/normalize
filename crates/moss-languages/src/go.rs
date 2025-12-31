@@ -391,6 +391,7 @@ impl Language for Go {
             },
             signature: format!("func {}{}", name, params),
             docstring: None,
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: if name
@@ -430,6 +431,7 @@ impl Language for Go {
             kind,
             signature: format!("type {}", name),
             docstring: None,
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: if name
@@ -536,6 +538,10 @@ impl Language for Go {
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
         // Go doc comments could be extracted but need special handling
         None
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

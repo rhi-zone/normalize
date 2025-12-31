@@ -101,6 +101,7 @@ impl Language for Elm {
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
             docstring: self.extract_docstring(node, content),
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: Visibility::Public,
@@ -123,6 +124,7 @@ impl Language for Elm {
             kind,
             signature: format!("{} {}", keyword, name),
             docstring: self.extract_docstring(node, content),
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: Visibility::Public,
@@ -152,6 +154,10 @@ impl Language for Elm {
             prev = sibling.prev_sibling();
         }
         None
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

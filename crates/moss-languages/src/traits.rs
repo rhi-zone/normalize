@@ -74,6 +74,7 @@ pub struct Symbol {
     pub kind: SymbolKind,
     pub signature: String,
     pub docstring: Option<String>,
+    pub attributes: Vec<String>,
     pub start_line: usize,
     pub end_line: usize,
     pub visibility: Visibility,
@@ -197,6 +198,9 @@ pub trait Language: Send + Sync {
 
     /// Extract docstring/doc comment for a node
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String>;
+
+    /// Extract attributes/decorators for a node (e.g., #[test], @Test)
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String>;
 
     // === Import/Export ===
 

@@ -94,6 +94,7 @@ impl SkeletonResult {
                     kind: sym.kind,
                     signature: sym.signature.clone(),
                     docstring: sym.docstring.clone(),
+                    attributes: Vec::new(),
                     start_line: sym.start_line,
                     end_line: sym.end_line,
                     visibility: sym.visibility,
@@ -117,9 +118,17 @@ impl SkeletonResult {
     }
 
     /// Filter out test functions and test modules.
-    /// Removes: functions starting with test_/Test, modules named tests/test/__tests__
+    /// Removes: functions with #[test]/#[cfg(test)], modules named tests/test/__tests__
     pub fn filter_tests(&self) -> SkeletonResult {
         fn is_test_symbol(sym: &Symbol) -> bool {
+            // Check attributes for test markers
+            let has_test_attr = sym.attributes.iter().any(|attr| {
+                attr.contains("#[test]") || attr.contains("#[cfg(test)]") || attr.contains("@Test")
+            });
+            if has_test_attr {
+                return true;
+            }
+
             let name = sym.name.as_str();
             match sym.kind {
                 SymbolKind::Function | SymbolKind::Method => {
@@ -146,6 +155,7 @@ impl SkeletonResult {
                 kind: sym.kind,
                 signature: sym.signature.clone(),
                 docstring: sym.docstring.clone(),
+                attributes: sym.attributes.clone(),
                 start_line: sym.start_line,
                 end_line: sym.end_line,
                 visibility: sym.visibility,

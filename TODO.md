@@ -4,10 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Module extraction: Rust `mod` blocks should be in skeleton and count as parents
-  - Prerequisite for `--tests` flag (can't hide `#[cfg(test)] mod tests` functions without this)
-- Attributes field in Symbol: extract `#[test]`, `#[cfg(test)]`, `@Test`, decorators
-  - Use for test filtering, optionally display like imports/docstrings
 - `--full --pretty` performance: 250ms for 109 lines is too slow (parsing each signature)
 
 ## Remaining Work
@@ -103,6 +99,10 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 ### Tooling
 - `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
+- Semantic refactoring: `moss edit <glob> --before 'fn extract_attributes' 'fn extract_attributes(...) { ... }'`
+  - Insert method before/after another method across multiple files
+  - Uses tree-sitter for semantic targeting (not regex)
+  - `--batch` flag for multiple targets in one invocation
 - Structured config crate (`moss-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
   - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml
   - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `moss-build`

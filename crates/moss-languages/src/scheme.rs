@@ -134,6 +134,7 @@ impl Language for Scheme {
                     kind: SymbolKind::Function,
                     signature: first_line.trim().to_string(),
                     docstring: None,
+                    attributes: Vec::new(),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: Visibility::Public,
@@ -149,6 +150,7 @@ impl Language for Scheme {
                 kind: SymbolKind::Function,
                 signature: first_line.trim().to_string(),
                 docstring: None,
+                attributes: Vec::new(),
                 start_line: node.start_position().row + 1,
                 end_line: node.end_position().row + 1,
                 visibility: Visibility::Public,
@@ -188,6 +190,7 @@ impl Language for Scheme {
                 kind: SymbolKind::Module,
                 signature: format!("(library {})", name),
                 docstring: None,
+                attributes: Vec::new(),
                 start_line: node.start_position().row + 1,
                 end_line: node.end_position().row + 1,
                 visibility: Visibility::Public,
@@ -203,6 +206,10 @@ impl Language for Scheme {
     }
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
         None
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

@@ -130,6 +130,7 @@ impl Language for R {
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
             docstring: self.extract_docstring(&parent, content),
+            attributes: Vec::new(),
             start_line: parent.start_position().row + 1,
             end_line: parent.end_position().row + 1,
             visibility: if name.starts_with('.') {
@@ -174,6 +175,10 @@ impl Language for R {
 
         doc_lines.reverse();
         Some(doc_lines.join(" "))
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

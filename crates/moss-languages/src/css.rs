@@ -74,6 +74,10 @@ impl Language for Css {
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
         None
     }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
+    }
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()
     }

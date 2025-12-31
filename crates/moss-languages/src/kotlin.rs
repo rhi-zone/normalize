@@ -149,6 +149,7 @@ impl Language for Kotlin {
             kind: SymbolKind::Function,
             signature: format!("fun {}{}{}", name, params, return_type),
             docstring: None,
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -168,6 +169,7 @@ impl Language for Kotlin {
             kind,
             signature: format!("{} {}", keyword, name),
             docstring: None,
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -187,6 +189,7 @@ impl Language for Kotlin {
                 kind: SymbolKind::Type,
                 signature: format!("typealias {} = {}", name, target),
                 docstring: None,
+                attributes: Vec::new(),
                 start_line: node.start_position().row + 1,
                 end_line: node.end_position().row + 1,
                 visibility: self.get_visibility(node, content),
@@ -228,6 +231,10 @@ impl Language for Kotlin {
             prev = sibling.prev_sibling();
         }
         None
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

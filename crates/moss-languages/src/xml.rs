@@ -81,6 +81,7 @@ impl Language for Xml {
                             kind: SymbolKind::Module,
                             signature: format!("<{}>", name),
                             docstring: None,
+                            attributes: Vec::new(),
                             start_line: node.start_position().row + 1,
                             end_line: node.end_position().row + 1,
                             visibility: Visibility::Public,
@@ -98,6 +99,10 @@ impl Language for Xml {
     }
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
         None
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()

@@ -90,6 +90,10 @@ impl Language for Jinja2 {
         None
     }
 
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
+    }
+
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         // Jinja2 grammar is minimal - only basic tokens, no structured nodes
         Vec::new()

@@ -96,6 +96,10 @@ impl Language for Query {
         None
     }
 
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
+    }
+
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()
     }

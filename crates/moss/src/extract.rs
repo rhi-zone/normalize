@@ -240,6 +240,7 @@ impl Extractor {
                     kind: moss_languages::SymbolKind::Module, // impl as module-like
                     signature: format!("impl {}", name),
                     docstring: None,
+                    attributes: Vec::new(),
                     start_line: methods.first().map(|m| m.start_line).unwrap_or(0),
                     end_line: methods.last().map(|m| m.end_line).unwrap_or(0),
                     visibility: Visibility::Public,

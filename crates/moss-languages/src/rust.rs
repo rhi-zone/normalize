@@ -230,6 +230,7 @@ impl Language for Rust {
             },
             signature,
             docstring: self.extract_docstring(node, content),
+            attributes: self.extract_attributes(node, content),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -248,6 +249,7 @@ impl Language for Rust {
                     kind: SymbolKind::Module, // impl blocks are like modules
                     signature: format!("impl {}", type_name),
                     docstring: None,
+                    attributes: self.extract_attributes(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: Visibility::Public,
@@ -263,6 +265,7 @@ impl Language for Rust {
                     kind: SymbolKind::Trait,
                     signature: format!("{}trait {}", vis, name),
                     docstring: self.extract_docstring(node, content),
+                    attributes: self.extract_attributes(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: self.get_visibility(node, content),
@@ -280,6 +283,7 @@ impl Language for Rust {
                     kind: SymbolKind::Module,
                     signature: format!("{}mod {}", vis, name),
                     docstring: self.extract_docstring(node, content),
+                    attributes: self.extract_attributes(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: self.get_visibility(node, content),
@@ -307,6 +311,7 @@ impl Language for Rust {
             kind,
             signature: format!("{}{} {}", vis, keyword, name),
             docstring: self.extract_docstring(node, content),
+            attributes: self.extract_attributes(node, content),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -345,6 +350,34 @@ impl Language for Rust {
         } else {
             Some(doc_lines.join("\n"))
         }
+    }
+
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        let mut attrs = Vec::new();
+
+        // Check for attributes child (e.g., #[test], #[cfg(test)])
+        if let Some(attr_node) = node.child_by_field_name("attributes") {
+            let mut cursor = attr_node.walk();
+            for child in attr_node.children(&mut cursor) {
+                if child.kind() == "attribute_item" {
+                    attrs.push(content[child.byte_range()].to_string());
+                }
+            }
+        }
+
+        // Also check preceding siblings for outer attributes
+        let mut prev = node.prev_sibling();
+        while let Some(sibling) = prev {
+            if sibling.kind() == "attribute_item" {
+                // Insert at beginning to maintain order
+                attrs.insert(0, content[sibling.byte_range()].to_string());
+                prev = sibling.prev_sibling();
+            } else {
+                break;
+            }
+        }
+
+        attrs
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

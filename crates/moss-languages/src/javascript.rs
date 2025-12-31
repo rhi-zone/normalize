@@ -80,6 +80,10 @@ impl Language for JavaScript {
         None
     }
 
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         ecmascript::extract_imports(node, content)
     }

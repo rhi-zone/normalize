@@ -111,6 +111,7 @@ impl Language for Scss {
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
             docstring: self.extract_docstring(node, content),
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -133,6 +134,7 @@ impl Language for Scss {
                     kind: SymbolKind::Class,
                     signature: selector,
                     docstring: None,
+                    attributes: Vec::new(),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: Visibility::Public,
@@ -172,6 +174,10 @@ impl Language for Scss {
 
         doc_lines.reverse();
         Some(doc_lines.join(" "))
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

@@ -96,6 +96,10 @@ impl Language for Meson {
         None
     }
 
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "normal_command" {
             return Vec::new();

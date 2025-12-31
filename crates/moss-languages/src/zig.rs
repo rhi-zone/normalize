@@ -131,6 +131,7 @@ impl Language for Zig {
             kind: SymbolKind::Function,
             signature,
             docstring: self.extract_docstring(node, content),
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -173,6 +174,7 @@ impl Language for Zig {
             kind,
             signature: format!("{} {}", prefix, name),
             docstring: self.extract_docstring(node, content),
+            attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -206,6 +208,10 @@ impl Language for Zig {
 
         doc_lines.reverse();
         Some(doc_lines.join(" "))
+    }
+
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
