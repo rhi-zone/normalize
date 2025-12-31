@@ -97,6 +97,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
   - Builtin `workflow` runner script interprets TOML files
   - Users can also write pure Lua scripts directly
 - Lua test framework: test discovery for `.moss/tests/` (test + test.property modules done)
+  - Command naming: must clearly indicate "moss Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
 - Type system uses beyond validation: serialization
   - Done: `T.describe(schema)` for introspection, `type.generate` for property testing
   - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
