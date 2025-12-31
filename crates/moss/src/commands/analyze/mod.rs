@@ -11,6 +11,7 @@ mod health;
 mod hotspots;
 pub mod length;
 mod lint;
+mod overview;
 pub mod report;
 pub mod security;
 mod stale_docs;

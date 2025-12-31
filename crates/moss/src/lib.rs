@@ -30,7 +30,6 @@ pub mod health;
 pub mod index;
 pub mod merge;
 pub mod output;
-pub mod overview;
 pub mod parsers;
 pub mod path_resolve;
 pub mod paths;

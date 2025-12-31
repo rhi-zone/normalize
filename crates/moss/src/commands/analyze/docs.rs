@@ -1,6 +1,6 @@
 //! Documentation coverage analysis
 
-use crate::overview::FileDocCoverage;
+use super::overview::FileDocCoverage;
 use std::collections::HashMap;
 use std::path::Path;
 

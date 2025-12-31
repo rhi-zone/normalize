@@ -1,6 +1,6 @@
 //! Codebase health overview analysis
 
-use crate::overview;
+use super::overview;
 use std::path::Path;
 
 /// Analyze codebase overview
