@@ -46,7 +46,7 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
     // 3. Create or update config.toml
     let config_path = moss_dir.join("config.toml");
     if !config_path.exists() {
-        let sigil_section = if todo_files.is_empty() {
+        let aliases_section = if todo_files.is_empty() {
             String::new()
         } else {
             let files_str = todo_files
@@ -54,7 +54,7 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
                 .map(|f| format!("\"{}\"", f))
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("\n[sigil]\ntodo = [{}]\n", files_str)
+            format!("\n[aliases]\ntodo = [{}]\n", files_str)
         };
 
         let default_config = format!(
@@ -66,10 +66,7 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
 # auto_start = true
 
 [analyze]
-# health = true
-# complexity = true
-# security = true
-# clones = false
+# clones = true
 
 # [analyze.weights]
 # health = 1.0
@@ -77,7 +74,7 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
 # security = 2.0
 # clones = 0.3
 {}"#,
-            sigil_section
+            aliases_section
         );
         if let Err(e) = fs::write(&config_path, default_config) {
             eprintln!("Failed to create config.toml: {}", e);
@@ -141,6 +138,8 @@ const GITIGNORE_ENTRIES: &[&str] = &[
     "!.moss/config.toml",
     "!.moss/duplicate-functions-allow",
     "!.moss/duplicate-types-allow",
+    "!.moss/hotspots-allow",
+    "!.moss/large-files-allow",
 ];
 
 /// Update .gitignore with moss entries. Returns list of changes made.
@@ -328,7 +327,7 @@ mod tests {
         cmd_init(tmp.path(), false);
 
         let config = fs::read_to_string(tmp.path().join(".moss/config.toml")).unwrap();
-        assert!(config.contains("[sigil]"));
+        assert!(config.contains("[aliases]"));
         assert!(config.contains("TODO.md"));
         assert!(config.contains("TASKS.md"));
     }
@@ -340,7 +339,7 @@ mod tests {
         cmd_init(tmp.path(), false);
 
         let config = fs::read_to_string(tmp.path().join(".moss/config.toml")).unwrap();
-        // Should not have sigil section if no TODO files found
-        assert!(!config.contains("[sigil]"));
+        // Should not have aliases section if no TODO files found
+        assert!(!config.contains("[aliases]"));
     }
 }

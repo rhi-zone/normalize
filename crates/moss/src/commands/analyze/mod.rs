@@ -112,6 +112,24 @@ impl AnalyzeConfig {
     }
 }
 
+/// Load patterns from a .moss allow file (e.g., hotspots-allow, large-files-allow)
+fn load_allow_file(root: &Path, filename: &str) -> Vec<String> {
+    let path = root.join(".moss").join(filename);
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+
+    content
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with('#')
+        })
+        .map(|line| line.trim().to_string())
+        .collect()
+}
+
 /// Run analyze command with args.
 pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     let effective_root = args
@@ -239,7 +257,10 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         }
 
         Some(AnalyzeCommand::Hotspots) => {
-            hotspots::cmd_hotspots(&effective_root, &config.analyze.hotspots_exclude, json)
+            // Combine config excludes with allow file
+            let mut excludes = config.analyze.hotspots_exclude.clone();
+            excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
+            hotspots::cmd_hotspots(&effective_root, &excludes, json)
         }
 
         Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, json),

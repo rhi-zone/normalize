@@ -1,0 +1,140 @@
+# Different serialization contexts for same concept
+Export SymbolInfo
+
+# TypeScript runner aggregates all result fields
+LintResult MossRunner
+
+# Same API surface in TS vs Rust
+LintResult ToolResult
+
+# Fix is subset of Diagnostic
+Diagnostic Fix
+
+# Shared diagnostic fields
+Diagnostic SecurityFinding
+
+# Same SARIF schema
+SarifReport SarifResult
+
+# Runner aggregates location fields
+Location MossRunner
+
+# Runner aggregates tool result
+MossRunner ToolResult
+
+# Runner aggregates security fields
+MossRunner SecurityFinding
+
+# Different views of symbol data
+Export IndexedSymbol
+
+# Different views of symbol data
+Export SearchResult
+
+# External vs internal symbol representation
+Export SymbolRecord
+
+# Database vs API representation
+SymbolInfo SymbolRecord
+
+# Index vs HTTP API representation
+IndexedSymbol SymbolInfo
+
+# Search result vs info representation
+SearchResult SymbolInfo
+
+# Query subset of full info
+PackageInfo PackageQuery
+
+# Query fields in tree node
+PackageQuery TreeNode
+
+# Args merge with Config pattern
+GrepArgs GrepConfig
+
+# Weights subset of config
+AnalyzeConfig AnalyzeWeights
+
+# Args include weight fields
+AnalyzeArgs AnalyzeWeights
+
+# Coincidental name/version overlap
+PackageQuery SarifDriver
+
+# Coincidental name/version overlap
+PackageQuery ToolListItem
+
+# Feature is package substructure
+Feature PackageInfo
+
+# TreeNode displays package info
+PackageInfo TreeNode
+
+# Args extends config pattern
+AnalyzeArgs AnalyzeConfig
+
+# TS runner aggregates diagnostic fields
+Diagnostic MossRunner
+
+# Different index representations
+IndexedSymbol SymbolRecord
+
+# Search result for symbols
+SearchResult SymbolRecord
+
+# Both are symbol query results
+IndexedSymbol SearchResult
+
+# Different purposes: health reporting vs index metadata
+IndexedFile LargeFile
+
+# SymbolMatch adds file field for search results
+FlatSymbol SymbolMatch
+
+# Overview is superset of health metrics
+HealthReport OverviewReport
+
+# Nested vs flat representation by design
+FlatSymbol Symbol
+
+# User config vs static tool definition
+CustomToolConfig ToolInfo
+
+# Static definition vs CLI output format
+ToolInfo ToolListItem
+
+# Grouped vs per-name flattened by design
+FlatImport Import
+
+# Different semantics: import vs re-export
+Import ReExport
+
+# HTTP response vs index search result
+SymbolDetailResponse SymbolMatch
+
+# Analysis result shares symbol location fields
+FlatSymbol FunctionComplexity
+
+# Analysis result shares symbol location fields
+FlatSymbol FunctionLength
+
+# Symbol info shares location fields
+FlatSymbol SymbolLocation
+
+# Coincidental path/name/kind overlap
+PackageSource SearchResult
+
+# Coincidental path/name/kind overlap
+PackageSource ViewNode
+
+# Weights are subset of report fields
+AnalyzeReport AnalyzeWeights
+
+# HTTP vs index representation
+IndexedSymbol SymbolMatch
+
+# Coincidental name/kind/path overlap
+SearchResult ViewNode
+
+# Different metrics with shared location fields, over-engineering to unify
+FunctionComplexity FunctionLength

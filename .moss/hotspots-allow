@@ -1,0 +1,10 @@
+# Git hotspots to exclude from analysis
+# One pattern per line (glob syntax)
+
+# Lock files
+**/pnpm-lock.yaml
+**/package-lock.json
+**/yarn.lock
+
+# Documentation
+*.md

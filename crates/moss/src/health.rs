@@ -3,6 +3,7 @@
 //! Quick overview of codebase health including file counts,
 //! complexity summary, and structural metrics.
 
+use glob::Pattern;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -244,15 +245,44 @@ fn is_lockfile(path: &str) -> bool {
     )
 }
 
-pub fn analyze_health(root: &Path) -> HealthReport {
-    // Try index first, fall back to filesystem walk
-    if let Some(mut index) = FileIndex::open_if_enabled(root) {
-        return analyze_health_indexed(root, &mut index);
-    }
-    analyze_health_unindexed(root)
+/// Load patterns from an allow file (.moss/large-files-allow or similar)
+fn load_allow_patterns(root: &Path, filename: &str) -> Vec<Pattern> {
+    let path = root.join(".moss").join(filename);
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+
+    content
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with('#')
+        })
+        .filter_map(|line| Pattern::new(line.trim()).ok())
+        .collect()
 }
 
-fn analyze_health_indexed(_root: &Path, index: &mut FileIndex) -> HealthReport {
+/// Check if path matches any allow pattern
+fn is_allowed(path: &str, patterns: &[Pattern]) -> bool {
+    patterns.iter().any(|p| p.matches(path))
+}
+
+pub fn analyze_health(root: &Path) -> HealthReport {
+    let allow_patterns = load_allow_patterns(root, "large-files-allow");
+
+    // Try index first, fall back to filesystem walk
+    if let Some(mut index) = FileIndex::open_if_enabled(root) {
+        return analyze_health_indexed(root, &mut index, &allow_patterns);
+    }
+    analyze_health_unindexed(root, &allow_patterns)
+}
+
+fn analyze_health_indexed(
+    _root: &Path,
+    index: &mut FileIndex,
+    allow_patterns: &[Pattern],
+) -> HealthReport {
     // Ensure file index is up to date (incremental - only changed files)
     let _ = index.incremental_refresh();
     // Note: We don't call refresh_call_graph() here - it's slow.
@@ -313,7 +343,10 @@ fn analyze_health_indexed(_root: &Path, index: &mut FileIndex) -> HealthReport {
                 continue;
             }
             total_lines += file.lines;
-            if file.lines >= LARGE_THRESHOLD && !is_lockfile(&file.path) {
+            if file.lines >= LARGE_THRESHOLD
+                && !is_lockfile(&file.path)
+                && !is_allowed(&file.path, allow_patterns)
+            {
                 large_files.push(LargeFile {
                     path: file.path,
                     lines: file.lines,
@@ -344,7 +377,7 @@ fn analyze_health_indexed(_root: &Path, index: &mut FileIndex) -> HealthReport {
 }
 
 /// Analyze health by walking the filesystem (slower, no complexity data)
-fn analyze_health_unindexed(root: &Path) -> HealthReport {
+fn analyze_health_unindexed(root: &Path, allow_patterns: &[Pattern]) -> HealthReport {
     use ignore::WalkBuilder;
 
     let mut files_by_language: HashMap<String, usize> = HashMap::new();
@@ -374,9 +407,13 @@ fn analyze_health_unindexed(root: &Path) -> HealthReport {
             total_lines += lines;
 
             let rel_path = path.strip_prefix(root).unwrap_or(path);
-            if lines >= LARGE_THRESHOLD && !is_lockfile(&rel_path.to_string_lossy()) {
+            let rel_str = rel_path.to_string_lossy();
+            if lines >= LARGE_THRESHOLD
+                && !is_lockfile(&rel_str)
+                && !is_allowed(&rel_str, allow_patterns)
+            {
                 large_files.push(LargeFile {
-                    path: rel_path.to_string_lossy().to_string(),
+                    path: rel_str.to_string(),
                     lines,
                 });
             }

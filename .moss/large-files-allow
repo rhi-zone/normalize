@@ -1,0 +1,15 @@
+# Large files that are expected/acceptable
+# One pattern per line (glob syntax)
+
+# Lock files
+**/pnpm-lock.yaml
+**/package-lock.json
+**/yarn.lock
+**/Cargo.lock
+
+# Documentation
+CHANGELOG.md
+docs/prior-art.md
+
+# Test data
+*_tests.rs
