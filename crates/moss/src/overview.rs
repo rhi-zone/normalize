@@ -39,6 +39,7 @@ pub struct OverviewReport {
     // Documentation
     pub functions_with_docs: usize,
     pub doc_coverage: f64,
+    pub worst_doc_coverage: Vec<FileDocCoverage>,
 
     // Dependencies
     pub total_imports: usize,
@@ -96,6 +97,18 @@ impl OverviewReport {
             self.functions_with_docs,
             self.total_functions + self.total_methods
         ));
+        if !self.worst_doc_coverage.is_empty() {
+            lines.push("  Worst coverage:".to_string());
+            for fc in &self.worst_doc_coverage {
+                lines.push(format!(
+                    "    {:.0}% ({}/{}) {}",
+                    fc.coverage_percent(),
+                    fc.documented,
+                    fc.total,
+                    fc.file_path
+                ));
+            }
+        }
         lines.push(String::new());
 
         // Complexity section
@@ -205,6 +218,7 @@ impl OverviewReport {
 
 /// Per-file stats for parallel aggregation
 struct FileStats {
+    file_path: String,
     lines: usize,
     functions: usize,
     classes: usize,
@@ -217,6 +231,32 @@ struct FileStats {
     modules: Vec<String>,
     todos: usize,
     fixmes: usize,
+}
+
+/// Doc coverage info for a single file
+#[derive(Debug, Clone)]
+pub struct FileDocCoverage {
+    pub file_path: String,
+    pub documented: usize,
+    pub total: usize,
+}
+
+impl FileDocCoverage {
+    /// Bayesian-adjusted coverage for sorting.
+    /// Uses Beta(1,1) prior (add 1 success and 1 failure).
+    /// This makes files with more callables (longer files) rank
+    /// higher when they have poor coverage.
+    pub fn bayesian_coverage(&self) -> f64 {
+        (self.documented as f64 + 1.0) / (self.total as f64 + 2.0)
+    }
+
+    pub fn coverage_percent(&self) -> f64 {
+        if self.total == 0 {
+            0.0
+        } else {
+            100.0 * self.documented as f64 / self.total as f64
+        }
+    }
 }
 
 /// Analyze codebase and produce overview report
@@ -250,6 +290,7 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
             // Skip detailed analysis for files without language support
             if lang.is_none() || !lang.unwrap().has_symbols() {
                 return Some(FileStats {
+                    file_path: file.path.clone(),
                     lines,
                     functions: 0,
                     classes: 0,
@@ -336,6 +377,7 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
             let modules: Vec<String> = deps.imports.iter().map(|i| i.module.clone()).collect();
 
             Some(FileStats {
+                file_path: file.path.clone(),
                 lines,
                 functions,
                 classes,
@@ -351,6 +393,32 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
             })
         })
         .collect();
+
+    // Collect per-file doc coverage for worst-coverage report
+    let mut file_coverages: Vec<FileDocCoverage> = stats
+        .iter()
+        .filter_map(|stat| {
+            let total = stat.functions + stat.methods;
+            if total == 0 {
+                return None;
+            }
+            Some(FileDocCoverage {
+                file_path: stat.file_path.clone(),
+                documented: stat.functions_with_docs,
+                total,
+            })
+        })
+        .collect();
+
+    // Sort by Bayesian coverage (lowest first = worst coverage with most evidence)
+    file_coverages.sort_by(|a, b| {
+        a.bayesian_coverage()
+            .partial_cmp(&b.bayesian_coverage())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Take top 5 worst
+    let worst_doc_coverage: Vec<FileDocCoverage> = file_coverages.into_iter().take(5).collect();
 
     // Aggregate results
     let mut total_lines = 0;
@@ -422,6 +490,7 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
         high_risk_functions,
         functions_with_docs,
         doc_coverage,
+        worst_doc_coverage,
         total_imports,
         unique_modules: all_modules.len(),
         todo_count,
