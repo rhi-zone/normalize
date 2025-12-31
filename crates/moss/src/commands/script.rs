@@ -36,6 +36,16 @@ pub enum ScriptAction {
     /// List available scripts
     List,
 
+    /// Create a new script from template
+    New {
+        /// Script name (without .lua extension)
+        name: String,
+
+        /// Template to use: basic (default), command
+        #[arg(short, long, default_value = "basic")]
+        template: String,
+    },
+
     /// Show script source (resolved path and highlighted code)
     Show {
         /// Script name
@@ -56,6 +66,7 @@ pub enum ScriptAction {
 pub fn cmd_script(action: ScriptAction, root: Option<&Path>, json: bool) -> i32 {
     match action {
         ScriptAction::List => cmd_script_list(root, json),
+        ScriptAction::New { name, template } => cmd_script_new(&name, &template, root, json),
         ScriptAction::Show { script } => cmd_script_show(&script, root, json),
         ScriptAction::Run { script, task } => cmd_script_run(&script, task.as_deref(), root, json),
     }
@@ -73,6 +84,103 @@ fn cmd_script_list(root: Option<&Path>, json: bool) -> i32 {
         for name in scripts {
             println!("{}", name);
         }
+    }
+
+    0
+}
+
+mod templates {
+    pub const BASIC: &str = include_str!("scripts/template.lua");
+    pub const COMMAND: &str = include_str!("scripts/template-command.lua");
+
+    pub fn get(name: &str) -> Option<&'static str> {
+        match name {
+            "basic" => Some(BASIC),
+            "command" => Some(COMMAND),
+            _ => None,
+        }
+    }
+
+    pub fn list() -> &'static [&'static str] {
+        &["basic", "command"]
+    }
+}
+
+fn cmd_script_new(name: &str, template: &str, root: Option<&Path>, json: bool) -> i32 {
+    let root = root.unwrap_or_else(|| Path::new("."));
+    let scripts_dir = root.join(".moss").join("scripts");
+    let script_path = scripts_dir.join(format!("{}.lua", name));
+
+    // Get template
+    let template_content = match templates::get(template) {
+        Some(t) => t,
+        None => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"error": "Unknown template", "available": templates::list()})
+                );
+            } else {
+                eprintln!(
+                    "Unknown template '{}'. Available: {}",
+                    template,
+                    templates::list().join(", ")
+                );
+            }
+            return 1;
+        }
+    };
+
+    // Check if script already exists
+    if script_path.exists() {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"error": "Script already exists", "path": script_path})
+            );
+        } else {
+            eprintln!("Script already exists: {}", script_path.display());
+        }
+        return 1;
+    }
+
+    // Check if it would shadow a builtin
+    if builtins::get(name).is_some() {
+        if !json {
+            println!("Note: This will override the builtin '{}' script", name);
+        }
+    }
+
+    // Create scripts directory if needed
+    if let Err(e) = std::fs::create_dir_all(&scripts_dir) {
+        if json {
+            println!("{}", serde_json::json!({"error": e.to_string()}));
+        } else {
+            eprintln!("Failed to create scripts directory: {}", e);
+        }
+        return 1;
+    }
+
+    // Generate script from template
+    let content = template_content.replace("{name}", name);
+
+    if let Err(e) = std::fs::write(&script_path, &content) {
+        if json {
+            println!("{}", serde_json::json!({"error": e.to_string()}));
+        } else {
+            eprintln!("Failed to write script: {}", e);
+        }
+        return 1;
+    }
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"created": script_path, "name": name})
+        );
+    } else {
+        println!("Created: {}", script_path.display());
+        println!("Run with: moss @{}", name);
     }
 
     0
