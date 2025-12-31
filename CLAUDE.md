@@ -85,6 +85,12 @@ Do not:
 - "Going in circles" = signal to simplify, not add complexity.
 - **Don't reinvent the wheel**: if ecosystem tooling exists (e.g., tree-sitter highlight queries), use it. Arborium ships `.scm` query files for every grammar - use those rather than hand-rolling node kind classifications.
 
+**Rust/Lua boundary: native ops and perf-critical only.**
+- Rust bindings for Lua should only expose: native operations (tree-sitter parsing, file I/O, subprocess), performance-critical code
+- Pure logic (CLI parsing, string manipulation, data transformation) belongs in Lua modules
+- Lua modules use `require("module")` - easier to read, modify, test
+- Don't write Rust just because you can; Lua is the user-facing scripting layer
+
 **Explicit over implicit.**
 - Convenience = zero-config. Hiding information = pretending everything is okay.
 - Location-based allowlists > hash-based (new occurrences shouldn't be silently ignored).

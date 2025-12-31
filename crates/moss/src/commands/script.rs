@@ -31,6 +31,19 @@ pub mod builtins {
     }
 }
 
+/// Builtin Lua modules (for require()).
+pub mod modules {
+    pub const CLI: &str = include_str!("scripts/cli.lua");
+
+    /// Get builtin module by name.
+    pub fn get(name: &str) -> Option<&'static str> {
+        match name {
+            "cli" => Some(CLI),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum ScriptAction {
     /// List available scripts

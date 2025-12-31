@@ -168,6 +168,7 @@ impl LuaRuntime {
             Self::register_shadow(&lua, &globals, &root)?;
             Self::register_memory(&lua, &globals, &root)?;
             Self::register_treesitter(&lua, &globals)?;
+            Self::register_modules(&lua)?;
         }
 
         Ok(Self { lua })
@@ -801,6 +802,26 @@ impl LuaRuntime {
         )?;
 
         globals.set("ts", ts_table)?;
+        Ok(())
+    }
+
+    /// Register builtin Lua modules for require().
+    fn register_modules(lua: &Lua) -> LuaResult<()> {
+        use crate::commands::script::modules;
+
+        // Get package.preload table
+        let package: Table = lua.globals().get("package")?;
+        let preload: Table = package.get("preload")?;
+
+        // Register each builtin module
+        if let Some(cli_src) = modules::get("cli") {
+            let cli_src = cli_src.to_string();
+            preload.set(
+                "cli",
+                lua.create_function(move |lua, ()| lua.load(&cli_src).eval::<Table>())?,
+            )?;
+        }
+
         Ok(())
     }
 }

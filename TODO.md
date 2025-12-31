@@ -88,8 +88,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Validates that view/edit primitives are sufficient for structural edits
 
 ### Script System
-- Rename `moss workflow` → `moss script`
-  - TOML workflow format: structured definition (steps, actions)
+- TOML workflow format: structured definition (steps, actions)
   - Builtin `workflow` runner script interprets TOML files
   - Users can also write pure Lua scripts directly
 - Lua CLI parsing library: opinionated arg parsing for scripts
@@ -164,6 +163,10 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - `moss @agent` (crates/moss/src/commands/scripts/agent.lua): MCP support as second-class citizen
   - Our own tools take priority, MCP as fallback/extension mechanism
   - Need to design how MCP servers are discovered/configured
+- Context view management: extend/edit/remove code views already in agent context
+  - Agents should be able to request "add more context around this symbol" or "remove this view"
+  - Incremental context refinement vs full re-fetch
+  - Blocked on: agent implementation existing at all
 
 ### CI/Infrastructure
 (No current issues)
