@@ -1524,6 +1524,9 @@ mod tests {
 #[path = "lua_runtime/test_cli_module.rs"]
 mod test_cli_module;
 #[cfg(test)]
+#[path = "lua_runtime/test_generate_module.rs"]
+mod test_generate_module;
+#[cfg(test)]
 #[path = "lua_runtime/test_type_module.rs"]
 mod test_type_module;
 #[cfg(test)]
