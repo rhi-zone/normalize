@@ -47,6 +47,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 ### Language Support
 98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
+- Lua highlighting broken: `moss view todo.lua`, `moss view validate.lua` not highlighting correctly
 
 ### Grammar Loading (external .so files)
 Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so files with highlight queries.
