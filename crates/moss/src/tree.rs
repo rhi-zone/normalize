@@ -2,6 +2,7 @@
 //!
 //! Git-aware tree display using the `ignore` crate for gitignore support.
 
+use crate::parsers::grammar_loader;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
 use moss_languages::{support_for_path, GrammarLoader};
@@ -12,13 +13,6 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock, RwLock};
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Query, QueryCursor};
-
-/// Global grammar loader singleton - avoids reloading grammars for each highlight call.
-static GRAMMAR_LOADER: OnceLock<GrammarLoader> = OnceLock::new();
-
-fn grammar_loader() -> &'static GrammarLoader {
-    GRAMMAR_LOADER.get_or_init(GrammarLoader::new)
-}
 
 /// Cached compiled queries for highlighting - Query::new is expensive (~100ms).
 static HIGHLIGHT_QUERY_CACHE: OnceLock<RwLock<HashMap<String, Arc<Query>>>> = OnceLock::new();
@@ -414,8 +408,12 @@ pub fn highlight_source(source: &str, grammar: &str, use_colors: bool) -> String
 
     // Process injections (embedded languages like code blocks in markdown)
     if let Some(injection_query) = get_injection_query(grammar, &language) {
-        let injection_spans =
-            collect_injection_spans(&injection_query, tree.root_node(), source, grammar_loader());
+        let injection_spans = collect_injection_spans(
+            &injection_query,
+            tree.root_node(),
+            source,
+            &*grammar_loader(),
+        );
         // Injection spans take precedence - remove base spans that overlap
         spans = merge_injection_spans(spans, injection_spans);
     }
@@ -524,7 +522,7 @@ fn collect_inner_spans(content: &str, grammar: &str, offset: usize) -> Vec<Highl
     // Recursively process injections in the injected content
     if let Some(injection_query) = get_injection_query(grammar, &language) {
         let nested_spans =
-            collect_injection_spans(&injection_query, tree.root_node(), content, loader);
+            collect_injection_spans(&injection_query, tree.root_node(), content, &*loader);
         // Adjust nested span offsets
         let adjusted: Vec<_> = nested_spans
             .into_iter()

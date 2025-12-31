@@ -1,8 +1,18 @@
 //! Tree-sitter parser initialization and management.
 
 use moss_languages::GrammarLoader;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tree_sitter::Parser;
+
+/// Global grammar loader singleton - avoids reloading grammars for each parse.
+static GRAMMAR_LOADER: OnceLock<Arc<GrammarLoader>> = OnceLock::new();
+
+/// Get the global grammar loader singleton.
+pub fn grammar_loader() -> Arc<GrammarLoader> {
+    GRAMMAR_LOADER
+        .get_or_init(|| Arc::new(GrammarLoader::new()))
+        .clone()
+}
 
 /// Collection of tree-sitter parsers using dynamic grammar loading.
 ///
@@ -15,9 +25,10 @@ pub struct Parsers {
 
 impl Parsers {
     /// Create new parser collection with dynamic grammar loading.
+    /// Uses the global singleton loader.
     pub fn new() -> Self {
         Self {
-            loader: Arc::new(GrammarLoader::new()),
+            loader: grammar_loader(),
         }
     }
 
