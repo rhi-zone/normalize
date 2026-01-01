@@ -538,8 +538,8 @@ async fn sessions_index(State(state): State<Arc<SessionsState>>) -> Html<String>
             let format_str = format.as_deref().unwrap_or("unknown");
             let short_id = if id.len() > 20 { &id[..20] } else { id };
             html.push_str(&format!(
-                "<tr><td title=\"{}\">{}</td><td>{}</td><td>{}</td><td><a href=\"/session/{}\">view</a> | <a href=\"/session/{}/raw\">raw</a></td></tr>\n",
-                id, short_id, format_str, age, id, id
+                "<tr><td title=\"{}\">{}</td><td>{}</td><td>{}</td><td><a href=\"/session/{}\">info</a> | <a href=\"/session/{}/chat\">chat</a> | <a href=\"/session/{}/raw\">raw</a></td></tr>\n",
+                id, short_id, format_str, age, id, id, id
             ));
         }
         html.push_str("</tbody></table>\n");
@@ -562,7 +562,7 @@ async fn session_detail(
     let mut html = String::from(HTML_HEADER);
     html.push_str(&format!("<h1>Session: {}</h1>\n", html_escape(&id)));
     html.push_str(&format!(
-        "<p><a href=\"/\">← Back</a> | <a href=\"/session/{}/chat\">View Chat</a> | <a href=\"/session/{}/raw\">Raw</a></p>\n",
+        "<p><a href=\"/\">← Back</a> | <a href=\"/session/{}/chat\">Chat</a> | <a href=\"/session/{}/raw\">Raw</a></p>\n",
         id, id
     ));
 
@@ -717,6 +717,20 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// Truncate string at char boundary (not byte boundary).
+fn truncate_str(s: &str, max_chars: usize) -> (&str, bool) {
+    if s.chars().count() <= max_chars {
+        (s, false)
+    } else {
+        let end = s
+            .char_indices()
+            .nth(max_chars)
+            .map(|(i, _)| i)
+            .unwrap_or(s.len());
+        (&s[..end], true)
+    }
+}
+
 /// Render JSONL chat log as HTML.
 fn render_chat_html(content: &str) -> String {
     use serde_json::Value;
@@ -809,9 +823,9 @@ fn render_content_blocks(content: &serde_json::Value) -> String {
                     ));
                     if let Some(inp) = input {
                         let json_str = serde_json::to_string_pretty(inp).unwrap_or_default();
-                        // Truncate very long inputs
-                        let display = if json_str.len() > 2000 {
-                            format!("{}...[truncated]", &json_str[..2000])
+                        let (truncated, was_truncated) = truncate_str(&json_str, 2000);
+                        let display = if was_truncated {
+                            format!("{}...[truncated]", truncated)
                         } else {
                             json_str
                         };
@@ -836,8 +850,9 @@ fn render_content_blocks(content: &serde_json::Value) -> String {
 
                     if let Some(content) = block.get("content") {
                         if let Some(text) = content.as_str() {
-                            let display = if text.len() > 5000 {
-                                format!("{}...[truncated]", &text[..5000])
+                            let (truncated, was_truncated) = truncate_str(text, 5000);
+                            let display = if was_truncated {
+                                format!("{}...[truncated]", truncated)
                             } else {
                                 text.to_string()
                             };
@@ -845,8 +860,9 @@ fn render_content_blocks(content: &serde_json::Value) -> String {
                         } else if let Some(arr) = content.as_array() {
                             for item in arr {
                                 if let Some(text) = item.get("text").and_then(|v| v.as_str()) {
-                                    let display = if text.len() > 5000 {
-                                        format!("{}...[truncated]", &text[..5000])
+                                    let (truncated, was_truncated) = truncate_str(text, 5000);
+                                    let display = if was_truncated {
+                                        format!("{}...[truncated]", truncated)
                                     } else {
                                         text.to_string()
                                     };
@@ -917,8 +933,9 @@ fn render_codex_payload(html: &mut String, payload: &serde_json::Value) {
         }
         "function_call_output" => {
             let output = payload.get("output").and_then(|v| v.as_str()).unwrap_or("");
-            let display = if output.len() > 5000 {
-                format!("{}...[truncated]", &output[..5000])
+            let (truncated, was_truncated) = truncate_str(output, 5000);
+            let display = if was_truncated {
+                format!("{}...[truncated]", truncated)
             } else {
                 output.to_string()
             };
