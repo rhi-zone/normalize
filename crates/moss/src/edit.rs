@@ -30,6 +30,17 @@ pub struct ContainerBody {
     pub is_empty: bool,
 }
 
+/// Convert a 1-based line number to byte offset in content.
+/// Clamps to content length for safety (last line may not have trailing newline).
+fn line_to_byte(content: &str, line: usize) -> usize {
+    let pos: usize = content
+        .lines()
+        .take(line.saturating_sub(1))
+        .map(|l| l.len() + 1)
+        .sum();
+    pos.min(content.len())
+}
+
 /// Editor for structural code modifications
 pub struct Editor {}
 
@@ -42,14 +53,6 @@ impl Editor {
     pub fn find_symbol(&self, path: &Path, content: &str, name: &str) -> Option<SymbolLocation> {
         let extractor = SkeletonExtractor::new();
         let result = extractor.extract(path, content);
-
-        fn line_to_byte(content: &str, line: usize) -> usize {
-            content
-                .lines()
-                .take(line.saturating_sub(1))
-                .map(|l| l.len() + 1)
-                .sum()
-        }
 
         fn search_symbols(
             symbols: &[crate::skeleton::SkeletonSymbol],
@@ -95,14 +98,6 @@ impl Editor {
         content: &str,
         pattern: &str,
     ) -> Vec<SymbolLocation> {
-        fn line_to_byte(content: &str, line: usize) -> usize {
-            content
-                .lines()
-                .take(line.saturating_sub(1))
-                .map(|l| l.len() + 1)
-                .sum()
-        }
-
         let symbol_matches = path_resolve::resolve_symbol_glob(path, content, pattern);
 
         let mut locations: Vec<SymbolLocation> = symbol_matches
@@ -335,14 +330,6 @@ impl Editor {
     ) -> Option<ContainerBody> {
         let extractor = SkeletonExtractor::new();
         let result = extractor.extract(path, content);
-
-        fn line_to_byte(content: &str, line: usize) -> usize {
-            content
-                .lines()
-                .take(line.saturating_sub(1))
-                .map(|l| l.len() + 1)
-                .sum()
-        }
 
         fn search_symbols(
             symbols: &[crate::skeleton::SkeletonSymbol],

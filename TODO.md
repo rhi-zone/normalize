@@ -43,7 +43,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - [x] Smart Header: `--context` shows referenced types (done)
   - Same-file and cross-file (via index) type lookup
   - Works with symbol paths and line-based lookup
-- Review view.rs scope: 1990 lines doing search, tree, file, symbol, line-range viewing. Consider consolidating before splitting into submodules.
+- [x] view.rs split into submodules: file.rs (319), lines.rs (199), symbol.rs (922), tree.rs (214), search.rs (179), mod.rs (429)
 
 ### Analyze Command
 - Glob pattern support: `moss analyze 'foo/**/bar.*'` for analyzing symbols matching patterns
