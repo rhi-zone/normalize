@@ -25,9 +25,8 @@
             # Fast linker for incremental builds
             mold
             clang
-            # VS Code extension (editors/vscode/) and docs
-            nodejs_latest
-            corepack
+            # JS tooling: VS Code extension, docs, sessions SPA
+            bun
           ];
 	  LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}:$LD_LIBRARY_PATH";
         };

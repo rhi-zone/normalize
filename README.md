@@ -167,6 +167,7 @@ Analyze Claude Code and other agent session logs:
 moss sessions                   # List recent sessions
 moss sessions <id>              # Show session details
 moss sessions <id> --analyze    # Full session analysis
+moss sessions --serve           # Web viewer at localhost:3939
 ```
 
 ## Configuration
@@ -231,6 +232,13 @@ cargo test
 # Install locally
 cargo install --path crates/moss-cli
 ```
+
+### Prerequisites
+
+- Rust toolchain (1.75+)
+- `bun` or `npm` - required to build the sessions web viewer SPA
+
+If using Nix: `nix develop` provides all dependencies.
 
 ## License
 
