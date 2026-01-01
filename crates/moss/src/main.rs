@@ -83,6 +83,14 @@ enum Commands {
         /// Force undo even if files were modified externally
         #[arg(long)]
         force: bool,
+
+        /// Jump to a specific shadow commit (restores file state from that point)
+        #[arg(long, value_name = "REF")]
+        goto: Option<String>,
+
+        /// Undo changes only for specific file(s) (used with --undo)
+        #[arg(long = "file", value_name = "PATH")]
+        undo_file: Option<String>,
     },
 
     /// View shadow git edit history
@@ -454,10 +462,21 @@ fn main() {
             undo,
             redo,
             force,
+            goto,
+            undo_file,
         } => {
-            // Handle undo/redo operations
-            if undo.is_some() || redo {
-                commands::edit::cmd_undo_redo(root.as_deref(), undo, redo, dry_run, force, cli.json)
+            // Handle undo/redo/goto operations
+            if undo.is_some() || redo || goto.is_some() {
+                commands::edit::cmd_undo_redo(
+                    root.as_deref(),
+                    undo,
+                    redo,
+                    goto.as_deref(),
+                    undo_file.as_deref(),
+                    dry_run,
+                    force,
+                    cli.json,
+                )
             } else {
                 // Regular edit requires target and action
                 let target = target.expect("Target is required for edit operations");

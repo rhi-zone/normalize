@@ -834,11 +834,13 @@ fn handle_glob_edit(
     0
 }
 
-/// Handle undo/redo operations on shadow git history.
+/// Handle undo/redo/goto operations on shadow git history.
 pub fn cmd_undo_redo(
     root: Option<&Path>,
     undo: Option<usize>,
     redo: bool,
+    goto: Option<&str>,
+    file_filter: Option<&str>,
     dry_run: bool,
     force: bool,
     json: bool,
@@ -861,6 +863,49 @@ pub fn cmd_undo_redo(
             eprintln!("No shadow history exists. Make an edit first with `moss edit`.");
         }
         return 1;
+    }
+
+    // Handle goto first (takes precedence)
+    if let Some(ref_str) = goto {
+        match shadow.goto(ref_str, dry_run, force) {
+            Ok(result) => {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "operation": if dry_run { "goto_preview" } else { "goto" },
+                            "target": ref_str,
+                            "description": result.description,
+                            "files": result.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+                            "commit": result.undone_commit
+                        })
+                    );
+                } else {
+                    if dry_run {
+                        println!("Would restore state from: {}", result.description);
+                    } else {
+                        println!("Restored state from: {}", result.description);
+                    }
+                    for file in &result.files {
+                        println!("  {}", file.display());
+                    }
+                }
+                return 0;
+            }
+            Err(e) => {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "error": e.to_string()
+                        })
+                    );
+                } else {
+                    eprintln!("{}", e);
+                }
+                return 1;
+            }
+        }
     }
 
     if redo {
@@ -900,7 +945,7 @@ pub fn cmd_undo_redo(
         }
     } else if let Some(count) = undo {
         let count = if count == 0 { 1 } else { count };
-        match shadow.undo(count, dry_run, force) {
+        match shadow.undo(count, file_filter, dry_run, force) {
             Ok(results) => {
                 // Collect all conflicts across results
                 let all_conflicts: Vec<_> =

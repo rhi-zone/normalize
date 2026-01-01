@@ -65,6 +65,11 @@ pub fn run(args: HistoryArgs, format: crate::output::OutputFormat) -> i32 {
         return cmd_status(&shadow, format.is_json());
     }
 
+    // Handle --all (tree view)
+    if args.all {
+        return cmd_tree(&shadow, args.limit, format.is_json());
+    }
+
     // Regular history listing
     let entries = shadow.history(args.file.as_deref(), args.limit);
 
@@ -190,4 +195,29 @@ fn cmd_status(shadow: &Shadow, json: bool) -> i32 {
     }
 
     0
+}
+
+/// Show full tree structure of shadow history (all branches).
+fn cmd_tree(shadow: &Shadow, limit: usize, json: bool) -> i32 {
+    match shadow.tree(limit) {
+        Some(tree_output) => {
+            if json {
+                // Parse tree into structured format
+                let lines: Vec<&str> = tree_output.lines().collect();
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "tree": lines
+                    })
+                );
+            } else {
+                print!("{}", tree_output);
+            }
+            0
+        }
+        None => {
+            eprintln!("Could not get tree view");
+            1
+        }
+    }
 }

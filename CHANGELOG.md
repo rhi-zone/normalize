@@ -32,6 +32,9 @@ See `docs/` for design docs and `README.md` for usage.
   - **Conflict detection**: blocks undo if files modified externally since last moss edit
   - `moss edit --undo --force` overrides conflict detection
   - Dry-run shows which files have conflicts
+  - `moss edit --goto <ref>` jumps to arbitrary commit in shadow history
+  - `moss edit --undo --file <path>` partial undo for specific file only
+  - `moss history --all` shows full tree structure with git graph
 - See `docs/design/shadow-git.md` for full design
 
 ### CLI

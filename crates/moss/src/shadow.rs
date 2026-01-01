@@ -356,6 +356,32 @@ impl Shadow {
         }
     }
 
+    /// Get tree view of shadow history (shows all branches with graph).
+    pub fn tree(&self, limit: usize) -> Option<String> {
+        if !self.exists() {
+            return None;
+        }
+
+        let output = Command::new("git")
+            .args([
+                "log",
+                "--graph",
+                "--all",
+                "--oneline",
+                "--decorate",
+                &format!("-{}", limit),
+            ])
+            .current_dir(&self.worktree)
+            .output()
+            .ok()?;
+
+        if output.status.success() {
+            Some(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            None
+        }
+    }
+
     /// Get current checkpoint (last git commit in real repo when shadow was updated).
     pub fn checkpoint(&self) -> Option<String> {
         self.history(None, 1)
@@ -387,11 +413,13 @@ impl Shadow {
     /// Undo the most recent edit (or specified number of edits).
     /// Returns information about what was undone.
     ///
+    /// If `file_filter` is Some, only undo changes to files matching that path.
     /// If `force` is false, checks for external modifications first and fails
     /// if any files have been modified outside of moss.
     pub fn undo(
         &self,
         count: usize,
+        file_filter: Option<&str>,
         dry_run: bool,
         force: bool,
     ) -> Result<Vec<UndoResult>, ShadowError> {
@@ -402,6 +430,22 @@ impl Shadow {
         let entries = self.history(None, count);
         if entries.is_empty() {
             return Err(ShadowError::Undo("No edits to undo".to_string()));
+        }
+
+        // Filter entries to only those affecting the specified file
+        let entries: Vec<_> = if let Some(filter) = file_filter {
+            entries
+                .into_iter()
+                .filter(|e| e.files.iter().any(|f| f.contains(filter) || f == filter))
+                .collect()
+        } else {
+            entries
+        };
+
+        if entries.is_empty() {
+            return Err(ShadowError::Undo(
+                "No edits found matching the file filter".to_string(),
+            ));
         }
 
         // Check for external modifications unless force is set
@@ -419,11 +463,23 @@ impl Shadow {
         let mut results = Vec::new();
 
         for entry in entries.iter().take(count) {
+            // Filter files to only those matching the filter
+            let files_to_undo: Vec<_> = if let Some(filter) = file_filter {
+                entry
+                    .files
+                    .iter()
+                    .filter(|f| f.contains(filter) || *f == filter)
+                    .cloned()
+                    .collect()
+            } else {
+                entry.files.clone()
+            };
+
             if dry_run {
                 // Also report conflicts in dry-run mode
                 let conflicts = self.detect_conflicts(&[entry.clone()]);
                 results.push(UndoResult {
-                    files: entry.files.iter().map(PathBuf::from).collect(),
+                    files: files_to_undo.iter().map(PathBuf::from).collect(),
                     undone_commit: entry.hash.clone(),
                     description: format!("{}: {}", entry.operation, entry.target),
                     conflicts,
@@ -434,7 +490,7 @@ impl Shadow {
             // For each file in the commit, restore from the parent commit state
             let parent_ref = format!("{}^", entry.hash);
 
-            for file_path in &entry.files {
+            for file_path in &files_to_undo {
                 let worktree_file = self.worktree.join(file_path);
                 let actual_file = self.root.join(file_path);
 
@@ -482,7 +538,7 @@ impl Shadow {
                 entry.target,
                 entry.target,
                 entry.hash,
-                entry.files.join(", "),
+                files_to_undo.join(", "),
                 self.get_real_git_head().unwrap_or_else(|| "none".to_string())
             );
 
@@ -492,7 +548,7 @@ impl Shadow {
                 .status();
 
             results.push(UndoResult {
-                files: entry.files.iter().map(PathBuf::from).collect(),
+                files: files_to_undo.iter().map(PathBuf::from).collect(),
                 undone_commit: entry.hash.clone(),
                 description: format!("{}: {}", entry.operation, entry.target),
                 conflicts: vec![], // Already checked/forced above
@@ -652,6 +708,157 @@ impl Shadow {
             undone_commit: undone_hash.to_string(),
             description: format!("redo: {}", latest.target),
             conflicts: vec![], // Redo doesn't check for conflicts
+        })
+    }
+
+    /// Jump to a specific commit in shadow history, restoring file state from that point.
+    /// Can use full SHA, short SHA, or relative refs like HEAD~2.
+    pub fn goto(
+        &self,
+        ref_str: &str,
+        dry_run: bool,
+        force: bool,
+    ) -> Result<UndoResult, ShadowError> {
+        if !self.exists() {
+            return Err(ShadowError::Undo("No shadow history exists".to_string()));
+        }
+
+        // Resolve the ref to a full commit hash
+        let rev_parse = Command::new("git")
+            .args(["rev-parse", ref_str])
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Undo(format!("Failed to resolve ref: {}", e)))?;
+
+        if !rev_parse.status.success() {
+            return Err(ShadowError::Undo(format!(
+                "Invalid ref '{}': not found in shadow history",
+                ref_str
+            )));
+        }
+
+        let target_hash = String::from_utf8_lossy(&rev_parse.stdout)
+            .trim()
+            .to_string();
+
+        // Get files changed in the target commit
+        let files_output = Command::new("git")
+            .args(["show", "--format=", "--name-only", &target_hash])
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Undo(format!("Failed to get files: {}", e)))?;
+
+        let files: Vec<String> = String::from_utf8_lossy(&files_output.stdout)
+            .lines()
+            .filter(|l| !l.is_empty())
+            .map(String::from)
+            .collect();
+
+        // Get the commit message for description
+        let log_output = Command::new("git")
+            .args(["log", "-1", "--format=%s", &target_hash])
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Undo(format!("Failed to get log: {}", e)))?;
+
+        let description = String::from_utf8_lossy(&log_output.stdout)
+            .trim()
+            .to_string();
+
+        if dry_run {
+            return Ok(UndoResult {
+                files: files.iter().map(PathBuf::from).collect(),
+                undone_commit: target_hash,
+                description,
+                conflicts: vec![],
+            });
+        }
+
+        // Check for conflicts if not forcing
+        if !force {
+            // Create a fake HistoryEntry for conflict detection
+            let fake_entry = HistoryEntry {
+                id: 0,
+                hash: target_hash.clone(),
+                subject: description.clone(),
+                operation: "goto".to_string(),
+                target: ref_str.to_string(),
+                files: files.clone(),
+                message: None,
+                workflow: None,
+                git_head: String::new(),
+                timestamp: String::new(),
+            };
+            let conflicts = self.detect_conflicts(&[fake_entry]);
+            if !conflicts.is_empty() {
+                let files_str = conflicts.join(", ");
+                return Err(ShadowError::Undo(format!(
+                    "Files modified externally: {}. Use --force to override.",
+                    files_str
+                )));
+            }
+        }
+
+        // Restore files from target commit state
+        for file_path in &files {
+            let worktree_file = self.worktree.join(file_path);
+            let actual_file = self.root.join(file_path);
+
+            let show_output = Command::new("git")
+                .args(["show", &format!("{}:{}", target_hash, file_path)])
+                .current_dir(&self.worktree)
+                .output();
+
+            match show_output {
+                Ok(output) if output.status.success() => {
+                    if let Some(parent) = actual_file.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    std::fs::write(&actual_file, &output.stdout).map_err(|e| {
+                        ShadowError::Undo(format!("Failed to write {}: {}", file_path, e))
+                    })?;
+                    if let Some(parent) = worktree_file.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let _ = std::fs::write(&worktree_file, &output.stdout);
+                }
+                _ => {
+                    // File doesn't exist in target commit
+                    if actual_file.exists() {
+                        std::fs::remove_file(&actual_file).map_err(|e| {
+                            ShadowError::Undo(format!("Failed to delete {}: {}", file_path, e))
+                        })?;
+                    }
+                    let _ = std::fs::remove_file(&worktree_file);
+                }
+            }
+        }
+
+        // Stage and commit the goto
+        let _ = Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&self.worktree)
+            .status();
+
+        let goto_msg = format!(
+            "moss edit: goto {}\n\nOperation: goto\nTarget: {}\nGoto-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
+            ref_str,
+            ref_str,
+            target_hash,
+            files.join(", "),
+            self.get_real_git_head().unwrap_or_else(|| "none".to_string())
+        );
+
+        let _ = Command::new("git")
+            .args(["commit", "-m", &goto_msg, "--allow-empty"])
+            .current_dir(&self.worktree)
+            .status();
+
+        Ok(UndoResult {
+            files: files.iter().map(PathBuf::from).collect(),
+            undone_commit: target_hash,
+            description,
+            conflicts: vec![],
         })
     }
 }
