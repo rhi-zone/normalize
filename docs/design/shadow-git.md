@@ -33,6 +33,9 @@ moss edit --undo 3            # Revert last 3 edits, prints summary of each
 moss edit --redo              # Re-apply last undone edit
 moss edit --history           # Show recent moss edits
 moss edit --history src/foo.rs  # Show edits for specific file
+moss edit --history --json    # Machine-readable output (for LLM/scripting)
+moss edit --diff <ref>        # Show what a commit changed (without undoing)
+moss edit --diff 2            # Diff for commit 2
 ```
 
 Undo output includes:
@@ -192,11 +195,15 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - **Rationale**: Once user commits in real git, they've accepted those changes. Shadow serves the gap between edits and commits.
 - **Mechanics**:
   - Shadow records real git HEAD at each shadow commit (for context)
-  - When user runs `git commit`, shadow marks that point as a "checkpoint"
+  - On each `moss edit`, check if real git HEAD changed since last shadow commit → checkpoint
   - `--undo` by default won't cross checkpoint boundaries (user explicitly committed)
   - `--undo --cross-checkpoint` allows undoing past a real commit (with warning)
   - `moss edit --status` shows: shadow edits since last real commit
-- **Open question**: Should `git commit` automatically prune old shadow history? Or keep for archaeology?
+- **Git operations that change files** (`git reset`, `git checkout`, `git stash pop`):
+  - Detected on next `moss edit` via HEAD or file content mismatch
+  - Shadow re-syncs: records new file state as baseline, creates checkpoint
+  - Old shadow history preserved but marked as pre-divergence
+- **Open question**: Should old shadow history be auto-pruned after checkpoint? Or keep for archaeology?
 
 ### D6: Multiple worktrees
 - **Problem**: User may have multiple git worktrees of the same repo. Each worktree has its own file state.
@@ -212,6 +219,8 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] Commit file state before each edit
 - [ ] `--message`/`--reason` flag for edit descriptions
 - [ ] `--history` to list recent edits
+- [ ] `--history --json` for machine-readable output
+- [ ] `--diff <ref>` to view changes without undoing
 
 ### Phase 2: Undo/Redo + Git Integration
 - [ ] `--undo` applies reverse patch, moves HEAD backward, prints summary
@@ -246,6 +255,8 @@ Uses `git filter-branch` or similar under the hood. Important for:
 
 ## Example Session
 
+### Basic undo/redo
+
 ```bash
 $ moss edit src/foo.rs/old_fn delete --message "Cleanup"
 delete: old_fn in src/foo.rs
@@ -275,8 +286,30 @@ $ moss edit --history --all
   | 1. delete: old_fn in src/foo.rs "Cleanup"
   |/
   0. (initial state)
+```
 
-$ moss edit --redo
-error: No forward history from current position.
-hint: Use --history --all to see other branches.
+### Checkpoint behavior (real git integration)
+
+```bash
+$ moss edit src/foo.rs/bar delete
+delete: bar in src/foo.rs
+
+$ git add -A && git commit -m "Remove bar"
+[main abc123] Remove bar
+
+$ moss edit src/foo.rs/baz delete
+delete: baz in src/foo.rs
+(checkpoint: git commit abc123)
+
+$ moss edit --undo
+Undoing: delete baz in src/foo.rs
+Files restored: src/foo.rs
+
+$ moss edit --undo
+error: Cannot undo past checkpoint (git commit abc123).
+hint: Use --undo --cross-checkpoint to undo past real git commits.
+
+$ moss edit --status
+Shadow edits since last commit: 0
+Last checkpoint: abc123 "Remove bar"
 ```
