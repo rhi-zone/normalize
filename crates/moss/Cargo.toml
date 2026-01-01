@@ -41,6 +41,7 @@ moss-languages = { path = "../moss-languages" }
 moss-jsonschema = { path = "../moss-jsonschema" }
 moss-openapi = { path = "../moss-openapi" }
 moss-packages = { path = "../moss-packages" }
+moss-sessions = { path = "../moss-sessions" }
 moss-tools = { path = "../moss-tools" }
 grep-matcher.workspace = true
 grep-regex.workspace = true

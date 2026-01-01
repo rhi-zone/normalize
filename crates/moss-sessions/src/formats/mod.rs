@@ -10,7 +10,7 @@ pub use claude_code::ClaudeCodeFormat;
 pub use gemini_cli::GeminiCliFormat;
 pub use moss::MossFormat;
 
-use crate::sessions::SessionAnalysis;
+use crate::SessionAnalysis;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;

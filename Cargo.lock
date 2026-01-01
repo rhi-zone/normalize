@@ -2825,6 +2825,7 @@ dependencies = [
  "moss-languages",
  "moss-openapi",
  "moss-packages",
+ "moss-sessions",
  "moss-tools",
  "notify",
  "nu-ansi-term",
@@ -3001,6 +3002,15 @@ dependencies = [
  "serde_yaml",
  "toml",
  "ureq",
+]
+
+[[package]]
+name = "moss-sessions"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

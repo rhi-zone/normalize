@@ -1,7 +1,7 @@
 //! Moss internal session JSON format parser.
 
 use super::{read_file, LogFormat};
-use crate::sessions::{SessionAnalysis, TokenStats, ToolStats};
+use crate::{SessionAnalysis, TokenStats, ToolStats};
 use serde_json::Value;
 use std::path::Path;
 

@@ -1,7 +1,7 @@
 //! Claude Code JSONL format parser.
 
 use super::{peek_lines, LogFormat};
-use crate::sessions::{
+use crate::{
     categorize_error, normalize_path, ErrorPattern, SessionAnalysis, TokenStats, ToolStats,
 };
 use serde_json::Value;
