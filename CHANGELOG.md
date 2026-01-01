@@ -4,6 +4,19 @@
 
 See `docs/` for design docs and `README.md` for usage.
 
+### Shadow Git (Phase 1)
+- Auto-track edits made via `moss edit` for undo/redo capability
+- Shadow repo created on first edit at `.moss/shadow/`
+- `--message`/`--reason` flag on edit command for edit descriptions
+- `moss history` command for viewing edit history
+  - File filtering: `moss history src/foo.rs`
+  - `--json` for machine-readable output
+  - `--diff <ref>` to view changes for specific commit
+  - `--status` for edits since last git checkpoint
+  - `--limit/-n` for controlling output count
+- `[shadow]` config section: `enabled`, `warn_on_delete`
+- See `docs/design/shadow-git.md` for full design
+
 ### CLI
 - Colorized `--help` output when colors enabled (respects --pretty, --compact, NO_COLOR, config)
 
