@@ -242,6 +242,17 @@ Maximize useful work per token. Minimize friction in the creative flow:
 - **Usefulness per token**: Avoid busywork. Every action should move toward the goal
 - **Future goal**: Diff-based editing to avoid sending unchanged code
 
+### Non-Interactive Fallbacks
+
+Every interactive feature must have a non-interactive equivalent. LLMs cannot respond to prompts, and scripts need deterministic behavior.
+
+- Interactive prompts → flags that specify the choice upfront
+- `--hunk` (interactive selection) → `--hunk-id h1,h3` or `--lines 10-25`
+- Confirmation prompts → `--yes` / `--no` flags
+- Prompts with defaults → flags that match default behavior (`--all-worktrees` vs `--local`)
+
+This isn't just about LLMs—it's about scriptability, CI/CD, and reproducibility. If a human can do it interactively, automation should be able to do it non-interactively.
+
 ### UX Principles
 
 - **No modals** - Everything inline, no popups blocking context
