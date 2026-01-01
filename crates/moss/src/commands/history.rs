@@ -29,6 +29,10 @@ pub struct HistoryArgs {
     /// Maximum number of entries to show
     #[arg(short = 'n', long, default_value = "20")]
     pub limit: usize,
+
+    /// Prune shadow history, keeping only the last N commits
+    #[arg(long, value_name = "KEEP")]
+    pub prune: Option<usize>,
 }
 
 /// Run history command.
@@ -68,6 +72,11 @@ pub fn run(args: HistoryArgs, format: crate::output::OutputFormat) -> i32 {
     // Handle --all (tree view)
     if args.all {
         return cmd_tree(&shadow, args.limit, format.is_json());
+    }
+
+    // Handle --prune
+    if let Some(keep) = args.prune {
+        return cmd_prune(&shadow, keep, format.is_json());
     }
 
     // Regular history listing
@@ -217,6 +226,48 @@ fn cmd_tree(shadow: &Shadow, limit: usize, json: bool) -> i32 {
         }
         None => {
             eprintln!("Could not get tree view");
+            1
+        }
+    }
+}
+
+/// Prune shadow history, keeping only the last N commits.
+fn cmd_prune(shadow: &Shadow, keep: usize, json: bool) -> i32 {
+    match shadow.prune(keep) {
+        Ok(pruned_count) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "pruned": pruned_count,
+                        "kept": keep
+                    })
+                );
+            } else {
+                if pruned_count > 0 {
+                    println!(
+                        "Pruned {} commit{}, keeping last {}",
+                        pruned_count,
+                        if pruned_count == 1 { "" } else { "s" },
+                        keep
+                    );
+                } else {
+                    println!("Nothing to prune (only {} commits in history)", keep);
+                }
+            }
+            0
+        }
+        Err(e) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "error": e.to_string()
+                    })
+                );
+            } else {
+                eprintln!("Prune failed: {}", e);
+            }
             1
         }
     }

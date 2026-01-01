@@ -199,16 +199,7 @@ Git stores the diff separately. Timestamp comes from git commit metadata. `Git-H
 
 Git's patch APIs enable fine-grained undo:
 - `--undo` reverts entire commit (all files, all changes)
-- `--undo --file src/foo.rs` reverts only that file
-- `--undo --hunk` interactive hunk selection (like `git checkout -p`)
-- `--undo --lines 10-25 src/foo.rs` non-interactive, reverts changes in line range
-
-Non-interactive hunk selection (for LLM/scripted usage):
-```bash
-moss history --show-hunks <ref>        # List hunks with IDs
-moss edit --undo --hunk-id h1,h3       # Undo specific hunks by ID
-moss edit --undo --lines 10-25 foo.rs  # Undo changes touching these lines
-```
+- `--undo --file src/foo.rs` reverts only that file from the commit
 
 Each partial undo creates a new shadow commit with just those reversals.
 
@@ -216,7 +207,7 @@ Each partial undo creates a new shadow commit with just those reversals.
 
 Some operations may touch multiple files (future: cross-file refactors like `moss move`):
 - Shadow commit is atomic: all files in one commit
-- Partial undo (file or hunk level) available via flags above
+- Partial undo (file level) available via `--file` flag
 - `--history src/foo.rs` filters to show only commits affecting that file
 
 ### Branch Pruning (Security)
@@ -289,24 +280,21 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] `moss history --diff <ref>` to view changes
 
 ### Phase 2: Undo/Redo + Git Integration
-- [ ] `moss edit --undo` applies reverse patch, moves HEAD backward
-- [ ] `moss edit --undo N` reverts N edits in sequence
-- [ ] `moss edit --undo --dry-run` preview without applying
-- [ ] `moss edit --undo --file` partial undo for specific file
-- [ ] `moss edit --undo --hunk` interactive hunk-level undo
-- [ ] `moss history --show-hunks <ref>` and `moss edit --undo --hunk-id` for non-interactive
-- [ ] `moss edit --undo --lines` for line-range based undo
-- [ ] `moss edit --redo` moves HEAD forward
-- [ ] `moss edit --goto <ref>` jumps to arbitrary commit
-- [ ] Conflict detection and `--force-undo` for external modifications
-- [ ] `moss history --all` shows full tree structure
-- [ ] `moss history <file>` filters to commits affecting that file
-- [ ] `moss history --status` shows uncommitted shadow edits
+- [x] `moss edit --undo` applies reverse patch, moves HEAD backward
+- [x] `moss edit --undo N` reverts N edits in sequence
+- [x] `moss edit --undo --dry-run` preview without applying
+- [x] `moss edit --undo --file` partial undo for specific file
+- [x] `moss edit --redo` moves HEAD forward
+- [x] `moss edit --goto <ref>` jumps to arbitrary commit
+- [x] Conflict detection and `--force` for external modifications
+- [x] `moss history --all` shows full tree structure
+- [x] `moss history <file>` filters to commits affecting that file
+- [x] `moss history --status` shows uncommitted shadow edits
 - [ ] Checkpoint integration: record real git HEAD, respect commit boundaries
 
 ### Phase 3: Security + Polish
-- [ ] `--prune` for removing commits/branches
-- [ ] `warn_on_delete` confirmation
+- [x] `moss history --prune N` for removing old commits (keep last N)
+- [x] `warn_on_delete` confirmation in config (requires --yes/-y)
 
 ## Risks
 

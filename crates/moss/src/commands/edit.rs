@@ -106,6 +106,7 @@ pub fn cmd_edit(
     action: EditAction,
     root: Option<&Path>,
     dry_run: bool,
+    yes: bool,
     json: bool,
     exclude: &[String],
     only: &[String],
@@ -119,6 +120,25 @@ pub fn cmd_edit(
     // Load config for shadow git setting
     let config = MossConfig::load(&root);
     let shadow_enabled = config.shadow.enabled();
+
+    // Check for delete confirmation if warn_on_delete is enabled
+    if matches!(action, EditAction::Delete) && !yes && !dry_run {
+        if config.shadow.warn_on_delete.unwrap_or(true) {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "error": "Delete requires confirmation",
+                        "hint": "Use --yes or -y to confirm deletion, or set [shadow] warn_on_delete = false"
+                    })
+                );
+            } else {
+                eprintln!("Delete requires confirmation. Use --yes or -y to confirm.");
+                eprintln!("To disable this warning: set [shadow] warn_on_delete = false in config");
+            }
+            return 1;
+        }
+    }
 
     // Ensure daemon is running if configured (will pick up edits)
     daemon::maybe_start_daemon(&root);

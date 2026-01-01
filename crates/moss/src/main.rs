@@ -91,6 +91,10 @@ enum Commands {
         /// Undo changes only for specific file(s) (used with --undo)
         #[arg(long = "file", value_name = "PATH")]
         undo_file: Option<String>,
+
+        /// Confirm destructive operations (delete) without prompting
+        #[arg(short = 'y', long)]
+        yes: bool,
     },
 
     /// View shadow git edit history
@@ -464,6 +468,7 @@ fn main() {
             force,
             goto,
             undo_file,
+            yes,
         } => {
             // Handle undo/redo/goto operations
             if undo.is_some() || redo || goto.is_some() {
@@ -487,6 +492,7 @@ fn main() {
                     action,
                     root.as_deref(),
                     dry_run,
+                    yes,
                     cli.json,
                     &exclude,
                     &only,

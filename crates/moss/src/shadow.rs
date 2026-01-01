@@ -410,6 +410,82 @@ impl Shadow {
         }
     }
 
+    /// Prune shadow history, keeping only the last N commits.
+    /// Returns the number of commits pruned.
+    pub fn prune(&self, keep: usize) -> Result<usize, ShadowError> {
+        if !self.exists() {
+            return Err(ShadowError::Init("No shadow history exists".to_string()));
+        }
+
+        let total = self.edit_count();
+        if total <= keep {
+            return Ok(0);
+        }
+
+        let to_prune = total - keep;
+
+        // Find the commit that will become the new root (the `keep`th commit from HEAD)
+        let new_root_output = Command::new("git")
+            .args(["rev-parse", &format!("HEAD~{}", keep - 1)])
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Init(format!("Failed to find root commit: {}", e)))?;
+
+        if !new_root_output.status.success() {
+            return Err(ShadowError::Init(
+                "Failed to find commit to keep".to_string(),
+            ));
+        }
+
+        let new_root = String::from_utf8_lossy(&new_root_output.stdout)
+            .trim()
+            .to_string();
+
+        // Create a graft to make the new root appear as an initial commit
+        let _ = Command::new("git")
+            .args(["replace", "--graft", &new_root])
+            .current_dir(&self.worktree)
+            .output();
+
+        // Use filter-branch to bake in the graft (rewrite history)
+        let filter_result = Command::new("git")
+            .args(["filter-branch", "--force", "--", "--all"])
+            .current_dir(&self.worktree)
+            .output();
+
+        if let Err(e) = filter_result {
+            return Err(ShadowError::Init(format!("Filter-branch failed: {}", e)));
+        }
+
+        // Clean up refs created by filter-branch
+        let _ = Command::new("git")
+            .args(["for-each-ref", "--format=%(refname)", "refs/original/"])
+            .current_dir(&self.worktree)
+            .output()
+            .map(|out| {
+                for refname in String::from_utf8_lossy(&out.stdout).lines() {
+                    let _ = Command::new("git")
+                        .args(["update-ref", "-d", refname])
+                        .current_dir(&self.worktree)
+                        .output();
+                }
+            });
+
+        // Remove the replacement ref
+        let _ = Command::new("git")
+            .args(["replace", "-d", &new_root])
+            .current_dir(&self.worktree)
+            .output();
+
+        // Run gc to actually free space
+        let _ = Command::new("git")
+            .args(["gc", "--prune=now", "--aggressive"])
+            .current_dir(&self.worktree)
+            .output();
+
+        Ok(to_prune)
+    }
+
     /// Undo the most recent edit (or specified number of edits).
     /// Returns information about what was undone.
     ///
