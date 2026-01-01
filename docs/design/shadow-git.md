@@ -14,6 +14,7 @@ Maintain a hidden git repository (`.moss/shadow/`) that automatically commits af
 
 ### Automatic Tracking
 - Every `moss edit` operation creates a shadow commit
+- Workflow-driven edits (`moss @workflow`) also tracked, with workflow name as context
 - Commit message includes: operation, target, timestamp, optional user message
 - Only tracks files modified by moss, not external changes
 
@@ -92,8 +93,6 @@ moss edit --goto 2            # Go to commit 2 (by number from --history)
       refs/
         heads/
           main                # Current position in edit tree
-        files/                # Per-file branch heads (Phase 2)
-          src%2Ffoo.rs        # HEAD for src/foo.rs edits (URL-encoded path)
     worktree/                 # Working copy of tracked files
 ```
 
@@ -103,7 +102,7 @@ The shadow repo tracks files in a separate worktree, not the user's actual files
 3. Copy new file state to worktree (captures "after")
 4. Commit the change
 
-**Initial state**: The shadow repo is created on first `moss edit`. The "initial state" commit (commit 0) contains the file's state before that first edit. Files not yet edited have no shadow history.
+**Initialization**: Shadow git is created by `moss init` (if `[shadow] enabled = true`, which is the default). The init output explicitly states that shadow git is now active. The "initial state" commit (commit 0) is created on first `moss edit`, containing the file's state before that edit.
 
 ### Shadow Commit Format
 
@@ -115,18 +114,29 @@ Message: Removing deprecated function
 Operation: delete
 Target: src/foo.rs/deprecated_fn
 Files: src/foo.rs
+Git-HEAD: abc123
 ```
 
-Git stores the diff separately. Timestamp comes from git commit metadata.
+For workflow-driven edits:
+```
+moss edit: insert src/foo.rs/new_handler
+
+Workflow: @api-scaffold
+Operation: insert
+Target: src/foo.rs/new_handler
+Files: src/foo.rs
+Git-HEAD: abc123
+```
+
+Git stores the diff separately. Timestamp comes from git commit metadata. `Git-HEAD` records the real git commit at time of edit (for checkpoint detection).
 
 ### Multi-File Edits
 
 Some operations may touch multiple files (future: cross-file refactors like `moss move`):
 - Shadow commit is atomic: all files in one commit
-- Undo reverts all files atomically
-- Per-file history (Phase 2) tracks each file's HEAD independently
-  - `--history src/foo.rs` shows only commits affecting that file
-  - `--undo --file src/foo.rs` reverts only that file's changes (creates partial undo commit)
+- `--undo` reverts all files in the commit atomically
+- `--undo --file src/foo.rs` reverts only that file (creates new commit with partial reverse patch)
+- `--history src/foo.rs` filters to show only commits affecting that file
 
 ### Branch Pruning (Security)
 
@@ -148,10 +158,10 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - **Rationale**: Undo shouldn't destroy information; users might want to return to undone state
 - **Trade-off**: More disk usage, but git handles this well
 
-### D2: Per-file history (Phase 2)
-- **Decision**: Add per-file branches immediately after basic implementation
-- **Rationale**: Users often want to undo edits to specific files without affecting others
-- **Implementation**: `refs/files/<path>` tracks per-file HEAD
+### D2: Per-file filtering (not branches)
+- **Decision**: Single unified timeline, with per-file filtering via `--history <file>`
+- **Rationale**: Per-file branches create confusing parallel timelines. One chronological history is simpler.
+- **Implementation**: `--history src/foo.rs` filters to commits affecting that file, but all commits share one timeline
 
 ### D3: Storage format
 - **Decision**: Use git
@@ -162,8 +172,22 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - **Rationale**: Shadow tracks moss edits, not manual edits; patch may fail if file diverged
 
 ### D5: Relationship to real git
-- **Decision**: Fully independent
-- **Rationale**: Shadow is for "oops" recovery, not version control; don't interfere with user's git workflow
+- **Decision**: Real git is source of truth; shadow tracks uncommitted moss edits
+- **Rationale**: Once user commits in real git, they've accepted those changes. Shadow serves the gap between edits and commits.
+- **Mechanics**:
+  - Shadow records real git HEAD at each shadow commit (for context)
+  - When user runs `git commit`, shadow marks that point as a "checkpoint"
+  - `--undo` by default won't cross checkpoint boundaries (user explicitly committed)
+  - `--undo --cross-checkpoint` allows undoing past a real commit (with warning)
+  - `moss edit --status` shows: shadow edits since last real commit
+- **Open question**: Should `git commit` automatically prune old shadow history? Or keep for archaeology?
+
+### D6: Multiple worktrees
+- **Problem**: User may have multiple git worktrees of the same repo. Each worktree has its own file state.
+- **Decision**: Each worktree gets its own shadow repo (`.moss/shadow/` is per-worktree)
+- **Rationale**: Shadow tracks file state, which differs per worktree. Sharing would cause conflicts.
+- **Implementation**: Shadow repo path includes worktree identifier if in a linked worktree
+- **Open question**: Should shadow repos share any state? (e.g., pruning decisions, retention policy)
 
 ## Implementation Plan
 
@@ -173,14 +197,16 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] `--message`/`--reason` flag for edit descriptions
 - [ ] `--history` to list recent edits
 
-### Phase 2: Undo/Redo + Per-File
+### Phase 2: Undo/Redo + Git Integration
 - [ ] `--undo` applies reverse patch, moves HEAD backward, prints summary
 - [ ] `--undo N` reverts N edits in sequence
 - [ ] `--redo` moves HEAD forward, applies patch (error if at branch point)
 - [ ] `--goto <ref>` jumps to arbitrary commit
 - [ ] Conflict detection and `--force-undo` for external modifications
 - [ ] `--history --all` shows full tree structure
-- [ ] Per-file branches (`refs/files/<path>`) and `--history <file>`
+- [ ] `--history <file>` filters to commits affecting that file
+- [ ] Checkpoint integration: record real git HEAD, respect commit boundaries
+- [ ] `--status` shows uncommitted shadow edits
 
 ### Phase 3: Security + Polish
 - [ ] `--prune` for removing commits/branches
