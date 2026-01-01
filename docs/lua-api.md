@@ -63,6 +63,25 @@ Hunk structure: `{id, file, old_start, old_lines, new_start, new_lines, header, 
 
 Tree userdata has `:root()` method returning a node. Nodes have: `:kind()`, `:text()`, `:start_row()`, `:end_row()`, `:child_count()`, `:child(i)`, `:children()`.
 
+## LLM
+
+Requires `--features llm` build.
+
+| Function | Description |
+|----------|-------------|
+| `llm.complete(provider?, model?, system?, prompt)` | Generate LLM completion |
+
+Arguments:
+- `provider`: "anthropic", "openai", "gemini", etc. Default: "anthropic"
+- `model`: Model name, or nil for provider default
+- `system`: System prompt, or nil
+- `prompt`: User prompt (required)
+
+Example:
+```lua
+local response = llm.complete(nil, nil, "You are helpful.", "What is 2+2?")
+```
+
 ## Agent
 
 | Function | Description |

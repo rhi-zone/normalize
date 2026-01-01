@@ -164,6 +164,7 @@ impl LuaRuntime {
 
             Self::register_commands(&lua, &globals)?;
             Self::register_helpers(&lua, &globals, &root)?;
+            Self::register_llm(&lua, &globals)?;
             Self::register_drivers(&lua, &globals, &root)?;
             Self::register_shadow(&lua, &globals, &root)?;
             Self::register_memory(&lua, &globals, &root)?;
@@ -483,8 +484,52 @@ impl LuaRuntime {
         Ok(())
     }
 
+    fn register_llm(lua: &Lua, globals: &Table) -> LuaResult<()> {
+        let llm_table = lua.create_table()?;
+
+        #[cfg(feature = "llm")]
+        {
+            use super::llm::LlmClient;
+
+            llm_table.set(
+                "complete",
+                lua.create_function(
+                    |_,
+                     (provider, model, system, prompt): (
+                        Option<String>,
+                        Option<String>,
+                        Option<String>,
+                        String,
+                    )| {
+                        let provider_str = provider.as_deref().unwrap_or("anthropic");
+                        let client = LlmClient::new(provider_str, model.as_deref())
+                            .map_err(mlua::Error::external)?;
+                        client
+                            .complete(system.as_deref(), &prompt)
+                            .map_err(mlua::Error::external)
+                    },
+                )?,
+            )?;
+        }
+
+        #[cfg(not(feature = "llm"))]
+        {
+            llm_table.set(
+                "complete",
+                lua.create_function(|_, _: (Option<String>, Option<String>, Option<String>, String)| {
+                    Err::<String, _>(mlua::Error::external(
+                        "llm.complete requires the 'llm' feature. Rebuild with: cargo build --features llm",
+                    ))
+                })?,
+            )?;
+        }
+
+        globals.set("llm", llm_table)?;
+        Ok(())
+    }
+
     fn register_drivers(lua: &Lua, globals: &Table, root: &Path) -> LuaResult<()> {
-        // auto { model = "...", prompt = "..." } -> CommandResult
+        // auto { model = "...", prompt = "..." } -> CommandResult (deprecated, use agent.lua)
         #[cfg(feature = "llm")]
         {
             let root_path = root.to_path_buf();
