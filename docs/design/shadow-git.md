@@ -79,9 +79,7 @@ JSON output example (`moss history --json`):
       "message": null,
       "workflow": null,
       "git_head": "abc123",
-      "timestamp": "2025-01-15T10:30:00Z",
-      "parent": 0,
-      "children": []
+      "timestamp": "2025-01-15T10:30:00Z"
     },
     {
       "id": 2,
@@ -91,13 +89,13 @@ JSON output example (`moss history --json`):
       "message": null,
       "workflow": null,
       "git_head": "def456",
-      "timestamp": "2025-01-15T10:25:00Z",
-      "parent": 1,
-      "children": []
+      "timestamp": "2025-01-15T10:25:00Z"
     }
   ]
 }
 ```
+
+Flat structure for script/CI use. Tree structure (branches) visible via `moss history --all` text output; reconstruct from edit order if needed programmatically.
 
 Note: `moss history` is the primary interface for shadow git. Mutations (`--undo`, `--redo`, `--goto`) work on both `moss history` and `moss edit` for convenience.
 
@@ -110,9 +108,10 @@ Undo output includes:
 ```toml
 [shadow]
 enabled = true                # Default: true
-retention_days = 30           # Auto-cleanup old commits
 warn_on_delete = true         # Confirm before deleting symbols
 ```
+
+Note: No automatic retention/cleanup. History is permanent unless explicitly pruned. Setting `enabled = false` stops new tracking but preserves existing shadow history.
 
 ## Architecture
 
@@ -168,7 +167,7 @@ The shadow repo tracks files in a separate worktree, not the user's actual files
 3. Copy new file state to worktree (captures "after")
 4. Commit the change
 
-**Initialization**: Shadow git is created by `moss init` (if `[shadow] enabled = true`, which is the default). The init output explicitly states that shadow git is now active. The "initial state" commit (commit 0) is created on first `moss edit`, containing the file's state before that edit.
+**Initialization**: Shadow git is created on first `moss edit` (if `[shadow] enabled = true`, which is the default). The "initial state" commit (commit 0) captures the file's state before that edit. No shadow repo exists until edits are made.
 
 ### Shadow Commit Format
 
@@ -206,7 +205,7 @@ Git's patch APIs enable fine-grained undo:
 
 Non-interactive hunk selection (for LLM/scripted usage):
 ```bash
-moss edit --show-hunks <ref>           # List hunks with IDs
+moss history --show-hunks <ref>        # List hunks with IDs
 moss edit --undo --hunk-id h1,h3       # Undo specific hunks by ID
 moss edit --undo --lines 10-25 foo.rs  # Undo changes touching these lines
 ```
@@ -295,7 +294,7 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] `moss edit --undo --dry-run` preview without applying
 - [ ] `moss edit --undo --file` partial undo for specific file
 - [ ] `moss edit --undo --hunk` interactive hunk-level undo
-- [ ] `moss history --show-hunks` and `moss edit --undo --hunk-id` for non-interactive
+- [ ] `moss history --show-hunks <ref>` and `moss edit --undo --hunk-id` for non-interactive
 - [ ] `moss edit --undo --lines` for line-range based undo
 - [ ] `moss edit --redo` moves HEAD forward
 - [ ] `moss edit --goto <ref>` jumps to arbitrary commit
@@ -307,13 +306,12 @@ Uses `git filter-branch` or similar under the hood. Important for:
 
 ### Phase 3: Security + Polish
 - [ ] `--prune` for removing commits/branches
-- [ ] Retention policy / auto-cleanup (only prunes merged branches)
 - [ ] `warn_on_delete` confirmation
 
 ## Risks
 
 1. **Disk usage**: Tree structure preserves everything
-   - Mitigation: Retention policy prunes old merged branches, `--prune` for manual cleanup, git gc
+   - Mitigation: `--prune` for manual cleanup, `git gc` compresses objects. Most edits are small diffs.
 
 2. **Performance**: Git operations add latency
    - Mitigation: Commits are small; consider async commits for non-blocking edits
