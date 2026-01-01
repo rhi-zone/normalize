@@ -47,6 +47,8 @@ See `docs/` for design docs and `README.md` for usage.
 - Signature highlighting fix: Lua, Ruby, Elixir signatures now highlight correctly
   - Added `Language::signature_suffix()` trait method for language-specific closing tokens
   - Replaces hardcoded Rust special case with proper trait-based solution
+- Glob pattern support for symbols: `moss view "file.rs/Symbol*"`
+- Split view.rs into submodules (search, tree, file, symbol, lines)
 
 ### Edit Command
 - Glob pattern support for multi-symbol operations: `moss edit "file.py/foo*" delete --multiple`
@@ -56,6 +58,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Supports all operations except `swap`: delete, replace, insert, move, copy
   - Preserves original file order when moving/copying multiple symbols
   - `--dry-run` shows what would be changed; `--json` for structured output
+- Unified glob symbol resolution with view command via shared `path_resolve` module
 
 ### Lua Script Libraries
 
