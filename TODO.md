@@ -92,7 +92,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - [x] Fuzzy glob in paths: `moss edit "TODO.md/**/feature*" delete` for item matching
 
 ### Tooling
-- Unify glob symbol resolution: `view`, `edit`, `analyze` should share the same `path_resolve` plumbing for glob patterns
+- [x] Unify glob symbol resolution: `view`, `edit`, `analyze` should share the same `path_resolve` plumbing for glob patterns
 - Documentation freshness: tooling to keep docs in sync with code
   - For moss itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
   - For user projects: detect stale docs in fresh projects (full moss assistance) and legacy codebases (missing/outdated docs)
@@ -150,7 +150,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
 ### Vision (Aspirational)
-- Shadow Git: auto-track all edits made via `moss edit` / workflow edit tools
+- Shadow Git: auto-track all edits made via `moss edit` / workflow edit tools (see `docs/design/shadow-git.md`)
   - `[shadow]` config section (enabled, retention policy, deletion warnings)
   - `moss edit --undo`: undo last edit, prints what was undone
   - `moss edit --redo`: redo undone edit
