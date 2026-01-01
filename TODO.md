@@ -40,9 +40,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - JSON Schema for complex action parameters (currently string-only)
 
 ### View Command
-- [x] Smart Header: `--context` shows referenced types from same file (done)
-  - Future: cross-file type resolution via index
-  - Future: `--context` for line-based symbol lookup (file:line syntax)
+- [x] Smart Header: `--context` shows referenced types (done)
+  - Same-file and cross-file (via index) type lookup
+  - Works with symbol paths and line-based lookup
 - Review view.rs scope: 1990 lines doing search, tree, file, symbol, line-range viewing. Consider consolidating before splitting into submodules.
 
 ### Analyze Command

@@ -8,6 +8,8 @@ See `docs/` for design docs and `README.md` for usage.
 - Smart Header: `--context` flag shows referenced type definitions when viewing a symbol
   - Extracts type identifiers from symbol source using tree-sitter
   - Looks up types defined in the same file (struct, enum, type, trait, interface, class)
+  - Cross-file type resolution via index (shows file path for external types)
+  - Works with both symbol paths (`file.rs/Symbol`) and line-based lookup (`file.rs:123`)
   - Shows signature and line number for each referenced type
 
 ### Shadow Git (Phase 1)

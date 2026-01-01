@@ -51,7 +51,7 @@ pub fn cmd_view_symbol_at_line(
     depth: i32,
     show_docs: bool,
     show_parent: bool,
-    _context: bool, // TODO: implement context display for line-based symbol lookup
+    context: bool,
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -166,6 +166,27 @@ pub fn cmd_view_symbol_at_line(
         let lines = tree::format_view_node(&view_node, &format_options);
         for line in lines {
             println!("{}", line);
+        }
+
+        // Show referenced type definitions when --context is used
+        if context {
+            if let Some(ref g) = grammar {
+                // Extract source for the symbol
+                let file_lines: Vec<&str> = content.lines().collect();
+                let start = sym.start_line.saturating_sub(1);
+                let end = sym.end_line.min(file_lines.len());
+                let source = file_lines[start..end].join("\n");
+
+                display_referenced_types(
+                    &source,
+                    g,
+                    &skeleton_result.symbols,
+                    &sym.name,
+                    use_colors,
+                    root,
+                    &resolved.file_path,
+                );
+            }
         }
     }
     0
@@ -441,7 +462,15 @@ pub fn cmd_view_symbol(
             // Show referenced type definitions when --context is used
             if context {
                 if let (Some(ref sr), Some(ref g)) = (&skeleton_result, &grammar) {
-                    display_referenced_types(&source, g, &sr.symbols, symbol_name, use_colors);
+                    display_referenced_types(
+                        &source,
+                        g,
+                        &sr.symbols,
+                        symbol_name,
+                        use_colors,
+                        root,
+                        file_path,
+                    );
                 }
             }
         }
@@ -511,6 +540,8 @@ pub fn cmd_view_symbol(
                                 &skeleton_result.symbols,
                                 symbol_name,
                                 use_colors,
+                                root,
+                                file_path,
                             );
                         }
                     }
@@ -715,13 +746,18 @@ fn find_type_definitions<'a>(
 }
 
 /// Display referenced type definitions for --context feature.
+/// Shows types from the same file first, then cross-file types via index.
 fn display_referenced_types(
     source: &str,
     grammar: &str,
     symbols: &[skeleton::SkeletonSymbol],
     symbol_name: &str,
     use_colors: bool,
+    root: &Path,
+    current_file: &str,
 ) {
+    use crate::index::FileIndex;
+
     let type_refs = extract_type_references(source, grammar);
 
     // Exclude the symbol itself from type references
@@ -732,19 +768,74 @@ fn display_referenced_types(
         return;
     }
 
-    let type_defs = find_type_definitions(symbols, &type_refs);
+    // Find types in same file
+    let local_type_defs = find_type_definitions(symbols, &type_refs);
+    let local_names: HashSet<String> = local_type_defs.iter().map(|s| s.name.clone()).collect();
 
-    if type_defs.is_empty() {
+    // Find remaining types not found locally via index
+    let remaining: HashSet<String> = type_refs.difference(&local_names).cloned().collect();
+
+    let mut external_types: Vec<(String, String, String, usize)> = Vec::new(); // (name, file, signature, line)
+
+    if !remaining.is_empty() {
+        if let Some(idx) = FileIndex::open_if_enabled(root) {
+            for type_name in &remaining {
+                if let Ok(matches) = idx.find_symbol(type_name) {
+                    // Find first match that's a type definition (not from current file)
+                    for (file, kind, start_line, _end_line) in matches {
+                        // Skip if from current file (already checked locally)
+                        if file == current_file {
+                            continue;
+                        }
+                        // Only include type-defining symbols
+                        if !["struct", "enum", "type", "trait", "interface", "class"]
+                            .contains(&kind.as_str())
+                        {
+                            continue;
+                        }
+                        // Fetch signature from file
+                        let full_path = root.join(&file);
+                        if let Ok(content) = std::fs::read_to_string(&full_path) {
+                            let extractor = skeleton::SkeletonExtractor::new();
+                            let result = extractor.extract(&full_path, &content);
+                            if let Some(sym) = find_symbol(&result.symbols, type_name) {
+                                external_types.push((
+                                    type_name.clone(),
+                                    file.clone(),
+                                    sym.signature.clone(),
+                                    start_line,
+                                ));
+                                break; // Found it, move to next type
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if local_type_defs.is_empty() && external_types.is_empty() {
         return;
     }
 
     println!();
     println!("// Referenced types:");
 
-    for sym in type_defs {
-        // Show signature only, not full source
+    // Show local types first
+    for sym in local_type_defs {
         let highlighted = tree::highlight_source(&sym.signature, grammar, use_colors);
         println!("//   {} (L{})", highlighted.trim(), sym.start_line);
+    }
+
+    // Show external types with file path
+    for (_name, file, signature, line) in external_types {
+        let file_grammar = support_for_path(Path::new(&file)).map(|s| s.grammar_name().to_string());
+        let highlighted = if let Some(ref g) = file_grammar {
+            tree::highlight_source(&signature, g, use_colors)
+        } else {
+            signature
+        };
+        println!("//   {} ({}:{})", highlighted.trim(), file, line);
     }
 }
 
