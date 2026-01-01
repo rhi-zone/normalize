@@ -53,55 +53,53 @@ impl Ecosystem for Python {
 
         // Try uv.lock (TOML format)
         let uv_lock = project_root.join("uv.lock");
-        if let Ok(content) = std::fs::read_to_string(&uv_lock) {
-            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
-                if let Some(packages) = parsed.get("package").and_then(|p| p.as_array()) {
-                    for pkg in packages {
-                        let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                        let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
-                        if name_normalized == normalized {
-                            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                                return Some(v.to_string());
-                            }
-                        }
-                    }
+        if let Ok(content) = std::fs::read_to_string(&uv_lock)
+            && let Ok(parsed) = toml::from_str::<toml::Value>(&content)
+            && let Some(packages) = parsed.get("package").and_then(|p| p.as_array())
+        {
+            for pkg in packages {
+                let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
+                if name_normalized == normalized
+                    && let Some(v) = pkg.get("version").and_then(|v| v.as_str())
+                {
+                    return Some(v.to_string());
                 }
             }
         }
 
         // Try poetry.lock (TOML format)
         let poetry_lock = project_root.join("poetry.lock");
-        if let Ok(content) = std::fs::read_to_string(&poetry_lock) {
-            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
-                if let Some(packages) = parsed.get("package").and_then(|p| p.as_array()) {
-                    for pkg in packages {
-                        let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                        let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
-                        if name_normalized == normalized {
-                            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                                return Some(v.to_string());
-                            }
-                        }
-                    }
+        if let Ok(content) = std::fs::read_to_string(&poetry_lock)
+            && let Ok(parsed) = toml::from_str::<toml::Value>(&content)
+            && let Some(packages) = parsed.get("package").and_then(|p| p.as_array())
+        {
+            for pkg in packages {
+                let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
+                if name_normalized == normalized
+                    && let Some(v) = pkg.get("version").and_then(|v| v.as_str())
+                {
+                    return Some(v.to_string());
                 }
             }
         }
 
         // Try Pipfile.lock (JSON format)
         let pipfile_lock = project_root.join("Pipfile.lock");
-        if let Ok(content) = std::fs::read_to_string(pipfile_lock) {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-                // Check default and develop sections
-                for section in ["default", "develop"] {
-                    if let Some(deps) = parsed.get(section).and_then(|s| s.as_object()) {
-                        for (name, info) in deps {
-                            let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
-                            if name_normalized == normalized {
-                                if let Some(v) = info.get("version").and_then(|v| v.as_str()) {
-                                    // Strip "==" prefix
-                                    return Some(v.strip_prefix("==").unwrap_or(v).to_string());
-                                }
-                            }
+        if let Ok(content) = std::fs::read_to_string(pipfile_lock)
+            && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
+        {
+            // Check default and develop sections
+            for section in ["default", "develop"] {
+                if let Some(deps) = parsed.get(section).and_then(|s| s.as_object()) {
+                    for (name, info) in deps {
+                        let name_normalized = name.to_lowercase().replace(['-', '.'], "_");
+                        if name_normalized == normalized
+                            && let Some(v) = info.get("version").and_then(|v| v.as_str())
+                        {
+                            // Strip "==" prefix
+                            return Some(v.strip_prefix("==").unwrap_or(v).to_string());
                         }
                     }
                 }
@@ -117,69 +115,65 @@ impl Ecosystem for Python {
     ) -> Result<Vec<crate::Dependency>, PackageError> {
         // Try pyproject.toml first
         let pyproject = project_root.join("pyproject.toml");
-        if let Ok(content) = std::fs::read_to_string(&pyproject) {
-            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
-                let mut deps = Vec::new();
+        if let Ok(content) = std::fs::read_to_string(&pyproject)
+            && let Ok(parsed) = toml::from_str::<toml::Value>(&content)
+        {
+            let mut deps = Vec::new();
 
-                // PEP 621: [project.dependencies]
-                if let Some(project) = parsed.get("project") {
-                    if let Some(dependencies) =
-                        project.get("dependencies").and_then(|d| d.as_array())
-                    {
-                        for dep in dependencies {
-                            if let Some(req) = dep.as_str().and_then(|s| parse_requirement(s)) {
-                                deps.push(req);
-                            }
+            // PEP 621: [project.dependencies]
+            if let Some(project) = parsed.get("project") {
+                if let Some(dependencies) = project.get("dependencies").and_then(|d| d.as_array()) {
+                    for dep in dependencies {
+                        if let Some(req) = dep.as_str().and_then(|s| parse_requirement(s)) {
+                            deps.push(req);
                         }
                     }
-                    // Optional dependencies
-                    if let Some(optional) = project
-                        .get("optional-dependencies")
-                        .and_then(|o| o.as_table())
-                    {
-                        for (_group, group_deps) in optional {
-                            if let Some(arr) = group_deps.as_array() {
-                                for dep in arr {
-                                    if let Some(mut req) =
-                                        dep.as_str().and_then(|s| parse_requirement(s))
-                                    {
-                                        req.optional = true;
-                                        deps.push(req);
-                                    }
+                }
+                // Optional dependencies
+                if let Some(optional) = project
+                    .get("optional-dependencies")
+                    .and_then(|o| o.as_table())
+                {
+                    for (_group, group_deps) in optional {
+                        if let Some(arr) = group_deps.as_array() {
+                            for dep in arr {
+                                if let Some(mut req) =
+                                    dep.as_str().and_then(|s| parse_requirement(s))
+                                {
+                                    req.optional = true;
+                                    deps.push(req);
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                // Poetry: [tool.poetry.dependencies]
-                if let Some(poetry) = parsed.get("tool").and_then(|t| t.get("poetry")) {
-                    if let Some(dependencies) =
-                        poetry.get("dependencies").and_then(|d| d.as_table())
-                    {
-                        for (name, value) in dependencies {
-                            if name == "python" {
-                                continue;
-                            }
-                            let version_req = match value {
-                                toml::Value::String(v) => Some(v.clone()),
-                                toml::Value::Table(t) => {
-                                    t.get("version").and_then(|v| v.as_str()).map(String::from)
-                                }
-                                _ => None,
-                            };
-                            deps.push(crate::Dependency {
-                                name: name.clone(),
-                                version_req,
-                                optional: false,
-                            });
-                        }
+            // Poetry: [tool.poetry.dependencies]
+            if let Some(poetry) = parsed.get("tool").and_then(|t| t.get("poetry"))
+                && let Some(dependencies) = poetry.get("dependencies").and_then(|d| d.as_table())
+            {
+                for (name, value) in dependencies {
+                    if name == "python" {
+                        continue;
                     }
+                    let version_req = match value {
+                        toml::Value::String(v) => Some(v.clone()),
+                        toml::Value::Table(t) => {
+                            t.get("version").and_then(|v| v.as_str()).map(String::from)
+                        }
+                        _ => None,
+                    };
+                    deps.push(crate::Dependency {
+                        name: name.clone(),
+                        version_req,
+                        optional: false,
+                    });
                 }
+            }
 
-                if !deps.is_empty() {
-                    return Ok(deps);
-                }
+            if !deps.is_empty() {
+                return Ok(deps);
             }
         }
 

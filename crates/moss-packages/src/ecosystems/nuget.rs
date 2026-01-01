@@ -42,10 +42,10 @@ impl Ecosystem for Nuget {
         // Check all target frameworks
         if let Some(deps) = parsed.get("dependencies").and_then(|d| d.as_object()) {
             for (_, framework_deps) in deps {
-                if let Some(pkg) = framework_deps.get(package) {
-                    if let Some(v) = pkg.get("resolved").and_then(|v| v.as_str()) {
-                        return Some(v.to_string());
-                    }
+                if let Some(pkg) = framework_deps.get(package)
+                    && let Some(v) = pkg.get("resolved").and_then(|v| v.as_str())
+                {
+                    return Some(v.to_string());
                 }
             }
         }
@@ -216,29 +216,29 @@ fn parse_nuspec(xml: &str, package: &str, version: &str) -> Result<PackageInfo, 
 
     // Parse dependencies
     let mut dependencies = Vec::new();
-    if let Some(deps_start) = xml.find("<dependencies>") {
-        if let Some(deps_end) = xml[deps_start..].find("</dependencies>") {
-            let deps_section = &xml[deps_start..deps_start + deps_end];
-            // Find all <dependency id="..." version="..." />
-            for dep_match in deps_section.split("<dependency") {
-                if let Some(id_start) = dep_match.find("id=\"") {
-                    let id_content = &dep_match[id_start + 4..];
-                    if let Some(id_end) = id_content.find('"') {
-                        let dep_name = id_content[..id_end].to_string();
-                        let version_req = if let Some(ver_start) = dep_match.find("version=\"") {
-                            let ver_content = &dep_match[ver_start + 9..];
-                            ver_content
-                                .find('"')
-                                .map(|end| ver_content[..end].to_string())
-                        } else {
-                            None
-                        };
-                        dependencies.push(Dependency {
-                            name: dep_name,
-                            version_req,
-                            optional: false,
-                        });
-                    }
+    if let Some(deps_start) = xml.find("<dependencies>")
+        && let Some(deps_end) = xml[deps_start..].find("</dependencies>")
+    {
+        let deps_section = &xml[deps_start..deps_start + deps_end];
+        // Find all <dependency id="..." version="..." />
+        for dep_match in deps_section.split("<dependency") {
+            if let Some(id_start) = dep_match.find("id=\"") {
+                let id_content = &dep_match[id_start + 4..];
+                if let Some(id_end) = id_content.find('"') {
+                    let dep_name = id_content[..id_end].to_string();
+                    let version_req = if let Some(ver_start) = dep_match.find("version=\"") {
+                        let ver_content = &dep_match[ver_start + 9..];
+                        ver_content
+                            .find('"')
+                            .map(|end| ver_content[..end].to_string())
+                    } else {
+                        None
+                    };
+                    dependencies.push(Dependency {
+                        name: dep_name,
+                        version_req,
+                        optional: false,
+                    });
                 }
             }
         }

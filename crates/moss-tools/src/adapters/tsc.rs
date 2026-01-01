@@ -115,47 +115,47 @@ fn parse_tsc_output(output: &str) -> Vec<Diagnostic> {
 
     for line in output.lines() {
         // Match pattern: file(line,col): severity TScode: message
-        if let Some((loc_part, rest)) = line.split_once("): ") {
-            if let Some((file, pos)) = loc_part.rsplit_once('(') {
-                let parts: Vec<&str> = pos.split(',').collect();
-                if parts.len() >= 2 {
-                    let line_num = parts[0].parse().unwrap_or(1);
-                    let col_num = parts[1].parse().unwrap_or(1);
+        if let Some((loc_part, rest)) = line.split_once("): ")
+            && let Some((file, pos)) = loc_part.rsplit_once('(')
+        {
+            let parts: Vec<&str> = pos.split(',').collect();
+            if parts.len() >= 2 {
+                let line_num = parts[0].parse().unwrap_or(1);
+                let col_num = parts[1].parse().unwrap_or(1);
 
-                    // Parse severity and code
-                    let (severity, code, message) =
-                        if let Some((sev_code, msg)) = rest.split_once(": ") {
-                            let (sev, code) = sev_code.split_once(' ').unwrap_or((sev_code, ""));
-                            let severity = match sev {
-                                "error" => DiagnosticSeverity::Error,
-                                "warning" => DiagnosticSeverity::Warning,
-                                _ => DiagnosticSeverity::Error,
-                            };
-                            (severity, code.to_string(), msg.to_string())
-                        } else {
-                            (
-                                DiagnosticSeverity::Error,
-                                "unknown".to_string(),
-                                rest.to_string(),
-                            )
-                        };
+                // Parse severity and code
+                let (severity, code, message) = if let Some((sev_code, msg)) = rest.split_once(": ")
+                {
+                    let (sev, code) = sev_code.split_once(' ').unwrap_or((sev_code, ""));
+                    let severity = match sev {
+                        "error" => DiagnosticSeverity::Error,
+                        "warning" => DiagnosticSeverity::Warning,
+                        _ => DiagnosticSeverity::Error,
+                    };
+                    (severity, code.to_string(), msg.to_string())
+                } else {
+                    (
+                        DiagnosticSeverity::Error,
+                        "unknown".to_string(),
+                        rest.to_string(),
+                    )
+                };
 
-                    diagnostics.push(Diagnostic {
-                        tool: "tsc".to_string(),
-                        rule_id: code,
-                        message,
-                        severity,
-                        location: Location {
-                            file: file.to_string().into(),
-                            line: line_num,
-                            column: col_num,
-                            end_line: None,
-                            end_column: None,
-                        },
-                        fix: None,
-                        help_url: None,
-                    });
-                }
+                diagnostics.push(Diagnostic {
+                    tool: "tsc".to_string(),
+                    rule_id: code,
+                    message,
+                    severity,
+                    location: Location {
+                        file: file.to_string().into(),
+                        line: line_num,
+                        column: col_num,
+                        end_line: None,
+                        end_column: None,
+                    },
+                    fix: None,
+                    help_url: None,
+                });
             }
         }
     }

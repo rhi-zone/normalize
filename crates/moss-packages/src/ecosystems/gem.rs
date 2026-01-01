@@ -43,14 +43,12 @@ impl Ecosystem for Gem {
         for line in content.lines() {
             let trimmed = line.trim();
             // Format: "gem_name (version)"
-            if let Some(rest) = trimmed.strip_prefix(package) {
-                if rest.starts_with(' ') || rest.starts_with('(') {
-                    if let Some(start) = rest.find('(') {
-                        if let Some(end) = rest.find(')') {
-                            return Some(rest[start + 1..end].to_string());
-                        }
-                    }
-                }
+            if let Some(rest) = trimmed.strip_prefix(package)
+                && (rest.starts_with(' ') || rest.starts_with('('))
+                && let Some(start) = rest.find('(')
+                && let Some(end) = rest.find(')')
+            {
+                return Some(rest[start + 1..end].to_string());
             }
         }
         None

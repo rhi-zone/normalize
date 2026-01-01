@@ -140,27 +140,25 @@ impl Tool for Rustfmt {
             // Fallback: parse cargo fmt --check output
             // Format: "Diff in /path/to/file.rs at line N:"
             for line in stderr.lines() {
-                if line.starts_with("Diff in ") {
-                    if let Some(rest) = line.strip_prefix("Diff in ") {
-                        if let Some((file, loc)) = rest.rsplit_once(" at line ") {
-                            let line_num: usize = loc.trim_end_matches(':').parse().unwrap_or(1);
-                            diagnostics.push(Diagnostic {
-                                tool: "rustfmt".to_string(),
-                                rule_id: "formatting".to_string(),
-                                message: "File needs formatting".to_string(),
-                                severity: DiagnosticSeverity::Warning,
-                                location: Location {
-                                    file: file.to_string().into(),
-                                    line: line_num,
-                                    column: 1,
-                                    end_line: None,
-                                    end_column: None,
-                                },
-                                fix: None,
-                                help_url: None,
-                            });
-                        }
-                    }
+                if let Some(rest) = line.strip_prefix("Diff in ")
+                    && let Some((file, loc)) = rest.rsplit_once(" at line ")
+                {
+                    let line_num: usize = loc.trim_end_matches(':').parse().unwrap_or(1);
+                    diagnostics.push(Diagnostic {
+                        tool: "rustfmt".to_string(),
+                        rule_id: "formatting".to_string(),
+                        message: "File needs formatting".to_string(),
+                        severity: DiagnosticSeverity::Warning,
+                        location: Location {
+                            file: file.to_string().into(),
+                            line: line_num,
+                            column: 1,
+                            end_line: None,
+                            end_column: None,
+                        },
+                        fix: None,
+                        help_url: None,
+                    });
                 }
             }
         }

@@ -158,13 +158,13 @@ impl Tool for Ruff {
                     help_url: d.url,
                 };
 
-                if let Some(fix) = d.fix {
-                    if let Some(msg) = fix.message {
-                        diag.fix = Some(crate::diagnostic::Fix {
-                            description: msg,
-                            replacement: String::new(), // Would need to parse edits
-                        });
-                    }
+                if let Some(fix) = d.fix
+                    && let Some(msg) = fix.message
+                {
+                    diag.fix = Some(crate::diagnostic::Fix {
+                        description: msg,
+                        replacement: String::new(), // Would need to parse edits
+                    });
                 }
 
                 diag

@@ -39,27 +39,23 @@ impl Ecosystem for Deno {
     fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
         // Check deno.lock
         let lockfile = project_root.join("deno.lock");
-        if let Ok(content) = std::fs::read_to_string(&lockfile) {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-                // deno.lock v3+ format has "packages" section
-                if let Some(packages) = parsed.get("packages") {
-                    // Check jsr packages
-                    if let Some(jsr) = packages.get("jsr") {
-                        if let Some(pkg) = jsr.get(package) {
-                            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                                return Some(v.to_string());
-                            }
-                        }
-                    }
-                    // Check npm packages
-                    if let Some(npm) = packages.get("npm") {
-                        if let Some(pkg) = npm.get(package) {
-                            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                                return Some(v.to_string());
-                            }
-                        }
-                    }
-                }
+        if let Ok(content) = std::fs::read_to_string(&lockfile)
+            && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
+            && let Some(packages) = parsed.get("packages")
+        {
+            // Check jsr packages
+            if let Some(jsr) = packages.get("jsr")
+                && let Some(pkg) = jsr.get(package)
+                && let Some(v) = pkg.get("version").and_then(|v| v.as_str())
+            {
+                return Some(v.to_string());
+            }
+            // Check npm packages
+            if let Some(npm) = packages.get("npm")
+                && let Some(pkg) = npm.get(package)
+                && let Some(v) = pkg.get("version").and_then(|v| v.as_str())
+            {
+                return Some(v.to_string());
             }
         }
         None
