@@ -73,6 +73,17 @@ Undo/redo mechanics:
 - After undo, new edits create a branch from current HEAD
 - Original commits (like D above) still exist, reachable via `--history --all`
 
+**Conflict handling**: If reverse patch doesn't apply (file was modified externally):
+- Abort undo and report conflict
+- User must resolve manually (e.g., discard external changes or use `moss edit --force-undo`)
+- `--force-undo` overwrites file with shadow's known state (destructive)
+
+**Branch navigation**: To restore a different branch:
+```bash
+moss edit --goto <ref>        # Move HEAD to ref, restore file to that state
+moss edit --goto 2            # Go to commit 2 (by number from --history)
+```
+
 ### Directory Structure
 ```
 .moss/
@@ -91,6 +102,8 @@ The shadow repo tracks files in a separate worktree, not the user's actual files
 2. Apply edit to user's file
 3. Copy new file state to worktree (captures "after")
 4. Commit the change
+
+**Initial state**: The shadow repo is created on first `moss edit`. The "initial state" commit (commit 0) contains the file's state before that first edit. Files not yet edited have no shadow history.
 
 ### Shadow Commit Format
 
@@ -164,6 +177,8 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] `--undo` applies reverse patch, moves HEAD backward, prints summary
 - [ ] `--undo N` reverts N edits in sequence
 - [ ] `--redo` moves HEAD forward, applies patch (error if at branch point)
+- [ ] `--goto <ref>` jumps to arbitrary commit
+- [ ] Conflict detection and `--force-undo` for external modifications
 - [ ] `--history --all` shows full tree structure
 - [ ] Per-file branches (`refs/files/<path>`) and `--history <file>`
 
