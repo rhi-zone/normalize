@@ -4,8 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-(empty - pick from Remaining Work or Backlog)
-
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
@@ -60,13 +58,10 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Define patterns via tree-sitter queries, whitelist locations
 
 ### `@` Aliases
-- **Design issue**: `[sigil]` and `[filter.aliases]` are confusingly separate
-  - `[sigil].todo = ["TODO.md"]` for command targets
-  - `[filter.aliases].config = ["*.toml", ...]` for `--only`/`--exclude`
-  - Should unify: one `[aliases]` section, context determines behavior
-- Target prefix: ✅ Done (`moss view @todo`, `moss edit @config`)
-- Command prefix: `moss @script-name args` → runs script with args
-  - Needs: `moss script run` to pass trailing args to scripts
+- [x] Unified `[sigil]` and `[filter.aliases]` into single `[aliases]` section
+- [x] Target prefix: (`moss view @todo`, `moss edit @config`)
+- [x] Command prefix: `moss @script-name args` runs script with args
+- [x] `moss script run` passes trailing args to scripts
 
 ### `moss todo` Future
 - Currently: Rust implementation with file/section detection, format preservation

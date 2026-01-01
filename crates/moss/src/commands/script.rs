@@ -85,6 +85,10 @@ pub enum ScriptAction {
         /// Task description (available as `task` variable in Lua)
         #[arg(short, long)]
         task: Option<String>,
+
+        /// Arguments to pass to the script (available as `args` table in Lua)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 }
 
@@ -93,7 +97,10 @@ pub fn cmd_script(action: ScriptAction, root: Option<&Path>, json: bool) -> i32 
         ScriptAction::List => cmd_script_list(root, json),
         ScriptAction::New { name, template } => cmd_script_new(&name, &template, root, json),
         ScriptAction::Show { script } => cmd_script_show(&script, root, json),
-        ScriptAction::Run { script, task } => cmd_script_run(&script, task.as_deref(), root, json),
+        ScriptAction::Run { script, task, args } => {
+            let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+            cmd_script_run(&script, task.as_deref(), &args_refs, root, json)
+        }
     }
 }
 
@@ -280,7 +287,13 @@ fn print_lua_highlighted(code: &str) {
 }
 
 #[cfg(feature = "lua")]
-fn cmd_script_run(script: &str, task: Option<&str>, root: Option<&Path>, json: bool) -> i32 {
+fn cmd_script_run(
+    script: &str,
+    task: Option<&str>,
+    args: &[&str],
+    root: Option<&Path>,
+    json: bool,
+) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
 
     // Check for explicit .lua path first
@@ -338,8 +351,19 @@ fn cmd_script_run(script: &str, task: Option<&str>, root: Option<&Path>, json: b
         }
     }
 
-    // Set args = {} for consistency with @ invocation
-    if let Err(e) = runtime.run_string("args = {}") {
+    // Set args table from command line arguments
+    let args_lua = if args.is_empty() {
+        "args = {}".to_string()
+    } else {
+        let entries = args
+            .iter()
+            .enumerate()
+            .map(|(i, a)| format!("[{}] = {:?}", i + 1, a))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("args = {{ {} }}", entries)
+    };
+    if let Err(e) = runtime.run_string(&args_lua) {
         eprintln!("Failed to set args: {}", e);
         return 1;
     }
@@ -369,7 +393,13 @@ fn cmd_script_run(script: &str, task: Option<&str>, root: Option<&Path>, json: b
 }
 
 #[cfg(not(feature = "lua"))]
-fn cmd_script_run(_script: &str, _task: Option<&str>, _root: Option<&Path>, _json: bool) -> i32 {
+fn cmd_script_run(
+    _script: &str,
+    _task: Option<&str>,
+    _args: &[&str],
+    _root: Option<&Path>,
+    _json: bool,
+) -> i32 {
     eprintln!("Scripts require the 'lua' feature");
     eprintln!("Rebuild with: cargo build --features lua");
     1
