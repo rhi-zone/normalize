@@ -45,6 +45,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
 - Review view.rs scope: 1990 lines doing search, tree, file, symbol, line-range viewing. Consider consolidating before splitting into submodules.
 
+### Analyze Command
+- Glob pattern support: `moss analyze 'foo/**/bar.*'` for analyzing symbols matching patterns
+
 ### Code Quality
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar

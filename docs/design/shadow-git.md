@@ -8,22 +8,36 @@ When `moss edit` modifies files, there's no easy way to undo changes. Users must
 
 ## Solution
 
-Maintain a hidden git repository (`.moss/shadow/`) that automatically commits after each `moss edit` operation.
+Maintain a hidden git repository (`.moss/shadow/`) that automatically commits after each `moss edit` operation, preserving full edit history as a tree.
 
 ## Core Features
 
 ### Automatic Tracking
 - Every `moss edit` operation creates a shadow commit
-- Commit message includes: operation, target, timestamp
+- Commit message includes: operation, target, timestamp, optional user message
 - Only tracks files modified by moss, not external changes
+
+### Edit Messages
+```bash
+moss edit src/foo.rs/bar delete --message "Removing deprecated function"
+moss edit src/foo.rs/bar delete --reason "Removing deprecated function"  # alias
+```
+
+Optional `--message` (or `--reason`) flag attaches a description to the edit, displayed in history and undo output.
 
 ### Undo/Redo
 ```bash
-moss edit --undo              # Revert last moss edit
-moss edit --undo 3            # Revert last 3 edits
+moss edit --undo              # Revert last moss edit, prints what was undone
+moss edit --undo 3            # Revert last 3 edits, prints summary of each
 moss edit --redo              # Re-apply last undone edit
 moss edit --history           # Show recent moss edits
+moss edit --history src/foo.rs  # Show edits for specific file
 ```
+
+Undo output includes:
+- Files changed
+- Edit descriptions (from `--message` if provided)
+- Operation type and target
 
 ### Configuration
 ```toml
@@ -35,100 +49,130 @@ warn_on_delete = true         # Confirm before deleting symbols
 
 ## Architecture
 
+### Tree Structure (Not Linear)
+
+Shadow history is a **tree**, not a linear history:
+- Undo creates a new branch point, doesn't destroy history
+- All edits preserved (can return to any previous state)
+- Branches can be pruned for security (remove sensitive content from history)
+
+```
+         A -- B -- C -- D  (main edit history)
+              \
+               E -- F      (branch after undoing C, making new edits)
+```
+
 ### Directory Structure
 ```
 .moss/
   shadow/
-    .git/                     # Shadow repository
-    HEAD                      # Current position (for undo/redo)
+    .git/                     # Shadow repository (tree structure)
     refs/
-      edits/                  # Branch per file? Or single linear history?
+      files/                  # Per-file branch heads (Phase 2)
+        src/
+          foo.rs              # HEAD for src/foo.rs edits
 ```
 
 ### Shadow Commit Format
 ```
 moss edit: delete src/foo.rs/deprecated_fn
 
+Message: Removing deprecated function
 Operation: delete
 Target: src/foo.rs/deprecated_fn
 Timestamp: 2025-01-01T12:00:00Z
+Files: src/foo.rs
 ---
 [patch content]
 ```
 
-## Design Questions
+### Branch Pruning (Security)
 
-### Q1: Single history or per-file?
-- **Single linear history**: Simpler, but undo affects all files
-- **Per-file branches**: More granular, but complex to manage
-- **Recommendation**: Start with single history, add per-file later if needed
+If sensitive content was accidentally committed:
+```bash
+moss edit --prune <commit-range>  # Remove commits from shadow history
+moss edit --prune-file src/secrets.rs  # Remove all history for a file
+```
 
-### Q2: Storage format?
-- **Full git repo**: Uses git's delta compression, familiar tooling
-- **Custom format**: More control, but reinvents wheel
-- **Recommendation**: Use git - it's designed for this
+Uses `git filter-branch` or similar under the hood. Important for:
+- Removing accidentally committed secrets
+- Cleaning up after experiments
+- Reducing repo size
 
-### Q3: What about external changes?
-- Shadow git only tracks moss edits
-- If user makes manual changes, shadow history diverges from actual file state
-- Options:
-  - A) Detect and warn on divergence
-  - B) Re-sync shadow on next moss edit
-  - C) Ignore - undo applies patch, may fail if file changed
-- **Recommendation**: Option B - re-sync by reading current file state before commit
+## Design Decisions
 
-### Q4: Relationship to real git?
-- Shadow git is independent - doesn't interfere with user's git
-- After `moss edit --undo`, user still needs to commit/discard in real git
-- Shadow is for "oops, wrong edit" recovery, not version control
+### D1: Tree structure over linear
+- **Decision**: Preserve all history as tree
+- **Rationale**: Undo shouldn't destroy information; users might want to return to undone state
+- **Trade-off**: More disk usage, but git handles this well
 
-### Q5: Multi-file edits?
-- Some operations touch multiple files (future: cross-file refactors)
-- Shadow commit should be atomic for multi-file edits
-- Undo should revert all files in the edit atomically
+### D2: Per-file history (Phase 2)
+- **Decision**: Add per-file branches immediately after basic implementation
+- **Rationale**: Users often want to undo edits to specific files without affecting others
+- **Implementation**: `refs/files/<path>` tracks per-file HEAD
+
+### D3: Storage format
+- **Decision**: Use git
+- **Rationale**: Delta compression, familiar tooling, handles trees naturally
+
+### D4: External changes
+- **Decision**: Re-sync by reading current file state before commit
+- **Rationale**: Shadow tracks moss edits, not manual edits; patch may fail if file diverged
+
+### D5: Relationship to real git
+- **Decision**: Fully independent
+- **Rationale**: Shadow is for "oops" recovery, not version control; don't interfere with user's git workflow
 
 ## Implementation Plan
 
 ### Phase 1: Basic Infrastructure
 - [ ] Create `.moss/shadow/` git repo on first `moss edit`
 - [ ] Commit file state before each edit
+- [ ] `--message`/`--reason` flag for edit descriptions
 - [ ] `--history` to list recent edits
 
-### Phase 2: Undo/Redo
-- [ ] `--undo` applies reverse patch
-- [ ] `--redo` re-applies forward patch
-- [ ] Handle conflicts gracefully
+### Phase 2: Undo/Redo + Per-File
+- [ ] `--undo` applies reverse patch, prints summary
+- [ ] `--undo N` reverts N edits with full output
+- [ ] `--redo` re-applies forward (creates new branch, preserves tree)
+- [ ] Per-file branches and `--history <file>`
 
-### Phase 3: Polish
-- [ ] Retention policy / auto-cleanup
+### Phase 3: Security + Polish
+- [ ] `--prune` for removing commits/branches
+- [ ] Retention policy / auto-cleanup (only prunes merged branches)
 - [ ] `warn_on_delete` confirmation
-- [ ] Per-file history view
 
 ## Risks
 
-1. **Disk usage**: Shadow repo grows over time
-   - Mitigation: Retention policy, git gc
+1. **Disk usage**: Tree structure preserves everything
+   - Mitigation: Retention policy prunes old merged branches, `--prune` for manual cleanup, git gc
 
-2. **Performance**: Git operations add latency to edits
-   - Mitigation: Commits are small (single file patches)
+2. **Performance**: Git operations add latency
+   - Mitigation: Commits are small; consider async commits for non-blocking edits
 
-3. **Complexity**: Another git repo to manage
-   - Mitigation: Fully automatic, user never interacts directly
+3. **Complexity**: Tree navigation
+   - Mitigation: Simple undo/redo for common case; tree visible only via `--history --all`
 
-## Alternatives Considered
+## Example Session
 
-### Backup files (foo.rs.bak)
-- Simple but clutters workspace
-- No history, just last version
+```bash
+$ moss edit src/foo.rs/old_fn delete --message "Cleanup"
+delete: old_fn in src/foo.rs
 
-### SQLite changelog
-- Flexible but custom format
-- No tooling for inspection
+$ moss edit src/foo.rs/helper rename new_helper
+rename: helper -> new_helper in src/foo.rs
 
-### Integration with real git
-- Interferes with user's workflow
-- Requires git to be initialized
+$ moss edit --undo 2
+Undoing 2 edits:
+  [2] rename: helper -> new_helper in src/foo.rs
+  [1] delete: old_fn in src/foo.rs (Cleanup)
+Files restored: src/foo.rs
 
-## Decision
+$ moss edit --history
+  3. [current] undo 2 edits
+  2. rename src/foo.rs/helper -> new_helper
+  1. delete src/foo.rs/old_fn "Cleanup"
 
-Use shadow git: minimal complexity, leverages git's strengths, fully isolated from user's workflow.
+$ moss edit --redo
+Re-applied: delete src/foo.rs/old_fn "Cleanup"
+```
