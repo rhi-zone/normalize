@@ -50,7 +50,8 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Example: `Query::new` restricted except in cached getters
   - Define patterns via tree-sitter queries, whitelist locations
 
-### `@` Aliases
+### `moss todo` Future
+- Goal: port `todo.rs` to `@todo` script (Lua + `moss edit` primitives)
   - These are conceptually `moss edit` ops on markdown
   - `@todo` target prefix is the path toward unification
 - `list` with filters, `clean`, `normalize` → port to Lua script (todo-specific semantics)
