@@ -66,6 +66,10 @@ enum Commands {
         /// Allow glob patterns to match multiple symbols
         #[arg(long, global = true)]
         multiple: bool,
+
+        /// Message describing the edit (for shadow git history)
+        #[arg(short, long, global = true, visible_alias = "reason")]
+        message: Option<String>,
     },
 
     /// Manage file index
@@ -430,6 +434,7 @@ fn main() {
             exclude,
             only,
             multiple,
+            message,
         } => commands::edit::cmd_edit(
             &target,
             action,
@@ -439,6 +444,7 @@ fn main() {
             &exclude,
             &only,
             multiple,
+            message.as_deref(),
         ),
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)

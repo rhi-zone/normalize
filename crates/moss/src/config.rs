@@ -13,6 +13,10 @@
 //! [index]
 //! enabled = true
 //!
+//! [shadow]
+//! enabled = true                # auto-track edits for undo/redo
+//! warn_on_delete = true         # confirm before deleting symbols
+//!
 //! [aliases]
 //! todo = ["TODO.md", "TASKS.md"]   # @todo for command targets AND filters
 //! config = [".moss/config.toml"]   # overrides built-in @config
@@ -50,6 +54,7 @@ use crate::commands::view::ViewConfig;
 use crate::daemon::DaemonConfig;
 use crate::merge::Merge;
 use crate::output::PrettyConfig;
+use crate::shadow::ShadowConfig;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -194,6 +199,7 @@ impl IndexConfig {
 pub struct MossConfig {
     pub daemon: DaemonConfig,
     pub index: IndexConfig,
+    pub shadow: ShadowConfig,
     pub aliases: AliasConfig,
     pub todo: TodoConfig,
     pub view: ViewConfig,

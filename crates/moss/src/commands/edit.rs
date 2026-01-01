@@ -3,6 +3,7 @@
 use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
+use crate::shadow::{EditInfo, Shadow};
 use crate::{daemon, edit, path_resolve};
 use std::path::Path;
 
@@ -109,10 +110,15 @@ pub fn cmd_edit(
     exclude: &[String],
     only: &[String],
     multiple: bool,
+    message: Option<&str>,
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Load config for shadow git setting
+    let config = MossConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
 
     // Ensure daemon is running if configured (will pick up edits)
     daemon::maybe_start_daemon(&root);
@@ -181,6 +187,9 @@ pub fn cmd_edit(
             &unified.file_path,
             dry_run,
             json,
+            &root,
+            shadow_enabled,
+            message,
         );
     }
 
@@ -199,6 +208,9 @@ pub fn cmd_edit(
             dry_run,
             json,
             multiple,
+            &root,
+            shadow_enabled,
+            message,
         );
     }
 
@@ -361,10 +373,14 @@ pub fn cmd_edit(
         operation,
         &new_content,
         &file_path,
+        &root,
+        shadow_enabled,
+        message,
     )
 }
 
 /// Handle file-level operations (prepend/append to file without symbol target)
+#[allow(clippy::too_many_arguments)]
 fn handle_file_level(
     action: &EditAction,
     editor: &edit::Editor,
@@ -373,6 +389,9 @@ fn handle_file_level(
     rel_path: &str,
     dry_run: bool,
     json: bool,
+    root: &Path,
+    shadow_enabled: bool,
+    message: Option<&str>,
 ) -> i32 {
     let (operation, new_content) = match action {
         EditAction::Insert {
@@ -408,10 +427,14 @@ fn handle_file_level(
         operation,
         &new_content,
         file_path,
+        root,
+        shadow_enabled,
+        message,
     )
 }
 
 /// Output result (dry-run or actual write)
+#[allow(clippy::too_many_arguments)]
 fn output_result(
     dry_run: bool,
     json: bool,
@@ -420,6 +443,9 @@ fn output_result(
     operation: Operation,
     new_content: &str,
     file_path: &Path,
+    root: &Path,
+    shadow_enabled: bool,
+    message: Option<&str>,
 ) -> i32 {
     if dry_run {
         if json {
@@ -444,9 +470,38 @@ fn output_result(
         return 0;
     }
 
+    // Shadow git: capture before state
+    let shadow = if shadow_enabled {
+        let s = Shadow::new(root);
+        if let Err(e) = s.before_edit(&[file_path]) {
+            eprintln!("warning: shadow git: {}", e);
+        }
+        Some(s)
+    } else {
+        None
+    };
+
     if let Err(e) = std::fs::write(file_path, new_content) {
         eprintln!("Error writing file: {}", e);
         return 1;
+    }
+
+    // Shadow git: capture after state and commit
+    if let Some(ref s) = shadow {
+        let target = match symbol {
+            Some(sym) => format!("{}/{}", rel_path, sym),
+            None => rel_path.to_string(),
+        };
+        let info = EditInfo {
+            operation: operation.to_string(),
+            target,
+            files: vec![file_path.to_path_buf()],
+            message: message.map(String::from),
+            workflow: None,
+        };
+        if let Err(e) = s.after_edit(&info) {
+            eprintln!("warning: shadow git: {}", e);
+        }
     }
 
     if json {
@@ -480,6 +535,9 @@ fn handle_glob_edit(
     dry_run: bool,
     json: bool,
     multiple: bool,
+    root: &Path,
+    shadow_enabled: bool,
+    message: Option<&str>,
 ) -> i32 {
     let matches = editor.find_symbols_matching(file_path, content, pattern);
 
@@ -717,9 +775,35 @@ fn handle_glob_edit(
         return 0;
     }
 
+    // Shadow git: capture before state
+    let shadow = if shadow_enabled {
+        let s = Shadow::new(root);
+        if let Err(e) = s.before_edit(&[file_path.as_path()]) {
+            eprintln!("warning: shadow git: {}", e);
+        }
+        Some(s)
+    } else {
+        None
+    };
+
     if let Err(e) = std::fs::write(file_path, &new_content) {
         eprintln!("Error writing file: {}", e);
         return 1;
+    }
+
+    // Shadow git: capture after state and commit
+    if let Some(ref s) = shadow {
+        let target = format!("{}/{}", rel_path, pattern);
+        let info = EditInfo {
+            operation: operation.to_string(),
+            target,
+            files: vec![file_path.clone()],
+            message: message.map(String::from),
+            workflow: None,
+        };
+        if let Err(e) = s.after_edit(&info) {
+            eprintln!("warning: shadow git: {}", e);
+        }
     }
 
     if json {
