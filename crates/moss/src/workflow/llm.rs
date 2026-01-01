@@ -188,91 +188,9 @@ impl LlmClient {
     }
 }
 
-/// Agent response with optional command to execute.
-#[derive(Debug)]
-pub enum AgentAction {
-    /// Execute a command and continue.
-    Command { name: String, args: Vec<String> },
-    /// Agent is done.
-    Done { message: String },
-}
-
-/// Parse agent response to extract commands.
-/// Format: Lines starting with "> " are commands.
-/// "DONE" on its own line means agent is finished.
-pub fn parse_agent_response(response: &str) -> AgentAction {
-    for line in response.lines() {
-        let line = line.trim();
-
-        // Check for done signal
-        if line.eq_ignore_ascii_case("done") || line.eq_ignore_ascii_case("[done]") {
-            return AgentAction::Done {
-                message: response.to_string(),
-            };
-        }
-
-        // Check for command (lines starting with "> ")
-        if let Some(cmd) = line.strip_prefix("> ") {
-            let parts: Vec<&str> = cmd.split_whitespace().collect();
-            if let Some((name, args)) = parts.split_first() {
-                return AgentAction::Command {
-                    name: name.to_string(),
-                    args: args.iter().map(|s| s.to_string()).collect(),
-                };
-            }
-        }
-    }
-
-    // No command found - treat as done with explanation
-    AgentAction::Done {
-        message: response.to_string(),
-    }
-}
-
-/// System prompt for agent mode.
-pub const AGENT_SYSTEM_PROMPT: &str = r#"Tools:
-view <path|symbol|path/symbol>
-edit <path|symbol|path/symbol> <task>
-analyze [--health|--complexity] [path]
-grep <pattern> [path]
-lint [--fix] [path]
-shell <command>
-
-Run: "> cmd". End: DONE"#;
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_parse_command() {
-        let response = "Let me check.\n> view src/main.rs\n";
-        match parse_agent_response(response) {
-            AgentAction::Command { name, args } => {
-                assert_eq!(name, "view");
-                assert_eq!(args, vec!["src/main.rs"]);
-            }
-            _ => panic!("Expected Command"),
-        }
-    }
-
-    #[test]
-    fn test_parse_done() {
-        let response = "I found the issue.\nDONE";
-        match parse_agent_response(response) {
-            AgentAction::Done { .. } => {}
-            _ => panic!("Expected Done"),
-        }
-    }
-
-    #[test]
-    fn test_parse_no_command() {
-        let response = "Just explaining something.";
-        match parse_agent_response(response) {
-            AgentAction::Done { .. } => {}
-            _ => panic!("Expected Done for no-command response"),
-        }
-    }
 
     #[cfg(feature = "llm")]
     #[test]
