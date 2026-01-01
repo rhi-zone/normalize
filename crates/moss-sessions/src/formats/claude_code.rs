@@ -329,16 +329,14 @@ fn analyze_file_tokens(entries: &[Value]) -> HashMap<String, u64> {
             }
 
             // Extract directory from Glob pattern
-            if tool_name == "Glob" {
-                if let Some(pattern) = input
+            if tool_name == "Glob"
+                && let Some(pattern) = input
                     .and_then(|i| i.get("pattern"))
                     .and_then(|v| v.as_str())
-                {
-                    if let Some(dir) = pattern.rsplit_once('/') {
-                        if !dir.0.starts_with('*') {
-                            data.paths.push(dir.0.to_string());
-                        }
-                    }
+                && let Some(dir) = pattern.rsplit_once('/')
+            {
+                if !dir.0.starts_with('*') {
+                    data.paths.push(dir.0.to_string());
                 }
             }
         }
