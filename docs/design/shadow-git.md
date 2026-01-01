@@ -136,7 +136,14 @@ Git's patch APIs enable fine-grained undo:
 - `--undo` reverts entire commit (all files, all changes)
 - `--undo --file src/foo.rs` reverts only that file
 - `--undo --hunk` interactive hunk selection (like `git checkout -p`)
-- `--undo --hunk src/foo.rs` interactive hunks for specific file
+- `--undo --lines 10-25 src/foo.rs` non-interactive, reverts changes in line range
+
+Non-interactive hunk selection (for LLM/scripted usage):
+```bash
+moss edit --show-hunks <ref>           # List hunks with IDs
+moss edit --undo --hunk-id h1,h3       # Undo specific hunks by ID
+moss edit --undo --lines 10-25 foo.rs  # Undo changes touching these lines
+```
 
 Each partial undo creates a new shadow commit with just those reversals.
 
@@ -211,6 +218,8 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] `--undo N` reverts N edits in sequence
 - [ ] `--undo --file` partial undo for specific file
 - [ ] `--undo --hunk` interactive hunk-level undo
+- [ ] `--show-hunks` and `--undo --hunk-id` for non-interactive hunk selection
+- [ ] `--undo --lines` for line-range based undo
 - [ ] `--redo` moves HEAD forward, applies patch (error if at branch point)
 - [ ] `--goto <ref>` jumps to arbitrary commit
 - [ ] Conflict detection and `--force-undo` for external modifications
