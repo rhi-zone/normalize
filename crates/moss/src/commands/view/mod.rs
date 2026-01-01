@@ -394,6 +394,22 @@ pub fn cmd_view(
             use_colors,
         )
     } else {
+        // Check if symbol path contains glob patterns
+        let symbol_pattern = unified.symbol_path.join("/");
+        if path_resolve::is_glob_pattern(&symbol_pattern) {
+            return symbol::cmd_view_symbol_glob(
+                &unified.file_path,
+                &symbol_pattern,
+                &root,
+                depth,
+                full,
+                show_docs,
+                json,
+                pretty,
+                use_colors,
+            );
+        }
+
         symbol::cmd_view_symbol(
             &unified.file_path,
             &unified.symbol_path,

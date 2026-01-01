@@ -97,7 +97,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - For moss itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
   - For user projects: detect stale docs in fresh projects (full moss assistance) and legacy codebases (missing/outdated docs)
   - Consider boy scout rule: when touching code, improve nearby docs
-- Case-insensitive matching (`-i` flag): `text-search`, optionally for `view`/`edit`/`analyze` path/symbol targets
+- Case-insensitive matching (`-i` flag): `text-search` ✓ has it, optionally add to `view`/`edit`/`analyze` path/symbol targets
 - `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 - Semantic refactoring: `moss edit <glob> --before 'fn extract_attributes' 'fn extract_attributes(...) { ... }'`

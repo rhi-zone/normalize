@@ -1,6 +1,6 @@
 use crate::parsers;
-use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
-use glob::Pattern;
+use crate::path_resolve;
+use crate::skeleton::SkeletonExtractor;
 use moss_languages::{support_for_path, Language, SymbolKind};
 use std::path::Path;
 
@@ -82,27 +82,19 @@ impl Editor {
         search_symbols(&result.symbols, name, content)
     }
 
-    /// Check if a pattern contains glob characters
+    /// Check if a pattern contains glob characters (delegates to path_resolve)
     pub fn is_glob_pattern(pattern: &str) -> bool {
-        pattern.contains('*') || pattern.contains('?') || pattern.contains('[')
+        path_resolve::is_glob_pattern(pattern)
     }
 
     /// Find all symbols matching a glob pattern in their path.
-    /// Pattern like "**/Edit*" matches "Moss Roadmap/Backlog/Edit Improvements"
+    /// Returns matches sorted by byte offset (reverse order for safe deletion).
     pub fn find_symbols_matching(
         &self,
         path: &Path,
         content: &str,
         pattern: &str,
     ) -> Vec<SymbolLocation> {
-        let extractor = SkeletonExtractor::new();
-        let result = extractor.extract(path, content);
-
-        let glob = match Pattern::new(pattern) {
-            Ok(g) => g,
-            Err(_) => return Vec::new(),
-        };
-
         fn line_to_byte(content: &str, line: usize) -> usize {
             content
                 .lines()
@@ -111,46 +103,28 @@ impl Editor {
                 .sum()
         }
 
-        fn collect_matching(
-            symbols: &[SkeletonSymbol],
-            glob: &Pattern,
-            content: &str,
-            parent_path: &str,
-            matches: &mut Vec<SymbolLocation>,
-        ) {
-            for sym in symbols {
-                let sym_path = if parent_path.is_empty() {
-                    sym.name.clone()
-                } else {
-                    format!("{}/{}", parent_path, sym.name)
-                };
+        let symbol_matches = path_resolve::resolve_symbol_glob(path, content, pattern);
 
-                if glob.matches(&sym_path) {
-                    let start_byte = line_to_byte(content, sym.start_line);
-                    let end_byte = line_to_byte(content, sym.end_line + 1);
-
-                    matches.push(SymbolLocation {
-                        name: sym.name.clone(),
-                        kind: sym.kind.as_str().to_string(),
-                        start_byte,
-                        end_byte,
-                        start_line: sym.start_line,
-                        end_line: sym.end_line,
-                        indent: String::new(),
-                    });
+        let mut locations: Vec<SymbolLocation> = symbol_matches
+            .into_iter()
+            .map(|m| {
+                let start_byte = line_to_byte(content, m.symbol.start_line);
+                let end_byte = line_to_byte(content, m.symbol.end_line + 1);
+                SymbolLocation {
+                    name: m.symbol.name,
+                    kind: m.symbol.kind.as_str().to_string(),
+                    start_byte,
+                    end_byte,
+                    start_line: m.symbol.start_line,
+                    end_line: m.symbol.end_line,
+                    indent: String::new(),
                 }
-
-                // Recurse into children
-                collect_matching(&sym.children, glob, content, &sym_path, matches);
-            }
-        }
-
-        let mut matches = Vec::new();
-        collect_matching(&result.symbols, &glob, content, "", &mut matches);
+            })
+            .collect();
 
         // Sort by start position (reverse for safe deletion from end to start)
-        matches.sort_by(|a, b| b.start_byte.cmp(&a.start_byte));
-        matches
+        locations.sort_by(|a, b| b.start_byte.cmp(&a.start_byte));
+        locations
     }
 
     /// Delete a symbol from the content

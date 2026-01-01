@@ -1,3 +1,4 @@
+use glob::Pattern as GlobPattern;
 use ignore::WalkBuilder;
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher};
@@ -5,6 +6,7 @@ use std::path::Path;
 
 use crate::config::MossConfig;
 use crate::index::FileIndex;
+use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 
 #[derive(Debug, Clone)]
 pub struct PathMatch {
@@ -585,6 +587,67 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
     fuzzy_matches.truncate(10);
 
     fuzzy_matches
+}
+
+/// Check if a pattern contains glob characters (* ? [)
+pub fn is_glob_pattern(pattern: &str) -> bool {
+    pattern.contains('*') || pattern.contains('?') || pattern.contains('[')
+}
+
+/// A symbol match with its full path (for glob resolution)
+#[derive(Debug, Clone)]
+pub struct SymbolMatch {
+    /// The symbol itself
+    pub symbol: SkeletonSymbol,
+    /// Full path from root (e.g., "Parent/Child/Symbol")
+    pub path: String,
+}
+
+/// Resolve symbols matching a glob pattern within a file.
+///
+/// Returns symbols whose paths match the pattern, sorted by line number (ascending).
+/// Pattern like "foo*" matches "foo_one", "foo_two".
+/// Pattern like "**/Edit*" matches "Main/Backlog/Edit Improvements".
+pub fn resolve_symbol_glob(file_path: &Path, content: &str, pattern: &str) -> Vec<SymbolMatch> {
+    let extractor = SkeletonExtractor::new();
+    let result = extractor.extract(file_path, content);
+
+    let glob = match GlobPattern::new(pattern) {
+        Ok(g) => g,
+        Err(_) => return Vec::new(),
+    };
+
+    fn collect_matching(
+        symbols: &[SkeletonSymbol],
+        glob: &GlobPattern,
+        parent_path: &str,
+        matches: &mut Vec<SymbolMatch>,
+    ) {
+        for sym in symbols {
+            let sym_path = if parent_path.is_empty() {
+                sym.name.clone()
+            } else {
+                format!("{}/{}", parent_path, sym.name)
+            };
+
+            if glob.matches(&sym_path) {
+                matches.push(SymbolMatch {
+                    symbol: sym.clone(),
+                    path: sym_path.clone(),
+                });
+            }
+
+            // Recurse into children
+            collect_matching(&sym.children, glob, &sym_path, matches);
+        }
+    }
+
+    let mut matches = Vec::new();
+    collect_matching(&result.symbols, &glob, "", &mut matches);
+
+    // Sort by line number (ascending, for display purposes)
+    matches.sort_by_key(|m| m.symbol.start_line);
+    matches
 }
 
 #[cfg(test)]

@@ -591,3 +591,85 @@ fn collect_identifiers(
         }
     }
 }
+
+/// View multiple symbols matching a glob pattern
+#[allow(clippy::too_many_arguments)]
+pub fn cmd_view_symbol_glob(
+    file_path: &str,
+    pattern: &str,
+    root: &Path,
+    _depth: i32,
+    _full: bool,
+    _show_docs: bool,
+    json: bool,
+    _pretty: bool,
+    _use_colors: bool,
+) -> i32 {
+    let full_path = root.join(file_path);
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading {}: {}", file_path, e);
+            return 1;
+        }
+    };
+
+    let matches = path_resolve::resolve_symbol_glob(&full_path, &content, pattern);
+
+    if matches.is_empty() {
+        eprintln!("No symbols match pattern: {}", pattern);
+        return 1;
+    }
+
+    if json {
+        let items: Vec<_> = matches
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "path": format!("{}/{}", file_path, m.path),
+                    "name": m.symbol.name,
+                    "kind": m.symbol.kind.as_str(),
+                    "start_line": m.symbol.start_line,
+                    "end_line": m.symbol.end_line,
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::json!({
+                "type": "glob_matches",
+                "file": file_path,
+                "pattern": pattern,
+                "count": matches.len(),
+                "matches": items
+            })
+        );
+        return 0;
+    }
+
+    println!("# {}/{} ({} matches)", file_path, pattern, matches.len());
+    println!();
+
+    let lines: Vec<&str> = content.lines().collect();
+
+    // Show each matched symbol
+    for m in &matches {
+        println!(
+            "## {} ({}, L{}-{})",
+            m.path,
+            m.symbol.kind.as_str(),
+            m.symbol.start_line,
+            m.symbol.end_line
+        );
+
+        // Show symbol source lines
+        for i in m.symbol.start_line..=m.symbol.end_line {
+            if i > 0 && i <= lines.len() {
+                println!("{}", lines[i - 1]);
+            }
+        }
+        println!();
+    }
+
+    0
+}
