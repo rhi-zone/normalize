@@ -253,6 +253,21 @@ Every interactive feature must have a non-interactive equivalent. LLMs cannot re
 
 This isn't just about LLMs—it's about scriptability, CI/CD, and reproducibility. If a human can do it interactively, automation should be able to do it non-interactively.
 
+### Minimize Friction, Maximize Affordances
+
+**Suggest obvious corrections**: When something seems wrong, suggest the likely fix. Not "here's what you could do" (overwhelming) but "did you mean X?" (helpful).
+- Symbol not found → "Did you mean: `moss text-search 'foo' file.rs`"
+- File not found → suggest fuzzy matches or similar names
+- Operation failed → suggest the recovery action
+
+**Report what was done**: After mutations, show what changed so users can validate nothing unexpected happened.
+- Files changed, lines added/removed
+- Summary matches what `--dry-run` would show
+- Especially important when the effect isn't obvious from the command
+- Enables quick "undo if wrong" decisions
+
+The goal: users should never wonder "did that work?" or "what did that do?"
+
 ### UX Principles
 
 - **No modals** - Everything inline, no popups blocking context
