@@ -41,6 +41,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - JSON Schema for complex action parameters (currently string-only)
 
 ### Code Quality
+- Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)

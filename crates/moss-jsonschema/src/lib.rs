@@ -579,8 +579,7 @@ mod tests {
         )
         .unwrap();
 
-        let gen = TypeScriptGenerator;
-        let output = gen.generate(&schema, "Person");
+        let output = TypeScriptGenerator.generate(&schema, "Person");
         assert!(output.contains("export interface Person"));
         assert!(output.contains("name: string"));
         assert!(output.contains("age?: number"));
@@ -595,8 +594,7 @@ mod tests {
         )
         .unwrap();
 
-        let gen = TypeScriptGenerator;
-        let output = gen.generate(&schema, "Color");
+        let output = TypeScriptGenerator.generate(&schema, "Color");
         assert!(output.contains("export type Color = \"red\" | \"green\" | \"blue\""));
     }
 }
