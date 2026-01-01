@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use moss::commands;
 use moss::commands::analyze::AnalyzeArgs;
 use moss::commands::edit::EditAction;
+use moss::commands::history::HistoryArgs;
 use moss::commands::text_search::TextSearchArgs;
 use moss::commands::view::ViewArgs;
 use moss::serve;
@@ -71,6 +72,9 @@ enum Commands {
         #[arg(short, long, global = true, visible_alias = "reason")]
         message: Option<String>,
     },
+
+    /// View shadow git edit history
+    History(HistoryArgs),
 
     /// Manage file index
     Index {
@@ -446,6 +450,7 @@ fn main() {
             multiple,
             message.as_deref(),
         ),
+        Commands::History(args) => commands::history::run(args, format),
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)
         }

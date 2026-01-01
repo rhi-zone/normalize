@@ -4,9 +4,24 @@
 //! commits after each `moss edit` operation, preserving full edit history.
 
 use crate::merge::Merge;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+/// A single entry in shadow git history.
+#[derive(Debug, Clone, Serialize)]
+pub struct HistoryEntry {
+    pub id: usize,
+    pub hash: String,
+    pub subject: String,
+    pub operation: String,
+    pub target: String,
+    pub files: Vec<String>,
+    pub message: Option<String>,
+    pub workflow: Option<String>,
+    pub git_head: String,
+    pub timestamp: String,
+}
 
 /// Shadow git configuration.
 #[derive(Debug, Clone, Deserialize, Default, Merge)]
@@ -226,6 +241,127 @@ impl Shadow {
         }
 
         Ok(())
+    }
+
+    /// Get history of shadow edits.
+    /// Returns list of edits in reverse chronological order (newest first).
+    pub fn history(&self, file_filter: Option<&str>, limit: usize) -> Vec<HistoryEntry> {
+        if !self.exists() {
+            return Vec::new();
+        }
+
+        // Get git log with custom format
+        // Use %x1e (record separator) between commits and %x1f (unit separator) between fields
+        let mut args = vec![
+            "log".to_string(),
+            "--format=%H%x1f%s%x1f%b%x1f%aI%x1e".to_string(),
+            format!("-{}", limit),
+        ];
+
+        // Filter by file if specified
+        if let Some(file) = file_filter {
+            args.push("--".to_string());
+            args.push(file.to_string());
+        }
+
+        let output = Command::new("git")
+            .args(&args)
+            .current_dir(&self.worktree)
+            .output();
+
+        let output = match output {
+            Ok(out) if out.status.success() => out,
+            _ => return Vec::new(),
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut entries = Vec::new();
+
+        // Split by record separator (0x1e)
+        let blocks: Vec<&str> = stdout
+            .split('\x1e')
+            .filter(|b| !b.trim().is_empty())
+            .collect();
+        let total = blocks.len();
+
+        for (idx, block) in blocks.into_iter().enumerate() {
+            // Parse the commit format: hash\x1fsubject\x1fbody\x1ftimestamp
+            let parts: Vec<&str> = block.split('\x1f').collect();
+            if parts.len() < 4 {
+                continue;
+            }
+
+            let hash = parts[0].trim();
+            let subject = parts[1].trim();
+            let body = parts[2].trim();
+            let timestamp = parts[3].trim();
+
+            // Parse body for structured fields
+            let mut operation = String::new();
+            let mut target = String::new();
+            let mut files = Vec::new();
+            let mut message = None;
+            let mut workflow = None;
+            let mut git_head = String::new();
+
+            for line in body.lines() {
+                if let Some(val) = line.strip_prefix("Operation: ") {
+                    operation = val.to_string();
+                } else if let Some(val) = line.strip_prefix("Target: ") {
+                    target = val.to_string();
+                } else if let Some(val) = line.strip_prefix("Files: ") {
+                    files = val.split(", ").map(String::from).collect();
+                } else if let Some(val) = line.strip_prefix("Message: ") {
+                    message = Some(val.to_string());
+                } else if let Some(val) = line.strip_prefix("Workflow: ") {
+                    workflow = Some(val.to_string());
+                } else if let Some(val) = line.strip_prefix("Git-HEAD: ") {
+                    git_head = val.to_string();
+                }
+            }
+
+            entries.push(HistoryEntry {
+                id: total - idx, // newest first, so first entry gets highest ID
+                hash: hash.to_string(),
+                subject: subject.to_string(),
+                operation,
+                target,
+                files,
+                message,
+                workflow,
+                git_head,
+                timestamp: timestamp.to_string(),
+            });
+        }
+
+        entries
+    }
+
+    /// Get diff for a specific commit.
+    pub fn diff(&self, commit_ref: &str) -> Option<String> {
+        if !self.exists() {
+            return None;
+        }
+
+        let output = Command::new("git")
+            .args(["show", "--format=", commit_ref])
+            .current_dir(&self.worktree)
+            .output()
+            .ok()?;
+
+        if output.status.success() {
+            Some(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Get current checkpoint (last git commit in real repo when shadow was updated).
+    pub fn checkpoint(&self) -> Option<String> {
+        self.history(None, 1)
+            .first()
+            .map(|e| e.git_head.clone())
+            .filter(|h| h != "none")
     }
 
     /// Get the number of shadow commits (edits tracked).

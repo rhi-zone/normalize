@@ -5,6 +5,7 @@ pub mod daemon;
 pub mod edit;
 pub mod filter;
 pub mod grammars;
+pub mod history;
 pub mod index;
 pub mod init;
 pub mod lint;

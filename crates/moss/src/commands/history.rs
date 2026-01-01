@@ -1,0 +1,193 @@
+//! History command - view shadow git edit history.
+
+use crate::shadow::Shadow;
+use clap::Args;
+use std::path::PathBuf;
+
+/// History command arguments.
+#[derive(Args, Debug)]
+pub struct HistoryArgs {
+    /// Filter history to specific file
+    pub file: Option<String>,
+
+    /// Root directory (defaults to current directory)
+    #[arg(short, long)]
+    pub root: Option<PathBuf>,
+
+    /// Show full tree structure (all branches)
+    #[arg(long)]
+    pub all: bool,
+
+    /// Show uncommitted shadow edits since last git commit
+    #[arg(long)]
+    pub status: bool,
+
+    /// Show diff for a specific commit
+    #[arg(long, value_name = "REF")]
+    pub diff: Option<String>,
+
+    /// Maximum number of entries to show
+    #[arg(short = 'n', long, default_value = "20")]
+    pub limit: usize,
+}
+
+/// Run history command.
+pub fn run(args: HistoryArgs, format: crate::output::OutputFormat) -> i32 {
+    let root = args
+        .root
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let shadow = Shadow::new(&root);
+
+    if !shadow.exists() {
+        if format.is_json() {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "head": null,
+                    "checkpoint": null,
+                    "edits": []
+                })
+            );
+        } else {
+            println!("No shadow history (no edits tracked yet)");
+        }
+        return 0;
+    }
+
+    // Handle --diff
+    if let Some(ref commit_ref) = args.diff {
+        return cmd_diff(&shadow, commit_ref, format.is_json());
+    }
+
+    // Handle --status
+    if args.status {
+        return cmd_status(&shadow, format.is_json());
+    }
+
+    // Regular history listing
+    let entries = shadow.history(args.file.as_deref(), args.limit);
+
+    if format.is_json() {
+        let checkpoint = shadow.checkpoint();
+        let head = entries.first().map(|e| e.id);
+
+        // Build JSON output matching design spec
+        let edits: Vec<serde_json::Value> = entries
+            .iter()
+            .map(|e| {
+                serde_json::json!({
+                    "id": e.id,
+                    "operation": e.operation,
+                    "target": e.target,
+                    "files": e.files,
+                    "message": e.message,
+                    "workflow": e.workflow,
+                    "git_head": e.git_head,
+                    "timestamp": e.timestamp
+                })
+            })
+            .collect();
+
+        println!(
+            "{}",
+            serde_json::json!({
+                "head": head,
+                "checkpoint": checkpoint,
+                "edits": edits
+            })
+        );
+    } else {
+        if entries.is_empty() {
+            println!("No edits in history");
+            return 0;
+        }
+
+        for entry in &entries {
+            let msg_suffix = entry
+                .message
+                .as_ref()
+                .map(|m| format!(" \"{}\"", m))
+                .unwrap_or_default();
+
+            let head_marker = if entry.id == entries.first().map(|e| e.id).unwrap_or(0) {
+                " [HEAD]"
+            } else {
+                ""
+            };
+
+            println!(
+                "  {}.{} {}: {} in {}{}",
+                entry.id,
+                head_marker,
+                entry.operation,
+                entry.target,
+                entry.files.join(", "),
+                msg_suffix
+            );
+        }
+    }
+
+    0
+}
+
+/// Show diff for a specific commit.
+fn cmd_diff(shadow: &Shadow, commit_ref: &str, json: bool) -> i32 {
+    match shadow.diff(commit_ref) {
+        Some(diff) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "ref": commit_ref,
+                        "diff": diff
+                    })
+                );
+            } else {
+                print!("{}", diff);
+            }
+            0
+        }
+        None => {
+            eprintln!("Could not find commit: {}", commit_ref);
+            1
+        }
+    }
+}
+
+/// Show status of shadow edits since last real git commit.
+fn cmd_status(shadow: &Shadow, json: bool) -> i32 {
+    let entries = shadow.history(None, 100);
+    let checkpoint = shadow.checkpoint();
+
+    // Count edits since checkpoint
+    let edits_since_checkpoint: Vec<_> = entries
+        .iter()
+        .take_while(|e| {
+            checkpoint
+                .as_ref()
+                .map(|c| &e.git_head != c)
+                .unwrap_or(true)
+        })
+        .collect();
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "edits_since_checkpoint": edits_since_checkpoint.len(),
+                "checkpoint": checkpoint
+            })
+        );
+    } else {
+        println!(
+            "Shadow edits since last commit: {}",
+            edits_since_checkpoint.len()
+        );
+        if let Some(cp) = checkpoint {
+            println!("Last checkpoint: {}", cp);
+        }
+    }
+
+    0
+}
