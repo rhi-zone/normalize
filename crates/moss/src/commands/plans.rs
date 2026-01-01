@@ -18,6 +18,7 @@ struct PlanInfo {
 
 /// Extract title from plan file (first line: "# Plan: <title>")
 fn extract_title(content: &str) -> String {
+    // Not chained: second strip_prefix is a fallback, would require duplicating first check
     if let Some(first_line) = content.lines().next() {
         if let Some(title) = first_line.strip_prefix("# Plan: ") {
             return title.to_string();

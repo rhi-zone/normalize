@@ -1175,6 +1175,7 @@ fn run_auto_loop(config: &Table, root: &PathBuf) -> LuaResult<CommandResult> {
     let max_turns: usize = config.get("max_turns").unwrap_or(10);
 
     // Extract provider from model (format: "provider/model" or just "provider")
+    // Not chained: else branch uses `m` directly when split_once fails
     let (provider, model_name) = if let Some(ref m) = model {
         if let Some((p, n)) = m.split_once('/') {
             (p, Some(n))
