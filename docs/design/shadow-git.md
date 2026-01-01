@@ -63,7 +63,7 @@ moss history --diff <ref>     # Show what a commit changed
 moss history --diff 2         # Diff for commit 2
 ```
 
-Note: Read-only operations moved to `moss history` (cleaner than `moss edit --history`). Mutations (`--undo`, `--redo`, `--goto`, `--prune`) stay with `moss edit`.
+Note: `moss history` is the primary interface for shadow git. Mutations (`--undo`, `--redo`, `--goto`) work on both `moss history` and `moss edit` for convenience.
 
 Undo output includes:
 - Files changed
