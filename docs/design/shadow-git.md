@@ -52,39 +52,68 @@ warn_on_delete = true         # Confirm before deleting symbols
 ### Tree Structure (Not Linear)
 
 Shadow history is a **tree**, not a linear history:
-- Undo creates a new branch point, doesn't destroy history
+- Undo moves HEAD backward but doesn't destroy commits
+- New edits after undo create a branch (fork in history)
 - All edits preserved (can return to any previous state)
 - Branches can be pruned for security (remove sensitive content from history)
 
 ```
-         A -- B -- C -- D  (main edit history)
+         A -- B -- C -- D  (original history, still exists)
               \
-               E -- F      (branch after undoing C, making new edits)
+               E -- F      (new branch: after undoing to B, made edits E, F)
+                    ^
+                   HEAD
 ```
+
+Undo/redo mechanics:
+- `--undo`: moves HEAD to parent commit, applies reverse patch to user files
+- `--undo N`: undoes N commits in sequence
+- `--redo`: moves HEAD to child commit, applies forward patch
+  - If multiple children exist (branch point), prompts user or requires `--redo <ref>`
+- After undo, new edits create a branch from current HEAD
+- Original commits (like D above) still exist, reachable via `--history --all`
 
 ### Directory Structure
 ```
 .moss/
   shadow/
-    .git/                     # Shadow repository (tree structure)
-    refs/
-      files/                  # Per-file branch heads (Phase 2)
-        src/
-          foo.rs              # HEAD for src/foo.rs edits
+    .git/                     # Shadow repository
+      refs/
+        heads/
+          main                # Current position in edit tree
+        files/                # Per-file branch heads (Phase 2)
+          src%2Ffoo.rs        # HEAD for src/foo.rs edits (URL-encoded path)
+    worktree/                 # Working copy of tracked files
 ```
 
+The shadow repo tracks files in a separate worktree, not the user's actual files. On each `moss edit`:
+1. Copy current file state to worktree (captures "before")
+2. Apply edit to user's file
+3. Copy new file state to worktree (captures "after")
+4. Commit the change
+
 ### Shadow Commit Format
+
+Commit message (structured for parsing):
 ```
 moss edit: delete src/foo.rs/deprecated_fn
 
 Message: Removing deprecated function
 Operation: delete
 Target: src/foo.rs/deprecated_fn
-Timestamp: 2025-01-01T12:00:00Z
 Files: src/foo.rs
----
-[patch content]
 ```
+
+Git stores the diff separately. Timestamp comes from git commit metadata.
+
+### Multi-File Edits
+
+Some operations may touch multiple files (future: cross-file refactors like `moss move`):
+- Shadow commit is atomic: all files in one commit
+- Undo reverts all files atomically
+- Per-file history (Phase 2) tracks each file's HEAD independently
+  - `--history src/foo.rs` shows only commits affecting that file
+  - `--undo --file src/foo.rs` reverts only that file's changes (creates partial undo commit)
 
 ### Branch Pruning (Security)
 
@@ -132,10 +161,11 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] `--history` to list recent edits
 
 ### Phase 2: Undo/Redo + Per-File
-- [ ] `--undo` applies reverse patch, prints summary
-- [ ] `--undo N` reverts N edits with full output
-- [ ] `--redo` re-applies forward (creates new branch, preserves tree)
-- [ ] Per-file branches and `--history <file>`
+- [ ] `--undo` applies reverse patch, moves HEAD backward, prints summary
+- [ ] `--undo N` reverts N edits in sequence
+- [ ] `--redo` moves HEAD forward, applies patch (error if at branch point)
+- [ ] `--history --all` shows full tree structure
+- [ ] Per-file branches (`refs/files/<path>`) and `--history <file>`
 
 ### Phase 3: Security + Polish
 - [ ] `--prune` for removing commits/branches
@@ -162,17 +192,30 @@ delete: old_fn in src/foo.rs
 $ moss edit src/foo.rs/helper rename new_helper
 rename: helper -> new_helper in src/foo.rs
 
+$ moss edit --history
+  2. [HEAD] rename: helper -> new_helper in src/foo.rs
+  1. delete: old_fn in src/foo.rs "Cleanup"
+
 $ moss edit --undo 2
 Undoing 2 edits:
-  [2] rename: helper -> new_helper in src/foo.rs
-  [1] delete: old_fn in src/foo.rs (Cleanup)
+  [2] rename: helper -> new_helper
+  [1] delete: old_fn "Cleanup"
 Files restored: src/foo.rs
+HEAD now at: (initial state)
 
-$ moss edit --history
-  3. [current] undo 2 edits
-  2. rename src/foo.rs/helper -> new_helper
-  1. delete src/foo.rs/old_fn "Cleanup"
+$ moss edit src/foo.rs/new_fn insert "fn new_fn() {}"
+insert: new_fn in src/foo.rs
+(created branch from initial state)
+
+$ moss edit --history --all
+  * 3. [HEAD] insert: new_fn in src/foo.rs
+  |
+  | 2. rename: helper -> new_helper in src/foo.rs
+  | 1. delete: old_fn in src/foo.rs "Cleanup"
+  |/
+  0. (initial state)
 
 $ moss edit --redo
-Re-applied: delete src/foo.rs/old_fn "Cleanup"
+error: No forward history from current position.
+hint: Use --history --all to see other branches.
 ```
