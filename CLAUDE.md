@@ -138,6 +138,9 @@ Add: workflow patterns, conventions, project-specific knowledge, tool usage patt
 Don't add: temporary notes (TODO.md), implementation details (docs/), one-off decisions (commit messages).
 Keep it slim: If CLAUDE.md grows past ~150 lines, refactor content to docs/ and reference it.
 
+### Updating docs/cli
+When changing CLI behavior (new flags, changed semantics, new features), update the corresponding `docs/cli/<command>.md` file.
+
 ### Updating TODO.md
 Proactively add features, ideas, patterns, technical debt, integration opportunities.
 Keep TODO.md lean (<100 lines). Move completed items to CHANGELOG.md.
