@@ -188,10 +188,10 @@ impl Language for CommonLisp {
         // Common Lisp docstrings are strings after the argument list
         let text = &content[node.byte_range()];
         // Simple heuristic: find first quoted string
-        if let Some(start) = text.find('"') {
-            if let Some(end) = text[start + 1..].find('"') {
-                return Some(text[start + 1..start + 1 + end].to_string());
-            }
+        if let Some(start) = text.find('"')
+            && let Some(end) = text[start + 1..].find('"')
+        {
+            return Some(text[start + 1..start + 1 + end].to_string());
         }
         None
     }

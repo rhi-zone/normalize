@@ -14,14 +14,11 @@ pub fn installed_version(package: &str, project_root: &Path) -> Option<String> {
     // Format: packages["package@version"] or packages["/package@version"]
     if let Some(packages) = parsed.get("packages").and_then(|p| p.as_mapping()) {
         for (key, _value) in packages {
-            if let Some(key_str) = key.as_str() {
-                // Keys are like "@scope/pkg@1.0.0" or "pkg@1.0.0"
-                let key_trimmed = key_str.trim_start_matches('/');
-                if let Some((name, version)) = parse_package_key(key_trimmed) {
-                    if name == package {
-                        return Some(version);
-                    }
-                }
+            if let Some(key_str) = key.as_str()
+                && let Some((name, version)) = parse_package_key(key_str.trim_start_matches('/'))
+                && name == package
+            {
+                return Some(version);
             }
         }
     }
@@ -30,14 +27,13 @@ pub fn installed_version(package: &str, project_root: &Path) -> Option<String> {
     if let Some(importers) = parsed.get("importers").and_then(|i| i.as_mapping()) {
         for (_importer_path, importer) in importers {
             for dep_type in ["dependencies", "devDependencies", "optionalDependencies"] {
-                if let Some(deps) = importer.get(dep_type).and_then(|d| d.as_mapping()) {
-                    if let Some(dep) = deps.get(package) {
-                        if let Some(version_info) = dep.get("version").and_then(|v| v.as_str()) {
-                            // Version might have peer dep suffix like "1.0.0(peer@2.0.0)"
-                            let version = version_info.split('(').next().unwrap_or(version_info);
-                            return Some(version.to_string());
-                        }
-                    }
+                if let Some(deps) = importer.get(dep_type).and_then(|d| d.as_mapping())
+                    && let Some(dep) = deps.get(package)
+                    && let Some(version_info) = dep.get("version").and_then(|v| v.as_str())
+                {
+                    // Version might have peer dep suffix like "1.0.0(peer@2.0.0)"
+                    let version = version_info.split('(').next().unwrap_or(version_info);
+                    return Some(version.to_string());
                 }
             }
         }
@@ -101,41 +97,37 @@ fn build_deps_map(parsed: &serde_yaml::Value) -> HashMap<String, Vec<String>> {
 
     if let Some(snapshots) = parsed.get("snapshots").and_then(|s| s.as_mapping()) {
         for (key, value) in snapshots {
-            if let Some(key_str) = key.as_str() {
-                if let Some((name, version)) = parse_snapshot_key(key_str) {
-                    let pkg_key = format!("{}@{}", name, version);
-                    let mut deps = Vec::new();
+            if let Some(key_str) = key.as_str()
+                && let Some((name, version)) = parse_snapshot_key(key_str)
+            {
+                let pkg_key = format!("{}@{}", name, version);
+                let mut deps = Vec::new();
 
-                    // Get dependencies
-                    if let Some(dep_map) = value.get("dependencies").and_then(|d| d.as_mapping()) {
-                        for (dep_name, dep_version) in dep_map {
-                            if let (Some(name), Some(ver)) =
-                                (dep_name.as_str(), dep_version.as_str())
-                            {
-                                // Version might have peer suffix
-                                let ver = ver.split('(').next().unwrap_or(ver);
-                                deps.push(format!("{}@{}", name, ver));
-                            }
+                // Get dependencies
+                if let Some(dep_map) = value.get("dependencies").and_then(|d| d.as_mapping()) {
+                    for (dep_name, dep_version) in dep_map {
+                        if let (Some(name), Some(ver)) = (dep_name.as_str(), dep_version.as_str()) {
+                            // Version might have peer suffix
+                            let ver = ver.split('(').next().unwrap_or(ver);
+                            deps.push(format!("{}@{}", name, ver));
                         }
                     }
-
-                    // Also include optionalDependencies
-                    if let Some(dep_map) = value
-                        .get("optionalDependencies")
-                        .and_then(|d| d.as_mapping())
-                    {
-                        for (dep_name, dep_version) in dep_map {
-                            if let (Some(name), Some(ver)) =
-                                (dep_name.as_str(), dep_version.as_str())
-                            {
-                                let ver = ver.split('(').next().unwrap_or(ver);
-                                deps.push(format!("{}@{}", name, ver));
-                            }
-                        }
-                    }
-
-                    deps_map.insert(pkg_key, deps);
                 }
+
+                // Also include optionalDependencies
+                if let Some(dep_map) = value
+                    .get("optionalDependencies")
+                    .and_then(|d| d.as_mapping())
+                {
+                    for (dep_name, dep_version) in dep_map {
+                        if let (Some(name), Some(ver)) = (dep_name.as_str(), dep_version.as_str()) {
+                            let ver = ver.split('(').next().unwrap_or(ver);
+                            deps.push(format!("{}@{}", name, ver));
+                        }
+                    }
+                }
+
+                deps_map.insert(pkg_key, deps);
             }
         }
     }
@@ -194,21 +186,19 @@ fn build_tree(
 ) -> Result<DependencyTree, PackageError> {
     // Get project name from package.json
     let pkg_json = project_root.join("package.json");
-    let (name, version) = if let Ok(content) = std::fs::read_to_string(&pkg_json) {
-        if let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content) {
-            (
-                pkg.get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("root")
-                    .to_string(),
-                pkg.get("version")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("0.0.0")
-                    .to_string(),
-            )
-        } else {
-            ("root".to_string(), "0.0.0".to_string())
-        }
+    let (name, version) = if let Ok(content) = std::fs::read_to_string(&pkg_json)
+        && let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content)
+    {
+        (
+            pkg.get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("root")
+                .to_string(),
+            pkg.get("version")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0.0.0")
+                .to_string(),
+        )
     } else {
         ("root".to_string(), "0.0.0".to_string())
     };
@@ -221,30 +211,27 @@ fn build_tree(
     const MAX_DEPTH: usize = 50; // Prevent runaway recursion
 
     // Get direct dependencies from importers section
-    if let Some(importers) = parsed.get("importers").and_then(|i| i.as_mapping()) {
-        // Root importer is "."
-        if let Some(root_importer) = importers
+    if let Some(importers) = parsed.get("importers").and_then(|i| i.as_mapping())
+        && let Some(root_importer) = importers
             .get(".")
             .or_else(|| importers.get(&serde_yaml::Value::String(".".to_string())))
-        {
-            for dep_type in ["dependencies", "devDependencies"] {
-                if let Some(deps) = root_importer.get(dep_type).and_then(|d| d.as_mapping()) {
-                    for (dep_name, dep_info) in deps {
-                        if let (Some(dep_name_str), Some(version_info)) = (
-                            dep_name.as_str(),
-                            dep_info.get("version").and_then(|v| v.as_str()),
-                        ) {
-                            // Version might have peer dep suffix
-                            let dep_version =
-                                version_info.split('(').next().unwrap_or(version_info);
-                            root_deps.push(build_node(
-                                dep_name_str,
-                                dep_version,
-                                &deps_map,
-                                &mut visited,
-                                MAX_DEPTH,
-                            ));
-                        }
+    {
+        for dep_type in ["dependencies", "devDependencies"] {
+            if let Some(deps) = root_importer.get(dep_type).and_then(|d| d.as_mapping()) {
+                for (dep_name, dep_info) in deps {
+                    if let (Some(dep_name_str), Some(version_info)) = (
+                        dep_name.as_str(),
+                        dep_info.get("version").and_then(|v| v.as_str()),
+                    ) {
+                        // Version might have peer dep suffix
+                        let dep_version = version_info.split('(').next().unwrap_or(version_info);
+                        root_deps.push(build_node(
+                            dep_name_str,
+                            dep_version,
+                            &deps_map,
+                            &mut visited,
+                            MAX_DEPTH,
+                        ));
                     }
                 }
             }

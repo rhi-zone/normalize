@@ -898,10 +898,10 @@ impl Language for Python {
         project_root: &Path,
     ) -> Option<ResolvedPackage> {
         // Check stdlib first
-        if let Some(stdlib) = find_python_stdlib(project_root) {
-            if let Some(pkg) = resolve_python_stdlib_import(import_name, &stdlib) {
-                return Some(pkg);
-            }
+        if let Some(stdlib) = find_python_stdlib(project_root)
+            && let Some(pkg) = resolve_python_stdlib_import(import_name, &stdlib)
+        {
+            return Some(pkg);
         }
 
         // Then site-packages

@@ -36,36 +36,28 @@ fn installed_version_text(package: &str, project_root: &Path) -> Option<String> 
     let parsed: serde_json::Value = serde_json_lenient::from_str(&content).ok()?;
 
     // packages section: "pkg": ["pkg@version", registry, {deps}, hash]
-    if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object()) {
-        if let Some(pkg_info) = packages.get(package) {
-            if let Some(arr) = pkg_info.as_array() {
-                if let Some(first) = arr.first().and_then(|v| v.as_str()) {
-                    if let Some(version) = extract_version_from_spec(first) {
-                        return Some(version);
-                    }
-                }
-            }
-        }
+    if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object())
+        && let Some(pkg_info) = packages.get(package)
+        && let Some(arr) = pkg_info.as_array()
+        && let Some(first) = arr.first().and_then(|v| v.as_str())
+        && let Some(version) = extract_version_from_spec(first)
+    {
+        return Some(version);
     }
 
     // Also check workspaces for direct deps
     if let Some(workspaces) = parsed.get("workspaces").and_then(|w| w.as_object()) {
         for (_ws_path, ws_info) in workspaces {
             for dep_type in ["dependencies", "devDependencies", "optionalDependencies"] {
-                if let Some(deps) = ws_info.get(dep_type).and_then(|d| d.as_object()) {
-                    if deps.contains_key(package) {
-                        if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object()) {
-                            if let Some(pkg_info) = packages.get(package) {
-                                if let Some(arr) = pkg_info.as_array() {
-                                    if let Some(first) = arr.first().and_then(|v| v.as_str()) {
-                                        if let Some(version) = extract_version_from_spec(first) {
-                                            return Some(version);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if let Some(deps) = ws_info.get(dep_type).and_then(|d| d.as_object())
+                    && deps.contains_key(package)
+                    && let Some(packages) = parsed.get("packages").and_then(|p| p.as_object())
+                    && let Some(pkg_info) = packages.get(package)
+                    && let Some(arr) = pkg_info.as_array()
+                    && let Some(first) = arr.first().and_then(|v| v.as_str())
+                    && let Some(version) = extract_version_from_spec(first)
+                {
+                    return Some(version);
                 }
             }
         }
@@ -912,38 +904,38 @@ fn build_tree_binary(project_root: &Path) -> Result<DependencyTree, PackageError
 }
 
 fn get_project_info(parsed: &serde_json::Value, project_root: &Path) -> (String, String) {
-    if let Some(workspaces) = parsed.get("workspaces").and_then(|w| w.as_object()) {
-        if let Some(root_ws) = workspaces.get("") {
-            let name = root_ws
-                .get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or("root");
-            let version = root_ws
-                .get("version")
-                .and_then(|v| v.as_str())
-                .unwrap_or("0.0.0");
-            return (name.to_string(), version.to_string());
-        }
+    if let Some(workspaces) = parsed.get("workspaces").and_then(|w| w.as_object())
+        && let Some(root_ws) = workspaces.get("")
+    {
+        let name = root_ws
+            .get("name")
+            .and_then(|n| n.as_str())
+            .unwrap_or("root");
+        let version = root_ws
+            .get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0.0.0");
+        return (name.to_string(), version.to_string());
     }
     get_project_info_from_package_json(project_root)
 }
 
 fn get_project_info_from_package_json(project_root: &Path) -> (String, String) {
     let pkg_json = project_root.join("package.json");
-    if let Ok(content) = std::fs::read_to_string(&pkg_json) {
-        if let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content) {
-            let name = pkg
-                .get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or("root")
-                .to_string();
-            let version = pkg
-                .get("version")
-                .and_then(|v| v.as_str())
-                .unwrap_or("0.0.0")
-                .to_string();
-            return (name, version);
-        }
+    if let Ok(content) = std::fs::read_to_string(&pkg_json)
+        && let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content)
+    {
+        let name = pkg
+            .get("name")
+            .and_then(|n| n.as_str())
+            .unwrap_or("root")
+            .to_string();
+        let version = pkg
+            .get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0.0.0")
+            .to_string();
+        return (name, version);
     }
     ("root".to_string(), "0.0.0".to_string())
 }

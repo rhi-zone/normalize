@@ -175,34 +175,32 @@ impl Ecosystem for Go {
             if line.trim().is_empty() {
                 continue;
             }
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
-                // Look for "finding" entries
-                if let Some(finding) = v.get("finding") {
-                    if let Some(osv) = finding.get("osv") {
-                        let id = osv.as_str().unwrap_or("").to_string();
-                        let trace = finding.get("trace").and_then(|t| t.as_array());
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(line)
+                && let Some(finding) = v.get("finding")
+                && let Some(osv) = finding.get("osv")
+            {
+                let id = osv.as_str().unwrap_or("").to_string();
+                let trace = finding.get("trace").and_then(|t| t.as_array());
 
-                        // Get package and version from trace
-                        let (package, version) = trace
-                            .and_then(|arr| arr.first())
-                            .map(|t| {
-                                let pkg = t.get("module").and_then(|m| m.as_str()).unwrap_or("");
-                                let ver = t.get("version").and_then(|v| v.as_str()).unwrap_or("");
-                                (pkg.to_string(), ver.to_string())
-                            })
-                            .unwrap_or_default();
+                // Get package and version from trace
+                let (package, version) = trace
+                    .and_then(|arr| arr.first())
+                    .map(|t| {
+                        let pkg = t.get("module").and_then(|m| m.as_str()).unwrap_or("");
+                        let ver = t.get("version").and_then(|v| v.as_str()).unwrap_or("");
+                        (pkg.to_string(), ver.to_string())
+                    })
+                    .unwrap_or_default();
 
-                        vulnerabilities.push(Vulnerability {
-                            package,
-                            version,
-                            severity: VulnerabilitySeverity::Unknown,
-                            title: id.clone(),
-                            url: Some(format!("https://pkg.go.dev/vuln/{}", id)),
-                            cve: None,
-                            fixed_in: None,
-                        });
-                    }
-                }
+                vulnerabilities.push(Vulnerability {
+                    package,
+                    version,
+                    severity: VulnerabilitySeverity::Unknown,
+                    title: id.clone(),
+                    url: Some(format!("https://pkg.go.dev/vuln/{}", id)),
+                    cve: None,
+                    fixed_in: None,
+                });
             }
         }
 

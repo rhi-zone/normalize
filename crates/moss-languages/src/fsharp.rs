@@ -342,14 +342,13 @@ impl Language for FSharp {
         for entry in std::fs::read_dir(project_root).ok()? {
             let entry = entry.ok()?;
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "fsproj") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Some(start) = content.find("<Version>") {
-                        let rest = &content[start + 9..];
-                        if let Some(end) = rest.find("</Version>") {
-                            return Some(rest[..end].to_string());
-                        }
-                    }
+            if path.extension().map_or(false, |e| e == "fsproj")
+                && let Ok(content) = std::fs::read_to_string(&path)
+                && let Some(start) = content.find("<Version>")
+            {
+                let rest = &content[start + 9..];
+                if let Some(end) = rest.find("</Version>") {
+                    return Some(rest[..end].to_string());
                 }
             }
         }

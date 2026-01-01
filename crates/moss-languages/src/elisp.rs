@@ -189,10 +189,10 @@ impl Language for Elisp {
         // Find first quoted string after arglist
         if let Some(paren_end) = text.find(')') {
             let after_args = &text[paren_end + 1..];
-            if let Some(start) = after_args.find('"') {
-                if let Some(end) = after_args[start + 1..].find('"') {
-                    return Some(after_args[start + 1..start + 1 + end].to_string());
-                }
+            if let Some(start) = after_args.find('"')
+                && let Some(end) = after_args[start + 1..].find('"')
+            {
+                return Some(after_args[start + 1..start + 1 + end].to_string());
             }
         }
         None

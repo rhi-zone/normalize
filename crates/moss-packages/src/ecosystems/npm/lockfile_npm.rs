@@ -13,20 +13,19 @@ pub fn installed_version(package: &str, project_root: &Path) -> Option<String> {
     // v2/v3 format: packages["node_modules/pkg"]
     if let Some(pkgs) = parsed.get("packages").and_then(|p| p.as_object()) {
         let key = format!("node_modules/{}", package);
-        if let Some(pkg) = pkgs.get(&key) {
-            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                return Some(v.to_string());
-            }
+        if let Some(pkg) = pkgs.get(&key)
+            && let Some(v) = pkg.get("version").and_then(|v| v.as_str())
+        {
+            return Some(v.to_string());
         }
     }
 
     // v1 format: dependencies["pkg"]
-    if let Some(deps) = parsed.get("dependencies").and_then(|d| d.as_object()) {
-        if let Some(pkg) = deps.get(package) {
-            if let Some(v) = pkg.get("version").and_then(|v| v.as_str()) {
-                return Some(v.to_string());
-            }
-        }
+    if let Some(deps) = parsed.get("dependencies").and_then(|d| d.as_object())
+        && let Some(pkg) = deps.get(package)
+        && let Some(v) = pkg.get("version").and_then(|v| v.as_str())
+    {
+        return Some(v.to_string());
     }
 
     None

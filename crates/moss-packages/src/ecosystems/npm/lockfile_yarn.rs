@@ -79,21 +79,21 @@ fn parse_yarn_lock(content: &str) -> HashMap<String, YarnEntry> {
         // New package entry (not indented, ends with :)
         if !line.starts_with(' ') && line.ends_with(':') {
             // Save previous entry if exists
-            if !current_packages.is_empty() {
-                if let Some(ver) = current_version.take() {
-                    let entry = YarnEntry {
-                        version: ver.clone(),
-                        dependencies: current_deps.clone(),
-                    };
-                    for pkg in &current_packages {
-                        entries.insert(
-                            pkg.clone(),
-                            YarnEntry {
-                                version: entry.version.clone(),
-                                dependencies: entry.dependencies.clone(),
-                            },
-                        );
-                    }
+            if !current_packages.is_empty()
+                && let Some(ver) = current_version.take()
+            {
+                let entry = YarnEntry {
+                    version: ver.clone(),
+                    dependencies: current_deps.clone(),
+                };
+                for pkg in &current_packages {
+                    entries.insert(
+                        pkg.clone(),
+                        YarnEntry {
+                            version: entry.version.clone(),
+                            dependencies: entry.dependencies.clone(),
+                        },
+                    );
                 }
             }
 
@@ -131,21 +131,21 @@ fn parse_yarn_lock(content: &str) -> HashMap<String, YarnEntry> {
     }
 
     // Save last entry
-    if !current_packages.is_empty() {
-        if let Some(ver) = current_version {
-            let entry = YarnEntry {
-                version: ver.clone(),
-                dependencies: current_deps,
-            };
-            for pkg in &current_packages {
-                entries.insert(
-                    pkg.clone(),
-                    YarnEntry {
-                        version: entry.version.clone(),
-                        dependencies: entry.dependencies.clone(),
-                    },
-                );
-            }
+    if !current_packages.is_empty()
+        && let Some(ver) = current_version
+    {
+        let entry = YarnEntry {
+            version: ver.clone(),
+            dependencies: current_deps,
+        };
+        for pkg in &current_packages {
+            entries.insert(
+                pkg.clone(),
+                YarnEntry {
+                    version: entry.version.clone(),
+                    dependencies: entry.dependencies.clone(),
+                },
+            );
         }
     }
 

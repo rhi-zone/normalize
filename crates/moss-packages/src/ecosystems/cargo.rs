@@ -218,83 +218,81 @@ impl Ecosystem for Cargo {
 
         let mut vulnerabilities = Vec::new();
 
-        if let Some(vulns) = v.get("vulnerabilities").and_then(|v| v.get("list")) {
-            if let Some(arr) = vulns.as_array() {
-                for vuln in arr {
-                    let advisory = vuln.get("advisory");
-                    let pkg = vuln.get("package");
+        if let Some(vulns) = v.get("vulnerabilities").and_then(|v| v.get("list"))
+            && let Some(arr) = vulns.as_array()
+        {
+            for vuln in arr {
+                let advisory = vuln.get("advisory");
+                let pkg = vuln.get("package");
 
-                    let package = pkg
-                        .and_then(|p| p.get("name"))
-                        .and_then(|n| n.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let version = pkg
-                        .and_then(|p| p.get("version"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
+                let package = pkg
+                    .and_then(|p| p.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let version = pkg
+                    .and_then(|p| p.get("version"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
 
-                    let title = advisory
-                        .and_then(|a| a.get("title"))
-                        .and_then(|t| t.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let url = advisory
-                        .and_then(|a| a.get("url"))
-                        .and_then(|u| u.as_str())
-                        .map(String::from);
-                    let cve = advisory
-                        .and_then(|a| a.get("aliases"))
-                        .and_then(|a| a.as_array())
-                        .and_then(|arr| {
-                            arr.iter()
-                                .find(|a| {
-                                    a.as_str().map(|s| s.starts_with("CVE-")).unwrap_or(false)
-                                })
-                                .and_then(|a| a.as_str().map(String::from))
-                        });
-
-                    // Get severity from CVSS if available
-                    let severity = advisory
-                        .and_then(|a| a.get("cvss"))
-                        .and_then(|c| c.as_f64())
-                        .map(|score| {
-                            if score >= 9.0 {
-                                VulnerabilitySeverity::Critical
-                            } else if score >= 7.0 {
-                                VulnerabilitySeverity::High
-                            } else if score >= 4.0 {
-                                VulnerabilitySeverity::Medium
-                            } else {
-                                VulnerabilitySeverity::Low
-                            }
-                        })
-                        .unwrap_or(VulnerabilitySeverity::Unknown);
-
-                    // Get patched versions
-                    let fixed_in = vuln
-                        .get("versions")
-                        .and_then(|v| v.get("patched"))
-                        .and_then(|p| p.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        })
-                        .filter(|s| !s.is_empty());
-
-                    vulnerabilities.push(Vulnerability {
-                        package,
-                        version,
-                        severity,
-                        title,
-                        url,
-                        cve,
-                        fixed_in,
+                let title = advisory
+                    .and_then(|a| a.get("title"))
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let url = advisory
+                    .and_then(|a| a.get("url"))
+                    .and_then(|u| u.as_str())
+                    .map(String::from);
+                let cve = advisory
+                    .and_then(|a| a.get("aliases"))
+                    .and_then(|a| a.as_array())
+                    .and_then(|arr| {
+                        arr.iter()
+                            .find(|a| a.as_str().map(|s| s.starts_with("CVE-")).unwrap_or(false))
+                            .and_then(|a| a.as_str().map(String::from))
                     });
-                }
+
+                // Get severity from CVSS if available
+                let severity = advisory
+                    .and_then(|a| a.get("cvss"))
+                    .and_then(|c| c.as_f64())
+                    .map(|score| {
+                        if score >= 9.0 {
+                            VulnerabilitySeverity::Critical
+                        } else if score >= 7.0 {
+                            VulnerabilitySeverity::High
+                        } else if score >= 4.0 {
+                            VulnerabilitySeverity::Medium
+                        } else {
+                            VulnerabilitySeverity::Low
+                        }
+                    })
+                    .unwrap_or(VulnerabilitySeverity::Unknown);
+
+                // Get patched versions
+                let fixed_in = vuln
+                    .get("versions")
+                    .and_then(|v| v.get("patched"))
+                    .and_then(|p| p.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    })
+                    .filter(|s| !s.is_empty());
+
+                vulnerabilities.push(Vulnerability {
+                    package,
+                    version,
+                    severity,
+                    title,
+                    url,
+                    cve,
+                    fixed_in,
+                });
             }
         }
 
@@ -425,32 +423,30 @@ fn fetch_crates_io_info(query: &PackageQuery) -> Result<PackageInfo, PackageErro
 
     // Get crate-level info (description, homepage, repository)
     let crate_url = format!("https://crates.io/api/v1/crates/{}", package);
-    let (description, homepage, repository) =
-        if let Ok(body) = crate::http::get_with_headers(&crate_url, headers) {
-            if let Ok(cv) = serde_json::from_str::<serde_json::Value>(&body) {
-                let crate_info = cv.get("crate");
-                (
-                    crate_info
-                        .and_then(|c| c.get("description"))
-                        .and_then(|d| d.as_str())
-                        .map(String::from),
-                    crate_info
-                        .and_then(|c| c.get("homepage"))
-                        .and_then(|h| h.as_str())
-                        .filter(|s| !s.is_empty())
-                        .map(String::from),
-                    crate_info
-                        .and_then(|c| c.get("repository"))
-                        .and_then(|r| r.as_str())
-                        .filter(|s| !s.is_empty())
-                        .map(String::from),
-                )
-            } else {
-                (None, None, None)
-            }
-        } else {
-            (None, None, None)
-        };
+    let (description, homepage, repository) = if let Ok(body) =
+        crate::http::get_with_headers(&crate_url, headers)
+        && let Ok(cv) = serde_json::from_str::<serde_json::Value>(&body)
+    {
+        let crate_info = cv.get("crate");
+        (
+            crate_info
+                .and_then(|c| c.get("description"))
+                .and_then(|d| d.as_str())
+                .map(String::from),
+            crate_info
+                .and_then(|c| c.get("homepage"))
+                .and_then(|h| h.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from),
+            crate_info
+                .and_then(|c| c.get("repository"))
+                .and_then(|r| r.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from),
+        )
+    } else {
+        (None, None, None)
+    };
 
     Ok(PackageInfo {
         name,

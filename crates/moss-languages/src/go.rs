@@ -591,15 +591,16 @@ impl Language for Go {
         _project_root: &Path,
     ) -> Option<PathBuf> {
         // Find go.mod to understand module boundaries
-        if let Some(go_mod_path) = find_go_mod(current_file) {
-            if let Some(module) = parse_go_mod(&go_mod_path) {
-                // Try local resolution within the module
-                let module_root = go_mod_path.parent()?;
-                if let Some(local_path) = resolve_go_import(import_path, &module, module_root) {
-                    if local_path.exists() && local_path.is_dir() {
-                        return Some(local_path);
-                    }
-                }
+        if let Some(go_mod_path) = find_go_mod(current_file)
+            && let Some(module) = parse_go_mod(&go_mod_path)
+        {
+            // Try local resolution within the module
+            let module_root = go_mod_path.parent()?;
+            if let Some(local_path) = resolve_go_import(import_path, &module, module_root)
+                && local_path.exists()
+                && local_path.is_dir()
+            {
+                return Some(local_path);
             }
         }
         None
@@ -611,12 +612,11 @@ impl Language for Go {
         _project_root: &Path,
     ) -> Option<ResolvedPackage> {
         // Check stdlib first
-        if is_go_stdlib_import(import_name) {
-            if let Some(stdlib) = find_go_stdlib() {
-                if let Some(pkg) = resolve_go_stdlib_import(import_name, &stdlib) {
-                    return Some(pkg);
-                }
-            }
+        if is_go_stdlib_import(import_name)
+            && let Some(stdlib) = find_go_stdlib()
+            && let Some(pkg) = resolve_go_stdlib_import(import_name, &stdlib)
+        {
+            return Some(pkg);
         }
 
         // Then mod cache

@@ -552,15 +552,13 @@ fn get_package_entry_point(pkg_dir: &Path, pkg_json: &Path) -> Option<PathBuf> {
             if path.is_file() {
                 return Some(path);
             }
-        } else if let Some(obj) = exports.as_object() {
-            // Try "." entry
-            if let Some(dot) = obj.get(".") {
-                if let Some(entry) = extract_export_entry(dot) {
-                    let path = pkg_dir.join(entry.trim_start_matches("./"));
-                    if path.is_file() {
-                        return Some(path);
-                    }
-                }
+        } else if let Some(obj) = exports.as_object()
+            && let Some(dot) = obj.get(".")
+            && let Some(entry) = extract_export_entry(dot)
+        {
+            let path = pkg_dir.join(entry.trim_start_matches("./"));
+            if path.is_file() {
+                return Some(path);
             }
         }
     }
@@ -897,20 +895,19 @@ fn deno_version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 /// Checks package.json for module/main fields, falls back to index.{js,mjs,cjs,ts}.
 pub fn find_package_entry(dir: &Path) -> Option<PathBuf> {
     let pkg_json = dir.join("package.json");
-    if pkg_json.is_file() {
-        if let Ok(content) = std::fs::read_to_string(&pkg_json) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                for field in &["module", "main"] {
-                    if let Some(entry) = json.get(field).and_then(|v| v.as_str()) {
-                        let path = dir.join(entry.trim_start_matches("./"));
-                        if path.is_file() {
-                            return Some(path);
-                        }
-                        let with_ext = path.with_extension("js");
-                        if with_ext.is_file() {
-                            return Some(with_ext);
-                        }
-                    }
+    if pkg_json.is_file()
+        && let Ok(content) = std::fs::read_to_string(&pkg_json)
+        && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+    {
+        for field in &["module", "main"] {
+            if let Some(entry) = json.get(field).and_then(|v| v.as_str()) {
+                let path = dir.join(entry.trim_start_matches("./"));
+                if path.is_file() {
+                    return Some(path);
+                }
+                let with_ext = path.with_extension("js");
+                if with_ext.is_file() {
+                    return Some(with_ext);
                 }
             }
         }

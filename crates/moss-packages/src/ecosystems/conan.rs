@@ -41,12 +41,11 @@ impl Ecosystem for Conan {
 
         if let Some(nodes) = parsed.get("graph_lock")?.get("nodes")?.as_object() {
             for (_, node) in nodes {
-                if let Some(ref_str) = node.get("ref").and_then(|r| r.as_str()) {
-                    // Format: "pkg/version" or "pkg/version@user/channel"
-                    if let Some(rest) = ref_str.strip_prefix(&format!("{}/", package)) {
-                        let version = rest.split('@').next()?;
-                        return Some(version.to_string());
-                    }
+                if let Some(ref_str) = node.get("ref").and_then(|r| r.as_str())
+                    && let Some(rest) = ref_str.strip_prefix(&format!("{}/", package))
+                {
+                    let version = rest.split('@').next()?;
+                    return Some(version.to_string());
                 }
             }
         }

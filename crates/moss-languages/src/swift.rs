@@ -430,15 +430,13 @@ impl Language for Swift {
     fn get_version(&self, project_root: &Path) -> Option<String> {
         // Check Package.swift for swift-tools-version
         let package_swift = project_root.join("Package.swift");
-        if package_swift.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&package_swift) {
-                if let Some(line) = content.lines().next() {
-                    if line.contains("swift-tools-version:") {
-                        let version = line.split(':').nth(1)?.trim();
-                        return Some(version.to_string());
-                    }
-                }
-            }
+        if package_swift.is_file()
+            && let Ok(content) = std::fs::read_to_string(&package_swift)
+            && let Some(line) = content.lines().next()
+            && line.contains("swift-tools-version:")
+        {
+            let version = line.split(':').nth(1)?.trim();
+            return Some(version.to_string());
         }
         None
     }

@@ -112,17 +112,17 @@ fn resolve_java_import(
     let package_path = import.replace('.', "/");
 
     // Try Maven first
-    if let Some(maven) = maven_repo {
-        if let Some(result) = find_java_package_in_maven(maven, &package_path, import) {
-            return Some(result);
-        }
+    if let Some(maven) = maven_repo
+        && let Some(result) = find_java_package_in_maven(maven, &package_path, import)
+    {
+        return Some(result);
     }
 
     // Try Gradle
-    if let Some(gradle) = gradle_cache {
-        if let Some(result) = find_java_package_in_gradle(gradle, &package_path, import) {
-            return Some(result);
-        }
+    if let Some(gradle) = gradle_cache
+        && let Some(result) = find_java_package_in_gradle(gradle, &package_path, import)
+    {
+        return Some(result);
     }
 
     None
