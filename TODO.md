@@ -4,6 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Analyze glob patterns: `moss analyze 'foo/**/bar.*'` for matching symbols
+- Case-insensitive matching (`-i` flag) for view/edit/analyze path targets
+- Multi-file batch edit: reduce latency vs N sequential edits
+
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
