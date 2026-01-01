@@ -473,9 +473,8 @@ pub async fn cmd_sessions_serve(project: Option<&Path>, port: u16) -> i32 {
 
     let app = Router::new()
         .route("/", get(sessions_index))
-        .route("/session/{id}", get(session_detail))
-        .route("/session/{id}/chat", get(session_chat))
-        .route("/session/{id}/raw", get(session_raw))
+        .route("/session/{id}", get(session_viewer))
+        .route("/api/session/{id}", get(session_json))
         .with_state(state);
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
@@ -531,15 +530,15 @@ async fn sessions_index(State(state): State<Arc<SessionsState>>) -> Html<String>
     if sessions.is_empty() {
         html.push_str("<p>No sessions found.</p>\n");
     } else {
-        html.push_str("<table>\n<thead><tr><th>Session</th><th>Format</th><th>Age</th><th>Actions</th></tr></thead>\n<tbody>\n");
+        html.push_str("<table>\n<thead><tr><th>Session</th><th>Format</th><th>Age</th></tr></thead>\n<tbody>\n");
         for (path, mtime, format) in &sessions {
             let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             let age = format_age(mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0));
             let format_str = format.as_deref().unwrap_or("unknown");
             let short_id = if id.len() > 20 { &id[..20] } else { id };
             html.push_str(&format!(
-                "<tr><td title=\"{}\">{}</td><td>{}</td><td>{}</td><td><a href=\"/session/{}\">info</a> | <a href=\"/session/{}/chat\">chat</a> | <a href=\"/session/{}/raw\">raw</a></td></tr>\n",
-                id, short_id, format_str, age, id, id, id
+                "<tr><td><a href=\"/session/{}\" title=\"{}\">{}</a></td><td>{}</td><td>{}</td></tr>\n",
+                id, id, short_id, format_str, age
             ));
         }
         html.push_str("</tbody></table>\n");
@@ -549,165 +548,37 @@ async fn sessions_index(State(state): State<Arc<SessionsState>>) -> Html<String>
     Html(html)
 }
 
-/// Session detail page: show analysis with link to chat.
-async fn session_detail(
-    State(state): State<Arc<SessionsState>>,
-    AxumPath(id): AxumPath<String>,
-) -> Result<Html<String>, StatusCode> {
-    let paths = resolve_session_paths(&id, state.project.as_deref());
-    let path = paths.first().ok_or(StatusCode::NOT_FOUND)?;
-
-    let analysis = analyze_session(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut html = String::from(HTML_HEADER);
-    html.push_str(&format!("<h1>Session: {}</h1>\n", html_escape(&id)));
-    html.push_str(&format!(
-        "<p><a href=\"/\">← Back</a> | <a href=\"/session/{}/chat\">Chat</a> | <a href=\"/session/{}/raw\">Raw</a></p>\n",
-        id, id
-    ));
-
-    // Render analysis as HTML
-    html.push_str("<div class=\"analysis\">\n");
-    html.push_str(&render_analysis_html(&analysis));
-    html.push_str("</div>\n");
-
-    html.push_str(HTML_FOOTER);
-    Ok(Html(html))
+/// Session viewer page: static HTML + JS that fetches and renders chat.
+async fn session_viewer(AxumPath(id): AxumPath<String>) -> Html<String> {
+    Html(VIEWER_HTML.replace("{{SESSION_ID}}", &html_escape(&id)))
 }
 
-/// Session chat page: render full conversation.
-async fn session_chat(
+/// API: return raw session log as JSON array.
+async fn session_json(
     State(state): State<Arc<SessionsState>>,
     AxumPath(id): AxumPath<String>,
-) -> Result<Html<String>, StatusCode> {
+) -> Result<axum::response::Response, StatusCode> {
+    use axum::response::IntoResponse;
+
     let paths = resolve_session_paths(&id, state.project.as_deref());
     let path = paths.first().ok_or(StatusCode::NOT_FOUND)?;
 
     let content = std::fs::read_to_string(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let mut html = String::from(HTML_HEADER_CHAT);
-    html.push_str(&format!("<h1>Session: {}</h1>\n", html_escape(&id)));
-    html.push_str(&format!(
-        "<p><a href=\"/\">← Back</a> | <a href=\"/session/{}\">Analysis</a> | <a href=\"/session/{}/raw\">Raw</a></p>\n",
-        id, id
-    ));
+    // Parse JSONL into JSON array
+    let entries: Vec<serde_json::Value> = content
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect();
 
-    html.push_str("<div class=\"chat\">\n");
-    html.push_str(&render_chat_html(&content));
-    html.push_str("</div>\n");
+    let json = serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string());
 
-    html.push_str(HTML_FOOTER);
-    Ok(Html(html))
-}
-
-/// Raw session dump.
-async fn session_raw(
-    State(state): State<Arc<SessionsState>>,
-    AxumPath(id): AxumPath<String>,
-) -> Result<String, StatusCode> {
-    let paths = resolve_session_paths(&id, state.project.as_deref());
-    let path = paths.first().ok_or(StatusCode::NOT_FOUND)?;
-
-    std::fs::read_to_string(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
-}
-
-/// Render SessionAnalysis as HTML.
-fn render_analysis_html(a: &crate::sessions::SessionAnalysis) -> String {
-    let mut html = String::new();
-
-    // Summary
-    let total_calls: usize = a.tool_stats.values().map(|s| s.calls).sum();
-    let total_errors: usize = a.tool_stats.values().map(|s| s.errors).sum();
-    let success_rate = if total_calls > 0 {
-        ((total_calls - total_errors) as f64 / total_calls as f64) * 100.0
-    } else {
-        100.0
-    };
-
-    html.push_str("<h2>Summary</h2>\n<ul>\n");
-    html.push_str(&format!("<li><strong>Format:</strong> {}</li>\n", a.format));
-    html.push_str(&format!(
-        "<li><strong>Tool calls:</strong> {}</li>\n",
-        total_calls
-    ));
-    html.push_str(&format!(
-        "<li><strong>Success rate:</strong> {:.1}%</li>\n",
-        success_rate
-    ));
-    html.push_str(&format!(
-        "<li><strong>Total turns:</strong> {}</li>\n",
-        a.total_turns
-    ));
-    html.push_str("</ul>\n");
-
-    // Token usage
-    if a.token_stats.api_calls > 0 {
-        html.push_str("<h2>Token Usage</h2>\n<ul>\n");
-        html.push_str(&format!(
-            "<li><strong>API calls:</strong> {}</li>\n",
-            a.token_stats.api_calls
-        ));
-        if a.token_stats.api_calls > 0 {
-            let avg_context = (a.token_stats.total_input + a.token_stats.cache_read)
-                / a.token_stats.api_calls as u64;
-            html.push_str(&format!(
-                "<li><strong>Avg context:</strong> {} tokens</li>\n",
-                avg_context
-            ));
-        }
-        if a.token_stats.max_context > 0 {
-            html.push_str(&format!(
-                "<li><strong>Context range:</strong> {} - {}</li>\n",
-                a.token_stats.min_context, a.token_stats.max_context
-            ));
-        }
-        if a.token_stats.cache_read > 0 {
-            html.push_str(&format!(
-                "<li><strong>Cache read:</strong> {} tokens</li>\n",
-                a.token_stats.cache_read
-            ));
-        }
-        html.push_str("</ul>\n");
-    }
-
-    // Tool usage table
-    if !a.tool_stats.is_empty() {
-        let mut tools: Vec<_> = a.tool_stats.values().collect();
-        tools.sort_by(|a, b| b.calls.cmp(&a.calls));
-
-        html.push_str("<h2>Tool Usage</h2>\n<table>\n");
-        html.push_str("<thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Success</th></tr></thead>\n<tbody>\n");
-        for tool in tools {
-            let rate = if tool.calls > 0 {
-                ((tool.calls - tool.errors) as f64 / tool.calls as f64) * 100.0
-            } else {
-                100.0
-            };
-            html.push_str(&format!(
-                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{:.0}%</td></tr>\n",
-                tool.name, tool.calls, tool.errors, rate
-            ));
-        }
-        html.push_str("</tbody></table>\n");
-    }
-
-    // Error patterns
-    if !a.error_patterns.is_empty() {
-        html.push_str("<h2>Error Patterns</h2>\n");
-        for pattern in &a.error_patterns {
-            html.push_str(&format!(
-                "<h3>{} ({})</h3>\n",
-                pattern.category, pattern.count
-            ));
-            html.push_str("<ul>\n");
-            for example in &pattern.examples {
-                html.push_str(&format!("<li><code>{}</code></li>\n", html_escape(example)));
-            }
-            html.push_str("</ul>\n");
-        }
-    }
-
-    html
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "application/json")],
+        json,
+    )
+        .into_response())
 }
 
 fn html_escape(s: &str) -> String {
@@ -823,15 +694,9 @@ fn render_content_blocks(content: &serde_json::Value) -> String {
                     ));
                     if let Some(inp) = input {
                         let json_str = serde_json::to_string_pretty(inp).unwrap_or_default();
-                        let (truncated, was_truncated) = truncate_str(&json_str, 2000);
-                        let display = if was_truncated {
-                            format!("{}...[truncated]", truncated)
-                        } else {
-                            json_str
-                        };
                         html.push_str(&format!(
                             "<pre class=\"tool-input\">{}</pre>",
-                            html_escape(&display)
+                            html_escape(&json_str)
                         ));
                     }
                     html.push_str("</div>");
@@ -1058,3 +923,160 @@ pre code { padding: 0; background: none; }
 "#;
 
 const HTML_FOOTER: &str = "</body></html>\n";
+
+const VIEWER_HTML: &str = r##"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session: {{SESSION_ID}}</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 1000px; margin: 0 auto; padding: 1rem; background: #0f0f23; color: #ccc; }
+h1 { color: #fff; font-size: 1.2rem; margin: 0 0 1rem 0; }
+a { color: #6eb5ff; }
+.nav { margin-bottom: 1rem; }
+#chat { margin-top: 1rem; }
+.message { margin: 0.75rem 0; padding: 0.75rem; border-radius: 6px; }
+.message.user { background: #1a1a3e; border-left: 3px solid #6eb5ff; }
+.message.assistant { background: #1a2a1a; border-left: 3px solid #4ade80; }
+.message.summary { background: #2a1a2a; border-left: 3px solid #a78bfa; }
+.message.system { background: #2a2a1a; border-left: 3px solid #fbbf24; font-size: 0.9em; }
+.role { font-size: 0.75rem; color: #888; text-transform: uppercase; margin-bottom: 0.25rem; }
+.text { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.tool-use { background: #16162a; padding: 0.5rem; border-radius: 4px; margin: 0.5rem 0; font-size: 0.9em; }
+.tool-name { color: #f59e0b; font-weight: bold; }
+.tool-input { margin-top: 0.5rem; }
+.tool-result { background: #0a0a15; padding: 0.5rem; border-radius: 4px; margin: 0.5rem 0; font-size: 0.85em; border: 1px solid #222; }
+.tool-result.error { border-color: #ef4444; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
+code { font-family: 'Fira Code', Consolas, monospace; background: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px; }
+pre code { background: none; padding: 0; }
+.loading { color: #888; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="/">← Sessions</a></div>
+<h1>{{SESSION_ID}}</h1>
+<div id="chat"><p class="loading">Loading...</p></div>
+<script>
+const sessionId = "{{SESSION_ID}}";
+
+async function load() {
+  const res = await fetch(`/api/session/${sessionId}`);
+  const entries = await res.json();
+  const chat = document.getElementById('chat');
+  chat.innerHTML = '';
+
+  for (const entry of entries) {
+    const type = entry.type;
+
+    // Claude Code format
+    if (type === 'user' || type === 'assistant') {
+      const msg = entry.message;
+      if (!msg || !msg.content) continue;
+      const div = document.createElement('div');
+      div.className = `message ${type}`;
+      div.innerHTML = `<div class="role">${type}</div>` + renderContent(msg.content);
+      chat.appendChild(div);
+    }
+    else if (type === 'summary') {
+      const div = document.createElement('div');
+      div.className = 'message summary';
+      div.innerHTML = `<div class="role">Summary</div><pre>${esc(entry.summary || '')}</pre>`;
+      chat.appendChild(div);
+    }
+    // Codex format
+    else if (type === 'response_item' || type === 'event_msg') {
+      const payload = entry.payload;
+      if (!payload) continue;
+      renderCodexPayload(chat, payload);
+    }
+  }
+
+  if (!chat.children.length) {
+    chat.innerHTML = '<p>No messages found.</p>';
+  }
+}
+
+function renderContent(content) {
+  if (!Array.isArray(content)) {
+    return `<div class="text">${esc(String(content))}</div>`;
+  }
+  let html = '';
+  for (const block of content) {
+    if (block.type === 'text') {
+      html += `<div class="text">${renderMarkdown(block.text || '')}</div>`;
+    } else if (block.type === 'tool_use') {
+      html += `<div class="tool-use"><span class="tool-name">${esc(block.name || 'unknown')}</span>`;
+      if (block.input) {
+        html += `<pre class="tool-input">${esc(JSON.stringify(block.input, null, 2))}</pre>`;
+      }
+      html += '</div>';
+    } else if (block.type === 'tool_result') {
+      const cls = block.is_error ? 'tool-result error' : 'tool-result';
+      let text = '';
+      if (typeof block.content === 'string') {
+        text = block.content;
+      } else if (Array.isArray(block.content)) {
+        text = block.content.map(c => c.text || '').join('\n');
+      }
+      html += `<div class="${cls}"><pre>${esc(text)}</pre></div>`;
+    }
+  }
+  return html;
+}
+
+function renderCodexPayload(chat, payload) {
+  const type = payload.type;
+  if (type === 'message') {
+    const role = payload.role || 'unknown';
+    const div = document.createElement('div');
+    div.className = `message ${role === 'user' ? 'user' : 'assistant'}`;
+    let html = `<div class="role">${role}</div>`;
+    if (Array.isArray(payload.content)) {
+      for (const block of payload.content) {
+        if (block.text) {
+          html += `<div class="text">${renderMarkdown(block.text)}</div>`;
+        }
+      }
+    }
+    div.innerHTML = html;
+    chat.appendChild(div);
+  } else if (type === 'function_call') {
+    const div = document.createElement('div');
+    div.className = 'message assistant';
+    div.innerHTML = `<div class="tool-use"><span class="tool-name">${esc(payload.name || '')}</span><pre class="tool-input">${esc(payload.arguments || '{}')}</pre></div>`;
+    chat.appendChild(div);
+  } else if (type === 'function_call_output') {
+    const div = document.createElement('div');
+    div.className = 'tool-result';
+    div.innerHTML = `<pre>${esc(payload.output || '')}</pre>`;
+    chat.appendChild(div);
+  }
+}
+
+function renderMarkdown(text) {
+  // Simple: escape, then code blocks, then inline code
+  let html = esc(text);
+  // Code blocks
+  html = html.replace(/```[\s\S]*?```/g, m => {
+    const code = m.slice(3, -3).replace(/^\w*\n/, '');
+    return `<pre><code>${code}</code></pre>`;
+  });
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Newlines
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+load();
+</script>
+</body>
+</html>
+"##;

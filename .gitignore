@@ -30,6 +30,7 @@ target/
 
 # dependencies
 node_modules/
+bun.lockb
 
 # logs
 npm-debug.log*

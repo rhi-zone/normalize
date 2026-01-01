@@ -1,0 +1,21 @@
+{
+  "name": "@moss/sessions-viewer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check:types": "tsgo --noEmit",
+    "lint": "oxlint",
+    "format": "oxfmt"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.0"
+  },
+  "devDependencies": {
+    "vite": "8.0.0-beta.0",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}
