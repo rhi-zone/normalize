@@ -21,10 +21,13 @@ Use cases:
 - **Checkpoint comparison**: "What did moss do since my last git commit?"
 - **Partial rollback**: Undo specific hunks while keeping others
 
-Design principles (see `docs/philosophy.md` for full context):
+Philosophy:
 - **Never destroy history** - even undo preserves the undone state as a branch
+- **Err on the side of keeping data** - disk is cheap, lost work is expensive
 - **Shadow is invisible until needed** - zero friction for normal workflow
 - **Real git is source of truth** - shadow serves the gap between edits and commits
+- **Minimize friction, maximize affordances** - prompts default to the common/safe choice (e.g., global prune defaults to yes for security)
+- **Non-interactive fallbacks** - every interactive prompt has a flag equivalent for LLM/scripted usage
 
 ## Core Features
 
