@@ -25,12 +25,11 @@ pub fn cmd_sessions_list(project: Option<&Path>, limit: usize, json: bool) -> i3
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                if let Ok(meta) = path.metadata() {
-                    if let Ok(mtime) = meta.modified() {
-                        sessions.push((path, mtime));
-                    }
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("jsonl")
+                && let Ok(meta) = path.metadata()
+                && let Ok(mtime) = meta.modified()
+            {
+                sessions.push((path, mtime));
             }
         }
     }
@@ -357,30 +356,28 @@ fn get_sessions_dir(project: Option<&Path>) -> Option<PathBuf> {
     };
 
     // 1. Explicit project path
-    if let Some(proj) = project {
-        if let Some(dir) = path_to_claude_dir(proj) {
-            return Some(dir);
-        }
+    if let Some(proj) = project
+        && let Some(dir) = path_to_claude_dir(proj)
+    {
+        return Some(dir);
     }
 
     // 2. Git root of current directory
     if let Ok(output) = std::process::Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()
+        && output.status.success()
+        && let Some(dir) =
+            path_to_claude_dir(Path::new(String::from_utf8_lossy(&output.stdout).trim()))
     {
-        if output.status.success() {
-            let git_root = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if let Some(dir) = path_to_claude_dir(Path::new(&git_root)) {
-                return Some(dir);
-            }
-        }
+        return Some(dir);
     }
 
     // 3. Current directory
-    if let Ok(cwd) = std::env::current_dir() {
-        if let Some(dir) = path_to_claude_dir(&cwd) {
-            return Some(dir);
-        }
+    if let Ok(cwd) = std::env::current_dir()
+        && let Some(dir) = path_to_claude_dir(&cwd)
+    {
+        return Some(dir);
     }
 
     None
@@ -554,27 +551,26 @@ async fn api_sessions(State(state): State<Arc<SessionsState>>) -> axum::response
 
     let mut sessions: Vec<serde_json::Value> = Vec::new();
 
-    if let Some(dir) = &sessions_dir {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let path = entry.path();
-                if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                    if let Ok(meta) = path.metadata() {
-                        if let Ok(mtime) = meta.modified() {
-                            let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                            let format = crate::sessions::FormatRegistry::new()
-                                .detect(&path)
-                                .map(|f| f.name().to_string())
-                                .unwrap_or_else(|| "unknown".to_string());
-                            let age = format_age(mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0));
-                            sessions.push(serde_json::json!({
-                                "id": id,
-                                "format": format,
-                                "age": age,
-                            }));
-                        }
-                    }
-                }
+    if let Some(dir) = &sessions_dir
+        && let Ok(entries) = std::fs::read_dir(dir)
+    {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("jsonl")
+                && let Ok(meta) = path.metadata()
+                && let Ok(mtime) = meta.modified()
+            {
+                let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                let format = crate::sessions::FormatRegistry::new()
+                    .detect(&path)
+                    .map(|f| f.name().to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                let age = format_age(mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0));
+                sessions.push(serde_json::json!({
+                    "id": id,
+                    "format": format,
+                    "age": age,
+                }));
             }
         }
     }

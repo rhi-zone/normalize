@@ -355,15 +355,15 @@ impl FileIndex {
                 if name_str.starts_with('.') {
                     continue;
                 }
-                if let Ok(meta) = entry.metadata() {
-                    if let Ok(mtime) = meta.modified() {
-                        let mtime_secs = mtime
-                            .duration_since(UNIX_EPOCH)
-                            .map(|d| d.as_secs() as i64)
-                            .unwrap_or(0);
-                        if mtime_secs > last_indexed {
-                            return true;
-                        }
+                if let Ok(meta) = entry.metadata()
+                    && let Ok(mtime) = meta.modified()
+                {
+                    let mtime_secs = mtime
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs() as i64)
+                        .unwrap_or(0);
+                    if mtime_secs > last_indexed {
+                        return true;
                     }
                 }
             }
@@ -374,23 +374,22 @@ impl FileIndex {
         if let Ok(mut stmt) = self
             .conn
             .prepare("SELECT path, mtime FROM files WHERE is_dir = 0 ORDER BY RANDOM() LIMIT 100")
-        {
-            if let Ok(rows) = stmt.query_map([], |row| {
+            && let Ok(rows) = stmt.query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-            }) {
-                for row in rows.flatten() {
-                    let (path, indexed_mtime) = row;
-                    let full_path = self.root.join(&path);
-                    if let Ok(meta) = full_path.metadata() {
-                        if let Ok(mtime) = meta.modified() {
-                            let current_mtime = mtime
-                                .duration_since(UNIX_EPOCH)
-                                .map(|d| d.as_secs() as i64)
-                                .unwrap_or(0);
-                            if current_mtime > indexed_mtime {
-                                return true;
-                            }
-                        }
+            })
+        {
+            for row in rows.flatten() {
+                let (path, indexed_mtime) = row;
+                let full_path = self.root.join(&path);
+                if let Ok(meta) = full_path.metadata()
+                    && let Ok(mtime) = meta.modified()
+                {
+                    let current_mtime = mtime
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs() as i64)
+                        .unwrap_or(0);
+                    if current_mtime > indexed_mtime {
+                        return true;
                     }
                 }
             }

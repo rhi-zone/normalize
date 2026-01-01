@@ -117,27 +117,25 @@ impl SymbolParser {
             let kind = node.kind();
 
             // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
-            if let Some(embedded) = support.embedded_content(&node, content) {
-                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
-                    if let Some(sub_tree) =
-                        parsers::parse_with_grammar(embedded.grammar, &embedded.content)
-                    {
-                        let mut sub_imports = Vec::new();
-                        let sub_root = sub_tree.root_node();
-                        let mut sub_cursor = sub_root.walk();
-                        self.collect_imports_with_trait(
-                            &mut sub_cursor,
-                            &embedded.content,
-                            sub_lang,
-                            &mut sub_imports,
-                        );
+            if let Some(embedded) = support.embedded_content(&node, content)
+                && let Some(sub_lang) = support_for_grammar(embedded.grammar)
+                && let Some(sub_tree) =
+                    parsers::parse_with_grammar(embedded.grammar, &embedded.content)
+            {
+                let mut sub_imports = Vec::new();
+                let sub_root = sub_tree.root_node();
+                let mut sub_cursor = sub_root.walk();
+                self.collect_imports_with_trait(
+                    &mut sub_cursor,
+                    &embedded.content,
+                    sub_lang,
+                    &mut sub_imports,
+                );
 
-                        // Adjust line numbers for embedded content offset
-                        for mut imp in sub_imports {
-                            imp.line += embedded.start_line - 1;
-                            imports.push(imp);
-                        }
-                    }
+                // Adjust line numbers for embedded content offset
+                for mut imp in sub_imports {
+                    imp.line += embedded.start_line - 1;
+                    imports.push(imp);
                 }
                 // Don't descend into embedded nodes - we've already processed them
                 if cursor.goto_next_sibling() {

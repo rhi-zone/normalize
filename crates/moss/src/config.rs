@@ -218,10 +218,10 @@ impl MossConfig {
         let mut config = Self::default_enabled();
 
         // Load global config
-        if let Some(global_path) = Self::global_config_path() {
-            if let Some(global) = Self::load_file(&global_path) {
-                config = config.merge(global);
-            }
+        if let Some(global_path) = Self::global_config_path()
+            && let Some(global) = Self::load_file(&global_path)
+        {
+            config = config.merge(global);
         }
 
         // Load per-project config (overrides global)

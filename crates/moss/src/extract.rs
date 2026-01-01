@@ -250,28 +250,26 @@ impl Extractor {
             let kind = node.kind();
 
             // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
-            if let Some(embedded) = support.embedded_content(&node, content) {
-                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
-                    if let Some(sub_tree) =
-                        parsers::parse_with_grammar(embedded.grammar, &embedded.content)
-                    {
-                        let mut sub_symbols = Vec::new();
-                        let sub_root = sub_tree.root_node();
-                        let mut sub_cursor = sub_root.walk();
-                        self.collect_symbols(
-                            &mut sub_cursor,
-                            &embedded.content,
-                            sub_lang,
-                            &mut sub_symbols,
-                            false,
-                        );
+            if let Some(embedded) = support.embedded_content(&node, content)
+                && let Some(sub_lang) = support_for_grammar(embedded.grammar)
+                && let Some(sub_tree) =
+                    parsers::parse_with_grammar(embedded.grammar, &embedded.content)
+            {
+                let mut sub_symbols = Vec::new();
+                let sub_root = sub_tree.root_node();
+                let mut sub_cursor = sub_root.walk();
+                self.collect_symbols(
+                    &mut sub_cursor,
+                    &embedded.content,
+                    sub_lang,
+                    &mut sub_symbols,
+                    false,
+                );
 
-                        // Adjust line numbers for embedded content offset
-                        for mut sym in sub_symbols {
-                            adjust_lines(&mut sym, embedded.start_line - 1);
-                            symbols.push(sym);
-                        }
-                    }
+                // Adjust line numbers for embedded content offset
+                for mut sym in sub_symbols {
+                    adjust_lines(&mut sym, embedded.start_line - 1);
+                    symbols.push(sym);
                 }
                 // Don't descend into embedded nodes - we've already processed them
                 if cursor.goto_next_sibling() {
