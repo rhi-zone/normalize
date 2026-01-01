@@ -27,7 +27,6 @@ Adding a new section (3 places):
 
 Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
-
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration
@@ -40,8 +39,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 ### Workflow Engine
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
-
-### View Command
 
 ### Code Quality
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
@@ -75,7 +72,8 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Pure Lua implementations preferred (simple, no deps)
   - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
 
-### Edit Improvements
+### Tooling
+- Documentation freshness: tooling to keep docs in sync with code
   - For moss itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
   - For user projects: detect stale docs in fresh projects (full moss assistance) and legacy codebases (missing/outdated docs)
   - Consider boy scout rule: when touching code, improve nearby docs
@@ -133,6 +131,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
 ### Vision (Aspirational)
+- Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
 - Synthesis: decompose complex tasks into solvable subproblems (`moss synthesize`)
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
 
