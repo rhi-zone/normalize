@@ -546,20 +546,21 @@ fn get_package_entry_point(pkg_dir: &Path, pkg_json: &Path) -> Option<PathBuf> {
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
 
     // Try "exports" field (simplified - just handle string or { ".": ... })
-    if let Some(exports) = json.get("exports") {
-        if let Some(entry) = exports.as_str() {
-            let path = pkg_dir.join(entry.trim_start_matches("./"));
-            if path.is_file() {
-                return Some(path);
-            }
-        } else if let Some(obj) = exports.as_object()
-            && let Some(dot) = obj.get(".")
-            && let Some(entry) = extract_export_entry(dot)
-        {
-            let path = pkg_dir.join(entry.trim_start_matches("./"));
-            if path.is_file() {
-                return Some(path);
-            }
+    if let Some(exports) = json.get("exports")
+        && let Some(entry) = exports.as_str()
+    {
+        let path = pkg_dir.join(entry.trim_start_matches("./"));
+        if path.is_file() {
+            return Some(path);
+        }
+    } else if let Some(exports) = json.get("exports")
+        && let Some(obj) = exports.as_object()
+        && let Some(dot) = obj.get(".")
+        && let Some(entry) = extract_export_entry(dot)
+    {
+        let path = pkg_dir.join(entry.trim_start_matches("./"));
+        if path.is_file() {
+            return Some(path);
         }
     }
 

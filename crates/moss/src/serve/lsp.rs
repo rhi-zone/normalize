@@ -57,16 +57,15 @@ impl MossBackend {
 impl LanguageServer for MossBackend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         // Get workspace root from params
-        if let Some(root_uri) = params.root_uri {
-            if let Ok(path) = root_uri.to_file_path() {
-                self.init_index(path);
-            }
-        } else if let Some(folders) = params.workspace_folders {
-            if let Some(folder) = folders.first() {
-                if let Ok(path) = folder.uri.to_file_path() {
-                    self.init_index(path);
-                }
-            }
+        if let Some(root_uri) = params.root_uri
+            && let Ok(path) = root_uri.to_file_path()
+        {
+            self.init_index(path);
+        } else if let Some(folders) = params.workspace_folders
+            && let Some(folder) = folders.first()
+            && let Ok(path) = folder.uri.to_file_path()
+        {
+            self.init_index(path);
         }
 
         Ok(InitializeResult {
@@ -567,15 +566,12 @@ impl LanguageServer for MossBackend {
         if let Ok(defs) = index.find_symbol(&old_name) {
             for (file, _kind, start_line, _end_line) in defs {
                 let target_path = root.join(&file);
-                if let Ok(target_uri) = Url::from_file_path(&target_path) {
-                    // Read file to find exact position
-                    if let Ok(file_content) = std::fs::read_to_string(&target_path) {
-                        if let Some(edit) =
-                            find_rename_edit(&file_content, start_line, &old_name, &new_name)
-                        {
-                            file_edits.entry(target_uri).or_default().push(edit);
-                        }
-                    }
+                if let Ok(target_uri) = Url::from_file_path(&target_path)
+                    && let Ok(file_content) = std::fs::read_to_string(&target_path)
+                    && let Some(edit) =
+                        find_rename_edit(&file_content, start_line, &old_name, &new_name)
+                {
+                    file_edits.entry(target_uri).or_default().push(edit);
                 }
             }
         }
@@ -584,14 +580,11 @@ impl LanguageServer for MossBackend {
         if let Ok(callers) = index.find_callers(&old_name) {
             for (file, _caller_name, line) in callers {
                 let target_path = root.join(&file);
-                if let Ok(target_uri) = Url::from_file_path(&target_path) {
-                    if let Ok(file_content) = std::fs::read_to_string(&target_path) {
-                        if let Some(edit) =
-                            find_rename_edit(&file_content, line, &old_name, &new_name)
-                        {
-                            file_edits.entry(target_uri).or_default().push(edit);
-                        }
-                    }
+                if let Ok(target_uri) = Url::from_file_path(&target_path)
+                    && let Ok(file_content) = std::fs::read_to_string(&target_path)
+                    && let Some(edit) = find_rename_edit(&file_content, line, &old_name, &new_name)
+                {
+                    file_edits.entry(target_uri).or_default().push(edit);
                 }
             }
         }

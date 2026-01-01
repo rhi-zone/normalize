@@ -121,14 +121,16 @@ impl Ecosystem for Python {
             let mut deps = Vec::new();
 
             // PEP 621: [project.dependencies]
-            if let Some(project) = parsed.get("project") {
-                if let Some(dependencies) = project.get("dependencies").and_then(|d| d.as_array()) {
-                    for dep in dependencies {
-                        if let Some(req) = dep.as_str().and_then(|s| parse_requirement(s)) {
-                            deps.push(req);
-                        }
+            if let Some(project) = parsed.get("project")
+                && let Some(dependencies) = project.get("dependencies").and_then(|d| d.as_array())
+            {
+                for dep in dependencies {
+                    if let Some(req) = dep.as_str().and_then(|s| parse_requirement(s)) {
+                        deps.push(req);
                     }
                 }
+            }
+            if let Some(project) = parsed.get("project") {
                 // Optional dependencies
                 if let Some(optional) = project
                     .get("optional-dependencies")
@@ -194,18 +196,18 @@ impl Ecosystem for Python {
     fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Try uv.lock first (TOML with package entries and dependencies)
         let uv_lock = project_root.join("uv.lock");
-        if let Ok(content) = std::fs::read_to_string(&uv_lock) {
-            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
-                return build_python_tree(&parsed, project_root);
-            }
+        if let Ok(content) = std::fs::read_to_string(&uv_lock)
+            && let Ok(parsed) = toml::from_str::<toml::Value>(&content)
+        {
+            return build_python_tree(&parsed, project_root);
         }
 
         // Try poetry.lock
         let poetry_lock = project_root.join("poetry.lock");
-        if let Ok(content) = std::fs::read_to_string(&poetry_lock) {
-            if let Ok(parsed) = toml::from_str::<toml::Value>(&content) {
-                return build_python_tree(&parsed, project_root);
-            }
+        if let Ok(content) = std::fs::read_to_string(&poetry_lock)
+            && let Ok(parsed) = toml::from_str::<toml::Value>(&content)
+        {
+            return build_python_tree(&parsed, project_root);
         }
 
         Err(PackageError::ParseError(
@@ -307,24 +309,22 @@ fn build_python_tree(
 ) -> Result<DependencyTree, PackageError> {
     // Get project name from pyproject.toml
     let pyproject = project_root.join("pyproject.toml");
-    let root_name = if let Ok(content) = std::fs::read_to_string(&pyproject) {
-        if let Ok(manifest) = toml::from_str::<toml::Value>(&content) {
-            manifest
-                .get("project")
-                .and_then(|p| p.get("name"))
-                .and_then(|n| n.as_str())
-                .map(String::from)
-                .or_else(|| {
-                    manifest
-                        .get("tool")
-                        .and_then(|t| t.get("poetry"))
-                        .and_then(|p| p.get("name"))
-                        .and_then(|n| n.as_str())
-                        .map(String::from)
-                })
-        } else {
-            None
-        }
+    let root_name = if let Ok(content) = std::fs::read_to_string(&pyproject)
+        && let Ok(manifest) = toml::from_str::<toml::Value>(&content)
+    {
+        manifest
+            .get("project")
+            .and_then(|p| p.get("name"))
+            .and_then(|n| n.as_str())
+            .map(String::from)
+            .or_else(|| {
+                manifest
+                    .get("tool")
+                    .and_then(|t| t.get("poetry"))
+                    .and_then(|p| p.get("name"))
+                    .and_then(|n| n.as_str())
+                    .map(String::from)
+            })
     } else {
         None
     };
@@ -464,10 +464,10 @@ fn parse_pypi_json(json_str: &str, package: &str) -> Result<PackageInfo, Package
     let mut dependencies = Vec::new();
     if let Some(requires) = info.get("requires_dist").and_then(|r| r.as_array()) {
         for req in requires {
-            if let Some(req_str) = req.as_str() {
-                if let Some(dep) = parse_requirement(req_str) {
-                    dependencies.push(dep);
-                }
+            if let Some(req_str) = req.as_str()
+                && let Some(dep) = parse_requirement(req_str)
+            {
+                dependencies.push(dep);
             }
         }
     }

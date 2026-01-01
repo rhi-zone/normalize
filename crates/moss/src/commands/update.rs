@@ -135,25 +135,25 @@ pub fn cmd_update(check_only: bool, json: bool) -> i32 {
 
     if let Some(checksum_url) = checksum_url {
         println!("  Verifying checksum...");
-        if let Ok(resp) = client.get(checksum_url).call() {
-            if let Ok(checksums) = resp.into_string() {
-                let expected = checksums
-                    .lines()
-                    .find(|line| line.contains(&asset_name))
-                    .and_then(|line| line.split_whitespace().next());
+        if let Ok(resp) = client.get(checksum_url).call()
+            && let Ok(checksums) = resp.into_string()
+        {
+            let expected = checksums
+                .lines()
+                .find(|line| line.contains(&asset_name))
+                .and_then(|line| line.split_whitespace().next());
 
-                if let Some(expected) = expected {
-                    let mut hasher = Sha256::new();
-                    hasher.update(&archive_data);
-                    let hash = hasher.finalize();
-                    let actual: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+            if let Some(expected) = expected {
+                let mut hasher = Sha256::new();
+                hasher.update(&archive_data);
+                let hash = hasher.finalize();
+                let actual: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
 
-                    if actual != expected {
-                        eprintln!("Checksum mismatch!");
-                        eprintln!("  Expected: {}", expected);
-                        eprintln!("  Got:      {}", actual);
-                        return 1;
-                    }
+                if actual != expected {
+                    eprintln!("Checksum mismatch!");
+                    eprintln!("  Expected: {}", expected);
+                    eprintln!("  Got:      {}", actual);
+                    return 1;
                 }
             }
         }

@@ -703,12 +703,10 @@ impl LuaRuntime {
                 let weight: Option<f64> = opts.as_ref().and_then(|t| t.get("weight").ok());
 
                 // Convert metadata table to JSON if present
-                let metadata: Option<String> = if let Some(ref t) = opts {
-                    if let Ok(meta) = t.get::<Value>("metadata") {
-                        Some(value_to_json(lua, &meta)?)
-                    } else {
-                        None
-                    }
+                let metadata: Option<String> = if let Some(ref t) = opts
+                    && let Ok(meta) = t.get::<Value>("metadata")
+                {
+                    Some(value_to_json(lua, &meta)?)
                 } else {
                     None
                 };

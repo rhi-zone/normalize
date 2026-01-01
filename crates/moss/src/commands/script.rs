@@ -340,11 +340,11 @@ fn cmd_script_run(
     };
 
     // Set task variable if provided
-    if let Some(t) = task {
-        if let Err(e) = runtime.run_string(&format!("task = {:?}", t)) {
-            eprintln!("Failed to set task: {}", e);
-            return 1;
-        }
+    if let Some(t) = task
+        && let Err(e) = runtime.run_string(&format!("task = {:?}", t))
+    {
+        eprintln!("Failed to set task: {}", e);
+        return 1;
     }
 
     // Set args table from command line arguments

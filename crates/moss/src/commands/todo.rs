@@ -190,10 +190,10 @@ fn parse_todo(content: &str) -> Vec<Section> {
         }
 
         // Parse items within current section
-        if let Some(ref mut section) = current_section {
-            if let Some(item) = parse_item(line, line_num) {
-                section.items.push(item);
-            }
+        if let Some(ref mut section) = current_section
+            && let Some(item) = parse_item(line, line_num)
+        {
+            section.items.push(item);
         }
     }
 

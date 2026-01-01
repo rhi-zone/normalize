@@ -22,10 +22,10 @@ fn get_highlight_query(grammar: &str, language: &tree_sitter::Language) -> Optio
     let cache = HIGHLIGHT_QUERY_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
 
     // Check cache first
-    if let Ok(read_guard) = cache.read() {
-        if let Some(query) = read_guard.get(grammar) {
-            return Some(Arc::clone(query));
-        }
+    if let Ok(read_guard) = cache.read()
+        && let Some(query) = read_guard.get(grammar)
+    {
+        return Some(Arc::clone(query));
     }
 
     // Not cached - compile and store
@@ -44,10 +44,10 @@ fn get_injection_query(grammar: &str, language: &tree_sitter::Language) -> Optio
     let cache = INJECTION_QUERY_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
 
     // Check cache first
-    if let Ok(read_guard) = cache.read() {
-        if let Some(query) = read_guard.get(grammar) {
-            return Some(Arc::clone(query));
-        }
+    if let Ok(read_guard) = cache.read()
+        && let Some(query) = read_guard.get(grammar)
+    {
+        return Some(Arc::clone(query));
     }
 
     // Not cached - compile and store

@@ -187,23 +187,22 @@ fn fetch_hex_info(package: &str) -> Result<PackageInfo, PackageError> {
         .get("releases")
         .and_then(|r| r.as_array())
         .and_then(|a| a.first())
+        && let Some(reqs) = latest.get("requirements").and_then(|r| r.as_object())
     {
-        if let Some(reqs) = latest.get("requirements").and_then(|r| r.as_object()) {
-            for (dep_name, req) in reqs {
-                let version_req = req
-                    .get("requirement")
-                    .and_then(|r| r.as_str())
-                    .map(String::from);
-                let optional = req
-                    .get("optional")
-                    .and_then(|o| o.as_bool())
-                    .unwrap_or(false);
-                dependencies.push(Dependency {
-                    name: dep_name.clone(),
-                    version_req,
-                    optional,
-                });
-            }
+        for (dep_name, req) in reqs {
+            let version_req = req
+                .get("requirement")
+                .and_then(|r| r.as_str())
+                .map(String::from);
+            let optional = req
+                .get("optional")
+                .and_then(|o| o.as_bool())
+                .unwrap_or(false);
+            dependencies.push(Dependency {
+                name: dep_name.clone(),
+                version_req,
+                optional,
+            });
         }
     }
 

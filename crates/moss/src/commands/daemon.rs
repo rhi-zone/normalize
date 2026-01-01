@@ -249,16 +249,16 @@ pub fn cmd_daemon(action: DaemonAction, json: bool) -> i32 {
                 Ok(resp) if resp.ok => {
                     if json {
                         println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
-                    } else if let Some(data) = resp.data {
-                        if let Some(roots) = data.as_array() {
-                            if roots.is_empty() {
-                                println!("No roots being watched");
-                            } else {
-                                println!("Watched roots:");
-                                for root in roots {
-                                    if let Some(path) = root.as_str() {
-                                        println!("  {}", path);
-                                    }
+                    } else if let Some(data) = resp.data
+                        && let Some(roots) = data.as_array()
+                    {
+                        if roots.is_empty() {
+                            println!("No roots being watched");
+                        } else {
+                            println!("Watched roots:");
+                            for root in roots {
+                                if let Some(path) = root.as_str() {
+                                    println!("  {}", path);
                                 }
                             }
                         }
