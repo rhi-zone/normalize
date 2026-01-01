@@ -130,12 +130,21 @@ Git-HEAD: abc123
 
 Git stores the diff separately. Timestamp comes from git commit metadata. `Git-HEAD` records the real git commit at time of edit (for checkpoint detection).
 
+### Undo Granularity
+
+Git's patch APIs enable fine-grained undo:
+- `--undo` reverts entire commit (all files, all changes)
+- `--undo --file src/foo.rs` reverts only that file
+- `--undo --hunk` interactive hunk selection (like `git checkout -p`)
+- `--undo --hunk src/foo.rs` interactive hunks for specific file
+
+Each partial undo creates a new shadow commit with just those reversals.
+
 ### Multi-File Edits
 
 Some operations may touch multiple files (future: cross-file refactors like `moss move`):
 - Shadow commit is atomic: all files in one commit
-- `--undo` reverts all files in the commit atomically
-- `--undo --file src/foo.rs` reverts only that file (creates new commit with partial reverse patch)
+- Partial undo (file or hunk level) available via flags above
 - `--history src/foo.rs` filters to show only commits affecting that file
 
 ### Branch Pruning (Security)
@@ -200,6 +209,8 @@ Uses `git filter-branch` or similar under the hood. Important for:
 ### Phase 2: Undo/Redo + Git Integration
 - [ ] `--undo` applies reverse patch, moves HEAD backward, prints summary
 - [ ] `--undo N` reverts N edits in sequence
+- [ ] `--undo --file` partial undo for specific file
+- [ ] `--undo --hunk` interactive hunk-level undo
 - [ ] `--redo` moves HEAD forward, applies patch (error if at branch point)
 - [ ] `--goto <ref>` jumps to arbitrary commit
 - [ ] Conflict detection and `--force-undo` for external modifications
