@@ -3,9 +3,11 @@
 //! Each format implements the `LogFormat` trait for parsing session logs.
 
 mod claude_code;
+mod codex;
 mod gemini_cli;
 
 pub use claude_code::ClaudeCodeFormat;
+pub use codex::CodexFormat;
 pub use gemini_cli::GeminiCliFormat;
 
 use crate::SessionAnalysis;
@@ -40,7 +42,11 @@ impl Default for FormatRegistry {
 impl FormatRegistry {
     pub fn new() -> Self {
         Self {
-            formats: vec![Box::new(ClaudeCodeFormat), Box::new(GeminiCliFormat)],
+            formats: vec![
+                Box::new(ClaudeCodeFormat),
+                Box::new(CodexFormat),
+                Box::new(GeminiCliFormat),
+            ],
         }
     }
 

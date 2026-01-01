@@ -166,7 +166,7 @@ enum Commands {
         #[arg(long)]
         jq: Option<String>,
 
-        /// Force specific format: claude, gemini, moss
+        /// Force specific format: claude, codex, gemini
         #[arg(long)]
         format: Option<String>,
 
