@@ -1,8 +1,13 @@
 //! Build script for moss - rebuilds SPA when source changes.
 
+use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use std::time::SystemTime;
+
+use flate2::Compression;
+use flate2::write::GzEncoder;
 
 fn main() {
     rebuild_spa_if_needed();
@@ -17,9 +22,9 @@ fn rebuild_spa_if_needed() {
     println!("cargo:rerun-if-changed=../../web/sessions/src");
     println!("cargo:rerun-if-changed=../../web/sessions/index.html");
     println!("cargo:rerun-if-changed=../../web/sessions/package.json");
-    println!("cargo:rerun-if-changed=../../web/sessions/dist/index.html");
-    println!("cargo:rerun-if-changed=../../web/sessions/dist/app.js");
-    println!("cargo:rerun-if-changed=../../web/sessions/dist/index.css");
+    println!("cargo:rerun-if-changed=../../web/sessions/dist/index.html.gz");
+    println!("cargo:rerun-if-changed=../../web/sessions/dist/app.js.gz");
+    println!("cargo:rerun-if-changed=../../web/sessions/dist/index.css.gz");
 
     if !src_dir.exists() {
         return; // No web source, skip
@@ -61,7 +66,11 @@ fn rebuild_spa_if_needed() {
 
     match result {
         Ok(status) if status.success() => {
-            eprintln!("SPA rebuild complete");
+            // Gzip the dist files for smaller binary embedding
+            gzip_file(&dist_dir.join("index.html"));
+            gzip_file(&dist_dir.join("app.js"));
+            gzip_file(&dist_dir.join("index.css"));
+            eprintln!("SPA rebuild complete (gzipped)");
         }
         Ok(status) => {
             panic!(
@@ -76,6 +85,18 @@ fn rebuild_spa_if_needed() {
             );
         }
     }
+}
+
+fn gzip_file(path: &Path) {
+    let content = fs::read(path).expect("Failed to read file for gzip");
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
+    encoder.write_all(&content).expect("Failed to gzip");
+    let compressed = encoder.finish().expect("Failed to finish gzip");
+    let gz_path = path.with_extension(format!(
+        "{}.gz",
+        path.extension().unwrap_or_default().to_str().unwrap_or("")
+    ));
+    fs::write(&gz_path, compressed).expect("Failed to write gzipped file");
 }
 
 fn newest_mtime(dir: &Path) -> Option<SystemTime> {

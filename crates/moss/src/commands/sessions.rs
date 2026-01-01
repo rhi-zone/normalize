@@ -457,7 +457,7 @@ use axum::{
     Router,
     extract::{Path as AxumPath, State},
     http::StatusCode,
-    response::{Html, IntoResponse},
+    response::IntoResponse,
     routing::get,
 };
 
@@ -465,10 +465,10 @@ struct SessionsState {
     project: Option<PathBuf>,
 }
 
-// Embedded SPA assets
-const SPA_HTML: &str = include_str!("../../../../web/sessions/dist/index.html");
-const SPA_JS: &str = include_str!("../../../../web/sessions/dist/app.js");
-const SPA_CSS: &str = include_str!("../../../../web/sessions/dist/index.css");
+// Embedded SPA assets (gzipped for smaller binary)
+const SPA_HTML_GZ: &[u8] = include_bytes!("../../../../web/sessions/dist/index.html.gz");
+const SPA_JS_GZ: &[u8] = include_bytes!("../../../../web/sessions/dist/app.js.gz");
+const SPA_CSS_GZ: &[u8] = include_bytes!("../../../../web/sessions/dist/index.css.gz");
 
 /// Start the sessions web server.
 pub async fn cmd_sessions_serve(project: Option<&Path>, port: u16) -> i32 {
@@ -505,19 +505,34 @@ pub async fn cmd_sessions_serve(project: Option<&Path>, port: u16) -> i32 {
     0
 }
 
-async fn spa_index() -> Html<&'static str> {
-    Html(SPA_HTML)
+async fn spa_index() -> impl IntoResponse {
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/html"),
+            (axum::http::header::CONTENT_ENCODING, "gzip"),
+        ],
+        SPA_HTML_GZ,
+    )
 }
 
 async fn spa_js() -> impl IntoResponse {
     (
-        [(axum::http::header::CONTENT_TYPE, "application/javascript")],
-        SPA_JS,
+        [
+            (axum::http::header::CONTENT_TYPE, "application/javascript"),
+            (axum::http::header::CONTENT_ENCODING, "gzip"),
+        ],
+        SPA_JS_GZ,
     )
 }
 
 async fn spa_css() -> impl IntoResponse {
-    ([(axum::http::header::CONTENT_TYPE, "text/css")], SPA_CSS)
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/css"),
+            (axum::http::header::CONTENT_ENCODING, "gzip"),
+        ],
+        SPA_CSS_GZ,
+    )
 }
 
 /// API: list all sessions as JSON.
