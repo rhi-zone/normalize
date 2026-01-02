@@ -5,8 +5,12 @@
 See `docs/` for design docs and `README.md` for usage.
 
 ### Agent Command
-- `moss @agent "task"` runs autonomous agent loop (max 50 turns)
+- `moss @agent "task"` runs autonomous agent loop (max 15 turns)
 - Pure Lua implementation (`require("agent")` module)
+- Ephemeral context model: outputs shown once, gone next turn unless kept
+  - `[cmd]keep[/cmd]` / `keep N` / `keep N M` - retain specific outputs
+  - `[cmd]note <fact>[/cmd]` - record synthesized insights
+  - Working memory replaces append-only turn history
 - Loop detection: warns when same command repeated 3+ times
 - Shadow git integration for automatic rollback on failed edits
 - Memory integration via `recall()` for cross-session context
