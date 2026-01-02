@@ -14,7 +14,7 @@ name = "moss"
 path = "src/main.rs"
 
 [features]
-default = ["lua"]
+default = ["lua", "llm"]
 
 # Optional LLM support for workflows
 llm = ["rig-core", "tokio-stream"]

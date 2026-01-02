@@ -132,6 +132,7 @@ Options:
 3. **JSON**: `{"tool": "view", "args": {"target": "src/main.rs"}}`
 4. **Function calling API**: Provider-specific (Anthropic tool_use, OpenAI function_call)
 5. **Prose**: "Please show me the structure of src/main.rs"
+6. **BBCode style**: `[cmd]view src/main.rs[/cmd]`
 
 Factors:
 - Reliability of parsing
@@ -139,7 +140,58 @@ Factors:
 - Model familiarity (training data distribution)
 - Provider compatibility
 
-**Experiment needed**: Same task with different formats, measure success rate.
+#### Rejected Formats
+
+**`> ` prefix (text/shell style)**
+- Problem: Claude models hallucinate command outputs after the `> ` line
+- Cause: `> ` is common in training data (shell prompts, quotes), model continues naturally
+- Result: Agent generates fake outputs instead of waiting for real execution
+- Tested with: Claude Sonnet
+
+**`<cmd></cmd>` (XML tags)**
+- Problem: Gemini models hallucinate command outputs
+- Cause: XML tags look too similar to HTML, thinking blocks, or structured formats in training data
+- Gemini 3 Flash: Hallucinated fake project outputs, responded in Chinese
+- Gemini 3 Pro: Works correctly, used multiple commands per turn effectively (but more expensive)
+- Claude models: Works correctly with multi-turn chat
+- Result: Inconsistent across providers
+
+#### Current Format: BBCode
+
+**`[cmd][/cmd]` (BBCode style)**
+- Chosen because it's visually distinct from HTML, XML, and thinking blocks
+- Less likely to trigger learned patterns from structured data
+- Still machine-parseable: `%[cmd%](.-)%[/cmd%]` (Lua pattern)
+
+#### Gemini Flash 3 Quirks (500 errors / empty responses)
+
+Testing revealed certain phrases trigger 500 errors or empty responses:
+
+**Trigger phrases (500 error):**
+- "shell" command in examples → use "run" or "exec" instead
+- "Multi-turn shell session" → use "Coding session" instead
+- Multiple example commands without `<pre>` wrapper
+
+**Trigger phrases (empty response):**
+- "Shell session" alone
+- "I execute them" → sounds like asking AI to do something dangerous
+- Various "session" + "execute" combinations
+
+**Workarounds:**
+- Wrap command examples in `<pre></pre>` tags
+- Use "Coding session" instead of "shell session"
+- Avoid "execute" - use "run" or "show results"
+- Avoid "shell" command - use "run" or "exec"
+
+**Works reliably:**
+- "Coding session. Output commands in [cmd][/cmd] tags."
+- `<pre>[cmd]view .[/cmd]</pre>`
+- "view", "text-search", "edit", "done" commands
+- "run" command (renamed from "shell")
+
+**Mitigation:**
+- Added retry logic (3 attempts) for intermittent 500 errors
+- ~40% of requests fail with 500, but retries usually succeed
 
 ### Context Model
 

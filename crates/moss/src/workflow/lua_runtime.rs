@@ -512,6 +512,38 @@ impl LuaRuntime {
                     },
                 )?,
             )?;
+
+            // Chat with message history
+            // Args: provider, model, system, prompt, history (table of {role, content})
+            llm_table.set(
+                "chat",
+                lua.create_function(
+                    |_,
+                     (provider, model, system, prompt, history_table): (
+                        Option<String>,
+                        Option<String>,
+                        Option<String>,
+                        String,
+                        mlua::Table,
+                    )| {
+                        // Convert Lua table to Vec<(String, String)>
+                        let mut history = Vec::new();
+                        for pair in history_table.sequence_values::<mlua::Table>() {
+                            let pair = pair?;
+                            let role: String = pair.get(1)?;
+                            let content: String = pair.get(2)?;
+                            history.push((role, content));
+                        }
+
+                        let provider_str = provider.as_deref().unwrap_or("anthropic");
+                        let client = LlmClient::new(provider_str, model.as_deref())
+                            .map_err(mlua::Error::external)?;
+                        client
+                            .chat(system.as_deref(), &prompt, history, None)
+                            .map_err(mlua::Error::external)
+                    },
+                )?,
+            )?;
         }
 
         #[cfg(not(feature = "llm"))]

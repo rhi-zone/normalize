@@ -5,7 +5,7 @@
 #[cfg(feature = "llm")]
 use rig::{
     client::{CompletionClient, ProviderClient},
-    completion::Prompt,
+    completion::{Chat, Message},
     providers,
 };
 
@@ -53,13 +53,13 @@ impl Provider {
     /// Get default model for this provider.
     pub fn default_model(&self) -> &'static str {
         match self {
-            Self::Anthropic => "claude-sonnet-4-20250514",
-            Self::OpenAI => "gpt-4o",
-            Self::Azure => "gpt-4o",
-            Self::Gemini => "gemini-2.0-flash",
+            Self::Anthropic => "claude-sonnet-4-5",
+            Self::OpenAI => "gpt-5.2",
+            Self::Azure => "gpt-5.2",
+            Self::Gemini => "gemini-3-flash-preview",
             Self::Cohere => "command-r-plus",
             Self::DeepSeek => "deepseek-chat",
-            Self::Groq => "llama-3.3-70b-versatile",
+            Self::Groq => "moonshotai/kimi-k2-instruct-0905",
             Self::Mistral => "mistral-large-latest",
             Self::Ollama => "llama3.2",
             Self::OpenRouter => "anthropic/claude-3.5-sonnet",
@@ -165,6 +165,42 @@ impl LlmClient {
         prompt: &str,
         max_tokens: usize,
     ) -> Result<String, String> {
+        self.chat_async(system, prompt, Vec::new(), max_tokens)
+            .await
+    }
+
+    /// Chat with message history.
+    pub fn chat(
+        &self,
+        system: Option<&str>,
+        prompt: &str,
+        history: Vec<(String, String)>, // (role, content) pairs
+        max_tokens: Option<usize>,
+    ) -> Result<String, String> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| format!("Failed to create runtime: {}", e))?;
+        rt.block_on(self.chat_async(system, prompt, history, max_tokens.unwrap_or(8192)))
+    }
+
+    async fn chat_async(
+        &self,
+        system: Option<&str>,
+        prompt: &str,
+        history: Vec<(String, String)>,
+        max_tokens: usize,
+    ) -> Result<String, String> {
+        // Convert history to rig Messages
+        let messages: Vec<Message> = history
+            .into_iter()
+            .map(|(role, content)| {
+                if role == "assistant" {
+                    Message::assistant(content)
+                } else {
+                    Message::user(content)
+                }
+            })
+            .collect();
+
         macro_rules! run_provider {
             ($client:expr) => {{
                 let client = $client;
@@ -174,7 +210,7 @@ impl LlmClient {
                 }
                 let agent = builder.build();
                 agent
-                    .prompt(prompt)
+                    .chat(prompt, messages.clone())
                     .await
                     .map_err(|e| format!("LLM request failed: {}", e))
             }};
@@ -190,7 +226,7 @@ impl LlmClient {
                 }
                 let agent = builder.build();
                 agent
-                    .prompt(prompt)
+                    .chat(prompt, messages)
                     .await
                     .map_err(|e| format!("LLM request failed: {}", e))
             }
