@@ -57,10 +57,10 @@ Exponential backoff (1s, 2s, 4s) for intermittent API failures. Reports total re
 
 | Model | Turns for simple Q | Style |
 |-------|-------------------|-------|
-| Gemini Flash 3 | 4-5 | Thorough exploration, then answers |
-| Claude Sonnet | 3-4 | Efficient, uses `[cmd]done[/cmd]` wrapper |
+| Claude Sonnet/Haiku | 1-2 | Efficient, uses `[cmd]done ...[/cmd]` with answer |
+| Gemini Flash 3 | max | Loops without concluding, doesn't use done format |
 
-Flash explores more but concludes reliably with current prompt tuning.
+Claude works reliably. Gemini Flash has issues with the BBCode format - it explores endlessly without using `[cmd]done[/cmd]` to provide final answers. May need prompt tuning or switching to function calling for Gemini.
 
 ## Python Implementation (to port)
 
@@ -436,11 +436,13 @@ Not doing **A1/A2** (agent adaptation) - that requires fine-tuning LLMs, outside
 - [x] Retry logic with exponential backoff
 - [x] Shadow git integration for rollback
 - [x] Memory integration via `recall()`
+- [x] Ephemeral context model with `keep`/`note` commands
+- [x] Command limit guard (max 10 per turn) to prevent runaway output
+- [x] Done command can coexist with exec commands (runs commands first, then returns)
 
 ## Next Steps
 
-1. **Remove context bandaids** - Replace `keep_last`/truncation with proper context reshaping
-2. Tune prompt for faster conclusions (Flash takes 4-5 turns vs ideal 2-3)
-3. Test with edit tasks (not just exploration)
-4. Improve `--explain` flag (Flash ignores step explanation request)
-5. Consider streaming output for long responses
+1. Fix Gemini Flash format compliance - doesn't use `[cmd]done[/cmd]` reliably
+2. Test with edit tasks (not just exploration)
+3. Test keep/note with multi-turn information gathering
+4. Consider streaming output for long responses

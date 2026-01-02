@@ -2,20 +2,26 @@
 local M = {}
 
 local SYSTEM_PROMPT = [[
-Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK. Conclude quickly using done.
-Outputs are ephemeral - gone next turn unless you keep them.
+Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK.
+
+Command outputs disappear after each turn. To retain information:
+- [cmd]keep[/cmd] or [cmd]keep 1 3[/cmd] saves outputs to working memory
+- [cmd]note key fact here[/cmd] records insights
+- [cmd]done YOUR FINAL ANSWER[/cmd] ends the session
+
 [commands]
-[cmd]done answer here[/cmd]
+[cmd]done The answer is X because Y[/cmd]
 [cmd]keep[/cmd]
-[cmd]keep 2[/cmd]
-[cmd]note main.rs uses clap for CLI[/cmd]
-[cmd]view [--types-only|--full|--deps] .[/cmd]
+[cmd]note uses clap for CLI[/cmd]
+[cmd]view .[/cmd]
+[cmd]view --types-only .[/cmd]
+[cmd]view --deps .[/cmd]
 [cmd]view src/main.rs[/cmd]
 [cmd]view src/main.rs/main[/cmd]
 [cmd]text-search "pattern"[/cmd]
-[cmd]edit src/lib.rs/foo [delete|replace|insert|move][/cmd]
-[cmd]package [list|tree|info|outdated|audit][/cmd]
-[cmd]analyze [complexity|security|callers|callees|...][/cmd]
+[cmd]edit src/lib.rs/foo delete|replace|insert|move[/cmd]
+[cmd]package list|tree|info|outdated|audit[/cmd]
+[cmd]analyze complexity|security|callers|callees[/cmd]
 [cmd]run cargo test[/cmd]
 [cmd]ask which module?[/cmd]
 [/commands]
@@ -58,7 +64,7 @@ function M.build_context(task, working_memory, current_outputs)
 
     -- Add current turn outputs (ephemeral, indexed)
     if current_outputs and #current_outputs > 0 then
-        table.insert(parts, "\n[outputs]")
+        table.insert(parts, "\n[outputs (use keep to save)]")
         for i, out in ipairs(current_outputs) do
             local header = string.format("[%d] $ %s", i, out.cmd)
             if not out.success then header = header .. " (failed)" end
@@ -201,19 +207,26 @@ function M.run(opts)
             return { success = true, output = table.concat(all_output, "\n") }
         end
 
+        -- Guard against runaway model output
+        local max_commands_per_turn = 10
+        if #commands > max_commands_per_turn then
+            print(string.format("[agent] WARNING: Model output %d commands, limiting to %d", #commands, max_commands_per_turn))
+            local limited = {}
+            for i = 1, max_commands_per_turn do
+                limited[i] = commands[i]
+            end
+            commands = limited
+        end
+
         -- Separate execution commands from memory commands
         local exec_commands = {}
         local keep_commands = {}
         local note_commands = {}
+        local done_summary = nil
 
         for _, cmd in ipairs(commands) do
             if cmd:match("^done") then
-                local summary = cmd:match("^done%s*(.*)") or ""
-                print("[agent] Done: " .. summary)
-                if total_retries > 0 then
-                    print("[agent] API retries: " .. total_retries)
-                end
-                return { success = true, output = table.concat(all_output, "\n") }
+                done_summary = cmd:match("^done%s*(.*)") or ""
             elseif cmd:match("^keep") then
                 table.insert(keep_commands, cmd)
             elseif cmd:match("^note ") then
@@ -221,6 +234,15 @@ function M.run(opts)
             else
                 table.insert(exec_commands, cmd)
             end
+        end
+
+        -- If ONLY done (no exec commands), return immediately
+        if done_summary and #exec_commands == 0 then
+            print("[agent] Done: " .. done_summary)
+            if total_retries > 0 then
+                print("[agent] API retries: " .. total_retries)
+            end
+            return { success = true, output = table.concat(all_output, "\n") }
         end
 
         -- Process keep commands FIRST (refers to previous turn's outputs)
@@ -309,6 +331,15 @@ function M.run(opts)
                     end
                 end)
             end
+        end
+
+        -- If done was requested along with commands, return after executing them
+        if done_summary then
+            print("[agent] Done: " .. done_summary)
+            if total_retries > 0 then
+                print("[agent] API retries: " .. total_retries)
+            end
+            return { success = true, output = table.concat(all_output, "\n") }
         end
     end
 
