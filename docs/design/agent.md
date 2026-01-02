@@ -1,66 +1,53 @@
 # Agent Design Notes
 
-Design decisions and implementation notes for `moss @agent`.
-
 ## Current Implementation
 
 **File:** `crates/moss/src/commands/scripts/agent.lua`
 
-### System Prompt
+### Prompt
 
 ```
 Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK. Conclude quickly using done.
 [commands]
 [cmd]done answer here[/cmd]
 [cmd]view [--types-only|--full|--deps] .[/cmd]
-[cmd]view src/main.rs[/cmd]
-[cmd]view src/main.rs/main[/cmd]
-[cmd]text-search "pattern"[/cmd]
-[cmd]edit src/lib.rs/foo [delete|replace|insert|move][/cmd]
-[cmd]package [list|tree|info|outdated|audit][/cmd]
-[cmd]analyze [complexity|security|callers|callees|...][/cmd]
-[cmd]run cargo test[/cmd]
-[cmd]ask which module?[/cmd]
+...
 [/commands]
 ```
 
-Key design choices:
-- `done` listed first to emphasize task completion
-- "Conclude quickly" efficiency hint
-- "Multiple per turn OK" enables batching
-- BBCode `[cmd][/cmd]` format (see Rejected Formats below)
-- `[commands][/commands]` wrapper for examples
+- `done` first → emphasizes completion
+- "Conclude quickly" → efficiency hint
+- BBCode `[cmd][/cmd]` → avoids HTML/XML confusion (see Rejected Formats)
+- `[commands]` wrapper → groups examples
 
-### CLI Usage
+### CLI
 
 ```bash
-moss @agent "What language is this project?"
-moss @agent --provider anthropic "List dependencies"
-moss @agent --max-turns 10 "Refactor the auth module"
-moss @agent --explain "What does this do?"  # Asks for step-by-step reasoning
+moss @agent "question"
+moss @agent --provider anthropic --model claude-sonnet-4-5 "task"
+moss @agent --max-turns 10 "complex task"
+moss @agent --explain "task"  # request step reasoning
 ```
 
 ### Architecture
 
-- **Pure Lua**: Agent loop is 100% Lua, Rust only exposes primitives
-- **Multi-turn chat**: Proper user/assistant message boundaries via `llm.chat()`
-- **Per-turn history**: Each turn stores `{response, outputs: [{cmd, output, success}]}`
-- **Loop detection**: Warns if same command repeated 3+ times
-- **Shadow git**: Snapshots before edits, rollback on failure
-- **Memory**: Recalls relevant context from previous sessions via `recall()`
+- Pure Lua agent loop, Rust exposes primitives only
+- Multi-turn chat via `llm.chat()` (proper message boundaries)
+- Per-turn history: `{response, outputs: [{cmd, output, success}]}`
+- Loop detection: warns if same command 3x
+- Shadow git: snapshot before edit, rollback on failure
+- Memory: `recall(task)` for cross-session context
 
-### Retry Logic
+### Retries
 
-Exponential backoff (1s, 2s, 4s) for intermittent API failures. Reports total retry count at session end if > 0.
+Exponential backoff (1s, 2s, 4s). Reports count at end if > 0.
 
-### Model Behavior
+### Model Comparison
 
-| Model | Turns for simple Q | Style |
-|-------|-------------------|-------|
-| Gemini Flash 3 | 4-5 | Thorough exploration, then answers |
-| Claude Sonnet | 3-4 | Efficient, uses `[cmd]done[/cmd]` wrapper |
-
-Flash explores more but concludes reliably with current prompt tuning.
+| Model | Turns | Notes |
+|-------|-------|-------|
+| Gemini Flash 3 | 4-5 | Thorough, then answers |
+| Claude Sonnet | 3-4 | Uses `[cmd]done ...[/cmd]` |
 
 ## Python Implementation (to port)
 
