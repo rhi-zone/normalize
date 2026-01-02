@@ -2,8 +2,9 @@
 local M = {}
 
 local SYSTEM_PROMPT = [[
-Coding session. Output commands in [cmd][/cmd] tags. Multiple commands per turn allowed.
+Coding session. Output commands in [cmd][/cmd] tags. Conclude quickly using done.
 [commands]
+[cmd]done answer here[/cmd]
 [cmd]view [--types-only|--full|--deps] .[/cmd]
 [cmd]view src/main.rs[/cmd]
 [cmd]view src/main.rs/main[/cmd]
@@ -13,7 +14,6 @@ Coding session. Output commands in [cmd][/cmd] tags. Multiple commands per turn 
 [cmd]analyze [complexity|security|callers|callees|...][/cmd]
 [cmd]run cargo test[/cmd]
 [cmd]ask which module?[/cmd]
-[cmd]done summary here[/cmd]
 [/commands]
 ]]
 
