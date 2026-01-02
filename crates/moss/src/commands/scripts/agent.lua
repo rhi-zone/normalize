@@ -2,25 +2,18 @@
 local M = {}
 
 local SYSTEM_PROMPT = [[
-Commands start with "> ". Output from commands appears after your message.
+Interleave thinking with commands. Commands start with "> ".
 
-> view <path>
-> grep <pattern>
-> edit <path> <task>
-> shell <cmd>
-> ask <question>
-> done <summary>
+> view <path>           # structure, symbols
+> view <path/symbol>    # symbol source
+> view <path>:10-20     # line range
+> text-search <pattern> # search code
+> edit <path> <task>    # modify code
+> shell <cmd>           # fallback for other commands
+> ask <question>        # ask user
+> done <summary>        # finish
 
-Example:
-  User: fix the typo
-  You: Let me find it.
-  > grep typo
-  [output appears here next turn]
-  You: Found it in README.md line 5.
-  > edit README.md fix typo on line 5
-  [output appears here next turn]
-  You: Fixed.
-  > done fixed typo in README.md
+Prefer view/text-search over shell.
 ]]
 
 -- Check if last N commands are identical (loop detection)
