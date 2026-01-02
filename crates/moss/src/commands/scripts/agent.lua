@@ -62,13 +62,15 @@ function M.build_context(task, working_memory, current_outputs)
 
     -- Add current turn outputs (ephemeral, indexed)
     if current_outputs and #current_outputs > 0 then
-        table.insert(parts, "\n[outputs (use keep to save)]")
+        table.insert(parts, "\n[outputs]")
         for i, out in ipairs(current_outputs) do
             local header = string.format("[%d] $ %s", i, out.cmd)
             if not out.success then header = header .. " (failed)" end
             table.insert(parts, header .. "\n" .. out.content)
         end
         table.insert(parts, "[/outputs]")
+        -- Post-history reminder
+        table.insert(parts, "\nNow: $(done ANSWER) or $(keep) + more commands")
     end
 
     return table.concat(parts, "\n")
