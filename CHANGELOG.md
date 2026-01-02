@@ -10,6 +10,8 @@ See `docs/` for design docs and `README.md` for usage.
 - Loop detection: warns when same command repeated 3+ times
 - Shadow git integration for automatic rollback on failed edits
 - Memory integration via `recall()` for cross-session context
+- `ask <question>` tool for clarifying questions (reads stdin)
+- Progress indicator ("Thinking...") while waiting for LLM
 - `llm.complete(provider?, model?, system?, prompt)` exposed to Lua scripts
 - See `docs/design/agent.md` for design rationale
 

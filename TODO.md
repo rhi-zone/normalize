@@ -103,6 +103,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 ### Agent Research
 - [x] Basic agent loop: `moss agent` with loop detection, shadow git, memory
+- Session format: save/replay agent sessions for debugging and analysis
 - Conversational loop pattern (vs hierarchical)
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
