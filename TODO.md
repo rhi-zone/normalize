@@ -103,6 +103,8 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 ### Agent Research
 - [x] Basic agent loop: `moss agent` with loop detection, shadow git, memory
+- Gemini outputs excessive commands (54 in one turn, limited to 10) - symptom of hallucinating intent
+- Prompt tuning: models not reliably using `$(done)` to conclude - loops instead
 - Automatic validation: agent validates changes in shadow worktree before committing (ephemeral, transparent)
 - Session format: save/replay agent sessions for debugging and analysis
 - Conversational loop pattern (vs hierarchical)
