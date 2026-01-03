@@ -4,9 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Analyze glob patterns: `moss analyze 'foo/**/bar.*'` for matching symbols
-- Case-insensitive matching (`-i` flag) for analyze path targets (view, edit: done)
-- Multi-file batch edit: reduce latency vs N sequential edits
+- [x] Analyze glob patterns: `moss analyze 'foo/**/bar.*'` for matching symbols
+- [x] Case-insensitive matching (`-i` flag) for analyze path targets (view, edit: done)
+- Multi-file batch edit: reduce latency vs N sequential edits (see `docs/design/batch-edit.md`)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
