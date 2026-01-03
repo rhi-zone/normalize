@@ -112,6 +112,7 @@ pub fn cmd_edit(
     only: &[String],
     multiple: bool,
     message: Option<&str>,
+    case_insensitive: bool,
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -231,12 +232,13 @@ pub fn cmd_edit(
             &root,
             shadow_enabled,
             message,
+            case_insensitive,
         );
     }
 
     // Exact symbol match
     let symbol_name = unified.symbol_path.last().unwrap();
-    let loc = match editor.find_symbol(&file_path, &content, symbol_name) {
+    let loc = match editor.find_symbol(&file_path, &content, symbol_name, case_insensitive) {
         Some(l) => l,
         None => {
             eprintln!("Symbol not found: {}", symbol_name);
@@ -255,7 +257,8 @@ pub fn cmd_edit(
         ),
 
         EditAction::Swap { ref other } => {
-            let other_loc = match editor.find_symbol(&file_path, &content, other) {
+            let other_loc = match editor.find_symbol(&file_path, &content, other, case_insensitive)
+            {
                 Some(l) => l,
                 None => {
                     eprintln!("Other symbol not found: {}", other);
@@ -309,14 +312,18 @@ pub fn cmd_edit(
 
             let result = match at {
                 Position::Before | Position::After => {
-                    let dest_loc =
-                        match editor.find_symbol(&file_path, &without_source, destination) {
-                            Some(l) => l,
-                            None => {
-                                eprintln!("Destination not found: {}", destination);
-                                return 1;
-                            }
-                        };
+                    let dest_loc = match editor.find_symbol(
+                        &file_path,
+                        &without_source,
+                        destination,
+                        case_insensitive,
+                    ) {
+                        Some(l) => l,
+                        None => {
+                            eprintln!("Destination not found: {}", destination);
+                            return 1;
+                        }
+                    };
                     if matches!(at, Position::Before) {
                         editor.insert_before(&without_source, &dest_loc, &source_content)
                     } else {
@@ -353,7 +360,12 @@ pub fn cmd_edit(
 
             let result = match at {
                 Position::Before | Position::After => {
-                    let dest_loc = match editor.find_symbol(&file_path, &content, destination) {
+                    let dest_loc = match editor.find_symbol(
+                        &file_path,
+                        &content,
+                        destination,
+                        case_insensitive,
+                    ) {
                         Some(l) => l,
                         None => {
                             eprintln!("Destination not found: {}", destination);
@@ -558,6 +570,7 @@ fn handle_glob_edit(
     root: &Path,
     shadow_enabled: bool,
     message: Option<&str>,
+    case_insensitive: bool,
 ) -> i32 {
     let matches = editor.find_symbols_matching(file_path, content, pattern);
 
@@ -663,7 +676,12 @@ fn handle_glob_edit(
                 let source_content = &content[loc.start_byte..loc.end_byte];
                 result = match at {
                     Position::Before | Position::After => {
-                        let dest_loc = match editor.find_symbol(file_path, &result, destination) {
+                        let dest_loc = match editor.find_symbol(
+                            file_path,
+                            &result,
+                            destination,
+                            case_insensitive,
+                        ) {
                             Some(l) => l,
                             None => {
                                 eprintln!("Destination not found: {}", destination);
@@ -722,7 +740,12 @@ fn handle_glob_edit(
                 let source_content = &content[loc.start_byte..loc.end_byte];
                 result = match at {
                     Position::Before | Position::After => {
-                        let dest_loc = match editor.find_symbol(file_path, &result, destination) {
+                        let dest_loc = match editor.find_symbol(
+                            file_path,
+                            &result,
+                            destination,
+                            case_insensitive,
+                        ) {
                             Some(l) => l,
                             None => {
                                 eprintln!("Destination not found: {}", destination);

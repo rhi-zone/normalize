@@ -50,7 +50,13 @@ impl Editor {
     }
 
     /// Find a symbol by name in a file (uses skeleton extractor)
-    pub fn find_symbol(&self, path: &Path, content: &str, name: &str) -> Option<SymbolLocation> {
+    pub fn find_symbol(
+        &self,
+        path: &Path,
+        content: &str,
+        name: &str,
+        case_insensitive: bool,
+    ) -> Option<SymbolLocation> {
         let extractor = SkeletonExtractor::new();
         let result = extractor.extract(path, content);
 
@@ -58,9 +64,15 @@ impl Editor {
             symbols: &[crate::skeleton::SkeletonSymbol],
             name: &str,
             content: &str,
+            case_insensitive: bool,
         ) -> Option<SymbolLocation> {
             for sym in symbols {
-                if sym.name == name {
+                let matches = if case_insensitive {
+                    sym.name.eq_ignore_ascii_case(name)
+                } else {
+                    sym.name == name
+                };
+                if matches {
                     let start_byte = line_to_byte(content, sym.start_line);
                     let end_byte = line_to_byte(content, sym.end_line + 1);
 
@@ -75,14 +87,14 @@ impl Editor {
                     });
                 }
                 // Search children
-                if let Some(loc) = search_symbols(&sym.children, name, content) {
+                if let Some(loc) = search_symbols(&sym.children, name, content, case_insensitive) {
                     return Some(loc);
                 }
             }
             None
         }
 
-        search_symbols(&result.symbols, name, content)
+        search_symbols(&result.symbols, name, content, case_insensitive)
     }
 
     /// Check if a pattern contains glob characters (delegates to path_resolve)

@@ -99,6 +99,10 @@ enum Commands {
         /// Confirm destructive operations (delete) without prompting
         #[arg(short = 'y', long)]
         yes: bool,
+
+        /// Case-insensitive symbol matching
+        #[arg(short = 'i', long)]
+        case_insensitive: bool,
     },
 
     /// View shadow git edit history
@@ -482,6 +486,7 @@ fn main() {
             undo_file,
             cross_checkpoint,
             yes,
+            case_insensitive,
         } => {
             // Handle undo/redo/goto operations
             if undo.is_some() || redo || goto.is_some() {
@@ -512,6 +517,7 @@ fn main() {
                     &only,
                     multiple,
                     message.as_deref(),
+                    case_insensitive,
                 )
             }
         }
