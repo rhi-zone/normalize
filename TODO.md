@@ -5,7 +5,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 - Analyze glob patterns: `moss analyze 'foo/**/bar.*'` for matching symbols
-- Case-insensitive matching (`-i` flag) for view/edit/analyze path targets
+- Case-insensitive matching (`-i` flag) for edit/analyze path targets (view: done)
 - Multi-file batch edit: reduce latency vs N sequential edits
 
 ## Remaining Work

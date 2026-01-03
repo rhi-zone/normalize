@@ -126,6 +126,10 @@ pub struct ViewArgs {
     /// Include only paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN")]
     pub only: Vec<String>,
+
+    /// Case-insensitive symbol matching
+    #[arg(short = 'i', long)]
+    pub case_insensitive: bool,
 }
 
 /// Run view command with args.
@@ -157,6 +161,7 @@ pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
         format.use_colors(),
         &args.exclude,
         &args.only,
+        args.case_insensitive,
     )
 }
 
@@ -183,6 +188,7 @@ pub fn cmd_view(
     use_colors: bool,
     exclude: &[String],
     only: &[String],
+    case_insensitive: bool,
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -312,6 +318,7 @@ pub fn cmd_view(
                 json,
                 pretty,
                 use_colors,
+                case_insensitive,
             );
         }
         _ => {
@@ -409,6 +416,7 @@ pub fn cmd_view(
                 json,
                 pretty,
                 use_colors,
+                case_insensitive,
             );
         }
 
@@ -424,6 +432,7 @@ pub fn cmd_view(
             json,
             pretty,
             use_colors,
+            case_insensitive,
         )
     }
 }

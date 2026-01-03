@@ -22,6 +22,7 @@ pub fn cmd_view_symbol_direct(
     json: bool,
     pretty: bool,
     use_colors: bool,
+    case_insensitive: bool,
 ) -> i32 {
     let symbol_path: Vec<String> = match parent_name {
         Some(p) => vec![p.to_string(), symbol_name.to_string()],
@@ -39,6 +40,7 @@ pub fn cmd_view_symbol_direct(
         json,
         pretty,
         use_colors,
+        case_insensitive,
     )
 }
 
@@ -192,16 +194,34 @@ pub fn cmd_view_symbol_at_line(
     0
 }
 
+/// Check if two names match, optionally case-insensitive
+fn names_match(a: &str, b: &str, case_insensitive: bool) -> bool {
+    if case_insensitive {
+        a.eq_ignore_ascii_case(b)
+    } else {
+        a == b
+    }
+}
+
 /// Find a symbol by name in a skeleton (recursive)
 pub fn find_symbol<'a>(
     symbols: &'a [skeleton::SkeletonSymbol],
     name: &str,
 ) -> Option<&'a skeleton::SkeletonSymbol> {
+    find_symbol_ci(symbols, name, false)
+}
+
+/// Find a symbol by name in a skeleton (recursive), with case sensitivity control
+pub fn find_symbol_ci<'a>(
+    symbols: &'a [skeleton::SkeletonSymbol],
+    name: &str,
+    case_insensitive: bool,
+) -> Option<&'a skeleton::SkeletonSymbol> {
     for sym in symbols {
-        if sym.name == name {
+        if names_match(&sym.name, name, case_insensitive) {
             return Some(sym);
         }
-        if let Some(found) = find_symbol(&sym.children, name) {
+        if let Some(found) = find_symbol_ci(&sym.children, name, case_insensitive) {
             return Some(found);
         }
     }
@@ -212,18 +232,21 @@ pub fn find_symbol<'a>(
 fn find_symbol_by_path<'a>(
     symbols: &'a [skeleton::SkeletonSymbol],
     path: &[String],
+    case_insensitive: bool,
 ) -> Option<&'a skeleton::SkeletonSymbol> {
     if path.is_empty() {
         return None;
     }
 
     if path.len() == 1 {
-        return find_symbol(symbols, &path[0]);
+        return find_symbol_ci(symbols, &path[0], case_insensitive);
     }
 
     let mut current_symbols = symbols;
     for (i, name) in path.iter().enumerate() {
-        let found = current_symbols.iter().find(|s| s.name == *name)?;
+        let found = current_symbols
+            .iter()
+            .find(|s| names_match(&s.name, name, case_insensitive))?;
         if i == path.len() - 1 {
             return Some(found);
         }
@@ -243,13 +266,14 @@ fn find_symbol_with_ancestors<'a>(
     symbols: &'a [skeleton::SkeletonSymbol],
     name: &str,
     ancestors: &mut Vec<AncestorInfo<'a>>,
+    case_insensitive: bool,
 ) -> Option<&'a skeleton::SkeletonSymbol> {
     for sym in symbols {
-        if sym.name == name {
+        if names_match(&sym.name, name, case_insensitive) {
             return Some(sym);
         }
         for child in &sym.children {
-            if child.name == name {
+            if names_match(&child.name, name, case_insensitive) {
                 ancestors.push(AncestorInfo {
                     symbol: sym,
                     sibling_count: sym.children.len().saturating_sub(1),
@@ -257,7 +281,9 @@ fn find_symbol_with_ancestors<'a>(
                 return Some(child);
             }
         }
-        if let Some(found) = find_symbol_with_ancestors(&sym.children, name, ancestors) {
+        if let Some(found) =
+            find_symbol_with_ancestors(&sym.children, name, ancestors, case_insensitive)
+        {
             ancestors.insert(
                 0,
                 AncestorInfo {
@@ -275,9 +301,10 @@ fn find_symbol_with_ancestors<'a>(
 fn find_symbol_with_parent<'a>(
     symbols: &'a [skeleton::SkeletonSymbol],
     name: &str,
+    case_insensitive: bool,
 ) -> (Option<&'a skeleton::SkeletonSymbol>, Vec<AncestorInfo<'a>>) {
     let mut ancestors = Vec::new();
-    let found = find_symbol_with_ancestors(symbols, name, &mut ancestors);
+    let found = find_symbol_with_ancestors(symbols, name, &mut ancestors, case_insensitive);
     (found, ancestors)
 }
 
@@ -300,6 +327,7 @@ pub fn cmd_view_symbol(
     json: bool,
     pretty: bool,
     use_colors: bool,
+    case_insensitive: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
@@ -426,7 +454,8 @@ pub fn cmd_view_symbol(
 
             let ancestors: Vec<(String, usize)> = if show_parent {
                 if let Some(ref sr) = skeleton_result {
-                    let (_, ancestor_infos) = find_symbol_with_parent(&sr.symbols, symbol_name);
+                    let (_, ancestor_infos) =
+                        find_symbol_with_parent(&sr.symbols, symbol_name, case_insensitive);
                     ancestor_infos
                         .into_iter()
                         .map(|a| (a.symbol.signature.clone(), a.sibling_count))
@@ -481,9 +510,9 @@ pub fn cmd_view_symbol(
         let skeleton_result = extractor.extract(&full_path, &content);
 
         let found_sym = if symbol_path.len() > 1 {
-            find_symbol_by_path(&skeleton_result.symbols, symbol_path)
+            find_symbol_by_path(&skeleton_result.symbols, symbol_path, case_insensitive)
         } else {
-            find_symbol(&skeleton_result.symbols, symbol_name)
+            find_symbol_ci(&skeleton_result.symbols, symbol_name, case_insensitive)
         };
 
         if let Some(sym) = found_sym {
@@ -517,9 +546,11 @@ pub fn cmd_view_symbol(
                     }
 
                     if show_parent && symbol_path.len() > 1 {
-                        if let Some(parent_sym) =
-                            find_symbol(&skeleton_result.symbols, &symbol_path[0])
-                        {
+                        if let Some(parent_sym) = find_symbol_ci(
+                            &skeleton_result.symbols,
+                            &symbol_path[0],
+                            case_insensitive,
+                        ) {
                             println!("\n{}\n", parent_sym.signature);
                         }
                     }
@@ -851,6 +882,7 @@ pub fn cmd_view_symbol_glob(
     json: bool,
     _pretty: bool,
     _use_colors: bool,
+    _case_insensitive: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
