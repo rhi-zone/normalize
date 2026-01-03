@@ -7,12 +7,14 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// Trace value provenance for a symbol.
+#[allow(clippy::too_many_arguments)]
 pub fn cmd_trace(
     symbol: &str,
     target: Option<&str>,
     root: &Path,
     max_depth: usize,
     recursive: bool,
+    _case_insensitive: bool, // Index find_symbols uses LOWER() by default
     json: bool,
     pretty: bool,
 ) -> i32 {

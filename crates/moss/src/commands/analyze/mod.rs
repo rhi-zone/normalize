@@ -300,23 +300,41 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             target,
             max_depth,
             recursive,
+            case_insensitive,
         }) => trace::cmd_trace(
             &symbol,
             target.as_deref(),
             &effective_root,
             max_depth,
             recursive,
+            case_insensitive,
             json,
             pretty,
         ),
 
-        Some(AnalyzeCommand::Callers { symbol }) => {
-            call_graph::cmd_call_graph(&effective_root, &symbol, true, false, json)
-        }
+        Some(AnalyzeCommand::Callers {
+            symbol,
+            case_insensitive,
+        }) => call_graph::cmd_call_graph(
+            &effective_root,
+            &symbol,
+            true,
+            false,
+            case_insensitive,
+            json,
+        ),
 
-        Some(AnalyzeCommand::Callees { symbol }) => {
-            call_graph::cmd_call_graph(&effective_root, &symbol, false, true, json)
-        }
+        Some(AnalyzeCommand::Callees {
+            symbol,
+            case_insensitive,
+        }) => call_graph::cmd_call_graph(
+            &effective_root,
+            &symbol,
+            false,
+            true,
+            case_insensitive,
+            json,
+        ),
 
         Some(AnalyzeCommand::Lint { target }) => {
             lint::cmd_lint_analyze(&effective_root, target.as_deref(), json)

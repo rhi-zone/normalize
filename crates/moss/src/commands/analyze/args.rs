@@ -113,18 +113,30 @@ pub enum AnalyzeCommand {
         /// Trace into called functions (show what they return)
         #[arg(long)]
         recursive: bool,
+
+        /// Case-insensitive symbol matching
+        #[arg(short = 'i', long)]
+        case_insensitive: bool,
     },
 
     /// Show what functions call a symbol
     Callers {
         /// Symbol to find callers for
         symbol: String,
+
+        /// Case-insensitive symbol matching
+        #[arg(short = 'i', long)]
+        case_insensitive: bool,
     },
 
     /// Show what functions a symbol calls
     Callees {
         /// Symbol to find callees for
         symbol: String,
+
+        /// Case-insensitive symbol matching
+        #[arg(short = 'i', long)]
+        case_insensitive: bool,
     },
 
     /// Run configured linters

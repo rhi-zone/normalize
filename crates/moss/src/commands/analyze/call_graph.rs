@@ -10,6 +10,7 @@ pub fn cmd_call_graph(
     target: &str,
     show_callers: bool,
     show_callees: bool,
+    _case_insensitive: bool, // Index methods already have case-insensitive fallbacks
     json: bool,
 ) -> i32 {
     // Try to parse target as file:symbol or just symbol
