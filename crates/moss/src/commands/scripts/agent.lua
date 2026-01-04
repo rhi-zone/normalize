@@ -1,26 +1,52 @@
 -- Agent module: autonomous task execution with moss tools
 local M = {}
 
+-- Characters for random IDs (no i,l,o,1,0 to avoid visual confusion)
+local ID_CHARS = "abcdefghjkmnpqrstuvwxyz23456789"
+local ID_LEN = 4
+
+-- Seed random on load
+math.randomseed(os.time())
+
 -- Generate random short IDs for memory items (avoid sequential to prevent LLM confusion)
-local id_chars = "abcdefghjkmnpqrstuvwxyz23456789"  -- no i,l,o,1,0 to avoid confusion
 function M.gen_id()
     local id = ""
-    for _ = 1, 4 do
-        local idx = math.random(1, #id_chars)
-        id = id .. id_chars:sub(idx, idx)
+    for _ = 1, ID_LEN do
+        local idx = math.random(1, #ID_CHARS)
+        id = id .. ID_CHARS:sub(idx, idx)
     end
     return id
 end
 
--- Seed random on first load
-math.randomseed(os.time())
+-- Memorize a fact to long-term memory (.moss/memory/facts.md)
+-- Returns: true on success, false + error message on failure
+function M.memorize(fact)
+    local memory_dir = _moss_root .. "/.moss/memory"
+    local facts_file = memory_dir .. "/facts.md"
+
+    -- Ensure directory exists
+    os.execute("mkdir -p " .. memory_dir)
+
+    -- Append fact with timestamp
+    local file, err = io.open(facts_file, "a")
+    if not file then
+        return false, err
+    end
+
+    local timestamp = os.date("%Y-%m-%d %H:%M")
+    file:write("- " .. fact .. " (" .. timestamp .. ")\n")
+    file:close()
+
+    return true
+end
 
 local SYSTEM_PROMPT = [[
 Coding session. Output commands in $(cmd) syntax. Multiple per turn OK.
 
 Command outputs disappear after each turn. To manage context:
 - $(keep) or $(keep 1 3) saves outputs to working memory
-- $(note key fact here) records insights
+- $(note key fact here) records insights for this session
+- $(memorize fact) saves to long-term memory (persists across sessions)
 - $(drop xk7f) removes item from working memory by ID
 - $(forget pattern) removes notes matching pattern
 - $(done YOUR FINAL ANSWER) ends the session
@@ -240,6 +266,7 @@ function M.run(opts)
         local note_commands = {}
         local drop_commands = {}
         local forget_commands = {}
+        local memorize_commands = {}
         local done_summary = nil
 
         for _, cmd in ipairs(commands) do
@@ -253,6 +280,8 @@ function M.run(opts)
                 table.insert(drop_commands, cmd)
             elseif cmd:match("^forget ") then
                 table.insert(forget_commands, cmd)
+            elseif cmd:match("^memorize ") then
+                table.insert(memorize_commands, cmd)
             else
                 table.insert(exec_commands, cmd)
             end
@@ -285,14 +314,21 @@ function M.run(opts)
         for _, cmd in ipairs(forget_commands) do
             local pattern = cmd:match("^forget%s+(.+)")
             if pattern then
-                local removed = 0
+                local removed = {}
                 for i = #working_memory, 1, -1 do
                     if working_memory[i].type == "note" and working_memory[i].content:find(pattern, 1, true) then
+                        table.insert(removed, working_memory[i])
                         table.remove(working_memory, i)
-                        removed = removed + 1
                     end
                 end
-                print("[agent] Forgot " .. removed .. " note(s) matching: " .. pattern)
+                if #removed > 0 then
+                    print("[agent] Forgot " .. #removed .. " note(s) matching '" .. pattern .. "':")
+                    for _, item in ipairs(removed) do
+                        print("  - [" .. item.id .. "] " .. item.content)
+                    end
+                else
+                    print("[agent] No notes matching: " .. pattern)
+                end
             end
         end
 
@@ -321,6 +357,19 @@ function M.run(opts)
             if fact then
                 table.insert(working_memory, {type = "note", id = M.gen_id(), content = fact})
                 print("[agent] Noted: " .. fact)
+            end
+        end
+
+        -- Process memorize commands (long-term, version-controlled)
+        for _, cmd in ipairs(memorize_commands) do
+            local fact = cmd:match("^memorize (.+)")
+            if fact then
+                local ok, err = M.memorize(fact)
+                if ok then
+                    print("[agent] Memorized: " .. fact)
+                else
+                    print("[agent] Failed to memorize: " .. (err or "unknown error"))
+                end
             end
         end
 
