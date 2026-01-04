@@ -4,6 +4,7 @@ local M = {}
 -- Characters for random IDs (no i,l,o,1,0 to avoid visual confusion)
 local ID_CHARS = "abcdefghjkmnpqrstuvwxyz23456789"
 local ID_LEN = 4
+local SESSION_ID_LEN = 8
 
 -- Seed random on load
 math.randomseed(os.time())
@@ -16,6 +17,162 @@ function M.gen_id()
         id = id .. ID_CHARS:sub(idx, idx)
     end
     return id
+end
+
+-- Generate longer session IDs for uniqueness across sessions
+function M.gen_session_id()
+    local id = ""
+    for _ = 1, SESSION_ID_LEN do
+        local idx = math.random(1, #ID_CHARS)
+        id = id .. ID_CHARS:sub(idx, idx)
+    end
+    return id
+end
+
+-- Session checkpoint directory
+local function get_session_dir()
+    return _moss_root .. "/.moss/agent"
+end
+
+-- Save session checkpoint to JSON file
+-- Returns: session_id on success, nil + error on failure
+function M.save_checkpoint(session_id, state)
+    local session_dir = get_session_dir()
+    os.execute("mkdir -p " .. session_dir)
+
+    local checkpoint_file = session_dir .. "/session-" .. session_id .. ".json"
+    local file, err = io.open(checkpoint_file, "w")
+    if not file then
+        return nil, err
+    end
+
+    -- Simple JSON serialization (working memory, task, progress)
+    local json_parts = {"{"}
+    table.insert(json_parts, string.format('"session_id": "%s",', session_id))
+    table.insert(json_parts, string.format('"task": %s,', M.json_encode_string(state.task)))
+    table.insert(json_parts, string.format('"turn": %d,', state.turn))
+    table.insert(json_parts, string.format('"timestamp": "%s",', os.date("%Y-%m-%dT%H:%M:%S")))
+
+    -- Serialize working memory
+    table.insert(json_parts, '"working_memory": [')
+    for i, item in ipairs(state.working_memory) do
+        local item_json = string.format(
+            '{"type": "%s", "id": "%s", "content": %s%s}',
+            item.type,
+            item.id,
+            M.json_encode_string(item.content),
+            item.cmd and string.format(', "cmd": %s, "success": %s', M.json_encode_string(item.cmd), tostring(item.success)) or ""
+        )
+        table.insert(json_parts, item_json)
+        if i < #state.working_memory then
+            table.insert(json_parts, ",")
+        end
+    end
+    table.insert(json_parts, "],")
+
+    -- Serialize progress summary
+    table.insert(json_parts, string.format('"progress": %s,', M.json_encode_string(state.progress or "")))
+    table.insert(json_parts, string.format('"open_questions": %s', M.json_encode_string(state.open_questions or "")))
+    table.insert(json_parts, "}")
+
+    file:write(table.concat(json_parts, "\n"))
+    file:close()
+
+    return session_id
+end
+
+-- JSON string encoding (handles escapes)
+function M.json_encode_string(s)
+    if s == nil then return "null" end
+    s = tostring(s)
+    s = s:gsub('\\', '\\\\')
+    s = s:gsub('"', '\\"')
+    s = s:gsub('\n', '\\n')
+    s = s:gsub('\r', '\\r')
+    s = s:gsub('\t', '\\t')
+    return '"' .. s .. '"'
+end
+
+-- Load session checkpoint from JSON file
+-- Returns: state table on success, nil + error on failure
+function M.load_checkpoint(session_id)
+    local checkpoint_file = get_session_dir() .. "/session-" .. session_id .. ".json"
+    local file, err = io.open(checkpoint_file, "r")
+    if not file then
+        return nil, "Session not found: " .. session_id
+    end
+
+    local content = file:read("*a")
+    file:close()
+
+    -- Parse JSON (simple parser for our known structure)
+    local state = M.parse_checkpoint_json(content)
+    if not state then
+        return nil, "Failed to parse checkpoint"
+    end
+
+    return state
+end
+
+-- Simple JSON parser for checkpoint format
+function M.parse_checkpoint_json(json)
+    local state = {working_memory = {}}
+
+    -- Extract simple fields
+    state.session_id = json:match('"session_id":%s*"([^"]*)"')
+    state.task = M.json_decode_string(json:match('"task":%s*(".-[^\\]")'))
+    state.turn = tonumber(json:match('"turn":%s*(%d+)'))
+    state.progress = M.json_decode_string(json:match('"progress":%s*(".-[^\\]")'))
+    state.open_questions = M.json_decode_string(json:match('"open_questions":%s*(".-[^\\]")'))
+
+    -- Extract working memory items
+    local wm_json = json:match('"working_memory":%s*%[(.-)%]')
+    if wm_json then
+        for item_json in wm_json:gmatch('{([^}]+)}') do
+            local item = {}
+            item.type = item_json:match('"type":%s*"([^"]*)"')
+            item.id = item_json:match('"id":%s*"([^"]*)"')
+            item.content = M.json_decode_string(item_json:match('"content":%s*(".-[^\\]")'))
+            local cmd = item_json:match('"cmd":%s*(".-[^\\]")')
+            if cmd then
+                item.cmd = M.json_decode_string(cmd)
+                item.success = item_json:match('"success":%s*true') ~= nil
+            end
+            table.insert(state.working_memory, item)
+        end
+    end
+
+    return state
+end
+
+-- JSON string decoding
+function M.json_decode_string(s)
+    if not s or s == "null" then return nil end
+    -- Remove surrounding quotes
+    s = s:match('^"(.*)"$') or s
+    s = s:gsub('\\n', '\n')
+    s = s:gsub('\\r', '\r')
+    s = s:gsub('\\t', '\t')
+    s = s:gsub('\\"', '"')
+    s = s:gsub('\\\\', '\\')
+    return s
+end
+
+-- List available session checkpoints
+function M.list_sessions()
+    local sessions = {}
+    local session_dir = get_session_dir()
+    local handle = io.popen("ls -t " .. session_dir .. "/session-*.json 2>/dev/null")
+    if handle then
+        for line in handle:lines() do
+            local id = line:match("session%-(.+)%.json$")
+            if id then
+                table.insert(sessions, id)
+            end
+        end
+        handle:close()
+    end
+    return sessions
 end
 
 -- Memorize a fact to long-term memory (.moss/memory/facts.md)
@@ -49,9 +206,11 @@ Command outputs disappear after each turn. To manage context:
 - $(memorize fact) saves to long-term memory (persists across sessions)
 - $(drop xk7f) removes item from working memory by ID
 - $(forget pattern) removes notes matching pattern
+- $(checkpoint progress summary | open questions) saves session for later resumption
 - $(done YOUR FINAL ANSWER) ends the session
 
 $(done The answer is X because Y)
+$(checkpoint Implemented auth module | Need to add tests)
 $(keep)
 $(note uses clap for CLI)
 $(view .)
@@ -82,10 +241,45 @@ function M.is_looping(recent_cmds, n)
     return true
 end
 
+-- Build error escalation context
+-- error_state: {cmd, retries, rolled_back, last_error}
+function M.build_error_context(error_state)
+    if not error_state then return "" end
+
+    local parts = {"\n[error recovery]"}
+    table.insert(parts, string.format("Command '%s' has failed %d time(s).", error_state.cmd, error_state.retries))
+
+    if error_state.last_error then
+        table.insert(parts, "Last error: " .. error_state.last_error:sub(1, 200))
+    end
+
+    if error_state.rolled_back then
+        table.insert(parts, "Status: Already rolled back to pre-edit state.")
+        table.insert(parts, "Options:")
+        table.insert(parts, "  1. $(ask <question>) - Get user guidance")
+        table.insert(parts, "  2. Try a different approach")
+        table.insert(parts, "  3. $(done BLOCKED: <explanation>) - Give up with explanation")
+    elseif error_state.retries >= 3 then
+        table.insert(parts, "Status: Max retries reached, will rollback on next failure.")
+        table.insert(parts, "Consider: Try a different approach or $(ask) for help.")
+    else
+        table.insert(parts, string.format("Status: Retry %d/3", error_state.retries))
+    end
+
+    table.insert(parts, "[/error recovery]")
+    return table.concat(parts, "\n")
+end
+
 -- Build context from working memory
 -- working_memory: list of {type="output"|"note", cmd?, content, id}
-function M.build_context(task, working_memory, current_outputs)
+-- error_state: optional {cmd, retries, rolled_back, last_error}
+function M.build_context(task, working_memory, current_outputs, error_state)
     local parts = {"Task: " .. task}
+
+    -- Add error recovery context if in error state
+    if error_state then
+        table.insert(parts, M.build_error_context(error_state))
+    end
 
     -- Add working memory (kept outputs and notes) - stable IDs for $(drop ID)
     if #working_memory > 0 then
@@ -146,6 +340,40 @@ function M.run(opts)
     local max_turns = opts.max_turns or 15
     local provider = opts.provider or "gemini"
     local model = opts.model
+    local session_id = opts.resume or M.gen_session_id()
+    local start_turn = 1
+
+    -- Resume from checkpoint if specified
+    local working_memory = {}
+    if opts.resume then
+        local state, err = M.load_checkpoint(opts.resume)
+        if state then
+            print("[agent] Resuming session: " .. opts.resume)
+            task = state.task or task
+            working_memory = state.working_memory or {}
+            start_turn = (state.turn or 0) + 1
+            if state.progress then
+                print("[agent] Previous progress: " .. state.progress)
+            end
+            if state.open_questions then
+                print("[agent] Open questions: " .. state.open_questions)
+            end
+        else
+            print("[agent] Warning: " .. (err or "Failed to load checkpoint"))
+            print("[agent] Starting fresh session")
+            session_id = M.gen_session_id()
+        end
+    else
+        -- Recall relevant memories into working memory (only for new sessions)
+        local ok, memories = pcall(recall, task, 3)
+        if ok and memories and #memories > 0 then
+            for _, m in ipairs(memories) do
+                table.insert(working_memory, {type = "note", id = M.gen_id(), content = "(recalled) " .. m.content})
+            end
+        end
+    end
+
+    print("[agent] Session: " .. session_id)
 
     -- Build task description
     local task_desc = task
@@ -153,15 +381,6 @@ function M.run(opts)
         task_desc = task_desc .. "\nIMPORTANT: Your final answer MUST end with '## Steps' listing each command you ran and why it was needed."
     end
     task_desc = task_desc .. "\nDirectory: " .. _moss_root
-
-    -- Recall relevant memories into working memory
-    local working_memory = {}
-    local ok, memories = pcall(recall, task, 3)
-    if ok and memories and #memories > 0 then
-        for _, m in ipairs(memories) do
-            table.insert(working_memory, {type = "note", id = M.gen_id(), content = "(recalled) " .. m.content})
-        end
-    end
 
     -- Initialize shadow git for rollback capability
     local shadow_ok = pcall(function()
@@ -173,6 +392,7 @@ function M.run(opts)
     local all_output = {}
     local total_retries = 0
     local current_outputs = nil  -- outputs from last turn (ephemeral)
+    local error_state = nil  -- tracks escalation: {cmd, retries, rolled_back}
 
     -- Open log file if debug mode
     local log_file = nil
@@ -183,11 +403,11 @@ function M.run(opts)
         end
     end
 
-    for turn = 1, max_turns do
-        print(string.format("[agent] Turn %d/%d", turn, max_turns))
+    for turn = start_turn, max_turns do
+        print(string.format("[agent] Turn %d/%d (session: %s)", turn, max_turns, session_id))
 
-        -- Build context from working memory + current outputs
-        local prompt = M.build_context(task_desc, working_memory, current_outputs)
+        -- Build context from working memory + current outputs + error state
+        local prompt = M.build_context(task_desc, working_memory, current_outputs, error_state)
 
         -- Add loop warning if needed
         if M.is_looping(recent_cmds, 3) then
@@ -267,11 +487,14 @@ function M.run(opts)
         local drop_commands = {}
         local forget_commands = {}
         local memorize_commands = {}
+        local checkpoint_cmd = nil
         local done_summary = nil
 
         for _, cmd in ipairs(commands) do
             if cmd:match("^done") then
                 done_summary = cmd:match("^done%s*(.*)") or ""
+            elseif cmd:match("^checkpoint") then
+                checkpoint_cmd = cmd
             elseif cmd:match("^keep") then
                 table.insert(keep_commands, cmd)
             elseif cmd:match("^note ") then
@@ -373,6 +596,46 @@ function M.run(opts)
             end
         end
 
+        -- Process checkpoint command (saves session state and exits)
+        if checkpoint_cmd then
+            local args = checkpoint_cmd:match("^checkpoint%s*(.*)")
+            local progress, open_questions = "", ""
+            if args then
+                -- Parse "progress | open questions" format
+                local p, q = args:match("^(.-)%s*|%s*(.*)$")
+                if p then
+                    progress = p
+                    open_questions = q
+                else
+                    progress = args
+                end
+            end
+
+            local state = {
+                task = task,
+                turn = turn,
+                working_memory = working_memory,
+                progress = progress,
+                open_questions = open_questions
+            }
+
+            local saved_id, err = M.save_checkpoint(session_id, state)
+            if saved_id then
+                print("[agent] Session checkpointed: " .. saved_id)
+                print("[agent] Resume with: moss @agent --resume " .. saved_id)
+                if progress ~= "" then
+                    print("[agent] Progress: " .. progress)
+                end
+                if open_questions ~= "" then
+                    print("[agent] Open questions: " .. open_questions)
+                end
+            else
+                print("[agent] Failed to checkpoint: " .. (err or "unknown error"))
+            end
+
+            return { success = true, output = table.concat(all_output, "\n"), session_id = session_id, checkpointed = true }
+        end
+
         -- Clear for this turn's outputs
         current_outputs = {}
 
@@ -422,15 +685,54 @@ function M.run(opts)
                 table.remove(recent_cmds, 1)
             end
 
-            -- Rollback on edit failure
-            if cmd:match("^edit") and not result.success and shadow_ok then
-                print("[agent] Edit failed, rolling back")
-                pcall(function()
-                    local snapshots = shadow.list()
-                    if #snapshots > 1 then
-                        shadow.restore(snapshots[#snapshots - 1].id)
+            -- Error escalation tracking
+            if not result.success then
+                -- Check if this is a validation-like command (run, edit)
+                local is_validation = cmd:match("^run ") or cmd:match("^edit")
+                if is_validation then
+                    if error_state and error_state.cmd == cmd then
+                        -- Same command failed again, increment retries
+                        error_state.retries = error_state.retries + 1
+                        error_state.last_error = result.output:sub(1, 500)
+                    else
+                        -- New error, start tracking
+                        error_state = {
+                            cmd = cmd,
+                            retries = 1,
+                            rolled_back = false,
+                            last_error = result.output:sub(1, 500)
+                        }
                     end
-                end)
+
+                    print(string.format("[agent] Error on '%s' (attempt %d/3)", cmd:sub(1, 40), error_state.retries))
+
+                    -- Escalation logic
+                    if error_state.retries >= 3 and not error_state.rolled_back and shadow_ok then
+                        print("[agent] Max retries reached, rolling back...")
+                        local rollback_ok = pcall(function()
+                            local snapshots = shadow.list()
+                            if #snapshots > 1 then
+                                shadow.restore(snapshots[#snapshots - 1].id)
+                            end
+                        end)
+                        if rollback_ok then
+                            error_state.rolled_back = true
+                            print("[agent] Rolled back to pre-edit state")
+                            -- Add note about rollback
+                            table.insert(working_memory, {
+                                type = "note",
+                                id = M.gen_id(),
+                                content = "ROLLBACK: " .. cmd .. " failed 3 times, reverted changes"
+                            })
+                        end
+                    end
+                end
+            else
+                -- Command succeeded, clear error state if it was for this command
+                if error_state and error_state.cmd == cmd then
+                    print("[agent] Error resolved for: " .. cmd:sub(1, 40))
+                    error_state = nil
+                end
             end
         end
 
@@ -444,11 +746,27 @@ function M.run(opts)
         end
     end
 
-    print("[agent] Max turns reached")
+    -- Auto-checkpoint on max turns reached
+    print("[agent] Max turns reached, auto-checkpointing...")
+    local state = {
+        task = task,
+        turn = max_turns,
+        working_memory = working_memory,
+        progress = "Session ended at max turns",
+        open_questions = "Review working memory for context"
+    }
+    local saved_id, err = M.save_checkpoint(session_id, state)
+    if saved_id then
+        print("[agent] Session auto-checkpointed: " .. saved_id)
+        print("[agent] Resume with: moss @agent --resume " .. saved_id)
+    else
+        print("[agent] Warning: Failed to auto-checkpoint: " .. (err or "unknown error"))
+    end
+
     if total_retries > 0 then
         print("[agent] API retries: " .. total_retries)
     end
-    return { success = false, output = table.concat(all_output, "\n") }
+    return { success = false, output = table.concat(all_output, "\n"), session_id = session_id }
 end
 
 -- Parse CLI args
@@ -470,6 +788,12 @@ function M.parse_args(args)
         elseif arg == "--explain" then
             opts.explain = true
             i = i + 1
+        elseif arg == "--resume" and args[i+1] then
+            opts.resume = args[i+1]
+            i = i + 2
+        elseif arg == "--list-sessions" then
+            opts.list_sessions = true
+            i = i + 1
         else
             table.insert(task_parts, arg)
             i = i + 1
@@ -484,6 +808,28 @@ end
 -- When required as module, return M
 if args and #args >= 0 then
     local opts = M.parse_args(args)
+
+    -- Handle --list-sessions
+    if opts.list_sessions then
+        local sessions = M.list_sessions()
+        if #sessions == 0 then
+            print("No saved sessions found.")
+        else
+            print("Available sessions:")
+            for _, id in ipairs(sessions) do
+                local state = M.load_checkpoint(id)
+                if state then
+                    local task_preview = (state.task or ""):sub(1, 50)
+                    if #(state.task or "") > 50 then task_preview = task_preview .. "..." end
+                    print(string.format("  %s  turn %d  %s", id, state.turn or 0, task_preview))
+                else
+                    print(string.format("  %s  (failed to load)", id))
+                end
+            end
+        end
+        os.exit(0)
+    end
+
     local result = M.run(opts)
     if not result.success then
         os.exit(1)

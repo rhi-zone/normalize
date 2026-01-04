@@ -127,7 +127,10 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Prompt testing framework: systematic evaluation of different prompts across LLMs
 - Prompt optimization tool: semi-automatic tuning for specific LLMs (especially proprietary/internal models)
   - Users should be able to hyper-optimize for their specific LLM setup
+  - Codebase-specific tuning: prompts can be optimized for user's own codebase (another form of specialization)
   - Could involve A/B testing, success rate tracking, automatic refinement
+  - Session/run tracking: save all sessions with diffs of what changed, for post-meta-optimization analysis
+  - Box-thinking mitigation: find ways to counteract LLMs' tendency to think inside the box (fundamental problem)
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
