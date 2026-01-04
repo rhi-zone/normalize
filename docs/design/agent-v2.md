@@ -152,13 +152,19 @@ Organization: both manual and LLM-assisted
 - Agent can reorganize/consolidate via LLM when prompted
 - `moss memory organize` - LLM pass to dedupe/categorize
 
+## Implemented
+
+- [x] Context commands: $(keep), $(note), $(drop), $(forget), $(memorize)
+- [x] Session checkpoints: $(checkpoint), --resume, --list-sessions
+- [x] Error escalation: retry → rollback → ask user (automatic after 3 failures)
+- [x] Working memory IDs: random 4-char strings to avoid LLM autocomplete
+
 ## Open Questions
 
 1. **Batch edit integration** - agent should use `edit.batch()` for multi-file changes
 2. **Parallel validation** - shadow worktree configurable, default OFF (complexity vs benefit)
 3. **Memory heuristics** - what to auto-memorize vs explicit `memorize` only?
 4. **Sub-agent error attribution** - when validation fails, which sub-agent caused it? Need tracing/blame mechanism
-5. **Working memory IDs** - using random 4-char strings (e.g., "xk7f") to avoid sequential autocomplete issues
 
 ## Success Criteria
 
