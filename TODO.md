@@ -161,8 +161,13 @@ After testing validates the core:
   - Fix direction: reframe task so multi-turn IS correct completion, not fight training
   - Ideas: "you are an investigator" role, explicit steps (gather → wait → answer), evidence-based answers
   - $(wait) is a band-aid (postprocessing), not a real fix
-  - **Verify**: is ephemeral context (drop by default) actually better? 4-turn success needs validation
+  - **Verified**: ephemeral context IS implemented correctly - outputs have 1-turn visibility window:
+    - Turn N outputs → visible in Turn N+1 `[outputs]` → gone by Turn N+2 unless `$(keep)`
+    - This window is intentional: LLM needs to see results before deciding what to keep
+    - True "drop immediately" would force blind `$(keep)` before seeing outputs
   - **Hypothesis**: identical context between any two LLM calls (pairwise) = error/loop - should never happen
+    - Risk: same command twice → same outputs → similar contexts → loop potential
+    - Mitigation: `is_looping()` catches repeated commands, but not identical context from different commands
 - **CRITICAL: Using grep patterns with text-search** - Claude Code used `\|` (grep OR syntax) with text-search
   - text-search was specifically renamed from grep to avoid regex escaping confusion
   - Agent failed to use tool correctly despite it being in the command list
