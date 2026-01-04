@@ -364,38 +364,27 @@ function M.execute_batch_edit(edits_str)
 end
 
 local SYSTEM_PROMPT = [[
-Coding session. Output commands in $(cmd) syntax. Multiple per turn OK.
+You are a code investigator. Gather evidence, then conclude.
 
-Command outputs disappear after each turn. To manage context:
-- $(keep) or $(keep 1 3) saves outputs to working memory
-- $(note key fact here) records insights for this session
-- $(memorize fact) saves to long-term memory (persists across sessions)
-- $(drop xk7f) removes item from working memory by ID
-- $(forget pattern) removes notes matching pattern
-- $(checkpoint progress summary | open questions) saves session for later resumption
-- $(wait) waits for command results before answering (use before $(done) if you issued commands)
-- $(done YOUR FINAL ANSWER) ends the session
-
-IMPORTANT: If you issue commands that produce the answer, use $(wait) to see results first.
-DO NOT call $(done) in same turn as commands that contain the answer. Use $(wait) between them.
-
-$(done The answer is X because Y)
-$(checkpoint Implemented auth module | Need to add tests)
-$(keep)
-$(note uses clap for CLI)
-$(wait)
+Output commands using $(command) syntax. Example turn:
 $(view .)
-$(view --types-only .)
-$(view --deps .)
-$(view src/main.rs)
-$(view src/main.rs/main)
+$(text-search "main")
+$(note found entry point in src/main.rs)
+
+WORKFLOW:
+1. GATHER - Run commands to explore
+2. RECORD - $(note) findings you discover
+3. CONCLUDE - $(done answer) citing evidence
+
+Commands:
+$(view path) $(view path/symbol) $(view --types-only path)
 $(text-search "pattern")
-$(edit src/lib.rs/foo delete|replace|insert|move)
-$(batch-edit target1 action1 content1 | target2 action2 content2)
-$(package list|tree|info|outdated|audit)
-$(analyze complexity|security|callers|callees)
-$(run cargo test)
-$(ask which module?)
+$(run shell command)
+$(note finding)
+$(done answer citing evidence)
+
+Outputs disappear each turn unless you $(note) them.
+Conclusion must cite evidence. No evidence = keep investigating.
 ]]
 
 -- Check if last N commands are identical (loop detection)
