@@ -509,6 +509,7 @@ function M.run(opts)
     local model = opts.model
     local session_id = opts.resume or M.gen_session_id()
     local start_turn = 1
+    local non_interactive = opts.non_interactive or false
 
     -- Resume from checkpoint if specified
     local working_memory = {}
@@ -860,10 +861,20 @@ function M.run(opts)
             local result
             if cmd:match("^ask ") then
                 local question = cmd:match("^ask (.+)")
-                io.write("[agent] " .. question .. "\n> ")
-                io.flush()
-                local answer = io.read("*l") or ""
-                result = { output = "User: " .. answer, success = true }
+                if non_interactive then
+                    -- In non-interactive mode, log the question and return a special response
+                    print("[agent] BLOCKED: " .. question .. " (non-interactive mode)")
+                    result = { output = "ERROR: Cannot ask user in non-interactive mode. Question was: " .. question, success = false }
+                    -- Log the block for analysis
+                    if session_log then
+                        session_log:log("blocked_ask", { question = question })
+                    end
+                else
+                    io.write("[agent] " .. question .. "\n> ")
+                    io.flush()
+                    local answer = io.read("*l") or ""
+                    result = { output = "User: " .. answer, success = true }
+                end
             elseif cmd:match("^batch%-edit ") then
                 -- Parse and execute batch edit via edit.batch()
                 local edits_str = cmd:match("^batch%-edit (.+)")
@@ -1030,6 +1041,9 @@ function M.parse_args(args)
             i = i + 1
         elseif arg == "--list-logs" then
             opts.list_logs = true
+            i = i + 1
+        elseif arg == "--non-interactive" or arg == "-n" then
+            opts.non_interactive = true
             i = i + 1
         else
             table.insert(task_parts, arg)
