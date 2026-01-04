@@ -140,6 +140,11 @@ After testing validates the core:
 - Moss's dynamic context reshaping avoids append-only accumulation problems
 - LLM code consistency: see `docs/llm-code-consistency.md`
 - Large file edits: agentic tools struggle with large deletions (Edit tool match failures)
+- **View loops**: Claude can get stuck viewing same files repeatedly without extracting info (session 67xvhqzk: 7× `view commands/`, 7× `view mod.rs`, 15 turns, task incomplete)
+  - Likely cause: `view` output doesn't contain the info needed (e.g., CLI command names in Rust enums/structs require deeper inspection)
+  - Possible fixes: better prompting, richer view output, or guide agent to use text-search for specific patterns
+  - Contrast: text-search task succeeded in 1 turn (session 6ruc3djn) - tool output contained answer directly
+  - Pattern: agent succeeds when tool output = answer, struggles when output requires interpretation/assembly
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
