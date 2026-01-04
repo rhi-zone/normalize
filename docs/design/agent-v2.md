@@ -158,13 +158,13 @@ Organization: both manual and LLM-assisted
 - [x] Session checkpoints: $(checkpoint), --resume, --list-sessions
 - [x] Error escalation: retry → rollback → ask user (automatic after 3 failures)
 - [x] Working memory IDs: random 4-char strings to avoid LLM autocomplete
+- [x] Batch edit: $(batch-edit target1 action content | target2 action content)
 
 ## Open Questions
 
-1. **Batch edit integration** - agent should use `edit.batch()` for multi-file changes
-2. **Parallel validation** - shadow worktree configurable, default OFF (complexity vs benefit)
-3. **Memory heuristics** - what to auto-memorize vs explicit `memorize` only?
-4. **Sub-agent error attribution** - when validation fails, which sub-agent caused it? Need tracing/blame mechanism
+1. **Parallel validation** - shadow worktree configurable, default OFF (complexity vs benefit)
+2. **Memory heuristics** - what to auto-memorize vs explicit `memorize` only?
+3. **Sub-agent error attribution** - when validation fails, which sub-agent caused it? Need tracing/blame mechanism
 
 ## Success Criteria
 

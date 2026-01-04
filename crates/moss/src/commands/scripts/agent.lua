@@ -197,6 +197,74 @@ function M.memorize(fact)
     return true
 end
 
+-- Execute batch edit from agent command string
+-- Format: "target1 action1 content1 | target2 action2 content2"
+-- Actions: delete, replace, insert
+function M.execute_batch_edit(edits_str)
+    local edits = {}
+    local outputs = {}
+
+    -- Split by | and parse each edit
+    for edit_part in (edits_str .. "|"):gmatch("(.-)%s*|%s*") do
+        edit_part = edit_part:match("^%s*(.-)%s*$")  -- trim
+        if edit_part ~= "" then
+            -- Parse: target action [content]
+            local target, rest = edit_part:match("^(%S+)%s+(.+)$")
+            if target then
+                local action, content = rest:match("^(%S+)%s*(.*)$")
+                if action then
+                    local edit = { target = target, action = action }
+                    if content and content ~= "" then
+                        edit.content = content
+                    end
+                    table.insert(edits, edit)
+                end
+            end
+        end
+    end
+
+    if #edits == 0 then
+        return { output = "No valid edits parsed", success = false }
+    end
+
+    -- Try to use edit.batch if available (Lua runtime context)
+    if edit and edit.batch then
+        local ok, result = pcall(function()
+            return edit.batch(edits, { message = "Agent batch edit" })
+        end)
+        if ok and result then
+            if result.success then
+                table.insert(outputs, string.format("Batch edit applied: %d edits", result.edits_applied or #edits))
+                if result.files_modified then
+                    for _, f in ipairs(result.files_modified) do
+                        table.insert(outputs, "  Modified: " .. f)
+                    end
+                end
+                return { output = table.concat(outputs, "\n"), success = true }
+            else
+                return { output = result.error or "Batch edit failed", success = false }
+            end
+        end
+    end
+
+    -- Fallback: generate JSON and pipe to moss edit --batch -
+    local json_edits = {}
+    for _, e in ipairs(edits) do
+        local json_edit = string.format('{"target": %s, "action": "%s"',
+            M.json_encode_string(e.target), e.action)
+        if e.content then
+            json_edit = json_edit .. string.format(', "content": %s', M.json_encode_string(e.content))
+        end
+        json_edit = json_edit .. "}"
+        table.insert(json_edits, json_edit)
+    end
+    local json = '{"edits": [' .. table.concat(json_edits, ", ") .. ']}'
+
+    -- Execute via moss CLI
+    local cmd = string.format("echo '%s' | ./target/debug/moss edit --batch -", json:gsub("'", "'\\''"))
+    return shell(cmd)
+end
+
 local SYSTEM_PROMPT = [[
 Coding session. Output commands in $(cmd) syntax. Multiple per turn OK.
 
@@ -220,6 +288,7 @@ $(view src/main.rs)
 $(view src/main.rs/main)
 $(text-search "pattern")
 $(edit src/lib.rs/foo delete|replace|insert|move)
+$(batch-edit target1 action1 content1 | target2 action2 content2)
 $(package list|tree|info|outdated|audit)
 $(analyze complexity|security|callers|callees)
 $(run cargo test)
@@ -641,8 +710,8 @@ function M.run(opts)
 
         -- Execute commands
         for _, cmd in ipairs(exec_commands) do
-            -- Snapshot before edits
-            if cmd:match("^edit") and shadow_ok then
+            -- Snapshot before edits (including batch-edit)
+            if (cmd:match("^edit") or cmd:match("^batch%-edit")) and shadow_ok then
                 pcall(function() shadow.snapshot({}) end)
             end
 
@@ -654,6 +723,11 @@ function M.run(opts)
                 io.flush()
                 local answer = io.read("*l") or ""
                 result = { output = "User: " .. answer, success = true }
+            elseif cmd:match("^batch%-edit ") then
+                -- Parse and execute batch edit via edit.batch()
+                local edits_str = cmd:match("^batch%-edit (.+)")
+                print("[agent] Batch editing: " .. edits_str:sub(1, 60) .. (edits_str:len() > 60 and "..." or ""))
+                result = M.execute_batch_edit(edits_str)
             elseif cmd:match("^run ") then
                 -- Execute raw shell command
                 local raw_cmd = cmd:match("^run (.+)")
@@ -687,8 +761,8 @@ function M.run(opts)
 
             -- Error escalation tracking
             if not result.success then
-                -- Check if this is a validation-like command (run, edit)
-                local is_validation = cmd:match("^run ") or cmd:match("^edit")
+                -- Check if this is a validation-like command (run, edit, batch-edit)
+                local is_validation = cmd:match("^run ") or cmd:match("^edit") or cmd:match("^batch%-edit")
                 if is_validation then
                     if error_state and error_state.cmd == cmd then
                         -- Same command failed again, increment retries
