@@ -8,16 +8,29 @@ See `docs/` for design docs and `README.md` for usage.
 - `moss @agent "task"` runs autonomous agent loop (max 15 turns)
 - Pure Lua implementation (`require("agent")` module)
 - Ephemeral context model: outputs shown once, gone next turn unless kept
-  - `[cmd]keep[/cmd]` / `keep N` / `keep N M` - retain specific outputs
-  - `[cmd]note <fact>[/cmd]` - record synthesized insights
+  - `$(keep)` / `$(keep N)` / `$(keep N M)` - retain specific outputs
+  - `$(note <fact>)` - record synthesized insights
+  - `$(drop <id>)` - remove item from working memory by ID
+  - `$(forget <pattern>)` - remove notes matching pattern
+  - `$(memorize <fact>)` - save to long-term memory (.moss/memory/facts.md)
   - Working memory replaces append-only turn history
+- Session continuity:
+  - `$(checkpoint progress | questions)` - save session for later
+  - `--resume <session-id>` - continue from checkpoint
+  - `--list-sessions` - show available checkpoints
+  - Auto-checkpoint on max turns reached
+- Error escalation: retry → rollback → ask user (automatic after 3 failures)
+- `$(batch-edit target1 action content | target2 ...)` - multi-file batch edits
+- Session logging: JSONL logs in .moss/agent/logs/ for analysis
+  - `--list-logs` - show available session logs
+- `--non-interactive` / `-n` - CI mode ($(ask) returns error instead of blocking)
 - Loop detection: warns when same command repeated 3+ times
 - Shadow git integration for automatic rollback on failed edits
 - Memory integration via `recall()` for cross-session context
-- `ask <question>` tool for clarifying questions (reads stdin)
+- `$(ask <question>)` - clarifying questions (reads stdin, errors in non-interactive mode)
 - Progress indicator ("Thinking...") while waiting for LLM
 - `llm.complete(provider?, model?, system?, prompt)` exposed to Lua scripts
-- See `docs/design/agent.md` for design rationale
+- See `docs/design/agent.md` and `docs/design/agent-v2.md` for design rationale
 
 ### View Command
 - Smart Header: `--context` flag shows referenced type definitions when viewing a symbol

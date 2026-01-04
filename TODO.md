@@ -6,9 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 **Paused** - focusing on agent testing/dogfooding. See Agent Research in Backlog.
 
-- [x] Expose batch edit to agent: `$(batch-edit)` command integrated
 - PR/diff analysis: `moss analyze --pr` for changed code focus
-- [x] Session format: JSONL logs for debugging/analysis, --list-logs
 - Streaming output for workflow engine `auto{}` driver
 
 ## Remaining Work
