@@ -4,7 +4,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Multi-file batch edit: implement design from `docs/design/batch-edit.md`
+**Paused** - focusing on agent testing/dogfooding. See Agent Research in Backlog.
+
+- Expose batch edit to agent: `edit.batch()` already in Lua, needs agent prompt/tool integration
+- PR/diff analysis: `moss analyze --pr` for changed code focus
+- Session format: save/replay agent sessions for debugging and analysis
+- Streaming output for workflow engine `auto{}` driver
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -159,7 +164,6 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
 
 ### Agent / MCP
-- Expose batch edit to agent: `edit.batch()` Lua API for atomic multi-file edits
 - Gemini Flash 3 prompt sensitivity: certain phrases ("shell", "execute", nested `[--opts]`) trigger 500 errors. Investigate if prompt can be further simplified to avoid safety filters entirely. See `docs/design/agent.md` for current workarounds.
 - `moss @agent` (crates/moss/src/commands/scripts/agent.lua): MCP support as second-class citizen
   - Our own tools take priority, MCP as fallback/extension mechanism
