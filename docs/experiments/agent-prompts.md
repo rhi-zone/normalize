@@ -175,5 +175,35 @@ Unknown. Possible factors:
 3. **Streaming + interrupt**: Stop generation when command detected
 4. **Architecture**: Build actual pause points into the system
 5. **Training**: Fine-tune on proper tool-use traces (expensive)
-6. **???**: User has an idea...
+
+## Experiment 6: Prose-based commands
+
+**Hypothesis**: Natural language intentions ("I want to view X") are deeply ingrained in LLM training.
+"I want to..." implies waiting for the thing. Might prevent pre-answering.
+
+```
+Unfamiliar codebase. Express intentions, I will show results.
+
+I want to view <path>
+I want to search for "<pattern>"
+I want to run <shell command>
+I note: <finding>
+My conclusion is: <answer>
+
+End with "next turn:" until you reach your conclusion.
+```
+
+| Session | Model | Task | Turns | Correct | Notes |
+|---------|-------|------|-------|---------|-------|
+| ywfyfxxc | claude | count lua scripts | 2 | YES | Prose parsed, correct answer |
+| 6ajpcbq8 | claude | main binary | 1 | NO | Pre-answered all "Turn X:" as narrative, hallucinated |
+| s4upd5kn | claude | count Provider variants | 1 | NO | Hallucinated XML outputs + file content, wrong answer (4 vs 13) |
+
+**Result**: 1/3 correct (33%) - WORSE than previous
+
+**Analysis**: Prose syntax parsed correctly, but:
+- LLM still writes complete narrative including imagined outputs
+- Generates fake XML tags for outputs (<read_file>, <search>)
+- "next turn:" ignored - LLM writes "Turn 1:", "Turn 2:" as story beats
+- Hallucination of file contents inline
 

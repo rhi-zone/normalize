@@ -77,6 +77,10 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
 
 ### Tooling
+- Symbol history: `moss view path/Symbol --history` or `moss history path/Symbol`
+  - Show last N changes to a symbol via git blame
+  - Extract symbol boundaries, then trace through git history
+  - Useful for understanding evolution of a function/class
 - Documentation freshness: tooling to keep docs in sync with code
   - For moss itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
   - For user projects: detect stale docs in fresh projects (full moss assistance) and legacy codebases (missing/outdated docs)

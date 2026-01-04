@@ -364,17 +364,27 @@ function M.execute_batch_edit(edits_str)
 end
 
 local SYSTEM_PROMPT = [[
-Unfamiliar codebase. You cannot see files until you run commands.
+Unfamiliar codebase. Express intentions, I will show results.
 
-Output commands using $(command) syntax. Example turn:
-$(view .)
-$(text-search "main")
-$(note found entry point in src/main.rs)
+I want to view <path>
+I want to view <path/Symbol>
+I want to view only types in <path>
+I want to view dependencies of <path>
+I want to search for "<pattern>"
+I want to search for "<pattern>" only in <glob>
+I want to analyze complexity
+I want to analyze callers of <symbol>
+I want to list packages
+I want to see outdated packages
+I want to run <shell command>
+I want to delete <path/Symbol>
+I want to replace <path/Symbol> with <code>
+I want to insert <code> before <path/Symbol>
+I note: <finding>
+I want to ask the user: <question>
+My conclusion is: <answer>
 
-$(view path) $(text-search "pattern") $(run command)
-$(edit target action) $(analyze complexity|callers)
-$(note finding) $(keep) $(drop id) $(ask question)
-$(done answer)
+End with "next turn:" until you reach your conclusion.
 ]]
 
 -- Check if last N commands are identical (loop detection)
@@ -531,7 +541,8 @@ function M.run(opts)
     local session_log = M.start_session_log(session_id)
     if session_log then
         session_log:log("task", {
-            prompt = task,
+            system_prompt = SYSTEM_PROMPT,
+            user_prompt = task,
             provider = provider,
             model = model or "default",
             max_turns = max_turns,
@@ -578,7 +589,7 @@ function M.run(opts)
             session_log.turn_count = turn
             session_log:log("turn_start", {
                 turn = turn,
-                prompt_length = #prompt,
+                prompt = prompt,
                 working_memory_count = #working_memory,
                 has_error_state = error_state ~= nil
             })
@@ -634,13 +645,89 @@ function M.run(opts)
         if session_log then
             session_log:log("llm_response", {
                 turn = turn,
-                response_length = #response,
+                response = response,
                 retries = total_retries
             })
         end
 
-        -- Extract all commands from response: $(cmd here)
+        -- Extract prose commands from response
         local commands = {}
+        local has_next_turn = response:match("next turn:") ~= nil
+
+        -- Parse "I want to view X" -> "view X"
+        for target in response:gmatch("I want to view ([^\n]+)") do
+            target = target:gsub("^%s+", ""):gsub("%s+$", "")
+            if target:match("^only types in") then
+                table.insert(commands, "view --types-only " .. target:match("^only types in (.+)"))
+            elseif target:match("^dependencies of") then
+                table.insert(commands, "view --deps " .. target:match("^dependencies of (.+)"))
+            else
+                table.insert(commands, "view " .. target)
+            end
+        end
+
+        -- Parse "I want to search for "X"" or "I want to search for "X" only in Y"
+        for pattern, rest in response:gmatch('I want to search for "([^"]+)"([^\n]*)') do
+            local only = rest:match("only in ([^\n]+)")
+            if only then
+                table.insert(commands, "text-search \"" .. pattern .. "\" --only " .. only:gsub("^%s+", ""):gsub("%s+$", ""))
+            else
+                table.insert(commands, "text-search \"" .. pattern .. "\"")
+            end
+        end
+
+        -- Parse "I want to analyze X"
+        for what in response:gmatch("I want to analyze ([^\n]+)") do
+            what = what:gsub("^%s+", ""):gsub("%s+$", "")
+            if what:match("^callers of") then
+                table.insert(commands, "analyze callers " .. what:match("^callers of (.+)"))
+            elseif what:match("^callees of") then
+                table.insert(commands, "analyze callees " .. what:match("^callees of (.+)"))
+            else
+                table.insert(commands, "analyze " .. what)
+            end
+        end
+
+        -- Parse "I want to list packages" / "I want to see outdated packages"
+        if response:match("I want to list packages") then
+            table.insert(commands, "package list")
+        end
+        if response:match("I want to see outdated packages") then
+            table.insert(commands, "package outdated")
+        end
+
+        -- Parse "I want to run X"
+        for cmd in response:gmatch("I want to run ([^\n]+)") do
+            table.insert(commands, "run " .. cmd:gsub("^%s+", ""):gsub("%s+$", ""))
+        end
+
+        -- Parse "I want to delete/replace/insert"
+        for target in response:gmatch("I want to delete ([^\n]+)") do
+            table.insert(commands, "edit " .. target:gsub("^%s+", ""):gsub("%s+$", "") .. " delete")
+        end
+        for target, code in response:gmatch("I want to replace ([^%s]+) with (.+)") do
+            table.insert(commands, "edit " .. target .. " replace " .. code)
+        end
+        for code, target in response:gmatch("I want to insert (.+) before ([^\n]+)") do
+            table.insert(commands, "edit " .. target:gsub("^%s+", ""):gsub("%s+$", "") .. " insert --before " .. code)
+        end
+
+        -- Parse "I note: X"
+        for finding in response:gmatch("I note: ([^\n]+)") do
+            table.insert(commands, "note " .. finding:gsub("^%s+", ""):gsub("%s+$", ""))
+        end
+
+        -- Parse "I want to ask the user: X"
+        for question in response:gmatch("I want to ask the user: ([^\n]+)") do
+            table.insert(commands, "ask " .. question:gsub("^%s+", ""):gsub("%s+$", ""))
+        end
+
+        -- Parse "My conclusion is: X"
+        for answer in response:gmatch("My conclusion is: ([^\n]+)") do
+            table.insert(commands, "done " .. answer:gsub("^%s+", ""):gsub("%s+$", ""))
+        end
+
+        -- Fallback: also check for $(cmd) syntax for backwards compat
         for cmd in response:gmatch("%$%((.-)%)") do
             table.insert(commands, cmd)
         end
@@ -902,9 +989,9 @@ function M.run(opts)
             if session_log then
                 session_log:log("command", {
                     turn = turn,
-                    cmd = cmd:sub(1, 100),  -- Truncate for log
+                    cmd = cmd,
                     success = result.success,
-                    output_length = #result.output
+                    output = result.output
                 })
             end
 
