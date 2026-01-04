@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 **Paused** - focusing on agent testing/dogfooding. See Agent Research in Backlog.
 
-- Expose batch edit to agent: `edit.batch()` already in Lua, needs agent prompt/tool integration
+- [x] Expose batch edit to agent: `$(batch-edit)` command integrated
 - PR/diff analysis: `moss analyze --pr` for changed code focus
 - Session format: save/replay agent sessions for debugging and analysis
 - Streaming output for workflow engine `auto{}` driver
