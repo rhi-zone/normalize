@@ -153,21 +153,17 @@ After testing validates the core:
   - Possible fixes: better prompting, richer view output, or guide agent to use text-search for specific patterns
   - Contrast: text-search task succeeded in 1 turn (session 6ruc3djn) - tool output contained answer directly
   - Pattern: agent succeeds when tool output = answer, struggles when output requires interpretation/assembly
-- **Pre-answering**: Claude outputs commands and `done` in same response, answering before seeing results (session 2x6yejkh: wrote 4 commands + `done "134"` in one turn, actual answer was "245")
-  - Agent can't have seen command output when it wrote the done statement - they're in the same LLM response
-  - Root cause: task framing makes single-turn look like correct completion
-  - LLM training rewards completing tasks correctly - if task looks complete in 1 turn, LLM does 1 turn
-  - **Key insight**: older prompt (commit 8e33340) took 4-5 turns and worked reliably
-  - Fix direction: reframe task so multi-turn IS correct completion, not fight training
-  - Ideas: "you are an investigator" role, explicit steps (gather → wait → answer), evidence-based answers
-  - $(wait) is a band-aid (postprocessing), not a real fix
-  - **Verified**: ephemeral context IS implemented correctly - outputs have 1-turn visibility window:
-    - Turn N outputs → visible in Turn N+1 `[outputs]` → gone by Turn N+2 unless `$(keep)`
-    - This window is intentional: LLM needs to see results before deciding what to keep
-    - True "drop immediately" would force blind `$(keep)` before seeing outputs
-  - **Hypothesis**: identical context between any two LLM calls (pairwise) = error/loop - should never happen
-    - Risk: same command twice → same outputs → similar contexts → loop potential
-    - Mitigation: `is_looping()` catches repeated commands, but not identical context from different commands
+- **Pre-answering**: [FIXED] See `docs/experiments/agent-prompts.md` for full analysis
+  - Root cause: task framing made single-turn look like correct completion
+  - Fix: "investigator" role + concrete example + evidence requirement
+  - Results: 3/3 correct with new prompt, 2-8 turns, no pre-answering
+  - Key insight: concrete example in prompt prevents LLM defaulting to XML function calls
+- **Ephemeral context**: Verified working correctly
+  - Turn N outputs → visible in Turn N+1 `[outputs]` → gone by Turn N+2 unless `$(keep)`
+  - 1-turn window is intentional: LLM needs to see results before deciding what to keep
+- **Context uniqueness hypothesis**: identical context between any two LLM calls = error/loop
+  - Risk: same command twice → same outputs → similar contexts → loop potential
+  - Mitigation: `is_looping()` catches repeated commands, not identical context from different commands
 - **CRITICAL: Using grep patterns with text-search** - Claude Code used `\|` (grep OR syntax) with text-search
   - text-search was specifically renamed from grep to avoid regex escaping confusion
   - Agent failed to use tool correctly despite it being in the command list
