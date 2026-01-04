@@ -124,6 +124,7 @@ Core v2 is implemented. Now: validate through real use before adding more featur
 - Intermittent 500 errors and timeouts
 - Occasionally outputs duplicate/excessive commands
 - SSL certificate validation failures in some environments (`InvalidCertificate(UnknownIssuer)` - missing CA certs or SSL inspection proxy)
+- **Google blocks Claude Code cloud environments**: 403 Forbidden on all Gemini API requests from Claude Code cloud infrastructure (even with valid API key and SSL bypass)
 
 ### Agent Future
 
