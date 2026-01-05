@@ -126,10 +126,11 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - Compare providers: Claude works reliably, Gemini has quirks (see below)
 - [x] **v2 vs v1**: compare state machine vs freeform loop (see agent-state-machine.md)
 
-**Log analysis**:
-- Review `.moss/agent/logs/*.jsonl` for patterns
-- Identify: long tool chains, repeated commands, error recovery paths
-- Track: which commands are used, success rates, typical session length
+**Log analysis** (74 sessions analyzed):
+- **Success rates**: Anthropic 58% (19/33), Gemini 44% (18/41)
+- **Command usage**: text-search most used (51×), then view (29×), some shell fallback (run ls/find)
+- **Turn distribution**: Successful sessions typically 2-6 turns, failures hit max turns
+- Session logs: `.moss/agent/logs/*.jsonl`
 
 **Known Gemini issues** (still present):
 - Hallucinates command outputs (answers before seeing results)

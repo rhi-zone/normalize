@@ -753,10 +753,20 @@ function M.run_state_machine(opts)
                         result = nil
                     end
                     if result then
+                        -- Truncate large outputs to prevent context bloat
+                        local content = result.output or ""
+                        local MAX_OUTPUT = 10000  -- ~10KB per command output
+                        local truncated = false
+                        if #content > MAX_OUTPUT then
+                            content = content:sub(1, MAX_OUTPUT)
+                            content = content .. "\n... [OUTPUT TRUNCATED - " .. (#(result.output or "") - MAX_OUTPUT) .. " more bytes]\n"
+                            truncated = true
+                        end
                         table.insert(last_outputs, {
                             cmd = cmd.full,
-                            content = result.output or "",
-                            success = result.success
+                            content = content,
+                            success = result.success,
+                            truncated = truncated
                         })
                         if session_log then
                             session_log:log("command", {
@@ -1367,9 +1377,16 @@ function M.run(opts)
                 log_file:flush()
             end
 
+            -- Truncate large outputs to prevent context bloat
+            local content = result.output or ""
+            local MAX_OUTPUT = 10000  -- ~10KB per command output
+            if #content > MAX_OUTPUT then
+                content = content:sub(1, MAX_OUTPUT)
+                content = content .. "\n... [OUTPUT TRUNCATED - " .. (#(result.output or "") - MAX_OUTPUT) .. " more bytes]\n"
+            end
             table.insert(current_outputs, {
                 cmd = cmd,
-                content = result.output,
+                content = content,
                 success = result.success
             })
 
