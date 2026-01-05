@@ -14,9 +14,9 @@ After agent validation:
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
   - Requires language-specific namespace semantics - low priority
-- Shadow worktree isolation: git worktree or overlayfs for parallel validation
-  - Store diffs in memory, use worktree as "materialized view"
-  - Apply patch to worktree → run validator → if pass, apply to user dir
+- Shadow worktree isolation: validate() and apply_to_real() implemented
+  - Current: shadow repo at `.moss/shadow/` with validation methods
+  - Remaining: edit in shadow instead of real files, then apply after validation
   - Zero user interruption (user can edit while agent tests in background)
 
 ### Configuration System
@@ -167,7 +167,8 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 ### Agent Future
 
 After testing validates the core:
-- Automatic validation: shadow worktree for testing changes before commit
+- Automatic validation: shadow.validate() and apply_to_real() methods added
+  - Integration with refactorer: edit in shadow, validate, then apply (not yet done)
 - [x] Planning state: --plan flag for v2, creates plan before exploring
 - [x] Error awareness: evaluator sees WARNING when commands fail
 - [x] Loop detection: bail out if same command 3x in a row
