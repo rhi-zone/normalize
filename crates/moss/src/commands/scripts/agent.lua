@@ -462,13 +462,17 @@ Output commands directly. Example: $(view src/main.rs)
 
         evaluator = {
             prompt = [[
-Review the information above. Do NOT explore more - only evaluate what's here.
-- If you can answer: $(answer The complete answer)
-- If more info needed: just say what's missing (explorer will gather it)
+Review results. Do NOT run commands - only evaluate.
+$(keep 1 3) - save specific new results to working memory
+$(keep) - save all new results
+$(drop 2) - remove item from working memory
+$(note finding) - record a finding
+$(answer The complete answer) - conclude
 
-Example: $(answer Cli is the first struct at line 13)
+If you can answer: $(answer ...)
+If more info needed: say what's missing.
 ]],
-            context = "all_outputs",  -- accumulated: full history
+            context = "working_memory",
             next = "explorer",
         },
     },
@@ -497,29 +501,33 @@ function M.build_explorer_context(task, last_outputs, notes)
     return table.concat(parts, "\n")
 end
 
--- Build context for evaluator state (accumulated - all outputs)
-function M.build_evaluator_context(task, all_outputs, notes)
+-- Build context for evaluator state (working memory + pending outputs)
+function M.build_evaluator_context(task, working_memory, last_outputs, notes)
     local parts = {"**Task:** " .. task}
 
     if #notes > 0 then
-        table.insert(parts, "\n**Notes recorded:**")
+        table.insert(parts, "\n**Notes:**")
         for _, note in ipairs(notes) do
             table.insert(parts, "- " .. note)
         end
     end
 
-    if #all_outputs > 0 then
-        table.insert(parts, "\n**All gathered information:**")
-        for i, turn in ipairs(all_outputs) do
-            table.insert(parts, string.format("\n*Turn %d:*", i))
-            for _, out in ipairs(turn) do
-                local status = out.success and "" or " (failed)"
-                table.insert(parts, string.format("\n`%s`%s\n```\n%s\n```", out.cmd, status, out.content))
-            end
+    if #working_memory > 0 then
+        table.insert(parts, "\n**Working memory** (kept from previous turns):")
+        for i, item in ipairs(working_memory) do
+            local status = item.success and "" or " (failed)"
+            table.insert(parts, string.format("\n[%d] `%s`%s\n```\n%s\n```", i, item.cmd, status, item.content))
         end
     end
 
-    table.insert(parts, "\n**Your job:** $(note) findings, then $(done ANSWER) or explain what's missing.")
+    if #last_outputs > 0 then
+        table.insert(parts, "\n**New results** (will be discarded unless you keep them):")
+        for i, out in ipairs(last_outputs) do
+            local status = out.success and "" or " (failed)"
+            table.insert(parts, string.format("\n[%d] `%s`%s\n```\n%s\n```", i, out.cmd, status, out.content))
+        end
+    end
+
     return table.concat(parts, "\n")
 end
 
@@ -536,8 +544,8 @@ function M.run_state_machine(opts)
 
     local state = MACHINE.start
     local notes = {}           -- accumulated notes
-    local all_outputs = {}     -- all outputs by turn: {{out1, out2}, {out3}, ...}
-    local last_outputs = {}    -- most recent turn's outputs
+    local working_memory = {}  -- curated outputs kept by evaluator
+    local last_outputs = {}    -- most recent turn's outputs (pending curation)
     local turn = 0
 
     while turn < max_turns do
@@ -549,7 +557,7 @@ function M.run_state_machine(opts)
         if state == "explorer" then
             context = M.build_explorer_context(task, last_outputs, notes)
         else
-            context = M.build_evaluator_context(task, all_outputs, notes)
+            context = M.build_evaluator_context(task, working_memory, last_outputs, notes)
         end
 
         print(string.format("[agent-v2] Turn %d/%d (%s)", turn, max_turns, state))
@@ -604,11 +612,32 @@ function M.run_state_machine(opts)
             end
         end
 
+        -- Handle $(keep) and $(drop) - only in evaluator state
+        if state == "evaluator" then
+            for _, cmd in ipairs(commands) do
+                if cmd.name == "keep" then
+                    local indices = M.parse_keep("keep " .. cmd.args, #last_outputs)
+                    for _, idx in ipairs(indices) do
+                        if last_outputs[idx] then
+                            table.insert(working_memory, last_outputs[idx])
+                            print("[agent-v2] Kept: " .. last_outputs[idx].cmd)
+                        end
+                    end
+                elseif cmd.name == "drop" then
+                    local idx = tonumber(cmd.args)
+                    if idx and working_memory[idx] then
+                        print("[agent-v2] Dropped: " .. working_memory[idx].cmd)
+                        table.remove(working_memory, idx)
+                    end
+                end
+            end
+        end
+
         -- Execute exploration commands (only in explorer state)
         if state == "explorer" then
             last_outputs = {}
             for _, cmd in ipairs(commands) do
-                if cmd.name ~= "note" and cmd.name ~= "done" then
+                if cmd.name ~= "note" and cmd.name ~= "done" and cmd.name ~= "answer" then
                     local result
                     if cmd.name == "run" then
                         print("[agent-v2] Running: " .. cmd.args)
@@ -630,9 +659,6 @@ function M.run_state_machine(opts)
                         })
                     end
                 end
-            end
-            if #last_outputs > 0 then
-                table.insert(all_outputs, last_outputs)
             end
         end
 
