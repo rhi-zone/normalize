@@ -168,6 +168,12 @@ After testing validates the core:
   - Receives: task description, list of agent types + descriptions
   - Outputs: which agent to invoke next, with what context
   - Challenge: what context does dispatcher see? (summaries? just task?)
+- Benchmark suite: systematic agent evaluation
+  - Task library: curated set of tasks with known answers/outcomes
+  - Per-run metrics: reliability (pass/fail), LLM calls (cost proxy, latency), tokens (in/out)
+  - Additional metrics: time-to-answer, tool usage patterns, error recovery rate
+  - Comparison: v1 vs v2, different providers, prompt variations
+  - Output: summary table, regression detection, cost/quality tradeoffs
 
 ### Agent Observations
 
