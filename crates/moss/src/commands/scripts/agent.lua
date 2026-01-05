@@ -458,13 +458,16 @@ Do not execute commands - just plan the approach.
 
         explorer = {
             prompt = [[
-Suggest commands to explore. Available:
+You are an EXPLORER. Suggest commands to gather information.
+
+Commands:
 $(view path) - file structure/symbols
 $(view path:start-end) - specific lines
-$(text-search pattern) - search codebase
+$(text-search "pattern") - search codebase
 $(run cmd) - shell command
 
-Output commands directly. Example: $(view src/main.rs)
+Output commands directly. Do NOT answer the question - that's the evaluator's job.
+Example: $(view src/main.rs) $(text-search "config")
 ]],
             context = "last_outputs",  -- ephemeral: only most recent
             next = "evaluator",
@@ -472,15 +475,26 @@ Output commands directly. Example: $(view src/main.rs)
 
         evaluator = {
             prompt = [[
-Review results. Do NOT run commands - only evaluate.
-$(keep 1 3) - save specific new results to working memory
-$(keep) - save all new results
-$(drop 2) - remove item from working memory
-$(note finding) - record a finding
-$(answer The complete answer) - conclude
+You are an EVALUATOR, not an explorer. Your ONLY job is to judge what we found.
 
-If you can answer: $(answer ...)
-If more info needed: say what's missing.
+RULES:
+1. NEVER output commands (not even in backticks like `view` or `text-search`)
+2. NEVER say "I need to", "Let me", or "I will" - those are explorer phrases
+3. You MUST either $(answer) or explain what specific info is missing
+
+If results contain the answer: $(answer The complete answer here)
+If results are partial: $(note what we found) then explain what's still needed
+If results are irrelevant: explain what went wrong
+
+Memory commands: $(keep 1 3), $(keep), $(drop 2), $(note finding)
+
+Example good response:
+"The search found `support_for_extension` in registry.rs which maps file extensions to languages.
+$(note Language detection uses support_for_extension() in moss-languages/registry.rs)
+$(answer moss detects language by file extension via support_for_extension() in the moss-languages registry)"
+
+Example BAD response (DO NOT DO THIS):
+"I need to understand more. Let me look at `view registry.rs`" ← WRONG, you're exploring!
 ]],
             context = "working_memory",
             next = "explorer",

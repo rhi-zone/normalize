@@ -190,6 +190,11 @@ After testing validates the core:
   - Agent failed to use tool correctly despite it being in the command list
   - This shows agents don't understand tool semantics, just syntax
   - Need better tool descriptions or examples in prompt
+- **Evaluator exploring instead of concluding**: [FIXED] Session zj3y5yu4 - evaluator output commands in backticks instead of $(answer)
+  - Root cause: passive prompt "Do NOT run commands" → models interpret as "describe what to run"
+  - Fix: strong role framing ("You are an EVALUATOR"), banned phrases ("NEVER say 'I need to'"), good/bad examples
+  - Results: 4 turns vs 12 turns (no answer) for same query
+  - Key insight: role assertion + explicit prohibitions + concrete examples beats instruction-only prompts
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs

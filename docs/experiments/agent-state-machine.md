@@ -133,26 +133,41 @@ local MACHINE = {
     states = {
         explorer = {
             prompt = [[
-Suggest commands to explore. Available:
+You are an EXPLORER. Suggest commands to gather information.
+
+Commands:
 $(view path) - file structure/symbols
 $(view path:start-end) - specific lines
-$(text-search pattern) - search codebase
+$(text-search "pattern") - search codebase
 $(run cmd) - shell command
 
-Output commands directly. Example: $(view src/main.rs)
+Output commands directly. Do NOT answer the question - that's the evaluator's job.
+Example: $(view src/main.rs) $(text-search "config")
 ]],
             context = "last_outputs",
             next = "evaluator",
         },
         evaluator = {
             prompt = [[
-Review the information above. Do NOT explore more - only evaluate what's here.
-- If you can answer: $(answer The complete answer)
-- If more info needed: just say what's missing (explorer will gather it)
+You are an EVALUATOR, not an explorer. Your ONLY job is to judge what we found.
 
-Example: $(answer Cli is the first struct at line 13)
+RULES:
+1. NEVER output commands (not even in backticks like `view` or `text-search`)
+2. NEVER say "I need to", "Let me", or "I will" - those are explorer phrases
+3. You MUST either $(answer) or explain what specific info is missing
+
+If results contain the answer: $(answer The complete answer here)
+If results are partial: $(note what we found) then explain what's still needed
+If results are irrelevant: explain what went wrong
+
+Memory commands: $(keep 1 3), $(keep), $(drop 2), $(note finding)
+
+Example good response:
+"The search found `support_for_extension` in registry.rs.
+$(note Language detection uses support_for_extension())
+$(answer moss detects language by file extension via support_for_extension())"
 ]],
-            context = "all_outputs",
+            context = "working_memory",
             next = "explorer",
         },
     },
@@ -179,6 +194,26 @@ Example: $(answer Cli is the first struct at line 13)
 2. **Evaluator must NOT explore**: Models would hallucinate file contents instead of asking for more info. Fixed with "Do NOT explore more"
 3. **Both $(done) and $(answer) accepted**: Models use both, so we handle both
 4. **One LLM call per state** (not 2 per turn as originally planned): cleaner separation
+5. **Evaluator needs strong role framing**: Models output commands in backticks when prompt is passive. Fixed by:
+   - "You are an EVALUATOR, not an explorer" (role assertion)
+   - "NEVER output commands (not even in backticks)" (explicit prohibition)
+   - "NEVER say 'I need to', 'Let me'" (ban exploration phrases)
+   - Concrete good/bad examples showing the distinction
+
+### Evaluator Prompt Evolution
+
+**Problem** (session zj3y5yu4): Evaluator kept outputting commands as markdown (`view file.rs`) instead of using $(answer). Hit max turns (12) without concluding despite finding relevant code.
+
+**Root cause**: Passive prompt "Do NOT run commands - only evaluate" didn't stop the model from *suggesting* commands. Models interpret "don't run" as "describe what you would run".
+
+**Fix**: Strong role framing + banned phrases + concrete examples:
+- Before: "Review results. Do NOT run commands - only evaluate."
+- After: "You are an EVALUATOR, not an explorer. NEVER output commands. NEVER say 'I need to'..."
+
+**Results** (post-fix):
+- "How does moss detect language?" → 4 turns, correct answer (was 12 turns, no answer)
+- "What CLI commands?" → 2 turns, comprehensive answer
+- "Purpose of moss-languages?" → 2 turns (Gemini), correct answer
 
 ## Planning State (--plan flag)
 
