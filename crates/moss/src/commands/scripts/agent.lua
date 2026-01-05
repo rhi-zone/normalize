@@ -625,10 +625,40 @@ local ROLE_PROMPTS = {
     refactorer = REFACTORER_PROMPTS,
 }
 
--- Note: Auto-dispatch via keyword matching was rejected:
--- - Too blunt (can't distinguish "fix the bug" from "how was this fixed?")
--- - English-only (doesn't work for other languages)
--- Future: LLM classifier for subagent spawning and dynamic role switching
+-- LLM-based auto-dispatch classifier
+-- Used for: subagent spawning, dynamic role switching mid-task
+local CLASSIFIER_PROMPT = [[
+Classify this task into exactly one role. Reply with ONLY the role name.
+
+Roles:
+- investigator: questions, exploration, understanding code ("how does X work?", "where is Y?")
+- auditor: finding issues, security/quality checks ("find bugs", "check for vulnerabilities")
+- refactorer: making changes, fixing, updating code ("rename X to Y", "add error handling")
+
+Task: %s
+
+Role:]]
+
+function M.classify_task(task, provider, model)
+    provider = provider or "gemini"
+    local prompt = string.format(CLASSIFIER_PROMPT, task)
+
+    -- Lightweight call with no history
+    local response = llm.chat(provider, model, "", prompt, {})
+    if not response then
+        return "investigator"  -- fallback
+    end
+
+    -- Extract role from response
+    local role_lower = response:lower():gsub("%s+", "")
+    if role_lower:find("auditor") then
+        return "auditor"
+    elseif role_lower:find("refactor") then
+        return "refactorer"
+    else
+        return "investigator"
+    end
+end
 
 -- Build machine config for a given role
 local function build_machine(role)
@@ -744,7 +774,16 @@ function M.run_state_machine(opts)
     local provider = opts.provider or "gemini"
     local model = opts.model  -- nil means use provider default
     local use_planner = opts.plan or false
-    local role = opts.role or "investigator"
+    local role = opts.role
+    if not role then
+        if opts.auto_dispatch and task then
+            print("[agent-v2] Classifying task...")
+            role = M.classify_task(task, provider, model)
+            print(string.format("[agent-v2] Auto-dispatch → %s", role))
+        else
+            role = "investigator"
+        end
+    end
 
     -- Refactorer always plans first
     if role == "refactorer" then
@@ -1764,6 +1803,10 @@ function M.parse_args(args)
             opts.v2 = true  -- refactorer requires v2
             opts.plan = true  -- refactorer should always plan first
             i = i + 1
+        elseif arg == "--auto" then
+            opts.auto_dispatch = true
+            opts.v2 = true
+            i = i + 1
         elseif arg == "--roles" then
             opts.list_roles = true
             i = i + 1
@@ -1833,6 +1876,7 @@ if args and #args >= 0 then
         print("  moss @agent --v2 'how does X work?'")
         print("  moss @agent --audit 'find unwrap on user input'")
         print("  moss @agent --refactor 'rename foo to bar'")
+        print("  moss @agent --auto 'task'  # LLM picks the role")
         os.exit(0)
     end
 
