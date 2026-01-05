@@ -189,14 +189,15 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
   - [x] ShadowWorktree struct: open/sync/edit/read/validate/diff/apply/reset
   - [x] Lua bindings: shadow.worktree.* API
   - [x] Edit routing: shadow.worktree.enable() + edit.run() routes to shadow
-- [ ] Agent integration for shadow-first editing
-  - [ ] Add --shadow flag to agent command
-  - [ ] Enable shadow at refactorer session start
-  - [ ] Validate all changes before apply at session end
-  - [ ] Handle apply/reset decision (auto or prompt)
-- [ ] Atomic multi-edit: batch-edit should be all-or-nothing
-  - Currently individual edits can partially apply
-  - Need transaction semantics: success = all apply, failure = none apply
+- [x] Agent integration for shadow-first editing
+  - [x] Add --shadow flag to agent command
+  - [x] Enable shadow at refactorer session start
+  - [x] Validate all changes before apply at session end
+  - [x] Handle apply/reset decision (auto or prompt)
+- [x] Atomic multi-edit: batch-edit should be all-or-nothing
+  - [x] BatchEdit::apply() now collects all changes in memory first
+  - [x] Only writes files after all edits compute successfully
+  - Write failures still possible (rare) - true atomic would need temp-file-then-rename
 - [ ] Edit preview: show diff before applying (--dry-run for edits)
 
 **Phase 2: Validation Integration**

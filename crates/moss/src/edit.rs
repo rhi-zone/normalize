@@ -806,8 +806,9 @@ impl BatchEdit {
             self.check_overlaps(path, file_edits)?;
         }
 
-        // Phase 3: Apply edits to each file (bottom-up to preserve line numbers)
-        let mut files_modified = Vec::new();
+        // Phase 3: Apply edits in memory (bottom-up to preserve line numbers)
+        // Collect all modified contents before writing anything - true atomicity
+        let mut modified_contents: Vec<(PathBuf, String)> = Vec::new();
         let mut edits_applied = 0;
 
         for (path, mut file_edits) in by_file {
@@ -822,6 +823,12 @@ impl BatchEdit {
                 edits_applied += 1;
             }
 
+            modified_contents.push((path, content));
+        }
+
+        // Phase 4: Write all files atomically (only if all edits succeeded)
+        let mut files_modified = Vec::new();
+        for (path, content) in modified_contents {
             std::fs::write(&path, &content)
                 .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
             files_modified.push(path);
