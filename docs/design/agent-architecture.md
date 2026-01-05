@@ -62,10 +62,12 @@ $(answer
 )
 ```
 
-### Refactorer (future)
+### Refactorer
 - **Purpose**: make changes to fix issues
 - **Tools**: view, text-search, edit, run (with validation)
 - **Output**: applied changes + verification
+- **Usage**: `moss @agent --refactor "rename foo to bar"`
+- **Note**: Always plans first (--plan implicit)
 
 ## Tool Access Levels
 
@@ -78,10 +80,11 @@ $(answer
 
 ## Dispatch
 
-Currently explicit only:
+Currently explicit via shortcuts:
 ```
-moss @agent --v2 --role auditor "find security issues"
-moss @agent --audit "check for unwrap"  # shortcut
+moss @agent --v2 "how does X work?"      # investigator (default)
+moss @agent --audit "find security issues"  # auditor
+moss @agent --refactor "rename foo to bar"  # refactorer
 ```
 
 Future: auto-dispatch via keyword matching or lightweight classifier:

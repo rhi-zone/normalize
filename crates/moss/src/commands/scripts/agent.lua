@@ -551,10 +551,78 @@ If incomplete: $(note findings) then explain what areas remain.
 ]],
 }
 
+-- ROLE: refactorer - makes changes to fix issues
+local REFACTORER_PROMPTS = {
+    planner = [[
+You are a code REFACTORER. Plan your changes carefully.
+
+Given the task, outline:
+1. What files need to be modified
+2. What specific changes are needed
+3. How to verify the changes work
+
+Then say "Ready to refactor."
+Do not execute commands yet - just plan.
+]],
+
+    explorer = [[
+You are a REFACTORER. Explore code, then make changes.
+
+FORMAT: Commands MUST use $(cmd args) syntax exactly. No markdown.
+CORRECT: $(view file.rs) $(edit file.rs/function_name replace new_code)
+WRONG: ```$(edit ...)``` or `edit ...`
+
+Exploration:
+$(view path) - examine code
+$(text-search "pattern") - find code
+
+Editing:
+$(edit path/Symbol delete) - delete symbol
+$(edit path/Symbol replace new_code) - replace symbol
+$(edit path/Symbol insert --before code) - insert before
+$(edit path/Symbol insert --after code) - insert after
+
+Validation:
+$(run cargo check) - check compilation
+$(run cargo test) - run tests
+
+Make ONE change at a time, then validate before continuing.
+]],
+
+    evaluator = [[
+You are a REFACTOR EVALUATOR. Assess the changes made.
+
+FORBIDDEN (will be ignored):
+- $(view ...), $(text-search ...), $(edit ...) - you don't act
+- Markdown code blocks with commands
+
+ALLOWED:
+- $(answer summary of changes) - when complete
+- $(note what was changed) - record progress
+- $(keep 1 3), $(drop 2) - manage memory
+
+Check validation results:
+- Did the build pass? Did tests pass?
+- If validation failed, explain what went wrong
+
+If changes complete and validated:
+$(answer
+## Changes Made
+- file.rs: replaced function X with Y
+- other.rs: added error handling
+
+Validation: cargo check passed, cargo test passed
+)
+
+If validation failed: $(note what failed) then explain the fix needed.
+]],
+}
+
 -- Role registry
 local ROLE_PROMPTS = {
     investigator = INVESTIGATOR_PROMPTS,
     auditor = AUDITOR_PROMPTS,
+    refactorer = REFACTORER_PROMPTS,
 }
 
 -- Build machine config for a given role
@@ -829,7 +897,8 @@ function M.run_state_machine(opts)
                         print("[agent-v2] Running: " .. cmd.args)
                         result = shell(cmd.args)
                     elseif cmd.name == "view" or cmd.name == "text-search" or
-                           cmd.name == "analyze" or cmd.name == "package" then
+                           cmd.name == "analyze" or cmd.name == "package" or
+                           cmd.name == "edit" then
                         print("[agent-v2] Running: " .. cmd.full)
                         result = shell("./target/debug/moss " .. cmd.full)
                     else
@@ -1680,6 +1749,11 @@ function M.parse_args(args)
             opts.role = "auditor"
             opts.v2 = true  -- auditor requires v2
             i = i + 1
+        elseif arg == "--refactor" then
+            opts.role = "refactorer"
+            opts.v2 = true  -- refactorer requires v2
+            opts.plan = true  -- refactorer should always plan first
+            i = i + 1
         elseif arg == "--roles" then
             opts.list_roles = true
             i = i + 1
@@ -1743,10 +1817,12 @@ if args and #args >= 0 then
         print("Available roles:")
         print("  investigator  (default) Answer questions about the codebase")
         print("  auditor       Find issues: security, quality, patterns")
+        print("  refactorer    Make code changes with validation")
         print("")
         print("Usage:")
-        print("  moss @agent --v2 --role auditor 'find security issues'")
-        print("  moss @agent --audit 'check for unwrap on user input'")
+        print("  moss @agent --v2 'how does X work?'")
+        print("  moss @agent --audit 'find unwrap on user input'")
+        print("  moss @agent --refactor 'rename foo to bar'")
         os.exit(0)
     end
 
