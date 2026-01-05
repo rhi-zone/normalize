@@ -625,6 +625,11 @@ local ROLE_PROMPTS = {
     refactorer = REFACTORER_PROMPTS,
 }
 
+-- Note: Auto-dispatch via keyword matching was considered but rejected:
+-- - Too blunt (can't distinguish "fix the bug" from "how was this fixed?")
+-- - English-only (doesn't work for other languages)
+-- - Better approach: lightweight LLM classifier call, or just use explicit flags
+
 -- Build machine config for a given role
 local function build_machine(role)
     local prompts = ROLE_PROMPTS[role] or ROLE_PROMPTS.investigator
@@ -740,6 +745,11 @@ function M.run_state_machine(opts)
     local model = opts.model  -- nil means use provider default
     local use_planner = opts.plan or false
     local role = opts.role or "investigator"
+
+    -- Refactorer always plans first
+    if role == "refactorer" then
+        use_planner = true
+    end
 
     -- Build machine config for this role
     local machine = build_machine(role)

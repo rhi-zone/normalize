@@ -177,10 +177,10 @@ After testing validates the core:
 - Session log format: proper design (events, timing, token counts, diffs, replayability)
 - Box-thinking mitigation: counteract LLMs' tendency to stay in familiar patterns
 - Agent architecture:
-  - [x] Role-based prompts: investigator, auditor implemented
-  - Refactorer role: edit capability with validation loop
-  - Auto-dispatch: keyword matching or classifier routes to roles
-  - Prompt tuning: consistent `$(cmd)` format, stop evaluator command leakage
+  - [x] Role-based prompts: investigator, auditor, refactorer implemented
+  - [x] Prompt tuning: explicit CORRECT/WRONG format, FORBIDDEN/ALLOWED sections
+  - [x] Command parser: handles parens inside quotes
+  - Auto-dispatch: keyword matching rejected (too blunt/English-only), consider LLM classifier
 - Benchmark suite: systematic agent evaluation
   - Task library: curated set of tasks with known answers/outcomes
   - Per-run metrics: reliability (pass/fail), LLM calls (cost proxy, latency), tokens (in/out)

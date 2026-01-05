@@ -87,10 +87,9 @@ moss @agent --audit "find security issues"  # auditor
 moss @agent --refactor "rename foo to bar"  # refactorer
 ```
 
-Future: auto-dispatch via keyword matching or lightweight classifier:
-- "find", "search", "where", "how" → investigator
-- "audit", "check", "issues", "vulnerabilities" → auditor
-- "fix", "refactor", "change", "update" → refactorer
+Future: LLM-based classifier (keyword matching rejected as too blunt/English-only):
+- Lightweight LLM call to classify intent
+- Or: stick with explicit flags, they work well
 
 ## Context Flow
 
