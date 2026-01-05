@@ -112,9 +112,11 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 
 **State machine agent (--v2)**:
-- Explorer/Evaluator separation prevents premature answering
-- Explorer: ephemeral context (last results), suggests commands
-- Evaluator: accumulated context (all results), decides continue/conclude
+- [x] Explorer/Evaluator separation prevents premature answering
+- [x] Working memory: $(keep), $(drop), $(note)
+- [x] Session logging for v2
+- [x] Optional --plan flag for planning phase
+- [x] Error awareness and loop detection
 - See `docs/experiments/agent-state-machine.md` for design and test results
 
 **Immediate** (dogfooding):
@@ -122,7 +124,7 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - Document friction points: where does the agent get stuck?
 - Prompt tuning: adjust based on observed Gemini/Claude behavior
 - Compare providers: Claude works reliably, Gemini has quirks (see below)
-- **v2 vs v1**: compare state machine vs freeform loop on same tasks
+- [x] **v2 vs v1**: compare state machine vs freeform loop (see agent-state-machine.md)
 
 **Log analysis**:
 - Review `.moss/agent/logs/*.jsonl` for patterns
@@ -148,7 +150,9 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 After testing validates the core:
 - Automatic validation: shadow worktree for testing changes before commit
 - [x] Planning state: --plan flag for v2, creates plan before exploring
-- More states: recovery, refinement (see `agent-state-machine.md`)
+- [x] Error awareness: evaluator sees WARNING when commands fail
+- [x] Loop detection: bail out if same command 3x in a row
+- Refinement state: verify answer before concluding (maybe overkill)
 - [x] Working memory for v2: $(keep), $(drop), $(note) - evaluator curates what persists
 - Prompt optimization tooling: A/B testing, codebase-specific tuning
 - Session log format: proper design (events, timing, token counts, diffs, replayability)
