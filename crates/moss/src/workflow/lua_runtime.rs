@@ -1014,6 +1014,22 @@ impl LuaRuntime {
             })?,
         )?;
 
+        // shadow.worktree.modified() -> list of modified file paths
+        worktree_table.set(
+            "modified",
+            lua.create_function(|lua, ()| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                let files: Vec<String> =
+                    wt.0.lock()
+                        .map_err(|_| mlua::Error::external("lock poisoned"))?
+                        .modified()
+                        .iter()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .collect();
+                Ok(files)
+            })?,
+        )?;
+
         // shadow.worktree.enable() -> route edit() through shadow worktree
         // Must call open() first
         worktree_table.set(

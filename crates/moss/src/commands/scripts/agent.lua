@@ -799,6 +799,23 @@ function M.run_state_machine(opts)
         use_planner = true
     end
 
+    -- Initialize shadow worktree for safe editing (--shadow flag or auto for refactorer)
+    local shadow_enabled = opts.shadow
+    if shadow_enabled then
+        print("[agent-v2] Initializing shadow worktree for safe editing...")
+        local ok, err = pcall(function()
+            shadow.worktree.open()
+            shadow.worktree.sync()
+            shadow.worktree.enable()
+        end)
+        if ok then
+            print("[agent-v2] Shadow mode enabled - edits go to .moss/shadow/worktree/")
+        else
+            print("[agent-v2] Warning: Failed to initialize shadow worktree: " .. tostring(err))
+            shadow_enabled = false
+        end
+    end
+
     -- Handle --diff: get changed files and add to task context
     if opts.diff_base ~= nil then
         local base = opts.diff_base
@@ -934,6 +951,42 @@ function M.run_state_machine(opts)
                             final_answer = after:gsub('\n.*', '')  -- first line only
                         end
                     end
+                    -- Handle shadow mode finalization
+                    if shadow_enabled then
+                        print("[agent-v2] Finalizing shadow edits...")
+                        local diff = shadow.worktree.diff()
+                        if diff and #diff > 0 then
+                            print("[agent-v2] Changes in shadow worktree:")
+                            print(diff)
+
+                            -- Validate if validate_cmd is set
+                            local should_apply = true
+                            if opts.validate_cmd then
+                                print("[agent-v2] Validating: " .. opts.validate_cmd)
+                                local validation = shadow.worktree.validate(opts.validate_cmd)
+                                if validation.success then
+                                    print("[agent-v2] Validation passed ✓")
+                                else
+                                    print("[agent-v2] Validation FAILED:")
+                                    print(validation.stdout or validation.stderr or "")
+                                    should_apply = false
+                                end
+                            end
+
+                            if should_apply then
+                                print("[agent-v2] Applying shadow changes to real repo...")
+                                local applied = shadow.worktree.apply()
+                                print("[agent-v2] Applied " .. #applied .. " file(s)")
+                            else
+                                print("[agent-v2] Discarding shadow changes (validation failed)")
+                                shadow.worktree.reset()
+                            end
+                        else
+                            print("[agent-v2] No shadow changes to apply")
+                        end
+                        shadow.worktree.disable()
+                    end
+
                     print("[agent-v2] Answer: " .. final_answer)
                     if session_log then
                         session_log:log("done", { answer = final_answer:sub(1, 200), turn = turn })
@@ -1030,6 +1083,11 @@ function M.run_state_machine(opts)
             -- Check for loops (same command 3+ times in a row)
             if M.is_looping(recent_cmds, 3) then
                 print("[agent-v2] Loop detected, bailing out")
+                if shadow_enabled then
+                    print("[agent-v2] Discarding shadow changes (loop detected)")
+                    shadow.worktree.reset()
+                    shadow.worktree.disable()
+                end
                 if session_log then
                     session_log:log("loop_detected", { cmd = recent_cmds[#recent_cmds], turn = turn })
                     session_log:close()
@@ -1044,6 +1102,11 @@ function M.run_state_machine(opts)
     end
 
     print("[agent-v2] Max turns reached")
+    if shadow_enabled then
+        print("[agent-v2] Discarding shadow changes (max turns)")
+        shadow.worktree.reset()
+        shadow.worktree.disable()
+    end
     if session_log then
         session_log:log("max_turns_reached", { turn = turn })
         session_log:close()
@@ -1211,8 +1274,45 @@ function M.parse_keep(cmd, num_outputs)
 end
 
 -- Main agent loop
+function M.show_help()
+    print([[Usage: moss @agent [options] <task>
+
+Options:
+  --provider <name>   LLM provider (gemini, openrouter, ollama)
+  --model <name>      Model name for the provider
+  --max-turns <n>     Maximum conversation turns (default: 15)
+  --explain           Trace: show full tool outputs
+  --resume <id>       Resume from a previous session
+  --list-sessions     List available sessions to resume
+  --list-logs         List session log files
+  -n, --non-interactive  Skip user input prompts
+  --v2                Use state machine agent (auto for --audit, --refactor)
+  --role <name>       Agent role (explorer, auditor, refactorer, investigator)
+  --audit             Shorthand for --role auditor --v2
+  --refactor          Shorthand for --role refactorer --v2 --plan
+  --plan              Enable planning mode
+  --validate <cmd>    Run validation command after edits (e.g., "cargo check")
+  --shadow            Edit in shadow worktree, validate before applying
+  --diff [base]       Focus on git diff (auto-detects main/master if base omitted)
+  --auto              Auto-dispatch based on task analysis
+  --roles             List available roles and descriptions
+  -h, --help          Show this help message
+
+Examples:
+  moss @agent "add error handling to parse_config"
+  moss @agent --refactor --validate "cargo check" "extract helper function"
+  moss @agent --refactor --shadow "rename foo to bar safely"
+  moss @agent --audit "review security of auth module"
+  moss @agent --resume abc123
+]])
+end
+
 function M.run(opts)
     opts = opts or {}
+    if opts.help then
+        M.show_help()
+        return { success = true }
+    end
     local task = opts.prompt or opts.task or "Help with this codebase"
     local max_turns = opts.max_turns or 15
     local provider = opts.provider or "gemini"
@@ -1868,7 +1968,10 @@ function M.parse_args(args)
     local i = 1
     while i <= #args do
         local arg = args[i]
-        if arg == "--provider" and args[i+1] then
+        if arg == "--help" or arg == "-h" then
+            opts.help = true
+            i = i + 1
+        elseif arg == "--provider" and args[i+1] then
             opts.provider = args[i+1]
             i = i + 2
         elseif arg == "--model" and args[i+1] then
@@ -1913,6 +2016,9 @@ function M.parse_args(args)
         elseif arg == "--validate" and args[i+1] then
             opts.validate_cmd = args[i+1]
             i = i + 2
+        elseif arg == "--shadow" then
+            opts.shadow = true
+            i = i + 1
         elseif arg == "--diff" then
             -- Optional base ref, default to auto-detect
             if args[i+1] and not args[i+1]:match("^%-") then
@@ -1995,6 +2101,7 @@ if args and #args >= 0 then
         print("  moss @agent --v2 'how does X work?'")
         print("  moss @agent --audit 'find unwrap on user input'")
         print("  moss @agent --refactor 'rename foo to bar'")
+        print("  moss @agent --refactor --shadow 'rename foo to bar'  # safe editing via shadow worktree")
         print("  moss @agent --auto 'task'  # LLM picks the role")
         os.exit(0)
     end
