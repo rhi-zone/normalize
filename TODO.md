@@ -185,13 +185,15 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 **Current state**: Investigator/Auditor work well. Refactorer has edit commands but needs safety rails.
 
 **Phase 1: Safe Editing** (foundation)
-- [ ] Shadow-first mode: all edits go to `.moss/shadow/`, validate, then apply
-  - [x] Infrastructure: ShadowWorktree struct with open/sync/edit/read/validate/diff/apply/reset
-  - [x] Lua bindings: shadow.worktree.* API for scripts
-  - [x] Route edit() through shadow via enable/disable: shadow.worktree.enable(), edit.run()
-  - [ ] Integrate into agent workflow: enable shadow at start, validate, apply at end
-  - On success: shadow.apply_to_real() merges changes
-  - On failure: shadow.reset(), agent sees error and can retry
+- [x] Shadow worktree infrastructure (can be used manually in Lua scripts now)
+  - [x] ShadowWorktree struct: open/sync/edit/read/validate/diff/apply/reset
+  - [x] Lua bindings: shadow.worktree.* API
+  - [x] Edit routing: shadow.worktree.enable() + edit.run() routes to shadow
+- [ ] Agent integration for shadow-first editing
+  - [ ] Add --shadow flag to agent command
+  - [ ] Enable shadow at refactorer session start
+  - [ ] Validate all changes before apply at session end
+  - [ ] Handle apply/reset decision (auto or prompt)
 - [ ] Atomic multi-edit: batch-edit should be all-or-nothing
   - Currently individual edits can partially apply
   - Need transaction semantics: success = all apply, failure = none apply
