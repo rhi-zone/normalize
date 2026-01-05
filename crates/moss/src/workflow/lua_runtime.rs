@@ -795,23 +795,7 @@ impl LuaRuntime {
             lua.create_function(|lua, ()| {
                 let sg: LuaShadowGit = lua.named_registry_value("_shadow_git")?;
                 let hunks = sg.0.hunks().map_err(mlua::Error::external)?;
-
-                let result = lua.create_table()?;
-                for (i, hunk) in hunks.iter().enumerate() {
-                    let h = lua.create_table()?;
-                    h.set("id", hunk.id)?;
-                    h.set("file", hunk.file.to_string_lossy().to_string())?;
-                    h.set("old_start", hunk.old_start)?;
-                    h.set("old_lines", hunk.old_lines)?;
-                    h.set("new_start", hunk.new_start)?;
-                    h.set("new_lines", hunk.new_lines)?;
-                    h.set("header", hunk.header.clone())?;
-                    h.set("content", hunk.content.clone())?;
-                    h.set("is_deletion", hunk.is_pure_deletion())?;
-                    h.set("deletion_ratio", hunk.deletion_ratio())?;
-                    result.set(i + 1, h)?;
-                }
-                Ok(result)
+                hunks_to_lua_table(lua, &hunks)
             })?,
         )?;
 
@@ -823,23 +807,7 @@ impl LuaRuntime {
                 let hunks =
                     sg.0.hunks_since(&snapshot_id)
                         .map_err(mlua::Error::external)?;
-
-                let result = lua.create_table()?;
-                for (i, hunk) in hunks.iter().enumerate() {
-                    let h = lua.create_table()?;
-                    h.set("id", hunk.id)?;
-                    h.set("file", hunk.file.to_string_lossy().to_string())?;
-                    h.set("old_start", hunk.old_start)?;
-                    h.set("old_lines", hunk.old_lines)?;
-                    h.set("new_start", hunk.new_start)?;
-                    h.set("new_lines", hunk.new_lines)?;
-                    h.set("header", hunk.header.clone())?;
-                    h.set("content", hunk.content.clone())?;
-                    h.set("is_deletion", hunk.is_pure_deletion())?;
-                    h.set("deletion_ratio", hunk.deletion_ratio())?;
-                    result.set(i + 1, h)?;
-                }
-                Ok(result)
+                hunks_to_lua_table(lua, &hunks)
             })?,
         )?;
 
@@ -1505,6 +1473,26 @@ fn flatten_table_to_filters(
     }
 
     Ok(filters)
+}
+
+/// Convert a slice of hunks to a Lua table.
+fn hunks_to_lua_table(lua: &Lua, hunks: &[super::shadow::Hunk]) -> LuaResult<Table> {
+    let result = lua.create_table()?;
+    for (i, hunk) in hunks.iter().enumerate() {
+        let h = lua.create_table()?;
+        h.set("id", hunk.id)?;
+        h.set("file", hunk.file.to_string_lossy().to_string())?;
+        h.set("old_start", hunk.old_start)?;
+        h.set("old_lines", hunk.old_lines)?;
+        h.set("new_start", hunk.new_start)?;
+        h.set("new_lines", hunk.new_lines)?;
+        h.set("header", hunk.header.clone())?;
+        h.set("content", hunk.content.clone())?;
+        h.set("is_deletion", hunk.is_pure_deletion())?;
+        h.set("deletion_ratio", hunk.deletion_ratio())?;
+        result.set(i + 1, h)?;
+    }
+    Ok(result)
 }
 
 /// Wrapper for ShadowGit to store in Lua registry.
