@@ -43,6 +43,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - JSON Schema for complex action parameters (currently string-only)
 
 ### Code Quality
+- `--allow` for duplicate-functions/duplicate-types: accept line range like output suggests (e.g., `--allow src/foo.rs:10-20`)
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
 - [x] Chained if-let: edition 2024 allows `if let Ok(x) = foo() && let Some(y) = bar(x)`. Audit complete.
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
@@ -165,6 +166,7 @@ After testing validates the core:
 
 ### Agent Observations
 
+- **FOOTGUN: Claude Code cwd**: `cd` in Bash commands persists across calls. E.g., `cd foo && perl ...` breaks subsequent calls. Always use absolute paths.
 - Claude works reliably with current prompt
 - Context compaction unreliable in practice (Claude Code + Opus 4.5 lost in-progress work)
 - Moss's dynamic context reshaping avoids append-only accumulation problems
