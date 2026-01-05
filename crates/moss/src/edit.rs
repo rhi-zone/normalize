@@ -719,6 +719,28 @@ pub struct BatchEditResult {
     pub errors: Vec<(String, String)>,
 }
 
+/// Preview of a file's changes before applying
+#[derive(Debug)]
+pub struct FilePreview {
+    /// Path to the file
+    pub path: PathBuf,
+    /// Original content
+    pub original: String,
+    /// Modified content
+    pub modified: String,
+    /// Number of edits in this file
+    pub edit_count: usize,
+}
+
+/// Result of previewing a batch edit
+#[derive(Debug)]
+pub struct BatchPreviewResult {
+    /// Previews for each file that would be modified
+    pub files: Vec<FilePreview>,
+    /// Total number of edits
+    pub total_edits: usize,
+}
+
 /// Batch editor for atomic multi-file edits
 pub struct BatchEdit {
     edits: Vec<BatchEditOp>,
@@ -838,6 +860,87 @@ impl BatchEdit {
             files_modified,
             edits_applied,
             errors,
+        })
+    }
+
+    /// Preview all edits without applying them
+    ///
+    /// Returns the original and modified content for each file so callers can
+    /// display a diff. Does not modify any files.
+    pub fn preview(&self, root: &Path) -> Result<BatchPreviewResult, String> {
+        if self.edits.is_empty() {
+            return Ok(BatchPreviewResult {
+                files: Vec::new(),
+                total_edits: 0,
+            });
+        }
+
+        // Phase 1: Resolve all targets and group by file
+        let mut by_file: HashMap<PathBuf, Vec<(usize, &BatchEditOp, SymbolLocation)>> =
+            HashMap::new();
+        let mut errors = Vec::new();
+        let editor = Editor::new();
+
+        for (idx, op) in self.edits.iter().enumerate() {
+            match self.resolve_target(root, &op.target, &editor) {
+                Ok((file_path, location)) => {
+                    by_file
+                        .entry(file_path)
+                        .or_default()
+                        .push((idx, op, location));
+                }
+                Err(e) => {
+                    errors.push((op.target.clone(), e));
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(format!(
+                "Failed to resolve {} target(s): {}",
+                errors.len(),
+                errors
+                    .iter()
+                    .map(|(t, e)| format!("{}: {}", t, e))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ));
+        }
+
+        // Phase 2: Check for overlapping edits
+        for (path, file_edits) in &by_file {
+            self.check_overlaps(path, file_edits)?;
+        }
+
+        // Phase 3: Compute modified content for each file
+        let mut file_previews = Vec::new();
+        let mut total_edits = 0;
+
+        for (path, mut file_edits) in by_file {
+            file_edits.sort_by(|a, b| b.2.start_line.cmp(&a.2.start_line));
+
+            let original = std::fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+
+            let mut modified = original.clone();
+            let edit_count = file_edits.len();
+
+            for (_idx, op, loc) in &file_edits {
+                modified = self.apply_single_edit(&editor, &modified, loc, &op.action)?;
+            }
+
+            total_edits += edit_count;
+            file_previews.push(FilePreview {
+                path,
+                original,
+                modified,
+                edit_count,
+            });
+        }
+
+        Ok(BatchPreviewResult {
+            files: file_previews,
+            total_edits,
         })
     }
 

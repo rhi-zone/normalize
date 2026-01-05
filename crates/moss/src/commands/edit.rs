@@ -1121,19 +1121,77 @@ pub fn cmd_batch_edit(
     };
 
     if dry_run {
-        // For dry run, just validate and show what would happen
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "dry_run": true,
-                    "message": "Batch edit validation passed"
-                })
-            );
-        } else {
-            println!("Dry run: batch edit would be applied");
+        // For dry run, preview edits and show diff
+        match batch.preview(&root) {
+            Ok(preview) => {
+                if json {
+                    let files: Vec<_> = preview
+                        .files
+                        .iter()
+                        .map(|f| {
+                            serde_json::json!({
+                                "path": f.path.display().to_string(),
+                                "edits": f.edit_count,
+                                "original": f.original,
+                                "modified": f.modified,
+                            })
+                        })
+                        .collect();
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "dry_run": true,
+                            "total_edits": preview.total_edits,
+                            "files": files,
+                        })
+                    );
+                } else {
+                    println!(
+                        "Dry run: {} edit(s) across {} file(s)\n",
+                        preview.total_edits,
+                        preview.files.len()
+                    );
+                    for file in &preview.files {
+                        println!("--- {}", file.path.display());
+                        println!(
+                            "+++ {} (after {} edit(s))",
+                            file.path.display(),
+                            file.edit_count
+                        );
+                        // Simple diff: show unified diff using similar crate or manual
+                        for (i, (old, new)) in
+                            file.original.lines().zip(file.modified.lines()).enumerate()
+                        {
+                            if old != new {
+                                println!("@@ -{} +{} @@", i + 1, i + 1);
+                                println!("-{}", old);
+                                println!("+{}", new);
+                            }
+                        }
+                        // Handle length differences
+                        let orig_lines: Vec<_> = file.original.lines().collect();
+                        let mod_lines: Vec<_> = file.modified.lines().collect();
+                        if mod_lines.len() > orig_lines.len() {
+                            println!("@@ -{} +{} @@", orig_lines.len() + 1, orig_lines.len() + 1);
+                            for line in &mod_lines[orig_lines.len()..] {
+                                println!("+{}", line);
+                            }
+                        } else if orig_lines.len() > mod_lines.len() {
+                            println!("@@ -{} +{} @@", mod_lines.len() + 1, mod_lines.len() + 1);
+                            for line in &orig_lines[mod_lines.len()..] {
+                                println!("-{}", line);
+                            }
+                        }
+                        println!();
+                    }
+                }
+                return 0;
+            }
+            Err(e) => {
+                eprintln!("Dry run failed: {}", e);
+                return 1;
+            }
         }
-        return 0;
     }
 
     // Apply the batch

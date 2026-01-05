@@ -198,7 +198,10 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
   - [x] BatchEdit::apply() now collects all changes in memory first
   - [x] Only writes files after all edits compute successfully
   - Write failures still possible (rare) - true atomic would need temp-file-then-rename
-- [ ] Edit preview: show diff before applying (--dry-run for edits)
+- [x] Edit preview: show diff before applying (--dry-run for edits)
+  - [x] BatchEdit::preview() computes changes without writing
+  - [x] --dry-run for batch edits shows unified diff output
+  - [x] JSON output includes original and modified content for each file
 
 **Phase 2: Validation Integration**
 - [x] --validate flag runs command after each edit (done)
