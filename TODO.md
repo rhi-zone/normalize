@@ -205,9 +205,10 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 
 **Phase 2: Validation Integration**
 - [x] --validate flag runs command after each edit (done)
-- [ ] Built-in validators: auto-detect cargo check, go build, tsc, etc.
-  - Don't require user to specify --validate "cargo check"
-  - Detect from project structure, run appropriate checks
+- [x] Built-in validators: auto-detect cargo check, go build, tsc, etc.
+  - [x] M.detect_validator() checks for Cargo.toml, tsconfig.json, go.mod, etc.
+  - [x] --auto-validate flag enables auto-detection
+  - [x] --shadow automatically enables auto-validation
 - [ ] Test selection: run only tests affected by changes
   - Use call graph to find test coverage for modified functions
   - Faster feedback loop than running full test suite

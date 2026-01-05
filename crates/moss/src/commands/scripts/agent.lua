@@ -29,6 +29,49 @@ function M.gen_session_id()
     return id
 end
 
+-- Auto-detect validation command based on project files
+function M.detect_validator()
+    -- Check for project markers in priority order
+    local checks = {
+        -- Rust: cargo check is fast type-checking
+        { file = "Cargo.toml", cmd = "cargo check", desc = "Rust" },
+        -- TypeScript: type-check without emitting
+        { file = "tsconfig.json", cmd = "tsc --noEmit", desc = "TypeScript" },
+        -- Go: fast compilation check
+        { file = "go.mod", cmd = "go build ./...", desc = "Go" },
+        -- Python: mypy if installed, else basic syntax check
+        { file = "pyproject.toml", cmd = "python -m py_compile", desc = "Python" },
+        -- Node.js: if package.json has typecheck script
+        { file = "package.json", cmd = nil, desc = "JavaScript/Node.js" },
+    }
+
+    for _, check in ipairs(checks) do
+        local f = io.open(_moss_root .. "/" .. check.file, "r")
+        if f then
+            f:close()
+            -- Special case: check for typecheck script in package.json
+            if check.file == "package.json" then
+                local pf = io.open(_moss_root .. "/package.json", "r")
+                if pf then
+                    local content = pf:read("*a")
+                    pf:close()
+                    if content:match('"typecheck"') or content:match('"type%-check"') then
+                        return "npm run typecheck", "Node.js (typecheck)"
+                    elseif content:match('"tsc"') then
+                        return "npm run tsc", "Node.js (tsc)"
+                    elseif content:match('"build"') then
+                        return "npm run build", "Node.js (build)"
+                    end
+                end
+                -- No validation script found, skip
+            elseif check.cmd then
+                return check.cmd, check.desc
+            end
+        end
+    end
+    return nil, nil  -- No validator detected
+end
+
 -- Session checkpoint directory
 local function get_session_dir()
     return _moss_root .. "/.moss/agent"
@@ -816,6 +859,17 @@ function M.run_state_machine(opts)
         end
     end
 
+    -- Auto-detect validator if:
+    -- 1. Shadow enabled and no explicit --validate, OR
+    -- 2. --auto-validate flag is set
+    if (shadow_enabled or opts.auto_validate) and not opts.validate_cmd then
+        local detected_cmd, detected_type = M.detect_validator()
+        if detected_cmd then
+            opts.validate_cmd = detected_cmd
+            print("[agent-v2] Auto-detected validator: " .. detected_cmd .. " (" .. detected_type .. ")")
+        end
+    end
+
     -- Handle --diff: get changed files and add to task context
     if opts.diff_base ~= nil then
         local base = opts.diff_base
@@ -1292,7 +1346,8 @@ Options:
   --refactor          Shorthand for --role refactorer --v2 --plan
   --plan              Enable planning mode
   --validate <cmd>    Run validation command after edits (e.g., "cargo check")
-  --shadow            Edit in shadow worktree, validate before applying
+  --auto-validate     Auto-detect validation command (cargo check, tsc, etc.)
+  --shadow            Edit in shadow worktree, validate before applying (enables --auto-validate)
   --diff [base]       Focus on git diff (auto-detects main/master if base omitted)
   --auto              Auto-dispatch based on task analysis
   --roles             List available roles and descriptions
@@ -2018,6 +2073,9 @@ function M.parse_args(args)
             i = i + 2
         elseif arg == "--shadow" then
             opts.shadow = true
+            i = i + 1
+        elseif arg == "--auto-validate" then
+            opts.auto_validate = true
             i = i + 1
         elseif arg == "--diff" then
             -- Optional base ref, default to auto-detect
