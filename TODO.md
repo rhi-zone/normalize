@@ -151,6 +151,8 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - Investigator can get stuck in explorer/evaluator cycles on complex questions
 - --diff flag works well for PR-focused analysis
 - Agent found real issues: hardcoded debug path, regex recompilation, potential path traversal
+- [x] Fixed: explorer prompts now include analyze/package commands (was causing text-search FOR commands instead of using them)
+- Agent correctly uses $(analyze length), $(analyze security) after prompt fix
 
 **Known Gemini issues** (still present):
 - Hallucinates command outputs (answers before seeing results)
