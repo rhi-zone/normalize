@@ -52,6 +52,14 @@ pub struct EditInfo {
     pub workflow: Option<String>,
 }
 
+/// Result of running a validation command in shadow worktree.
+pub struct ValidationResult {
+    pub success: bool,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+}
+
 /// Shadow git repository manager.
 pub struct Shadow {
     /// Root of the project (where .moss/ lives)
@@ -388,6 +396,71 @@ impl Shadow {
             .first()
             .map(|e| e.git_head.clone())
             .filter(|h| h != "none")
+    }
+
+    /// Run a validation command in the shadow worktree.
+    /// Returns (success, stdout, stderr).
+    /// Used by agents to test changes before applying to real files.
+    pub fn validate(&self, cmd: &str, args: &[&str]) -> Result<ValidationResult, ShadowError> {
+        if !self.exists() {
+            return Err(ShadowError::Init("No shadow worktree exists".to_string()));
+        }
+
+        let output = Command::new(cmd)
+            .args(args)
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Validation(format!("Failed to run {}: {}", cmd, e)))?;
+
+        Ok(ValidationResult {
+            success: output.status.success(),
+            exit_code: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        })
+    }
+
+    /// Apply pending shadow changes to the real worktree.
+    /// Only call this after validation passes.
+    /// Returns list of files that were updated.
+    pub fn apply_to_real(&self) -> Result<Vec<PathBuf>, ShadowError> {
+        if !self.exists() {
+            return Err(ShadowError::Init("No shadow worktree exists".to_string()));
+        }
+
+        // Get list of changed files in shadow
+        let output = Command::new("git")
+            .args(["diff", "--name-only", "HEAD~1", "HEAD"])
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Validation(format!("git diff failed: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(ShadowError::Validation(
+                "Failed to get changed files".to_string(),
+            ));
+        }
+
+        let files: Vec<PathBuf> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|l| self.root.join(l))
+            .collect();
+
+        // Copy each file from shadow to real
+        for file in &files {
+            let rel = file.strip_prefix(&self.root).unwrap_or(file.as_path());
+            let shadow_file = self.worktree.join(rel);
+            if shadow_file.exists() {
+                if let Some(parent) = file.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| ShadowError::Validation(format!("mkdir failed: {}", e)))?;
+                }
+                std::fs::copy(&shadow_file, file)
+                    .map_err(|e| ShadowError::Validation(format!("copy failed: {}", e)))?;
+            }
+        }
+
+        Ok(files)
     }
 
     /// Get the number of shadow commits (edits tracked).
@@ -976,6 +1049,7 @@ pub enum ShadowError {
     Init(String),
     Commit(String),
     Undo(String),
+    Validation(String),
 }
 
 impl std::fmt::Display for ShadowError {
@@ -984,6 +1058,7 @@ impl std::fmt::Display for ShadowError {
             ShadowError::Init(msg) => write!(f, "Shadow init error: {}", msg),
             ShadowError::Commit(msg) => write!(f, "Shadow commit error: {}", msg),
             ShadowError::Undo(msg) => write!(f, "Shadow undo error: {}", msg),
+            ShadowError::Validation(msg) => write!(f, "Shadow validation error: {}", msg),
         }
     }
 }
