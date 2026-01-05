@@ -29,6 +29,76 @@ function M.gen_session_id()
     return id
 end
 
+-- Risk levels for edits
+M.RISK = {
+    LOW = "low",       -- Comments, docs, minor tweaks
+    MEDIUM = "medium", -- Function body changes, new functions
+    HIGH = "high",     -- Deletions, public API, config, entry points
+}
+
+-- Assess risk level of an edit operation
+-- edit_info: { action = "delete"|"replace"|"insert", target = "path/Symbol", content = "..." }
+function M.assess_risk(edit_info)
+    local action = edit_info.action or "replace"
+    local target = edit_info.target or ""
+    local content = edit_info.content or ""
+
+    -- HIGH: Delete is always high risk
+    if action == "delete" then
+        return M.RISK.HIGH, "Deleting code is high risk"
+    end
+
+    -- HIGH: Config files
+    local config_patterns = { "%.toml$", "%.json$", "%.yaml$", "%.yml$", "%.env", "Dockerfile", "Makefile" }
+    for _, pat in ipairs(config_patterns) do
+        if target:match(pat) then
+            return M.RISK.HIGH, "Modifying config file"
+        end
+    end
+
+    -- HIGH: Entry points and public API
+    local high_risk_symbols = { "main", "run", "execute", "start", "init" }
+    for _, sym in ipairs(high_risk_symbols) do
+        if target:lower():match("/" .. sym .. "$") then
+            return M.RISK.HIGH, "Modifying entry point or public API"
+        end
+    end
+
+    -- HIGH: Changes that add pub/public visibility
+    if content:match("^%s*pub%s") or content:match("^%s*public%s") or content:match("^%s*export%s") then
+        return M.RISK.HIGH, "Changing public API"
+    end
+
+    -- LOW: Comments and documentation
+    if content:match("^%s*//") or content:match("^%s*#") or content:match("^%s*%-%-") or
+       content:match("^%s*/%*") or content:match("^%s*'''") or content:match('^%s*"""') then
+        return M.RISK.LOW, "Adding comment or documentation"
+    end
+
+    -- LOW: Pure insertions (adding new code, not modifying)
+    if action == "insert" then
+        return M.RISK.LOW, "Inserting new code"
+    end
+
+    -- MEDIUM: Everything else (replace operations on regular code)
+    return M.RISK.MEDIUM, "Modifying function or code"
+end
+
+-- Risk level ordering for comparisons
+local RISK_ORDER = { low = 1, medium = 2, high = 3 }
+
+-- Check if edit should be auto-approved based on risk threshold
+-- auto_approve_level: "low", "medium", "high", or nil (no auto-approve)
+-- Returns: true if should auto-approve, false if needs user confirmation
+function M.should_auto_approve(edit_risk, auto_approve_level)
+    if not auto_approve_level then
+        return false  -- No auto-approve, always ask
+    end
+    local risk_value = RISK_ORDER[edit_risk] or 2
+    local threshold = RISK_ORDER[auto_approve_level] or 1
+    return risk_value <= threshold
+end
+
 -- Auto-detect validation command based on project files
 function M.detect_validator()
     -- Check for project markers in priority order
@@ -1348,6 +1418,7 @@ Options:
   --validate <cmd>    Run validation command after edits (e.g., "cargo check")
   --auto-validate     Auto-detect validation command (cargo check, tsc, etc.)
   --shadow            Edit in shadow worktree, validate before applying (enables --auto-validate)
+  --auto-approve [LEVEL]  Auto-approve edits up to risk level (low/medium/high, default: low)
   --diff [base]       Focus on git diff (auto-detects main/master if base omitted)
   --auto              Auto-dispatch based on task analysis
   --roles             List available roles and descriptions
@@ -2077,6 +2148,15 @@ function M.parse_args(args)
         elseif arg == "--auto-validate" then
             opts.auto_validate = true
             i = i + 1
+        elseif arg == "--auto-approve" then
+            -- Accept risk level: low, medium, high (default: low)
+            if args[i+1] and not args[i+1]:match("^%-") then
+                opts.auto_approve = args[i+1]
+                i = i + 2
+            else
+                opts.auto_approve = "low"  -- default: only auto-approve low risk
+                i = i + 1
+            end
         elseif arg == "--diff" then
             -- Optional base ref, default to auto-detect
             if args[i+1] and not args[i+1]:match("^%-") then

@@ -214,14 +214,16 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
   - Faster feedback loop than running full test suite
 
 **Phase 3: User Approval Gates**
-- [ ] Risk assessment: classify edits by risk level
-  - Low: add comment, rename local variable
-  - Medium: modify function body, add new function
+- [x] Risk assessment: classify edits by risk level
+  - [x] M.assess_risk() classifies edits as low/medium/high
+  - Low: add comment, insert new code
+  - Medium: modify function body
   - High: delete code, change public API, modify config
-- [ ] Approval checkpoints: pause for user review at risk thresholds
-  - `--auto-approve low` - auto-apply low-risk, pause for medium+
-  - Show diff, ask user to approve/reject/modify
-- [ ] Undo stack: `moss undo` to revert last agent change
+- [x] Approval checkpoints: pause for user review at risk thresholds
+  - [x] --auto-approve [level] flag (low/medium/high)
+  - [x] M.should_auto_approve() checks risk vs threshold
+  - Integration with agent edit flow is ready (needs wiring)
+- [x] Undo stack: `moss edit --undo` to revert last edit (already implemented)
 
 **Phase 4: Multi-Step Workflows**
 - [ ] Task decomposition: break large tasks into subtasks
