@@ -243,7 +243,11 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - [x] --diff flag: focus on changed files
 
 **After full agency**: evaluate agent code quality
-- [ ] Run `moss analyze complexity` on agent.lua - likely high due to organic growth
+- [ ] Refactor agent.lua - current complexity is critical:
+  - M.run: 172 (critical - needs splitting)
+  - M.run_state_machine: 74 (critical)
+  - M.parse_args: 30 (high)
+  - Total: 2013 lines, 30 functions, avg complexity 14.1
 - [ ] Check for duplicate logic across roles (investigator/auditor/refactorer prompts)
 - [ ] Consider splitting agent.lua into modules (parser, state machine, roles, commands)
 - [ ] Review Rust-side agent support code in lua_runtime.rs
