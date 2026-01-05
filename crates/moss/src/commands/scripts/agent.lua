@@ -542,6 +542,19 @@ function M.run_state_machine(opts)
     local session_id = M.gen_session_id()
     print("[agent-v2] Session: " .. session_id)
 
+    -- Start session logging
+    local session_log = M.start_session_log(session_id)
+    if session_log then
+        session_log:log("task", {
+            system_prompt = "state_machine_v2",
+            user_prompt = task,
+            provider = provider,
+            model = model or "default",
+            max_turns = max_turns,
+            machine_start = MACHINE.start
+        })
+    end
+
     local state = MACHINE.start
     local notes = {}           -- accumulated notes
     local working_memory = {}  -- curated outputs kept by evaluator
@@ -564,6 +577,18 @@ function M.run_state_machine(opts)
         io.write("[agent-v2] Thinking... ")
         io.flush()
 
+        -- Log turn start
+        if session_log then
+            session_log.turn_count = turn
+            session_log:log("turn_start", {
+                turn = turn,
+                state = state,
+                working_memory_count = #working_memory,
+                notes_count = #notes,
+                pending_outputs = #last_outputs
+            })
+        end
+
         -- LLM call with optional bootstrap
         local history = {}
         if state_config.bootstrap then
@@ -573,6 +598,15 @@ function M.run_state_machine(opts)
         local response = llm.chat(provider, model, state_config.prompt, context, history)
         io.write("done\n")
         print(response)
+
+        -- Log LLM response
+        if session_log then
+            session_log:log("llm_response", {
+                turn = turn,
+                state = state,
+                response = response:sub(1, 500)  -- truncate for log
+            })
+        end
 
         -- Parse commands from response
         local commands = {}
@@ -597,6 +631,10 @@ function M.run_state_machine(opts)
                         end
                     end
                     print("[agent-v2] Answer: " .. final_answer)
+                    if session_log then
+                        session_log:log("done", { answer = final_answer:sub(1, 200), turn = turn })
+                        session_log:close()
+                    end
                     return {success = true, answer = final_answer, turns = turn}
                 else
                     print("[agent-v2] Warning: $(" .. cmd.name .. ") ignored in explorer state")
@@ -657,6 +695,14 @@ function M.run_state_machine(opts)
                             content = result.output or "",
                             success = result.success
                         })
+                        if session_log then
+                            session_log:log("command", {
+                                cmd = cmd.full,
+                                success = result.success,
+                                output_length = (result.output or ""):len(),
+                                turn = turn
+                            })
+                        end
                     end
                 end
             end
@@ -667,6 +713,10 @@ function M.run_state_machine(opts)
     end
 
     print("[agent-v2] Max turns reached")
+    if session_log then
+        session_log:log("max_turns_reached", { turn = turn })
+        session_log:close()
+    end
     return {success = false, reason = "max_turns", turns = turn}
 end
 
