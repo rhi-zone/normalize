@@ -404,6 +404,9 @@ $(text-search "<pattern>" --only <glob>) - search in specific files
 
 Analysis:
 $(analyze complexity) - find complex functions
+$(analyze length) - find long functions
+$(analyze security) - find security issues
+$(analyze duplicate-functions) - find code clones
 $(analyze callers <symbol>) - show what calls this
 $(analyze callees <symbol>) - show what this calls
 $(analyze hotspots) - git history hotspots
