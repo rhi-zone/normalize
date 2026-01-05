@@ -8,9 +8,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 After agent validation:
 - [x] PR/diff analysis: `moss analyze --diff <base>` for changed code focus
-  - Works for: complexity, length, security
-  - TODO: extend to duplicates, health, docs
-- Streaming output for workflow engine `auto{}` driver
+  - Works for: complexity, length, security, duplicates, docs
+- [x] Streaming output: `auto{}` driver for workflow engine
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -43,7 +42,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 ## Backlog
 
 ### Workflow Engine
-- Consider streaming output for `auto{}` driver
+- [x] Streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
 
 ### Code Quality
