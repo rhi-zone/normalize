@@ -524,6 +524,19 @@ end
 function M.build_evaluator_context(task, working_memory, last_outputs, notes)
     local parts = {"**Task:** " .. task}
 
+    -- Check for failures in new results
+    local has_failures = false
+    for _, out in ipairs(last_outputs) do
+        if not out.success then
+            has_failures = true
+            break
+        end
+    end
+
+    if has_failures then
+        table.insert(parts, "\n**WARNING: Some commands failed.** Consider alternative approaches.")
+    end
+
     if #notes > 0 then
         table.insert(parts, "\n**Notes:**")
         for _, note in ipairs(notes) do
@@ -534,7 +547,7 @@ function M.build_evaluator_context(task, working_memory, last_outputs, notes)
     if #working_memory > 0 then
         table.insert(parts, "\n**Working memory** (kept from previous turns):")
         for i, item in ipairs(working_memory) do
-            local status = item.success and "" or " (failed)"
+            local status = item.success and "" or " (FAILED)"
             table.insert(parts, string.format("\n[%d] `%s`%s\n```\n%s\n```", i, item.cmd, status, item.content))
         end
     end
@@ -542,7 +555,7 @@ function M.build_evaluator_context(task, working_memory, last_outputs, notes)
     if #last_outputs > 0 then
         table.insert(parts, "\n**New results** (will be discarded unless you keep them):")
         for i, out in ipairs(last_outputs) do
-            local status = out.success and "" or " (failed)"
+            local status = out.success and "" or " (FAILED)"
             table.insert(parts, string.format("\n[%d] `%s`%s\n```\n%s\n```", i, out.cmd, status, out.content))
         end
     end
@@ -582,6 +595,7 @@ function M.run_state_machine(opts)
     local working_memory = {}  -- curated outputs kept by evaluator
     local last_outputs = {}    -- most recent turn's outputs (pending curation)
     local plan = nil           -- plan from planner state
+    local recent_cmds = {}     -- for loop detection
     local turn = 0
 
     while turn < max_turns do
@@ -740,6 +754,21 @@ function M.run_state_machine(opts)
                         end
                     end
                 end
+            end
+
+            -- Track commands for loop detection
+            for _, out in ipairs(last_outputs) do
+                table.insert(recent_cmds, out.cmd)
+            end
+
+            -- Check for loops (same command 3+ times in a row)
+            if M.is_looping(recent_cmds, 3) then
+                print("[agent-v2] Loop detected, bailing out")
+                if session_log then
+                    session_log:log("loop_detected", { cmd = recent_cmds[#recent_cmds], turn = turn })
+                    session_log:close()
+                end
+                return {success = false, reason = "loop_detected", turns = turn}
             end
         end
 
