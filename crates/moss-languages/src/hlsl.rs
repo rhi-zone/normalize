@@ -302,7 +302,7 @@ impl Language for Hlsl {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["hlsl", "hlsli", "fx", "fxh", "cginc"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {

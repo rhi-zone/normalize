@@ -192,7 +192,7 @@ impl Language for Xml {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["xml", "xsl", "xslt", "xsd"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 }
 

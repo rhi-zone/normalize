@@ -164,7 +164,7 @@ impl Language for Css {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["css", "scss"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 }
 

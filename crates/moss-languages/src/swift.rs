@@ -468,7 +468,7 @@ impl Language for Swift {
         if is_dir && (name == "build" || name == ".build" || name == "Pods") {
             return true;
         }
-        !is_dir && !has_extension(name, &["swift"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

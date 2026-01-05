@@ -422,7 +422,7 @@ impl Language for Erlang {
         if is_dir && (name == "_build" || name == "deps" || name == ".rebar3") {
             return true;
         }
-        !is_dir && !has_extension(name, &["erl", "hrl"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

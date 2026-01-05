@@ -280,7 +280,7 @@ impl Language for Vhdl {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["vhd", "vhdl"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {

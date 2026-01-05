@@ -225,7 +225,7 @@ impl Language for JavaScript {
         {
             return true;
         }
-        !is_dir && !has_extension(name, &["js", "mjs", "cjs"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

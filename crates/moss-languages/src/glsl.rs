@@ -265,11 +265,7 @@ impl Language for Glsl {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir
-            && !has_extension(
-                name,
-                &["glsl", "vert", "frag", "geom", "comp", "tesc", "tese"],
-            )
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {

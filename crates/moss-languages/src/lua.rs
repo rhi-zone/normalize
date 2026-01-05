@@ -360,7 +360,7 @@ impl Language for Lua {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["lua"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

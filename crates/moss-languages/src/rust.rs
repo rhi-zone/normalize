@@ -695,7 +695,7 @@ impl Language for Rust {
             return true;
         }
         // Only index .rs files
-        !is_dir && !has_extension(name, &["rs"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

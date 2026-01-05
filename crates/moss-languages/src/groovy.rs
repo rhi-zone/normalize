@@ -348,7 +348,7 @@ impl Language for Groovy {
         if is_dir && (name == "build" || name == ".gradle") {
             return true;
         }
-        !is_dir && !has_extension(name, &["groovy", "gradle", "gvy", "gy", "gsh"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {

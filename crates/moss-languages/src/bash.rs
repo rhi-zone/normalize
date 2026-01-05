@@ -212,7 +212,7 @@ impl Language for Bash {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["sh", "bash"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 }
 

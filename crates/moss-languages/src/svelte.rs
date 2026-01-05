@@ -425,7 +425,7 @@ impl Language for Svelte {
         if is_dir && (name == "node_modules" || name == ".svelte-kit" || name == "build") {
             return true;
         }
-        !is_dir && !has_extension(name, &["svelte"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

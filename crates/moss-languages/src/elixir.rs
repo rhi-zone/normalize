@@ -468,7 +468,7 @@ impl Language for Elixir {
         if is_dir && (name == "_build" || name == "deps" || name == ".elixir_ls") {
             return true;
         }
-        !is_dir && !has_extension(name, &["ex", "exs"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

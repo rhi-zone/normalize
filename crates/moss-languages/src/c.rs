@@ -350,7 +350,7 @@ impl Language for C {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["c", "h"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 }
 

@@ -350,7 +350,7 @@ impl Language for Haskell {
         if is_dir && (name == "dist" || name == "dist-newstyle" || name == ".stack-work") {
             return true;
         }
-        !is_dir && !has_extension(name, &["hs", "lhs"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

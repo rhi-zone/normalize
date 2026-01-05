@@ -360,7 +360,7 @@ pub trait Language: Send + Sync {
 
     /// Should this entry be skipped when indexing packages?
     /// Called for each file/directory in package directories.
-    /// Use helper functions `skip_dotfiles()` and `has_indexable_extension()` for common checks.
+    /// Use helper functions `skip_dotfiles()` and `has_extension(name, self.indexable_extensions())` for common checks.
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool;
 
     /// Get the module/package name from a directory entry name.

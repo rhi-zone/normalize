@@ -327,7 +327,7 @@ impl Language for PowerShell {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["ps1", "psm1", "psd1"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {

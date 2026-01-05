@@ -326,7 +326,7 @@ impl Language for Gleam {
         if is_dir && name == "build" {
             return true;
         }
-        !is_dir && !has_extension(name, &["gleam"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {

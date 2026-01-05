@@ -347,7 +347,7 @@ impl Language for Clojure {
         if is_dir && name == "target" {
             return true;
         }
-        !is_dir && !has_extension(name, &["clj", "cljs", "cljc"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

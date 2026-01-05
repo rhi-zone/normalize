@@ -182,7 +182,7 @@ impl Language for Json {
         if skip_dotfiles(name) {
             return true;
         }
-        !is_dir && !has_extension(name, &["json", "jsonc"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 }
 

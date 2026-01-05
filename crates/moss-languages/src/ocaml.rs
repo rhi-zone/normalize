@@ -356,7 +356,7 @@ impl Language for OCaml {
         if is_dir && name == "_build" {
             return true;
         }
-        !is_dir && !has_extension(name, &["ml", "mli"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

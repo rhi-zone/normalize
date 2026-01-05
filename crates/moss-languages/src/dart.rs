@@ -464,7 +464,7 @@ impl Language for Dart {
         if is_dir && (name == "build" || name == ".dart_tool" || name == ".pub-cache") {
             return true;
         }
-        !is_dir && !has_extension(name, &["dart"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

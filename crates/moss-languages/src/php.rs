@@ -445,7 +445,7 @@ impl Language for Php {
         if is_dir && (name == "vendor" || name == "cache" || name == "tests") {
             return true;
         }
-        !is_dir && !has_extension(name, &["php"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {

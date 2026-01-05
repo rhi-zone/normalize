@@ -222,7 +222,7 @@ impl Language for TypeScript {
         {
             return true;
         }
-        !is_dir && !has_extension(name, &["ts", "mts", "cts", "js", "mjs", "cjs", "d.ts"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn package_module_name(&self, entry_name: &str) -> String {
@@ -453,7 +453,7 @@ impl Language for Tsx {
         {
             return true;
         }
-        !is_dir && !has_extension(name, &["tsx", "ts", "js", "d.ts"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 
     fn package_module_name(&self, entry_name: &str) -> String {

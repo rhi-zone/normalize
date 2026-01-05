@@ -220,7 +220,7 @@ impl Language for Vue {
         if is_dir && name == "node_modules" {
             return true;
         }
-        !is_dir && !has_extension(name, &["vue"])
+        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 }
 
