@@ -186,7 +186,9 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 
 **Phase 1: Safe Editing** (foundation)
 - [ ] Shadow-first mode: all edits go to `.moss/shadow/`, validate, then apply
-  - Route $(edit ...) through shadow.edit() instead of direct file writes
+  - [x] Infrastructure: ShadowWorktree struct with open/sync/edit/read/validate/diff/apply/reset
+  - [x] Lua bindings: shadow.worktree.* API for scripts
+  - [ ] Route $(edit ...) through shadow.edit() instead of direct file writes
   - Validation runs in shadow (cargo check, tests) before touching real files
   - On success: shadow.apply_to_real() merges changes
   - On failure: shadow.reset(), agent sees error and can retry
