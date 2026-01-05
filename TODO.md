@@ -177,11 +177,10 @@ After testing validates the core:
 - Session log format: proper design (events, timing, token counts, diffs, replayability)
 - Box-thinking mitigation: counteract LLMs' tendency to stay in familiar patterns
 - Agent architecture:
-  - "Agent" = state machine + prompt (explorer, auditor, refactorer, etc.)
-  - Mode switching = same state machine, different prompts for different tasks
-  - Read-only agents are useful standalone (explore subagents, non-agentic workflows)
-  - Dispatcher routes tasks to appropriate prompt/role, not separate processes
-  - Challenge: what context does dispatcher see? (summaries? just task?)
+  - [x] Role-based prompts: investigator, auditor implemented
+  - Refactorer role: edit capability with validation loop
+  - Auto-dispatch: keyword matching or classifier routes to roles
+  - Prompt tuning: consistent `$(cmd)` format, stop evaluator command leakage
 - Benchmark suite: systematic agent evaluation
   - Task library: curated set of tasks with known answers/outcomes
   - Per-run metrics: reliability (pass/fail), LLM calls (cost proxy, latency), tokens (in/out)

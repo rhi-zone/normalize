@@ -767,14 +767,8 @@ function M.run_state_machine(opts)
             goto continue
         end
 
-        -- Parse commands from response
-        local commands = {}
-        for cmd_content in response:gmatch('%$%(([^%)]+)%)') do
-            local cmd_name, args = cmd_content:match('^(%S+)%s*(.*)$')
-            if cmd_name then
-                table.insert(commands, {name = cmd_name, args = args or "", full = cmd_name .. " " .. (args or "")})
-            end
-        end
+        -- Parse commands from response (handles quoted strings properly)
+        local commands = M.parse_commands(response)
 
         -- Handle $(done) or $(answer) - only valid in evaluator state
         for _, cmd in ipairs(commands) do
@@ -986,6 +980,63 @@ function M.build_context(task, working_memory, current_outputs, error_state)
     return table.concat(parts, "\n")
 end
 
+-- Parse $(cmd args) commands from response, handling quoted strings properly
+-- Returns list of {name, args, full} tables
+function M.parse_commands(response)
+    local commands = {}
+    local i = 1
+    local len = #response
+
+    while i <= len do
+        -- Look for $(
+        local start = response:find("%$%(", i)
+        if not start then break end
+
+        -- Find matching ) considering quotes
+        local j = start + 2  -- skip $(
+        local in_quote = nil  -- nil, '"', or "'"
+        local depth = 1
+
+        while j <= len and depth > 0 do
+            local c = response:sub(j, j)
+
+            if in_quote then
+                -- Inside quotes: only look for matching quote (handle escapes)
+                if c == in_quote and response:sub(j - 1, j - 1) ~= '\\' then
+                    in_quote = nil
+                end
+            else
+                -- Outside quotes
+                if c == '"' or c == "'" then
+                    in_quote = c
+                elseif c == '(' then
+                    depth = depth + 1
+                elseif c == ')' then
+                    depth = depth - 1
+                end
+            end
+            j = j + 1
+        end
+
+        if depth == 0 then
+            -- Extract content between $( and )
+            local content = response:sub(start + 2, j - 2)
+            local cmd_name, args = content:match('^(%S+)%s*(.*)$')
+            if cmd_name then
+                table.insert(commands, {
+                    name = cmd_name,
+                    args = args or "",
+                    full = cmd_name .. " " .. (args or "")
+                })
+            end
+        end
+
+        i = j
+    end
+
+    return commands
+end
+
 -- Parse keep command: "keep" | "keep all" | "keep 1" | "keep 1 2 3"
 function M.parse_keep(cmd, num_outputs)
     local indices = {}
@@ -1185,22 +1236,17 @@ function M.run(opts)
             })
         end
 
-        -- Extract commands from response
+        -- Extract commands from response (handles quoted strings properly)
         local commands = {}
-
-        -- Parse $(cmd args) format - the primary format we teach via bootstrap
-        for cmd_content in response:gmatch('%$%(([^%)]+)%)') do
-            local cmd_name, args = cmd_content:match('^(%S+)%s*(.*)$')
-            if cmd_name then
-                args = args or ""
-                if cmd_name == "view" or cmd_name == "text-search" or cmd_name == "run" or
-                   cmd_name == "note" or cmd_name == "done" or cmd_name == "keep" or
-                   cmd_name == "drop" or cmd_name == "memorize" or cmd_name == "forget" or
-                   cmd_name == "analyze" or cmd_name == "package" or cmd_name == "edit" or
-                   cmd_name == "batch-edit" or cmd_name == "checkpoint" or cmd_name == "ask" or
-                   cmd_name == "wait" or cmd_name == "help" then
-                    table.insert(commands, cmd_name .. " " .. args)
-                end
+        local parsed = M.parse_commands(response)
+        for _, cmd in ipairs(parsed) do
+            if cmd.name == "view" or cmd.name == "text-search" or cmd.name == "run" or
+               cmd.name == "note" or cmd.name == "done" or cmd.name == "keep" or
+               cmd.name == "drop" or cmd.name == "memorize" or cmd.name == "forget" or
+               cmd.name == "analyze" or cmd.name == "package" or cmd.name == "edit" or
+               cmd.name == "batch-edit" or cmd.name == "checkpoint" or cmd.name == "ask" or
+               cmd.name == "wait" or cmd.name == "help" then
+                table.insert(commands, cmd.name .. " " .. cmd.args)
             end
         end
 
