@@ -34,15 +34,33 @@ Each role is a prompt that defines:
 - How it should interpret results
 - When it should conclude
 
-### Explorer (default)
+Roles are implemented in `agent.lua` as `ROLE_PROMPTS` tables.
+
+### Investigator (default)
 - **Purpose**: answer questions about the codebase
 - **Tools**: view, text-search, run (read-only shell)
 - **Output**: answer with evidence
+- **Usage**: `moss @agent --v2 "how does X work?"`
 
 ### Auditor
 - **Purpose**: find issues (security, quality, patterns)
 - **Tools**: view, text-search, run (read-only shell)
 - **Output**: findings with locations and severity
+- **Usage**: `moss @agent --audit "find unwrap on user input"`
+
+Auditor evaluator output format:
+```
+$(note SECURITY:HIGH file.rs:45 - unsanitized input)
+$(note QUALITY:MED file.rs:120 - unwrap on Result)
+
+$(answer
+## Audit Findings
+### Critical
+- None
+### High
+- file.rs:45 - unsanitized shell input
+)
+```
 
 ### Refactorer (future)
 - **Purpose**: make changes to fix issues
@@ -60,12 +78,14 @@ Each role is a prompt that defines:
 
 ## Dispatch
 
-Two modes:
-1. **Explicit**: `moss @agent --role auditor "find security issues"`
-2. **Auto-dispatch**: classifier picks role based on task phrasing
+Currently explicit only:
+```
+moss @agent --v2 --role auditor "find security issues"
+moss @agent --audit "check for unwrap"  # shortcut
+```
 
-Auto-dispatch is a lightweight LLM call or keyword matching:
-- "find", "search", "where", "how" → explorer
+Future: auto-dispatch via keyword matching or lightweight classifier:
+- "find", "search", "where", "how" → investigator
 - "audit", "check", "issues", "vulnerabilities" → auditor
 - "fix", "refactor", "change", "update" → refactorer
 
