@@ -162,7 +162,7 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 **Prompt tuning observations**:
 - Claude sometimes uses bash-style `view ...` instead of `$(view ...)`
 - Evaluator occasionally outputs commands in backticks
-- text-search regex with backslash fails (e.g., `\.unwrap(`)
+- [x] Command parser now handles parens inside quotes: `$(text-search "unwrap()")`
 
 ### Agent Future
 
