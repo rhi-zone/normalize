@@ -678,6 +678,56 @@ impl LuaRuntime {
         )
         .exec()?;
 
+        // auto { actions = {...} } - run all actions automatically with streaming output
+        lua.load(
+            r#"
+            function auto(config)
+                local actions = config.actions
+                if not actions then
+                    error("auto{} requires actions table")
+                end
+
+                -- Sort action names for consistent ordering
+                local names = {}
+                for name, _ in pairs(actions) do
+                    table.insert(names, name)
+                end
+                table.sort(names)
+
+                local results = {}
+                local all_ok = true
+
+                -- Run each action with streaming output
+                for _, name in ipairs(names) do
+                    io.stdout:write("▶ " .. name .. "... ")
+                    io.stdout:flush()
+
+                    local action = actions[name]
+                    local ok, result = pcall(action)
+
+                    if ok then
+                        print("✓")
+                        if result then
+                            print("  " .. tostring(result):gsub("\n", "\n  "))
+                        end
+                        results[name] = { success = true, output = result }
+                    else
+                        print("✗")
+                        print("  Error: " .. tostring(result))
+                        results[name] = { success = false, error = result }
+                        all_ok = false
+                        if config.stop_on_error then
+                            break
+                        end
+                    end
+                end
+
+                return { results = results, success = all_ok }
+            end
+            "#,
+        )
+        .exec()?;
+
         Ok(())
     }
 
