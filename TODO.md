@@ -13,6 +13,8 @@ After agent validation:
 - [x] Agent --diff: `moss @agent --diff [BASE]` for PR/changed file focus
 
 ## Remaining Work
+- [ ] claude_code.rs: cache regex patterns instead of recompiling on every call
+- [ ] agent.lua: replace hardcoded ./target/debug/moss with proper binary detection
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
   - Requires language-specific namespace semantics - low priority
@@ -143,6 +145,12 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - **Command usage**: text-search most used (51×), then view (29×), some shell fallback (run ls/find)
 - **Turn distribution**: Successful sessions typically 2-6 turns, failures hit max turns
 - Session logs: `.moss/agent/logs/*.jsonl`
+
+**v2 state machine observations** (Anthropic):
+- Auditor role completes efficiently: 2-4 turns for focused tasks
+- Investigator can get stuck in explorer/evaluator cycles on complex questions
+- --diff flag works well for PR-focused analysis
+- Agent found real issues: hardcoded debug path, regex recompilation, potential path traversal
 
 **Known Gemini issues** (still present):
 - Hallucinates command outputs (answers before seeing results)
