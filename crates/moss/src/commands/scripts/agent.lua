@@ -441,11 +441,21 @@ Outputs disappear each turn unless you $(keep) or $(note) them.
 ]]
 
 -- State machine configuration
--- Two specialized states: explorer (suggests commands) and evaluator (judges progress)
+-- Three specialized states: planner (optional), explorer, evaluator
 local MACHINE = {
-    start = "explorer",
+    start = "explorer",  -- default; can be overridden to "planner"
 
     states = {
+        planner = {
+            prompt = [[
+Create a brief plan to accomplish this task.
+List 2-4 concrete steps, then say "Ready to explore."
+Do not execute commands - just plan the approach.
+]],
+            context = "task_only",
+            next = "explorer",
+        },
+
         explorer = {
             prompt = [[
 Suggest commands to explore. Available:
@@ -478,9 +488,18 @@ If more info needed: say what's missing.
     },
 }
 
+-- Build context for planner state (task only)
+function M.build_planner_context(task)
+    return "**Task:** " .. task .. "\n\nCreate a plan to accomplish this task."
+end
+
 -- Build context for explorer state (ephemeral - last outputs only)
-function M.build_explorer_context(task, last_outputs, notes)
+function M.build_explorer_context(task, last_outputs, notes, plan)
     local parts = {"**Task:** " .. task}
+
+    if plan then
+        table.insert(parts, "\n**Plan:**\n" .. plan)
+    end
 
     if #notes > 0 then
         table.insert(parts, "\n**Notes so far:**")
@@ -538,12 +557,14 @@ function M.run_state_machine(opts)
     local max_turns = opts.max_turns or 10
     local provider = opts.provider or "gemini"
     local model = opts.model  -- nil means use provider default
+    local use_planner = opts.plan or false
 
     local session_id = M.gen_session_id()
     print("[agent-v2] Session: " .. session_id)
 
     -- Start session logging
     local session_log = M.start_session_log(session_id)
+    local start_state = use_planner and "planner" or "explorer"
     if session_log then
         session_log:log("task", {
             system_prompt = "state_machine_v2",
@@ -551,14 +572,16 @@ function M.run_state_machine(opts)
             provider = provider,
             model = model or "default",
             max_turns = max_turns,
-            machine_start = MACHINE.start
+            machine_start = start_state,
+            use_planner = use_planner
         })
     end
 
-    local state = MACHINE.start
+    local state = start_state
     local notes = {}           -- accumulated notes
     local working_memory = {}  -- curated outputs kept by evaluator
     local last_outputs = {}    -- most recent turn's outputs (pending curation)
+    local plan = nil           -- plan from planner state
     local turn = 0
 
     while turn < max_turns do
@@ -567,8 +590,10 @@ function M.run_state_machine(opts)
 
         -- Build context based on state
         local context
-        if state == "explorer" then
-            context = M.build_explorer_context(task, last_outputs, notes)
+        if state == "planner" then
+            context = M.build_planner_context(task)
+        elseif state == "explorer" then
+            context = M.build_explorer_context(task, last_outputs, notes, plan)
         else
             context = M.build_evaluator_context(task, working_memory, last_outputs, notes)
         end
@@ -606,6 +631,16 @@ function M.run_state_machine(opts)
                 state = state,
                 response = response:sub(1, 500)  -- truncate for log
             })
+        end
+
+        -- Handle planner state - save plan and transition
+        if state == "planner" then
+            plan = response
+            if session_log then
+                session_log:log("plan_created", { plan = response:sub(1, 500) })
+            end
+            state = state_config.next
+            goto continue
         end
 
         -- Parse commands from response
@@ -710,6 +745,7 @@ function M.run_state_machine(opts)
 
         -- Transition to next state
         state = state_config.next
+        ::continue::
     end
 
     print("[agent-v2] Max turns reached")
@@ -1436,6 +1472,9 @@ function M.parse_args(args)
             i = i + 1
         elseif arg == "--v2" or arg == "--state-machine" then
             opts.v2 = true
+            i = i + 1
+        elseif arg == "--plan" then
+            opts.plan = true
             i = i + 1
         else
             table.insert(task_parts, arg)

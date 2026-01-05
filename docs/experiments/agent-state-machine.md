@@ -180,10 +180,35 @@ Example: $(answer Cli is the first struct at line 13)
 3. **Both $(done) and $(answer) accepted**: Models use both, so we handle both
 4. **One LLM call per state** (not 2 per turn as originally planned): cleaner separation
 
+## Planning State (--plan flag)
+
+Optional planning state that runs before exploration. Usage:
+```bash
+moss @agent "complex task" --v2 --plan --max-turns 12
+```
+
+Flow: planner → explorer → evaluator → (repeat or done)
+
+The planner:
+- Receives only the task (no outputs yet)
+- Creates a 2-4 step plan
+- Plan is shown to explorer in context
+
+Example output:
+```
+[agent-v2] Turn 1/12 (planner)
+[agent-v2] Thinking... 1. Find all main.rs files in the project
+2. Read each file and search for struct definitions
+3. Extract struct names and line numbers
+
+Ready to explore.
+[agent-v2] Turn 2/12 (explorer)
+...
+```
+
 ## Future Extensions
 
 - **Recovery state**: Handle errors, suggest fixes
-- **Planning state**: Before exploring, plan the approach
 - **Refinement state**: After draft answer, verify/improve
 - **Conditional transitions**: Based on output patterns, errors, etc.
 
