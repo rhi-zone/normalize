@@ -38,7 +38,8 @@ pub struct AnalyzeArgs {
     pub compact: bool,
 
     /// Analyze only files changed since base ref (e.g., main, HEAD~1)
-    #[arg(long, value_name = "BASE", global = true)]
+    /// If no BASE given, defaults to origin's default branch
+    #[arg(long, value_name = "BASE", global = true, num_args = 0..=1, default_missing_value = "")]
     pub diff: Option<String>,
 }
 

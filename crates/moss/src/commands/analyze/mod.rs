@@ -196,13 +196,32 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
     // Get files from --diff if specified
     let diff_files = if let Some(ref base) = args.diff {
-        match get_diff_files(&effective_root, base) {
+        // If base is empty, detect default branch
+        let effective_base = if base.is_empty() {
+            match detect_default_branch(&effective_root) {
+                Some(branch) => branch,
+                None => {
+                    eprintln!(
+                        "error: Could not detect default branch. Specify explicitly: --diff main"
+                    );
+                    return 1;
+                }
+            }
+        } else {
+            base.clone()
+        };
+
+        match get_diff_files(&effective_root, &effective_base) {
             Ok(files) => {
                 if files.is_empty() {
-                    eprintln!("No changed files found relative to {}", base);
+                    eprintln!("No changed files found relative to {}", effective_base);
                     return 0;
                 }
-                eprintln!("Analyzing {} changed files (vs {})", files.len(), base);
+                eprintln!(
+                    "Analyzing {} changed files (vs {})",
+                    files.len(),
+                    effective_base
+                );
                 files
             }
             Err(e) => {
@@ -478,6 +497,101 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             print_report(&report, json, pretty)
         }
     }
+}
+
+/// Detect the default remote (usually "origin")
+fn detect_default_remote(root: &Path) -> Option<String> {
+    // Check if current branch has an upstream
+    let upstream = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "@{upstream}"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+
+    if upstream.status.success() {
+        let upstream_ref = String::from_utf8_lossy(&upstream.stdout).trim().to_string();
+        // origin/main -> origin
+        if let Some(remote) = upstream_ref.split('/').next() {
+            return Some(remote.to_string());
+        }
+    }
+
+    // Fallback: check if origin exists
+    let check = Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+
+    if check.status.success() {
+        return Some("origin".to_string());
+    }
+
+    // Last resort: first remote
+    let remotes = Command::new("git")
+        .args(["remote"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+
+    if remotes.status.success() {
+        let first = String::from_utf8_lossy(&remotes.stdout)
+            .lines()
+            .next()?
+            .to_string();
+        if !first.is_empty() {
+            return Some(first);
+        }
+    }
+
+    None
+}
+
+/// Detect the default branch from the default remote
+fn detect_default_branch(root: &Path) -> Option<String> {
+    let remote = detect_default_remote(root)?;
+
+    // Try git symbolic-ref refs/remotes/{remote}/HEAD
+    let output = Command::new("git")
+        .args(["symbolic-ref", &format!("refs/remotes/{}/HEAD", remote)])
+        .current_dir(root)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let full_ref = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        // refs/remotes/origin/main -> origin/main
+        return full_ref
+            .strip_prefix("refs/remotes/")
+            .map(|s| s.to_string());
+    }
+
+    // Fallback: try common remote branch names
+    for branch in ["main", "master"] {
+        let full_branch = format!("{}/{}", remote, branch);
+        let check = Command::new("git")
+            .args(["rev-parse", "--verify", &full_branch])
+            .current_dir(root)
+            .output()
+            .ok()?;
+        if check.status.success() {
+            return Some(full_branch);
+        }
+    }
+
+    // Last fallback: try local branches
+    for branch in ["main", "master"] {
+        let check = Command::new("git")
+            .args(["rev-parse", "--verify", branch])
+            .current_dir(root)
+            .output()
+            .ok()?;
+        if check.status.success() {
+            return Some(branch.to_string());
+        }
+    }
+
+    None
 }
 
 /// Get files changed relative to a base ref using git
