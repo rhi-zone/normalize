@@ -416,6 +416,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                     show_source,
                     min_lines,
                     json,
+                    filter.as_ref(),
                 );
                 result
             }
@@ -596,7 +597,7 @@ fn run_all_passes(
         false, // elide_literals
         false, // show_source
         1,     // min_lines
-        json,
+        json, filter,
     );
 
     if dup_result != 0 {

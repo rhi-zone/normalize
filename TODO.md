@@ -187,6 +187,8 @@ After testing validates the core:
   - [x] Command parser: handles parens inside quotes
   - [x] Auto-dispatch: LLM classifier (`--auto` flag)
     - Use cases: subagent spawning, dynamic role switching mid-task
+  - PR/diff analysis agent: `moss @agent --audit --diff main` for focused review
+    - Agent sees only changed files, audits for issues in the diff
 - Benchmark suite: systematic agent evaluation
   - Task library: curated set of tasks with known answers/outcomes
   - Per-run metrics: reliability (pass/fail), LLM calls (cost proxy, latency), tokens (in/out)

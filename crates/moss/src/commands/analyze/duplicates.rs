@@ -1,6 +1,7 @@
 //! Duplicate function and type detection.
 
 use crate::extract::Extractor;
+use crate::filter::Filter;
 use crate::parsers;
 use moss_languages::support_for_path;
 use std::collections::{HashMap, HashSet};
@@ -271,6 +272,7 @@ pub fn cmd_duplicate_functions_with_count(
     show_source: bool,
     min_lines: usize,
     json: bool,
+    filter: Option<&Filter>,
 ) -> (i32, usize) {
     let extractor = Extractor::new();
 
@@ -294,6 +296,15 @@ pub fn cmd_duplicate_functions_with_count(
         path.is_file() && super::is_source_file(path)
     }) {
         let path = entry.path();
+
+        // Apply filter if specified
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(_) => continue,
