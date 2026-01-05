@@ -17,9 +17,8 @@ After agent validation:
   - Requires language-specific namespace semantics - low priority
 - Shadow worktree isolation: validate() and apply_to_real() implemented
   - Current: shadow repo at `.moss/shadow/` with validation methods
-  - Two modes needed:
-    - Direct edit (default): edit real files, shadow for rollback
-    - Shadow-first (--validate): edit shadow, run validation, apply if passes
+  - [x] Auto-validation: `--validate <cmd>` runs validation after each edit, rollback on failure
+  - Future: true shadow-first mode (edit in shadow, then apply)
   - Zero user interruption (user can edit while agent tests in background)
 
 ### Configuration System

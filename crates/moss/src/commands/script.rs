@@ -16,6 +16,7 @@ pub mod builtins {
     pub const TODO: &str = include_str!("scripts/todo.lua");
     pub const CONFIG: &str = include_str!("scripts/config.lua");
     pub const AGENT: &str = include_str!("scripts/agent.lua");
+    pub const BENCHMARK: &str = include_str!("scripts/benchmark.lua");
 
     /// Get builtin script by name.
     pub fn get(name: &str) -> Option<&'static str> {
@@ -23,13 +24,14 @@ pub mod builtins {
             "todo" => Some(TODO),
             "config" => Some(CONFIG),
             "agent" => Some(AGENT),
+            "benchmark" => Some(BENCHMARK),
             _ => None,
         }
     }
 
     /// List all builtin script names.
     pub fn list() -> &'static [&'static str] {
-        &["agent", "config", "todo"]
+        &["agent", "benchmark", "config", "todo"]
     }
 }
 
