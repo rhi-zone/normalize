@@ -80,6 +80,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
 
 ### Tooling
+- Read .git directly instead of spawning git commands where possible
+  - Default branch detection, diff file listing, etc.
+  - Trade-off: faster but more fragile (worktrees, packed refs, submodules)
 - Symbol history: `moss view path/Symbol --history` or `moss history path/Symbol`
   - Show last N changes to a symbol via git blame
   - Extract symbol boundaries, then trace through git history
