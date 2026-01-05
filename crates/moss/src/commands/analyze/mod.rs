@@ -26,6 +26,7 @@ use crate::merge::Merge;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// Analyze command configuration.
 #[derive(Debug, Clone, Deserialize, Default, Merge)]
@@ -193,9 +194,36 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&effective_root);
 
+    // Get files from --diff if specified
+    let diff_files = if let Some(ref base) = args.diff {
+        match get_diff_files(&effective_root, base) {
+            Ok(files) => {
+                if files.is_empty() {
+                    eprintln!("No changed files found relative to {}", base);
+                    return 0;
+                }
+                eprintln!("Analyzing {} changed files (vs {})", files.len(), base);
+                files
+            }
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
+    // Merge diff files into only patterns
+    let mut only_patterns = args.only.clone();
+    for file in &diff_files {
+        // Add as exact path pattern (leading / means root-relative)
+        only_patterns.push(format!("/{}", file));
+    }
+
     // Build filter for --exclude and --only (returns None on error after printing message)
-    let filter = if !args.exclude.is_empty() || !args.only.is_empty() {
-        match build_filter(&effective_root, &args.exclude, &args.only) {
+    let filter = if !args.exclude.is_empty() || !only_patterns.is_empty() {
+        match build_filter(&effective_root, &args.exclude, &only_patterns) {
             Some(f) => Some(f),
             None => return 1, // Error already printed
         }
@@ -447,6 +475,47 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             print_report(&report, json, pretty)
         }
     }
+}
+
+/// Get files changed relative to a base ref using git
+fn get_diff_files(root: &Path, base: &str) -> Result<Vec<String>, String> {
+    // Try merge-base first for branch comparisons
+    let merge_base = Command::new("git")
+        .args(["merge-base", base, "HEAD"])
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("Failed to run git merge-base: {}", e))?;
+
+    let base_ref = if merge_base.status.success() {
+        String::from_utf8_lossy(&merge_base.stdout)
+            .trim()
+            .to_string()
+    } else {
+        // Fall back to using base directly (for HEAD~N style refs)
+        base.to_string()
+    };
+
+    // Get changed files
+    let output = Command::new("git")
+        .args(["diff", "--name-only", &base_ref])
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "git diff failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let files: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| l.to_string())
+        .collect();
+
+    Ok(files)
 }
 
 /// Build filter from exclude/only patterns

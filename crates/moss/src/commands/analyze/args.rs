@@ -32,6 +32,14 @@ pub struct AnalyzeArgs {
     /// Include only paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN", global = true)]
     pub only: Vec<String>,
+
+    /// Compact output without colors (overrides TTY detection)
+    #[arg(long, global = true)]
+    pub compact: bool,
+
+    /// Analyze only files changed since base ref (e.g., main, HEAD~1)
+    #[arg(long, value_name = "BASE", global = true)]
+    pub diff: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
