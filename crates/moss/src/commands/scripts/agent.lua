@@ -999,6 +999,7 @@ function M.run_state_machine(opts)
     local plan = nil           -- plan from planner state
     local recent_cmds = {}     -- for loop detection
     local turn = 0
+    local validation_retry_count = 0  -- track validation retries
 
     while turn < max_turns do
         turn = turn + 1
@@ -1085,6 +1086,7 @@ function M.run_state_machine(opts)
 
                             -- Validate if validate_cmd is set
                             local should_apply = true
+                            local validation_error = nil
                             if opts.validate_cmd then
                                 print("[agent-v2] Validating: " .. opts.validate_cmd)
                                 local validation = shadow.worktree.validate(opts.validate_cmd)
@@ -1092,7 +1094,8 @@ function M.run_state_machine(opts)
                                     print("[agent-v2] Validation passed ✓")
                                 else
                                     print("[agent-v2] Validation FAILED:")
-                                    print(validation.stdout or validation.stderr or "")
+                                    validation_error = validation.stdout or validation.stderr or "Unknown error"
+                                    print(validation_error)
                                     should_apply = false
                                 end
                             end
@@ -1122,8 +1125,26 @@ function M.run_state_machine(opts)
                                     end
                                 end
                             else
-                                print("[agent-v2] Discarding shadow changes (validation failed)")
-                                shadow.worktree.reset()
+                                -- Validation failed - retry if allowed
+                                local max_retries = opts.retry_on_failure or 0
+                                if validation_retry_count < max_retries then
+                                    validation_retry_count = validation_retry_count + 1
+                                    print("[agent-v2] Retrying (" .. validation_retry_count .. "/" .. max_retries .. ")...")
+                                    -- Reset shadow and inject error into working memory
+                                    shadow.worktree.reset()
+                                    shadow.worktree.sync()  -- Resync to clean state
+                                    table.insert(working_memory, {
+                                        id = M.gen_id(),
+                                        type = "error",
+                                        content = "VALIDATION FAILED. Please fix this error and try again:\n" .. validation_error,
+                                    })
+                                    -- Don't return - continue the state machine
+                                    goto continue
+                                else
+                                    print("[agent-v2] Discarding shadow changes (validation failed" ..
+                                        (max_retries > 0 and ", max retries reached" or "") .. ")")
+                                    shadow.worktree.reset()
+                                end
                             end
                         else
                             print("[agent-v2] No shadow changes to apply")
@@ -1440,6 +1461,7 @@ Options:
   --shadow            Edit in shadow worktree, validate before applying (enables --auto-validate)
   --auto-approve [LEVEL]  Auto-approve edits up to risk level (low/medium/high, default: low)
   --commit            Auto-commit changes after successful validation
+  --retry-on-failure [N]  Retry up to N times on validation failure (default: 1)
   --diff [base]       Focus on git diff (auto-detects main/master if base omitted)
   --auto              Auto-dispatch based on task analysis
   --roles             List available roles and descriptions
@@ -2181,6 +2203,15 @@ function M.parse_args(args)
         elseif arg == "--commit" then
             opts.commit = true
             i = i + 1
+        elseif arg == "--retry-on-failure" then
+            -- Number of retries on validation failure (default: 1)
+            if args[i+1] and args[i+1]:match("^%d+$") then
+                opts.retry_on_failure = tonumber(args[i+1])
+                i = i + 2
+            else
+                opts.retry_on_failure = 1  -- default: 1 retry
+                i = i + 1
+            end
         elseif arg == "--diff" then
             -- Optional base ref, default to auto-detect
             if args[i+1] and not args[i+1]:match("^%-") then

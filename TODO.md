@@ -237,9 +237,10 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
   - [x] Only commits if validation passes
 
 **Phase 5: Error Recovery**
-- [ ] Retry with context: when validation fails, agent sees error and retries
-  - Currently: rollback and stop
-  - Future: rollback, show error to agent, let it try different approach
+- [x] Retry with context: when validation fails, agent sees error and retries
+  - [x] --retry-on-failure [N] flag (default: 1 retry)
+  - [x] Validation error injected into working memory
+  - [x] Shadow reset and sync before retry
 - [ ] Partial success: if 3/5 edits work, apply those, report failures
 - [ ] Human-in-the-loop escalation: if agent stuck, ask user for guidance
 
