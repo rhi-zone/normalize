@@ -11,9 +11,18 @@
 //! - Hunk-level rollback of bad edits
 //! - Detection of suspicious deletions (high deletion_ratio)
 //! - Full audit trail of agent modifications
+//!
+//! ## Shadow Worktree (for agent editing)
+//!
+//! `ShadowWorktree` provides isolated editing via git worktree:
+//! - Edits happen in `.moss/shadow/worktree/`, not the real repo
+//! - Validation runs in the worktree (cargo check, tests)
+//! - On success, changes are copied to the real repo
+//! - On failure, worktree is reset without affecting real files
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use git2::{DiffOptions, Repository, Signature};
 
@@ -271,6 +280,278 @@ impl ShadowGit {
         Ok(snapshots)
     }
 }
+
+/// Result of running validation in the shadow worktree.
+#[derive(Debug)]
+pub struct ValidationResult {
+    pub success: bool,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+}
+
+/// Shadow worktree for isolated editing and validation.
+///
+/// Uses git worktree to create a full working copy where edits can be
+/// made and validated without affecting the real repository.
+pub struct ShadowWorktree {
+    /// Path to the main repository root
+    root: PathBuf,
+    /// Path to the shadow worktree directory
+    worktree_path: PathBuf,
+    /// Files that have been modified in the shadow
+    modified_files: Vec<PathBuf>,
+}
+
+impl ShadowWorktree {
+    /// Initialize or open the shadow worktree.
+    ///
+    /// Creates a git worktree at `.moss/shadow/worktree/` linked to the main repo.
+    pub fn open(root: &Path) -> Result<Self, ShadowWorktreeError> {
+        let shadow_dir = root.join(".moss").join("shadow");
+        let worktree_path = shadow_dir.join("worktree");
+
+        std::fs::create_dir_all(&shadow_dir).map_err(|e| ShadowWorktreeError::Io(e.to_string()))?;
+
+        // Check if worktree already exists and is valid
+        if worktree_path.join(".git").exists() {
+            return Ok(Self {
+                root: root.to_path_buf(),
+                worktree_path,
+                modified_files: Vec::new(),
+            });
+        }
+
+        // Prune stale worktree registrations (handles "missing but registered" case)
+        let _ = Command::new("git")
+            .args(["worktree", "prune"])
+            .current_dir(root)
+            .output();
+
+        // Create worktree using git command (more reliable than git2 for worktrees)
+        let output = Command::new("git")
+            .args(["worktree", "add", "--detach"])
+            .arg(&worktree_path)
+            .arg("HEAD")
+            .current_dir(root)
+            .output()
+            .map_err(|e| ShadowWorktreeError::Git(e.to_string()))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // Worktree might already exist but be in a bad state - try to recover
+            if stderr.contains("already exists") {
+                // Remove and retry
+                let _ = Command::new("git")
+                    .args(["worktree", "remove", "--force"])
+                    .arg(&worktree_path)
+                    .current_dir(root)
+                    .output();
+                let _ = std::fs::remove_dir_all(&worktree_path);
+
+                let retry = Command::new("git")
+                    .args(["worktree", "add", "--detach"])
+                    .arg(&worktree_path)
+                    .arg("HEAD")
+                    .current_dir(root)
+                    .output()
+                    .map_err(|e| ShadowWorktreeError::Git(e.to_string()))?;
+
+                if !retry.status.success() {
+                    return Err(ShadowWorktreeError::Git(
+                        String::from_utf8_lossy(&retry.stderr).to_string(),
+                    ));
+                }
+            } else {
+                return Err(ShadowWorktreeError::Git(stderr.to_string()));
+            }
+        }
+
+        Ok(Self {
+            root: root.to_path_buf(),
+            worktree_path,
+            modified_files: Vec::new(),
+        })
+    }
+
+    /// Get the path to the shadow worktree.
+    pub fn path(&self) -> &Path {
+        &self.worktree_path
+    }
+
+    /// Sync the worktree with the current state of the main repo.
+    ///
+    /// This resets the worktree to match HEAD of the main repo.
+    pub fn sync(&mut self) -> Result<(), ShadowWorktreeError> {
+        // Reset worktree to HEAD
+        let output = Command::new("git")
+            .args(["reset", "--hard", "HEAD"])
+            .current_dir(&self.worktree_path)
+            .output()
+            .map_err(|e| ShadowWorktreeError::Git(e.to_string()))?;
+
+        if !output.status.success() {
+            return Err(ShadowWorktreeError::Git(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ));
+        }
+
+        // Clean untracked files
+        let _ = Command::new("git")
+            .args(["clean", "-fd"])
+            .current_dir(&self.worktree_path)
+            .output();
+
+        self.modified_files.clear();
+        Ok(())
+    }
+
+    /// Edit a file in the shadow worktree.
+    ///
+    /// The path should be relative to the repository root.
+    pub fn edit(&mut self, rel_path: &Path, content: &str) -> Result<(), ShadowWorktreeError> {
+        let shadow_path = self.worktree_path.join(rel_path);
+
+        // Create parent directories if needed
+        if let Some(parent) = shadow_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| ShadowWorktreeError::Io(e.to_string()))?;
+        }
+
+        std::fs::write(&shadow_path, content)
+            .map_err(|e| ShadowWorktreeError::Io(e.to_string()))?;
+
+        // Track modified file
+        if !self.modified_files.contains(&rel_path.to_path_buf()) {
+            self.modified_files.push(rel_path.to_path_buf());
+        }
+
+        Ok(())
+    }
+
+    /// Read a file from the shadow worktree.
+    pub fn read(&self, rel_path: &Path) -> Result<String, ShadowWorktreeError> {
+        let shadow_path = self.worktree_path.join(rel_path);
+        std::fs::read_to_string(&shadow_path).map_err(|e| ShadowWorktreeError::Io(e.to_string()))
+    }
+
+    /// Run a validation command in the shadow worktree.
+    ///
+    /// The command is run with the worktree as the current directory.
+    pub fn validate(&self, cmd: &str) -> Result<ValidationResult, ShadowWorktreeError> {
+        let output = Command::new("sh")
+            .args(["-c", cmd])
+            .current_dir(&self.worktree_path)
+            .output()
+            .map_err(|e| ShadowWorktreeError::Io(e.to_string()))?;
+
+        Ok(ValidationResult {
+            success: output.status.success(),
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            exit_code: output.status.code().unwrap_or(-1),
+        })
+    }
+
+    /// Get a diff of changes in the shadow worktree.
+    ///
+    /// Only shows changes to files that were modified via `edit()`, not all
+    /// untracked files (which would include build artifacts from validation).
+    pub fn diff(&self) -> Result<String, ShadowWorktreeError> {
+        let mut result = String::new();
+
+        for modified_path in &self.modified_files {
+            let rel_path = modified_path.to_string_lossy();
+
+            // Check if file exists in HEAD
+            let in_head = Command::new("git")
+                .args(["ls-tree", "-r", "HEAD", "--name-only", "--", &*rel_path])
+                .current_dir(&self.worktree_path)
+                .output()
+                .map_err(|e| ShadowWorktreeError::Git(e.to_string()))?;
+
+            let is_tracked = !in_head.stdout.is_empty();
+
+            if is_tracked {
+                // File exists in HEAD, show diff
+                let diff_output = Command::new("git")
+                    .args(["diff", "--no-color", "HEAD", "--", &*rel_path])
+                    .current_dir(&self.worktree_path)
+                    .output()
+                    .map_err(|e| ShadowWorktreeError::Git(e.to_string()))?;
+                result.push_str(&String::from_utf8_lossy(&diff_output.stdout));
+            } else {
+                // New file, show as full addition
+                let path = self.worktree_path.join(modified_path);
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    result.push_str(&format!("\n--- /dev/null\n+++ b/{}\n", rel_path));
+                    let line_count = content.lines().count();
+                    if line_count > 0 {
+                        result.push_str(&format!("@@ -0,0 +1,{} @@\n", line_count));
+                        for line in content.lines() {
+                            result.push_str(&format!("+{}\n", line));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Get list of modified files in the shadow worktree.
+    pub fn modified(&self) -> &[PathBuf] {
+        &self.modified_files
+    }
+
+    /// Apply changes from shadow worktree to the real repository.
+    ///
+    /// Only copies files that were modified via `edit()`.
+    pub fn apply(&self) -> Result<Vec<PathBuf>, ShadowWorktreeError> {
+        let mut applied = Vec::new();
+
+        for rel_path in &self.modified_files {
+            let shadow_path = self.worktree_path.join(rel_path);
+            let real_path = self.root.join(rel_path);
+
+            if shadow_path.exists() {
+                // Create parent directories if needed
+                if let Some(parent) = real_path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| ShadowWorktreeError::Io(e.to_string()))?;
+                }
+
+                std::fs::copy(&shadow_path, &real_path)
+                    .map_err(|e| ShadowWorktreeError::Io(e.to_string()))?;
+                applied.push(rel_path.clone());
+            }
+        }
+
+        Ok(applied)
+    }
+
+    /// Reset the shadow worktree, discarding all changes.
+    pub fn reset(&mut self) -> Result<(), ShadowWorktreeError> {
+        self.sync()
+    }
+}
+
+/// Errors from shadow worktree operations.
+#[derive(Debug)]
+pub enum ShadowWorktreeError {
+    Git(String),
+    Io(String),
+}
+
+impl std::fmt::Display for ShadowWorktreeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ShadowWorktreeError::Git(e) => write!(f, "git error: {}", e),
+            ShadowWorktreeError::Io(e) => write!(f, "io error: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for ShadowWorktreeError {}
 
 #[cfg(test)]
 mod tests {

@@ -9,7 +9,7 @@ use mlua::{
 };
 
 use super::memory::MemoryStore;
-use super::shadow::ShadowGit;
+use super::shadow::{ShadowGit, ShadowWorktree};
 
 /// What the runtime is waiting for from the frontend.
 #[derive(Debug, Clone)]
@@ -869,6 +869,132 @@ impl LuaRuntime {
             })?,
         )?;
 
+        // shadow.worktree subtable for isolated editing
+        let worktree_table = lua.create_table()?;
+        let root_for_worktree = root_path.clone();
+
+        // shadow.worktree.open() -> opens/creates worktree, returns path
+        worktree_table.set(
+            "open",
+            lua.create_function(move |lua, ()| {
+                let wt = ShadowWorktree::open(&root_for_worktree).map_err(mlua::Error::external)?;
+                let path = wt.path().to_string_lossy().to_string();
+                lua.set_named_registry_value(
+                    "_shadow_worktree",
+                    LuaShadowWorktree(std::sync::Arc::new(std::sync::Mutex::new(wt))),
+                )?;
+                Ok(path)
+            })?,
+        )?;
+
+        // shadow.worktree.sync() -> reset worktree to HEAD
+        worktree_table.set(
+            "sync",
+            lua.create_function(|lua, ()| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                wt.0.lock()
+                    .map_err(|_| mlua::Error::external("lock poisoned"))?
+                    .sync()
+                    .map_err(mlua::Error::external)?;
+                Ok(())
+            })?,
+        )?;
+
+        // shadow.worktree.edit(path, content) -> edit file in worktree
+        worktree_table.set(
+            "edit",
+            lua.create_function(|lua, (path, content): (String, String)| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                wt.0.lock()
+                    .map_err(|_| mlua::Error::external("lock poisoned"))?
+                    .edit(std::path::Path::new(&path), &content)
+                    .map_err(mlua::Error::external)?;
+                Ok(())
+            })?,
+        )?;
+
+        // shadow.worktree.read(path) -> read file from worktree
+        worktree_table.set(
+            "read",
+            lua.create_function(|lua, path: String| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                let content =
+                    wt.0.lock()
+                        .map_err(|_| mlua::Error::external("lock poisoned"))?
+                        .read(std::path::Path::new(&path))
+                        .map_err(mlua::Error::external)?;
+                Ok(content)
+            })?,
+        )?;
+
+        // shadow.worktree.validate(cmd) -> run validation, returns {success, stdout, stderr}
+        worktree_table.set(
+            "validate",
+            lua.create_function(|lua, cmd: String| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                let result =
+                    wt.0.lock()
+                        .map_err(|_| mlua::Error::external("lock poisoned"))?
+                        .validate(&cmd)
+                        .map_err(mlua::Error::external)?;
+
+                let t = lua.create_table()?;
+                t.set("success", result.success)?;
+                t.set("stdout", result.stdout)?;
+                t.set("stderr", result.stderr)?;
+                t.set("exit_code", result.exit_code)?;
+                Ok(t)
+            })?,
+        )?;
+
+        // shadow.worktree.diff() -> get diff of changes
+        worktree_table.set(
+            "diff",
+            lua.create_function(|lua, ()| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                let diff =
+                    wt.0.lock()
+                        .map_err(|_| mlua::Error::external("lock poisoned"))?
+                        .diff()
+                        .map_err(mlua::Error::external)?;
+                Ok(diff)
+            })?,
+        )?;
+
+        // shadow.worktree.apply() -> apply changes to real repo, returns list of files
+        worktree_table.set(
+            "apply",
+            lua.create_function(|lua, ()| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                let files =
+                    wt.0.lock()
+                        .map_err(|_| mlua::Error::external("lock poisoned"))?
+                        .apply()
+                        .map_err(mlua::Error::external)?;
+
+                let result = lua.create_table()?;
+                for (i, f) in files.iter().enumerate() {
+                    result.set(i + 1, f.to_string_lossy().to_string())?;
+                }
+                Ok(result)
+            })?,
+        )?;
+
+        // shadow.worktree.reset() -> discard changes
+        worktree_table.set(
+            "reset",
+            lua.create_function(|lua, ()| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                wt.0.lock()
+                    .map_err(|_| mlua::Error::external("lock poisoned"))?
+                    .reset()
+                    .map_err(mlua::Error::external)?;
+                Ok(())
+            })?,
+        )?;
+
+        shadow_table.set("worktree", worktree_table)?;
+
         globals.set("shadow", shadow_table)?;
         Ok(())
     }
@@ -1322,6 +1448,30 @@ impl FromLua for LuaShadowGit {
                 from: value.type_name(),
                 to: "LuaShadowGit".to_string(),
                 message: Some("expected ShadowGit userdata".to_string()),
+            }),
+        }
+    }
+}
+
+/// Wrapper for ShadowWorktree to store in Lua registry.
+struct LuaShadowWorktree(std::sync::Arc<std::sync::Mutex<ShadowWorktree>>);
+
+impl Clone for LuaShadowWorktree {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl UserData for LuaShadowWorktree {}
+
+impl FromLua for LuaShadowWorktree {
+    fn from_lua(value: Value, _lua: &Lua) -> LuaResult<Self> {
+        match value {
+            Value::UserData(ud) => Ok(ud.borrow::<LuaShadowWorktree>()?.clone()),
+            _ => Err(mlua::Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "LuaShadowWorktree".to_string(),
+                message: Some("expected ShadowWorktree userdata".to_string()),
             }),
         }
     }
