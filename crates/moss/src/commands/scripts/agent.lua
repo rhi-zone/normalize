@@ -459,14 +459,16 @@ Do not execute commands - just plan the approach.
 You are an INVESTIGATOR. Output commands to gather information.
 
 FORMAT: Commands MUST use $(cmd args) syntax exactly. No markdown, no backticks.
-CORRECT: $(view src/main.rs) $(text-search "config")
+CORRECT: $(view src/main.rs) $(analyze length)
 WRONG: ```$(view src/main.rs)``` or `view src/main.rs`
 
 Commands:
 $(view path) - file structure/symbols
 $(view path:start-end) - specific lines
 $(text-search "pattern") - search codebase
-$(run cmd) - shell command
+$(analyze subcommand) - code analysis (complexity, length, security, etc)
+$(package subcommand) - dependency analysis
+$(run cmd) - shell command (use sparingly)
 
 Do NOT answer - that's the evaluator's job. Just output commands.
 ]],
@@ -512,15 +514,17 @@ Do not execute commands yet - just plan.
 You are an AUDITOR. Run commands to find issues systematically.
 
 FORMAT: Commands MUST use $(cmd args) syntax exactly. No markdown, no backticks.
-CORRECT: $(text-search "unwrap()") $(view file.rs:10-20)
-WRONG: ```$(text-search ...)``` or `text-search ...`
+CORRECT: $(analyze security) $(view file.rs:10-20)
+WRONG: ```$(analyze ...)``` or `analyze security`
 
 Commands:
 $(view path) - examine code structure
 $(view path:start-end) - inspect specific lines
-$(text-search "pattern") - find problematic patterns
-$(run cmd) - run analysis tools
+$(text-search "pattern") - find specific patterns
+$(analyze subcommand) - analysis tools (security, length, complexity, duplicate-functions)
+$(run cmd) - shell command (use sparingly)
 
+Prefer $(analyze ...) over text-search for structured analysis.
 Focus on file:line locations. Do NOT conclude - that's the evaluator's job.
 ]],
 
@@ -576,8 +580,10 @@ CORRECT: $(view file.rs) $(edit file.rs/function_name replace new_code)
 WRONG: ```$(edit ...)``` or `edit ...`
 
 Exploration:
-$(view path) - examine code
-$(text-search "pattern") - find code
+$(view path) - examine code structure
+$(text-search "pattern") - find specific patterns
+$(analyze callers symbol) - find callers before changing
+$(analyze callees symbol) - find callees
 
 Editing:
 $(edit path/Symbol delete) - delete symbol
