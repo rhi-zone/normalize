@@ -188,8 +188,8 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - [ ] Shadow-first mode: all edits go to `.moss/shadow/`, validate, then apply
   - [x] Infrastructure: ShadowWorktree struct with open/sync/edit/read/validate/diff/apply/reset
   - [x] Lua bindings: shadow.worktree.* API for scripts
-  - [ ] Route $(edit ...) through shadow.edit() instead of direct file writes
-  - Validation runs in shadow (cargo check, tests) before touching real files
+  - [x] Route edit() through shadow via enable/disable: shadow.worktree.enable(), edit.run()
+  - [ ] Integrate into agent workflow: enable shadow at start, validate, apply at end
   - On success: shadow.apply_to_real() merges changes
   - On failure: shadow.reset(), agent sees error and can retry
 - [ ] Atomic multi-edit: batch-edit should be all-or-nothing
