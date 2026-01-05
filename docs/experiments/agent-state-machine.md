@@ -187,11 +187,31 @@ Example: $(answer Cli is the first struct at line 13)
 - **Refinement state**: After draft answer, verify/improve
 - **Conditional transitions**: Based on output patterns, errors, etc.
 
-## Comparison to Current Design
+## V1 vs V2 Comparison (2026-01-05)
 
-| Aspect | Current (single agent) | State machine |
-|--------|----------------------|---------------|
-| LLM calls per turn | 1 | 2 (explore + evaluate) |
-| Context | Ephemeral (forget each turn) | Explorer: ephemeral, Evaluator: accumulated |
-| Who concludes | Same agent that explores | Only evaluator |
-| When to stop | Model must judge while exploring | Dedicated evaluation step |
+**Query: "How many Provider variants are in llm.rs?"**
+- V1: 5 turns, correct answer (13)
+- V2: 6 turns (3 cycles), correct answer (13)
+
+**Query: "What is the first struct in main.rs?"**
+- V1: 6 turns, correct answer (Cli)
+- V2: 6 turns (3 cycles), ran out of turns (ambiguous "main.rs")
+
+**Observations:**
+- V2 uses 2x turns for same work (explorer + evaluator per cycle)
+- V2 has explicit memory curation ($(keep), $(drop))
+- V2 prevents pre-answering (explorer can't conclude)
+- V2 struggles with limited turn budgets (need ~2x v1's max_turns)
+
+**Recommendation:** Use max_turns = 12-16 for V2 to match V1's effective exploration depth.
+
+## Design Comparison
+
+| Aspect | V1 (freeform) | V2 (state machine) |
+|--------|--------------|-------------------|
+| LLM calls per "turn" | 1 | 1 (but 2 per cycle) |
+| Context | Ephemeral + working memory | Explorer: ephemeral, Evaluator: accumulated |
+| Who concludes | Same agent | Only evaluator |
+| Memory curation | Agent decides inline | Evaluator explicitly keeps/drops |
+| Pre-answering | Can happen | Prevented by design |
+| Turn efficiency | Higher | Lower (2 calls per cycle) |
