@@ -133,8 +133,9 @@ fn detect_todo_files(root: &Path) -> Vec<String> {
 }
 
 /// Entries we want in .gitignore
-/// Note: .moss/* ignores contents, allowing !.moss/... to un-ignore specific files.
-/// Don't use .moss/ or **/.moss/ - those ignore the directory itself, blocking un-ignore.
+/// - .moss/* ignores root .moss/ contents (patterns with / only match at root)
+/// - !.moss/... un-ignores specific files (works because /* ignores contents, not the dir)
+/// NOTE: We omit **/.moss/ because it would block un-ignore patterns entirely.
 const GITIGNORE_ENTRIES: &[&str] = &[
     ".moss/*",
     "!.moss/config.toml",
@@ -305,6 +306,7 @@ mod tests {
     #[test]
     fn test_init_inserts_near_existing() {
         let tmp = tempdir().unwrap();
+        // Existing .gitignore already has .moss/*
         fs::write(
             tmp.path().join(".gitignore"),
             "node_modules\n.moss/*\nother_stuff\n",
