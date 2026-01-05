@@ -230,8 +230,36 @@ if not todo_file then
 end
 
 if action == "list" then
-    local result = view("@todo")
-    print(result.output)
+    local content = read_file(todo_file)
+    local sections = parse_todo(content)
+
+    if #sections == 0 then
+        print("No sections found in " .. todo_file)
+        os.exit(1)
+    end
+
+    -- Show pending items from all sections (top-level only, up to level 2)
+    local found_any = false
+    for _, section in ipairs(sections) do
+        if section.level <= 2 then
+            local pending = {}
+            for _, item in ipairs(section.items) do
+                if item.is_task and not item.done then
+                    table.insert(pending, item)
+                end
+            end
+            if #pending > 0 then
+                found_any = true
+                print(section.name .. ":")
+                for _, item in ipairs(pending) do
+                    print("  [ ] " .. item.text)
+                end
+            end
+        end
+    end
+    if not found_any then
+        print("No pending items")
+    end
 
 elseif action == "add" then
     local text = table.concat(args, " ", 2)
