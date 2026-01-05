@@ -242,6 +242,13 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - [x] Benchmark suite: systematic evaluation
 - [x] --diff flag: focus on changed files
 
+**After full agency**: evaluate agent code quality
+- [ ] Run `moss analyze complexity` on agent.lua - likely high due to organic growth
+- [ ] Check for duplicate logic across roles (investigator/auditor/refactorer prompts)
+- [ ] Consider splitting agent.lua into modules (parser, state machine, roles, commands)
+- [ ] Review Rust-side agent support code in lua_runtime.rs
+- [ ] Document stable interfaces vs implementation details
+
 ### Agent Observations
 
 - **FOOTGUN: Claude Code cwd**: `cd` in Bash commands persists across calls. E.g., `cd foo && perl ...` breaks subsequent calls. Always use absolute paths.
