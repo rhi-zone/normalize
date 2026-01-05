@@ -232,9 +232,9 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - [ ] Cross-file refactoring: rename symbol across codebase
   - Find all usages (analyze callers), edit each
   - Validate after all changes applied
-- [ ] Commit integration: --commit flag auto-commits after success
-  - Generate commit message from changes made
-  - Only commit if validation passes
+- [x] Commit integration: --commit flag auto-commits after success
+  - [x] Stages applied files and commits with task-based message
+  - [x] Only commits if validation passes
 
 **Phase 5: Error Recovery**
 - [ ] Retry with context: when validation fails, agent sees error and retries

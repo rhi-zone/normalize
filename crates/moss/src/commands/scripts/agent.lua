@@ -1101,6 +1101,26 @@ function M.run_state_machine(opts)
                                 print("[agent-v2] Applying shadow changes to real repo...")
                                 local applied = shadow.worktree.apply()
                                 print("[agent-v2] Applied " .. #applied .. " file(s)")
+
+                                -- Auto-commit if --commit flag is set
+                                if opts.commit and #applied > 0 then
+                                    print("[agent-v2] Creating git commit...")
+                                    -- Stage all applied files
+                                    for _, file in ipairs(applied) do
+                                        shell("git add " .. file)
+                                    end
+                                    -- Generate commit message from task
+                                    local commit_msg = task:sub(1, 50)
+                                    if #task > 50 then
+                                        commit_msg = commit_msg .. "..."
+                                    end
+                                    local result = shell("git commit -m '[moss agent] " .. commit_msg:gsub("'", "'\\''") .. "'")
+                                    if result.success then
+                                        print("[agent-v2] Committed changes ✓")
+                                    else
+                                        print("[agent-v2] Warning: git commit failed - " .. (result.output or ""))
+                                    end
+                                end
                             else
                                 print("[agent-v2] Discarding shadow changes (validation failed)")
                                 shadow.worktree.reset()
@@ -1419,6 +1439,7 @@ Options:
   --auto-validate     Auto-detect validation command (cargo check, tsc, etc.)
   --shadow            Edit in shadow worktree, validate before applying (enables --auto-validate)
   --auto-approve [LEVEL]  Auto-approve edits up to risk level (low/medium/high, default: low)
+  --commit            Auto-commit changes after successful validation
   --diff [base]       Focus on git diff (auto-detects main/master if base omitted)
   --auto              Auto-dispatch based on task analysis
   --roles             List available roles and descriptions
@@ -2157,6 +2178,9 @@ function M.parse_args(args)
                 opts.auto_approve = "low"  -- default: only auto-approve low risk
                 i = i + 1
             end
+        elseif arg == "--commit" then
+            opts.commit = true
+            i = i + 1
         elseif arg == "--diff" then
             -- Optional base ref, default to auto-detect
             if args[i+1] and not args[i+1]:match("^%-") then
