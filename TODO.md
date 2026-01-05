@@ -164,9 +164,11 @@ After testing validates the core:
 - Prompt optimization tooling: A/B testing, codebase-specific tuning
 - Session log format: proper design (events, timing, token counts, diffs, replayability)
 - Box-thinking mitigation: counteract LLMs' tendency to stay in familiar patterns
-- Dispatcher agent: meta-agent that routes to specialized agents
-  - Receives: task description, list of agent types + descriptions
-  - Outputs: which agent to invoke next, with what context
+- Agent architecture:
+  - "Agent" = state machine + prompt (explorer, auditor, refactorer, etc.)
+  - Mode switching = same state machine, different prompts for different tasks
+  - Read-only agents are useful standalone (explore subagents, non-agentic workflows)
+  - Dispatcher routes tasks to appropriate prompt/role, not separate processes
   - Challenge: what context does dispatcher see? (summaries? just task?)
 - Benchmark suite: systematic agent evaluation
   - Task library: curated set of tasks with known answers/outcomes
