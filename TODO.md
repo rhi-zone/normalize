@@ -116,6 +116,48 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Cross-session continuity without re-reading everything
 - Investigate memory-mapped context, incremental updates
 
+### Agent Future (deferred complex features)
+
+**Test selection** - run only tests affected by changes
+- Prerequisite: Call graph extraction in indexer (who calls what)
+- Prerequisite: Test file detection (identify test functions/modules)
+- Map modified functions → tests that call them
+- Integration with test runners (cargo test, pytest, jest)
+
+**Task decomposition** - break large tasks into validated subtasks
+- Prerequisite: Better planning prompts (current --plan is basic)
+- Prerequisite: Subtask validation (each step must pass before next)
+- Agent creates plan with discrete steps
+- Each step is a mini-agent session with its own validation
+- Rollback entire task if any step fails
+
+**Cross-file refactoring** - rename/move symbols across codebase
+- Prerequisite: Symbol graph in indexer (callers, callees, types)
+- Prerequisite: Import/export tracking per language
+- Find all usages via `moss analyze --callers Symbol`
+- Edit each usage atomically (all-or-nothing)
+- Update imports/exports as needed
+
+**Human-in-the-loop escalation** - ask user when stuck
+- Prerequisite: Interactive mode in agent (currently non-blocking)
+- Prerequisite: Stuck detection (beyond loop detection)
+- When agent can't proceed, pause and ask user
+- User provides guidance, agent continues
+- Graceful degradation when non-interactive
+
+**Partial success handling** - apply working edits, report failures
+- Trade-off: Conflicts with atomic editing (all-or-nothing is often safer)
+- Use case: Large batch where some files have issues
+- Report which succeeded, which failed, why
+- Consider: Is this actually desirable? Atomic may be better.
+
+**Refactor agent.lua** - reduce complexity
+- Current: M.run 172 complexity (critical), M.run_state_machine 74 (critical)
+- Total: ~2100 lines, 30 functions, avg complexity 14.1
+- Split into modules: parser.lua, state_machine.lua, roles.lua, commands.lua
+- Extract duplicate logic across roles
+- Document stable interfaces vs implementation details
+
 ### Agent Testing (Current Focus)
 
 Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
