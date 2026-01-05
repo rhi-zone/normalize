@@ -10,6 +10,7 @@ After agent validation:
 - [x] PR/diff analysis: `moss analyze --diff <base>` for changed code focus
   - Works for: complexity, length, security, duplicates, docs
 - [x] Streaming output: `auto{}` driver for workflow engine
+- [x] Agent --diff: `moss @agent --diff [BASE]` for PR/changed file focus
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
