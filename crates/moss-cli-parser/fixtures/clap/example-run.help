@@ -1,0 +1,9 @@
+Run the project
+
+Usage: example run [ARGS]...
+
+Arguments:
+  [ARGS]...  Arguments to pass
+
+Options:
+  -h, --help  Print help

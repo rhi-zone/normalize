@@ -1,0 +1,8 @@
+Build the project
+
+Usage: example build [OPTIONS]
+
+Options:
+  -r, --release       Build in release mode
+  -t, --target <DIR>  Target directory
+  -h, --help          Print help

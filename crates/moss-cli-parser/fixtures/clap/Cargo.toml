@@ -1,0 +1,13 @@
+[package]
+name = "example-clap"
+version = "1.0.0"
+edition = "2021"
+
+[workspace]
+
+[[bin]]
+name = "example"
+path = "example.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }

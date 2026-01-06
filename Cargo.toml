@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 default-members = ["crates/moss"]
+exclude = ["crates/moss-cli-parser/fixtures"]
 members = [
     "crates/moss",
+    "crates/moss-cli-parser",
     "crates/moss-derive",
     "crates/moss-grammars",
     "crates/moss-jsonschema",
