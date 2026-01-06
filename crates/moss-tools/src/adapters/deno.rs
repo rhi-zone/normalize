@@ -19,33 +19,31 @@ fn deno_command() -> Option<&'static str> {
 }
 
 /// Deno type checker adapter.
-pub struct Deno {
-    info: ToolInfo,
-}
+pub struct Deno;
+
+const DENO_INFO: ToolInfo = ToolInfo {
+    name: "deno",
+    category: ToolCategory::TypeChecker,
+    extensions: &["ts", "tsx", "js", "jsx"],
+    check_cmd: &["deno", "--version"],
+    website: "https://deno.land/",
+};
 
 impl Deno {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "deno",
-                category: ToolCategory::TypeChecker,
-                extensions: &["ts", "tsx", "js", "jsx"],
-                check_cmd: &["deno", "--version"],
-                website: "https://deno.land/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Deno {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Tool for Deno {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &DENO_INFO
     }
 
     fn is_available(&self) -> bool {

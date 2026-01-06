@@ -12,27 +12,25 @@ use std::path::Path;
 use std::process::Command;
 
 /// Oxlint JavaScript/TypeScript linter adapter.
-pub struct Oxlint {
-    info: ToolInfo,
-}
+pub struct Oxlint;
+
+const OXLINT_INFO: ToolInfo = ToolInfo {
+    name: "oxlint",
+    category: ToolCategory::Linter,
+    extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"],
+    check_cmd: &["oxlint", "--version"],
+    website: "https://oxc.rs/",
+};
 
 impl Oxlint {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "oxlint",
-                category: ToolCategory::Linter,
-                extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"],
-                check_cmd: &["oxlint", "--version"],
-                website: "https://oxc.rs/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Oxlint {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -86,7 +84,7 @@ struct OxlintPosition {
 
 impl Tool for Oxlint {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &OXLINT_INFO
     }
 
     fn is_available(&self) -> bool {

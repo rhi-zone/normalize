@@ -1,11 +1,31 @@
 //! JSON Schema type generation.
 //!
 //! Generates type definitions from JSON Schema for multiple languages.
+//!
+//! # Extensibility
+//!
+//! Users can register custom generators via [`register()`]:
+//!
+//! ```ignore
+//! use moss_jsonschema::{JsonSchemaGenerator, register};
+//! use serde_json::Value;
+//!
+//! struct MyGenerator;
+//!
+//! impl JsonSchemaGenerator for MyGenerator {
+//!     fn language(&self) -> &'static str { "mylang" }
+//!     fn generate(&self, schema: &Value, root_name: &str) -> String { /* ... */ }
+//! }
+//!
+//! // Register before first use
+//! register(&MyGenerator);
+//! ```
 
 use serde_json::Value;
+use std::sync::{OnceLock, RwLock};
 
 /// A type generator for a specific language.
-pub trait JsonSchemaGenerator {
+pub trait JsonSchemaGenerator: Send + Sync {
     /// Language name (e.g., "typescript", "python", "rust")
     fn language(&self) -> &'static str;
 
@@ -13,29 +33,86 @@ pub trait JsonSchemaGenerator {
     fn generate(&self, schema: &Value, root_name: &str) -> String;
 }
 
-/// Registry of available generators.
-pub fn generators() -> Vec<Box<dyn JsonSchemaGenerator>> {
-    vec![
-        Box::new(TypeScriptGenerator),
-        Box::new(PythonGenerator),
-        Box::new(RustGenerator),
-    ]
+/// Global registry of generator plugins.
+static GENERATORS: RwLock<Vec<&'static dyn JsonSchemaGenerator>> = RwLock::new(Vec::new());
+static INITIALIZED: OnceLock<()> = OnceLock::new();
+
+/// Register a custom generator plugin.
+///
+/// Call this before any generation operations to add custom generators.
+/// Built-in generators are registered automatically on first use.
+pub fn register(generator: &'static dyn JsonSchemaGenerator) {
+    GENERATORS.write().unwrap().push(generator);
 }
 
-/// Find a generator by language.
-pub fn find_generator(lang: &str) -> Option<Box<dyn JsonSchemaGenerator>> {
+/// Initialize built-in generators (called automatically on first use).
+fn init_builtin() {
+    INITIALIZED.get_or_init(|| {
+        let mut generators = GENERATORS.write().unwrap();
+        static TS: TypeScriptGenerator = TypeScriptGenerator;
+        static PY: PythonGenerator = PythonGenerator;
+        static RS: RustGenerator = RustGenerator;
+        generators.push(&TS);
+        generators.push(&PY);
+        generators.push(&RS);
+    });
+}
+
+/// Get a generator by language from the global registry.
+pub fn get_generator(lang: &str) -> Option<&'static dyn JsonSchemaGenerator> {
+    init_builtin();
     let lang_lower = lang.to_lowercase();
-    generators().into_iter().find(|g| {
-        g.language() == lang_lower
-            || (lang_lower == "ts" && g.language() == "typescript")
-            || (lang_lower == "py" && g.language() == "python")
-            || (lang_lower == "rs" && g.language() == "rust")
-    })
+    GENERATORS
+        .read()
+        .unwrap()
+        .iter()
+        .find(|g| {
+            g.language() == lang_lower
+                || (lang_lower == "ts" && g.language() == "typescript")
+                || (lang_lower == "py" && g.language() == "python")
+                || (lang_lower == "rs" && g.language() == "rust")
+        })
+        .copied()
 }
 
-/// List available generators.
+/// List all available generator language names from the global registry.
 pub fn list_generators() -> Vec<&'static str> {
-    generators().iter().map(|g| g.language()).collect()
+    init_builtin();
+    GENERATORS
+        .read()
+        .unwrap()
+        .iter()
+        .map(|g| g.language())
+        .collect()
+}
+
+// Backwards-compatible aliases
+/// Find a generator by language (alias for get_generator, returns Box for compatibility).
+pub fn find_generator(lang: &str) -> Option<Box<dyn JsonSchemaGenerator>> {
+    get_generator(lang).map(|g| Box::new(GeneratorWrapper(g)) as Box<dyn JsonSchemaGenerator>)
+}
+
+struct GeneratorWrapper(&'static dyn JsonSchemaGenerator);
+
+impl JsonSchemaGenerator for GeneratorWrapper {
+    fn language(&self) -> &'static str {
+        self.0.language()
+    }
+
+    fn generate(&self, schema: &Value, root_name: &str) -> String {
+        self.0.generate(schema, root_name)
+    }
+}
+
+/// Registry of available generators (returns boxed generators for compatibility).
+pub fn generators() -> Vec<Box<dyn JsonSchemaGenerator>> {
+    init_builtin();
+    GENERATORS
+        .read()
+        .unwrap()
+        .iter()
+        .map(|g| Box::new(GeneratorWrapper(*g)) as Box<dyn JsonSchemaGenerator>)
+        .collect()
 }
 
 // --- TypeScript ---

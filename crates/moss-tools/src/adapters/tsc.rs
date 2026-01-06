@@ -15,33 +15,31 @@ fn tsc_command() -> Option<(String, Vec<String>)> {
 }
 
 /// TypeScript compiler (tsc) type checker adapter.
-pub struct Tsc {
-    info: ToolInfo,
-}
+pub struct Tsc;
+
+const TSC_INFO: ToolInfo = ToolInfo {
+    name: "tsc",
+    category: ToolCategory::TypeChecker,
+    extensions: &["ts", "tsx", "mts", "cts"],
+    check_cmd: &["tsc", "--version"],
+    website: "https://www.typescriptlang.org/",
+};
 
 impl Tsc {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "tsc",
-                category: ToolCategory::TypeChecker,
-                extensions: &["ts", "tsx", "mts", "cts"],
-                check_cmd: &["tsc", "--version"],
-                website: "https://www.typescriptlang.org/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Tsc {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Tool for Tsc {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &TSC_INFO
     }
 
     fn is_available(&self) -> bool {

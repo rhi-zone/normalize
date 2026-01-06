@@ -14,33 +14,31 @@ fn oxfmt_command() -> Option<(String, Vec<String>)> {
 }
 
 /// Oxfmt JavaScript/TypeScript formatter adapter.
-pub struct Oxfmt {
-    info: ToolInfo,
-}
+pub struct Oxfmt;
+
+const OXFMT_INFO: ToolInfo = ToolInfo {
+    name: "oxfmt",
+    category: ToolCategory::Formatter,
+    extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"],
+    check_cmd: &["oxfmt", "--version"],
+    website: "https://oxc.rs/",
+};
 
 impl Oxfmt {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "oxfmt",
-                category: ToolCategory::Formatter,
-                extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"],
-                check_cmd: &["oxfmt", "--version"],
-                website: "https://oxc.rs/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Oxfmt {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Tool for Oxfmt {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &OXFMT_INFO
     }
 
     fn is_available(&self) -> bool {

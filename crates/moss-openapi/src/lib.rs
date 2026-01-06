@@ -1,11 +1,32 @@
 //! OpenAPI client code generation.
 //!
 //! Trait-based design allows multiple implementations per language/framework.
+//!
+//! # Extensibility
+//!
+//! Users can register custom generators via [`register()`]:
+//!
+//! ```ignore
+//! use moss_openapi::{OpenApiClientGenerator, register};
+//! use serde_json::Value;
+//!
+//! struct MyGenerator;
+//!
+//! impl OpenApiClientGenerator for MyGenerator {
+//!     fn language(&self) -> &'static str { "mylang" }
+//!     fn variant(&self) -> &'static str { "myvariant" }
+//!     fn generate(&self, spec: &Value) -> String { /* ... */ }
+//! }
+//!
+//! // Register before first use
+//! register(&MyGenerator);
+//! ```
 
 use serde_json::Value;
+use std::sync::{OnceLock, RwLock};
 
 /// A code generator for a specific language/framework.
-pub trait OpenApiClientGenerator {
+pub trait OpenApiClientGenerator: Send + Sync {
     /// Language name (e.g., "typescript", "python")
     fn language(&self) -> &'static str;
 
@@ -16,31 +37,89 @@ pub trait OpenApiClientGenerator {
     fn generate(&self, spec: &Value) -> String;
 }
 
-/// Registry of available generators.
-pub fn generators() -> Vec<Box<dyn OpenApiClientGenerator>> {
-    vec![
-        Box::new(TypeScriptFetch),
-        Box::new(PythonUrllib),
-        Box::new(RustUreq),
-    ]
+/// Global registry of generator plugins.
+static GENERATORS: RwLock<Vec<&'static dyn OpenApiClientGenerator>> = RwLock::new(Vec::new());
+static INITIALIZED: OnceLock<()> = OnceLock::new();
+
+/// Register a custom generator plugin.
+///
+/// Call this before any generation operations to add custom generators.
+/// Built-in generators are registered automatically on first use.
+pub fn register(generator: &'static dyn OpenApiClientGenerator) {
+    GENERATORS.write().unwrap().push(generator);
 }
 
-/// Find a generator by language (returns first match).
-pub fn find_generator(lang: &str) -> Option<Box<dyn OpenApiClientGenerator>> {
+/// Initialize built-in generators (called automatically on first use).
+fn init_builtin() {
+    INITIALIZED.get_or_init(|| {
+        let mut generators = GENERATORS.write().unwrap();
+        static TS: TypeScriptFetch = TypeScriptFetch;
+        static PY: PythonUrllib = PythonUrllib;
+        static RS: RustUreq = RustUreq;
+        generators.push(&TS);
+        generators.push(&PY);
+        generators.push(&RS);
+    });
+}
+
+/// Get a generator by language from the global registry (returns first match).
+pub fn get_generator(lang: &str) -> Option<&'static dyn OpenApiClientGenerator> {
+    init_builtin();
     let lang_lower = lang.to_lowercase();
-    generators().into_iter().find(|g| {
-        g.language() == lang_lower
-            || (lang_lower == "ts" && g.language() == "typescript")
-            || (lang_lower == "py" && g.language() == "python")
-            || (lang_lower == "rs" && g.language() == "rust")
-    })
+    GENERATORS
+        .read()
+        .unwrap()
+        .iter()
+        .find(|g| {
+            g.language() == lang_lower
+                || (lang_lower == "ts" && g.language() == "typescript")
+                || (lang_lower == "py" && g.language() == "python")
+                || (lang_lower == "rs" && g.language() == "rust")
+        })
+        .copied()
 }
 
-/// List available generators.
+/// List all available generators (language, variant) from the global registry.
 pub fn list_generators() -> Vec<(&'static str, &'static str)> {
-    generators()
+    init_builtin();
+    GENERATORS
+        .read()
+        .unwrap()
         .iter()
         .map(|g| (g.language(), g.variant()))
+        .collect()
+}
+
+// Backwards-compatible aliases
+/// Find a generator by language (alias for get_generator, returns Box for compatibility).
+pub fn find_generator(lang: &str) -> Option<Box<dyn OpenApiClientGenerator>> {
+    get_generator(lang).map(|g| Box::new(GeneratorWrapper(g)) as Box<dyn OpenApiClientGenerator>)
+}
+
+struct GeneratorWrapper(&'static dyn OpenApiClientGenerator);
+
+impl OpenApiClientGenerator for GeneratorWrapper {
+    fn language(&self) -> &'static str {
+        self.0.language()
+    }
+
+    fn variant(&self) -> &'static str {
+        self.0.variant()
+    }
+
+    fn generate(&self, spec: &Value) -> String {
+        self.0.generate(spec)
+    }
+}
+
+/// Registry of available generators (returns boxed generators for compatibility).
+pub fn generators() -> Vec<Box<dyn OpenApiClientGenerator>> {
+    init_builtin();
+    GENERATORS
+        .read()
+        .unwrap()
+        .iter()
+        .map(|g| Box::new(GeneratorWrapper(*g)) as Box<dyn OpenApiClientGenerator>)
         .collect()
 }
 

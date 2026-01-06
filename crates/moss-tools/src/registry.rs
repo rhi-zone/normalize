@@ -1,8 +1,129 @@
 //! Tool registry for discovering and running tools.
+//!
+//! # Extensibility
+//!
+//! Users can register custom tools via [`register()`]:
+//!
+//! ```ignore
+//! use moss_tools::{Tool, ToolInfo, ToolCategory, ToolResult, ToolError, register_tool};
+//! use std::path::Path;
+//!
+//! struct MyTool;
+//!
+//! impl Tool for MyTool {
+//!     fn info(&self) -> ToolInfo { /* ... */ }
+//!     fn is_available(&self) -> bool { /* ... */ }
+//!     fn detect(&self, root: &Path) -> f32 { /* ... */ }
+//!     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> { /* ... */ }
+//! }
+//!
+//! // Register before first use
+//! register_tool(&MyTool);
+//! ```
 
 use crate::{Diagnostic, Tool, ToolCategory, ToolResult};
 use rayon::prelude::*;
 use std::path::Path;
+use std::sync::{OnceLock, RwLock};
+
+/// Global registry of tool plugins.
+static TOOLS: RwLock<Vec<&'static dyn Tool>> = RwLock::new(Vec::new());
+static INITIALIZED: OnceLock<()> = OnceLock::new();
+
+/// Register a custom tool plugin.
+///
+/// Call this before any detection operations to add custom tools.
+/// Built-in tools are registered automatically on first use.
+pub fn register(tool: &'static dyn Tool) {
+    TOOLS.write().unwrap().push(tool);
+}
+
+/// Initialize built-in tools (called automatically on first use).
+fn init_builtin() {
+    use crate::adapters::*;
+
+    INITIALIZED.get_or_init(|| {
+        let mut tools = TOOLS.write().unwrap();
+        // Python tools
+        static RUFF: Ruff = Ruff;
+        static MYPY: Mypy = Mypy;
+        static PYRIGHT: Pyright = Pyright;
+        // JavaScript/TypeScript tools
+        static OXLINT: Oxlint = Oxlint;
+        static OXFMT: Oxfmt = Oxfmt;
+        static ESLINT: Eslint = Eslint;
+        static BIOME_LINT: BiomeLint = BiomeLint;
+        static BIOME_FORMAT: BiomeFormat = BiomeFormat;
+        static PRETTIER: Prettier = Prettier;
+        static TSGO: Tsgo = Tsgo;
+        static TSC: Tsc = Tsc;
+        static DENO: Deno = Deno;
+        // Rust tools
+        static CLIPPY: Clippy = Clippy;
+        static RUSTFMT: Rustfmt = Rustfmt;
+        // Go tools
+        static GOFMT: Gofmt = Gofmt;
+        static GOVET: Govet = Govet;
+
+        tools.push(&RUFF);
+        tools.push(&MYPY);
+        tools.push(&PYRIGHT);
+        tools.push(&OXLINT);
+        tools.push(&OXFMT);
+        tools.push(&ESLINT);
+        tools.push(&BIOME_LINT);
+        tools.push(&BIOME_FORMAT);
+        tools.push(&PRETTIER);
+        tools.push(&TSGO);
+        tools.push(&TSC);
+        tools.push(&DENO);
+        tools.push(&CLIPPY);
+        tools.push(&RUSTFMT);
+        tools.push(&GOFMT);
+        tools.push(&GOVET);
+    });
+}
+
+/// Get a tool by name from the global registry.
+pub fn get_tool(name: &str) -> Option<&'static dyn Tool> {
+    init_builtin();
+    TOOLS
+        .read()
+        .unwrap()
+        .iter()
+        .find(|t| t.info().name == name)
+        .copied()
+}
+
+/// List all available tool names from the global registry.
+pub fn list_tools() -> Vec<&'static str> {
+    init_builtin();
+    TOOLS
+        .read()
+        .unwrap()
+        .iter()
+        .map(|t| t.info().name)
+        .collect()
+}
+
+/// Detect relevant tools for a project using the global registry.
+pub fn detect_tools(root: &Path) -> Vec<(&'static dyn Tool, f32)> {
+    init_builtin();
+    let tools = TOOLS.read().unwrap();
+
+    let mut relevant: Vec<_> = tools
+        .iter()
+        .map(|t| {
+            let score = t.detect(root);
+            (*t, score)
+        })
+        .filter(|(_, score)| *score > 0.0)
+        .filter(|(t, _)| t.is_available())
+        .collect();
+
+    relevant.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    relevant
+}
 
 /// Registry of available tools.
 pub struct ToolRegistry {

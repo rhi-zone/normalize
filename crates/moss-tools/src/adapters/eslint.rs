@@ -15,27 +15,25 @@ fn eslint_command() -> Option<(String, Vec<String>)> {
 }
 
 /// ESLint JavaScript/TypeScript linter adapter.
-pub struct Eslint {
-    info: ToolInfo,
-}
+pub struct Eslint;
+
+const ESLINT_INFO: ToolInfo = ToolInfo {
+    name: "eslint",
+    category: ToolCategory::Linter,
+    extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs"],
+    check_cmd: &["eslint", "--version"],
+    website: "https://eslint.org/",
+};
 
 impl Eslint {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "eslint",
-                category: ToolCategory::Linter,
-                extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs"],
-                check_cmd: &["eslint", "--version"],
-                website: "https://eslint.org/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Eslint {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -61,7 +59,7 @@ struct EslintMessage {
 
 impl Tool for Eslint {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &ESLINT_INFO
     }
 
     fn is_available(&self) -> bool {

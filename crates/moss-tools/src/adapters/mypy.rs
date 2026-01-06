@@ -15,27 +15,25 @@ fn mypy_command() -> Option<(String, Vec<String>)> {
 }
 
 /// Mypy Python type checker adapter.
-pub struct Mypy {
-    info: ToolInfo,
-}
+pub struct Mypy;
+
+const MYPY_INFO: ToolInfo = ToolInfo {
+    name: "mypy",
+    category: ToolCategory::TypeChecker,
+    extensions: &["py", "pyi"],
+    check_cmd: &["mypy", "--version"],
+    website: "https://mypy-lang.org/",
+};
 
 impl Mypy {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "mypy",
-                category: ToolCategory::TypeChecker,
-                extensions: &["py", "pyi"],
-                check_cmd: &["mypy", "--version"],
-                website: "https://mypy-lang.org/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Mypy {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -52,7 +50,7 @@ struct MypyDiagnostic {
 
 impl Tool for Mypy {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &MYPY_INFO
     }
 
     fn is_available(&self) -> bool {

@@ -308,4 +308,7 @@ fn is_executable(path: &Path) -> bool {
 }
 
 // Re-export ecosystem detection functions
-pub use ecosystems::{all_ecosystems, detect_all_ecosystems, detect_ecosystem};
+pub use ecosystems::{
+    all_ecosystems, detect_all_ecosystems, detect_ecosystem, get_ecosystem, list_ecosystems,
+    register as register_ecosystem,
+};

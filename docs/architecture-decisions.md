@@ -120,3 +120,66 @@ For future local LLM/embedding integration:
 2. **Extractive**: TextRank, TF-IDF (no NN needed)
 3. **Small NN**: Embeddings, abstractive summary
 4. **LLM**: Only when simpler methods insufficient
+
+## Trait-Based Extensibility
+
+**Decision**: All trait-based crates use a global registry with runtime registration.
+
+### Pattern
+
+```rust
+use std::sync::{OnceLock, RwLock};
+
+// Global registry
+static FORMATS: RwLock<Vec<&'static dyn MyTrait>> = RwLock::new(Vec::new());
+static INITIALIZED: OnceLock<()> = OnceLock::new();
+
+// Public registration function
+pub fn register(item: &'static dyn MyTrait) {
+    FORMATS.write().unwrap().push(item);
+}
+
+// Lazy initialization of built-ins
+fn init_builtin() {
+    INITIALIZED.get_or_init(|| {
+        let mut formats = FORMATS.write().unwrap();
+        formats.push(&BuiltinA);
+        formats.push(&BuiltinB);
+    });
+}
+
+// Lookup functions call init_builtin() first
+pub fn get(name: &str) -> Option<&'static dyn MyTrait> {
+    init_builtin();
+    FORMATS.read().unwrap().iter().find(|f| f.name() == name).copied()
+}
+```
+
+### Why This Pattern?
+
+1. **Pure Rust extensibility**: Users implement traits in their code, no Lua/plugins needed
+2. **Library-friendly**: Crates stay pure Rust, no embedded interpreters
+3. **Lazy init**: Built-ins registered on first use, not at startup
+4. **Thread-safe**: `RwLock` + `OnceLock` for concurrent access
+
+### Crates Using This Pattern
+
+| Crate | Trait | Purpose |
+|-------|-------|---------|
+| moss-languages | `Language` | Language support (98 built-in) |
+| moss-cli-parser | `CliFormat` | CLI help parsing |
+| moss-sessions | `LogFormat` | Agent session log parsing |
+| moss-tools | `Tool`, `TestRunner` | Tool/runner adapters |
+| moss-packages | `Ecosystem` | Package manager support |
+| moss-jsonschema | `JsonSchemaGenerator` | Type generation |
+| moss-openapi | `OpenApiClientGenerator` | API client generation |
+
+### Why No Feature Gates?
+
+Unlike tree-sitter grammars (megabytes each), trait implementations are ~200 lines each. Feature gates add:
+- Cargo.toml complexity
+- CI matrix explosion
+- Documentation burden
+- User confusion
+
+Not worth it for small implementations. All built-ins are always compiled.

@@ -15,27 +15,25 @@ fn ruff_command() -> Option<(String, Vec<String>)> {
 }
 
 /// Ruff Python linter/formatter adapter.
-pub struct Ruff {
-    info: ToolInfo,
-}
+pub struct Ruff;
+
+const RUFF_INFO: ToolInfo = ToolInfo {
+    name: "ruff",
+    category: ToolCategory::Linter,
+    extensions: &["py", "pyi"],
+    check_cmd: &["ruff", "--version"],
+    website: "https://docs.astral.sh/ruff/",
+};
 
 impl Ruff {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "ruff",
-                category: ToolCategory::Linter,
-                extensions: &["py", "pyi"],
-                check_cmd: &["ruff", "--version"],
-                website: "https://docs.astral.sh/ruff/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Ruff {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -67,7 +65,7 @@ struct RuffFix {
 
 impl Tool for Ruff {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &RUFF_INFO
     }
 
     fn is_available(&self) -> bool {

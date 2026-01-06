@@ -10,33 +10,31 @@ use std::path::Path;
 use std::process::Command;
 
 /// Go formatter adapter.
-pub struct Gofmt {
-    info: ToolInfo,
-}
+pub struct Gofmt;
+
+const GOFMT_INFO: ToolInfo = ToolInfo {
+    name: "gofmt",
+    category: ToolCategory::Formatter,
+    extensions: &["go"],
+    check_cmd: &["gofmt", "-h"],
+    website: "https://pkg.go.dev/cmd/gofmt",
+};
 
 impl Gofmt {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "gofmt",
-                category: ToolCategory::Formatter,
-                extensions: &["go"],
-                check_cmd: &["gofmt", "-h"],
-                website: "https://pkg.go.dev/cmd/gofmt",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Gofmt {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Tool for Gofmt {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &GOFMT_INFO
     }
 
     fn is_available(&self) -> bool {
@@ -138,33 +136,31 @@ impl Tool for Gofmt {
 }
 
 /// Go vet adapter - Go static analyzer.
-pub struct Govet {
-    info: ToolInfo,
-}
+pub struct Govet;
+
+const GOVET_INFO: ToolInfo = ToolInfo {
+    name: "go-vet",
+    category: ToolCategory::Linter,
+    extensions: &["go"],
+    check_cmd: &["go", "vet", "-h"],
+    website: "https://pkg.go.dev/cmd/vet",
+};
 
 impl Govet {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "go-vet",
-                category: ToolCategory::Linter,
-                extensions: &["go"],
-                check_cmd: &["go", "vet", "-h"],
-                website: "https://pkg.go.dev/cmd/vet",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Govet {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Tool for Govet {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &GOVET_INFO
     }
 
     fn is_available(&self) -> bool {

@@ -14,36 +14,34 @@ fn prettier_command() -> Option<(String, Vec<String>)> {
 }
 
 /// Prettier formatter adapter.
-pub struct Prettier {
-    info: ToolInfo,
-}
+pub struct Prettier;
+
+const PRETTIER_INFO: ToolInfo = ToolInfo {
+    name: "prettier",
+    category: ToolCategory::Formatter,
+    extensions: &[
+        "js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", "json", "md", "yaml", "yml", "css",
+        "scss", "less", "html", "vue", "svelte", "graphql",
+    ],
+    check_cmd: &["prettier", "--version"],
+    website: "https://prettier.io/",
+};
 
 impl Prettier {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "prettier",
-                category: ToolCategory::Formatter,
-                extensions: &[
-                    "js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", "json", "md", "yaml",
-                    "yml", "css", "scss", "less", "html", "vue", "svelte", "graphql",
-                ],
-                check_cmd: &["prettier", "--version"],
-                website: "https://prettier.io/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Prettier {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Tool for Prettier {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &PRETTIER_INFO
     }
 
     fn is_available(&self) -> bool {

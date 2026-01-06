@@ -16,52 +16,48 @@ fn biome_command() -> Option<(String, Vec<String>)> {
 }
 
 /// Biome linter adapter.
-pub struct BiomeLint {
-    info: ToolInfo,
-}
+pub struct BiomeLint;
+
+const BIOME_LINT_INFO: ToolInfo = ToolInfo {
+    name: "biome",
+    category: ToolCategory::Linter,
+    extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", "json"],
+    check_cmd: &["biome", "--version"],
+    website: "https://biomejs.dev/",
+};
 
 impl BiomeLint {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "biome",
-                category: ToolCategory::Linter,
-                extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", "json"],
-                check_cmd: &["biome", "--version"],
-                website: "https://biomejs.dev/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for BiomeLint {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 /// Biome formatter adapter.
-pub struct BiomeFormat {
-    info: ToolInfo,
-}
+pub struct BiomeFormat;
+
+const BIOME_FORMAT_INFO: ToolInfo = ToolInfo {
+    name: "biome-fmt",
+    category: ToolCategory::Formatter,
+    extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", "json"],
+    check_cmd: &["biome", "--version"],
+    website: "https://biomejs.dev/",
+};
 
 impl BiomeFormat {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "biome-fmt",
-                category: ToolCategory::Formatter,
-                extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", "json"],
-                check_cmd: &["biome", "--version"],
-                website: "https://biomejs.dev/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for BiomeFormat {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -190,7 +186,7 @@ fn parse_biome_output(stdout: &str) -> Result<Vec<Diagnostic>, ToolError> {
 
 impl Tool for BiomeLint {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &BIOME_LINT_INFO
     }
 
     fn is_available(&self) -> bool {
@@ -202,7 +198,7 @@ impl Tool for BiomeLint {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        detect_biome(root, self.info.extensions)
+        detect_biome(root, BIOME_LINT_INFO.extensions)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
@@ -256,7 +252,7 @@ impl Tool for BiomeLint {
 
 impl Tool for BiomeFormat {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &BIOME_FORMAT_INFO
     }
 
     fn is_available(&self) -> bool {
@@ -268,7 +264,7 @@ impl Tool for BiomeFormat {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        detect_biome(root, self.info.extensions)
+        detect_biome(root, BIOME_FORMAT_INFO.extensions)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {

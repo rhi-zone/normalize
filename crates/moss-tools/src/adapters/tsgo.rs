@@ -16,33 +16,31 @@ fn tsgo_command() -> Option<(String, Vec<String>)> {
 }
 
 /// Tsgo native TypeScript type checker adapter.
-pub struct Tsgo {
-    info: ToolInfo,
-}
+pub struct Tsgo;
+
+const TSGO_INFO: ToolInfo = ToolInfo {
+    name: "tsgo",
+    category: ToolCategory::TypeChecker,
+    extensions: &["ts", "tsx", "mts", "cts"],
+    check_cmd: &["tsgo", "--version"],
+    website: "https://github.com/microsoft/typescript-go",
+};
 
 impl Tsgo {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "tsgo",
-                category: ToolCategory::TypeChecker,
-                extensions: &["ts", "tsx", "mts", "cts"],
-                check_cmd: &["tsgo", "--version"],
-                website: "https://github.com/microsoft/typescript-go",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Tsgo {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Tool for Tsgo {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &TSGO_INFO
     }
 
     fn is_available(&self) -> bool {

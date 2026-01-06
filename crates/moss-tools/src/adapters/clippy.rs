@@ -11,27 +11,25 @@ use std::path::Path;
 use std::process::Command;
 
 /// Clippy Rust linter adapter.
-pub struct Clippy {
-    info: ToolInfo,
-}
+pub struct Clippy;
+
+const CLIPPY_INFO: ToolInfo = ToolInfo {
+    name: "clippy",
+    category: ToolCategory::Linter,
+    extensions: &["rs"],
+    check_cmd: &["cargo", "clippy", "--version"],
+    website: "https://doc.rust-lang.org/clippy/",
+};
 
 impl Clippy {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "clippy",
-                category: ToolCategory::Linter,
-                extensions: &["rs"],
-                check_cmd: &["cargo", "clippy", "--version"],
-                website: "https://doc.rust-lang.org/clippy/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Clippy {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -75,7 +73,7 @@ struct CompilerSpan {
 
 impl Tool for Clippy {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &CLIPPY_INFO
     }
 
     fn is_available(&self) -> bool {

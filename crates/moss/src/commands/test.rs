@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use moss_tools::test_runners::{all_test_runners, detect_test_runner};
+use moss_tools::test_runners::{all_runners, detect_test_runner, get_runner};
 
 /// Run tests with auto-detected or specified runner.
 pub fn cmd_test_run(root: Option<&Path>, runner: Option<&str>, args: &[String]) -> i32 {
@@ -10,9 +10,7 @@ pub fn cmd_test_run(root: Option<&Path>, runner: Option<&str>, args: &[String]) 
 
     let test_runner = if let Some(name) = runner {
         // Find specific runner by name
-        all_test_runners()
-            .into_iter()
-            .find(|r| r.info().name == name)
+        get_runner(name)
     } else {
         // Auto-detect
         detect_test_runner(root)
@@ -50,7 +48,7 @@ pub fn cmd_test_list(root: Option<&Path>) -> i32 {
 
     println!("Available test runners:\n");
 
-    for runner in all_test_runners() {
+    for runner in all_runners() {
         let info = runner.info();
         let available = runner.is_available();
         let score = runner.detect(root);

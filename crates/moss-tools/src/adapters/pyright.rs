@@ -20,27 +20,25 @@ fn pyright_command() -> Option<(String, Vec<String>)> {
 }
 
 /// Pyright Python type checker adapter.
-pub struct Pyright {
-    info: ToolInfo,
-}
+pub struct Pyright;
+
+const PYRIGHT_INFO: ToolInfo = ToolInfo {
+    name: "pyright",
+    category: ToolCategory::TypeChecker,
+    extensions: &["py", "pyi"],
+    check_cmd: &["pyright", "--version"],
+    website: "https://github.com/microsoft/pyright",
+};
 
 impl Pyright {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "pyright",
-                category: ToolCategory::TypeChecker,
-                extensions: &["py", "pyi"],
-                check_cmd: &["pyright", "--version"],
-                website: "https://github.com/microsoft/pyright",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Pyright {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -75,7 +73,7 @@ struct PyrightPosition {
 
 impl Tool for Pyright {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &PYRIGHT_INFO
     }
 
     fn is_available(&self) -> bool {

@@ -44,7 +44,7 @@ mod tools;
 
 pub use custom::{CustomTool, CustomToolConfig, ToolsConfig, load_custom_tools};
 pub use diagnostic::{Diagnostic, DiagnosticSeverity, Fix, Location};
-pub use registry::ToolRegistry;
+pub use registry::{ToolRegistry, detect_tools, get_tool, list_tools, register as register_tool};
 pub use sarif::SarifReport;
 pub use tools::{Tool, ToolCategory, ToolError, ToolInfo, ToolResult, has_config_file};
 

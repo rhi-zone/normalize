@@ -31,12 +31,12 @@ All trait-based crates follow the moss-languages pattern for extensibility:
 
 Crates with registries:
 - [x] moss-languages: `Language` trait, `register()` in registry.rs
-- [x] moss-cli-parser: `CliFormat` trait, `FormatRegistry::register()`
-- [x] moss-sessions: `LogFormat` trait, `FormatRegistry::register()`
-- [ ] moss-tools: `Tool` trait, `TestRunner` trait
-- [ ] moss-packages: `Ecosystem` trait
-- [ ] moss-jsonschema: `JsonSchemaGenerator` trait
-- [ ] moss-openapi: `OpenApiClientGenerator` trait
+- [x] moss-cli-parser: `CliFormat` trait, `register()` in formats/mod.rs
+- [x] moss-sessions: `LogFormat` trait, `register()` in formats/mod.rs
+- [x] moss-tools: `Tool` trait (`register_tool()`), `TestRunner` trait (`register()`)
+- [x] moss-packages: `Ecosystem` trait, `register_ecosystem()` in ecosystems/mod.rs
+- [x] moss-jsonschema: `JsonSchemaGenerator` trait, `register()` in lib.rs
+- [x] moss-openapi: `OpenApiClientGenerator` trait, `register()` in lib.rs
 
 Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. moss CLI can add Lua bindings at application layer for scripting.
 

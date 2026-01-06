@@ -11,27 +11,25 @@ use std::path::Path;
 use std::process::Command;
 
 /// Rustfmt Rust formatter adapter.
-pub struct Rustfmt {
-    info: ToolInfo,
-}
+pub struct Rustfmt;
+
+const RUSTFMT_INFO: ToolInfo = ToolInfo {
+    name: "rustfmt",
+    category: ToolCategory::Formatter,
+    extensions: &["rs"],
+    check_cmd: &["rustfmt", "--version"],
+    website: "https://rust-lang.github.io/rustfmt/",
+};
 
 impl Rustfmt {
     pub fn new() -> Self {
-        Self {
-            info: ToolInfo {
-                name: "rustfmt",
-                category: ToolCategory::Formatter,
-                extensions: &["rs"],
-                check_cmd: &["rustfmt", "--version"],
-                website: "https://rust-lang.github.io/rustfmt/",
-            },
-        }
+        Self
     }
 }
 
 impl Default for Rustfmt {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -58,7 +56,7 @@ struct RustfmtDiff {
 
 impl Tool for Rustfmt {
     fn info(&self) -> &ToolInfo {
-        &self.info
+        &RUSTFMT_INFO
     }
 
     fn is_available(&self) -> bool {
