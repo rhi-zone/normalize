@@ -56,7 +56,8 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--type` vs `--kind`: standardized to `--kind` (view now uses `--kind` like analyze complexity)
 
 ### CLI Cleanup
-- [ ] Remove/generalize `moss plans`: too tool-specific (hardcoded `~/.claude/plans/`), violates "generalize don't multiply". Multiple tools create plans (Claude Code, Google Antigravity). Options: (a) remove entirely, (b) make part of `moss sessions` with format detection, (c) generalize to detect plans from multiple tools
+- [x] Move `moss plans` to `moss sessions plans`: groups tool-specific data under sessions
+- [x] Rename `moss filter aliases` to `moss aliases`: removes unnecessary namespace layer
 - [x] Unify `lint`/`test` under `moss tools`: `moss tools lint [run|list]`, `moss tools test [run|list]`
 - [x] Remove `analyze lint`: duplicate of `moss lint`, adds no value
 
