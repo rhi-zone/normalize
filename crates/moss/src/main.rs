@@ -581,6 +581,7 @@ fn main() {
                     format.as_deref(),
                     grep.as_deref(),
                     cli.json,
+                    cli.pretty,
                 )
             } else if let Some(session_id) = session {
                 commands::sessions::cmd_sessions_show(
@@ -590,6 +591,7 @@ fn main() {
                     format.as_deref(),
                     analyze,
                     cli.json,
+                    cli.pretty,
                 )
             } else {
                 commands::sessions::cmd_sessions_list(

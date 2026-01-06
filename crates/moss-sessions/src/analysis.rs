@@ -225,6 +225,145 @@ impl SessionAnalysis {
 
         lines.join("\n")
     }
+
+    /// Format as pretty output with bar charts.
+    pub fn to_pretty(&self) -> String {
+        use std::fmt::Write;
+        let mut out = String::new();
+
+        // Header
+        writeln!(out, "\x1b[1;36m━━━ Session Analysis ━━━\x1b[0m").unwrap();
+        writeln!(out).unwrap();
+
+        // Summary
+        writeln!(out, "\x1b[1mFormat:\x1b[0m {}", self.format).unwrap();
+        writeln!(
+            out,
+            "\x1b[1mTool calls:\x1b[0m {} ({:.1}% success)",
+            self.total_tool_calls(),
+            self.overall_success_rate() * 100.0
+        )
+        .unwrap();
+        writeln!(out, "\x1b[1mTurns:\x1b[0m {}", self.total_turns).unwrap();
+        if self.parallel_opportunities > 0 {
+            writeln!(
+                out,
+                "\x1b[1mParallel opportunities:\x1b[0m {}",
+                self.parallel_opportunities
+            )
+            .unwrap();
+        }
+        writeln!(out).unwrap();
+
+        // Tool usage with bar charts
+        if !self.tool_stats.is_empty() {
+            writeln!(out, "\x1b[1;36m━━━ Tool Usage ━━━\x1b[0m").unwrap();
+
+            let mut tools: Vec<_> = self.tool_stats.values().collect();
+            tools.sort_by(|a, b| b.calls.cmp(&a.calls));
+
+            let max_calls = tools.first().map(|t| t.calls).unwrap_or(1);
+            let max_name_len = tools.iter().map(|t| t.name.len()).max().unwrap_or(10);
+
+            for tool in tools {
+                let bar_width = 30;
+                let filled = (tool.calls as f64 / max_calls as f64 * bar_width as f64) as usize;
+                let bar: String = "█".repeat(filled) + &"░".repeat(bar_width - filled);
+
+                let color = if tool.errors > 0 {
+                    "\x1b[31m"
+                } else {
+                    "\x1b[32m"
+                };
+                writeln!(
+                    out,
+                    "{:>width$} {} {}{:>5}\x1b[0m{}",
+                    tool.name,
+                    bar,
+                    color,
+                    tool.calls,
+                    if tool.errors > 0 {
+                        format!(" ({} errors)", tool.errors)
+                    } else {
+                        String::new()
+                    },
+                    width = max_name_len
+                )
+                .unwrap();
+            }
+            writeln!(out).unwrap();
+        }
+
+        // Token usage
+        if self.token_stats.api_calls > 0 {
+            let ts = &self.token_stats;
+            writeln!(out, "\x1b[1;36m━━━ Token Usage ━━━\x1b[0m").unwrap();
+            writeln!(out, "API calls: {}", ts.api_calls).unwrap();
+            writeln!(out, "Avg context: {} tokens", ts.avg_context()).unwrap();
+            writeln!(
+                out,
+                "Context range: {} - {}",
+                ts.min_context, ts.max_context
+            )
+            .unwrap();
+            if ts.cache_read > 0 {
+                writeln!(out, "Cache read: {} tokens", format_tokens(ts.cache_read)).unwrap();
+            }
+            if ts.cache_create > 0 {
+                writeln!(
+                    out,
+                    "Cache create: {} tokens",
+                    format_tokens(ts.cache_create)
+                )
+                .unwrap();
+            }
+            writeln!(out).unwrap();
+        }
+
+        // Token hotspots
+        if !self.file_tokens.is_empty() {
+            writeln!(out, "\x1b[1;36m━━━ Token Hotspots ━━━\x1b[0m").unwrap();
+            let mut paths: Vec<_> = self.file_tokens.iter().collect();
+            paths.sort_by(|a, b| b.1.cmp(a.1));
+
+            let max_tokens = paths.first().map(|(_, t)| **t).unwrap_or(1);
+
+            for (path, tokens) in paths.iter().take(10) {
+                let bar_width = 20;
+                let filled = (**tokens as f64 / max_tokens as f64 * bar_width as f64) as usize;
+                let bar: String = "█".repeat(filled) + &"░".repeat(bar_width - filled);
+                writeln!(out, "{} {:>8} {}", bar, format_tokens(**tokens), path).unwrap();
+            }
+            writeln!(out).unwrap();
+        }
+
+        // Message types (compact)
+        if !self.message_counts.is_empty() {
+            writeln!(out, "\x1b[1;36m━━━ Message Types ━━━\x1b[0m").unwrap();
+            let mut counts: Vec<_> = self.message_counts.iter().collect();
+            counts.sort_by(|a, b| b.1.cmp(a.1));
+
+            let items: Vec<String> = counts
+                .iter()
+                .take(8)
+                .map(|(k, v)| format!("{}:{}", k, v))
+                .collect();
+            writeln!(out, "{}", items.join("  ")).unwrap();
+        }
+
+        out
+    }
+}
+
+/// Format token count with K/M suffix.
+fn format_tokens(tokens: u64) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M", tokens as f64 / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{:.1}K", tokens as f64 / 1_000.0)
+    } else {
+        tokens.to_string()
+    }
 }
 
 /// Categorize an error by its content.
