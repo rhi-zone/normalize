@@ -20,12 +20,12 @@ $(view src/)
 $(text-search "main")"
 
 Commands:
-$(view path) - file structure/symbols
+$(view path) - file/dir structure, or fuzzy-match name
 $(view path:start-end) - specific lines
 $(text-search "pattern") - search codebase
-$(analyze subcommand) - code analysis (complexity, length, security, etc)
+$(analyze subcommand) - code analysis
 $(package subcommand) - dependency analysis
-$(run cmd) - shell command (use sparingly)
+$(run cmd) - shell command
 
 WRONG formats (will fail): <function_calls>, ```$(cmd)```, bare cmd without $()
 
@@ -41,17 +41,18 @@ FORBIDDEN (will be ignored):
 - "Let me check", "I need to look" - explorer phrases
 
 ALLOWED:
-- $(answer your conclusion here) - final answer
-- $(note finding) - record a finding
+- $(answer your complete conclusion) - final answer (be specific, list items)
+- $(note finding) - record a finding for later
 - $(keep 1 3), $(drop 2) - manage memory
 
-If answer is clear: $(answer The answer based on evidence)
-If incomplete: $(note what we found) then explain what's missing
+IMPORTANT: Give COMPLETE answers. Don't just say "6 files" - list them.
 
-Example:
-"Found support_for_extension() in registry.rs maps extensions to languages.
-$(note Language detection in moss-languages/registry.rs)
-$(answer moss detects language by file extension via support_for_extension())"
+If answer is clear: $(answer Complete answer with details)
+If incomplete: $(note what we found) then say what's missing
+
+Example for "what files exist?":
+"$(answer The files are: main.rs, lib.rs, utils.rs, config.rs)"
+NOT: "$(answer 4 files)"
 ]],
 }
 
