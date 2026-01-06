@@ -41,12 +41,6 @@ M.memorize = session.memorize
 -- Batch edit execution (delegated to agent.commands module)
 M.execute_batch_edit = commands.execute_batch_edit
 
--- V1 prompts (delegated to agent.roles module)
-local SYSTEM_PROMPT = roles.V1_SYSTEM_PROMPT
-local BOOTSTRAP = roles.V1_BOOTSTRAP
-local BOOTSTRAP_ASSISTANT = roles.V1_BOOTSTRAP_ASSISTANT
-local BOOTSTRAP_USER = roles.V1_BOOTSTRAP_USER
-
 -- Role prompts and state machine config (delegated to agent.roles module)
 M.classify_task = roles.classify_task
 local build_machine = roles.build_machine
@@ -237,13 +231,8 @@ function M.run_state_machine(opts)
             })
         end
 
-        -- LLM call with optional bootstrap
-        local history = {}
-        if state_config.bootstrap then
-            -- Inject bootstrap as fake assistant turn
-            table.insert(history, {role = "assistant", content = state_config.bootstrap})
-        end
-        local response = llm.chat(provider, model, state_config.prompt, context, history)
+        -- LLM call
+        local response = llm.chat(provider, model, state_config.prompt, context, {})
         io.write("done\n")
         print(response)
 
