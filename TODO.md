@@ -197,13 +197,12 @@ State machine agent (v2) is now the default. Use `--v1` for legacy freeform loop
 - [x] Fixed: explorer prompts now include analyze/package commands (was causing text-search FOR commands instead of using them)
 - Agent correctly uses $(analyze length), $(analyze security) after prompt fix
 
-**v1 → v2 consolidation** (goal: remove v1, simplify to single agent loop):
+**v1 → v2 consolidation** - COMPLETE:
 - [x] Port checkpoint/resume to v2 (v1-only feature)
 - [x] Fix investigator looping (add max explorer cycles or escape hatch)
 - [x] Add non-interactive mode to v2
-- [x] Make v2 the default (--v1 flag for legacy)
-- [ ] Dogfood v2-default for a week
-- [ ] Remove v1 code (~650 lines)
+- [x] Make v2 the default
+- [x] Remove v1 code (~650 lines removed, agent.lua now 773 lines)
 
 **Known Gemini issues** (still present):
 - Hallucinates command outputs (answers before seeing results)

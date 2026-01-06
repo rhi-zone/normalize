@@ -139,12 +139,6 @@ function M.parse_args(args)
         elseif arg == "--non-interactive" or arg == "-n" then
             opts.non_interactive = true
             i = i + 1
-        elseif arg == "--v2" or arg == "--state-machine" then
-            opts.v2 = true  -- explicit v2 (now default, kept for compatibility)
-            i = i + 1
-        elseif arg == "--v1" or arg == "--legacy" then
-            opts.v1 = true  -- use legacy freeform loop
-            i = i + 1
         elseif arg == "--plan" then
             opts.plan = true
             i = i + 1
@@ -153,11 +147,9 @@ function M.parse_args(args)
             i = i + 2
         elseif arg == "--audit" then
             opts.role = "auditor"
-            opts.v2 = true  -- auditor requires v2
             i = i + 1
         elseif arg == "--refactor" then
             opts.role = "refactorer"
-            opts.v2 = true  -- refactorer requires v2
             opts.plan = true  -- refactorer should always plan first
             i = i + 1
         elseif arg == "--validate" and args[i+1] then
@@ -199,7 +191,6 @@ function M.parse_args(args)
             end
         elseif arg == "--auto" then
             opts.auto_dispatch = true
-            opts.v2 = true
             i = i + 1
         elseif arg == "--roles" then
             opts.list_roles = true
