@@ -109,7 +109,7 @@ pub fn cmd_sessions_show(
     json: bool,
 ) -> i32 {
     // Find matching session files
-    let paths = resolve_session_paths(session_id, project);
+    let paths = resolve_session_paths(session_id, project, format);
 
     if paths.is_empty() {
         eprintln!("No sessions found matching: {}", session_id);
@@ -417,7 +417,11 @@ fn get_sessions_dir(project: Option<&Path>) -> Option<PathBuf> {
 /// - Prefix: "3585" or "3585*"
 /// - Glob: "agent-*"
 /// - Full path: "/path/to/session.jsonl"
-fn resolve_session_paths(session_id: &str, project: Option<&Path>) -> Vec<PathBuf> {
+fn resolve_session_paths(
+    session_id: &str,
+    project: Option<&Path>,
+    format: Option<&str>,
+) -> Vec<PathBuf> {
     // If it's already a path, use it directly
     if session_id.contains('/') || session_id.ends_with(".jsonl") {
         let path = PathBuf::from(session_id);
@@ -427,9 +431,25 @@ fn resolve_session_paths(session_id: &str, project: Option<&Path>) -> Vec<PathBu
         return vec![];
     }
 
-    let sessions_dir = match get_sessions_dir(project) {
-        Some(d) => d,
-        None => return vec![],
+    // Use format-specific sessions directory
+    let registry = FormatRegistry::new();
+    let sessions_dir = if let Some(fmt_name) = format {
+        if let Some(fmt) = registry.get(fmt_name) {
+            let dir = fmt.sessions_dir(project);
+            if dir.exists() {
+                dir
+            } else {
+                return vec![];
+            }
+        } else {
+            return vec![];
+        }
+    } else {
+        // Default to claude for backwards compatibility
+        match get_sessions_dir(project) {
+            Some(d) => d,
+            None => return vec![],
+        }
     };
 
     // Check for exact match first
@@ -622,7 +642,7 @@ async fn api_session(
     State(state): State<Arc<SessionsState>>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<axum::response::Response, StatusCode> {
-    let paths = resolve_session_paths(&id, state.project.as_deref());
+    let paths = resolve_session_paths(&id, state.project.as_deref(), None);
     let path = paths.first().ok_or(StatusCode::NOT_FOUND)?;
 
     let content = std::fs::read_to_string(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
