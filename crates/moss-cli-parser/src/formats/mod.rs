@@ -1,7 +1,9 @@
 //! CLI format parsers.
 
+mod argparse;
 mod clap;
 
+pub use self::argparse::ArgparseFormat;
 pub use self::clap::ClapFormat;
 
 use crate::CliSpec;
@@ -27,7 +29,7 @@ impl FormatRegistry {
     /// Create a new registry with all built-in formats.
     pub fn new() -> Self {
         Self {
-            formats: vec![Box::new(ClapFormat)],
+            formats: vec![Box::new(ClapFormat), Box::new(ArgparseFormat)],
         }
     }
 

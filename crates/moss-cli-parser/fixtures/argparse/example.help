@@ -1,0 +1,15 @@
+usage: example [-h] [-v] [-c FILE] [-p PORT] {build,run,clean} ...
+
+An example CLI tool for testing
+
+positional arguments:
+  {build,run,clean}  Commands
+    build            Build the project
+    run              Run the project
+    clean            Clean build artifacts
+
+options:
+  -h, --help         show this help message and exit
+  -v, --verbose      Enable verbose output
+  -c, --config FILE  Config file path
+  -p, --port PORT    Port number (default: 8080)
