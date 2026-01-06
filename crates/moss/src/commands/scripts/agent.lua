@@ -64,9 +64,9 @@ function M.run_state_machine(opts)
     local role = opts.role
     if not role then
         if opts.auto_dispatch and task then
-            print("[agent-v2] Classifying task...")
+            print("[agent] Classifying task...")
             role = M.classify_task(task, provider, model)
-            print(string.format("[agent-v2] Auto-dispatch → %s", role))
+            print(string.format("[agent] Auto-dispatch → %s", role))
         else
             role = "investigator"
         end
@@ -80,16 +80,16 @@ function M.run_state_machine(opts)
     -- Initialize shadow worktree for safe editing (--shadow flag or auto for refactorer)
     local shadow_enabled = opts.shadow
     if shadow_enabled then
-        print("[agent-v2] Initializing shadow worktree for safe editing...")
+        print("[agent] Initializing shadow worktree for safe editing...")
         local ok, err = pcall(function()
             shadow.worktree.open()
             shadow.worktree.sync()
             shadow.worktree.enable()
         end)
         if ok then
-            print("[agent-v2] Shadow mode enabled - edits go to .moss/shadow/worktree/")
+            print("[agent] Shadow mode enabled - edits go to .moss/shadow/worktree/")
         else
-            print("[agent-v2] Warning: Failed to initialize shadow worktree: " .. tostring(err))
+            print("[agent] Warning: Failed to initialize shadow worktree: " .. tostring(err))
             shadow_enabled = false
         end
     end
@@ -101,7 +101,7 @@ function M.run_state_machine(opts)
         local detected_cmd, detected_type = M.detect_validator()
         if detected_cmd then
             opts.validate_cmd = detected_cmd
-            print("[agent-v2] Auto-detected validator: " .. detected_cmd .. " (" .. detected_type .. ")")
+            print("[agent] Auto-detected validator: " .. detected_cmd .. " (" .. detected_type .. ")")
         end
     end
 
@@ -126,7 +126,7 @@ function M.run_state_machine(opts)
             for file in diff_result.output:gmatch("[^\n]+") do
                 table.insert(diff_files, file)
             end
-            print("[agent-v2] Focusing on " .. #diff_files .. " changed files (vs " .. base .. ")")
+            print("[agent] Focusing on " .. #diff_files .. " changed files (vs " .. base .. ")")
             task = task .. "\n\nFOCUS: Only analyze these changed files:\n"
             for _, f in ipairs(diff_files) do
                 task = task .. "  - " .. f .. "\n"
@@ -150,7 +150,7 @@ function M.run_state_machine(opts)
     if opts.resume then
         local checkpoint, err = M.load_checkpoint(opts.resume)
         if checkpoint then
-            print("[agent-v2] Resuming session: " .. opts.resume)
+            print("[agent] Resuming session: " .. opts.resume)
             task = checkpoint.task or task
             start_turn = checkpoint.turn or 0
             resumed_state = checkpoint.state
@@ -159,19 +159,19 @@ function M.run_state_machine(opts)
             resumed_plan = checkpoint.plan
             role = checkpoint.role or role
             if checkpoint.progress then
-                print("[agent-v2] Previous progress: " .. checkpoint.progress)
+                print("[agent] Previous progress: " .. checkpoint.progress)
             end
             if checkpoint.open_questions then
-                print("[agent-v2] Open questions: " .. checkpoint.open_questions)
+                print("[agent] Open questions: " .. checkpoint.open_questions)
             end
         else
-            print("[agent-v2] Warning: " .. (err or "Failed to load checkpoint"))
-            print("[agent-v2] Starting fresh session")
+            print("[agent] Warning: " .. (err or "Failed to load checkpoint"))
+            print("[agent] Starting fresh session")
             session_id = M.gen_session_id()
         end
     end
 
-    print(string.format("[agent-v2:%s] Session: %s", role, session_id))
+    print(string.format("[agent:%s] Session: %s", role, session_id))
 
     -- Start session logging
     local session_log = M.start_session_log(session_id)
@@ -215,8 +215,8 @@ function M.run_state_machine(opts)
             context = M.build_evaluator_context(task, working_memory, last_outputs, notes)
         end
 
-        print(string.format("[agent-v2] Turn %d/%d (%s)", turn, max_turns, state))
-        io.write("[agent-v2] Thinking... ")
+        print(string.format("[agent] Turn %d/%d (%s)", turn, max_turns, state))
+        io.write("[agent] Thinking... ")
         io.flush()
 
         -- Log turn start
@@ -273,22 +273,22 @@ function M.run_state_machine(opts)
                     end
                     -- Handle shadow mode finalization
                     if shadow_enabled then
-                        print("[agent-v2] Finalizing shadow edits...")
+                        print("[agent] Finalizing shadow edits...")
                         local diff = shadow.worktree.diff()
                         if diff and #diff > 0 then
-                            print("[agent-v2] Changes in shadow worktree:")
+                            print("[agent] Changes in shadow worktree:")
                             print(diff)
 
                             -- Validate if validate_cmd is set
                             local should_apply = true
                             local validation_error = nil
                             if opts.validate_cmd then
-                                print("[agent-v2] Validating: " .. opts.validate_cmd)
+                                print("[agent] Validating: " .. opts.validate_cmd)
                                 local validation = shadow.worktree.validate(opts.validate_cmd)
                                 if validation.success then
-                                    print("[agent-v2] Validation passed ✓")
+                                    print("[agent] Validation passed ✓")
                                 else
-                                    print("[agent-v2] Validation FAILED:")
+                                    print("[agent] Validation FAILED:")
                                     validation_error = validation.stdout or validation.stderr or "Unknown error"
                                     print(validation_error)
                                     should_apply = false
@@ -296,13 +296,13 @@ function M.run_state_machine(opts)
                             end
 
                             if should_apply then
-                                print("[agent-v2] Applying shadow changes to real repo...")
+                                print("[agent] Applying shadow changes to real repo...")
                                 local applied = shadow.worktree.apply()
-                                print("[agent-v2] Applied " .. #applied .. " file(s)")
+                                print("[agent] Applied " .. #applied .. " file(s)")
 
                                 -- Auto-commit if --commit flag is set
                                 if opts.commit and #applied > 0 then
-                                    print("[agent-v2] Creating git commit...")
+                                    print("[agent] Creating git commit...")
                                     -- Stage all applied files
                                     for _, file in ipairs(applied) do
                                         shell("git add " .. file)
@@ -314,9 +314,9 @@ function M.run_state_machine(opts)
                                     end
                                     local result = shell("git commit -m '[moss agent] " .. commit_msg:gsub("'", "'\\''") .. "'")
                                     if result.success then
-                                        print("[agent-v2] Committed changes ✓")
+                                        print("[agent] Committed changes ✓")
                                     else
-                                        print("[agent-v2] Warning: git commit failed - " .. (result.output or ""))
+                                        print("[agent] Warning: git commit failed - " .. (result.output or ""))
                                     end
                                 end
                             else
@@ -324,7 +324,7 @@ function M.run_state_machine(opts)
                                 local max_retries = opts.retry_on_failure or 0
                                 if validation_retry_count < max_retries then
                                     validation_retry_count = validation_retry_count + 1
-                                    print("[agent-v2] Retrying (" .. validation_retry_count .. "/" .. max_retries .. ")...")
+                                    print("[agent] Retrying (" .. validation_retry_count .. "/" .. max_retries .. ")...")
                                     -- Reset shadow and inject error into working memory
                                     shadow.worktree.reset()
                                     shadow.worktree.sync()  -- Resync to clean state
@@ -336,25 +336,25 @@ function M.run_state_machine(opts)
                                     -- Don't return - continue the state machine
                                     goto continue
                                 else
-                                    print("[agent-v2] Discarding shadow changes (validation failed" ..
+                                    print("[agent] Discarding shadow changes (validation failed" ..
                                         (max_retries > 0 and ", max retries reached" or "") .. ")")
                                     shadow.worktree.reset()
                                 end
                             end
                         else
-                            print("[agent-v2] No shadow changes to apply")
+                            print("[agent] No shadow changes to apply")
                         end
                         shadow.worktree.disable()
                     end
 
-                    print("[agent-v2] Answer: " .. final_answer)
+                    print("[agent] Answer: " .. final_answer)
                     if session_log then
                         session_log:log("done", { answer = final_answer:sub(1, 200), turn = turn })
                         session_log:close()
                     end
                     return {success = true, answer = final_answer, turns = turn}
                 else
-                    print("[agent-v2] Warning: $(" .. cmd.name .. ") ignored in explorer state")
+                    print("[agent] Warning: $(" .. cmd.name .. ") ignored in explorer state")
                 end
             end
         end
@@ -363,7 +363,7 @@ function M.run_state_machine(opts)
         for _, cmd in ipairs(commands) do
             if cmd.name == "note" then
                 table.insert(notes, cmd.args)
-                print("[agent-v2] Noted: " .. cmd.args)
+                print("[agent] Noted: " .. cmd.args)
             end
         end
 
@@ -395,16 +395,16 @@ function M.run_state_machine(opts)
 
                 local saved_id, err = M.save_checkpoint(session_id, checkpoint_state)
                 if saved_id then
-                    print("[agent-v2] Session checkpointed: " .. saved_id)
-                    print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+                    print("[agent] Session checkpointed: " .. saved_id)
+                    print("[agent] Resume with: moss @agent --resume " .. saved_id)
                     if progress ~= "" then
-                        print("[agent-v2] Progress: " .. progress)
+                        print("[agent] Progress: " .. progress)
                     end
                     if open_questions ~= "" then
-                        print("[agent-v2] Open questions: " .. open_questions)
+                        print("[agent] Open questions: " .. open_questions)
                     end
                 else
-                    print("[agent-v2] Failed to checkpoint: " .. (err or "unknown error"))
+                    print("[agent] Failed to checkpoint: " .. (err or "unknown error"))
                 end
 
                 if shadow_enabled then
@@ -426,13 +426,13 @@ function M.run_state_machine(opts)
                     for _, idx in ipairs(indices) do
                         if last_outputs[idx] then
                             table.insert(working_memory, last_outputs[idx])
-                            print("[agent-v2] Kept: " .. last_outputs[idx].cmd)
+                            print("[agent] Kept: " .. last_outputs[idx].cmd)
                         end
                     end
                 elseif cmd.name == "drop" then
                     local idx = tonumber(cmd.args)
                     if idx and working_memory[idx] then
-                        print("[agent-v2] Dropped: " .. working_memory[idx].cmd)
+                        print("[agent] Dropped: " .. working_memory[idx].cmd)
                         table.remove(working_memory, idx)
                     end
                 end
@@ -448,28 +448,28 @@ function M.run_state_machine(opts)
                     if cmd.name == "ask" then
                         -- Handle $(ask) command - request user input
                         if non_interactive then
-                            print("[agent-v2] BLOCKED: " .. cmd.args .. " (non-interactive mode)")
+                            print("[agent] BLOCKED: " .. cmd.args .. " (non-interactive mode)")
                             result = { output = "ERROR: Cannot ask user in non-interactive mode. Question was: " .. cmd.args, success = false }
                             if session_log then
                                 session_log:log("blocked_ask", { question = cmd.args, turn = turn })
                             end
                         else
-                            io.write("[agent-v2] " .. cmd.args .. "\n> ")
+                            io.write("[agent] " .. cmd.args .. "\n> ")
                             io.flush()
                             local answer = io.read("*l") or ""
                             result = { output = "User: " .. answer, success = true }
                         end
                     elseif cmd.name == "run" then
-                        print("[agent-v2] Running: " .. cmd.args)
+                        print("[agent] Running: " .. cmd.args)
                         result = shell(cmd.args)
                     elseif cmd.name == "view" or cmd.name == "text-search" or
                            cmd.name == "analyze" or cmd.name == "package" or
                            cmd.name == "edit" then
-                        print("[agent-v2] Running: " .. cmd.full)
+                        print("[agent] Running: " .. cmd.full)
                         result = shell(_moss_bin .. " " .. cmd.full)
                     else
                         -- Unknown command, skip
-                        print("[agent-v2] Skipping unknown: " .. cmd.name)
+                        print("[agent] Skipping unknown: " .. cmd.name)
                         result = nil
                     end
                     if result then
@@ -507,7 +507,7 @@ function M.run_state_machine(opts)
 
             -- Check for loops (same command 3+ times in a row)
             if M.is_looping(recent_cmds, 3) then
-                print("[agent-v2] Loop detected, auto-checkpointing...")
+                print("[agent] Loop detected, auto-checkpointing...")
                 local checkpoint_state = {
                     task = task,
                     turn = turn,
@@ -521,11 +521,11 @@ function M.run_state_machine(opts)
                 }
                 local saved_id, _ = M.save_checkpoint(session_id, checkpoint_state)
                 if saved_id then
-                    print("[agent-v2] Session checkpointed: " .. saved_id)
-                    print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+                    print("[agent] Session checkpointed: " .. saved_id)
+                    print("[agent] Resume with: moss @agent --resume " .. saved_id)
                 end
                 if shadow_enabled then
-                    print("[agent-v2] Discarding shadow changes (loop detected)")
+                    print("[agent] Discarding shadow changes (loop detected)")
                     shadow.worktree.reset()
                     shadow.worktree.disable()
                 end
@@ -541,7 +541,7 @@ function M.run_state_machine(opts)
         if state == "evaluator" and state_config.next == "explorer" then
             evaluator_cycles = evaluator_cycles + 1
             if evaluator_cycles >= max_evaluator_cycles then
-                print(string.format("[agent-v2] Evaluator cycle limit reached (%d), forcing conclusion", max_evaluator_cycles))
+                print(string.format("[agent] Evaluator cycle limit reached (%d), forcing conclusion", max_evaluator_cycles))
                 -- Force the agent to conclude by switching to final evaluator prompt
                 local forced_context = M.build_evaluator_context(task, working_memory, last_outputs, notes)
                 forced_context = forced_context .. "\n\nIMPORTANT: You have explored enough. You MUST now provide $(done YOUR_ANSWER) with your best answer based on available information. Do not request more exploration."
@@ -556,7 +556,7 @@ function M.run_state_machine(opts)
                                 local after = forced_response:match('%$%(done%s+ANSWER%)%s*[-:]?%s*(.+)')
                                 if after then final_answer = after:gsub('\n.*', '') end
                             end
-                            print("[agent-v2] Forced answer: " .. final_answer)
+                            print("[agent] Forced answer: " .. final_answer)
                             if session_log then
                                 session_log:log("done", { answer = final_answer:sub(1, 200), turn = turn, forced = true })
                                 session_log:close()
@@ -566,7 +566,7 @@ function M.run_state_machine(opts)
                     end
                 end
                 -- If still no answer, checkpoint and bail
-                print("[agent-v2] Could not force conclusion, checkpointing...")
+                print("[agent] Could not force conclusion, checkpointing...")
                 local checkpoint_state = {
                     task = task, turn = turn, state = state, notes = notes,
                     working_memory = working_memory, plan = plan, role = role,
@@ -575,8 +575,8 @@ function M.run_state_machine(opts)
                 }
                 local saved_id, _ = M.save_checkpoint(session_id, checkpoint_state)
                 if saved_id then
-                    print("[agent-v2] Session checkpointed: " .. saved_id)
-                    print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+                    print("[agent] Session checkpointed: " .. saved_id)
+                    print("[agent] Resume with: moss @agent --resume " .. saved_id)
                 end
                 if session_log then
                     session_log:log("cycle_limit", { cycles = evaluator_cycles, turn = turn })
@@ -597,7 +597,7 @@ function M.run_state_machine(opts)
     end
 
     -- Auto-checkpoint on max turns reached
-    print("[agent-v2] Max turns reached, auto-checkpointing...")
+    print("[agent] Max turns reached, auto-checkpointing...")
     local checkpoint_state = {
         task = task,
         turn = turn,
@@ -611,14 +611,14 @@ function M.run_state_machine(opts)
     }
     local saved_id, err = M.save_checkpoint(session_id, checkpoint_state)
     if saved_id then
-        print("[agent-v2] Session auto-checkpointed: " .. saved_id)
-        print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+        print("[agent] Session auto-checkpointed: " .. saved_id)
+        print("[agent] Resume with: moss @agent --resume " .. saved_id)
     else
-        print("[agent-v2] Warning: Failed to auto-checkpoint: " .. (err or "unknown error"))
+        print("[agent] Warning: Failed to auto-checkpoint: " .. (err or "unknown error"))
     end
 
     if shadow_enabled then
-        print("[agent-v2] Discarding shadow changes (max turns)")
+        print("[agent] Discarding shadow changes (max turns)")
         shadow.worktree.reset()
         shadow.worktree.disable()
     end
