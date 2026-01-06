@@ -4,24 +4,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-**Agent testing/dogfooding** - see "Agent Testing" in Backlog for details.
-
-After agent validation:
-- [x] PR/diff analysis: `moss analyze --diff <base>` for changed code focus
-  - Works for: complexity, length, security, duplicates, docs
-- [x] Streaming output: `auto{}` driver for workflow engine
-- [x] Agent --diff: `moss @agent --diff [BASE]` for PR/changed file focus
+- Agent dogfooding: run on real tasks, document friction points
 
 ## Remaining Work
-- [x] claude_code.rs: cache regex patterns instead of recompiling on every call
-- [x] agent.lua: replace hardcoded ./target/debug/moss with proper binary detection
-- Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
-  - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
+- Namespace-qualified lookups: `moss view std::vector`, `moss view com.example.Foo`
   - Requires language-specific namespace semantics - low priority
-- Shadow worktree isolation: validate() and apply_to_real() implemented
-  - Current: shadow repo at `.moss/shadow/` with validation methods
-  - [x] Auto-validation: `--validate <cmd>` runs validation after each edit, rollback on failure
-  - Future: true shadow-first mode (edit in shadow, then apply)
+- Shadow worktree: true shadow-first mode (edit in shadow, then apply)
+  - Current: --shadow flag works, but not default for all edits
   - Zero user interruption (user can edit while agent tests in background)
 
 ### Configuration System
@@ -154,55 +143,23 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Report which succeeded, which failed, why
 - Consider: Is this actually desirable? Atomic may be better.
 
-**Refactor agent.lua** - [DONE] reduced complexity
+**Agent refactoring** - COMPLETE:
 - Split into 6 modules: parser, session, context, risk, commands, roles
-- agent.lua reduced from ~2300 to ~1240 lines (46% reduction)
-- Remaining: core runner functions (run, run_state_machine) - self-contained, no further extraction needed
+- Removed v1 freeform loop, kept only state machine
+- agent.lua: 2300 → 762 lines (67% reduction)
 
-### Agent Testing (Current Focus)
+### Agent Testing
 
-State machine agent (v2) is now the default. Use `--v1` for legacy freeform loop.
-
-**State machine agent (v2, now default)**:
-- [x] Explorer/Evaluator separation prevents premature answering
-- [x] Working memory: $(keep), $(drop), $(note)
-- [x] Session logging for v2
-- [x] Optional --plan flag for planning phase
-- [x] Error awareness and loop detection
-- See `docs/experiments/agent-state-machine.md` for design and test results
-
-**Immediate** (dogfooding):
-- [x] Run agent on real moss tasks, analyze session logs
-- Document friction points: where does the agent get stuck?
-- Prompt tuning: adjust based on observed Gemini/Claude behavior
-- Compare providers: Claude works reliably, Gemini has quirks (see below)
-- [x] **v2 vs v1**: compare state machine vs freeform loop (see agent-state-machine.md)
-- [x] **Complex task testing**: Agent successfully handles multi-file analysis tasks:
-  - DRY violation detection (found real issue, fixed 88 files)
-  - Security audit (traced input→shell execution paths)
-  - Test coverage analysis (identified untested modules)
-  - Error handling audit (found `let _ =` swallowing patterns)
-
-**Log analysis** (74 sessions analyzed):
-- **Success rates**: Anthropic 58% (19/33), Gemini 44% (18/41)
-- **Command usage**: text-search most used (51×), then view (29×), some shell fallback (run ls/find)
-- **Turn distribution**: Successful sessions typically 2-6 turns, failures hit max turns
+**Observations** (74 sessions analyzed):
+- Success rates: Anthropic 58%, Gemini 44%
+- Auditor role completes in 2-4 turns for focused tasks
+- Investigator can loop on complex questions (mitigated by cycle detection)
+- --diff flag works well for PR-focused analysis
 - Session logs: `.moss/agent/logs/*.jsonl`
 
-**v2 state machine observations** (Anthropic):
-- Auditor role completes efficiently: 2-4 turns for focused tasks
-- Investigator can get stuck in explorer/evaluator cycles on complex questions
-- --diff flag works well for PR-focused analysis
-- Agent found real issues: hardcoded debug path, regex recompilation, potential path traversal
-- [x] Fixed: explorer prompts now include analyze/package commands (was causing text-search FOR commands instead of using them)
-- Agent correctly uses $(analyze length), $(analyze security) after prompt fix
-
-**v1 → v2 consolidation** - COMPLETE:
-- [x] Port checkpoint/resume to v2 (v1-only feature)
-- [x] Fix investigator looping (add max explorer cycles or escape hatch)
-- [x] Add non-interactive mode to v2
-- [x] Make v2 the default
-- [x] Remove v1 code (~650 lines removed, agent.lua now 773 lines)
+**Ongoing**:
+- Document friction points: where does the agent get stuck?
+- Prompt tuning based on observed behavior
 
 **Known Gemini issues** (still present):
 - Hallucinates command outputs (answers before seeing results)
@@ -228,103 +185,17 @@ State machine agent (v2) is now the default. Use `--v1` for legacy freeform loop
 **Prompt tuning observations**:
 - Claude sometimes uses bash-style `view ...` instead of `$(view ...)`
 - Evaluator occasionally outputs commands in backticks
-- [x] Command parser now handles parens inside quotes: `$(text-search "unwrap()")`
 
-### Agent Future: Roadmap to Full Agency
+### Agent Future
 
-**Current state**: Core agency features complete. Refactorer now has full safety rails:
-- Shadow-first editing with validation
-- Auto-detection of validators
-- Risk assessment and approval gates
-- Retry on failure with error context
-- Auto-commit on success
+Core agency features complete (shadow editing, validation, risk gates, retry, auto-commit).
 
-Remaining: task decomposition, cross-file refactoring, human escalation (complex features).
-
-**Phase 1: Safe Editing** (foundation)
-- [x] Shadow worktree infrastructure (can be used manually in Lua scripts now)
-  - [x] ShadowWorktree struct: open/sync/edit/read/validate/diff/apply/reset
-  - [x] Lua bindings: shadow.worktree.* API
-  - [x] Edit routing: shadow.worktree.enable() + edit.run() routes to shadow
-- [x] Agent integration for shadow-first editing
-  - [x] Add --shadow flag to agent command
-  - [x] Enable shadow at refactorer session start
-  - [x] Validate all changes before apply at session end
-  - [x] Handle apply/reset decision (auto or prompt)
-- [x] Atomic multi-edit: batch-edit should be all-or-nothing
-  - [x] BatchEdit::apply() now collects all changes in memory first
-  - [x] Only writes files after all edits compute successfully
-  - Write failures still possible (rare) - true atomic would need temp-file-then-rename
-- [x] Edit preview: show diff before applying (--dry-run for edits)
-  - [x] BatchEdit::preview() computes changes without writing
-  - [x] --dry-run for batch edits shows unified diff output
-  - [x] JSON output includes original and modified content for each file
-
-**Phase 2: Validation Integration**
-- [x] --validate flag runs command after each edit (done)
-- [x] Built-in validators: auto-detect cargo check, go build, tsc, etc.
-  - [x] M.detect_validator() checks for Cargo.toml, tsconfig.json, go.mod, etc.
-  - [x] --auto-validate flag enables auto-detection
-  - [x] --shadow automatically enables auto-validation
-- [ ] Test selection: run only tests affected by changes
-  - Use call graph to find test coverage for modified functions
-  - Faster feedback loop than running full test suite
-
-**Phase 3: User Approval Gates**
-- [x] Risk assessment: classify edits by risk level
-  - [x] M.assess_risk() classifies edits as low/medium/high
-  - Low: add comment, insert new code
-  - Medium: modify function body
-  - High: delete code, change public API, modify config
-- [x] Approval checkpoints: pause for user review at risk thresholds
-  - [x] --auto-approve [level] flag (low/medium/high)
-  - [x] M.should_auto_approve() checks risk vs threshold
-  - Integration with agent edit flow is ready (needs wiring)
-- [x] Undo stack: `moss edit --undo` to revert last edit (already implemented)
-
-**Phase 4: Multi-Step Workflows**
-- [ ] Task decomposition: break large tasks into subtasks
-  - Agent creates plan, executes step-by-step
-  - Each step validated before proceeding
+**Remaining**:
+- [ ] Test selection: run only tests affected by changes (use call graph)
+- [ ] Task decomposition: break large tasks into validated subtasks
 - [ ] Cross-file refactoring: rename symbol across codebase
-  - Find all usages (analyze callers), edit each
-  - Validate after all changes applied
-- [x] Commit integration: --commit flag auto-commits after success
-  - [x] Stages applied files and commits with task-based message
-  - [x] Only commits if validation passes
-
-**Phase 5: Error Recovery**
-- [x] Retry with context: when validation fails, agent sees error and retries
-  - [x] --retry-on-failure [N] flag (default: 1 retry)
-  - [x] Validation error injected into working memory
-  - [x] Shadow reset and sync before retry
-- [ ] Partial success: if 3/5 edits work, apply those, report failures
-- [ ] Human-in-the-loop escalation: if agent stuck, ask user for guidance
-
-**Completed foundations**:
-- [x] Role-based prompts: investigator, auditor, refactorer
-- [x] Working memory: $(keep), $(drop), $(note)
-- [x] Planning state: --plan flag
-- [x] Error awareness: evaluator sees command failures
-- [x] Loop detection: bail after 3x same command
-- [x] Auto-dispatch: LLM classifier for role selection
-- [x] Benchmark suite: systematic evaluation
-- [x] --diff flag: focus on changed files
-
-**After full agency**: evaluate agent code quality
-- [x] Refactor agent.lua - extracted 6 submodules:
-  - agent.parser (CLI args, command parsing, JSON encode/decode)
-  - agent.session (checkpoints, logs, session management, memorize)
-  - agent.context (build_*_context functions)
-  - agent.risk (risk assessment, validators)
-  - agent.commands (execute_batch_edit)
-  - agent.roles (prompts, build_machine, classify_task, v1 prompts)
-  - agent.lua reduced from ~2300 to ~1240 lines (46% reduction)
-- [x] Review Rust-side agent support code in lua_runtime.rs
-  - Extracted treesitter bindings to lua_runtime/treesitter.rs (259 lines)
-  - Extracted shadow bindings to lua_runtime/shadow.rs (361 lines)
-  - mod.rs reduced from 1857 to 1260 lines (-32%)
-- [x] Document stable interfaces vs implementation details (docs/lua-api.md)
+- [ ] Partial success: apply working edits, report failures
+- [ ] Human-in-the-loop escalation: ask user when stuck
 
 ### Agent Observations
 

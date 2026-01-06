@@ -31,12 +31,17 @@ See `docs/` for design docs and `README.md` for usage.
 - `$(ask <question>)` - clarifying questions (reads stdin, errors in non-interactive mode)
 - Progress indicator ("Thinking...") while waiting for LLM
 - `llm.complete(provider?, model?, system?, prompt)` exposed to Lua scripts
-- State machine agent (`--v2`): explorer/evaluator separation
+- State machine architecture (explorer/evaluator/planner states)
   - Explorer: suggests commands, ephemeral context (last outputs only)
   - Evaluator: judges progress, curates working memory, decides when done
   - `--plan` flag: optional planning phase before exploration
   - Prevents pre-answering: only evaluator can conclude
-  - Strong role framing in prompts for reliable behavior
+  - Evaluator cycle detection: forces conclusion after 5 explorer↔evaluator cycles
+- Roles: `--audit` (find issues), `--refactor` (make changes), `--auto` (LLM picks)
+- Shadow editing: `--shadow` edits in worktree, validates before applying
+- Validation: `--validate <cmd>`, `--auto-validate`, `--retry-on-failure`
+- Risk assessment: `--auto-approve [low|medium|high]`
+- Auto-commit: `--commit` commits after successful validation
 - See `docs/design/agent.md` and `docs/experiments/agent-state-machine.md` for design rationale
 
 ### View Command
