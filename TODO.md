@@ -161,9 +161,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 ### Agent Testing (Current Focus)
 
-Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
+State machine agent (v2) is now the default. Use `--v1` for legacy freeform loop.
 
-**State machine agent (--v2)**:
+**State machine agent (v2, now default)**:
 - [x] Explorer/Evaluator separation prevents premature answering
 - [x] Working memory: $(keep), $(drop), $(note)
 - [x] Session logging for v2
@@ -196,6 +196,14 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - Agent found real issues: hardcoded debug path, regex recompilation, potential path traversal
 - [x] Fixed: explorer prompts now include analyze/package commands (was causing text-search FOR commands instead of using them)
 - Agent correctly uses $(analyze length), $(analyze security) after prompt fix
+
+**v1 → v2 consolidation** (goal: remove v1, simplify to single agent loop):
+- [x] Port checkpoint/resume to v2 (v1-only feature)
+- [x] Fix investigator looping (add max explorer cycles or escape hatch)
+- [x] Add non-interactive mode to v2
+- [x] Make v2 the default (--v1 flag for legacy)
+- [ ] Dogfood v2-default for a week
+- [ ] Remove v1 code (~650 lines)
 
 **Known Gemini issues** (still present):
 - Hallucinates command outputs (answers before seeing results)

@@ -140,7 +140,10 @@ function M.parse_args(args)
             opts.non_interactive = true
             i = i + 1
         elseif arg == "--v2" or arg == "--state-machine" then
-            opts.v2 = true
+            opts.v2 = true  -- explicit v2 (now default, kept for compatibility)
+            i = i + 1
+        elseif arg == "--v1" or arg == "--legacy" then
+            opts.v1 = true  -- use legacy freeform loop
             i = i + 1
         elseif arg == "--plan" then
             opts.plan = true

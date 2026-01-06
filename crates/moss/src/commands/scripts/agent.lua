@@ -144,12 +144,44 @@ function M.run_state_machine(opts)
     -- Build machine config for this role
     local machine = build_machine(role)
 
-    local session_id = M.gen_session_id()
+    -- Session ID and resume state
+    local session_id = opts.resume or M.gen_session_id()
+    local start_turn = 0
+    local resumed_state = nil
+    local resumed_notes = nil
+    local resumed_working_memory = nil
+    local resumed_plan = nil
+
+    -- Resume from checkpoint if specified
+    if opts.resume then
+        local checkpoint, err = M.load_checkpoint(opts.resume)
+        if checkpoint then
+            print("[agent-v2] Resuming session: " .. opts.resume)
+            task = checkpoint.task or task
+            start_turn = checkpoint.turn or 0
+            resumed_state = checkpoint.state
+            resumed_notes = checkpoint.notes
+            resumed_working_memory = checkpoint.working_memory
+            resumed_plan = checkpoint.plan
+            role = checkpoint.role or role
+            if checkpoint.progress then
+                print("[agent-v2] Previous progress: " .. checkpoint.progress)
+            end
+            if checkpoint.open_questions then
+                print("[agent-v2] Open questions: " .. checkpoint.open_questions)
+            end
+        else
+            print("[agent-v2] Warning: " .. (err or "Failed to load checkpoint"))
+            print("[agent-v2] Starting fresh session")
+            session_id = M.gen_session_id()
+        end
+    end
+
     print(string.format("[agent-v2:%s] Session: %s", role, session_id))
 
     -- Start session logging
     local session_log = M.start_session_log(session_id)
-    local start_state = use_planner and "planner" or "explorer"
+    local start_state = resumed_state or (use_planner and "planner" or "explorer")
     if session_log then
         session_log:log("task", {
             system_prompt = "state_machine_v2",
@@ -164,13 +196,16 @@ function M.run_state_machine(opts)
     end
 
     local state = start_state
-    local notes = {}           -- accumulated notes
-    local working_memory = {}  -- curated outputs kept by evaluator
+    local notes = resumed_notes or {}           -- accumulated notes
+    local working_memory = resumed_working_memory or {}  -- curated outputs kept by evaluator
     local last_outputs = {}    -- most recent turn's outputs (pending curation)
-    local plan = nil           -- plan from planner state
+    local plan = resumed_plan  -- plan from planner state
     local recent_cmds = {}     -- for loop detection
-    local turn = 0
+    local turn = start_turn
     local validation_retry_count = 0  -- track validation retries
+    local evaluator_cycles = 0        -- track evaluator→explorer cycles without progress
+    local max_evaluator_cycles = opts.max_cycles or 5  -- bail if stuck in explore/evaluate loop
+    local non_interactive = opts.non_interactive or false
 
     while turn < max_turns do
         turn = turn + 1
@@ -343,6 +378,57 @@ function M.run_state_machine(opts)
             end
         end
 
+        -- Handle $(checkpoint) command - saves session state and exits
+        for _, cmd in ipairs(commands) do
+            if cmd.name == "checkpoint" then
+                local args = cmd.args or ""
+                local progress, open_questions = "", ""
+                -- Parse "progress | open questions" format
+                local p, q = args:match("^(.-)%s*|%s*(.*)$")
+                if p then
+                    progress = p
+                    open_questions = q
+                else
+                    progress = args
+                end
+
+                local checkpoint_state = {
+                    task = task,
+                    turn = turn,
+                    state = state,
+                    notes = notes,
+                    working_memory = working_memory,
+                    plan = plan,
+                    role = role,
+                    progress = progress,
+                    open_questions = open_questions
+                }
+
+                local saved_id, err = M.save_checkpoint(session_id, checkpoint_state)
+                if saved_id then
+                    print("[agent-v2] Session checkpointed: " .. saved_id)
+                    print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+                    if progress ~= "" then
+                        print("[agent-v2] Progress: " .. progress)
+                    end
+                    if open_questions ~= "" then
+                        print("[agent-v2] Open questions: " .. open_questions)
+                    end
+                else
+                    print("[agent-v2] Failed to checkpoint: " .. (err or "unknown error"))
+                end
+
+                if shadow_enabled then
+                    shadow.worktree.disable()
+                end
+                if session_log then
+                    session_log:log("checkpoint", { progress = progress, open_questions = open_questions })
+                    session_log:close()
+                end
+                return {success = true, checkpointed = true, session_id = session_id, turns = turn}
+            end
+        end
+
         -- Handle $(keep) and $(drop) - only in evaluator state
         if state == "evaluator" then
             for _, cmd in ipairs(commands) do
@@ -368,9 +454,23 @@ function M.run_state_machine(opts)
         if state == "explorer" then
             last_outputs = {}
             for _, cmd in ipairs(commands) do
-                if cmd.name ~= "note" and cmd.name ~= "done" and cmd.name ~= "answer" then
+                if cmd.name ~= "note" and cmd.name ~= "done" and cmd.name ~= "answer" and cmd.name ~= "checkpoint" then
                     local result
-                    if cmd.name == "run" then
+                    if cmd.name == "ask" then
+                        -- Handle $(ask) command - request user input
+                        if non_interactive then
+                            print("[agent-v2] BLOCKED: " .. cmd.args .. " (non-interactive mode)")
+                            result = { output = "ERROR: Cannot ask user in non-interactive mode. Question was: " .. cmd.args, success = false }
+                            if session_log then
+                                session_log:log("blocked_ask", { question = cmd.args, turn = turn })
+                            end
+                        else
+                            io.write("[agent-v2] " .. cmd.args .. "\n> ")
+                            io.flush()
+                            local answer = io.read("*l") or ""
+                            result = { output = "User: " .. answer, success = true }
+                        end
+                    elseif cmd.name == "run" then
                         print("[agent-v2] Running: " .. cmd.args)
                         result = shell(cmd.args)
                     elseif cmd.name == "view" or cmd.name == "text-search" or
@@ -418,7 +518,23 @@ function M.run_state_machine(opts)
 
             -- Check for loops (same command 3+ times in a row)
             if M.is_looping(recent_cmds, 3) then
-                print("[agent-v2] Loop detected, bailing out")
+                print("[agent-v2] Loop detected, auto-checkpointing...")
+                local checkpoint_state = {
+                    task = task,
+                    turn = turn,
+                    state = state,
+                    notes = notes,
+                    working_memory = working_memory,
+                    plan = plan,
+                    role = role,
+                    progress = "Session ended due to loop detection",
+                    open_questions = "Agent was repeating: " .. (recent_cmds[#recent_cmds] or "unknown")
+                }
+                local saved_id, _ = M.save_checkpoint(session_id, checkpoint_state)
+                if saved_id then
+                    print("[agent-v2] Session checkpointed: " .. saved_id)
+                    print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+                end
                 if shadow_enabled then
                     print("[agent-v2] Discarding shadow changes (loop detected)")
                     shadow.worktree.reset()
@@ -428,7 +544,61 @@ function M.run_state_machine(opts)
                     session_log:log("loop_detected", { cmd = recent_cmds[#recent_cmds], turn = turn })
                     session_log:close()
                 end
-                return {success = false, reason = "loop_detected", turns = turn}
+                return {success = false, reason = "loop_detected", turns = turn, session_id = session_id}
+            end
+        end
+
+        -- Track evaluator→explorer cycles to detect infinite loops
+        if state == "evaluator" and state_config.next == "explorer" then
+            evaluator_cycles = evaluator_cycles + 1
+            if evaluator_cycles >= max_evaluator_cycles then
+                print(string.format("[agent-v2] Evaluator cycle limit reached (%d), forcing conclusion", max_evaluator_cycles))
+                -- Force the agent to conclude by switching to final evaluator prompt
+                local forced_context = M.build_evaluator_context(task, working_memory, last_outputs, notes)
+                forced_context = forced_context .. "\n\nIMPORTANT: You have explored enough. You MUST now provide $(done YOUR_ANSWER) with your best answer based on available information. Do not request more exploration."
+
+                local forced_response = llm.complete(provider, model, state_config.prompt, forced_context)
+                if forced_response then
+                    local forced_cmds = M.parse_commands(forced_response)
+                    for _, cmd in ipairs(forced_cmds) do
+                        if cmd.name == "done" or cmd.name == "answer" then
+                            local final_answer = cmd.args
+                            if final_answer == "ANSWER" then
+                                local after = forced_response:match('%$%(done%s+ANSWER%)%s*[-:]?%s*(.+)')
+                                if after then final_answer = after:gsub('\n.*', '') end
+                            end
+                            print("[agent-v2] Forced answer: " .. final_answer)
+                            if session_log then
+                                session_log:log("done", { answer = final_answer:sub(1, 200), turn = turn, forced = true })
+                                session_log:close()
+                            end
+                            return {success = true, answer = final_answer, turns = turn, forced = true}
+                        end
+                    end
+                end
+                -- If still no answer, checkpoint and bail
+                print("[agent-v2] Could not force conclusion, checkpointing...")
+                local checkpoint_state = {
+                    task = task, turn = turn, state = state, notes = notes,
+                    working_memory = working_memory, plan = plan, role = role,
+                    progress = "Evaluator stuck in loop, could not conclude",
+                    open_questions = "Task may be too complex - consider breaking it down"
+                }
+                local saved_id, _ = M.save_checkpoint(session_id, checkpoint_state)
+                if saved_id then
+                    print("[agent-v2] Session checkpointed: " .. saved_id)
+                    print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+                end
+                if session_log then
+                    session_log:log("cycle_limit", { cycles = evaluator_cycles, turn = turn })
+                    session_log:close()
+                end
+                return {success = false, reason = "cycle_limit", turns = turn, session_id = session_id}
+            end
+        elseif state == "explorer" then
+            -- Reset cycle counter if we're making progress (new outputs)
+            if #last_outputs > 0 then
+                evaluator_cycles = 0
             end
         end
 
@@ -437,7 +607,27 @@ function M.run_state_machine(opts)
         ::continue::
     end
 
-    print("[agent-v2] Max turns reached")
+    -- Auto-checkpoint on max turns reached
+    print("[agent-v2] Max turns reached, auto-checkpointing...")
+    local checkpoint_state = {
+        task = task,
+        turn = turn,
+        state = state,
+        notes = notes,
+        working_memory = working_memory,
+        plan = plan,
+        role = role,
+        progress = "Session ended at max turns",
+        open_questions = "Review working memory for context"
+    }
+    local saved_id, err = M.save_checkpoint(session_id, checkpoint_state)
+    if saved_id then
+        print("[agent-v2] Session auto-checkpointed: " .. saved_id)
+        print("[agent-v2] Resume with: moss @agent --resume " .. saved_id)
+    else
+        print("[agent-v2] Warning: Failed to auto-checkpoint: " .. (err or "unknown error"))
+    end
+
     if shadow_enabled then
         print("[agent-v2] Discarding shadow changes (max turns)")
         shadow.worktree.reset()
@@ -447,7 +637,7 @@ function M.run_state_machine(opts)
         session_log:log("max_turns_reached", { turn = turn })
         session_log:close()
     end
-    return {success = false, reason = "max_turns", turns = turn}
+    return {success = false, reason = "max_turns", turns = turn, session_id = session_id}
 end
 
 -- Check if last N commands are identical (loop detection)
@@ -1221,19 +1411,22 @@ if args and #args >= 0 then
         print("  refactorer    Make code changes with validation")
         print("")
         print("Usage:")
-        print("  moss @agent --v2 'how does X work?'")
+        print("  moss @agent 'how does X work?'")
         print("  moss @agent --audit 'find unwrap on user input'")
         print("  moss @agent --refactor 'rename foo to bar'")
         print("  moss @agent --refactor --shadow 'rename foo to bar'  # safe editing via shadow worktree")
         print("  moss @agent --auto 'task'  # LLM picks the role")
+        print("  moss @agent --v1 'task'    # legacy freeform loop")
         os.exit(0)
     end
 
     local result
-    if opts.v2 then
-        result = M.run_state_machine(opts)
-    else
+    if opts.v1 then
+        -- Legacy freeform loop (--v1 flag)
         result = M.run(opts)
+    else
+        -- State machine agent (default)
+        result = M.run_state_machine(opts)
     end
     if not result.success then
         os.exit(1)
