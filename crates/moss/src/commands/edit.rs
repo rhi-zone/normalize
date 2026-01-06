@@ -3,7 +3,7 @@
 use clap::Args;
 use std::path::{Path, PathBuf};
 
-use crate::commands::filter::detect_project_languages;
+use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
 use crate::shadow::{EditInfo, Shadow};

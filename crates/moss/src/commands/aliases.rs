@@ -1,29 +1,29 @@
-//! Filter command for managing filter aliases.
+//! Aliases command - list filter aliases used by --exclude/--only.
+
+use clap::Args;
+use std::path::{Path, PathBuf};
 
 use crate::config::MossConfig;
 use crate::filter::{AliasStatus, list_aliases};
-use clap::Subcommand;
-use std::path::Path;
 
-#[derive(Subcommand)]
-pub enum FilterAction {
-    /// List available filter aliases
-    Aliases,
+/// Aliases command arguments
+#[derive(Args)]
+pub struct AliasesArgs {
+    /// Root directory (defaults to current directory)
+    #[arg(short, long)]
+    pub root: Option<PathBuf>,
 }
 
-/// Handle filter subcommands.
-pub fn cmd_filter(action: FilterAction, root: Option<&Path>, json: bool) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
+/// Run the aliases command
+pub fn run(args: AliasesArgs, json: bool) -> i32 {
+    let root = args
+        .root
         .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    match action {
-        FilterAction::Aliases => cmd_filter_aliases(&root, json),
-    }
+    cmd_aliases(&root, json)
 }
 
 /// List available filter aliases.
-fn cmd_filter_aliases(root: &Path, json: bool) -> i32 {
+fn cmd_aliases(root: &Path, json: bool) -> i32 {
     let config = MossConfig::load(root);
 
     // Detect languages in the project

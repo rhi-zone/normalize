@@ -3,6 +3,7 @@ use clap::{ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
 use moss::commands;
+use moss::commands::aliases::AliasesArgs;
 use moss::commands::analyze::AnalyzeArgs;
 use moss::commands::edit::EditArgs;
 use moss::commands::generate::GenerateArgs;
@@ -83,15 +84,8 @@ enum Commands {
     /// Analyze codebase (health, complexity, security, duplicates, docs)
     Analyze(AnalyzeArgs),
 
-    /// Manage filter aliases
-    Filter {
-        #[command(subcommand)]
-        action: commands::filter::FilterAction,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
+    /// List filter aliases (used by --exclude/--only)
+    Aliases(AliasesArgs),
 
     /// Search for text patterns in files (fast ripgrep-based search)
     #[command(name = "text-search")]
@@ -112,16 +106,6 @@ enum Commands {
         /// Root directory (defaults to current directory)
         #[arg(short, long, global = true)]
         root: Option<PathBuf>,
-    },
-
-    /// List and view Claude Code plans from ~/.claude/plans/
-    Plans {
-        /// Plan name to view (omit to list all plans)
-        name: Option<String>,
-
-        /// Limit number of plans to list
-        #[arg(short, long, default_value = "20")]
-        limit: usize,
     },
 
     /// Run Lua scripts
@@ -266,14 +250,9 @@ fn main() {
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
         Commands::Analyze(args) => commands::analyze::run(args, format),
-        Commands::Filter { action, root } => {
-            commands::filter::cmd_filter(action, root.as_deref(), cli.json)
-        }
+        Commands::Aliases(args) => commands::aliases::run(args, cli.json),
         Commands::TextSearch(args) => commands::text_search::run(args, format),
         Commands::Sessions(args) => commands::sessions::run(args, cli.json, cli.pretty),
-        Commands::Plans { name, limit } => {
-            commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
-        }
         Commands::Package {
             action,
             ecosystem,

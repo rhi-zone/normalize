@@ -3,7 +3,7 @@
 //! Named "text-search" to avoid confusion with unix grep. The internal implementation
 //! uses ripgrep, but the command name indicates purpose rather than tool.
 
-use crate::commands::filter::detect_project_languages;
+use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
 use crate::merge::Merge;

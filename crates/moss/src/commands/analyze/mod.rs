@@ -15,7 +15,7 @@ pub mod security;
 mod stale_docs;
 mod trace;
 
-use crate::commands::filter::detect_project_languages;
+use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;

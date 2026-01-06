@@ -6,7 +6,7 @@ mod search;
 mod symbol;
 mod tree;
 
-use crate::commands::filter::detect_project_languages;
+use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
 use crate::merge::Merge;

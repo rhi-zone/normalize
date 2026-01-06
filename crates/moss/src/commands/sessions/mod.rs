@@ -2,6 +2,7 @@
 
 mod analyze;
 mod list;
+mod plans;
 mod serve;
 mod show;
 mod stats;
@@ -11,7 +12,7 @@ pub use serve::cmd_sessions_serve;
 pub use show::cmd_sessions_show;
 pub use stats::cmd_sessions_stats;
 
-use clap::Args;
+use clap::{Args, Subcommand};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -21,48 +22,68 @@ use crate::sessions::FormatRegistry;
 /// Sessions command arguments
 #[derive(Args)]
 pub struct SessionsArgs {
+    #[command(subcommand)]
+    pub command: Option<SessionsCommand>,
+
     /// Session ID or path (optional - lists sessions if omitted)
     pub session: Option<String>,
 
     /// Root directory (defaults to current directory)
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     pub root: Option<PathBuf>,
 
     /// Apply jq filter to each JSONL line
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub jq: Option<String>,
 
     /// Force specific format: claude, codex, gemini, moss
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub format: Option<String>,
 
     /// Filter sessions by grep pattern (searches prompt/commands)
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub grep: Option<String>,
 
     /// Run full analysis instead of dumping raw log
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     pub analyze: bool,
 
     /// Show aggregate statistics across all sessions
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub stats: bool,
 
     /// Start web server for viewing sessions
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub serve: bool,
 
     /// Port for web server (default: 3939)
-    #[arg(long, default_value = "3939")]
+    #[arg(long, default_value = "3939", global = true)]
     pub port: u16,
 
     /// Limit number of sessions to list
-    #[arg(short, long, default_value = "20")]
+    #[arg(short, long, default_value = "20", global = true)]
     pub limit: usize,
+}
+
+#[derive(Subcommand)]
+pub enum SessionsCommand {
+    /// List and view agent plans (from ~/.claude/plans/, etc.)
+    Plans {
+        /// Plan name to view (omit to list all plans)
+        name: Option<String>,
+    },
 }
 
 /// Run the sessions command
 pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
+    // Handle subcommands first
+    if let Some(cmd) = args.command {
+        return match cmd {
+            SessionsCommand::Plans { name } => plans::cmd_plans(name.as_deref(), args.limit, json),
+        };
+    }
+
+    // Existing flag-based dispatch
     if args.serve {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
         rt.block_on(cmd_sessions_serve(args.root.as_deref(), args.port))
