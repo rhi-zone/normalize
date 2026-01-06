@@ -62,8 +62,10 @@ moss analyze callees main
 - `--json` - Output as JSON
 - `--jq <EXPR>` - Filter JSON with jq
 - `--pretty` - Human-friendly output
+- `--compact` - Compact output without colors
 - `--exclude <PATTERN>` - Exclude paths
 - `--only <PATTERN>` - Include only paths
+- `--diff [<BASE>]` - Analyze only files changed since base ref (default: origin's default branch)
 
 ### Subcommand-specific
 

@@ -65,8 +65,11 @@ moss view src/main.rs:10-50     # Lines 10-50
 
 ### Output
 - `--json` - Output as JSON
+- `--jq <EXPR>` - Filter JSON with jq expression (implies --json)
 - `--pretty` - Syntax highlighting and colors
+- `--compact` - Compact output without colors
 - `-r, --root <PATH>` - Root directory (default: current)
+- `-i, --case-insensitive` - Case-insensitive symbol matching
 
 ## Module Structure
 
