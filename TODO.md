@@ -55,6 +55,11 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--allow` semantics: reviewed - intentional (different analysis types need different allowlist formats: patterns for files/hotspots, locations for duplicate-functions, pairs for duplicate-types; help text documents each)
 - [x] `--type` vs `--kind`: standardized to `--kind` (view now uses `--kind` like analyze complexity)
 
+### CLI Cleanup
+- [ ] Remove/generalize `moss plans`: too tool-specific (hardcoded `~/.claude/plans/`), violates "generalize don't multiply". Multiple tools create plans (Claude Code, Google Antigravity). Options: (a) remove entirely, (b) make part of `moss sessions` with format detection, (c) generalize to detect plans from multiple tools
+- [ ] Unify `lint`/`test` under `moss tools`: both orchestrate external ecosystem tools, distinct from `moss analyze` (moss's own structural analysis). `moss tools lint`, `moss tools test`, `moss tools list`
+- [x] Remove `analyze lint`: duplicate of `moss lint`, adds no value
+
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration

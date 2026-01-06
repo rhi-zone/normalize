@@ -35,13 +35,6 @@ pub enum AnalyzeCommand {
         target: Option<String>,
     },
 
-    /// Show comprehensive project overview (compact summary with grade)
-    Overview {
-        /// Compact one-line output
-        #[arg(short, long)]
-        compact: bool,
-    },
-
     /// Run complexity analysis
     Complexity {
         /// Target file or directory
@@ -130,12 +123,6 @@ pub enum AnalyzeCommand {
         /// Case-insensitive symbol matching
         #[arg(short = 'i', long)]
         case_insensitive: bool,
-    },
-
-    /// Run configured linters
-    Lint {
-        /// Target file or directory
-        target: Option<String>,
     },
 
     /// Show git history hotspots (frequently changed files)

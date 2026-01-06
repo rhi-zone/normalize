@@ -144,7 +144,7 @@ enum Commands {
         action: commands::grammars::GrammarAction,
     },
 
-    /// Analyze codebase (unified health, complexity, security, overview)
+    /// Analyze codebase (health, complexity, security, duplicates, docs)
     Analyze(AnalyzeArgs),
 
     /// Manage filter aliases

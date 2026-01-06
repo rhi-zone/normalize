@@ -1,9 +1,32 @@
 //! Documentation coverage analysis
 
-use super::overview::FileDocCoverage;
 use crate::filter::Filter;
 use std::collections::HashMap;
 use std::path::Path;
+
+/// Doc coverage info for a single file
+#[derive(Debug, Clone)]
+pub struct FileDocCoverage {
+    pub file_path: String,
+    pub documented: usize,
+    pub total: usize,
+}
+
+impl FileDocCoverage {
+    /// Bayesian-adjusted coverage for sorting.
+    /// Uses Beta(1,1) prior (add 1 success and 1 failure).
+    pub fn bayesian_coverage(&self) -> f64 {
+        (self.documented as f64 + 1.0) / (self.total as f64 + 2.0)
+    }
+
+    pub fn coverage_percent(&self) -> f64 {
+        if self.total == 0 {
+            100.0 // No callables = trivially 100% documented
+        } else {
+            100.0 * self.documented as f64 / self.total as f64
+        }
+    }
+}
 
 /// Documentation coverage report
 pub struct DocCoverageReport {

@@ -8,11 +8,8 @@ pub mod complexity;
 mod docs;
 mod duplicates;
 mod files;
-mod health;
 mod hotspots;
 pub mod length;
-mod lint;
-mod overview;
 pub mod report;
 pub mod security;
 mod stale_docs;
@@ -273,12 +270,6 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             print_report(&report, json, pretty)
         }
 
-        Some(AnalyzeCommand::Overview { compact }) => health::cmd_overview(
-            Some(&effective_root),
-            compact || config.analyze.compact(),
-            json,
-        ),
-
         Some(AnalyzeCommand::Complexity {
             target,
             threshold,
@@ -390,10 +381,6 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             case_insensitive,
             json,
         ),
-
-        Some(AnalyzeCommand::Lint { target }) => {
-            lint::cmd_lint_analyze(&effective_root, target.as_deref(), json)
-        }
 
         Some(AnalyzeCommand::Hotspots { allow, reason }) => {
             if let Some(pattern) = allow {
@@ -689,7 +676,10 @@ fn run_all_passes(
     let mut exit_code = 0;
     let mut scores: Vec<(f64, f64)> = Vec::new();
 
-    // Run main analysis
+    // 1. Main analysis (health, complexity, length, security)
+    if !json {
+        eprintln!("Running: health, complexity, length, security...");
+    }
     let report = report::analyze(
         target, root, true, // health
         true, // complexity
@@ -713,7 +703,10 @@ fn run_all_passes(
         println!("{}", report.format());
     }
 
-    // Run duplicate function detection
+    // 2. Duplicate functions
+    if !json {
+        eprintln!("Running: duplicate-functions...");
+    }
     let (dup_result, dup_count) = duplicates::cmd_duplicate_functions_with_count(
         root, true,  // elide_identifiers
         false, // elide_literals
@@ -726,13 +719,79 @@ fn run_all_passes(
         exit_code = dup_result;
     }
 
-    // Score duplicates
     let dup_score = if dup_count == 0 {
         100.0
     } else {
         (100.0 - (dup_count as f64 * 5.0)).max(0.0)
     };
     scores.push((dup_score, weights.duplicate_functions()));
+
+    // 3. Duplicate types
+    if !json {
+        eprintln!("Running: duplicate-types...");
+    }
+    let dup_types_result = duplicates::cmd_duplicate_types(root, root, 70, json);
+    if dup_types_result != 0 {
+        exit_code = dup_types_result;
+    }
+
+    // 4. Documentation coverage
+    if !json {
+        eprintln!("Running: docs...");
+    }
+    let docs_result = docs::cmd_docs(root, 10, json, filter);
+    if docs_result != 0 {
+        exit_code = docs_result;
+    }
+
+    // 5. Longest files
+    if !json {
+        eprintln!("Running: files...");
+    }
+    let excludes = load_allow_file(root, "large-files-allow");
+    let files_result = files::cmd_files(root, 20, &excludes, json);
+    if files_result != 0 {
+        exit_code = files_result;
+    }
+
+    // 6. Git hotspots
+    if !json {
+        eprintln!("Running: hotspots...");
+    }
+    let config = MossConfig::load(root);
+    let mut hotspot_excludes = config.analyze.hotspots_exclude.clone();
+    hotspot_excludes.extend(load_allow_file(root, "hotspots-allow"));
+    let hotspots_result = hotspots::cmd_hotspots(root, &hotspot_excludes, json);
+    if hotspots_result != 0 {
+        exit_code = hotspots_result;
+    }
+
+    // 7. Documentation reference checks
+    if !json {
+        eprintln!("Running: check-refs...");
+    }
+    let refs_result = check_refs::cmd_check_refs(root, json);
+    if refs_result != 0 {
+        exit_code = refs_result;
+    }
+
+    // 8. Stale documentation
+    if !json {
+        eprintln!("Running: stale-docs...");
+    }
+    let stale_result = stale_docs::cmd_stale_docs(root, json);
+    if stale_result != 0 {
+        exit_code = stale_result;
+    }
+
+    // 9. Example references
+    if !json {
+        eprintln!("Running: check-examples...");
+    }
+    let examples_result = check_examples::cmd_check_examples(root, json);
+    if examples_result != 0 {
+        exit_code = examples_result;
+    }
 
     // Print overall grade
     if !json && !scores.is_empty() {
