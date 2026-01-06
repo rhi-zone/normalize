@@ -1,4 +1,23 @@
 //! CLI format parsers.
+//!
+//! # Extensibility
+//!
+//! Users can register custom formats via [`register()`]:
+//!
+//! ```ignore
+//! use moss_cli_parser::{CliFormat, CliSpec, register};
+//!
+//! struct MyFormat;
+//!
+//! impl CliFormat for MyFormat {
+//!     fn name(&self) -> &'static str { "myformat" }
+//!     fn detect(&self, help: &str) -> f64 { /* ... */ }
+//!     fn parse(&self, help: &str) -> Result<CliSpec, String> { /* ... */ }
+//! }
+//!
+//! // Register before first use
+//! register(&MyFormat);
+//! ```
 
 mod argparse;
 mod clap;
@@ -15,6 +34,32 @@ pub use self::commander::CommanderFormat;
 pub use self::yargs::YargsFormat;
 
 use crate::CliSpec;
+use std::sync::{OnceLock, RwLock};
+
+/// Global registry of CLI format parsers.
+static FORMATS: RwLock<Vec<&'static dyn CliFormat>> = RwLock::new(Vec::new());
+static INITIALIZED: OnceLock<()> = OnceLock::new();
+
+/// Register a custom CLI format parser.
+///
+/// Call this before any parsing operations to add custom formats.
+/// Built-in formats are registered automatically on first use.
+pub fn register(format: &'static dyn CliFormat) {
+    FORMATS.write().unwrap().push(format);
+}
+
+/// Initialize built-in formats (called automatically on first use).
+fn init_builtin() {
+    INITIALIZED.get_or_init(|| {
+        let mut formats = FORMATS.write().unwrap();
+        formats.push(&ClapFormat);
+        formats.push(&ArgparseFormat);
+        formats.push(&ClickFormat);
+        formats.push(&CommanderFormat);
+        formats.push(&YargsFormat);
+        formats.push(&CobraFormat);
+    });
+}
 
 /// Trait for CLI help format parsers.
 pub trait CliFormat: Send + Sync {
@@ -28,7 +73,42 @@ pub trait CliFormat: Send + Sync {
     fn parse(&self, help_text: &str) -> Result<CliSpec, String>;
 }
 
-/// Registry of all available CLI format parsers.
+/// Get a format by name from the global registry.
+pub fn get_format(name: &str) -> Option<&'static dyn CliFormat> {
+    init_builtin();
+    FORMATS
+        .read()
+        .unwrap()
+        .iter()
+        .find(|f| f.name() == name)
+        .copied()
+}
+
+/// Auto-detect format from help text using the global registry.
+pub fn detect_format(help_text: &str) -> Option<&'static dyn CliFormat> {
+    init_builtin();
+    FORMATS
+        .read()
+        .unwrap()
+        .iter()
+        .map(|f| (*f, f.detect(help_text)))
+        .filter(|(_, score)| *score > 0.5)
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .map(|(f, _)| f)
+}
+
+/// List all available format names from the global registry.
+pub fn list_formats() -> Vec<&'static str> {
+    init_builtin();
+    FORMATS.read().unwrap().iter().map(|f| f.name()).collect()
+}
+
+/// Registry of CLI format parsers.
+///
+/// For most use cases, prefer the global registry via [`register()`],
+/// [`get_format()`], [`detect_format()`], and [`list_formats()`].
+///
+/// Use `FormatRegistry` when you need an isolated registry (e.g., testing).
 pub struct FormatRegistry {
     formats: Vec<Box<dyn CliFormat>>,
 }
@@ -46,6 +126,16 @@ impl FormatRegistry {
                 Box::new(CobraFormat),
             ],
         }
+    }
+
+    /// Create an empty registry (no built-in formats).
+    pub fn empty() -> Self {
+        Self { formats: vec![] }
+    }
+
+    /// Register a custom format.
+    pub fn register(&mut self, format: Box<dyn CliFormat>) {
+        self.formats.push(format);
     }
 
     /// Get a format by name.

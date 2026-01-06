@@ -23,6 +23,23 @@ Adding a new section (3 places):
 
 Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
+### Trait-Based Extensibility
+All trait-based crates follow the moss-languages pattern for extensibility:
+- Global registry with `register()` function for user implementations
+- Built-ins initialized lazily via `init_builtin()` + `OnceLock`
+- No feature gates (implementations are small, not worth the complexity)
+
+Crates with registries:
+- [x] moss-languages: `Language` trait, `register()` in registry.rs
+- [x] moss-cli-parser: `CliFormat` trait, `FormatRegistry::register()`
+- [x] moss-sessions: `LogFormat` trait, `FormatRegistry::register()`
+- [ ] moss-tools: `Tool` trait, `TestRunner` trait
+- [ ] moss-packages: `Ecosystem` trait
+- [ ] moss-jsonschema: `JsonSchemaGenerator` trait
+- [ ] moss-openapi: `OpenApiClientGenerator` trait
+
+Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. moss CLI can add Lua bindings at application layer for scripting.
+
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration

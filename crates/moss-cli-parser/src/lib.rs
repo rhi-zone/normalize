@@ -27,7 +27,7 @@
 
 mod formats;
 
-pub use formats::{CliFormat, FormatRegistry};
+pub use formats::{CliFormat, FormatRegistry, detect_format, get_format, list_formats, register};
 
 use serde::{Deserialize, Serialize};
 

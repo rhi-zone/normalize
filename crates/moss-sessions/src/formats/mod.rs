@@ -1,6 +1,28 @@
 //! Log format plugins.
 //!
 //! Each format implements the `LogFormat` trait for parsing session logs.
+//!
+//! # Extensibility
+//!
+//! Users can register custom formats via [`register()`]:
+//!
+//! ```ignore
+//! use moss_sessions::{LogFormat, SessionAnalysis, SessionFile, register};
+//! use std::path::{Path, PathBuf};
+//!
+//! struct MyAgentFormat;
+//!
+//! impl LogFormat for MyAgentFormat {
+//!     fn name(&self) -> &'static str { "myagent" }
+//!     fn sessions_dir(&self, project: Option<&Path>) -> PathBuf { /* ... */ }
+//!     fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> { /* ... */ }
+//!     fn detect(&self, path: &Path) -> f64 { /* ... */ }
+//!     fn analyze(&self, path: &Path) -> Result<SessionAnalysis, String> { /* ... */ }
+//! }
+//!
+//! // Register before first use
+//! register(&MyAgentFormat);
+//! ```
 
 mod claude_code;
 mod codex;
@@ -16,6 +38,30 @@ use crate::SessionAnalysis;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
+use std::sync::{OnceLock, RwLock};
+
+/// Global registry of log format plugins.
+static FORMATS: RwLock<Vec<&'static dyn LogFormat>> = RwLock::new(Vec::new());
+static INITIALIZED: OnceLock<()> = OnceLock::new();
+
+/// Register a custom log format plugin.
+///
+/// Call this before any parsing operations to add custom formats.
+/// Built-in formats are registered automatically on first use.
+pub fn register(format: &'static dyn LogFormat) {
+    FORMATS.write().unwrap().push(format);
+}
+
+/// Initialize built-in formats (called automatically on first use).
+fn init_builtin() {
+    INITIALIZED.get_or_init(|| {
+        let mut formats = FORMATS.write().unwrap();
+        formats.push(&ClaudeCodeFormat);
+        formats.push(&CodexFormat);
+        formats.push(&GeminiCliFormat);
+        formats.push(&MossAgentFormat);
+    });
+}
 
 /// Session file with metadata.
 pub struct SessionFile {
@@ -43,6 +89,37 @@ pub trait LogFormat: Send + Sync {
     fn analyze(&self, path: &Path) -> Result<SessionAnalysis, String>;
 }
 
+/// Get a format by name from the global registry.
+pub fn get_format(name: &str) -> Option<&'static dyn LogFormat> {
+    init_builtin();
+    FORMATS
+        .read()
+        .unwrap()
+        .iter()
+        .find(|f| f.name() == name)
+        .copied()
+}
+
+/// Auto-detect format for a file using the global registry.
+pub fn detect_format(path: &Path) -> Option<&'static dyn LogFormat> {
+    init_builtin();
+    let formats = FORMATS.read().unwrap();
+    let mut best: Option<(&'static dyn LogFormat, f64)> = None;
+    for fmt in formats.iter() {
+        let score = fmt.detect(path);
+        if score > 0.0 && (best.is_none() || score > best.unwrap().1) {
+            best = Some((*fmt, score));
+        }
+    }
+    best.map(|(fmt, _)| fmt)
+}
+
+/// List all available format names from the global registry.
+pub fn list_formats() -> Vec<&'static str> {
+    init_builtin();
+    FORMATS.read().unwrap().iter().map(|f| f.name()).collect()
+}
+
 /// Default implementation: list .jsonl files in a directory.
 pub fn list_jsonl_sessions(dir: &Path) -> Vec<SessionFile> {
     let mut sessions = Vec::new();
@@ -62,6 +139,11 @@ pub fn list_jsonl_sessions(dir: &Path) -> Vec<SessionFile> {
 }
 
 /// Registry of available log formats.
+///
+/// For most use cases, prefer the global registry via [`register()`],
+/// [`get_format()`], [`detect_format()`], and [`list_formats()`].
+///
+/// Use `FormatRegistry` when you need an isolated registry (e.g., testing).
 pub struct FormatRegistry {
     formats: Vec<Box<dyn LogFormat>>,
 }
@@ -73,6 +155,7 @@ impl Default for FormatRegistry {
 }
 
 impl FormatRegistry {
+    /// Create a new registry with all built-in formats.
     pub fn new() -> Self {
         Self {
             formats: vec![
@@ -82,6 +165,16 @@ impl FormatRegistry {
                 Box::new(MossAgentFormat),
             ],
         }
+    }
+
+    /// Create an empty registry (no built-in formats).
+    pub fn empty() -> Self {
+        Self { formats: vec![] }
+    }
+
+    /// Register a custom format.
+    pub fn register(&mut self, format: Box<dyn LogFormat>) {
+        self.formats.push(format);
     }
 
     /// Detect the best format for a file.
@@ -104,6 +197,11 @@ impl FormatRegistry {
             .iter()
             .find(|f| f.name() == name)
             .map(|f| f.as_ref())
+    }
+
+    /// List all available format names.
+    pub fn list(&self) -> Vec<&'static str> {
+        self.formats.iter().map(|f| f.name()).collect()
     }
 }
 
