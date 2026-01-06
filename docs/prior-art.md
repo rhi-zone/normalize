@@ -141,7 +141,7 @@ Does 5-20x parallelization help? Depends on task independence.
 | Coordination cost | Spread across team | Single person bottleneck |
 | Merge conflicts | Independent areas | Changes ripple through |
 
-**When parallelization helps:**
+**When within-repo parallelization helps:**
 - Many truly independent tasks (different features, different bugs)
 - Mature codebase with stable interfaces
 - Multiple humans can monitor multiple streams
@@ -151,7 +151,29 @@ Does 5-20x parallelization help? Depends on task independence.
 - Coherent system where changes ripple through
 - Single developer attention is the real bottleneck
 
-**Key insight**: Parallelization ROI correlates with codebase maturity and task independence, not just team size.
+**Cross-Project vs Within-Project Parallelization:**
+
+There are two forms of parallelization:
+1. **Within-project**: Multiple agents on ONE codebase (Boris's approach)
+2. **Cross-project**: One agent per DIFFERENT codebase
+
+| Aspect | Within-Project | Cross-Project |
+|--------|---------------|---------------|
+| Merge conflicts | Possible | Zero |
+| Coordination cost | High | Zero |
+| Context isolation | Manual (subagents) | Natural (different repos) |
+| Mental model | Must track multiple areas | One coherent model per project |
+
+**Cross-project avoids footguns** (untested whether it's actually "better"):
+- Cleaner history (effectively trunk-based development per project)
+- No merge conflicts to resolve
+- No coordination overhead
+- No risk of agents stepping on each other
+- Natural context boundaries
+
+Example workflow: 3 projects, each with its own Claude Code session, context-switching based on energy/interest/blockage. Each project stays internally coherent while total output parallelizes across projects.
+
+Within-project parallelization makes sense when you're *forced* to work on one codebase (team project, single product) but have independent surfaces. If you have multiple projects, cross-project parallelization avoids the coordination costs.
 
 **Moss Observations:**
 - Claude Code's design validates moss's "library is the API" approach
