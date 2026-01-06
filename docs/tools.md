@@ -57,14 +57,16 @@ moss analyze [target] [options]
 
 ### text-search
 
-Regex search with structural awareness.
+Regex search using ripgrep.
 
 ```
 moss text-search <pattern> [options]
 ```
 
+- `-i` — case-insensitive
+- `-l, --limit <N>` — max results
 - `--only <glob>` — filter by filename/path
-- `--context N` — lines of context
+- `--exclude <glob>` — exclude paths
 - `--json` — structured output
 
 ### sessions

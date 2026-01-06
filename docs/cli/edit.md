@@ -89,9 +89,29 @@ For bulk swapping, use multiple individual swap commands or a script.
 
 ## Options
 
+### Core
 - `--dry-run` - Show what would change without modifying
 - `--multiple` - Allow glob patterns matching multiple symbols
+- `-y, --yes` - Confirm destructive operations without prompting
+- `-m, --message <TEXT>` - Message describing the edit (for shadow git history)
+- `-i, --case-insensitive` - Case-insensitive symbol matching
+
+### Undo/Redo (Shadow Git)
+- `--undo [<N>]` - Undo the last N edits (default: 1)
+- `--redo` - Redo the last undone edit
+- `--goto <REF>` - Jump to a specific shadow commit
+- `--file <PATH>` - Undo changes only for specific file(s)
+- `--cross-checkpoint` - Allow undo across git commit boundaries
+- `--force` - Force undo even if files were modified externally
+
+### Batch
+- `--batch <FILE>` - Apply batch edits from JSON file (or `-` for stdin)
+
+### Output
 - `--json` - Output results as JSON
+- `--jq <EXPR>` - Filter JSON with jq expression
+- `--pretty` - Human-friendly output
+- `--compact` - Compact output without colors
 - `-r, --root <PATH>` - Root directory
 - `--exclude <PATTERNS>` - Exclude files matching patterns
 - `--only <PATTERNS>` - Only include files matching patterns

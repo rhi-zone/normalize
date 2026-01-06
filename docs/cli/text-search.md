@@ -1,67 +1,63 @@
-# moss text-search (grep)
+# moss text-search
 
-Fast text search using ripgrep. Alias: `moss grep`.
+Fast text search using ripgrep.
 
 ## Usage
 
 ```bash
-moss text-search <PATTERN> [PATH]
-moss grep <PATTERN> [PATH]
+moss text-search <PATTERN> [OPTIONS]
 ```
 
 ## Examples
 
 ```bash
 # Search in current directory
-moss grep "fn parse"
-moss grep "TODO|FIXME"
+moss text-search "fn parse"
+moss text-search "TODO|FIXME"
 
-# Search in specific path
-moss grep "error" src/
+# Case insensitive
+moss text-search "config" -i
 
 # With file filtering
-moss grep "impl.*Config" --only "*.rs"
-moss grep "async" --exclude "@tests"
+moss text-search "impl.*Config" --only "*.rs"
+moss text-search "async" --exclude "@tests"
 
-# Context lines
-moss grep "panic!" -C 3
-moss grep "unsafe" -B 2 -A 2
+# Limit results
+moss text-search "error" --limit 20
 
-# Output modes
-moss grep "Config" --files        # Just file names
-moss grep "Config" --count        # Match counts
-moss grep "Config" --json         # JSON output
+# JSON output
+moss text-search "Config" --json
+moss text-search "Config" --jq '.matches[]'
 ```
 
 ## Options
 
-### Pattern
-- `-i` - Case insensitive
-- `-w` - Word boundaries
-- `-F` - Fixed string (not regex)
+| Option | Description |
+|--------|-------------|
+| `-i, --ignore-case` | Case-insensitive search |
+| `-l, --limit <N>` | Maximum number of matches to return |
+| `--only <PATTERN>` | Include only files matching pattern or @alias |
+| `--exclude <PATTERN>` | Exclude files matching pattern or @alias |
+| `--json` | Output as JSON |
+| `--jq <EXPR>` | Filter JSON with jq expression (implies --json) |
+| `--pretty` | Human-friendly output with colors |
+| `--compact` | Compact output without colors |
+| `-r, --root <PATH>` | Root directory (default: current) |
 
-### Filtering
-- `--only <PATTERN>` - Include only matching paths
-- `--exclude <PATTERN>` - Exclude matching paths
-- `--type <TYPE>` - File type (rs, py, js, etc.)
-- `--hidden` - Search hidden files
+## Aliases
 
-### Context
-- `-A <N>` - Lines after match
-- `-B <N>` - Lines before match
-- `-C <N>` - Lines before and after
+Moss path aliases work with `--only` and `--exclude`:
 
-### Output
-- `--files` - Only show file names
-- `--count` - Show match counts
-- `-n` - Show line numbers (default)
-- `--json` - JSON output
+```bash
+moss text-search "test" --only @tests      # Only test files
+moss text-search "config" --exclude @generated
+```
 
 ## vs ripgrep
 
-`moss grep` is a thin wrapper around ripgrep with:
-- Integration with moss aliases (`@tests`, `@config`)
+`moss text-search` is a thin wrapper around ripgrep with:
+- Integration with moss path aliases (`@tests`, `@config`, etc.)
 - Consistent output formatting with other moss commands
 - JSON output for scripting
 
-For advanced ripgrep features, use `rg` directly.
+For advanced ripgrep features (context lines, file types, word boundaries), use `rg` directly.
