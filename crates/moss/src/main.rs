@@ -237,20 +237,10 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
-    /// Run linters, formatters, and type checkers
-    Lint {
+    /// External ecosystem tools (linters, formatters, test runners)
+    Tools {
         #[command(subcommand)]
-        action: Option<LintAction>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
-
-    /// Run native test runners (cargo test, go test, bun test, etc.)
-    Test {
-        #[command(subcommand)]
-        action: Option<TestAction>,
+        action: ToolsAction,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long, global = true)]
@@ -309,50 +299,64 @@ enum GenerateTarget {
 }
 
 #[derive(Subcommand)]
-enum LintAction {
-    /// Run linters on target (default when no subcommand given)
-    Run {
+enum ToolsAction {
+    /// Run linters, formatters, and type checkers
+    Lint {
+        #[command(subcommand)]
+        action: Option<LintSubAction>,
+
         /// Target path to check (defaults to current directory)
+        #[arg(global = true)]
         target: Option<String>,
 
         /// Fix issues automatically where possible
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         fix: bool,
 
         /// Specific tools to run (comma-separated, e.g., "ruff,oxlint")
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         tools: Option<String>,
 
         /// Filter by category: lint, fmt, type
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         category: Option<String>,
 
         /// Output in SARIF format
-        #[arg(long)]
+        #[arg(long, global = true)]
         sarif: bool,
 
         /// Watch for file changes and re-run on save
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         watch: bool,
     },
 
-    /// List available linting tools
-    List,
-}
+    /// Run native test runners (cargo test, go test, bun test, etc.)
+    Test {
+        #[command(subcommand)]
+        action: Option<TestSubAction>,
 
-#[derive(Subcommand)]
-enum TestAction {
-    /// Run tests (default when no subcommand given)
-    Run {
         /// Specific test runner to use (cargo, go, bun, npm, pytest)
-        #[arg(short = 'R', long)]
+        #[arg(short = 'R', long, global = true)]
         runner: Option<String>,
 
         /// Additional arguments to pass to the test runner
         #[arg(trailing_var_arg = true)]
         args: Vec<String>,
     },
+}
 
+#[derive(Subcommand)]
+enum LintSubAction {
+    /// Run linters (default)
+    Run,
+    /// List available linting tools
+    List,
+}
+
+#[derive(Subcommand)]
+enum TestSubAction {
+    /// Run tests (default)
+    Run,
     /// List available test runners
     List,
 }
@@ -614,60 +618,53 @@ fn main() {
         Commands::Script { action, root } => {
             commands::script::cmd_script(action, root.as_deref(), cli.json)
         }
-        Commands::Lint { action, root } => {
-            let action = action.unwrap_or(LintAction::Run {
-                target: None,
-                fix: false,
-                tools: None,
-                category: None,
-                sarif: false,
-                watch: false,
-            });
-            match action {
-                LintAction::Run {
-                    target,
-                    fix,
-                    tools,
-                    category,
-                    sarif,
-                    watch,
-                } => {
-                    if watch {
-                        commands::lint::cmd_lint_watch(
-                            target.as_deref(),
-                            root.as_deref(),
-                            fix,
-                            tools.as_deref(),
-                            category.as_deref(),
-                            cli.json,
-                        )
-                    } else {
-                        commands::lint::cmd_lint_run(
-                            target.as_deref(),
-                            root.as_deref(),
-                            fix,
-                            tools.as_deref(),
-                            category.as_deref(),
-                            sarif,
-                            format,
-                        )
-                    }
+        Commands::Tools { action, root } => match action {
+            ToolsAction::Lint {
+                action: sub_action,
+                target,
+                fix,
+                tools,
+                category,
+                sarif,
+                watch,
+            } => {
+                let is_list = matches!(sub_action, Some(LintSubAction::List));
+                if is_list {
+                    commands::tools::lint::cmd_lint_list(root.as_deref(), &format)
+                } else if watch {
+                    commands::tools::lint::cmd_lint_watch(
+                        target.as_deref(),
+                        root.as_deref(),
+                        fix,
+                        tools.as_deref(),
+                        category.as_deref(),
+                        cli.json,
+                    )
+                } else {
+                    commands::tools::lint::cmd_lint_run(
+                        target.as_deref(),
+                        root.as_deref(),
+                        fix,
+                        tools.as_deref(),
+                        category.as_deref(),
+                        sarif,
+                        format,
+                    )
                 }
-                LintAction::List => commands::lint::cmd_lint_list(root.as_deref(), &format),
             }
-        }
-        Commands::Test { action, root } => {
-            let action = action.unwrap_or(TestAction::Run {
-                runner: None,
-                args: vec![],
-            });
-            match action {
-                TestAction::Run { runner, args } => {
-                    commands::test::cmd_test_run(root.as_deref(), runner.as_deref(), &args)
+            ToolsAction::Test {
+                action: sub_action,
+                runner,
+                args,
+            } => {
+                let is_list = matches!(sub_action, Some(TestSubAction::List));
+                if is_list {
+                    commands::tools::test::cmd_test_list(root.as_deref())
+                } else {
+                    commands::tools::test::cmd_test_run(root.as_deref(), runner.as_deref(), &args)
                 }
-                TestAction::List => commands::test::cmd_test_list(root.as_deref()),
             }
-        }
+        },
         Commands::Serve { protocol, root } => match protocol {
             ServeProtocol::Mcp => serve::mcp::cmd_serve_mcp(root.as_deref(), cli.json),
             ServeProtocol::Http { port, openapi } => {

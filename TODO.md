@@ -57,7 +57,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 
 ### CLI Cleanup
 - [ ] Remove/generalize `moss plans`: too tool-specific (hardcoded `~/.claude/plans/`), violates "generalize don't multiply". Multiple tools create plans (Claude Code, Google Antigravity). Options: (a) remove entirely, (b) make part of `moss sessions` with format detection, (c) generalize to detect plans from multiple tools
-- [ ] Unify `lint`/`test` under `moss tools`: both orchestrate external ecosystem tools, distinct from `moss analyze` (moss's own structural analysis). `moss tools lint`, `moss tools test`, `moss tools list`
+- [x] Unify `lint`/`test` under `moss tools`: `moss tools lint [run|list]`, `moss tools test [run|list]`
 - [x] Remove `analyze lint`: duplicate of `moss lint`, adds no value
 
 ### Rust Redesign Candidates
