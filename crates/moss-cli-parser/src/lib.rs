@@ -1,4 +1,4 @@
-//! Parse CLI --help output from various frameworks (clap, argparse, click, etc.)
+//! Parse CLI --help output from various frameworks.
 //!
 //! # Architecture
 //!
@@ -9,9 +9,11 @@
 //! # Supported Formats
 //!
 //! - `clap` - Rust's clap/structopt
-//! - `argparse` - Python's argparse
+//! - `argparse` - Python's argparse (stdlib)
 //! - `click` - Python's click
-//! - `commander` - Node's commander.js
+//! - `commander` - Node.js commander.js
+//! - `yargs` - Node.js yargs
+//! - `cobra` - Go's cobra (spf13/cobra)
 //!
 //! # Example
 //!
