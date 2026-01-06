@@ -4,6 +4,7 @@ pub mod analyze;
 pub mod daemon;
 pub mod edit;
 pub mod filter;
+pub mod generate;
 pub mod grammars;
 pub mod history;
 pub mod index;

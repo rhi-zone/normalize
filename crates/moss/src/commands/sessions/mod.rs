@@ -11,10 +11,90 @@ pub use serve::cmd_sessions_serve;
 pub use show::cmd_sessions_show;
 pub use stats::cmd_sessions_stats;
 
-use crate::sessions::FormatRegistry;
+use clap::Args;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+
+use crate::sessions::FormatRegistry;
+
+/// Sessions command arguments
+#[derive(Args)]
+pub struct SessionsArgs {
+    /// Session ID or path (optional - lists sessions if omitted)
+    pub session: Option<String>,
+
+    /// Root directory (defaults to current directory)
+    #[arg(short, long)]
+    pub root: Option<PathBuf>,
+
+    /// Apply jq filter to each JSONL line
+    #[arg(long)]
+    pub jq: Option<String>,
+
+    /// Force specific format: claude, codex, gemini, moss
+    #[arg(long)]
+    pub format: Option<String>,
+
+    /// Filter sessions by grep pattern (searches prompt/commands)
+    #[arg(long)]
+    pub grep: Option<String>,
+
+    /// Run full analysis instead of dumping raw log
+    #[arg(short, long)]
+    pub analyze: bool,
+
+    /// Show aggregate statistics across all sessions
+    #[arg(long)]
+    pub stats: bool,
+
+    /// Start web server for viewing sessions
+    #[arg(long)]
+    pub serve: bool,
+
+    /// Port for web server (default: 3939)
+    #[arg(long, default_value = "3939")]
+    pub port: u16,
+
+    /// Limit number of sessions to list
+    #[arg(short, long, default_value = "20")]
+    pub limit: usize,
+}
+
+/// Run the sessions command
+pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
+    if args.serve {
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+        rt.block_on(cmd_sessions_serve(args.root.as_deref(), args.port))
+    } else if args.stats {
+        cmd_sessions_stats(
+            args.root.as_deref(),
+            args.limit,
+            args.format.as_deref(),
+            args.grep.as_deref(),
+            json,
+            pretty,
+        )
+    } else if let Some(session_id) = args.session {
+        cmd_sessions_show(
+            &session_id,
+            args.root.as_deref(),
+            args.jq.as_deref(),
+            args.format.as_deref(),
+            args.analyze,
+            json,
+            pretty,
+        )
+    } else {
+        cmd_sessions_list(
+            args.root.as_deref(),
+            args.limit,
+            args.format.as_deref(),
+            args.grep.as_deref(),
+            json,
+        )
+    }
+}
 
 /// Check if a session file matches a grep pattern.
 /// Searches through the raw JSONL content for any match.

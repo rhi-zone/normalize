@@ -1,11 +1,129 @@
 //! Edit command for moss CLI.
 
+use clap::Args;
+use std::path::{Path, PathBuf};
+
 use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
 use crate::shadow::{EditInfo, Shadow};
 use crate::{daemon, edit, path_resolve};
-use std::path::Path;
+
+/// Edit command arguments
+#[derive(Args)]
+pub struct EditArgs {
+    /// Target to edit (path like src/main.py/Foo/bar)
+    pub target: Option<String>,
+
+    /// Edit action to perform
+    #[command(subcommand)]
+    pub action: Option<EditAction>,
+
+    /// Root directory (defaults to current directory)
+    #[arg(short, long, global = true)]
+    pub root: Option<PathBuf>,
+
+    /// Dry run - show what would be changed without applying
+    #[arg(long, global = true)]
+    pub dry_run: bool,
+
+    /// Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
+    #[arg(long, value_delimiter = ',', global = true)]
+    pub exclude: Vec<String>,
+
+    /// Only include files matching patterns or aliases
+    #[arg(long, value_delimiter = ',', global = true)]
+    pub only: Vec<String>,
+
+    /// Allow glob patterns to match multiple symbols
+    #[arg(long, global = true)]
+    pub multiple: bool,
+
+    /// Message describing the edit (for shadow git history)
+    #[arg(short, long, global = true, visible_alias = "reason")]
+    pub message: Option<String>,
+
+    /// Undo the last N edits (default: 1)
+    #[arg(long, value_name = "N", num_args = 0..=1, default_missing_value = "1")]
+    pub undo: Option<usize>,
+
+    /// Redo the last undone edit
+    #[arg(long)]
+    pub redo: bool,
+
+    /// Force undo even if files were modified externally
+    #[arg(long)]
+    pub force: bool,
+
+    /// Jump to a specific shadow commit (restores file state from that point)
+    #[arg(long, value_name = "REF")]
+    pub goto: Option<String>,
+
+    /// Undo changes only for specific file(s) (used with --undo)
+    #[arg(long = "file", value_name = "PATH")]
+    pub undo_file: Option<String>,
+
+    /// Allow undo to cross git commit boundaries (checkpoints)
+    #[arg(long)]
+    pub cross_checkpoint: bool,
+
+    /// Confirm destructive operations (delete) without prompting
+    #[arg(short = 'y', long)]
+    pub yes: bool,
+
+    /// Case-insensitive symbol matching
+    #[arg(short = 'i', long)]
+    pub case_insensitive: bool,
+
+    /// Apply batch edits from JSON file (or - for stdin)
+    #[arg(long, value_name = "FILE")]
+    pub batch: Option<String>,
+}
+
+/// Run the edit command
+pub fn run(args: EditArgs, json: bool) -> i32 {
+    // Handle undo/redo/goto operations
+    if args.undo.is_some() || args.redo || args.goto.is_some() {
+        cmd_undo_redo(
+            args.root.as_deref(),
+            args.undo,
+            args.redo,
+            args.goto.as_deref(),
+            args.undo_file.as_deref(),
+            args.cross_checkpoint,
+            args.dry_run,
+            args.force,
+            json,
+        )
+    } else if let Some(batch_file) = args.batch {
+        // Batch edit mode
+        cmd_batch_edit(
+            &batch_file,
+            args.root.as_deref(),
+            args.dry_run,
+            args.message.as_deref(),
+            json,
+        )
+    } else {
+        // Regular edit requires target and action
+        let target = args.target.expect("Target is required for edit operations");
+        let action = args.action.expect("Action is required for edit operations");
+
+        cmd_edit(
+            &target,
+            action,
+            args.root.as_deref(),
+            args.dry_run,
+            args.yes,
+            json,
+            &args.exclude,
+            &args.only,
+            args.multiple,
+            args.message.as_deref(),
+            args.case_insensitive,
+        )
+    }
+}
 
 /// Position for insert/move/copy operations
 #[derive(Clone, Copy, clap::ValueEnum)]

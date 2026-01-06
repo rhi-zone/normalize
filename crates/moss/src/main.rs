@@ -4,12 +4,14 @@ use std::path::{Path, PathBuf};
 
 use moss::commands;
 use moss::commands::analyze::AnalyzeArgs;
-use moss::commands::edit::EditAction;
+use moss::commands::edit::EditArgs;
+use moss::commands::generate::GenerateArgs;
 use moss::commands::history::HistoryArgs;
+use moss::commands::sessions::SessionsArgs;
 use moss::commands::text_search::TextSearchArgs;
 use moss::commands::tools::ToolsAction;
 use moss::commands::view::ViewArgs;
-use moss::serve;
+use moss::serve::{self, ServeArgs};
 
 #[derive(Parser)]
 #[command(name = "moss")]
@@ -41,74 +43,7 @@ enum Commands {
     View(ViewArgs),
 
     /// Edit a node in the codebase tree (structural code modification)
-    Edit {
-        /// Target to edit (path like src/main.py/Foo/bar)
-        target: Option<String>,
-
-        /// Edit action to perform
-        #[command(subcommand)]
-        action: Option<EditAction>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-
-        /// Dry run - show what would be changed without applying
-        #[arg(long, global = true)]
-        dry_run: bool,
-
-        /// Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
-        #[arg(long, value_delimiter = ',', global = true)]
-        exclude: Vec<String>,
-
-        /// Only include files matching patterns or aliases
-        #[arg(long, value_delimiter = ',', global = true)]
-        only: Vec<String>,
-
-        /// Allow glob patterns to match multiple symbols
-        #[arg(long, global = true)]
-        multiple: bool,
-
-        /// Message describing the edit (for shadow git history)
-        #[arg(short, long, global = true, visible_alias = "reason")]
-        message: Option<String>,
-
-        /// Undo the last N edits (default: 1)
-        #[arg(long, value_name = "N", num_args = 0..=1, default_missing_value = "1")]
-        undo: Option<usize>,
-
-        /// Redo the last undone edit
-        #[arg(long)]
-        redo: bool,
-
-        /// Force undo even if files were modified externally
-        #[arg(long)]
-        force: bool,
-
-        /// Jump to a specific shadow commit (restores file state from that point)
-        #[arg(long, value_name = "REF")]
-        goto: Option<String>,
-
-        /// Undo changes only for specific file(s) (used with --undo)
-        #[arg(long = "file", value_name = "PATH")]
-        undo_file: Option<String>,
-
-        /// Allow undo to cross git commit boundaries (checkpoints)
-        #[arg(long)]
-        cross_checkpoint: bool,
-
-        /// Confirm destructive operations (delete) without prompting
-        #[arg(short = 'y', long)]
-        yes: bool,
-
-        /// Case-insensitive symbol matching
-        #[arg(short = 'i', long)]
-        case_insensitive: bool,
-
-        /// Apply batch edits from JSON file (or - for stdin)
-        #[arg(long, value_name = "FILE")]
-        batch: Option<String>,
-    },
+    Edit(EditArgs),
 
     /// View shadow git edit history
     History(HistoryArgs),
@@ -163,46 +98,7 @@ enum Commands {
     TextSearch(TextSearchArgs),
 
     /// Analyze Claude Code and other agent session logs
-    Sessions {
-        /// Session ID or path (optional - lists sessions if omitted)
-        session: Option<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Apply jq filter to each JSONL line
-        #[arg(long)]
-        jq: Option<String>,
-
-        /// Force specific format: claude, codex, gemini, moss
-        #[arg(long)]
-        format: Option<String>,
-
-        /// Filter sessions by grep pattern (searches prompt/commands)
-        #[arg(long)]
-        grep: Option<String>,
-
-        /// Run full analysis instead of dumping raw log
-        #[arg(short, long)]
-        analyze: bool,
-
-        /// Show aggregate statistics across all sessions
-        #[arg(long)]
-        stats: bool,
-
-        /// Start web server for viewing sessions
-        #[arg(long)]
-        serve: bool,
-
-        /// Port for web server (default: 3939)
-        #[arg(long, default_value = "3939")]
-        port: u16,
-
-        /// Limit number of sessions to list
-        #[arg(short, long, default_value = "20")]
-        limit: usize,
-    },
+    Sessions(SessionsArgs),
 
     /// Package management: info, list, tree, outdated
     Package {
@@ -249,74 +145,10 @@ enum Commands {
     },
 
     /// Start a moss server (MCP, HTTP, LSP)
-    Serve {
-        #[command(subcommand)]
-        protocol: ServeProtocol,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
+    Serve(ServeArgs),
 
     /// Generate code from API spec
-    Generate {
-        #[command(subcommand)]
-        target: GenerateTarget,
-    },
-}
-
-#[derive(Subcommand)]
-enum GenerateTarget {
-    /// Generate API client from OpenAPI spec
-    Client {
-        /// OpenAPI spec JSON file
-        spec: PathBuf,
-
-        /// Target language: typescript, python, rust
-        #[arg(short, long)]
-        lang: String,
-
-        /// Output file (stdout if not specified)
-        #[arg(short, long)]
-        output: Option<PathBuf>,
-    },
-    /// Generate types from JSON Schema
-    Types {
-        /// JSON Schema file
-        schema: PathBuf,
-
-        /// Root type name
-        #[arg(short, long, default_value = "Root")]
-        name: String,
-
-        /// Target language: typescript, python, rust
-        #[arg(short, long)]
-        lang: String,
-
-        /// Output file (stdout if not specified)
-        #[arg(short, long)]
-        output: Option<PathBuf>,
-    },
-}
-
-#[derive(Subcommand)]
-enum ServeProtocol {
-    /// Start MCP server for LLM integration (stdio transport)
-    Mcp,
-
-    /// Start HTTP server (REST API)
-    Http {
-        /// Port to listen on
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
-
-        /// Output OpenAPI spec and exit (don't start server)
-        #[arg(long)]
-        openapi: bool,
-    },
-
-    /// Start LSP server for IDE integration
-    Lsp,
+    Generate(GenerateArgs),
 }
 
 /// Help output styling.
@@ -424,67 +256,7 @@ fn main() {
 
     let exit_code = match cli.command {
         Commands::View(args) => commands::view::run(args, format),
-        Commands::Edit {
-            target,
-            action,
-            root,
-            dry_run,
-            exclude,
-            only,
-            multiple,
-            message,
-            undo,
-            redo,
-            force,
-            goto,
-            undo_file,
-            cross_checkpoint,
-            yes,
-            case_insensitive,
-            batch,
-        } => {
-            // Handle undo/redo/goto operations
-            if undo.is_some() || redo || goto.is_some() {
-                commands::edit::cmd_undo_redo(
-                    root.as_deref(),
-                    undo,
-                    redo,
-                    goto.as_deref(),
-                    undo_file.as_deref(),
-                    cross_checkpoint,
-                    dry_run,
-                    force,
-                    cli.json,
-                )
-            } else if let Some(batch_file) = batch {
-                // Batch edit mode
-                commands::edit::cmd_batch_edit(
-                    &batch_file,
-                    root.as_deref(),
-                    dry_run,
-                    message.as_deref(),
-                    cli.json,
-                )
-            } else {
-                // Regular edit requires target and action
-                let target = target.expect("Target is required for edit operations");
-                let action = action.expect("Action is required for edit operations");
-
-                commands::edit::cmd_edit(
-                    &target,
-                    action,
-                    root.as_deref(),
-                    dry_run,
-                    yes,
-                    cli.json,
-                    &exclude,
-                    &only,
-                    multiple,
-                    message.as_deref(),
-                    case_insensitive,
-                )
-            }
-        }
+        Commands::Edit(args) => commands::edit::run(args, cli.json),
         Commands::History(args) => commands::history::run(args, format),
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)
@@ -498,53 +270,7 @@ fn main() {
             commands::filter::cmd_filter(action, root.as_deref(), cli.json)
         }
         Commands::TextSearch(args) => commands::text_search::run(args, format),
-        Commands::Sessions {
-            session,
-            root,
-            jq,
-            format,
-            grep,
-            analyze,
-            stats,
-            serve,
-            port,
-            limit,
-        } => {
-            if serve {
-                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-                rt.block_on(commands::sessions::cmd_sessions_serve(
-                    root.as_deref(),
-                    port,
-                ))
-            } else if stats {
-                commands::sessions::cmd_sessions_stats(
-                    root.as_deref(),
-                    limit,
-                    format.as_deref(),
-                    grep.as_deref(),
-                    cli.json,
-                    cli.pretty,
-                )
-            } else if let Some(session_id) = session {
-                commands::sessions::cmd_sessions_show(
-                    &session_id,
-                    root.as_deref(),
-                    jq.as_deref(),
-                    format.as_deref(),
-                    analyze,
-                    cli.json,
-                    cli.pretty,
-                )
-            } else {
-                commands::sessions::cmd_sessions_list(
-                    root.as_deref(),
-                    limit,
-                    format.as_deref(),
-                    grep.as_deref(),
-                    cli.json,
-                )
-            }
-        }
+        Commands::Sessions(args) => commands::sessions::run(args, cli.json, cli.pretty),
         Commands::Plans { name, limit } => {
             commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
         }
@@ -559,110 +285,8 @@ fn main() {
         Commands::Tools { action, root } => {
             commands::tools::run(action, root.as_deref(), format, cli.json)
         }
-        Commands::Serve { protocol, root } => match protocol {
-            ServeProtocol::Mcp => serve::mcp::cmd_serve_mcp(root.as_deref(), cli.json),
-            ServeProtocol::Http { port, openapi } => {
-                if openapi {
-                    // Output OpenAPI spec and exit
-                    use serve::http::ApiDoc;
-                    use utoipa::OpenApi;
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&ApiDoc::openapi()).unwrap()
-                    );
-                    0
-                } else {
-                    let root = root.unwrap_or_else(|| std::path::PathBuf::from("."));
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(serve::http::run_http_server(&root, port))
-                }
-            }
-            ServeProtocol::Lsp => {
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(serve::lsp::run_lsp_server(root.as_deref()))
-            }
-        },
-        Commands::Generate { target } => match target {
-            GenerateTarget::Client { spec, lang, output } => {
-                let Some(generator) = moss_openapi::find_generator(&lang) else {
-                    eprintln!("Unknown language: {}. Available:", lang);
-                    for (lang, variant) in moss_openapi::list_generators() {
-                        eprintln!("  {} ({})", lang, variant);
-                    }
-                    std::process::exit(1);
-                };
-
-                let content = match std::fs::read_to_string(&spec) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("Failed to read {}: {}", spec.display(), e);
-                        std::process::exit(1);
-                    }
-                };
-                let spec_json: serde_json::Value = match serde_json::from_str(&content) {
-                    Ok(j) => j,
-                    Err(e) => {
-                        eprintln!("Failed to parse JSON: {}", e);
-                        std::process::exit(1);
-                    }
-                };
-
-                let code = generator.generate(&spec_json);
-
-                if let Some(path) = output {
-                    if let Err(e) = std::fs::write(&path, &code) {
-                        eprintln!("Failed to write {}: {}", path.display(), e);
-                        std::process::exit(1);
-                    }
-                    eprintln!("Generated {}", path.display());
-                } else {
-                    print!("{}", code);
-                }
-                0
-            }
-            GenerateTarget::Types {
-                schema,
-                name,
-                lang,
-                output,
-            } => {
-                let Some(generator) = moss_jsonschema::find_generator(&lang) else {
-                    eprintln!("Unknown language: {}. Available:", lang);
-                    for l in moss_jsonschema::list_generators() {
-                        eprintln!("  {}", l);
-                    }
-                    std::process::exit(1);
-                };
-
-                let content = match std::fs::read_to_string(&schema) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("Failed to read {}: {}", schema.display(), e);
-                        std::process::exit(1);
-                    }
-                };
-                let schema_json: serde_json::Value = match serde_json::from_str(&content) {
-                    Ok(j) => j,
-                    Err(e) => {
-                        eprintln!("Failed to parse JSON: {}", e);
-                        std::process::exit(1);
-                    }
-                };
-
-                let code = generator.generate(&schema_json, &name);
-
-                if let Some(path) = output {
-                    if let Err(e) = std::fs::write(&path, &code) {
-                        eprintln!("Failed to write {}: {}", path.display(), e);
-                        std::process::exit(1);
-                    }
-                    eprintln!("Generated {}", path.display());
-                } else {
-                    print!("{}", code);
-                }
-                0
-            }
-        },
+        Commands::Serve(args) => serve::run(args, cli.json),
+        Commands::Generate(args) => commands::generate::run(args),
     };
 
     std::process::exit(exit_code);
