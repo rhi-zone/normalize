@@ -1,47 +1,56 @@
 //! Sessions command - analyze Claude Code and other agent session logs.
 
-use crate::sessions::analyze_session;
+use crate::sessions::{FormatRegistry, LogFormat, SessionFile, analyze_session};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// List available sessions in the Claude Code projects directory.
-pub fn cmd_sessions_list(project: Option<&Path>, limit: usize, json: bool) -> i32 {
-    let sessions_dir = get_sessions_dir(project);
+/// List available sessions for a format.
+pub fn cmd_sessions_list(
+    project: Option<&Path>,
+    limit: usize,
+    format_name: Option<&str>,
+    grep: Option<&str>,
+    json: bool,
+) -> i32 {
+    let registry = FormatRegistry::new();
 
-    let Some(dir) = sessions_dir else {
-        eprintln!("Could not find Claude Code sessions directory");
-        return 1;
+    // Get format (default to claude for backwards compatibility)
+    let format: &dyn LogFormat = match format_name {
+        Some(name) => match registry.get(name) {
+            Some(f) => f,
+            None => {
+                eprintln!("Unknown format: {}", name);
+                return 1;
+            }
+        },
+        None => registry.get("claude").unwrap(),
     };
 
-    if !dir.exists() {
-        eprintln!("Sessions directory not found: {}", dir.display());
+    // Compile grep pattern if provided
+    let grep_re = grep.map(|p| regex::Regex::new(p).ok()).flatten();
+    if grep.is_some() && grep_re.is_none() {
+        eprintln!("Invalid grep pattern: {}", grep.unwrap());
         return 1;
     }
 
-    // Find all .jsonl files, sorted by modification time (newest first)
-    let mut sessions: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&dir) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("jsonl")
-                && let Ok(meta) = path.metadata()
-                && let Ok(mtime) = meta.modified()
-            {
-                sessions.push((path, mtime));
-            }
-        }
+    // Get sessions from format (handles directory structure differences)
+    let mut sessions: Vec<SessionFile> = format.list_sessions(project);
+
+    // Apply grep filter if provided
+    if let Some(ref re) = grep_re {
+        sessions.retain(|s| session_matches_grep(&s.path, re));
     }
 
-    sessions.sort_by(|a, b| b.1.cmp(&a.1));
+    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
     sessions.truncate(limit);
 
     if sessions.is_empty() {
         if json {
             println!("[]");
         } else {
-            eprintln!("No sessions found in {}", dir.display());
+            eprintln!("No {} sessions found", format_name.unwrap_or("Claude Code"));
         }
         return 0;
     }
@@ -49,26 +58,45 @@ pub fn cmd_sessions_list(project: Option<&Path>, limit: usize, json: bool) -> i3
     if json {
         let output: Vec<_> = sessions
             .iter()
-            .map(|(path, mtime)| {
-                let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                let age = mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
+            .map(|s| {
+                let id = s.path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                let age = s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
                 serde_json::json!({
                     "id": id,
-                    "path": path,
+                    "path": s.path,
                     "age_seconds": age
                 })
             })
             .collect();
         println!("{}", serde_json::to_string(&output).unwrap());
     } else {
-        for (path, mtime) in &sessions {
-            let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-            let age = format_age(mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0));
+        for s in &sessions {
+            let id = s
+                .path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or("");
+            let age = format_age(s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0));
             println!("{} ({})", id, age);
         }
     }
 
     0
+}
+
+/// Check if a session file matches a grep pattern.
+/// Searches through the raw JSONL content for any match.
+fn session_matches_grep(path: &Path, pattern: &regex::Regex) -> bool {
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    let reader = BufReader::new(file);
+    for line in reader.lines().map_while(Result::ok) {
+        if pattern.is_match(&line) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Show/analyze a specific session or sessions matching a pattern.

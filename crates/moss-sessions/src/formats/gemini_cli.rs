@@ -1,10 +1,10 @@
 //! Gemini CLI JSON format parser.
 
-use super::{LogFormat, read_file};
+use super::{LogFormat, SessionFile, read_file};
 use crate::{SessionAnalysis, TokenStats, ToolStats, normalize_path};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Gemini CLI session log format (JSON with messages array).
 pub struct GeminiCliFormat;
@@ -12,6 +12,37 @@ pub struct GeminiCliFormat;
 impl LogFormat for GeminiCliFormat {
     fn name(&self) -> &'static str {
         "gemini"
+    }
+
+    fn sessions_dir(&self, _project: Option<&Path>) -> PathBuf {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+        PathBuf::from(home).join(".gemini/tmp")
+    }
+
+    fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
+        let dir = self.sessions_dir(project);
+        // Gemini stores sessions in ~/.gemini/tmp/<hash>/logs.json
+        let mut sessions = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let subdir = entry.path();
+                if !subdir.is_dir() {
+                    continue;
+                }
+                let logs_path = subdir.join("logs.json");
+                if logs_path.exists() {
+                    if let Ok(meta) = logs_path.metadata() {
+                        if let Ok(mtime) = meta.modified() {
+                            sessions.push(SessionFile {
+                                path: logs_path,
+                                mtime,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        sessions
     }
 
     fn detect(&self, path: &Path) -> f64 {

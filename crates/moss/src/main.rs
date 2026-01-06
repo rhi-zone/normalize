@@ -174,9 +174,13 @@ enum Commands {
         #[arg(long)]
         jq: Option<String>,
 
-        /// Force specific format: claude, codex, gemini
+        /// Force specific format: claude, codex, gemini, moss
         #[arg(long)]
         format: Option<String>,
+
+        /// Filter sessions by grep pattern (searches prompt/commands)
+        #[arg(long)]
+        grep: Option<String>,
 
         /// Run full analysis instead of dumping raw log
         #[arg(short, long)]
@@ -553,6 +557,7 @@ fn main() {
             project,
             jq,
             format,
+            grep,
             analyze,
             serve,
             port,
@@ -574,7 +579,13 @@ fn main() {
                     cli.json,
                 )
             } else {
-                commands::sessions::cmd_sessions_list(project.as_deref(), limit, cli.json)
+                commands::sessions::cmd_sessions_list(
+                    project.as_deref(),
+                    limit,
+                    format.as_deref(),
+                    grep.as_deref(),
+                    cli.json,
+                )
             }
         }
         Commands::Plans { name, limit } => {

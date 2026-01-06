@@ -5,20 +5,35 @@
 mod claude_code;
 mod codex;
 mod gemini_cli;
+mod moss_agent;
 
 pub use claude_code::ClaudeCodeFormat;
 pub use codex::CodexFormat;
 pub use gemini_cli::GeminiCliFormat;
+pub use moss_agent::MossAgentFormat;
 
 use crate::SessionAnalysis;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Session file with metadata.
+pub struct SessionFile {
+    pub path: PathBuf,
+    pub mtime: std::time::SystemTime,
+}
 
 /// Trait for session log format plugins.
 pub trait LogFormat: Send + Sync {
-    /// Format identifier (e.g., "claude", "gemini").
+    /// Format identifier (e.g., "claude", "codex", "gemini", "moss").
     fn name(&self) -> &'static str;
+
+    /// Get the sessions directory for this format.
+    /// Does NOT check if the directory exists - that's handled by list_sessions.
+    fn sessions_dir(&self, project: Option<&Path>) -> PathBuf;
+
+    /// List all session files for this format.
+    fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile>;
 
     /// Check if this format can parse the given file.
     /// Returns a confidence score 0.0-1.0.
@@ -26,6 +41,24 @@ pub trait LogFormat: Send + Sync {
 
     /// Parse the log file and produce analysis.
     fn analyze(&self, path: &Path) -> Result<SessionAnalysis, String>;
+}
+
+/// Default implementation: list .jsonl files in a directory.
+pub fn list_jsonl_sessions(dir: &Path) -> Vec<SessionFile> {
+    let mut sessions = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                if let Ok(meta) = path.metadata() {
+                    if let Ok(mtime) = meta.modified() {
+                        sessions.push(SessionFile { path, mtime });
+                    }
+                }
+            }
+        }
+    }
+    sessions
 }
 
 /// Registry of available log formats.
@@ -46,6 +79,7 @@ impl FormatRegistry {
                 Box::new(ClaudeCodeFormat),
                 Box::new(CodexFormat),
                 Box::new(GeminiCliFormat),
+                Box::new(MossAgentFormat),
             ],
         }
     }

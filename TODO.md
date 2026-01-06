@@ -338,3 +338,4 @@ git push --tags
 ```
 - Verify cross-platform builds in GitHub Actions
 - Test `moss update` against real release
+- view: directory output shows dir name as first line (tree style) - intentional?

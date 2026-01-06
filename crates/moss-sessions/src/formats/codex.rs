@@ -1,6 +1,6 @@
 //! OpenAI Codex CLI JSONL format parser.
 
-use super::{LogFormat, peek_lines};
+use super::{LogFormat, SessionFile, peek_lines};
 use crate::{
     ErrorPattern, SessionAnalysis, TokenStats, ToolStats, categorize_error, normalize_path,
 };
@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// OpenAI Codex CLI session log format (JSONL).
 pub struct CodexFormat;
@@ -16,6 +16,57 @@ pub struct CodexFormat;
 impl LogFormat for CodexFormat {
     fn name(&self) -> &'static str {
         "codex"
+    }
+
+    fn sessions_dir(&self, _project: Option<&Path>) -> PathBuf {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+        PathBuf::from(home).join(".codex/sessions")
+    }
+
+    fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
+        let dir = self.sessions_dir(project);
+        // Codex stores sessions in ~/.codex/sessions/YYYY/MM/DD/*.jsonl
+        let mut sessions = Vec::new();
+        // Walk year directories
+        if let Ok(years) = std::fs::read_dir(&dir) {
+            for year in years.filter_map(|e| e.ok()) {
+                if !year.path().is_dir() {
+                    continue;
+                }
+                // Walk month directories
+                if let Ok(months) = std::fs::read_dir(year.path()) {
+                    for month in months.filter_map(|e| e.ok()) {
+                        if !month.path().is_dir() {
+                            continue;
+                        }
+                        // Walk day directories
+                        if let Ok(days) = std::fs::read_dir(month.path()) {
+                            for day in days.filter_map(|e| e.ok()) {
+                                if !day.path().is_dir() {
+                                    continue;
+                                }
+                                // Find .jsonl files
+                                if let Ok(files) = std::fs::read_dir(day.path()) {
+                                    for file in files.filter_map(|e| e.ok()) {
+                                        let path = file.path();
+                                        if path.extension().and_then(|e| e.to_str())
+                                            == Some("jsonl")
+                                        {
+                                            if let Ok(meta) = path.metadata() {
+                                                if let Ok(mtime) = meta.modified() {
+                                                    sessions.push(SessionFile { path, mtime });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        sessions
     }
 
     fn detect(&self, path: &Path) -> f64 {

@@ -1,6 +1,6 @@
 //! Claude Code JSONL format parser.
 
-use super::{LogFormat, peek_lines};
+use super::{LogFormat, SessionFile, list_jsonl_sessions, peek_lines};
 use crate::{
     ErrorPattern, SessionAnalysis, TokenStats, ToolStats, categorize_error, normalize_path,
 };
@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 /// Claude Code session log format (JSONL).
@@ -17,6 +17,53 @@ pub struct ClaudeCodeFormat;
 impl LogFormat for ClaudeCodeFormat {
     fn name(&self) -> &'static str {
         "claude"
+    }
+
+    fn sessions_dir(&self, project: Option<&Path>) -> PathBuf {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+        let claude_dir = PathBuf::from(home).join(".claude/projects");
+
+        // Claude encodes project paths - check which encoding variant exists
+        let path_to_claude_dir = |path: &Path| -> PathBuf {
+            let path_str = path.to_string_lossy().replace('/', "-");
+            // Try with leading dash first (Claude's format)
+            let proj_dir = claude_dir.join(format!("-{}", path_str.trim_start_matches('-')));
+            if proj_dir.exists() {
+                return proj_dir;
+            }
+            // Try without leading dash
+            let proj_dir = claude_dir.join(&path_str);
+            if proj_dir.exists() {
+                return proj_dir;
+            }
+            // Return primary format even if it doesn't exist yet
+            claude_dir.join(format!("-{}", path_str.trim_start_matches('-')))
+        };
+
+        if let Some(proj) = project {
+            return path_to_claude_dir(proj);
+        }
+
+        if let Ok(output) = std::process::Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .output()
+        {
+            if output.status.success() {
+                return path_to_claude_dir(Path::new(
+                    String::from_utf8_lossy(&output.stdout).trim(),
+                ));
+            }
+        }
+
+        if let Ok(cwd) = std::env::current_dir() {
+            return path_to_claude_dir(&cwd);
+        }
+
+        claude_dir
+    }
+
+    fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
+        list_jsonl_sessions(&self.sessions_dir(project))
     }
 
     fn detect(&self, path: &Path) -> f64 {
