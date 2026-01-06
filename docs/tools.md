@@ -22,36 +22,37 @@ moss view [target] [options]
 - `view file.py/Class` — symbol source
 - `--depth N` — expansion depth
 - `--deps` — show dependencies
-- `--calls` — show callers
-- `--called-by` — show callees
+- `--types-only` — only type definitions
 
 ### edit
 
-Structural code modifications.
+Structural code modifications via subcommands.
 
 ```
-moss edit <target> [options]
+moss edit <target> <subcommand>
 ```
 
-- `--delete` — remove node
-- `--replace "code"` — swap content
-- `--before "code"` — insert before
-- `--after "code"` — insert after
-- `--prepend "code"` — add to start
-- `--append "code"` — add to end
+- `delete` — remove symbol
+- `replace "code"` — swap content
+- `insert "code" --at before|after|prepend|append` — insert relative to target
+- `move <dest>` — move symbol
+- `swap <other>` — swap two symbols
+- `--undo` — undo last edit
 
 ### analyze
 
-Health, complexity, and security analysis.
+Codebase analysis via subcommands.
 
 ```
-moss analyze [target] [options]
+moss analyze [subcommand] [options]
 ```
 
-- `analyze` — full codebase analysis
-- `--health` — file counts, line counts, avg complexity
-- `--complexity` — cyclomatic complexity per function
-- `--security` — vulnerability scanning
+- `health` — file counts, line counts, avg complexity
+- `complexity` — cyclomatic complexity per function
+- `security` — vulnerability scanning
+- `callers <symbol>` — what calls this symbol
+- `callees <symbol>` — what this symbol calls
+- `hotspots` — frequently changed files
 
 ## Search & Sessions
 
