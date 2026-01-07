@@ -183,3 +183,58 @@ Unlike tree-sitter grammars (megabytes each), trait implementations are ~200 lin
 - User confusion
 
 Not worth it for small implementations. All built-ins are always compiled.
+
+## Allowlist Conventions
+
+Two mechanisms for allowing/ignoring findings, used for different cases:
+
+### Global Allowlist Files (`.moss/*-allow`)
+
+For **file-level or cross-location findings**:
+
+| File | Purpose |
+|------|---------|
+| `hotspots-allow` | Files with high git churn (metadata about file history) |
+| `duplicate-functions-allow` | Pairs of intentionally similar functions |
+| `duplicate-types-allow` | Pairs of intentionally similar types |
+| `large-files-allow` | Files allowed to exceed size threshold |
+
+These can't be inline comments because:
+- They're about whole files, not specific lines
+- They're about relationships between multiple locations
+- They're metadata about files (churn, size), not code
+
+### Inline Comments
+
+For **single-location code findings** (syntax rules):
+
+```rust
+// moss-allow: rust/unwrap-in-impl - input validated above
+let value = result.unwrap();
+```
+
+Inline comments make sense here because:
+- The finding is about a specific piece of code
+- Comments survive refactoring (move with the code)
+- The reason is visible at the location
+- Familiar pattern (clippy `#[allow()]`, ESLint `// eslint-disable`)
+
+### Config-Based Patterns
+
+For **file pattern exclusions** on syntax rules:
+
+```toml
+[analyze.rules."rust/unwrap-in-impl"]
+allow = ["**/tests/**", "src/bin/**"]
+```
+
+This is a third option for "don't lint these files at all" - coarser than inline comments, finer than disabling the rule entirely.
+
+### Summary
+
+| Finding type | Mechanism | Example |
+|--------------|-----------|---------|
+| Whole-file property | `.moss/*-allow` | Large files, hotspots |
+| Cross-location relationship | `.moss/*-allow` | Duplicate functions |
+| Code pattern (file exclusion) | Config `allow` patterns | Skip tests for unwrap rule |
+| Code pattern (specific instance) | Inline comment | Allow this one unwrap |
