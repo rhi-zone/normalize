@@ -131,6 +131,7 @@ Unusual or challenging scenarios that don't fit standard patterns:
 ### Meta Workflows
 - [Codebase Onboarding](codebase-onboarding.md) - "Understand this new project"
 - [Documentation Synthesis](documentation-synthesis.md) - generating docs from code (inverse of code synthesis)
+- [Debugging Practices](debugging-practices.md) - cross-cutting practices for effective debugging
 
 ### Security/Forensic Edge Cases
 - [Cryptanalysis](cryptanalysis.md) - analyzing crypto implementations for weaknesses
@@ -161,8 +162,9 @@ Unusual or challenging scenarios that don't fit standard patterns:
 | Cryptanalysis | Documented | Survey → Analyze → Verify → Report |
 | Steganography | Documented | Triage → Analyze → Extract → Verify |
 | Malware Analysis | Documented | Triage → Static → Dynamic → Document |
-| Security Audit | Partial | Auditor role + analyze security |
-| Feature Implementation | Not started | - |
+| Debugging Practices | Documented | Issues log, debug tooling, golden tests |
+| Security Audit | Documented | Scope → Survey → Deep Dive → Report |
+| Feature Implementation | Documented | Understand → Design → Implement → Verify |
 
 ## Living Documents
 
