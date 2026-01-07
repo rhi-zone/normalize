@@ -81,6 +81,9 @@ pub struct RuleOverride {
     pub severity: Option<String>,
     /// Enable or disable the rule.
     pub enabled: Option<bool>,
+    /// Additional file patterns to allow (skip) for this rule.
+    #[serde(default)]
+    pub allow: Vec<String>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).

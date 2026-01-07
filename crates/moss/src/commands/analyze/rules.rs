@@ -102,6 +102,52 @@ pub struct Finding {
     pub matched_text: String,
 }
 
+/// Check if a line contains a moss-allow comment for the given rule.
+/// Supports: `// moss-allow: rule-id` or `/* moss-allow: rule-id */`
+fn line_has_allow_comment(line: &str, rule_id: &str) -> bool {
+    // Look for moss-allow: followed by the rule ID
+    // Pattern: moss-allow: rule-id (optionally followed by - reason)
+    if let Some(pos) = line.find("moss-allow:") {
+        let after = &line[pos + 11..]; // len("moss-allow:")
+        let after = after.trim_start();
+        // Check if rule_id matches (might be followed by space, dash, or end of comment)
+        if after.starts_with(rule_id) {
+            let rest = &after[rule_id.len()..];
+            // Valid if followed by nothing, whitespace, dash (reason), or end of comment
+            return rest.is_empty()
+                || rest.starts_with(char::is_whitespace)
+                || rest.starts_with('-')
+                || rest.starts_with("*/");
+        }
+    }
+    false
+}
+
+/// Check if a finding should be allowed based on inline comments.
+/// Checks the line of the finding and the line before.
+fn is_allowed_by_comment(content: &str, start_line: usize, rule_id: &str) -> bool {
+    let lines: Vec<&str> = content.lines().collect();
+    let line_idx = start_line.saturating_sub(1); // 0-indexed
+
+    // Check the line itself
+    if let Some(line) = lines.get(line_idx) {
+        if line_has_allow_comment(line, rule_id) {
+            return true;
+        }
+    }
+
+    // Check the line before (for standalone comment)
+    if line_idx > 0 {
+        if let Some(line) = lines.get(line_idx - 1) {
+            if line_has_allow_comment(line, rule_id) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 /// Load all rules from all sources, merged by ID.
 /// Order: builtins → ~/.config/moss/rules/ → .moss/rules/
 /// Then applies config overrides (severity, disable).
@@ -139,6 +185,12 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
             }
             if let Some(enabled) = override_cfg.enabled {
                 rule.enabled = enabled;
+            }
+            // Merge additional allow patterns from config
+            for pattern_str in &override_cfg.allow {
+                if let Ok(pattern) = Pattern::new(pattern_str) {
+                    rule.allow.push(pattern);
+                }
             }
         }
     }
@@ -390,12 +442,19 @@ pub fn run_rules(rules: &[Rule], root: &Path, filter_rule: Option<&str>) -> Vec<
 
                     if let Some(cap) = capture {
                         let node = cap.node;
+                        let start_line = node.start_position().row + 1;
+
+                        // Check for inline allow comment
+                        if is_allowed_by_comment(&content, start_line, &rule.id) {
+                            continue;
+                        }
+
                         let text = node.utf8_text(content.as_bytes()).unwrap_or("");
 
                         findings.push(Finding {
                             rule_id: rule.id.clone(),
                             file: file.clone(),
-                            start_line: node.start_position().row + 1,
+                            start_line,
                             start_col: node.start_position().column + 1,
                             end_line: node.end_position().row + 1,
                             end_col: node.end_position().column + 1,
