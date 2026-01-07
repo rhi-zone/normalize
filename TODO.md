@@ -74,6 +74,11 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] Streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
 
+### Package Management
+- `moss package install/uninstall`: proxy to ecosystem tools (cargo add, npm install, etc.)
+  - Very low priority - needs concrete use case showing value beyond direct tool usage
+  - Possible value-adds: install across all ecosystems, auto-audit after install, config-driven installs
+
 ### Code Quality
 - [x] `--allow` for duplicate-functions: accept line range like output suggests (e.g., `--allow src/foo.rs:10-20`)
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
