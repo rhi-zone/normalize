@@ -94,8 +94,9 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `moss analyze ast`, `moss analyze query` (authoring tools)
   - [x] Phase 1b: `moss analyze rules` reads .moss/rules/*.scm with TOML frontmatter
+  - [x] Phase 3a: builtin rules infrastructure (embedded + override + disable)
   - Phase 2: severity config override, SARIF output
-  - Phase 3: builtin rules (see `docs/design/builtin-rules.md`), sharing, auto-fix
+  - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
 
 ### Script System
 - TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**

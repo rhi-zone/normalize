@@ -69,10 +69,12 @@ See `docs/` for design docs and `README.md` for usage.
   - Matches files with glob pattern and analyzes them
   - Works with complexity, length, and security analysis
 - `moss analyze rules`: syntax-based linting with tree-sitter queries
-  - Reads `.moss/rules/*.scm` files with TOML frontmatter
-  - Frontmatter fields: `id`, `severity`, `message`, `allow` (glob patterns), `languages`
+  - Rules load from: embedded builtins → `~/.config/moss/rules/` → `.moss/rules/`
+  - Later rules override earlier by `id`; `enabled = false` disables a rule
+  - Frontmatter fields: `id`, `severity`, `message`, `allow`, `languages`, `enabled`
   - Tree-sitter predicates supported: `#eq?`, `#match?`, `#any-of?`
   - `--rule <id>` runs a specific rule, `--list` shows available rules
+  - Builtin rules: `rust/todo-macro`, `rust/println-debug`, `rust/dbg-macro`, `no-fixme-comment`
   - JSON output with `--json`
   - Shows file count in header: "src/**/*.rs (18 files)"
 - `-i/--case-insensitive` flag for trace, callers, callees subcommands
