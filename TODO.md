@@ -91,10 +91,10 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
-- Syntax-based linting: custom rules like ESLint's `no-restricted-syntax` but tree-sitter based
-  - Example: `GrammarLoader::new` restricted except in `grammar_loader()` singleton
-  - Example: `Query::new` restricted except in cached getters
-  - Define patterns via tree-sitter queries, whitelist locations
+- Syntax-based linting: see `docs/design/syntax-linting.md`
+  - Phase 1: `moss analyze ast`, `moss analyze query`, rule files
+  - Phase 2: allow patterns, severity config, SARIF output
+  - Phase 3: builtin rules, sharing, auto-fix
 
 ### Script System
 - TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**
