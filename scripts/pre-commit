@@ -1,28 +1,14 @@
 #!/usr/bin/env bash
-# Pre-commit hook: lint, format check, and drift update
+# Pre-commit hook: Rust checks
 #
 # Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
 set -e
 
-echo "Running ruff check..."
-ruff check src/ tests/
+echo "Running cargo check..."
+cargo check --quiet
 
-echo "Running ruff format check..."
-ruff format --check src/ tests/
-
-# Auto-update generated specs if they've drifted
-echo "Checking/updating generated specs..."
-if uv run python scripts/check_gen_drift.py --update 2>/dev/null; then
-    # Check if specs were modified
-    if git diff --quiet specs/; then
-        echo "  Generated specs: OK (up to date)"
-    else
-        echo "  Generated specs: Updated! Staging changes..."
-        git add specs/
-    fi
-else
-    echo "  Warning: Could not run drift check (non-critical)"
-fi
+echo "Running cargo fmt check..."
+cargo fmt -- --check
 
 echo "Pre-commit checks passed!"
