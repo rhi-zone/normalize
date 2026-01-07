@@ -97,6 +97,12 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - [x] Phase 3a: builtin rules infrastructure (embedded + override + disable)
   - [x] Phase 2: severity config override, SARIF output
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
+  - Phase 4 (low priority): tree automata for multi-rule matching
+    - Potential gain: single tree traversal instead of N (one per rule)
+    - Current: ~0.4s/rule, so 13 rules = 5s. Tree automata could reduce to ~1s
+    - Cost: complex implementation (tree automata vs linear DFA), maintenance burden
+    - Worth it when: 50+ rules, or real-time/incremental use cases
+    - Alternative: parallel rule execution (simpler, good enough for batch)
 
 ### Script System
 - TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**

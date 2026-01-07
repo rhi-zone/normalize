@@ -342,15 +342,31 @@ fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> Opti
     })
 }
 
+/// Pre-compiled query with metadata for efficient matching.
+struct CompiledRule<'a> {
+    rule: &'a Rule,
+    query: tree_sitter::Query,
+    match_idx: usize,
+}
+
 /// Run rules against files in a directory.
+/// Optimized: files are read and parsed once, then all applicable rules run against them.
 pub fn run_rules(rules: &[Rule], root: &Path, filter_rule: Option<&str>) -> Vec<Finding> {
     let mut findings = Vec::new();
     let loader = grammar_loader();
 
-    // Collect all source files
-    let files = collect_source_files(root);
+    // Filter rules first
+    let active_rules: Vec<&Rule> = rules
+        .iter()
+        .filter(|r| filter_rule.map_or(true, |f| r.id == f))
+        .collect();
 
-    // Group files by language/grammar
+    if active_rules.is_empty() {
+        return findings;
+    }
+
+    // Collect all source files and group by grammar
+    let files = collect_source_files(root);
     let mut files_by_grammar: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for file in files {
         if let Some(lang) = support_for_path(&file) {
@@ -359,107 +375,119 @@ pub fn run_rules(rules: &[Rule], root: &Path, filter_rule: Option<&str>) -> Vec<
         }
     }
 
-    // Run each rule
-    for rule in rules {
-        // Filter by rule ID if specified
-        if let Some(filter) = filter_rule {
-            if rule.id != filter {
-                continue;
-            }
-        }
+    // Pre-compile queries: grammar -> list of compiled rules
+    let mut compiled_by_grammar: HashMap<String, Vec<CompiledRule>> = HashMap::new();
 
-        // Determine which grammars this rule applies to
-        let target_grammars: Vec<&String> = if rule.languages.is_empty() {
-            // Try to infer from query - for now, try all grammars
-            files_by_grammar.keys().collect()
-        } else {
-            rule.languages.iter().collect()
+    for grammar_name in files_by_grammar.keys() {
+        let Some(grammar) = loader.get(grammar_name) else {
+            continue;
         };
 
-        for grammar_name in target_grammars {
-            let Some(grammar) = loader.get(grammar_name) else {
+        let mut compiled = Vec::new();
+        for rule in &active_rules {
+            // Check if rule applies to this grammar
+            let applies =
+                rule.languages.is_empty() || rule.languages.iter().any(|l| l == grammar_name);
+            if !applies {
                 continue;
-            };
+            }
 
-            // Compile query for this grammar
+            // Compile query
             let query = match tree_sitter::Query::new(&grammar, &rule.query_str) {
                 Ok(q) => q,
-                Err(_) => {
-                    // Query doesn't apply to this grammar
-                    continue;
-                }
+                Err(_) => continue,
             };
 
-            // Find the @match capture index
             let match_idx = query
                 .capture_names()
                 .iter()
                 .position(|n| *n == "match")
                 .unwrap_or(0);
 
-            // Get files for this grammar
-            let Some(files) = files_by_grammar.get(grammar_name) else {
-                continue;
+            compiled.push(CompiledRule {
+                rule,
+                query,
+                match_idx,
+            });
+        }
+
+        if !compiled.is_empty() {
+            compiled_by_grammar.insert(grammar_name.clone(), compiled);
+        }
+    }
+
+    // Process files: read once, parse once, run all applicable rules
+    for (grammar_name, files) in &files_by_grammar {
+        let Some(compiled_rules) = compiled_by_grammar.get(grammar_name) else {
+            continue;
+        };
+
+        let Some(grammar) = loader.get(grammar_name) else {
+            continue;
+        };
+
+        // Reuse parser for all files with same grammar
+        let mut parser = tree_sitter::Parser::new();
+        if parser.set_language(&grammar).is_err() {
+            continue;
+        }
+
+        for file in files {
+            let rel_path = file.strip_prefix(root).unwrap_or(file);
+            let rel_path_str = rel_path.to_string_lossy();
+
+            // Read file once
+            let content = match std::fs::read_to_string(file) {
+                Ok(c) => c,
+                Err(_) => continue,
             };
 
-            // Run query on each file
-            for file in files {
-                // Check if file is in allowlist
-                let rel_path = file.strip_prefix(root).unwrap_or(file);
-                let rel_path_str = rel_path.to_string_lossy();
-                if rule.allow.iter().any(|p| p.matches(&rel_path_str)) {
+            // Parse once
+            let tree = match parser.parse(&content, None) {
+                Some(t) => t,
+                None => continue,
+            };
+
+            // Run all applicable rules against this parsed tree
+            for compiled in compiled_rules {
+                // Check allow patterns
+                if compiled.rule.allow.iter().any(|p| p.matches(&rel_path_str)) {
                     continue;
                 }
 
-                let content = match std::fs::read_to_string(file) {
-                    Ok(c) => c,
-                    Err(_) => continue,
-                };
-
-                // Parse file
-                let mut parser = tree_sitter::Parser::new();
-                if parser.set_language(&grammar).is_err() {
-                    continue;
-                }
-
-                let tree = match parser.parse(&content, None) {
-                    Some(t) => t,
-                    None => continue,
-                };
-
-                // Run query
                 let mut cursor = tree_sitter::QueryCursor::new();
-                let mut matches = cursor.matches(&query, tree.root_node(), content.as_bytes());
+                let mut matches =
+                    cursor.matches(&compiled.query, tree.root_node(), content.as_bytes());
 
                 while let Some(m) = matches.next() {
-                    // Evaluate predicates
-                    if !evaluate_predicates(&query, m, content.as_bytes()) {
+                    if !evaluate_predicates(&compiled.query, m, content.as_bytes()) {
                         continue;
                     }
 
-                    // Find the @match capture
-                    let capture = m.captures.iter().find(|c| c.index as usize == match_idx);
+                    let capture = m
+                        .captures
+                        .iter()
+                        .find(|c| c.index as usize == compiled.match_idx);
 
                     if let Some(cap) = capture {
                         let node = cap.node;
                         let start_line = node.start_position().row + 1;
 
-                        // Check for inline allow comment
-                        if is_allowed_by_comment(&content, start_line, &rule.id) {
+                        if is_allowed_by_comment(&content, start_line, &compiled.rule.id) {
                             continue;
                         }
 
                         let text = node.utf8_text(content.as_bytes()).unwrap_or("");
 
                         findings.push(Finding {
-                            rule_id: rule.id.clone(),
+                            rule_id: compiled.rule.id.clone(),
                             file: file.clone(),
                             start_line,
                             start_col: node.start_position().column + 1,
                             end_line: node.end_position().row + 1,
                             end_col: node.end_position().column + 1,
-                            message: rule.message.clone(),
-                            severity: rule.severity,
+                            message: compiled.rule.message.clone(),
+                            severity: compiled.rule.severity,
                             matched_text: text.lines().next().unwrap_or("").to_string(),
                         });
                     }
