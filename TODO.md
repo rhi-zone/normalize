@@ -92,7 +92,8 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
 - Syntax-based linting: see `docs/design/syntax-linting.md`
-  - Phase 1: `moss analyze ast`, `moss analyze query`, rule files
+  - [x] Phase 1: `moss analyze ast`, `moss analyze query` (authoring tools)
+  - Phase 1b: rule files (.moss/rules/*.scm)
   - Phase 2: allow patterns, severity config, SARIF output
   - Phase 3: builtin rules, sharing, auto-fix
 

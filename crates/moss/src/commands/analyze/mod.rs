@@ -1,6 +1,7 @@
 //! Analyze command - run analysis on target.
 
 mod args;
+mod ast;
 mod call_graph;
 mod check_examples;
 mod check_refs;
@@ -10,6 +11,7 @@ mod duplicates;
 mod files;
 mod hotspots;
 pub mod length;
+mod query;
 pub mod report;
 pub mod security;
 mod stale_docs;
@@ -473,6 +475,14 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 pretty,
             )
         }
+
+        Some(AnalyzeCommand::Ast { file, at, sexp }) => ast::cmd_ast(&file, at, sexp, json),
+
+        Some(AnalyzeCommand::Query {
+            file,
+            query,
+            show_source,
+        }) => query::cmd_query(&file, &query, show_source, json),
 
         // No subcommand: default to health analysis
         None => {

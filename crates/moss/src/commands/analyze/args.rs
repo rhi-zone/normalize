@@ -196,4 +196,31 @@ pub enum AnalyzeCommand {
         /// Target file or directory
         target: Option<String>,
     },
+
+    /// Show AST for a file (for authoring syntax rules)
+    Ast {
+        /// File to parse
+        file: PathBuf,
+
+        /// Show AST node at this line number
+        #[arg(long)]
+        at: Option<usize>,
+
+        /// Output as S-expression (default: tree format)
+        #[arg(long)]
+        sexp: bool,
+    },
+
+    /// Test a tree-sitter query against a file
+    Query {
+        /// File to query
+        file: PathBuf,
+
+        /// Tree-sitter query pattern (S-expression)
+        query: String,
+
+        /// Show full matched source code
+        #[arg(long)]
+        show_source: bool,
+    },
 }
