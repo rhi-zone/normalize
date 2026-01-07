@@ -111,6 +111,23 @@ Discoverability through simplicity. With 100+ tools, users can't find what they 
 
 Put smarts in the tool, not the schema. Tool definitions cost context. With only 3 primitives, there's no ambiguity about which tool to use—the cognitive load disappears entirely.
 
+#### Friction Minimization Loop
+
+Moss's meta-goal: make it easier to reduce friction, which accelerates development, which makes it easier to improve moss.
+
+```
+Workflows documented → Failure modes identified → Encoded as tooling → Friction reduced → Faster iteration → (loop)
+```
+
+Prevention hierarchy (most to least reliable):
+1. **Tooling** - automated checks catch it (linters, CI, rules)
+2. **Type system** - invalid states unrepresentable
+3. **Tests** - regression tests encode invariants
+4. **Process** - workflow steps force checks
+5. **Documentation** - requires someone to read (unreliable)
+
+The goal is moving failure modes UP this hierarchy. Documentation is the fallback when tooling doesn't exist yet, not the primary defense. Every documented failure mode is a candidate for automation.
+
 #### Err on Keeping Data
 
 Disk is cheap. Lost work is expensive. When in doubt, preserve:
