@@ -58,6 +58,12 @@ See `docs/` for design docs and `README.md` for usage.
 - Glob pattern support for target: `moss analyze 'src/**/*.rs'`
   - Matches files with glob pattern and analyzes them
   - Works with complexity, length, and security analysis
+- `moss analyze rules`: syntax-based linting with tree-sitter queries
+  - Reads `.moss/rules/*.scm` files with TOML frontmatter
+  - Frontmatter fields: `id`, `severity`, `message`, `allow` (glob patterns), `languages`
+  - Tree-sitter predicates supported: `#eq?`, `#match?`, `#any-of?`
+  - `--rule <id>` runs a specific rule, `--list` shows available rules
+  - JSON output with `--json`
   - Shows file count in header: "src/**/*.rs (18 files)"
 - `-i/--case-insensitive` flag for trace, callers, callees subcommands
   - Matches symbol names case-insensitively
