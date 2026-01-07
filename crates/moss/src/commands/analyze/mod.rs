@@ -26,6 +26,7 @@ use crate::filter::Filter;
 use crate::merge::Merge;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -53,6 +54,22 @@ pub struct AnalyzeConfig {
     /// Patterns to exclude from hotspots analysis (e.g., generated code, lock files)
     #[serde(default)]
     pub hotspots_exclude: Vec<String>,
+    /// Syntax rules configuration
+    #[serde(default)]
+    pub rules: RulesConfig,
+}
+
+/// Configuration for syntax rules analysis.
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct RulesConfig {
+    /// Override rule severities by rule ID.
+    /// e.g., { "rust/unnecessary-let" = "warning" }
+    #[serde(default)]
+    pub severity: HashMap<String, String>,
+    /// Disable specific rules by ID.
+    #[serde(default)]
+    pub disable: Vec<String>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -486,12 +503,24 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             show_source,
         }) => query::cmd_query(&file, &query, show_source, json),
 
-        Some(AnalyzeCommand::Rules { rule, list, target }) => {
+        Some(AnalyzeCommand::Rules {
+            rule,
+            list,
+            sarif,
+            target,
+        }) => {
             let target_root = target
                 .as_ref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| effective_root.clone());
-            rules::cmd_rules(&target_root, rule.as_deref(), list, json)
+            rules::cmd_rules(
+                &target_root,
+                rule.as_deref(),
+                list,
+                json,
+                sarif,
+                &config.analyze.rules,
+            )
         }
 
         // No subcommand: default to health analysis

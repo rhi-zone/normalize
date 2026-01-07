@@ -95,7 +95,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - [x] Phase 1: `moss analyze ast`, `moss analyze query` (authoring tools)
   - [x] Phase 1b: `moss analyze rules` reads .moss/rules/*.scm with TOML frontmatter
   - [x] Phase 3a: builtin rules infrastructure (embedded + override + disable)
-  - Phase 2: severity config override, SARIF output
+  - [x] Phase 2: severity config override, SARIF output
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
 
 ### Script System

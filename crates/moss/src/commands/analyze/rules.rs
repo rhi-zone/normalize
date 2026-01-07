@@ -29,6 +29,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 // Embedded builtin rules
+use super::RulesConfig;
 use super::builtin_rules::BUILTIN_RULES;
 use streaming_iterator::StreamingIterator;
 
@@ -103,7 +104,8 @@ pub struct Finding {
 
 /// Load all rules from all sources, merged by ID.
 /// Order: builtins → ~/.config/moss/rules/ → .moss/rules/
-pub fn load_all_rules(project_root: &Path) -> Vec<Rule> {
+/// Then applies config overrides (severity, disable).
+pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
     let mut rules_by_id: HashMap<String, Rule> = HashMap::new();
 
     // 1. Load embedded builtins
@@ -125,6 +127,22 @@ pub fn load_all_rules(project_root: &Path) -> Vec<Rule> {
     let project_rules_dir = project_root.join(".moss").join("rules");
     for rule in load_rules_from_dir(&project_rules_dir) {
         rules_by_id.insert(rule.id.clone(), rule);
+    }
+
+    // 4. Apply config overrides
+    for (rule_id, severity_str) in &config.severity {
+        if let Some(rule) = rules_by_id.get_mut(rule_id) {
+            if let Ok(severity) = severity_str.parse() {
+                rule.severity = severity;
+            }
+        }
+    }
+
+    // 5. Disable rules from config
+    for rule_id in &config.disable {
+        if let Some(rule) = rules_by_id.get_mut(rule_id) {
+            rule.enabled = false;
+        }
     }
 
     // Filter out disabled rules
@@ -534,9 +552,16 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
 }
 
 /// Run the rules command.
-pub fn cmd_rules(root: &Path, filter_rule: Option<&str>, list_only: bool, json: bool) -> i32 {
+pub fn cmd_rules(
+    root: &Path,
+    filter_rule: Option<&str>,
+    list_only: bool,
+    json: bool,
+    sarif: bool,
+    config: &RulesConfig,
+) -> i32 {
     // Load rules from all sources (builtins + user global + project)
-    let rules = load_all_rules(root);
+    let rules = load_all_rules(root, config);
 
     if rules.is_empty() {
         if !list_only {
@@ -583,7 +608,9 @@ pub fn cmd_rules(root: &Path, filter_rule: Option<&str>, list_only: bool, json: 
     // Run rules
     let findings = run_rules(&rules, root, filter_rule);
 
-    if json {
+    if sarif {
+        print_sarif(&rules, &findings, root);
+    } else if json {
         let output: Vec<_> = findings
             .iter()
             .map(|f| {
@@ -635,5 +662,82 @@ pub fn cmd_rules(root: &Path, filter_rule: Option<&str>, list_only: bool, json: 
         1
     } else {
         0
+    }
+}
+
+/// Output findings in SARIF 2.1.0 format for IDE integration.
+fn print_sarif(rules: &[Rule], findings: &[Finding], root: &Path) {
+    // Build rules array for the tool driver
+    let sarif_rules: Vec<_> = rules
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "shortDescription": { "text": r.message },
+                "defaultConfiguration": {
+                    "level": severity_to_sarif_level(r.severity)
+                }
+            })
+        })
+        .collect();
+
+    // Build results array
+    let results: Vec<_> = findings
+        .iter()
+        .map(|f| {
+            let uri = f
+                .file
+                .canonicalize()
+                .ok()
+                .map(|p| format!("file://{}", p.display()))
+                .unwrap_or_else(|| {
+                    let rel = f.file.strip_prefix(root).unwrap_or(&f.file);
+                    rel.display().to_string()
+                });
+
+            serde_json::json!({
+                "ruleId": f.rule_id,
+                "level": severity_to_sarif_level(f.severity),
+                "message": { "text": f.message },
+                "locations": [{
+                    "physicalLocation": {
+                        "artifactLocation": { "uri": uri },
+                        "region": {
+                            "startLine": f.start_line,
+                            "startColumn": f.start_col,
+                            "endLine": f.end_line,
+                            "endColumn": f.end_col
+                        }
+                    }
+                }]
+            })
+        })
+        .collect();
+
+    let sarif = serde_json::json!({
+        "version": "2.1.0",
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "moss",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "informationUri": "https://github.com/pterror/moss",
+                    "rules": sarif_rules
+                }
+            },
+            "results": results
+        }]
+    });
+
+    println!("{}", serde_json::to_string_pretty(&sarif).unwrap());
+}
+
+/// Convert moss severity to SARIF level.
+fn severity_to_sarif_level(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Error => "error",
+        Severity::Warning => "warning",
+        Severity::Info => "note",
     }
 }

@@ -234,6 +234,10 @@ pub enum AnalyzeCommand {
         #[arg(long)]
         list: bool,
 
+        /// Output in SARIF format for IDE integration
+        #[arg(long)]
+        sarif: bool,
+
         /// Target directory to scan
         target: Option<String>,
     },
