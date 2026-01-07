@@ -49,7 +49,6 @@
 
 use crate::commands::analyze::AnalyzeConfig;
 use crate::commands::text_search::TextSearchConfig;
-use crate::commands::todo::TodoConfig;
 use crate::commands::view::ViewConfig;
 use crate::daemon::DaemonConfig;
 use crate::merge::Merge;
@@ -201,7 +200,6 @@ pub struct MossConfig {
     pub index: IndexConfig,
     pub shadow: ShadowConfig,
     pub aliases: AliasConfig,
-    pub todo: TodoConfig,
     pub view: ViewConfig,
     pub analyze: AnalyzeConfig,
     #[serde(rename = "text-search")]

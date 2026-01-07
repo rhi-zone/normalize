@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Add `[serve]` config section (port, host settings)
-- Documentation freshness: check docs/cli/*.md against --help output
-- More agent dogfooding on different task types (refactoring, complex investigation)
+- Symbol history: `moss view path/Symbol --history` (show last N changes via git)
+- Case-insensitive matching: add `-i` flag to `view`/`edit` symbol matching
+- Validate node kinds against grammars: audit function in each language file
+- Directory context: hierarchical CLAUDE.md-style context files
 
 ## Remaining Work
 - Namespace-qualified lookups: `moss view std::vector`, `moss view com.example.Foo`
@@ -16,7 +17,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Zero user interruption (user can edit while agent tests in background)
 
 ### Configuration System
-Sections: `[daemon]`, `[index]`, `[aliases]`, `[todo]`, `[view]`, `[analyze]`, `[text-search]`, `[pretty]`, `[serve]`
+Sections: `[daemon]`, `[index]`, `[aliases]`, `[view]`, `[analyze]`, `[text-search]`, `[pretty]`, `[serve]`
 
 Adding a new section (3 places):
 1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module
@@ -95,13 +96,6 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - Example: `Query::new` restricted except in cached getters
   - Define patterns via tree-sitter queries, whitelist locations
 
-### `moss todo` Future
-- Goal: port `todo.rs` to `@todo` script (Lua + `moss edit` primitives)
-  - These are conceptually `moss edit` ops on markdown
-  - `@todo` target prefix is the path toward unification
-- `list` with filters, `clean`, `normalize` → port to Lua script (todo-specific semantics)
-- Validates that view/edit primitives are sufficient for structural edits
-
 ### Script System
 - TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**
   - Builtin `workflow` runner script interprets TOML files
@@ -133,7 +127,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - Consider boy scout rule: when touching code, improve nearby docs
 - Case-insensitive matching (`-i` flag): `text-search` ✓ has it, optionally add to `view`/`edit`/`analyze` path/symbol targets
 - `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
-- Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
+- [x] Multi-file batch edit: `moss edit --batch edits.json` (see docs/design/batch-edit.md)
 - Semantic refactoring: `moss edit <glob> --before 'fn extract_attributes' 'fn extract_attributes(...) { ... }'`
   - Insert method before/after another method across multiple files
   - Uses tree-sitter for semantic targeting (not regex)

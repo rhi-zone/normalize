@@ -13,7 +13,6 @@ pub mod package;
 pub mod script;
 pub mod sessions;
 pub mod text_search;
-pub mod todo;
 pub mod tools;
 pub mod update;
 pub mod view;
