@@ -2,6 +2,7 @@
 
 pub mod aliases;
 pub mod analyze;
+pub mod context;
 pub mod daemon;
 pub mod edit;
 pub mod generate;

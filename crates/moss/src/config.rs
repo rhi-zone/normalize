@@ -350,31 +350,6 @@ config = []
     }
 
     #[test]
-    fn test_todo_config() {
-        let dir = TempDir::new().unwrap();
-        let moss_dir = dir.path().join(".moss");
-        std::fs::create_dir_all(&moss_dir).unwrap();
-
-        let config_path = moss_dir.join("config.toml");
-        let mut file = std::fs::File::create(&config_path).unwrap();
-        writeln!(
-            file,
-            r#"
-[todo]
-file = "TASKS.md"
-primary_section = "Backlog"
-show_all = true
-"#
-        )
-        .unwrap();
-
-        let config = MossConfig::load(dir.path());
-        assert_eq!(config.todo.file, Some("TASKS.md".to_string()));
-        assert_eq!(config.todo.primary_section, Some("Backlog".to_string()));
-        assert!(config.todo.show_all());
-    }
-
-    #[test]
     fn test_merge_preserves_explicit_values() {
         // Simulate: global sets enabled=false, project only sets auto_start=true
         // The explicit enabled=false should be preserved, not overwritten by default

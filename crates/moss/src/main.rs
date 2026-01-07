@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use moss::commands;
 use moss::commands::aliases::AliasesArgs;
 use moss::commands::analyze::AnalyzeArgs;
+use moss::commands::context::ContextArgs;
 use moss::commands::edit::EditArgs;
 use moss::commands::generate::GenerateArgs;
 use moss::commands::history::HistoryArgs;
@@ -86,6 +87,9 @@ enum Commands {
 
     /// List filter aliases (used by --exclude/--only)
     Aliases(AliasesArgs),
+
+    /// Show directory context (hierarchical .context.md files)
+    Context(ContextArgs),
 
     /// Search for text patterns in files (fast ripgrep-based search)
     #[command(name = "text-search")]
@@ -251,6 +255,7 @@ fn main() {
         Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
         Commands::Analyze(args) => commands::analyze::run(args, format),
         Commands::Aliases(args) => commands::aliases::run(args, cli.json),
+        Commands::Context(args) => commands::context::run(args, format),
         Commands::TextSearch(args) => commands::text_search::run(args, format),
         Commands::Sessions(args) => commands::sessions::run(args, cli.json, cli.pretty),
         Commands::Package {

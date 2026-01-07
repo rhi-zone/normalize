@@ -120,6 +120,10 @@ pub struct ViewArgs {
     #[arg(long)]
     pub context: bool,
 
+    /// Prepend directory context (.context.md files from hierarchy)
+    #[arg(long)]
+    pub dir_context: bool,
+
     /// Exclude paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN", value_delimiter = ',')]
     pub exclude: Vec<String>,
@@ -154,6 +158,21 @@ pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
             args.case_insensitive,
             format.is_json(),
         );
+    }
+
+    // Handle --dir-context: prepend directory context before main output
+    if args.dir_context && !format.is_json() {
+        let target_path = args
+            .target
+            .as_ref()
+            .map(|t| effective_root.join(t))
+            .unwrap_or_else(|| effective_root.clone());
+        if let Some(ctx) =
+            crate::commands::context::get_merged_context(&effective_root, &target_path)
+        {
+            println!("{}", ctx);
+            println!("\n---\n");
+        }
     }
 
     cmd_view(
