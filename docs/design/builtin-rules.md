@@ -221,6 +221,57 @@ enabled = false
 allow = ["**/generated/**", "**/proto/**"]
 ```
 
+## Rule Conditionals (`requires`)
+
+Rules can specify conditions that must be met before they run:
+
+```toml
+# ---
+# id = "rust/chained-if-let"
+# requires = { "rust.edition" = ">=2024" }
+# ---
+```
+
+### Available Sources
+
+| Source | Keys | Description |
+|--------|------|-------------|
+| `env.*` | Any env var | Environment variables (e.g., `env.CI`) |
+| `path.*` | `rel`, `ext`, `filename` | File path components |
+| `git.*` | `branch`, `staged`, `dirty` | Repository state |
+| `rust.*` | `edition`, `resolver`, `name`, `version` | Cargo.toml fields |
+
+### Operators
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| (none) | `"2024"` | Exact match |
+| `>=` | `">=2024"` | Greater or equal |
+| `<=` | `"<=2021"` | Less or equal |
+| `!` | `"!2018"` | Not equal |
+
+### Examples
+
+```toml
+# Only on Rust 2024+
+requires = { "rust.edition" = ">=2024" }
+
+# Only in CI
+requires = { "env.CI" = "true" }
+
+# Not on main branch
+requires = { "git.branch" = "!main" }
+
+# Combine multiple conditions (all must match)
+requires = { "rust.edition" = ">=2024", "env.CI" = "true" }
+```
+
+### Pluggable Sources
+
+The source system is pluggable via the `RuleSource` trait. Additional sources
+can be added for TypeScript (`tsconfig.json`), Python (`pyproject.toml`),
+Go (`go.mod`), etc.
+
 ## Known Limitations
 
 ### In-File Test Detection (`#[cfg(test)]`)
