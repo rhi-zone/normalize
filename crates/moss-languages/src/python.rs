@@ -1054,12 +1054,12 @@ mod tests {
     use crate::GrammarLoader;
     use tree_sitter::Parser;
 
-    fn parse_python(content: &str) -> tree_sitter::Tree {
+    fn parse_python(content: &str) -> (tree_sitter::Tree, GrammarLoader) {
         let loader = GrammarLoader::new();
         let language = loader.get("python").unwrap();
         let mut parser = Parser::new();
         parser.set_language(&language).unwrap();
-        parser.parse(content, None).unwrap()
+        (parser.parse(content, None).unwrap(), loader)
     }
 
     #[test]
@@ -1076,7 +1076,7 @@ mod tests {
     """Convert to string."""
     return str(x)
 "#;
-        let tree = parse_python(content);
+        let (tree, _loader) = parse_python(content);
         let root = tree.root_node();
 
         // Find function node
@@ -1100,7 +1100,7 @@ mod tests {
     """A foo class."""
     pass
 "#;
-        let tree = parse_python(content);
+        let (tree, _loader) = parse_python(content);
         let root = tree.root_node();
 
         let mut cursor = root.walk();
@@ -1124,7 +1124,7 @@ def _protected(): pass
 def __private(): pass
 def __dunder__(): pass
 "#;
-        let tree = parse_python(content);
+        let (tree, _loader) = parse_python(content);
         let root = tree.root_node();
 
         let mut cursor = root.walk();

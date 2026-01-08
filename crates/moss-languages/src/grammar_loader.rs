@@ -3,6 +3,41 @@
 //! Loads tree-sitter grammars from shared libraries (.so/.dylib/.dll).
 //! Also loads highlight queries (.scm files) for syntax highlighting.
 //! Grammars are compiled from arborium sources via `cargo xtask build-grammars`.
+//!
+//! # ABI Compatibility
+//!
+//! Tree-sitter grammars have an ABI version embedded at compile time. The tree-sitter
+//! library only loads grammars within its supported version range:
+//! - tree-sitter 0.24: ABI 13-14
+//! - tree-sitter 0.25+: ABI 13-15
+//!
+//! Arborium grammar crates embed the ABI version in their parser.c source. When arborium
+//! updates to use newer tree-sitter, grammars must be recompiled. Stale grammars in
+//! `~/.config/moss/grammars/` may cause `LanguageError { version: N }` if incompatible.
+//!
+//! # Lifetime Requirements
+//!
+//! **IMPORTANT**: The `GrammarLoader` must outlive any `Language` or `Tree` obtained from it.
+//! The loader holds the shared library (`Library`) that contains the grammar's code. If the
+//! loader is dropped, the library is unloaded, and any `Language`/`Tree` references become
+//! dangling pointers (use-after-free, likely segfault).
+//!
+//! Safe patterns:
+//! - Use a global singleton loader (see `moss::parsers::grammar_loader()`)
+//! - Keep the loader in scope for the duration of tree usage
+//! - Return `(Tree, GrammarLoader)` tuples from helper functions
+//!
+//! Unsafe pattern (causes segfault):
+//! ```ignore
+//! fn parse(code: &str) -> Tree {
+//!     let loader = GrammarLoader::new();  // Created here
+//!     let lang = loader.get("python").unwrap();
+//!     let mut parser = Parser::new();
+//!     parser.set_language(&lang).unwrap();
+//!     parser.parse(code, None).unwrap()   // Tree returned
+//! }  // loader dropped here - library unloaded!
+//! // Tree now has dangling pointers -> segfault on use
+//! ```
 
 use libloading::{Library, Symbol};
 use std::collections::HashMap;
@@ -11,11 +46,15 @@ use std::sync::{Arc, RwLock};
 use tree_sitter::Language;
 use tree_sitter_language::LanguageFn;
 
-/// Loaded grammar library.
+/// Loaded grammar with its backing library.
+///
+/// The `_library` field keeps the shared library loaded in memory. The `language`
+/// field contains pointers into this library's memory. Dropping the library while
+/// the language is in use causes undefined behavior (typically segfault).
 struct LoadedGrammar {
-    /// Keep library alive while Language is in use.
+    /// Backing shared library - must outlive any use of `language`.
     _library: Library,
-    /// The tree-sitter Language pointer.
+    /// Tree-sitter Language (contains pointers into `_library`).
     language: Language,
 }
 

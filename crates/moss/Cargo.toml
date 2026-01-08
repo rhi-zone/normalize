@@ -33,7 +33,7 @@ walkdir.workspace = true
 ignore.workspace = true
 nucleo-matcher.workspace = true
 rusqlite.workspace = true
-tree-sitter = "0.24"
+tree-sitter = "0.25"
 streaming-iterator = "0.1"
 dirs = "5"
 moss-core = { path = "../moss-core" }
