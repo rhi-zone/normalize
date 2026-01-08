@@ -146,14 +146,16 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
     - [x] Extended language coverage: Python (print-debug, breakpoint), Go (fmt-print), Ruby (binding-pry)
     - Remaining: rule sharing/import mechanism, auto-fix support
-  - Project manifest parsing: extract version/config from Cargo.toml, tsconfig.json, pyproject.toml, go.mod, etc.
-    - Cache per-directory, find nearest manifest for each file
-    - Consumers: rules (conditionals), index (syntax features), view (formatting), analysis
-  - Rule conditionals: richer predicates beyond path-based `allow`
-    - Data sources: manifest (edition/version), env (CI/OS), config flags, index (imports/symbols), git state
-    - Example: `requires = { rust.edition = ">=2024" }` for chained if-let
-    - Example: `requires = { env.CI = true }` for stricter CI-only rules
-    - Current `allow` is path-only; this generalizes to arbitrary conditions
+  - [x] Project manifest parsing: extract version/config from Cargo.toml
+    - RustSource parses Cargo.toml for edition, resolver, name, version
+    - Finds nearest Cargo.toml for each file
+    - TODO: Add TypeScript (tsconfig.json), Python (pyproject.toml), Go (go.mod)
+  - [x] Rule conditionals: `requires` predicates beyond path-based `allow`
+    - Pluggable RuleSource trait for data sources
+    - Built-in sources: env, path, git, rust
+    - Operators: exact match, >=, <=, !
+    - Example: `requires = { "rust.edition" = ">=2024" }` for chained if-let
+    - Example: `requires = { "env.CI" = "true" }` for stricter CI-only rules
   - Semantic rules system: for rules needing cross-file analysis (import cycles, unused exports, type mismatches). Current syntax-based rules are single-file AST queries; semantic rules need index-backed analysis. Separate infrastructure, triggered differently (post-index vs per-file).
   - [x] Phase 4: combined query optimization (single-traversal multi-rule matching)
     - Achieved via tree-sitter combined queries (simpler than full tree automata)
