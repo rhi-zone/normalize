@@ -17,6 +17,25 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Parse a simple TOML value from ` = "value"` or ` = 'value'`.
+/// Used for quick line-based parsing of config files.
+fn parse_toml_value(rest: &str) -> Option<String> {
+    let rest = rest.trim();
+    let rest = rest.strip_prefix('=')?;
+    let rest = rest.trim();
+
+    // Handle quoted strings
+    if let Some(rest) = rest.strip_prefix('"') {
+        return rest.strip_suffix('"').map(|s| s.to_string());
+    }
+    if let Some(rest) = rest.strip_prefix('\'') {
+        return rest.strip_suffix('\'').map(|s| s.to_string());
+    }
+
+    // Handle unquoted values (numbers, etc.)
+    Some(rest.to_string())
+}
+
 /// Context passed to sources for evaluation.
 pub struct SourceContext<'a> {
     /// Absolute path to the file being analyzed.
@@ -197,53 +216,97 @@ impl RustSource {
         }
     }
 
-    /// Parse edition from Cargo.toml content.
-    fn parse_cargo_toml(content: &str) -> HashMap<String, String> {
+    /// Find the workspace root Cargo.toml (the one with [workspace] section).
+    fn find_workspace_root(start: &Path) -> Option<std::path::PathBuf> {
+        let mut current = start.parent()?;
+        loop {
+            let cargo_toml = current.join("Cargo.toml");
+            if cargo_toml.exists() {
+                if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+                    if let Ok(parsed) = content.parse::<toml::Table>() {
+                        if parsed.contains_key("workspace") {
+                            return Some(cargo_toml);
+                        }
+                    }
+                }
+            }
+            current = current.parent()?;
+        }
+    }
+
+    /// Parse Cargo.toml, resolving workspace inheritance.
+    fn parse_cargo_toml(cargo_toml_path: &Path) -> HashMap<String, String> {
         let mut result = HashMap::new();
 
-        // Simple TOML parsing for key fields
-        // TODO: Use proper TOML parser for robustness
-        for line in content.lines() {
-            let line = line.trim();
+        let content = match std::fs::read_to_string(cargo_toml_path) {
+            Ok(c) => c,
+            Err(_) => return result,
+        };
 
-            if let Some(rest) = line.strip_prefix("edition") {
-                if let Some(value) = Self::parse_value(rest) {
-                    result.insert("edition".to_string(), value);
+        let parsed: toml::Table = match content.parse() {
+            Ok(t) => t,
+            Err(_) => return result,
+        };
+
+        // Get package table
+        let package = match parsed.get("package").and_then(|v| v.as_table()) {
+            Some(p) => p,
+            None => return result,
+        };
+
+        // Keys we're interested in
+        let keys = ["edition", "resolver", "name", "version"];
+
+        // Try to get workspace values lazily (only if needed)
+        let mut workspace_package: Option<&toml::Table> = None;
+        let mut workspace_parsed: Option<toml::Table> = None;
+
+        for key in keys {
+            if let Some(value) = package.get(key) {
+                // Check for workspace inheritance: { workspace = true }
+                if let Some(table) = value.as_table() {
+                    if table.get("workspace").and_then(|v| v.as_bool()) == Some(true) {
+                        // Lazily load workspace Cargo.toml
+                        if workspace_package.is_none() {
+                            if let Some(ws_path) = Self::find_workspace_root(cargo_toml_path) {
+                                if let Ok(ws_content) = std::fs::read_to_string(&ws_path) {
+                                    if let Ok(ws_parsed) = ws_content.parse::<toml::Table>() {
+                                        workspace_parsed = Some(ws_parsed);
+                                    }
+                                }
+                            }
+                            workspace_package = workspace_parsed
+                                .as_ref()
+                                .and_then(|ws| ws.get("workspace"))
+                                .and_then(|w| w.as_table())
+                                .and_then(|w| w.get("package"))
+                                .and_then(|p| p.as_table());
+                        }
+
+                        // Get value from workspace
+                        if let Some(ws_pkg) = workspace_package {
+                            if let Some(ws_value) = ws_pkg.get(key) {
+                                if let Some(s) = ws_value.as_str() {
+                                    result.insert(key.to_string(), s.to_string());
+                                } else if let Some(i) = ws_value.as_integer() {
+                                    result.insert(key.to_string(), i.to_string());
+                                }
+                            }
+                        }
+                        continue;
+                    }
                 }
-            } else if let Some(rest) = line.strip_prefix("resolver") {
-                if let Some(value) = Self::parse_value(rest) {
-                    result.insert("resolver".to_string(), value);
-                }
-            } else if let Some(rest) = line.strip_prefix("name") {
-                if let Some(value) = Self::parse_value(rest) {
-                    result.insert("name".to_string(), value);
-                }
-            } else if let Some(rest) = line.strip_prefix("version") {
-                if let Some(value) = Self::parse_value(rest) {
-                    result.insert("version".to_string(), value);
+
+                // Direct value
+                if let Some(s) = value.as_str() {
+                    result.insert(key.to_string(), s.to_string());
+                } else if let Some(i) = value.as_integer() {
+                    result.insert(key.to_string(), i.to_string());
                 }
             }
         }
 
         result
-    }
-
-    /// Parse a TOML value from ` = "value"` or ` = 'value'`.
-    fn parse_value(rest: &str) -> Option<String> {
-        let rest = rest.trim();
-        let rest = rest.strip_prefix('=')?;
-        let rest = rest.trim();
-
-        // Handle quoted strings
-        if let Some(rest) = rest.strip_prefix('"') {
-            return rest.strip_suffix('"').map(|s| s.to_string());
-        }
-        if let Some(rest) = rest.strip_prefix('\'') {
-            return rest.strip_suffix('\'').map(|s| s.to_string());
-        }
-
-        // Handle unquoted values (numbers, etc.)
-        Some(rest.to_string())
     }
 }
 
@@ -261,9 +324,8 @@ impl RuleSource for RustSource {
 
         // Find nearest Cargo.toml
         let cargo_toml = Self::find_cargo_toml(ctx.file_path)?;
-        let content = std::fs::read_to_string(&cargo_toml).ok()?;
 
-        Some(Self::parse_cargo_toml(&content))
+        Some(Self::parse_cargo_toml(&cargo_toml))
     }
 }
 
@@ -443,7 +505,7 @@ impl PythonSource {
             let line = line.trim();
 
             if let Some(rest) = line.strip_prefix("requires-python") {
-                if let Some(value) = RustSource::parse_value(rest) {
+                if let Some(value) = parse_toml_value(rest) {
                     // Strip comparison operators for the version
                     let version = value
                         .trim_start_matches(">=")
@@ -454,11 +516,11 @@ impl PythonSource {
                     result.insert("requires_python".to_string(), version.to_string());
                 }
             } else if let Some(rest) = line.strip_prefix("name") {
-                if let Some(value) = RustSource::parse_value(rest) {
+                if let Some(value) = parse_toml_value(rest) {
                     result.insert("name".to_string(), value);
                 }
             } else if let Some(rest) = line.strip_prefix("version") {
-                if let Some(value) = RustSource::parse_value(rest) {
+                if let Some(value) = parse_toml_value(rest) {
                     result.insert("version".to_string(), value);
                 }
             }
@@ -619,6 +681,9 @@ mod tests {
 
     #[test]
     fn test_rust_source_parse_cargo_toml() {
+        let temp_dir = std::env::temp_dir().join("moss_test_cargo_toml");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let cargo_path = temp_dir.join("Cargo.toml");
         let content = r#"
 [package]
 name = "my-crate"
@@ -626,11 +691,13 @@ version = "0.1.0"
 edition = "2024"
 resolver = "2"
 "#;
-        let result = RustSource::parse_cargo_toml(content);
+        std::fs::write(&cargo_path, content).unwrap();
+        let result = RustSource::parse_cargo_toml(&cargo_path);
         assert_eq!(result.get("name"), Some(&"my-crate".to_string()));
         assert_eq!(result.get("version"), Some(&"0.1.0".to_string()));
         assert_eq!(result.get("edition"), Some(&"2024".to_string()));
         assert_eq!(result.get("resolver"), Some(&"2".to_string()));
+        std::fs::remove_dir_all(&temp_dir).ok();
     }
 
     #[test]

@@ -13,9 +13,6 @@ pub trait Merge {
     fn merge(self, other: Self) -> Self;
 }
 
-// Re-export the derive macro
-pub use moss_derive::Merge;
-
 // === Primitives (other always wins) ===
 
 impl Merge for bool {

@@ -5,7 +5,7 @@
 
 use crate::config::MossConfig;
 use crate::index::FileIndex;
-use crate::merge::Merge;
+use moss_derive::Merge;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

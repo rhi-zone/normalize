@@ -2,7 +2,6 @@
 
 mod args;
 mod ast;
-mod builtin_rules;
 mod call_graph;
 mod check_examples;
 mod check_refs;
@@ -14,8 +13,7 @@ mod hotspots;
 pub mod length;
 mod query;
 pub mod report;
-mod rule_sources;
-mod rules;
+mod rules_cmd;
 pub mod security;
 mod stale_docs;
 mod trace;
@@ -24,10 +22,10 @@ use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;
-use crate::merge::Merge;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
+use moss_derive::Merge;
+pub use moss_rules::{RuleOverride, RulesConfig};
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -58,33 +56,6 @@ pub struct AnalyzeConfig {
     /// Syntax rules configuration
     #[serde(default)]
     pub rules: RulesConfig,
-}
-
-/// Configuration for syntax rules analysis.
-/// Maps rule ID to per-rule configuration.
-/// e.g., { "rust/unnecessary-let" = { severity = "warning" } }
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(transparent)]
-pub struct RulesConfig(pub HashMap<String, RuleOverride>);
-
-impl Merge for RulesConfig {
-    fn merge(mut self, other: Self) -> Self {
-        self.0.extend(other.0);
-        self
-    }
-}
-
-/// Per-rule configuration override.
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(default)]
-pub struct RuleOverride {
-    /// Override the rule's severity.
-    pub severity: Option<String>,
-    /// Enable or disable the rule.
-    pub enabled: Option<bool>,
-    /// Additional file patterns to allow (skip) for this rule.
-    #[serde(default)]
-    pub allow: Vec<String>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -529,8 +500,8 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 .as_ref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| effective_root.clone());
-            let debug_flags = rules::DebugFlags::from_args(&debug);
-            rules::cmd_rules(
+            let debug_flags = moss_rules::DebugFlags::from_args(&debug);
+            rules_cmd::cmd_rules(
                 &target_root,
                 rule.as_deref(),
                 list,

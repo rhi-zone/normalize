@@ -10,9 +10,9 @@ mod tree;
 use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
-use crate::merge::Merge;
 use crate::{daemon, path_resolve};
 use clap::Args;
+use moss_derive::Merge;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 

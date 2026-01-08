@@ -3,11 +3,7 @@
 //! Rules are embedded at compile time and loaded as the lowest-priority source.
 //! Users can override or disable them via ~/.config/moss/rules/ or .moss/rules/.
 
-/// A builtin rule definition (id, content).
-pub struct BuiltinRule {
-    pub id: &'static str,
-    pub content: &'static str,
-}
+use crate::BuiltinRule;
 
 /// All embedded builtin rules.
 pub const BUILTIN_RULES: &[BuiltinRule] = &[

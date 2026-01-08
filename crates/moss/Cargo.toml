@@ -36,9 +36,11 @@ rusqlite.workspace = true
 tree-sitter = "0.24"
 streaming-iterator = "0.1"
 dirs = "5"
+moss-core = { path = "../moss-core" }
 moss-derive = { path = "../moss-derive" }
 moss-languages = { path = "../moss-languages" }
 moss-jsonschema = { path = "../moss-jsonschema" }
+moss-rules = { path = "../moss-rules" }
 moss-openapi = { path = "../moss-openapi" }
 moss-packages = { path = "../moss-packages" }
 moss-sessions = { path = "../moss-sessions" }

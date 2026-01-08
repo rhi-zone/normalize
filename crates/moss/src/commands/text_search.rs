@@ -6,10 +6,10 @@
 use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
-use crate::merge::Merge;
 use crate::output::{OutputFormat, OutputFormatter};
 use crate::text_search;
 use clap::Args;
+use moss_derive::Merge;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 

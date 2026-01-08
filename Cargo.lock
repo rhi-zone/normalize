@@ -2857,11 +2857,13 @@ dependencies = [
  "jaq-std",
  "libc",
  "mlua",
+ "moss-core",
  "moss-derive",
  "moss-jsonschema",
  "moss-languages",
  "moss-openapi",
  "moss-packages",
+ "moss-rules",
  "moss-sessions",
  "moss-tools",
  "notify",
@@ -2899,6 +2901,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "moss-core"
+version = "0.1.0"
 
 [[package]]
 name = "moss-derive"
@@ -3050,6 +3056,23 @@ dependencies = [
  "serde_yaml",
  "toml",
  "ureq",
+]
+
+[[package]]
+name = "moss-rules"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "glob",
+ "ignore",
+ "moss-core",
+ "moss-derive",
+ "moss-languages",
+ "regex",
+ "serde",
+ "streaming-iterator",
+ "toml",
+ "tree-sitter",
 ]
 
 [[package]]
