@@ -89,6 +89,8 @@ See `docs/` for design docs and `README.md` for usage.
   - `rust/chained-if-let`: flags nested if-let patterns (uses `requires` for Rust 2024+ only)
   - JSON output with `--json`
   - Shows file count in header: "src/**/*.rs (18 files)"
+  - Language sources: `typescript.*` (tsconfig.json), `python.*` (pyproject.toml), `go.*` (go.mod)
+  - Extracted to `moss-rules` crate (library code separate from CLI)
 - `-i/--case-insensitive` flag for trace, callers, callees subcommands
   - Matches symbol names case-insensitively
   - Consistent with view and edit command flags
