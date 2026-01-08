@@ -1,7 +1,10 @@
 //! Haskell language support.
 
 use crate::external_packages::ResolvedPackage;
-use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
+use crate::{
+    Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+    simple_function_symbol,
+};
 use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
@@ -90,22 +93,12 @@ impl Language for Haskell {
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(node, content),
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+        Some(simple_function_symbol(
+            node,
+            content,
+            name,
+            self.extract_docstring(node, content),
+        ))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {

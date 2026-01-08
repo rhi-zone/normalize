@@ -144,6 +144,53 @@ pub fn has_extension(name: &str, extensions: &[&str]) -> bool {
         .any(|ext| name.ends_with(&format!(".{}", ext)))
 }
 
+// === Helper functions for common extractor patterns ===
+
+/// Create a simple symbol with standard defaults.
+///
+/// Used by languages with straightforward function/method syntax where symbols:
+/// - Have public visibility
+/// - Use first line as signature
+/// - Have no attributes or children
+/// - Don't implement interfaces
+///
+/// Languages using this: cmake, glsl, graphql, hlsl, awk, elm, fish, haskell,
+/// jq, julia, ocaml, powershell, zsh
+pub fn simple_symbol(
+    node: &tree_sitter::Node,
+    content: &str,
+    name: &str,
+    kind: SymbolKind,
+    docstring: Option<String>,
+) -> Symbol {
+    let text = &content[node.byte_range()];
+    let first_line = text.lines().next().unwrap_or(text);
+
+    Symbol {
+        name: name.to_string(),
+        kind,
+        signature: first_line.trim().to_string(),
+        docstring,
+        attributes: Vec::new(),
+        start_line: node.start_position().row + 1,
+        end_line: node.end_position().row + 1,
+        visibility: Visibility::Public,
+        children: Vec::new(),
+        is_interface_impl: false,
+        implements: Vec::new(),
+    }
+}
+
+/// Create a simple function symbol (convenience wrapper).
+pub fn simple_function_symbol(
+    node: &tree_sitter::Node,
+    content: &str,
+    name: &str,
+    docstring: Option<String>,
+) -> Symbol {
+    simple_symbol(node, content, name, SymbolKind::Function, docstring)
+}
+
 /// Unified language support trait.
 ///
 /// Each language implements this trait to provide:

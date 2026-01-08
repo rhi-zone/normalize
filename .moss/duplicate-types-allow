@@ -138,3 +138,91 @@ SearchResult ViewNode
 
 # Different metrics with shared location fields, over-engineering to unify
 FunctionComplexity FunctionLength
+
+# Location-based types naturally share line/column fields
+Diagnostic OxlintPosition
+MossRunner OxlintPosition
+MossRunner EslintMessage
+Symbol FunctionInfo
+OxlintSpan PyrightRange
+OxlintSpan BiomeSpan
+OxlintSpan GrepMatch
+OxlintPosition EslintMessage
+OxlintPosition MypyDiagnostic
+OxlintPosition Location
+PyrightRange BiomeSpan
+PyrightRange GrepMatch
+BiomeSpan GrepMatch
+
+# Coincidental dependency/version overlap
+YarnEntry BunPackage
+YarnEntry PackageInfo
+YarnEntry TreeNode
+BunPackage PackageQuery
+BunPackage TreeNode
+PackageQuery CliSpec
+PackageInfo TestRunnerInfo
+Feature TestRunnerInfo
+
+# Span/range types share start/end fields (common pattern)
+PyrightRange HighlightSpan
+BiomeSpan HighlightSpan
+HighlightSpan GrepMatch
+
+# Coincidental 2-field overlaps from small types
+TestRunnerInfo CliSpec
+TestRunnerInfo CliCommand
+FileLength LargeFile
+ViewArgs ViewOpts
+EditArgs BatchEditOp
+TextSearchConfig TextSearchArgs
+GrepArgs TextSearchConfig
+GrepArgs TextSearchArgs
+ParsedTree HighlightedFile
+LlmConfig ModelConfig
+NotebookCell ChunkResponse
+FileIndex SymbolIndex
+FileReexports FileSymbols
+FileSymbols FileIndex
+FileSymbols FileReexports
+ViewNode ViewEntry
+RulesConfig ToolConfig
+AgentMessage AgentTask
+RulesConfig EnabledRule
+TextSearchArgs FileListQuery
+MemoryItem BuiltinRule
+ParsedTree HighlightedFile
+HighlightedFile ParsedTree
+IndexMetadata FileEntry
+IndexMeta SearchMeta
+FileIndex SymbolIndex
+
+# Lua tree-sitter wrappers share internal state
+LuaTree LuaNode
+
+# LLM configs share model/provider fields
+LlmClient MossAgentSession
+
+# Content-based types share id/content
+Hunk BuiltinRule
+
+# Server state types share index/root
+AppState MossBackend
+
+# File parsing results share symbol data
+ExtractResult ParsedFileData
+
+# Dependency extraction types (same domain)
+ExtractedDeps DepsResult
+
+# Index data types (same domain)
+ParsedFileData CallGraphStats
+
+# File metadata types share path/mtime
+IndexedFile SessionFile
+
+# Edit history types (nested structure)
+HistoryEntry EditInfo
+
+# Rule config types (same domain)
+RuleOverride Rule

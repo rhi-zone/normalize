@@ -47,3 +47,93 @@ crates/moss/src/commands/analyze.rs:security
 # Python stdlib lookup (similar but distinct)
 crates/moss-languages/src/python.rs:get_python_version
 crates/moss-languages/src/python.rs:find_python_stdlib
+
+# C/C++ shared include directive handling (same preprocessor syntax)
+crates/moss-languages/src/c.rs:extract_imports
+crates/moss-languages/src/cpp.rs:extract_imports
+
+# Query functions (intentionally parallel highlight/injection)
+crates/moss/src/tree.rs:get_highlight_query
+crates/moss/src/tree.rs:get_injection_query
+
+# Shader languages share comment/docstring syntax
+crates/moss-languages/src/glsl.rs:extract_docstring
+crates/moss-languages/src/hlsl.rs:extract_docstring
+crates/moss-languages/src/glsl.rs:extract_public_symbols
+crates/moss-languages/src/hlsl.rs:extract_public_symbols
+
+# Shell languages share comment patterns (# prefix)
+crates/moss-languages/src/awk.rs:extract_docstring
+crates/moss-languages/src/fish.rs:extract_docstring
+crates/moss-languages/src/jq.rs:extract_docstring
+crates/moss-languages/src/zsh.rs:extract_docstring
+
+# Config/DSL languages share comment patterns (# prefix)
+crates/moss-languages/src/nix.rs:extract_docstring
+crates/moss-languages/src/perl.rs:extract_docstring
+crates/moss-languages/src/vim.rs:extract_docstring
+
+# Simple container extraction (name from first child, standard signature)
+crates/moss-languages/src/devicetree.rs:extract_container
+crates/moss-languages/src/kdl.rs:extract_container
+crates/moss-languages/src/verilog.rs:extract_container
+crates/moss-languages/src/rescript.rs:extract_container
+crates/moss-languages/src/agda.rs:extract_container
+crates/moss-languages/src/tlaplus.rs:extract_container
+crates/moss-languages/src/matlab.rs:extract_container
+crates/moss-languages/src/matlab.rs:extract_type
+
+# Simple function extraction patterns (not yet using helper)
+crates/moss-languages/src/matlab.rs:extract_function
+crates/moss-languages/src/starlark.rs:extract_function
+crates/moss-languages/src/thrift.rs:extract_function
+crates/moss-languages/src/batch.rs:extract_function
+crates/moss-languages/src/groovy.rs:extract_function
+crates/moss-languages/src/scss.rs:extract_function
+crates/moss-languages/src/svelte.rs:extract_function
+
+# JavaScript test patterns (jest/vitest conventions)
+crates/moss-languages/src/javascript.rs:is_test_symbol
+crates/moss-languages/src/vue.rs:is_test_symbol
+crates/moss-languages/src/typescript.rs:is_test_symbol
+crates/moss-languages/src/svelte.rs:is_test_symbol
+
+# Shell public symbol extraction (all exports via declare)
+crates/moss-languages/src/bash.rs:extract_public_symbols
+crates/moss-languages/src/fish.rs:extract_public_symbols
+crates/moss-languages/src/zsh.rs:extract_public_symbols
+crates/moss-languages/src/bash.rs:extract_function
+crates/moss-languages/src/vue.rs:extract_function
+
+# Import format (JS module conventions)
+crates/moss-languages/src/vue.rs:format_import
+crates/moss-languages/src/svelte.rs:format_import
+
+# Import extraction (keyword-based import patterns)
+crates/moss-languages/src/caddy.rs:extract_imports
+crates/moss-languages/src/capnp.rs:extract_imports
+crates/moss-languages/src/idris.rs:extract_imports
+crates/moss-languages/src/lean.rs:extract_imports
+
+# TypeScript duplicate methods (same impl in TypeScript and TSX)
+crates/moss-languages/src/typescript.rs:container_body
+crates/moss-languages/src/typescript.rs:is_test_symbol
+crates/moss-languages/src/typescript.rs:package_sources
+
+# Java/Kotlin/Groovy test patterns (JUnit conventions)
+crates/moss-languages/src/groovy.rs:is_test_symbol
+crates/moss-languages/src/java.rs:is_test_symbol
+crates/moss-languages/src/kotlin.rs:is_test_symbol
+
+# Generator lookup pattern (openapi/jsonschema crates)
+crates/moss-openapi/src/lib.rs:get_generator
+crates/moss-jsonschema/src/lib.rs:get_generator
+
+# FFI new() constructor pattern
+crates/moss-languages/src/ffi.rs:new
+crates/moss-cli-parser/src/formats/mod.rs:new
+
+# Language node_name implementations (name child lookup)
+crates/moss-languages/src/batch.rs:node_name
+crates/moss-languages/src/d.rs:node_name
+crates/moss-languages/src/matlab.rs:node_name

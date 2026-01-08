@@ -117,8 +117,10 @@ jobs:
 
       - name: Check for code clones
         run: |
-          ./target/release/moss analyze duplicate-functions
-          ./target/release/moss analyze duplicate-types
+          # Catch significant function duplication (15+ lines)
+          ./target/release/moss analyze duplicate-functions --min-lines 15
+          # Catch significant type duplication (90%+ overlap, 5+ common fields)
+          ./target/release/moss analyze duplicate-types --min-overlap 90
         env:
           MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 

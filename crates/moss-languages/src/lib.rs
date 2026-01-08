@@ -26,6 +26,7 @@
 //! ```
 
 pub mod c_cpp;
+mod component;
 pub mod ecmascript;
 pub mod external_packages;
 pub mod ffi;
@@ -140,7 +141,8 @@ pub use registry::{
 };
 pub use traits::{
     EmbeddedBlock, Export, Import, Language, PackageSource, PackageSourceKind, Symbol, SymbolKind,
-    Visibility, VisibilityMechanism, has_extension, skip_dotfiles,
+    Visibility, VisibilityMechanism, has_extension, simple_function_symbol, simple_symbol,
+    skip_dotfiles,
 };
 
 // Re-export language structs
