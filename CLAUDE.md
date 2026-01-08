@@ -23,6 +23,10 @@ Behavioral rules for Claude Code in this repository.
 
 **Don't say these (edit first):** "Fair point", "Should have", "That should go in X" → edit the file BEFORE responding.
 
+**Do the work properly.** When asked to analyze X, actually read X - don't synthesize from conversation. The cost of doing it right < redoing it.
+
+**If citing CLAUDE.md after failing:** The file failed its purpose. Adjust it to actually prevent the failure.
+
 ## Dogfooding
 
 **Use moss, not builtin tools.** Avoid Read/Grep/Glob - they waste tokens.
@@ -52,6 +56,8 @@ Do not:
 - Replace content when editing lists - extend, don't replace
 - Cut corners with fallbacks - implement properly for each case
 - Mark as done prematurely - note what remains
+- Fear "over-modularization" - 100 lines is fine for a module
+- Consider time constraints - we're NOT short on time; optimize for correctness
 
 ## Design Principles
 
@@ -64,5 +70,7 @@ Do not:
 **Explicit over implicit.** Log when skipping. Location-based allowlists > hash-based. Show what's at stake before refusing.
 
 **Separate niche from shared.** Don't bloat config.toml with feature-specific data. Use separate files for specialized data.
+
+**Dynamic context > append-only.** Chatbot model (growing conversation log) is wrong for agents. Moss uses context that can be reshaped, not just accumulated.
 
 **When stuck (2+ attempts):** Step back. Am I solving the right problem? Check docs/philosophy.md before questioning design.
