@@ -61,20 +61,6 @@ impl SourceRegistry {
         self.sources.push(source);
     }
 
-    /// Evaluate all sources for a file, returning combined namespace.key -> value map.
-    pub fn evaluate(&self, ctx: &SourceContext) -> HashMap<String, String> {
-        let mut result = HashMap::new();
-        for source in &self.sources {
-            if let Some(values) = source.evaluate(ctx) {
-                let ns = source.namespace();
-                for (key, value) in values {
-                    result.insert(format!("{}.{}", ns, key), value);
-                }
-            }
-        }
-        result
-    }
-
     /// Get a specific value by full key (e.g., "rust.edition").
     pub fn get(&self, ctx: &SourceContext, key: &str) -> Option<String> {
         // Parse namespace.key
