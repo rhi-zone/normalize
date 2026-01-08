@@ -3,6 +3,7 @@
 //! Sources provide data that rules can use in `requires` predicates:
 //! ```toml
 //! requires = { rust.edition = ">=2024" }
+//! requires = { rust.is_test_file = "!" }  # exclude test files
 //! requires = { env.CI = "true" }
 //! requires = { path.matches = "**/tests/**" }
 //! ```
@@ -200,7 +201,9 @@ impl RuleSource for GitSource {
 
 /// Rust project source - parses Cargo.toml for edition, resolver, etc.
 ///
-/// Provides `rust.edition`, `rust.resolver`, `rust.name`.
+/// Provides:
+/// - `rust.edition`, `rust.resolver`, `rust.name`, `rust.version` - from Cargo.toml
+/// - `rust.is_test_file` - true if file is in tests/, named *_test.rs, or has top-level #[cfg(test)]
 pub struct RustSource;
 
 impl RustSource {
@@ -308,6 +311,45 @@ impl RustSource {
 
         result
     }
+
+    /// Detect if a file is a test file based on path patterns and content.
+    fn is_test_file(ctx: &SourceContext) -> bool {
+        let path = ctx.rel_path;
+
+        // Path-based detection
+        if path.starts_with("tests/")
+            || path.starts_with("tests\\")
+            || path.contains("/tests/")
+            || path.contains("\\tests\\")
+        {
+            return true;
+        }
+
+        // Filename patterns
+        if let Some(filename) = ctx.file_path.file_name().and_then(|n| n.to_str()) {
+            if filename.ends_with("_test.rs")
+                || filename.ends_with("_tests.rs")
+                || filename.starts_with("test_")
+            {
+                return true;
+            }
+        }
+
+        // Check file content for top-level #[cfg(test)]
+        // This catches files that are primarily test code
+        if let Ok(content) = std::fs::read_to_string(ctx.file_path) {
+            // Look for #[cfg(test)] at start of line (top-level attribute)
+            for line in content.lines().take(50) {
+                // Skip to first non-comment, non-empty line with #[cfg(test)]
+                let trimmed = line.trim();
+                if trimmed.starts_with("#[cfg(test)]") {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
 }
 
 impl RuleSource for RustSource {
@@ -323,9 +365,19 @@ impl RuleSource for RustSource {
         }
 
         // Find nearest Cargo.toml
-        let cargo_toml = Self::find_cargo_toml(ctx.file_path)?;
+        let cargo_toml = Self::find_cargo_toml(ctx.file_path);
 
-        Some(Self::parse_cargo_toml(&cargo_toml))
+        let mut result = cargo_toml
+            .map(|p| Self::parse_cargo_toml(&p))
+            .unwrap_or_default();
+
+        // Detect test files
+        result.insert(
+            "is_test_file".to_string(),
+            Self::is_test_file(ctx).to_string(),
+        );
+
+        Some(result)
     }
 }
 
@@ -778,5 +830,40 @@ require (
             Some(&"github.com/user/repo".to_string())
         );
         assert_eq!(result.get("version"), Some(&"1.21".to_string()));
+    }
+
+    #[test]
+    fn test_rust_is_test_file() {
+        // Path-based detection: /tests/ directory
+        let ctx = SourceContext {
+            file_path: Path::new("/project/tests/integration.rs"),
+            rel_path: "tests/integration.rs",
+            project_root: Path::new("/project"),
+        };
+        assert!(RustSource::is_test_file(&ctx));
+
+        // Filename pattern: *_test.rs
+        let ctx = SourceContext {
+            file_path: Path::new("/project/src/foo_test.rs"),
+            rel_path: "src/foo_test.rs",
+            project_root: Path::new("/project"),
+        };
+        assert!(RustSource::is_test_file(&ctx));
+
+        // Filename pattern: test_*.rs
+        let ctx = SourceContext {
+            file_path: Path::new("/project/src/test_bar.rs"),
+            rel_path: "src/test_bar.rs",
+            project_root: Path::new("/project"),
+        };
+        assert!(RustSource::is_test_file(&ctx));
+
+        // Not a test file
+        let ctx = SourceContext {
+            file_path: Path::new("/project/src/lib.rs"),
+            rel_path: "src/lib.rs",
+            project_root: Path::new("/project"),
+        };
+        assert!(!RustSource::is_test_file(&ctx));
     }
 }
