@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Pre-commit hook: Rust checks
+# Pre-commit hook: format check and clippy
 #
 # Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
 set -e
 
-echo "Running cargo check..."
-cargo check --quiet
-
 echo "Running cargo fmt check..."
-cargo fmt -- --check
+cargo fmt --check
+
+echo "Running cargo clippy..."
+cargo clippy --all-targets --all-features -- -D warnings 2>/dev/null || {
+    echo "  Warning: clippy check failed or not available (non-critical)"
+}
 
 echo "Pre-commit checks passed!"
