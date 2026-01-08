@@ -203,7 +203,7 @@ End with "next turn:" until you reach your conclusion.
 
 **Analysis**: Prose syntax parsed correctly, but:
 - LLM still writes complete narrative including imagined outputs
-- Generates fake XML tags for outputs (<read_file>, <search>)
+- Generates fake XML tags for outputs (`<read_file>`, `<search>`)
 - "next turn:" ignored - LLM writes "Turn 1:", "Turn 2:" as story beats
 - Hallucination of file contents inline
 
