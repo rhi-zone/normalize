@@ -117,9 +117,15 @@ jobs:
 
       - name: Check for code clones
         run: |
-          # Catch significant function duplication (15+ lines)
+          # --min-lines 15: Functions under 15 lines are often simple patterns
+          # (constructors, getters, trait impls) where duplication is acceptable.
+          # Above 15 lines usually indicates extractable shared logic.
           ./target/release/moss analyze duplicate-functions --min-lines 15
-          # Catch significant type duplication (90%+ overlap, 5+ common fields)
+
+          # --min-overlap 90: Overlap = common_fields / smaller_type_fields.
+          # Small types (e.g., Position{line,column}) match any type with those
+          # fields, causing false positives. 90% filters coincidental matches
+          # while catching genuinely duplicated domain types.
           ./target/release/moss analyze duplicate-types --min-overlap 90
         env:
           MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars

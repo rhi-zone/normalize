@@ -1,3 +1,22 @@
+# Duplicate Types Allowlist
+#
+# CI runs: moss analyze duplicate-types --min-overlap 90
+#
+# Threshold rationale:
+# - Overlap is calculated as: common_fields / smaller_type_fields
+# - Types with only 2 fields (like Position {line, column}) will 100% match
+#   any type containing those fields, creating many false positives
+# - 90% overlap catches genuinely duplicated domain types while filtering
+#   coincidental matches from small utility types
+# - Most flagged pairs are intentional: different views of same data,
+#   Args/Config patterns, or domain types that naturally share fields
+#
+# To add entries, use the CLI (preferred):
+#   moss analyze duplicate-types --allow "TypeA" "TypeB" --reason "why they're distinct"
+#
+# Format: TypeA TypeB (one pair per line, # comments allowed)
+# Order doesn't matter. Document why pairs are intentionally distinct.
+
 # Different serialization contexts for same concept
 Export SymbolInfo
 

@@ -68,8 +68,8 @@ cache/
 
 *.cpuprofile
 
-# Moss - ignore .moss/ in subdirectories entirely
-**/.moss/
+# Moss - ignore .moss/ in subdirectories (but not root)
+*/**/.moss/
 
 # Root .moss/ - ignore all but config/allow files
 /.moss/*

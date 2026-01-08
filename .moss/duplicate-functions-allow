@@ -1,3 +1,20 @@
+# Duplicate Functions Allowlist
+#
+# CI runs: moss analyze duplicate-functions --min-lines 15
+#
+# Threshold rationale:
+# - Functions under 15 lines are often simple patterns (constructors, getters,
+#   standard trait implementations) where duplication is acceptable
+# - Above 15 lines, duplication usually indicates extractable shared logic
+# - This threshold eliminates ~95% of false positives while catching significant clones
+#
+# To add entries, use the CLI (preferred):
+#   moss analyze duplicate-functions --allow "file:symbol" --reason "why it's intentional"
+#
+# Format: file:symbol (one per line, # comments allowed)
+# Groups of related entries should be documented with a comment explaining why
+# they're intentionally parallel rather than candidates for extraction.
+
 # Legitimate parallel structures in openapi/jsonschema crates
 crates/moss-openapi/src/lib.rs:find_generator
 crates/moss-openapi/src/lib.rs:generators
