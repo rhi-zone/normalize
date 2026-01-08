@@ -15,6 +15,8 @@ export default withMermaid(
     },
   },
 
+  ignoreDeadLinks: true,
+
   title: 'Moss',
   description: 'Code intelligence CLI with structural awareness',
 

@@ -98,7 +98,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target/grammars
-          key: grammars-linux-${{ hashFiles('Cargo.lock') }}
+          key: grammars-linux-${{ hashFiles('Cargo.lock', 'xtask/src/**') }}
 
       - name: Fetch dependencies
         run: cargo fetch
