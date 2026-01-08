@@ -47,7 +47,7 @@ Moss provides a unified CLI for code intelligence. Three core primitives: **view
 | [sessions](sessions.md) | Analyze agent session logs |
 | [plans](plans.md) | View Claude Code plans |
 | [update](update.md) | Self-update moss |
-| [filter](filter.md) | Manage filter aliases |
+| [aliases](aliases.md) | Manage filter aliases |
 | [serve](serve.md) | Start MCP/HTTP/LSP server |
 | [generate](generate.md) | Generate code from API specs |
 
