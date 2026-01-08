@@ -146,13 +146,15 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
     - [x] Extended language coverage: Python (print-debug, breakpoint), Go (fmt-print), Ruby (binding-pry)
     - Remaining: rule sharing/import mechanism, auto-fix support
-  - [x] Project manifest parsing: extract version/config from Cargo.toml
-    - RustSource parses Cargo.toml for edition, resolver, name, version
-    - Finds nearest Cargo.toml for each file
-    - TODO: Add TypeScript (tsconfig.json), Python (pyproject.toml), Go (go.mod)
+  - [x] Project manifest parsing: extract version/config from project manifests
+    - RustSource: Cargo.toml (edition, resolver, name, version)
+    - TypeScriptSource: tsconfig.json + package.json (target, module, strict, node_version)
+    - PythonSource: pyproject.toml (requires_python, name, version)
+    - GoSource: go.mod (version, module)
+    - Each source finds nearest manifest for the file being analyzed
   - [x] Rule conditionals: `requires` predicates beyond path-based `allow`
     - Pluggable RuleSource trait for data sources
-    - Built-in sources: env, path, git, rust
+    - Built-in sources: env, path, git, rust, typescript, python, go
     - Operators: exact match, >=, <=, !
     - Example: `requires = { "rust.edition" = ">=2024" }` for chained if-let
     - Example: `requires = { "env.CI" = "true" }` for stricter CI-only rules

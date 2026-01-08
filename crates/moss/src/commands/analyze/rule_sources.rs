@@ -267,6 +267,296 @@ impl RuleSource for RustSource {
     }
 }
 
+/// TypeScript/JavaScript project source - parses tsconfig.json and package.json.
+///
+/// Provides `typescript.target`, `typescript.module`, `typescript.strict`, `node.version`.
+pub struct TypeScriptSource;
+
+impl TypeScriptSource {
+    /// Find the nearest tsconfig.json for a given file path.
+    fn find_tsconfig(file_path: &Path) -> Option<std::path::PathBuf> {
+        let mut current = file_path.parent()?;
+        loop {
+            let tsconfig = current.join("tsconfig.json");
+            if tsconfig.exists() {
+                return Some(tsconfig);
+            }
+            current = current.parent()?;
+        }
+    }
+
+    /// Find the nearest package.json for a given file path.
+    fn find_package_json(file_path: &Path) -> Option<std::path::PathBuf> {
+        let mut current = file_path.parent()?;
+        loop {
+            let pkg = current.join("package.json");
+            if pkg.exists() {
+                return Some(pkg);
+            }
+            current = current.parent()?;
+        }
+    }
+
+    /// Parse tsconfig.json for compilerOptions.
+    fn parse_tsconfig(content: &str) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+
+        // Simple JSON parsing for key fields in compilerOptions
+        // Look for "target", "module", "strict", "moduleResolution"
+        for line in content.lines() {
+            let line = line.trim();
+
+            if let Some(value) = Self::extract_json_string(line, "target") {
+                result.insert("target".to_string(), value);
+            } else if let Some(value) = Self::extract_json_string(line, "module") {
+                result.insert("module".to_string(), value);
+            } else if let Some(value) = Self::extract_json_string(line, "moduleResolution") {
+                result.insert("moduleResolution".to_string(), value);
+            } else if line.contains("\"strict\"") {
+                if line.contains("true") {
+                    result.insert("strict".to_string(), "true".to_string());
+                } else if line.contains("false") {
+                    result.insert("strict".to_string(), "false".to_string());
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Parse package.json for engines.node.
+    fn parse_package_json(content: &str) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+
+        // Look for engines.node version
+        let mut in_engines = false;
+        for line in content.lines() {
+            let line = line.trim();
+            if line.contains("\"engines\"") {
+                in_engines = true;
+            } else if in_engines {
+                if line.starts_with('}') {
+                    in_engines = false;
+                } else if let Some(value) = Self::extract_json_string(line, "node") {
+                    result.insert("node_version".to_string(), value);
+                }
+            }
+
+            // Also get name and version
+            if let Some(value) = Self::extract_json_string(line, "name") {
+                if !result.contains_key("name") {
+                    result.insert("name".to_string(), value);
+                }
+            }
+            if let Some(value) = Self::extract_json_string(line, "version") {
+                if !result.contains_key("version") {
+                    result.insert("version".to_string(), value);
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Extract a JSON string value: `"key": "value"` or `"key": "value",`
+    fn extract_json_string(line: &str, key: &str) -> Option<String> {
+        let pattern = format!("\"{}\"", key);
+        if !line.contains(&pattern) {
+            return None;
+        }
+
+        // Find the value after the colon
+        let colon_pos = line.find(':')?;
+        let after_colon = line[colon_pos + 1..].trim();
+
+        // Extract quoted string
+        if let Some(rest) = after_colon.strip_prefix('"') {
+            let end = rest.find('"')?;
+            return Some(rest[..end].to_string());
+        }
+
+        None
+    }
+}
+
+impl RuleSource for TypeScriptSource {
+    fn namespace(&self) -> &str {
+        "typescript"
+    }
+
+    fn evaluate(&self, ctx: &SourceContext) -> Option<HashMap<String, String>> {
+        // Only apply to TypeScript/JavaScript files
+        let ext = ctx.file_path.extension()?.to_string_lossy();
+        if !matches!(ext.as_ref(), "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs") {
+            return None;
+        }
+
+        let mut result = HashMap::new();
+
+        // Parse tsconfig.json if present
+        if let Some(tsconfig) = Self::find_tsconfig(ctx.file_path) {
+            if let Ok(content) = std::fs::read_to_string(&tsconfig) {
+                result.extend(Self::parse_tsconfig(&content));
+            }
+        }
+
+        // Parse package.json if present
+        if let Some(pkg_json) = Self::find_package_json(ctx.file_path) {
+            if let Ok(content) = std::fs::read_to_string(&pkg_json) {
+                result.extend(Self::parse_package_json(&content));
+            }
+        }
+
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
+        }
+    }
+}
+
+/// Python project source - parses pyproject.toml for project metadata.
+///
+/// Provides `python.version`, `python.name`.
+pub struct PythonSource;
+
+impl PythonSource {
+    /// Find the nearest pyproject.toml for a given file path.
+    fn find_pyproject(file_path: &Path) -> Option<std::path::PathBuf> {
+        let mut current = file_path.parent()?;
+        loop {
+            let pyproject = current.join("pyproject.toml");
+            if pyproject.exists() {
+                return Some(pyproject);
+            }
+            current = current.parent()?;
+        }
+    }
+
+    /// Parse pyproject.toml for project metadata.
+    fn parse_pyproject(content: &str) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+
+        // Simple TOML parsing for key fields
+        // Look for requires-python, name, version
+        for line in content.lines() {
+            let line = line.trim();
+
+            if let Some(rest) = line.strip_prefix("requires-python") {
+                if let Some(value) = RustSource::parse_value(rest) {
+                    // Strip comparison operators for the version
+                    let version = value
+                        .trim_start_matches(">=")
+                        .trim_start_matches("<=")
+                        .trim_start_matches("==")
+                        .trim_start_matches('^')
+                        .trim_start_matches('~');
+                    result.insert("requires_python".to_string(), version.to_string());
+                }
+            } else if let Some(rest) = line.strip_prefix("name") {
+                if let Some(value) = RustSource::parse_value(rest) {
+                    result.insert("name".to_string(), value);
+                }
+            } else if let Some(rest) = line.strip_prefix("version") {
+                if let Some(value) = RustSource::parse_value(rest) {
+                    result.insert("version".to_string(), value);
+                }
+            }
+        }
+
+        result
+    }
+}
+
+impl RuleSource for PythonSource {
+    fn namespace(&self) -> &str {
+        "python"
+    }
+
+    fn evaluate(&self, ctx: &SourceContext) -> Option<HashMap<String, String>> {
+        // Only apply to Python files
+        let ext = ctx.file_path.extension()?;
+        if ext != "py" {
+            return None;
+        }
+
+        // Find nearest pyproject.toml
+        let pyproject = Self::find_pyproject(ctx.file_path)?;
+        let content = std::fs::read_to_string(&pyproject).ok()?;
+
+        let result = Self::parse_pyproject(&content);
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
+        }
+    }
+}
+
+/// Go project source - parses go.mod for module metadata.
+///
+/// Provides `go.version`, `go.module`.
+pub struct GoSource;
+
+impl GoSource {
+    /// Find the nearest go.mod for a given file path.
+    fn find_go_mod(file_path: &Path) -> Option<std::path::PathBuf> {
+        let mut current = file_path.parent()?;
+        loop {
+            let go_mod = current.join("go.mod");
+            if go_mod.exists() {
+                return Some(go_mod);
+            }
+            current = current.parent()?;
+        }
+    }
+
+    /// Parse go.mod for module metadata.
+    fn parse_go_mod(content: &str) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+
+        for line in content.lines() {
+            let line = line.trim();
+
+            // module github.com/user/repo
+            if let Some(rest) = line.strip_prefix("module ") {
+                result.insert("module".to_string(), rest.trim().to_string());
+            }
+            // go 1.21
+            else if let Some(rest) = line.strip_prefix("go ") {
+                result.insert("version".to_string(), rest.trim().to_string());
+            }
+        }
+
+        result
+    }
+}
+
+impl RuleSource for GoSource {
+    fn namespace(&self) -> &str {
+        "go"
+    }
+
+    fn evaluate(&self, ctx: &SourceContext) -> Option<HashMap<String, String>> {
+        // Only apply to Go files
+        let ext = ctx.file_path.extension()?;
+        if ext != "go" {
+            return None;
+        }
+
+        // Find nearest go.mod
+        let go_mod = Self::find_go_mod(ctx.file_path)?;
+        let content = std::fs::read_to_string(&go_mod).ok()?;
+
+        let result = Self::parse_go_mod(&content);
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
+        }
+    }
+}
+
 /// Create a registry with all built-in sources.
 pub fn builtin_registry() -> SourceRegistry {
     let mut registry = SourceRegistry::new();
@@ -274,7 +564,9 @@ pub fn builtin_registry() -> SourceRegistry {
     registry.register(Box::new(PathSource));
     registry.register(Box::new(GitSource));
     registry.register(Box::new(RustSource));
-    // TODO: Add ConfigSource, TypeScriptSource, PythonSource, GoSource, etc.
+    registry.register(Box::new(TypeScriptSource));
+    registry.register(Box::new(PythonSource));
+    registry.register(Box::new(GoSource));
     registry
 }
 
@@ -356,5 +648,68 @@ resolver = "2"
         // Should find edition from Cargo.toml
         let edition = registry.get(&ctx, "rust.edition");
         assert!(edition.is_some(), "Should find rust.edition");
+    }
+
+    #[test]
+    fn test_typescript_source_parse_tsconfig() {
+        let content = r#"{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "strict": true,
+    "moduleResolution": "bundler"
+  }
+}"#;
+        let result = TypeScriptSource::parse_tsconfig(content);
+        assert_eq!(result.get("target"), Some(&"ES2020".to_string()));
+        assert_eq!(result.get("module"), Some(&"ESNext".to_string()));
+        assert_eq!(result.get("strict"), Some(&"true".to_string()));
+        assert_eq!(result.get("moduleResolution"), Some(&"bundler".to_string()));
+    }
+
+    #[test]
+    fn test_typescript_source_parse_package_json() {
+        let content = r#"{
+  "name": "my-app",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}"#;
+        let result = TypeScriptSource::parse_package_json(content);
+        assert_eq!(result.get("name"), Some(&"my-app".to_string()));
+        assert_eq!(result.get("version"), Some(&"1.0.0".to_string()));
+        assert_eq!(result.get("node_version"), Some(&">=18.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_python_source_parse_pyproject() {
+        let content = r#"
+[project]
+name = "my-package"
+version = "0.1.0"
+requires-python = ">=3.10"
+"#;
+        let result = PythonSource::parse_pyproject(content);
+        assert_eq!(result.get("name"), Some(&"my-package".to_string()));
+        assert_eq!(result.get("version"), Some(&"0.1.0".to_string()));
+        assert_eq!(result.get("requires_python"), Some(&"3.10".to_string()));
+    }
+
+    #[test]
+    fn test_go_source_parse_go_mod() {
+        let content = r#"module github.com/user/repo
+
+go 1.21
+
+require (
+    golang.org/x/text v0.3.0
+)"#;
+        let result = GoSource::parse_go_mod(content);
+        assert_eq!(
+            result.get("module"),
+            Some(&"github.com/user/repo".to_string())
+        );
+        assert_eq!(result.get("version"), Some(&"1.21".to_string()));
     }
 }

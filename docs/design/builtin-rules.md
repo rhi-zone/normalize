@@ -258,9 +258,12 @@ Rules can specify conditions that must be met before they run:
 | Source | Keys | Description |
 |--------|------|-------------|
 | `env.*` | Any env var | Environment variables (e.g., `env.CI`) |
-| `path.*` | `rel`, `ext`, `filename` | File path components |
+| `path.*` | `rel`, `abs`, `ext`, `filename` | File path components |
 | `git.*` | `branch`, `staged`, `dirty` | Repository state |
 | `rust.*` | `edition`, `resolver`, `name`, `version` | Cargo.toml fields |
+| `typescript.*` | `target`, `module`, `strict`, `moduleResolution`, `name`, `version`, `node_version` | tsconfig.json + package.json |
+| `python.*` | `requires_python`, `name`, `version` | pyproject.toml fields |
+| `go.*` | `version`, `module` | go.mod fields |
 
 ### Operators
 
@@ -289,9 +292,8 @@ requires = { "rust.edition" = ">=2024", "env.CI" = "true" }
 
 ### Pluggable Sources
 
-The source system is pluggable via the `RuleSource` trait. Additional sources
-can be added for TypeScript (`tsconfig.json`), Python (`pyproject.toml`),
-Go (`go.mod`), etc.
+The source system is pluggable via the `RuleSource` trait. Built-in sources cover
+common project types. Additional sources can be added by implementing `RuleSource`.
 
 ## Known Limitations
 
