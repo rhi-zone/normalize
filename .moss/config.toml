@@ -18,5 +18,9 @@ enabled = false
 [analyze.rules."js/console-log"]
 allow = ["**/fixtures/**"]
 
+# Enable numeric literal suffix rule (disabled by default)
+[analyze.rules."rust/numeric-type-annotation"]
+enabled = true
+
 [aliases]
 todo = ["TODO.md"]
