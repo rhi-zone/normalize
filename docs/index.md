@@ -29,6 +29,6 @@ features:
 
 ## Quick Links
 
-- **Getting Started**: [Introduction](/introduction) | [Installation](/installation)
+- **Getting Started**: [Introduction](/introduction)
 - **Commands**: [view](/cli/view) | [edit](/cli/edit) | [analyze](/cli/analyze)
 - **Reference**: [Language Support](/language-support) | [Lua API](/lua-api)

@@ -550,7 +550,7 @@ pub fn connect(host: &str, port: u16) -> Result<Connection, Error> {
 
 ### README Template
 
-```markdown
+````markdown
 # Project Name
 
 One-line description.
@@ -579,7 +579,7 @@ let result = client.query("SELECT 1")?;
 ## License
 
 MIT
-```
+````
 
 ### Function Documentation Template
 
