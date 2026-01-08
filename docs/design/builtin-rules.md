@@ -119,6 +119,27 @@ Flags `type Foo = Bar;` where Bar is a simple type - adds indirection without va
 
 **Legitimate uses:** Generic bounds, documentation, API stability.
 
+#### `rust/chained-if-let`
+**Severity:** info | **Languages:** rust | **Requires:** `rust.edition >= 2024`
+
+Flags nested if-let patterns that can be chained with `&&` in Rust 2024+.
+
+```rust
+// Before (flagged)
+if let Some(x) = foo() {
+    if let Some(y) = bar(x) {
+        use_both(x, y);
+    }
+}
+
+// After (Rust 2024+)
+if let Some(x) = foo() && let Some(y) = bar(x) {
+    use_both(x, y);
+}
+```
+
+**Only runs on:** Rust 2024+ edition (detected from Cargo.toml).
+
 ### JavaScript/TypeScript Rules
 
 #### `js/console-log`

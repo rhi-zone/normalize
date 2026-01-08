@@ -41,6 +41,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("rust_unnecessary_type_alias.scm"),
     },
     BuiltinRule {
+        id: "rust/chained-if-let",
+        content: include_str!("rust_chained_if_let.scm"),
+    },
+    BuiltinRule {
         id: "hardcoded-secret",
         content: include_str!("hardcoded_secret.scm"),
     },
