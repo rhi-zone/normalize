@@ -5,7 +5,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 - [x] Rule sharing/import: `moss rules add/update/list/remove` (Phase 1 complete)
-- Auto-fix support: for simple patterns like removing `dbg!()` statements
+- [x] Auto-fix support: `moss analyze rules --fix` with fix templates
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
 
 ## Remaining Work
@@ -147,7 +147,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
     - [x] Extended language coverage: Python (print-debug, breakpoint), Go (fmt-print), Ruby (binding-pry)
     - [x] Rule sharing/import mechanism (`moss rules add/update/list/remove`)
-    - Remaining: auto-fix support
+    - [x] Auto-fix support (`moss analyze rules --fix`)
   - [x] Project manifest parsing: extract version/config from project manifests
     - RustSource: Cargo.toml (edition, resolver, name, version)
     - TypeScriptSource: tsconfig.json + package.json (target, module, strict, node_version)
