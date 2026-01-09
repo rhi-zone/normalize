@@ -3,32 +3,29 @@ layout: home
 
 hero:
   name: "Moss"
-  text: "Structural code intelligence"
-  tagline: "For humans and AI agents. View, edit, and analyze code at the AST level."
+  text: "Code intelligence CLI"
+  tagline: "Navigate, analyze, and modify codebases using AST structure instead of text."
   actions:
     - theme: brand
-      text: Introduction
+      text: Get Started
       link: /introduction
     - theme: alt
       text: CLI Reference
       link: /cli/
-    - theme: alt
-      text: Philosophy
-      link: /philosophy
 
 features:
+  - title: View Structure
+    details: Browse directories, files, and symbols as a unified tree. Jump to any function or class by name.
+  - title: Analyze Quality
+    details: Health metrics, complexity analysis, duplicate detection, and security scanning in one tool.
   - title: 98 Languages
-    details: Tree-sitter grammars for comprehensive language support with dynamic loading.
-  - title: Three Primitives
-    details: view, edit, analyze - simple commands that compose into powerful workflows.
-  - title: Lua Workflows
-    details: Scriptable automation with auto{} LLM driver for AI-assisted development.
-  - title: Shadow Git
-    details: Hunk-level edit tracking in .moss/.git for safe, reversible changes.
+    details: Tree-sitter grammars for Python, Rust, TypeScript, Go, and 94 more languages.
+  - title: Tool Integration
+    details: Unified interface to linters (ruff, clippy, eslint), formatters, and type checkers.
 ---
 
 ## Quick Links
 
-- **Getting Started**: [Introduction](/introduction)
-- **Commands**: [view](/cli/view) | [edit](/cli/edit) | [analyze](/cli/analyze)
-- **Reference**: [Language Support](/language-support) | [Lua API](/lua-api)
+- [Introduction](/introduction) - Installation and first steps
+- [CLI Reference](/cli/) - All commands and options
+- [Language Support](/language-support) - Supported languages and features

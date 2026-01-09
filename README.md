@@ -1,17 +1,19 @@
 # Moss
 
-Fast code intelligence CLI. Provides structural awareness of codebases through AST-based analysis.
+Fast code intelligence CLI. Structural awareness of codebases through AST-based analysis.
 
 ## Install
 
 ```bash
-# Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/pterror/moss/master/install.sh | bash
-
 # From source
-cargo install --path crates/moss-cli
+cargo install --path crates/moss
 
 # Or build locally
+cargo build --release
+./target/release/moss --help
+
+# With Nix
+nix develop
 cargo build --release
 ```
 
@@ -28,13 +30,13 @@ moss view src/main.rs
 moss view src/main.rs/main
 
 # Analyze codebase health
-moss analyze --health
+moss analyze health
 
 # Search for text patterns
 moss text-search "TODO"
 
 # Run linters
-moss lint
+moss tools lint
 ```
 
 ## Commands
@@ -56,31 +58,33 @@ moss view --focus src/foo.rs    # Resolve and show imported symbols
 
 ### analyze - Codebase Analysis
 
-Unified analysis with multiple modes:
+Unified analysis with subcommands:
 
 ```bash
-moss analyze                    # Health + complexity + security
-moss analyze --health           # Codebase metrics and health score
-moss analyze --complexity       # Cyclomatic complexity report
-moss analyze --security         # Security vulnerability scan
-moss analyze --overview         # Comprehensive project overview
-moss analyze --lint             # Run all detected linters
-moss analyze --hotspots         # Git history analysis (churn + complexity)
-moss analyze --storage          # Index and cache sizes
+moss analyze health             # Codebase metrics and health score
+moss analyze complexity         # Cyclomatic complexity report
+moss analyze length             # Function length analysis
+moss analyze security           # Security vulnerability scan
+moss analyze hotspots           # Git history analysis (churn + complexity)
+moss analyze duplicate-functions # Detect code clones
+moss analyze duplicate-types    # Detect duplicate type definitions
+moss analyze docs               # Documentation coverage
+moss analyze all                # Run all analysis passes
 ```
 
-### lint - Run Linters
+### tools - Linters and Test Runners
 
 Unified interface to linters, formatters, and type checkers:
 
 ```bash
-moss lint                       # Auto-detect and run relevant tools
-moss lint --fix                 # Auto-fix where possible
-moss lint --watch               # Watch mode with debounce
-moss lint --sarif               # Output in SARIF format
-moss lint --category type       # Only type checkers
-moss lint --tools ruff,clippy   # Specific tools
-moss lint --list                # List available tools
+moss tools lint                 # Auto-detect and run relevant tools
+moss tools lint --fix           # Auto-fix where possible
+moss tools lint --sarif         # Output in SARIF format
+moss tools lint --category type # Only type checkers
+moss tools lint --tools ruff,clippy # Specific tools
+moss tools lint --list          # List available tools
+
+moss tools test                 # Run native test runners
 ```
 
 Supported tools: ruff, clippy, rustfmt, oxlint, biome, prettier, tsc, mypy, pyright, eslint, gofmt, go-vet, deno-check, and more.
@@ -121,23 +125,6 @@ moss serve http --port 8080     # REST API server
 moss serve lsp                  # LSP server for IDEs
 ```
 
-#### HTTP API Endpoints
-
-- `GET /health` - Server status
-- `GET /files?pattern=foo` - Search files
-- `GET /files/*path` - File info with symbols
-- `GET /symbols?name=foo` - Search symbols
-- `GET /symbols/:name` - Symbol source code
-- `GET /search?q=foo` - Combined search
-
-#### LSP Capabilities
-
-- Document symbols
-- Workspace symbol search
-- Hover (signature + docstring)
-- Go to definition
-- Find references
-
 ### index - Manage Index
 
 Control the file and symbol index:
@@ -149,14 +136,13 @@ moss index reindex              # Full reindex
 moss index reindex --call-graph # Include call graph
 ```
 
-### workflow - TOML Workflows
+### script - Lua Scripts
 
-Run scripted workflows defined in `.moss/workflows/`:
+Run Lua scripts for automation:
 
 ```bash
-moss workflow list              # List available workflows
-moss workflow run build         # Run a workflow
-moss workflow show build        # Show workflow definition
+moss script run my_script.lua   # Run a Lua script
+moss script list                # List available scripts
 ```
 
 ### sessions - Session Analysis
@@ -172,6 +158,20 @@ moss sessions --serve           # Web viewer at localhost:3939
 
 ## Configuration
 
+Create `.moss/config.toml`:
+
+```toml
+[index]
+enabled = true
+
+[view]
+depth = 1
+line_numbers = false
+
+[filter.aliases]
+tests = ["**/test_*.py", "**/*_test.go"]
+```
+
 ### Custom Lint Tools
 
 Add custom tools in `.moss/tools.toml`:
@@ -182,27 +182,7 @@ name = "my-linter"
 command = ["my-linter", "--format", "json"]
 category = "linter"
 languages = ["python"]
-
-# Parse output as SARIF or line-based
-output_format = "sarif"  # or "lines"
-```
-
-### Workflows
-
-Define workflows in `.moss/workflows/*.toml`:
-
-```toml
-name = "build"
-description = "Build and test"
-
-[[steps]]
-name = "check"
-command = ["cargo", "check"]
-
-[[steps]]
-name = "test"
-command = ["cargo", "test"]
-depends_on = ["check"]
+output_format = "sarif"
 ```
 
 ## Output Formats
@@ -211,8 +191,8 @@ Most commands support `--json` for structured output:
 
 ```bash
 moss view src/main.rs --json
-moss analyze --health --json
-moss lint --json
+moss analyze health --json
+moss tools lint --json
 ```
 
 ## Language Support
@@ -229,8 +209,11 @@ cargo build
 # Test
 cargo test
 
+# Build grammars (required for tests)
+cargo xtask build-grammars
+
 # Install locally
-cargo install --path crates/moss-cli
+cargo install --path crates/moss
 ```
 
 ### Prerequisites

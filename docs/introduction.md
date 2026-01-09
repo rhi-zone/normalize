@@ -1,18 +1,18 @@
 # Moss
 
-**Structural code intelligence for humans and AI agents.**
+**Code intelligence CLI for navigating and analyzing codebases.**
 
-Moss provides tools for understanding, navigating, and modifying code at a structural level (AST, control flow, dependencies) rather than treating code as text.
+Moss understands code structure (functions, classes, imports) rather than treating code as text. This enables precise navigation, accurate analysis, and structural modifications.
 
 ## Quick Start
 
 ```bash
 # Build from source
-git clone https://github.com/pterror/moss
+git clone https://github.com/rhizome-lab/moss
 cd moss
 cargo build --release
 
-# Or with nix
+# Or with Nix
 nix develop
 cargo build --release
 
@@ -20,44 +20,29 @@ cargo build --release
 moss view src/main.rs
 
 # Analyze codebase health
-moss analyze --health
+moss analyze health
 
-# Search for a symbol
-moss view SkeletonExtractor
+# Search for a symbol by name
+moss view MyClass
 ```
 
-## Three Primitives
+## Core Commands
 
 | Command | Purpose | Example |
 |---------|---------|---------|
-| `view` | See structure | `moss view src/` `moss view MyClass` |
-| `edit` | Modify code | `moss edit src/foo.rs/func --delete` |
-| `analyze` | Compute metrics | `moss analyze --complexity` |
+| `view` | Navigate structure | `moss view src/` or `moss view MyClass` |
+| `analyze` | Quality metrics | `moss analyze health` or `moss analyze complexity` |
+| `tools` | Run linters | `moss tools lint` or `moss tools test` |
 
-See [Primitives Spec](primitives-spec.md) for full documentation.
+## What It Does
 
-## Key Features
+**Navigate code structure** - Browse directories, files, and symbols as a unified tree. Find any function or class by name across the entire codebase.
 
-- **98 Languages** - Tree-sitter grammars for comprehensive language support
-- **Structural Editing** - AST-based code modifications with fuzzy matching
-- **Lua Workflows** - Scriptable automation with `auto{}` LLM driver
-- **Background Indexing** - Daemon maintains symbol/call graph index
-- **Shadow Git** - Hunk-level edit tracking in `.moss/.git`
+**Analyze code quality** - Health metrics, cyclomatic complexity, function length, duplicate detection, and security scanning.
 
-## Architecture
+**Run ecosystem tools** - Unified interface to linters (ruff, clippy, eslint, oxlint), formatters, and type checkers with consistent output.
 
-```
-moss view/edit/analyze     CLI commands
-        │
-        ▼
-    FileIndex              SQLite symbol/call graph
-        │
-        ▼
-  SkeletonExtractor        AST → structured output
-        │
-        ▼
-   GrammarLoader           Dynamic .so grammar loading
-```
+**98 language support** - Tree-sitter grammars for Python, Rust, TypeScript, JavaScript, Go, Java, C, C++, and many more.
 
 ## Configuration
 
@@ -77,7 +62,6 @@ tests = ["**/test_*.py", "**/*_test.go"]
 
 ## Documentation
 
-- [Philosophy](philosophy.md) - Design tenets and principles
-- [Primitives Spec](primitives-spec.md) - view, edit, analyze reference
+- [CLI Reference](/cli/) - All commands and options
 - [Language Support](language-support.md) - 98 supported languages
-- [Lua Workflows](workflow-format.md) - Automation with Lua scripts
+- [Philosophy](philosophy.md) - Design tenets and principles

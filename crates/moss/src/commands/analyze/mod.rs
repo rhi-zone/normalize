@@ -14,6 +14,7 @@ pub mod length;
 mod query;
 pub mod report;
 mod rules_cmd;
+mod sarif;
 pub mod security;
 mod stale_docs;
 mod trace;
@@ -281,34 +282,58 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             target,
             threshold,
             kind,
+            sarif,
         }) => {
-            let report = report::analyze(
-                target.as_deref(),
-                &effective_root,
-                false, // health
-                true,  // complexity
-                false, // length
-                false, // security
-                threshold.or(config.analyze.threshold()),
-                kind.as_deref(),
-                filter.as_ref(),
-            );
-            print_report(&report, json, pretty)
+            if sarif {
+                // Run complexity analysis and output in SARIF format
+                let report = complexity::analyze_codebase_complexity(
+                    &effective_root,
+                    usize::MAX, // no limit for SARIF
+                    threshold.or(config.analyze.threshold()),
+                    filter.as_ref(),
+                );
+                sarif::print_complexity_sarif(&report.functions, &effective_root);
+                0
+            } else {
+                let report = report::analyze(
+                    target.as_deref(),
+                    &effective_root,
+                    false, // health
+                    true,  // complexity
+                    false, // length
+                    false, // security
+                    threshold.or(config.analyze.threshold()),
+                    kind.as_deref(),
+                    filter.as_ref(),
+                );
+                print_report(&report, json, pretty)
+            }
         }
 
-        Some(AnalyzeCommand::Length { target }) => {
-            let report = report::analyze(
-                target.as_deref(),
-                &effective_root,
-                false, // health
-                false, // complexity
-                true,  // length
-                false, // security
-                None,
-                None,
-                filter.as_ref(),
-            );
-            print_report(&report, json, pretty)
+        Some(AnalyzeCommand::Length { target, sarif }) => {
+            if sarif {
+                // Run length analysis and output in SARIF format
+                let report = length::analyze_codebase_length(
+                    &effective_root,
+                    usize::MAX, // no limit for SARIF
+                    filter.as_ref(),
+                );
+                sarif::print_length_sarif(&report.functions, &effective_root);
+                0
+            } else {
+                let report = report::analyze(
+                    target.as_deref(),
+                    &effective_root,
+                    false, // health
+                    false, // complexity
+                    true,  // length
+                    false, // security
+                    None,
+                    None,
+                    filter.as_ref(),
+                );
+                print_report(&report, json, pretty)
+            }
         }
 
         Some(AnalyzeCommand::Security { target }) => {

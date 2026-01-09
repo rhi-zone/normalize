@@ -31,6 +31,7 @@ export default withMermaid(
       { text: 'Guide', link: '/introduction' },
       { text: 'CLI Reference', link: '/cli/commands' },
       { text: 'Design', link: '/philosophy' },
+      { text: 'Rhizome', link: 'https://rhizome-lab.github.io/' },
     ],
 
     sidebar: {
@@ -98,7 +99,7 @@ export default withMermaid(
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/pterror/moss' }
+      { icon: 'github', link: 'https://github.com/rhizome-lab/moss' }
     ],
 
     search: {
@@ -106,7 +107,7 @@ export default withMermaid(
     },
 
     editLink: {
-      pattern: 'https://github.com/pterror/moss/edit/master/docs/:path',
+      pattern: 'https://github.com/rhizome-lab/moss/edit/master/docs/:path',
       text: 'Edit this page on GitHub'
     },
   },

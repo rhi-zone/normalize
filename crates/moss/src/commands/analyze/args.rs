@@ -47,12 +47,20 @@ pub enum AnalyzeCommand {
         /// Filter by symbol kind: function, method
         #[arg(long)]
         kind: Option<String>,
+
+        /// Output in SARIF format for IDE integration
+        #[arg(long)]
+        sarif: bool,
     },
 
     /// Run function length analysis
     Length {
         /// Target file or directory
         target: Option<String>,
+
+        /// Output in SARIF format for IDE integration
+        #[arg(long)]
+        sarif: bool,
     },
 
     /// Run security analysis
