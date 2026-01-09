@@ -115,7 +115,7 @@ Turn 6: Add test
   + fn test_view_empty_file() { ... }
 
 Turn 7: Validate
-  $(run cargo test -p moss view)
+  $(run cargo test -p rhizome-moss view)
   → All tests pass
   $(run ./target/debug/moss view /tmp/empty.rs)
   → No crash, shows empty output

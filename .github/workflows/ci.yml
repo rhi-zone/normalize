@@ -113,7 +113,7 @@ jobs:
           MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
       - name: Build moss
-        run: cargo build --release -p moss
+        run: cargo build --release -p rhizome-moss
 
       - name: Check for code clones
         run: |
@@ -152,7 +152,7 @@ jobs:
           workspaces: "crates -> target"
 
       - name: Build release
-        run: cargo build --release -p moss
+        run: cargo build --release -p rhizome-moss
 
       - name: Run benchmarks
         run: |

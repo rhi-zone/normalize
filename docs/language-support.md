@@ -602,10 +602,10 @@ The `validate_node_kinds` test in `registry.rs` checks that all node kind string
 
 ```bash
 # 1. See which kinds are invalid for a language
-cargo test -p moss-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
+cargo test -p rhizome-moss-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
 
 # 2. Dump valid node kinds for that grammar
-DUMP_GRAMMAR=python cargo test -p moss-languages dump_node_kinds -- --nocapture --ignored
+DUMP_GRAMMAR=python cargo test -p rhizome-moss-languages dump_node_kinds -- --nocapture --ignored
 
 # 3. Find the correct node kind name
 # e.g., "async_function_definition" doesn't exist, but "function_definition" does
@@ -615,7 +615,7 @@ DUMP_GRAMMAR=python cargo test -p moss-languages dump_node_kinds -- --nocapture 
 # Replace invalid kind with correct one, or remove if not applicable
 
 # 5. Re-run validation to confirm fix
-cargo test -p moss-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
+cargo test -p rhizome-moss-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
 ```
 
 **Common patterns:**

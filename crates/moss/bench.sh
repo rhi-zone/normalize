@@ -14,7 +14,7 @@ fi
 
 # Build release first
 echo "Building release binary..."
-cargo build --release -p moss-cli 2>/dev/null
+cargo build --release -p rhizome-moss 2>/dev/null
 
 MOSS="./target/release/moss"
 
