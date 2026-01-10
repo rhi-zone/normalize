@@ -19,6 +19,9 @@ default = []
 # Optional MCP server support
 mcp = ["rmcp", "schemars"]
 
+# Build sessions web UI (requires bun/npm, enable in CI)
+sessions-web = []
+
 [dependencies]
 clap.workspace = true
 serde.workspace = true

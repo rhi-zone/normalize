@@ -10,6 +10,9 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 
 fn main() {
+    // Only build SPA when sessions-web feature is enabled
+    // Library consumers don't need it, CI/release builds enable it
+    #[cfg(feature = "sessions-web")]
     rebuild_spa_if_needed();
 }
 

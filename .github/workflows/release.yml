@@ -60,6 +60,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y musl-tools
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install sessions SPA deps
+        run: bun install
+        working-directory: web/sessions
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -67,7 +74,7 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build CLI
-        run: cargo build --release --target ${{ matrix.target }} -p rhizome-moss
+        run: cargo build --release --target ${{ matrix.target }} -p rhizome-moss --features sessions-web
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
