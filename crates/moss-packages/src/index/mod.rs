@@ -21,12 +21,14 @@ pub mod chaotic_aur;
 pub mod copr;
 pub mod dnf;
 pub mod endeavouros;
+pub mod freebsd;
 pub mod gentoo;
 pub mod guix;
 pub mod manjaro;
 pub mod nix;
 pub mod pacman;
 pub mod slackware;
+pub mod void;
 
 // Windows package managers
 pub mod choco;
@@ -97,12 +99,14 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &copr::Copr,
         &dnf::Dnf,
         &endeavouros::EndeavourOs,
+        &freebsd::FreeBsd,
         &gentoo::Gentoo,
         &guix::Guix,
         &manjaro::Manjaro,
         &nix::Nix,
         &pacman::Pacman,
         &slackware::Slackware,
+        &void::Void,
         // Windows
         &choco::Choco,
         &msys2::Msys2,

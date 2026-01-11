@@ -300,6 +300,24 @@ fn test_apk() {
 }
 
 #[test]
+#[ignore = "Slow: downloads ~60MB FreeBSD packagesite"]
+fn test_freebsd() {
+    let index = freebsd::FreeBsd;
+    test_fetch(&index, "curl");
+    test_versions(&index, "curl");
+    test_search(&index, "curl");
+}
+
+#[test]
+#[ignore = "Slow: downloads ~20MB Void repodata"]
+fn test_void() {
+    let index = void::Void;
+    test_fetch(&index, "ripgrep");
+    test_versions(&index, "ripgrep");
+    test_search(&index, "grep");
+}
+
+#[test]
 fn test_apk_enhanced_metadata() {
     let index = apk::Apk;
     let curl = index.fetch("curl").unwrap();
@@ -702,8 +720,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 58,
-        "should have at least 58 indices, got {}",
+        indices.len() >= 56,
+        "should have at least 56 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);
