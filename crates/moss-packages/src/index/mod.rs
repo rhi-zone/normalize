@@ -113,6 +113,8 @@ static SNAP_INDEX: OnceLock<snap::Snap> = OnceLock::new();
 static CONDA_INDEX: OnceLock<conda::Conda> = OnceLock::new();
 static MAVEN_INDEX: OnceLock<maven::Maven> = OnceLock::new();
 static DOCKER_INDEX: OnceLock<docker::Docker> = OnceLock::new();
+static FDROID_INDEX: OnceLock<fdroid::FDroid> = OnceLock::new();
+static MSYS2_INDEX: OnceLock<msys2::Msys2> = OnceLock::new();
 
 fn init_builtin() -> Vec<&'static dyn PackageIndex> {
     vec![
@@ -137,7 +139,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         VOID_INDEX.get_or_init(void::Void::all),
         // Windows
         CHOCO_INDEX.get_or_init(choco::Choco::all),
-        &msys2::Msys2,
+        MSYS2_INDEX.get_or_init(msys2::Msys2::all),
         SCOOP_INDEX.get_or_init(scoop::Scoop::all),
         WINGET_INDEX.get_or_init(winget::Winget::all),
         // macOS
@@ -150,7 +152,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         // Containers
         DOCKER_INDEX.get_or_init(docker::Docker::all),
         // Mobile
-        &fdroid::FDroid,
+        FDROID_INDEX.get_or_init(fdroid::FDroid::all),
         &termux::Termux,
         // Language
         &bioconductor::Bioconductor,

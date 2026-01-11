@@ -486,7 +486,7 @@ fn test_choco() {
 
 #[test]
 fn test_msys2() {
-    let index = msys2::Msys2;
+    let index = msys2::Msys2::mingw64();
     test_fetch(&index, "git");
     test_versions(&index, "git");
     test_search(&index, "git");
@@ -548,7 +548,7 @@ fn test_docker() {
 
 #[test]
 fn test_fdroid() {
-    let index = fdroid::FDroid;
+    let index = fdroid::FDroid::main();
     test_fetch(&index, "org.fdroid.fdroid");
     test_versions(&index, "org.fdroid.fdroid");
     test_search(&index, "browser");
