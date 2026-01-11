@@ -161,7 +161,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - ghcr: GitHub Container Registry requires authentication (401)
 - gradle: Plugin portal API returning 404 (plugins.gradle.org/api/plugins)
 
-**Implemented fetchers** (56 total: 18 distro, 5 Windows, 3 macOS, 2 cross-platform, 1 container, 1 mobile, 26 language):
+**Implemented fetchers** (57 total: 18 distro, 5 Windows, 3 macOS, 2 cross-platform, 1 container, 1 mobile, 27 language):
 - [x] APK (Alpine): APKINDEX.tar.gz with checksums, deps, archive URLs
 - [x] Artix Linux: Arch-based, shares arch_common logic with pacman
 - [x] NixOS/Nix: search.nixos.org Elasticsearch API
@@ -184,6 +184,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - [x] CTAN: ctan.org JSON API (TeX/LaTeX packages)
 - [x] Racket: pkgs.racket-lang.org (Racket packages)
 - [x] Bioconductor: bioconductor.r-universe.dev API (R bioinformatics)
+- [x] Hunter: GitHub cmake parsing (C++ packages)
 - [x] Docker: hub.docker.com API (container images)
 - [x] F-Droid: f-droid.org API (Android FOSS apps)
 - [x] vcpkg: GitHub baseline.json + port manifests (C++ packages)

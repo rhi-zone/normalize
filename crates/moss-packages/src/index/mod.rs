@@ -68,6 +68,7 @@ pub mod gem;
 pub mod go;
 pub mod hackage;
 pub mod hex;
+pub mod hunter;
 pub mod jsr;
 pub mod julia;
 pub mod luarocks;
@@ -141,6 +142,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &go::Go,
         &hackage::Hackage,
         &hex::Hex,
+        &hunter::Hunter,
         &jsr::Jsr,
         &julia::Julia,
         &luarocks::LuaRocks,

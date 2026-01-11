@@ -178,7 +178,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 ### C/C++
 - [~] conan - Conan Center (CLI only, no REST API)
 - [x] vcpkg - vcpkg (GitHub baseline.json)
-- [ ] hunter - Hunter C++ package manager
+- [x] hunter - Hunter C++ (GitHub cmake parsing)
 - [ ] biicode - Biicode (discontinued)
 
 ### TeX

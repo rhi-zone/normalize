@@ -474,6 +474,14 @@ fn test_vcpkg() {
 }
 
 #[test]
+fn test_hunter() {
+    let index = hunter::Hunter;
+    test_fetch(&index, "Boost");
+    test_versions(&index, "Boost");
+    test_search(&index, "curl");
+}
+
+#[test]
 fn test_vcpkg_fetch_all() {
     let index = vcpkg::Vcpkg;
     test_fetch_all(&index);
@@ -727,8 +735,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 56,
-        "should have at least 56 indices, got {}",
+        indices.len() >= 57,
+        "should have at least 57 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);
