@@ -241,18 +241,22 @@ impl Pacman {
         Self::parse_db(&data, repo)
     }
 
-    /// Parse an Arch .db file (gzipped tar with desc files).
+    /// Parse an Arch .db file (gzipped or zstd-compressed tar with desc files).
     /// Note: data may already be decompressed if ureq auto-decompressed based on Content-Encoding.
     fn parse_db(data: &[u8], repo: ArchRepo) -> Result<Vec<PackageMeta>, IndexError> {
-        // Check if data is gzip compressed (magic bytes 0x1f 0x8b)
+        // Detect compression format and decompress
         let tar_data = if data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b {
-            // Data is gzip compressed - decompress it
+            // Data is gzip compressed (magic bytes 0x1f 0x8b)
             let mut decoder = GzDecoder::new(Cursor::new(data));
             let mut decompressed = Vec::new();
             decoder
                 .read_to_end(&mut decompressed)
                 .map_err(IndexError::Io)?;
             decompressed
+        } else if data.len() >= 4 && data[0..4] == [0x28, 0xb5, 0x2f, 0xfd] {
+            // Data is zstd compressed (magic bytes 0x28 0xb5 0x2f 0xfd)
+            zstd::stream::decode_all(Cursor::new(data))
+                .map_err(|e| IndexError::Decompress(e.to_string()))?
         } else {
             // Data is already decompressed (ureq auto-decompressed based on Content-Encoding)
             data.to_vec()
@@ -365,13 +369,27 @@ impl Pacman {
             version,
             description: fields.get("DESC").cloned(),
             homepage: fields.get("URL").cloned(),
-            repository: None,
+            repository: None, // Arch packages don't have source repo URLs in db
             license: fields.get("LICENSE").cloned(),
             binaries: Vec::new(),
+            keywords: fields
+                .get("GROUPS")
+                .map(|g| {
+                    g.lines()
+                        .filter(|l| !l.is_empty())
+                        .map(String::from)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            maintainers: fields
+                .get("PACKAGER")
+                .map(|p| vec![p.clone()])
+                .unwrap_or_default(),
+            published: fields.get("BUILDDATE").cloned(),
+            downloads: None, // Arch doesn't track downloads
             archive_url,
             checksum,
             extra,
-            ..Default::default()
         })
     }
 
