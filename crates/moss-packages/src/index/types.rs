@@ -3,6 +3,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Iterator over packages from an index.
+/// Allows lazy/streaming iteration without loading all packages into memory.
+pub type PackageIter<'a> = Box<dyn Iterator<Item = Result<PackageMeta, IndexError>> + Send + 'a>;
+
 /// Metadata about a package from an index.
 ///
 /// This is the raw metadata extracted from a package manager's index,
@@ -136,14 +140,26 @@ pub trait PackageIndex: Send + Sync {
         false
     }
 
-    /// Iterate over all packages in the index.
+    /// Fetch all packages into a Vec (loads everything into memory).
     ///
     /// Check `supports_fetch_all()` first - this returns an error if not supported.
-    /// This may be expensive for large indices.
+    /// For large indices, prefer `iter_all()` to avoid memory pressure.
     fn fetch_all(&self) -> Result<Vec<PackageMeta>, IndexError> {
-        Err(IndexError::Network(
+        Err(IndexError::NotImplemented(
             "bulk fetch not implemented for this index".into(),
         ))
+    }
+
+    /// Iterate over all packages lazily (streaming).
+    ///
+    /// This is the preferred method for large indices as it avoids loading
+    /// all packages into memory at once. Default implementation wraps `fetch_all()`.
+    ///
+    /// Override this method to provide truly streaming implementations for
+    /// indices that support it (e.g., line-by-line parsing of compressed files).
+    fn iter_all(&self) -> Result<PackageIter<'_>, IndexError> {
+        let packages = self.fetch_all()?;
+        Ok(Box::new(packages.into_iter().map(Ok)))
     }
 
     /// Search packages by name pattern.

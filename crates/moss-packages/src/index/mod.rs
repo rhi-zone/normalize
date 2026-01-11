@@ -84,7 +84,7 @@ pub mod pub_dev;
 pub mod racket;
 pub mod vcpkg;
 
-pub use types::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+pub use types::{IndexError, PackageIndex, PackageIter, PackageMeta, VersionMeta};
 
 use std::sync::OnceLock;
 

@@ -101,6 +101,37 @@ fn test_fetch_all(index: &dyn PackageIndex) {
     }
 }
 
+fn test_iter_all(index: &dyn PackageIndex) {
+    let result = index.iter_all();
+    if let Ok(iter) = result {
+        let mut count = 0;
+        let mut errors = 0;
+        for item in iter {
+            match item {
+                Ok(_) => count += 1,
+                Err(_) => errors += 1,
+            }
+        }
+        println!(
+            "{}: iter_all() yielded {} packages ({} errors)",
+            index.ecosystem(),
+            count,
+            errors
+        );
+        assert!(
+            count > 0,
+            "{}: iter_all should yield packages",
+            index.ecosystem()
+        );
+    } else {
+        println!(
+            "{}: iter_all not implemented: {:?}",
+            index.ecosystem(),
+            result.err()
+        );
+    }
+}
+
 // =============================================================================
 // Distro package managers
 // =============================================================================
@@ -118,6 +149,33 @@ fn test_apt() {
 fn test_apt_fetch_all() {
     let index = apt::Apt::stable();
     test_fetch_all(&index);
+}
+
+#[test]
+fn test_apt_iter_all() {
+    let index = apt::Apt::stable();
+    test_iter_all(&index);
+}
+
+#[test]
+fn test_apt_iter_all_matches_fetch_all() {
+    // Verify iter_all and fetch_all return the same packages
+    let index = apt::Apt::with_repos(&[apt::AptRepo::StableMain]);
+
+    let fetch_all_pkgs = index.fetch_all().unwrap();
+    let iter_all_pkgs: Vec<_> = index.iter_all().unwrap().filter_map(|r| r.ok()).collect();
+
+    assert_eq!(
+        fetch_all_pkgs.len(),
+        iter_all_pkgs.len(),
+        "iter_all and fetch_all should return same count"
+    );
+
+    // Verify first few packages match
+    for (fetch_pkg, iter_pkg) in fetch_all_pkgs.iter().take(10).zip(iter_all_pkgs.iter()) {
+        assert_eq!(fetch_pkg.name, iter_pkg.name, "package names should match");
+        assert_eq!(fetch_pkg.version, iter_pkg.version, "versions should match");
+    }
 }
 
 #[test]

@@ -26,7 +26,7 @@
 //! let custom = Apt::with_repos(&[AptRepo::StableMain, AptRepo::StableContrib]);
 //! ```
 
-use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+use super::{IndexError, PackageIndex, PackageIter, PackageMeta, VersionMeta};
 use crate::cache;
 use flate2::read::GzDecoder;
 use rayon::prelude::*;
@@ -408,6 +408,27 @@ impl Apt {
 
         Ok(packages)
     }
+
+    /// Fetch raw repo data without parsing.
+    fn fetch_repo_data(repo: AptRepo) -> Result<Vec<u8>, IndexError> {
+        let url = repo.packages_url();
+        let (data, _was_cached) = cache::fetch_with_cache(
+            "apt",
+            &format!("packages-{}", repo.name()),
+            &url,
+            INDEX_CACHE_TTL,
+        )
+        .map_err(IndexError::Network)?;
+        Ok(data)
+    }
+
+    /// Load raw data for all configured repos (parallel fetch).
+    fn load_repos_data(&self) -> Vec<(Vec<u8>, AptRepo)> {
+        self.repos
+            .par_iter()
+            .filter_map(|&repo| Self::fetch_repo_data(repo).ok().map(|data| (data, repo)))
+            .collect()
+    }
 }
 
 impl PackageIndex for Apt {
@@ -484,6 +505,15 @@ impl PackageIndex for Apt {
 
     fn fetch_all(&self) -> Result<Vec<PackageMeta>, IndexError> {
         self.load_packages()
+    }
+
+    fn iter_all(&self) -> Result<PackageIter<'_>, IndexError> {
+        // Load raw data for all repos (parallel), then stream parse sequentially
+        let repos_data = self.load_repos_data();
+        if repos_data.is_empty() {
+            return Err(IndexError::Network("Failed to load any APT repos".into()));
+        }
+        Ok(Box::new(AptPackageIter::new(repos_data)))
     }
 
     fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
@@ -600,6 +630,149 @@ impl PackageBuilder {
             extra,
             ..Default::default()
         })
+    }
+}
+
+/// Owning iterator over packages from multiple APT repos.
+/// Holds the loaded data and iterates through repos sequentially.
+pub struct AptPackageIter {
+    /// Loaded repo data: (data bytes, repo enum)
+    repos_data: Vec<(Vec<u8>, AptRepo)>,
+    /// Current repo index
+    current_repo_idx: usize,
+    /// Current reader (Box to handle different reader types)
+    current_reader: Option<Box<dyn BufRead + Send>>,
+    /// Current repo being processed
+    current_repo: Option<AptRepo>,
+    /// Package builder for current stanza
+    current_builder: Option<PackageBuilder>,
+    /// Whether we've finished all repos
+    done: bool,
+}
+
+impl AptPackageIter {
+    fn new(repos_data: Vec<(Vec<u8>, AptRepo)>) -> Self {
+        Self {
+            repos_data,
+            current_repo_idx: 0,
+            current_reader: None,
+            current_repo: None,
+            current_builder: None,
+            done: false,
+        }
+    }
+
+    fn advance_to_next_repo(&mut self) -> bool {
+        if self.current_repo_idx >= self.repos_data.len() {
+            self.done = true;
+            return false;
+        }
+
+        let (data, repo) = &self.repos_data[self.current_repo_idx];
+        self.current_repo_idx += 1;
+        self.current_repo = Some(*repo);
+
+        // Create reader, handling gzip if needed
+        let reader: Box<dyn BufRead + Send> =
+            if data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+                // Gzip compressed - decompress into memory first
+                let mut decoder = GzDecoder::new(Cursor::new(data.clone()));
+                let mut decompressed = Vec::new();
+                if decoder.read_to_end(&mut decompressed).is_ok() {
+                    Box::new(BufReader::new(Cursor::new(decompressed)))
+                } else {
+                    // Decompression failed, skip this repo
+                    return self.advance_to_next_repo();
+                }
+            } else {
+                Box::new(BufReader::new(Cursor::new(data.clone())))
+            };
+
+        self.current_reader = Some(reader);
+        true
+    }
+}
+
+impl Iterator for AptPackageIter {
+    type Item = Result<PackageMeta, IndexError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.done {
+                return None;
+            }
+
+            // Initialize first repo if needed
+            if self.current_reader.is_none() && !self.advance_to_next_repo() {
+                return None;
+            }
+
+            let reader = self.current_reader.as_mut()?;
+            let repo = self.current_repo?;
+
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => {
+                    // EOF for this repo - flush builder and move to next
+                    if let Some(builder) = self.current_builder.take() {
+                        if let Some(pkg) = builder.build(repo) {
+                            // Move to next repo before returning
+                            self.current_reader = None;
+                            return Some(Ok(pkg));
+                        }
+                    }
+                    // No package to yield, advance to next repo
+                    if !self.advance_to_next_repo() {
+                        return None;
+                    }
+                    continue;
+                }
+                Ok(_) => {
+                    let line = line.trim_end_matches('\n');
+
+                    if line.is_empty() {
+                        // End of stanza - yield package if complete
+                        if let Some(builder) = self.current_builder.take() {
+                            if let Some(pkg) = builder.build(repo) {
+                                return Some(Ok(pkg));
+                            }
+                        }
+                        continue;
+                    }
+
+                    if line.starts_with(' ') || line.starts_with('\t') {
+                        continue;
+                    }
+
+                    if let Some((key, value)) = line.split_once(':') {
+                        let key = key.trim();
+                        let value = value.trim();
+                        let builder = self.current_builder.get_or_insert_with(PackageBuilder::new);
+
+                        match key {
+                            "Package" => builder.name = Some(value.to_string()),
+                            "Version" => builder.version = Some(value.to_string()),
+                            "Description" => builder.description = Some(value.to_string()),
+                            "Homepage" => builder.homepage = Some(value.to_string()),
+                            "Vcs-Git" | "Vcs-Browser" => {
+                                if builder.repository.is_none() {
+                                    builder.repository = Some(value.to_string());
+                                }
+                            }
+                            "Filename" => builder.filename = Some(value.to_string()),
+                            "SHA256" => builder.sha256 = Some(value.to_string()),
+                            "Depends" => builder.depends = Some(value.to_string()),
+                            "Size" => builder.size = value.parse().ok(),
+                            _ => {}
+                        }
+                    }
+                }
+                Err(e) => {
+                    self.done = true;
+                    return Some(Err(IndexError::Io(e)));
+                }
+            }
+        }
     }
 }
 
