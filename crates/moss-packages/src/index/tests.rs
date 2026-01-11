@@ -235,7 +235,7 @@ fn test_artix_repos() {
 
 #[test]
 fn test_nix() {
-    let index = nix::Nix;
+    let index = nix::Nix::unstable();
     test_fetch(&index, "ripgrep");
     test_versions(&index, "ripgrep");
     test_search(&index, "grep");
@@ -243,7 +243,7 @@ fn test_nix() {
 
 #[test]
 fn test_gentoo() {
-    let index = gentoo::Gentoo;
+    let index = gentoo::Gentoo::main_only();
     test_fetch(&index, "sys-apps/ripgrep");
     test_versions(&index, "sys-apps/ripgrep");
     // Note: search returns HTML not JSON, so it's not supported
@@ -252,7 +252,7 @@ fn test_gentoo() {
 #[test]
 #[ignore = "Slow: downloads full Guix package list (~25MB decompressed)"]
 fn test_guix() {
-    let index = guix::Guix;
+    let index = guix::Guix::official();
     test_fetch(&index, "ripgrep");
     test_versions(&index, "ripgrep");
     test_search(&index, "grep");
@@ -261,7 +261,7 @@ fn test_guix() {
 #[test]
 #[ignore = "SlackBuilds uses GitHub raw files, may be slow"]
 fn test_slackware() {
-    let index = slackware::Slackware;
+    let index = slackware::Slackware::latest_stable();
     test_fetch(&index, "ripgrep");
     test_versions(&index, "ripgrep");
 }
@@ -269,7 +269,7 @@ fn test_slackware() {
 #[test]
 fn test_cachyos() {
     // CachyOS uses Arch repos + AUR
-    let index = cachyos::CachyOs;
+    let index = cachyos::CachyOs::stable();
     test_fetch(&index, "ripgrep");
     test_search(&index, "grep");
 }
@@ -277,7 +277,7 @@ fn test_cachyos() {
 #[test]
 fn test_endeavouros() {
     // EndeavourOS uses Arch repos + AUR
-    let index = endeavouros::EndeavourOs;
+    let index = endeavouros::EndeavourOs::stable();
     test_fetch(&index, "ripgrep");
     test_search(&index, "grep");
 }
@@ -461,7 +461,7 @@ fn test_apk_repos() {
 
 #[test]
 fn test_winget() {
-    let index = winget::Winget;
+    let index = winget::Winget::winget_only();
     // winget.run API may not have all packages, use a common one
     test_fetch(&index, "Microsoft.VisualStudioCode");
     // Skip version test as API structure varies
@@ -470,7 +470,7 @@ fn test_winget() {
 
 #[test]
 fn test_scoop() {
-    let index = scoop::Scoop;
+    let index = scoop::Scoop::core();
     test_fetch(&index, "git");
     test_versions(&index, "git");
     test_search(&index, "git");
@@ -478,7 +478,7 @@ fn test_scoop() {
 
 #[test]
 fn test_choco() {
-    let index = choco::Choco;
+    let index = choco::Choco::community();
     test_fetch(&index, "git");
     test_versions(&index, "git");
     test_search(&index, "git");
@@ -524,7 +524,7 @@ fn test_macports() {
 
 #[test]
 fn test_snap() {
-    let index = snap::Snap;
+    let index = snap::Snap::stable();
     test_fetch(&index, "firefox");
     test_versions(&index, "firefox");
     test_search(&index, "browser");
@@ -536,7 +536,7 @@ fn test_snap() {
 
 #[test]
 fn test_docker() {
-    let index = docker::Docker;
+    let index = docker::Docker::hub();
     test_fetch(&index, "nginx");
     test_versions(&index, "nginx");
     test_search(&index, "nginx");
@@ -653,7 +653,7 @@ fn test_hex() {
 
 #[test]
 fn test_maven() {
-    let index = maven::Maven;
+    let index = maven::Maven::central();
     test_fetch(&index, "com.google.guava:guava");
     test_versions(&index, "com.google.guava:guava");
     test_search(&index, "guava");
@@ -766,7 +766,7 @@ fn test_homebrew_casks() {
 #[test]
 #[ignore = "Slow: downloads ~50MB conda repodata"]
 fn test_conda() {
-    let index = conda::Conda;
+    let index = conda::Conda::conda_forge();
     test_fetch(&index, "python");
     test_versions(&index, "python");
     test_search(&index, "numpy");
@@ -774,7 +774,7 @@ fn test_conda() {
 
 #[test]
 fn test_flatpak() {
-    let index = flatpak::Flatpak;
+    let index = flatpak::Flatpak::flathub();
     test_fetch(&index, "org.mozilla.firefox");
     test_versions(&index, "org.mozilla.firefox");
     test_search(&index, "firefox");

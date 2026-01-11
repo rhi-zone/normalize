@@ -99,6 +99,20 @@ static MANJARO_INDEX: OnceLock<manjaro::Manjaro> = OnceLock::new();
 static APT_INDEX: OnceLock<apt::Apt> = OnceLock::new();
 static DNF_INDEX: OnceLock<dnf::Dnf> = OnceLock::new();
 static UBUNTU_INDEX: OnceLock<ubuntu::Ubuntu> = OnceLock::new();
+static NIX_INDEX: OnceLock<nix::Nix> = OnceLock::new();
+static CACHYOS_INDEX: OnceLock<cachyos::CachyOs> = OnceLock::new();
+static ENDEAVOUROS_INDEX: OnceLock<endeavouros::EndeavourOs> = OnceLock::new();
+static GENTOO_INDEX: OnceLock<gentoo::Gentoo> = OnceLock::new();
+static GUIX_INDEX: OnceLock<guix::Guix> = OnceLock::new();
+static SLACKWARE_INDEX: OnceLock<slackware::Slackware> = OnceLock::new();
+static SCOOP_INDEX: OnceLock<scoop::Scoop> = OnceLock::new();
+static CHOCO_INDEX: OnceLock<choco::Choco> = OnceLock::new();
+static WINGET_INDEX: OnceLock<winget::Winget> = OnceLock::new();
+static FLATPAK_INDEX: OnceLock<flatpak::Flatpak> = OnceLock::new();
+static SNAP_INDEX: OnceLock<snap::Snap> = OnceLock::new();
+static CONDA_INDEX: OnceLock<conda::Conda> = OnceLock::new();
+static MAVEN_INDEX: OnceLock<maven::Maven> = OnceLock::new();
+static DOCKER_INDEX: OnceLock<docker::Docker> = OnceLock::new();
 
 fn init_builtin() -> Vec<&'static dyn PackageIndex> {
     vec![
@@ -106,35 +120,35 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         APK_INDEX.get_or_init(apk::Apk::all),
         APT_INDEX.get_or_init(apt::Apt::all),
         ARTIX_INDEX.get_or_init(artix::Artix::all),
-        &cachyos::CachyOs,
+        CACHYOS_INDEX.get_or_init(cachyos::CachyOs::all),
         &chaotic_aur::ChaoticAur,
         &copr::Copr,
         DNF_INDEX.get_or_init(dnf::Dnf::all),
-        &endeavouros::EndeavourOs,
+        ENDEAVOUROS_INDEX.get_or_init(endeavouros::EndeavourOs::all),
         FREEBSD_INDEX.get_or_init(freebsd::FreeBsd::all),
-        &gentoo::Gentoo,
-        &guix::Guix,
+        GENTOO_INDEX.get_or_init(gentoo::Gentoo::all),
+        GUIX_INDEX.get_or_init(guix::Guix::all),
         MANJARO_INDEX.get_or_init(manjaro::Manjaro::all),
-        &nix::Nix,
+        NIX_INDEX.get_or_init(nix::Nix::all),
         OPENSUSE_INDEX.get_or_init(opensuse::OpenSuse::all),
         PACMAN_INDEX.get_or_init(pacman::Pacman::all),
-        &slackware::Slackware,
+        SLACKWARE_INDEX.get_or_init(slackware::Slackware::all),
         UBUNTU_INDEX.get_or_init(ubuntu::Ubuntu::all),
         VOID_INDEX.get_or_init(void::Void::all),
         // Windows
-        &choco::Choco,
+        CHOCO_INDEX.get_or_init(choco::Choco::all),
         &msys2::Msys2,
-        &scoop::Scoop,
-        &winget::Winget,
+        SCOOP_INDEX.get_or_init(scoop::Scoop::all),
+        WINGET_INDEX.get_or_init(winget::Winget::all),
         // macOS
         &brew::Brew,
         &homebrew_casks::HomebrewCasks,
         &macports::MacPorts,
         // Cross-platform
-        &flatpak::Flatpak,
-        &snap::Snap,
+        FLATPAK_INDEX.get_or_init(flatpak::Flatpak::all),
+        SNAP_INDEX.get_or_init(snap::Snap::all),
         // Containers
-        &docker::Docker,
+        DOCKER_INDEX.get_or_init(docker::Docker::all),
         // Mobile
         &fdroid::FDroid,
         &termux::Termux,
@@ -146,7 +160,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &ctan::Ctan,
         &composer::Composer,
         &conan::Conan,
-        &conda::Conda,
+        CONDA_INDEX.get_or_init(conda::Conda::all),
         &cran::Cran,
         &deno::Deno,
         &dub::Dub,
@@ -158,7 +172,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &jsr::Jsr,
         &julia::Julia,
         &luarocks::LuaRocks,
-        &maven::Maven,
+        MAVEN_INDEX.get_or_init(maven::Maven::all),
         &metacpan::MetaCpan,
         &nimble::Nimble,
         &npm::NpmIndex,

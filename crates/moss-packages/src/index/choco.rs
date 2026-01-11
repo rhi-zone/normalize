@@ -8,18 +8,143 @@
 //! - **fetch_versions**: `community.chocolatey.org/api/v2/FindPackagesById()?id='{name}'`
 //! - **search**: `community.chocolatey.org/api/v2/Search()?searchTerm='{query}'`
 //! - **fetch_all**: Not supported (API requires search terms)
+//!
+//! ## Multi-source Support
+//! ```rust,ignore
+//! use moss_packages::index::choco::{Choco, ChocoSource};
+//!
+//! // All sources (default)
+//! let all = Choco::all();
+//!
+//! // Community only
+//! let community = Choco::community();
+//! ```
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use quick_xml::de::from_str;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::io::Read;
 
-/// Chocolatey package index fetcher.
-pub struct Choco;
+/// Available Chocolatey sources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ChocoSource {
+    /// Chocolatey community repository
+    Community,
+}
+
+impl ChocoSource {
+    /// Get the API base URL for this source.
+    fn api_url(&self) -> &'static str {
+        match self {
+            Self::Community => "https://community.chocolatey.org/api/v2",
+        }
+    }
+
+    /// Get the source name for tagging.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Community => "community",
+        }
+    }
+
+    /// All available sources.
+    pub fn all() -> &'static [ChocoSource] {
+        &[Self::Community]
+    }
+}
+
+/// Chocolatey package index fetcher with configurable sources.
+pub struct Choco {
+    sources: Vec<ChocoSource>,
+}
 
 impl Choco {
-    /// Chocolatey community API (OData v2).
-    const CHOCO_API: &'static str = "https://community.chocolatey.org/api/v2";
+    /// Create a fetcher with all sources.
+    pub fn all() -> Self {
+        Self {
+            sources: ChocoSource::all().to_vec(),
+        }
+    }
+
+    /// Create a fetcher with community source only.
+    pub fn community() -> Self {
+        Self {
+            sources: vec![ChocoSource::Community],
+        }
+    }
+
+    /// Create a fetcher with custom source selection.
+    pub fn with_sources(sources: &[ChocoSource]) -> Self {
+        Self {
+            sources: sources.to_vec(),
+        }
+    }
+
+    /// Fetch a package from a specific source.
+    fn fetch_from_source(name: &str, source: ChocoSource) -> Result<PackageMeta, IndexError> {
+        let url = format!(
+            "{}/Packages()?$filter=Id%20eq%20'{}'%20and%20IsLatestVersion&$top=1",
+            source.api_url(),
+            urlencoding::encode(name)
+        );
+
+        let response = ureq::get(&url).call()?;
+        let xml = response.into_string()?;
+
+        let packages = parse_odata_response(&xml)?;
+        let props = packages
+            .first()
+            .ok_or_else(|| IndexError::NotFound(name.to_string()))?;
+
+        props
+            .to_package_meta(name, source)
+            .ok_or_else(|| IndexError::NotFound(name.to_string()))
+    }
+
+    /// Fetch versions from a specific source.
+    fn fetch_versions_from_source(
+        name: &str,
+        source: ChocoSource,
+    ) -> Result<Vec<VersionMeta>, IndexError> {
+        let url = format!(
+            "{}/Packages()?$filter=Id%20eq%20'{}'&$orderby=Version%20desc&$top=20",
+            source.api_url(),
+            urlencoding::encode(name)
+        );
+
+        let response = ureq::get(&url).call()?;
+        let xml = response.into_string()?;
+
+        let packages = parse_odata_response(&xml)?;
+
+        Ok(packages
+            .iter()
+            .filter_map(|p| p.to_version_meta())
+            .collect())
+    }
+
+    /// Search a specific source.
+    fn search_source(query: &str, source: ChocoSource) -> Result<Vec<PackageMeta>, IndexError> {
+        // Limit to 10 results (XML responses are verbose)
+        let url = format!(
+            "{}/Search()?searchTerm='{}'&includePrerelease=false&$top=10",
+            source.api_url(),
+            urlencoding::encode(query)
+        );
+
+        let response = ureq::get(&url).call()?;
+        // Read full response body (into_string has 10MB limit which should be plenty)
+        let mut xml = String::new();
+        response.into_reader().read_to_string(&mut xml)?;
+
+        let packages = parse_odata_response(&xml)?;
+
+        Ok(packages
+            .iter()
+            .filter_map(|p| p.to_package_meta("", source))
+            .collect())
+    }
 }
 
 // OData Atom feed structures for deserialization
@@ -63,7 +188,13 @@ struct Properties {
 }
 
 impl Properties {
-    fn to_package_meta(&self, name: &str) -> Option<PackageMeta> {
+    fn to_package_meta(&self, name: &str, source: ChocoSource) -> Option<PackageMeta> {
+        let mut extra = HashMap::new();
+        extra.insert(
+            "source_repo".to_string(),
+            serde_json::Value::String(source.name().to_string()),
+        );
+
         Some(PackageMeta {
             name: self.id.clone().unwrap_or_else(|| name.to_string()),
             version: self
@@ -78,6 +209,7 @@ impl Properties {
                 .or_else(|| self.package_source_url.clone()),
             license: self.license_url.clone(),
             binaries: Vec::new(),
+            extra,
             ..Default::default()
         })
     }
@@ -155,61 +287,43 @@ impl PackageIndex for Choco {
     }
 
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
-        let url = format!(
-            "{}/Packages()?$filter=Id%20eq%20'{}'%20and%20IsLatestVersion&$top=1",
-            Self::CHOCO_API,
-            urlencoding::encode(name)
-        );
+        // Try each configured source until we find the package
+        for &source in &self.sources {
+            match Self::fetch_from_source(name, source) {
+                Ok(pkg) => return Ok(pkg),
+                Err(IndexError::NotFound(_)) => continue,
+                Err(e) => return Err(e),
+            }
+        }
 
-        let response = ureq::get(&url).call()?;
-        let xml = response.into_string()?;
-
-        let packages = parse_odata_response(&xml)?;
-        let props = packages
-            .first()
-            .ok_or_else(|| IndexError::NotFound(name.to_string()))?;
-
-        props
-            .to_package_meta(name)
-            .ok_or_else(|| IndexError::NotFound(name.to_string()))
+        Err(IndexError::NotFound(name.to_string()))
     }
 
     fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
-        let url = format!(
-            "{}/Packages()?$filter=Id%20eq%20'{}'&$orderby=Version%20desc&$top=20",
-            Self::CHOCO_API,
-            urlencoding::encode(name)
-        );
+        let mut all_versions = Vec::new();
 
-        let response = ureq::get(&url).call()?;
-        let xml = response.into_string()?;
+        for &source in &self.sources {
+            if let Ok(versions) = Self::fetch_versions_from_source(name, source) {
+                all_versions.extend(versions);
+            }
+        }
 
-        let packages = parse_odata_response(&xml)?;
+        if all_versions.is_empty() {
+            return Err(IndexError::NotFound(name.to_string()));
+        }
 
-        Ok(packages
-            .iter()
-            .filter_map(|p| p.to_version_meta())
-            .collect())
+        Ok(all_versions)
     }
 
     fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
-        // Limit to 10 results (XML responses are verbose)
-        let url = format!(
-            "{}/Search()?searchTerm='{}'&includePrerelease=false&$top=10",
-            Self::CHOCO_API,
-            urlencoding::encode(query)
-        );
+        let mut results = Vec::new();
 
-        let response = ureq::get(&url).call()?;
-        // Read full response body (into_string has 10MB limit which should be plenty)
-        let mut xml = String::new();
-        response.into_reader().read_to_string(&mut xml)?;
+        for &source in &self.sources {
+            if let Ok(packages) = Self::search_source(query, source) {
+                results.extend(packages);
+            }
+        }
 
-        let packages = parse_odata_response(&xml)?;
-
-        Ok(packages
-            .iter()
-            .filter_map(|p| p.to_package_meta(""))
-            .collect())
+        Ok(results)
     }
 }

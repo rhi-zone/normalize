@@ -5,11 +5,30 @@
 //!
 //! ## API Strategy
 //! - **fetch**: `search.nixos.org` Elasticsearch API - Official NixOS search
-//! - **fetch_versions**: Same API, single version per channel
+//! - **fetch_versions**: Queries all configured channels
 //! - **search**: `search.nixos.org` Elasticsearch query
 //! - **fetch_all**: Not supported (too large, use search instead)
+//!
+//! ## Multi-repo Support
+//! ```rust,ignore
+//! use moss_packages::index::nix::{Nix, NixChannel};
+//!
+//! // All channels (default)
+//! let all = Nix::all();
+//!
+//! // Unstable only
+//! let unstable = Nix::unstable();
+//!
+//! // Stable channels only
+//! let stable = Nix::stable();
+//!
+//! // Custom selection
+//! let custom = Nix::with_channels(&[NixChannel::NixosUnstable, NixChannel::Nixos2411]);
+//! ```
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+use rayon::prelude::*;
+use std::collections::HashMap;
 
 /// Simple base64 encoding for Basic Auth.
 fn base64_encode(input: &str) -> String {
@@ -45,8 +64,94 @@ fn base64_encode(input: &str) -> String {
     result
 }
 
-/// Nix package index fetcher.
-pub struct Nix;
+/// Available Nix channels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NixChannel {
+    // === Unstable ===
+    /// NixOS unstable (rolling release)
+    NixosUnstable,
+    /// nixpkgs unstable (for non-NixOS systems)
+    NixpkgsUnstable,
+
+    // === Stable ===
+    /// NixOS 24.11 (latest stable)
+    Nixos2411,
+    /// NixOS 24.05
+    Nixos2405,
+    /// NixOS 23.11
+    Nixos2311,
+
+    // === Darwin ===
+    /// nixpkgs-unstable for macOS
+    NixpkgsDarwinUnstable,
+}
+
+impl NixChannel {
+    /// Get the Elasticsearch index pattern for this channel.
+    fn index_pattern(&self) -> &'static str {
+        match self {
+            Self::NixosUnstable => "latest-*-nixos-unstable",
+            Self::NixpkgsUnstable => "latest-*-nixpkgs-unstable",
+            Self::Nixos2411 => "latest-*-nixos-24.11",
+            Self::Nixos2405 => "latest-*-nixos-24.05",
+            Self::Nixos2311 => "latest-*-nixos-23.11",
+            Self::NixpkgsDarwinUnstable => "latest-*-nixpkgs-unstable",
+        }
+    }
+
+    /// Get the channel name for tagging.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::NixosUnstable => "nixos-unstable",
+            Self::NixpkgsUnstable => "nixpkgs-unstable",
+            Self::Nixos2411 => "nixos-24.11",
+            Self::Nixos2405 => "nixos-24.05",
+            Self::Nixos2311 => "nixos-23.11",
+            Self::NixpkgsDarwinUnstable => "nixpkgs-darwin-unstable",
+        }
+    }
+
+    /// All available channels.
+    pub fn all() -> &'static [NixChannel] {
+        &[
+            Self::NixosUnstable,
+            Self::NixpkgsUnstable,
+            Self::Nixos2411,
+            Self::Nixos2405,
+            Self::Nixos2311,
+        ]
+    }
+
+    /// Unstable channels only.
+    pub fn unstable() -> &'static [NixChannel] {
+        &[Self::NixosUnstable, Self::NixpkgsUnstable]
+    }
+
+    /// Stable channels only.
+    pub fn stable() -> &'static [NixChannel] {
+        &[Self::Nixos2411, Self::Nixos2405, Self::Nixos2311]
+    }
+
+    /// NixOS channels only (not plain nixpkgs).
+    pub fn nixos() -> &'static [NixChannel] {
+        &[
+            Self::NixosUnstable,
+            Self::Nixos2411,
+            Self::Nixos2405,
+            Self::Nixos2311,
+        ]
+    }
+
+    /// Latest stable only.
+    pub fn latest_stable() -> &'static [NixChannel] {
+        &[Self::Nixos2411]
+    }
+}
+
+/// Nix package index fetcher with configurable channels.
+pub struct Nix {
+    channels: Vec<NixChannel>,
+}
 
 impl Nix {
     /// NixOS Elasticsearch-based search API (Bonsai cluster).
@@ -55,21 +160,59 @@ impl Nix {
         "https://nixos-search-7-1733963800.us-east-1.bonsaisearch.net";
     const AUTH_USER: &'static str = "aWVSALXpZv";
     const AUTH_PASS: &'static str = "X8gPHnzL52wFEekuxsfQ9cSh";
-    /// Index pattern with wildcard to match any version number.
-    const INDEX: &'static str = "latest-*-nixos-unstable";
-}
 
-impl PackageIndex for Nix {
-    fn ecosystem(&self) -> &'static str {
-        "nix"
+    /// Create a fetcher with all channels.
+    pub fn all() -> Self {
+        Self {
+            channels: NixChannel::all().to_vec(),
+        }
     }
 
-    fn display_name(&self) -> &'static str {
-        "Nixpkgs (Nix/NixOS)"
+    /// Create a fetcher with unstable channels only.
+    pub fn unstable() -> Self {
+        Self {
+            channels: NixChannel::unstable().to_vec(),
+        }
     }
 
-    fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
-        // Use Elasticsearch query for exact match
+    /// Create a fetcher with stable channels only.
+    pub fn stable() -> Self {
+        Self {
+            channels: NixChannel::stable().to_vec(),
+        }
+    }
+
+    /// Create a fetcher with NixOS channels only.
+    pub fn nixos() -> Self {
+        Self {
+            channels: NixChannel::nixos().to_vec(),
+        }
+    }
+
+    /// Create a fetcher with latest stable only.
+    pub fn latest_stable() -> Self {
+        Self {
+            channels: NixChannel::latest_stable().to_vec(),
+        }
+    }
+
+    /// Create a fetcher with custom channel selection.
+    pub fn with_channels(channels: &[NixChannel]) -> Self {
+        Self {
+            channels: channels.to_vec(),
+        }
+    }
+
+    /// Get authorization header value.
+    fn auth_header() -> String {
+        format!(
+            "Basic {}",
+            base64_encode(&format!("{}:{}", Self::AUTH_USER, Self::AUTH_PASS))
+        )
+    }
+
+    /// Fetch a package from a specific channel.
+    fn fetch_from_channel(name: &str, channel: NixChannel) -> Result<PackageMeta, IndexError> {
         let query = serde_json::json!({
             "query": {
                 "bool": {
@@ -82,19 +225,16 @@ impl PackageIndex for Nix {
             "size": 1
         });
 
-        let response: serde_json::Value =
-            ureq::post(&format!("{}/{}/_search", Self::NIXOS_SEARCH, Self::INDEX))
-                .set("Content-Type", "application/json")
-                .set("Accept", "application/json")
-                .set(
-                    "Authorization",
-                    &format!(
-                        "Basic {}",
-                        base64_encode(&format!("{}:{}", Self::AUTH_USER, Self::AUTH_PASS))
-                    ),
-                )
-                .send_json(&query)?
-                .into_json()?;
+        let response: serde_json::Value = ureq::post(&format!(
+            "{}/{}/_search",
+            Self::NIXOS_SEARCH,
+            channel.index_pattern()
+        ))
+        .set("Content-Type", "application/json")
+        .set("Accept", "application/json")
+        .set("Authorization", &Self::auth_header())
+        .send_json(&query)?
+        .into_json()?;
 
         let hits = response["hits"]["hits"]
             .as_array()
@@ -105,6 +245,13 @@ impl PackageIndex for Nix {
             .ok_or_else(|| IndexError::NotFound(name.to_string()))?;
 
         let source = &hit["_source"];
+        let mut extra = HashMap::new();
+
+        // Tag with source channel
+        extra.insert(
+            "source_repo".to_string(),
+            serde_json::Value::String(channel.name().to_string()),
+        );
 
         Ok(PackageMeta {
             name: source["package_attr_name"]
@@ -149,22 +296,13 @@ impl PackageIndex for Nix {
                         .collect()
                 })
                 .unwrap_or_default(),
+            extra,
             ..Default::default()
         })
     }
 
-    fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
-        // Nixpkgs doesn't expose version history via the search API
-        // Each channel has its own version; we only return unstable here
-        let pkg = self.fetch(name)?;
-        Ok(vec![VersionMeta {
-            version: pkg.version,
-            released: None,
-            yanked: false,
-        }])
-    }
-
-    fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
+    /// Search in a specific channel.
+    fn search_channel(query: &str, channel: NixChannel) -> Result<Vec<PackageMeta>, IndexError> {
         let es_query = serde_json::json!({
             "query": {
                 "bool": {
@@ -186,19 +324,16 @@ impl PackageIndex for Nix {
             "size": 50
         });
 
-        let response: serde_json::Value =
-            ureq::post(&format!("{}/{}/_search", Self::NIXOS_SEARCH, Self::INDEX))
-                .set("Content-Type", "application/json")
-                .set("Accept", "application/json")
-                .set(
-                    "Authorization",
-                    &format!(
-                        "Basic {}",
-                        base64_encode(&format!("{}:{}", Self::AUTH_USER, Self::AUTH_PASS))
-                    ),
-                )
-                .send_json(&es_query)?
-                .into_json()?;
+        let response: serde_json::Value = ureq::post(&format!(
+            "{}/{}/_search",
+            Self::NIXOS_SEARCH,
+            channel.index_pattern()
+        ))
+        .set("Content-Type", "application/json")
+        .set("Accept", "application/json")
+        .set("Authorization", &Self::auth_header())
+        .send_json(&es_query)?
+        .into_json()?;
 
         let hits = response["hits"]["hits"]
             .as_array()
@@ -208,6 +343,12 @@ impl PackageIndex for Nix {
             .iter()
             .filter_map(|hit| {
                 let source = &hit["_source"];
+                let mut extra = HashMap::new();
+                extra.insert(
+                    "source_repo".to_string(),
+                    serde_json::Value::String(channel.name().to_string()),
+                );
+
                 Some(PackageMeta {
                     name: source["package_attr_name"].as_str()?.to_string(),
                     version: source["package_version"]
@@ -248,10 +389,68 @@ impl PackageIndex for Nix {
                                 .collect()
                         })
                         .unwrap_or_default(),
+                    extra,
                     ..Default::default()
                 })
             })
             .collect())
+    }
+}
+
+impl PackageIndex for Nix {
+    fn ecosystem(&self) -> &'static str {
+        "nix"
+    }
+
+    fn display_name(&self) -> &'static str {
+        "Nixpkgs (Nix/NixOS)"
+    }
+
+    fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
+        // Try each configured channel until we find the package
+        for channel in &self.channels {
+            match Self::fetch_from_channel(name, *channel) {
+                Ok(pkg) => return Ok(pkg),
+                Err(IndexError::NotFound(_)) => continue,
+                Err(e) => return Err(e),
+            }
+        }
+
+        Err(IndexError::NotFound(name.to_string()))
+    }
+
+    fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
+        // Query all configured channels in parallel
+        let results: Vec<_> = self
+            .channels
+            .par_iter()
+            .filter_map(|channel| Self::fetch_from_channel(name, *channel).ok())
+            .collect();
+
+        if results.is_empty() {
+            return Err(IndexError::NotFound(name.to_string()));
+        }
+
+        Ok(results
+            .into_iter()
+            .map(|pkg| VersionMeta {
+                version: pkg.version,
+                released: None,
+                yanked: false,
+            })
+            .collect())
+    }
+
+    fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
+        // Search all configured channels in parallel
+        let results: Vec<_> = self
+            .channels
+            .par_iter()
+            .filter_map(|channel| Self::search_channel(query, *channel).ok())
+            .flatten()
+            .collect();
+
+        Ok(results)
     }
 }
 

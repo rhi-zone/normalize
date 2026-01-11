@@ -3,15 +3,118 @@
 //! Fetches package metadata from Scoop buckets (main, extras, versions).
 //!
 //! ## API Strategy
-//! - **fetch**: `scoop.sh/api/apps/{name}` - Community Scoop API (unofficial)
+//! - **fetch**: GitHub raw bucket manifests
 //! - **fetch_versions**: Same API, single version
 //! - **search**: `scoop.sh/api/apps?q=`
-//! - **fetch_all**: `scoop.sh/api/apps` (all apps from main buckets)
+//! - **fetch_all**: Not supported (no bulk API)
+//!
+//! ## Multi-bucket Support
+//! ```rust,ignore
+//! use moss_packages::index::scoop::{Scoop, ScoopBucket};
+//!
+//! // All buckets (default)
+//! let all = Scoop::all();
+//!
+//! // Main + Extras only
+//! let core = Scoop::core();
+//!
+//! // Main bucket only
+//! let main = Scoop::main_only();
+//! ```
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+use std::collections::HashMap;
 
-/// Scoop package index fetcher.
-pub struct Scoop;
+/// Available Scoop buckets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ScoopBucket {
+    /// Main bucket - essential apps
+    Main,
+    /// Extras - additional apps including GUI apps
+    Extras,
+    /// Versions - old versions of apps
+    Versions,
+    /// Games
+    Games,
+    /// Nerd Fonts
+    NerdFonts,
+    /// Java - JDKs and Java tools
+    Java,
+    /// PHP versions
+    Php,
+    /// Nonportable - apps requiring special install
+    Nonportable,
+}
+
+impl ScoopBucket {
+    /// Get the GitHub repo path for this bucket.
+    fn repo_path(&self) -> &'static str {
+        match self {
+            Self::Main => "ScoopInstaller/Main/master/bucket",
+            Self::Extras => "ScoopInstaller/Extras/master/bucket",
+            Self::Versions => "ScoopInstaller/Versions/master/bucket",
+            Self::Games => "Calinou/scoop-games/master/bucket",
+            Self::NerdFonts => "matthewjberger/scoop-nerd-fonts/master/bucket",
+            Self::Java => "ScoopInstaller/Java/master/bucket",
+            Self::Php => "ScoopInstaller/PHP/master/bucket",
+            Self::Nonportable => "ScoopInstaller/Nonportable/master/bucket",
+        }
+    }
+
+    /// Get the bucket name for tagging.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Main => "main",
+            Self::Extras => "extras",
+            Self::Versions => "versions",
+            Self::Games => "games",
+            Self::NerdFonts => "nerd-fonts",
+            Self::Java => "java",
+            Self::Php => "php",
+            Self::Nonportable => "nonportable",
+        }
+    }
+
+    /// All available buckets.
+    pub fn all() -> &'static [ScoopBucket] {
+        &[
+            Self::Main,
+            Self::Extras,
+            Self::Versions,
+            Self::Games,
+            Self::NerdFonts,
+            Self::Java,
+            Self::Php,
+            Self::Nonportable,
+        ]
+    }
+
+    /// Core buckets (Main + Extras).
+    pub fn core() -> &'static [ScoopBucket] {
+        &[Self::Main, Self::Extras]
+    }
+
+    /// Main bucket only.
+    pub fn main() -> &'static [ScoopBucket] {
+        &[Self::Main]
+    }
+
+    /// Development-focused buckets.
+    pub fn dev() -> &'static [ScoopBucket] {
+        &[
+            Self::Main,
+            Self::Extras,
+            Self::Versions,
+            Self::Java,
+            Self::Php,
+        ]
+    }
+}
+
+/// Scoop package index fetcher with configurable buckets.
+pub struct Scoop {
+    buckets: Vec<ScoopBucket>,
+}
 
 impl Scoop {
     /// Scoop search API.
@@ -20,15 +123,51 @@ impl Scoop {
     /// GitHub raw content for bucket manifests.
     const GITHUB_RAW: &'static str = "https://raw.githubusercontent.com";
 
-    /// Main bucket.
-    const MAIN_BUCKET: &'static str = "ScoopInstaller/Main/master/bucket";
+    /// Create a fetcher with all buckets.
+    pub fn all() -> Self {
+        Self {
+            buckets: ScoopBucket::all().to_vec(),
+        }
+    }
 
-    /// Extras bucket.
-    const EXTRAS_BUCKET: &'static str = "ScoopInstaller/Extras/master/bucket";
+    /// Create a fetcher with core buckets (Main + Extras).
+    pub fn core() -> Self {
+        Self {
+            buckets: ScoopBucket::core().to_vec(),
+        }
+    }
 
-    fn fetch_from_bucket(&self, name: &str, bucket: &str) -> Result<PackageMeta, IndexError> {
-        let url = format!("{}/{}/{}.json", Self::GITHUB_RAW, bucket, name);
+    /// Create a fetcher with main bucket only.
+    pub fn main_only() -> Self {
+        Self {
+            buckets: ScoopBucket::main().to_vec(),
+        }
+    }
+
+    /// Create a fetcher with development-focused buckets.
+    pub fn dev() -> Self {
+        Self {
+            buckets: ScoopBucket::dev().to_vec(),
+        }
+    }
+
+    /// Create a fetcher with custom bucket selection.
+    pub fn with_buckets(buckets: &[ScoopBucket]) -> Self {
+        Self {
+            buckets: buckets.to_vec(),
+        }
+    }
+
+    /// Fetch a package from a specific bucket.
+    fn fetch_from_bucket(name: &str, bucket: ScoopBucket) -> Result<PackageMeta, IndexError> {
+        let url = format!("{}/{}/{}.json", Self::GITHUB_RAW, bucket.repo_path(), name);
         let response: serde_json::Value = ureq::get(&url).call()?.into_json()?;
+
+        let mut extra = HashMap::new();
+        extra.insert(
+            "source_repo".to_string(),
+            serde_json::Value::String(bucket.name().to_string()),
+        );
 
         Ok(PackageMeta {
             name: name.to_string(),
@@ -67,6 +206,7 @@ impl Scoop {
                         .collect()
                 })
                 .unwrap_or_default(),
+            extra,
             ..Default::default()
         })
     }
@@ -82,20 +222,38 @@ impl PackageIndex for Scoop {
     }
 
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
-        // Try main bucket first, then extras
-        self.fetch_from_bucket(name, Self::MAIN_BUCKET)
-            .or_else(|_| self.fetch_from_bucket(name, Self::EXTRAS_BUCKET))
+        // Try each configured bucket until we find the package
+        for &bucket in &self.buckets {
+            match Self::fetch_from_bucket(name, bucket) {
+                Ok(pkg) => return Ok(pkg),
+                Err(IndexError::Network(_)) => continue,
+                Err(e) => return Err(e),
+            }
+        }
+
+        Err(IndexError::NotFound(name.to_string()))
     }
 
     fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
         // Scoop manifests only contain current version
-        // Could check versions bucket for historical versions
-        let pkg = self.fetch(name)?;
-        Ok(vec![VersionMeta {
-            version: pkg.version,
-            released: None,
-            yanked: false,
-        }])
+        // Check all configured buckets for available versions
+        let mut versions = Vec::new();
+
+        for &bucket in &self.buckets {
+            if let Ok(pkg) = Self::fetch_from_bucket(name, bucket) {
+                versions.push(VersionMeta {
+                    version: format!("{} ({})", pkg.version, bucket.name()),
+                    released: None,
+                    yanked: false,
+                });
+            }
+        }
+
+        if versions.is_empty() {
+            return Err(IndexError::NotFound(name.to_string()));
+        }
+
+        Ok(versions)
     }
 
     fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
@@ -107,9 +265,26 @@ impl PackageIndex for Scoop {
             .as_array()
             .ok_or_else(|| IndexError::Parse("expected array".into()))?;
 
+        // Filter to configured buckets
+        let bucket_names: Vec<_> = self.buckets.iter().map(|b| b.name()).collect();
+
         Ok(apps
             .iter()
+            .filter(|app| {
+                app["bucket"]
+                    .as_str()
+                    .map(|b| bucket_names.contains(&b))
+                    .unwrap_or(true) // Include if no bucket specified
+            })
             .filter_map(|app| {
+                let mut extra = HashMap::new();
+                if let Some(bucket) = app["bucket"].as_str() {
+                    extra.insert(
+                        "source_repo".to_string(),
+                        serde_json::Value::String(bucket.to_string()),
+                    );
+                }
+
                 Some(PackageMeta {
                     name: app["name"].as_str()?.to_string(),
                     version: app["version"].as_str().unwrap_or("unknown").to_string(),
@@ -118,6 +293,7 @@ impl PackageIndex for Scoop {
                     repository: None,
                     license: app["license"].as_str().map(String::from),
                     binaries: Vec::new(),
+                    extra,
                     ..Default::default()
                 })
             })
