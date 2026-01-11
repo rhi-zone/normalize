@@ -213,7 +213,7 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - extra field for ecosystem-specific metadata not in normalized fields
 
 **Performance improvements needed**:
-- [ ] Streaming/iterator API: Currently fetchers load all packages into memory before filtering. For cross-referencing 50+ ecosystems, this is ~1GB+ in memory. Need lazy/streaming approach where we iterate packages without loading all into Vec first.
+- [x] Streaming/iterator API: Added `iter_all()` to PackageIndex trait with lazy iteration. APT implements streaming `AptPackageIter` that parses line-by-line.
 - [x] Parallel repo fetching: openSUSE fetches repos in parallel with rayon (~4x speedup)
 
 **Multi-repo coverage done**:
