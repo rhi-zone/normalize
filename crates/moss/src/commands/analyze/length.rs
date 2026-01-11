@@ -74,10 +74,40 @@ pub fn analyze_codebase_length(
     };
 
     sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
+
+    // Compute full stats before truncation
+    // For length: critical = too_long (>100), high = long (51-100)
+    let full_stats = if !sorted.is_empty() {
+        use crate::analyze::function_length::LengthCategory;
+        let total_count = sorted.len();
+        let total_sum: usize = sorted.iter().map(|f| f.lines).sum();
+        let total_avg = total_sum as f64 / total_count as f64;
+        let total_max = sorted.first().map(|f| f.lines).unwrap_or(0);
+        let critical_count = sorted
+            .iter()
+            .filter(|f| f.category() == LengthCategory::TooLong)
+            .count();
+        let high_count = sorted
+            .iter()
+            .filter(|f| f.category() == LengthCategory::Long)
+            .count();
+
+        Some(crate::analyze::FullStats {
+            total_count,
+            total_avg,
+            total_max,
+            critical_count,
+            high_count,
+        })
+    } else {
+        None
+    };
+
     sorted.truncate(limit);
 
     LengthReport {
         functions: sorted,
         file_path: root.to_string_lossy().to_string(),
+        full_stats,
     }
 }

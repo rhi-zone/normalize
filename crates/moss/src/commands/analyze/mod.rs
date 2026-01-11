@@ -947,17 +947,37 @@ pub(crate) fn is_source_file(path: &Path) -> bool {
 fn print_complexity_report(report: &ComplexityReport) {
     println!("# Complexity Analysis");
     println!();
-    println!("Functions: {}", report.functions.len());
-    println!("Average: {:.1}", report.avg_complexity());
-    println!("Maximum: {}", report.max_complexity());
 
-    let crit = report.critical_risk_count();
-    let high = report.high_risk_count();
-    if crit > 0 {
-        println!("Critical (>20): {}", crit);
-    }
-    if high > 0 || crit == 0 {
-        println!("High risk (11-20): {}", high);
+    // Use full_stats if available (computed before truncation), otherwise use report methods
+    if let Some(ref stats) = report.full_stats {
+        let shown = report.functions.len();
+        if stats.total_count > shown {
+            println!("Functions: {} (showing {})", stats.total_count, shown);
+        } else {
+            println!("Functions: {}", stats.total_count);
+        }
+        println!("Average: {:.1}", stats.total_avg);
+        println!("Maximum: {}", stats.total_max);
+
+        if stats.critical_count > 0 {
+            println!("Critical (>20): {}", stats.critical_count);
+        }
+        if stats.high_count > 0 || stats.critical_count == 0 {
+            println!("High risk (11-20): {}", stats.high_count);
+        }
+    } else {
+        println!("Functions: {}", report.functions.len());
+        println!("Average: {:.1}", report.avg_complexity());
+        println!("Maximum: {}", report.max_complexity());
+
+        let crit = report.critical_risk_count();
+        let high = report.high_risk_count();
+        if crit > 0 {
+            println!("Critical (>20): {}", crit);
+        }
+        if high > 0 || crit == 0 {
+            println!("High risk (11-20): {}", high);
+        }
     }
 
     if !report.functions.is_empty() {
@@ -987,17 +1007,45 @@ fn print_complexity_report_pretty(report: &ComplexityReport) {
 
     println!("{}", Style::new().bold().paint("Complexity Analysis"));
     println!();
-    println!("Functions: {}", report.functions.len());
-    println!("Average: {:.1}", report.avg_complexity());
-    println!("Maximum: {}", report.max_complexity());
 
-    let crit = report.critical_risk_count();
-    let high = report.high_risk_count();
-    if crit > 0 {
-        println!("{}: {}", Color::Red.paint("Critical (>20)"), crit);
-    }
-    if high > 0 || crit == 0 {
-        println!("{}: {}", Color::Yellow.paint("High risk (11-20)"), high);
+    // Use full_stats if available (computed before truncation), otherwise use report methods
+    if let Some(ref stats) = report.full_stats {
+        let shown = report.functions.len();
+        if stats.total_count > shown {
+            println!("Functions: {} (showing {})", stats.total_count, shown);
+        } else {
+            println!("Functions: {}", stats.total_count);
+        }
+        println!("Average: {:.1}", stats.total_avg);
+        println!("Maximum: {}", stats.total_max);
+
+        if stats.critical_count > 0 {
+            println!(
+                "{}: {}",
+                Color::Red.paint("Critical (>20)"),
+                stats.critical_count
+            );
+        }
+        if stats.high_count > 0 || stats.critical_count == 0 {
+            println!(
+                "{}: {}",
+                Color::Yellow.paint("High risk (11-20)"),
+                stats.high_count
+            );
+        }
+    } else {
+        println!("Functions: {}", report.functions.len());
+        println!("Average: {:.1}", report.avg_complexity());
+        println!("Maximum: {}", report.max_complexity());
+
+        let crit = report.critical_risk_count();
+        let high = report.high_risk_count();
+        if crit > 0 {
+            println!("{}: {}", Color::Red.paint("Critical (>20)"), crit);
+        }
+        if high > 0 || crit == 0 {
+            println!("{}: {}", Color::Yellow.paint("High risk (11-20)"), high);
+        }
     }
 
     if !report.functions.is_empty() {
@@ -1042,17 +1090,37 @@ fn print_length_report(report: &LengthReport) {
 
     println!("# Function Length Analysis");
     println!();
-    println!("Functions: {}", report.functions.len());
-    println!("Average: {:.1} lines", report.avg_length());
-    println!("Maximum: {} lines", report.max_length());
 
-    let too_long = report.too_long_count();
-    let long = report.long_count();
-    if too_long > 0 {
-        println!("Too Long (>100): {}", too_long);
-    }
-    if long > 0 || too_long == 0 {
-        println!("Long (51-100): {}", long);
+    // Use full_stats if available (computed before truncation), otherwise use report methods
+    if let Some(ref stats) = report.full_stats {
+        let shown = report.functions.len();
+        if stats.total_count > shown {
+            println!("Functions: {} (showing {})", stats.total_count, shown);
+        } else {
+            println!("Functions: {}", stats.total_count);
+        }
+        println!("Average: {:.1} lines", stats.total_avg);
+        println!("Maximum: {} lines", stats.total_max);
+
+        if stats.critical_count > 0 {
+            println!("Too Long (>100): {}", stats.critical_count);
+        }
+        if stats.high_count > 0 || stats.critical_count == 0 {
+            println!("Long (51-100): {}", stats.high_count);
+        }
+    } else {
+        println!("Functions: {}", report.functions.len());
+        println!("Average: {:.1} lines", report.avg_length());
+        println!("Maximum: {} lines", report.max_length());
+
+        let too_long = report.too_long_count();
+        let long = report.long_count();
+        if too_long > 0 {
+            println!("Too Long (>100): {}", too_long);
+        }
+        if long > 0 || too_long == 0 {
+            println!("Long (51-100): {}", long);
+        }
     }
 
     if !report.functions.is_empty() {
@@ -1083,17 +1151,45 @@ fn print_length_report_pretty(report: &LengthReport) {
 
     println!("{}", Style::new().bold().paint("Function Length Analysis"));
     println!();
-    println!("Functions: {}", report.functions.len());
-    println!("Average: {:.1} lines", report.avg_length());
-    println!("Maximum: {} lines", report.max_length());
 
-    let too_long = report.too_long_count();
-    let long = report.long_count();
-    if too_long > 0 {
-        println!("{}: {}", Color::Red.paint("Too Long (>100)"), too_long);
-    }
-    if long > 0 || too_long == 0 {
-        println!("{}: {}", Color::Yellow.paint("Long (51-100)"), long);
+    // Use full_stats if available (computed before truncation), otherwise use report methods
+    if let Some(ref stats) = report.full_stats {
+        let shown = report.functions.len();
+        if stats.total_count > shown {
+            println!("Functions: {} (showing {})", stats.total_count, shown);
+        } else {
+            println!("Functions: {}", stats.total_count);
+        }
+        println!("Average: {:.1} lines", stats.total_avg);
+        println!("Maximum: {} lines", stats.total_max);
+
+        if stats.critical_count > 0 {
+            println!(
+                "{}: {}",
+                Color::Red.paint("Too Long (>100)"),
+                stats.critical_count
+            );
+        }
+        if stats.high_count > 0 || stats.critical_count == 0 {
+            println!(
+                "{}: {}",
+                Color::Yellow.paint("Long (51-100)"),
+                stats.high_count
+            );
+        }
+    } else {
+        println!("Functions: {}", report.functions.len());
+        println!("Average: {:.1} lines", report.avg_length());
+        println!("Maximum: {} lines", report.max_length());
+
+        let too_long = report.too_long_count();
+        let long = report.long_count();
+        if too_long > 0 {
+            println!("{}: {}", Color::Red.paint("Too Long (>100)"), too_long);
+        }
+        if long > 0 || too_long == 0 {
+            println!("{}: {}", Color::Yellow.paint("Long (51-100)"), long);
+        }
     }
 
     if !report.functions.is_empty() {

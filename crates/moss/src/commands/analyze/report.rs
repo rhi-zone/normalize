@@ -611,6 +611,7 @@ fn analyze_glob(
             Some(ComplexityReport {
                 functions: all_functions,
                 file_path: pattern.to_string(),
+                full_stats: None,
             })
         } else {
             None
@@ -646,6 +647,7 @@ fn analyze_glob(
             Some(LengthReport {
                 functions: all_functions,
                 file_path: pattern.to_string(),
+                full_stats: None,
             })
         } else {
             None

@@ -80,10 +80,35 @@ pub fn analyze_codebase_complexity(
     }
 
     filtered.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+
+    // Compute full stats before truncation
+    let full_stats = if !filtered.is_empty() {
+        let total_count = filtered.len();
+        let total_sum: usize = filtered.iter().map(|f| f.complexity).sum();
+        let total_avg = total_sum as f64 / total_count as f64;
+        let total_max = filtered.first().map(|f| f.complexity).unwrap_or(0);
+        let critical_count = filtered.iter().filter(|f| f.complexity > 20).count();
+        let high_count = filtered
+            .iter()
+            .filter(|f| f.complexity >= 11 && f.complexity <= 20)
+            .count();
+
+        Some(crate::analyze::FullStats {
+            total_count,
+            total_avg,
+            total_max,
+            critical_count,
+            high_count,
+        })
+    } else {
+        None
+    };
+
     filtered.truncate(limit);
 
     ComplexityReport {
         functions: filtered,
         file_path: root.to_string_lossy().to_string(),
+        full_stats,
     }
 }

@@ -166,6 +166,7 @@ impl ComplexityAnalyzer {
         ComplexityReport {
             functions,
             file_path: path.to_string_lossy().to_string(),
+            full_stats: None,
         }
     }
 

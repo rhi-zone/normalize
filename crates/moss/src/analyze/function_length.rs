@@ -114,6 +114,7 @@ impl LengthAnalyzer {
         LengthReport {
             functions,
             file_path: path.to_string_lossy().to_string(),
+            full_stats: None,
         }
     }
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionLength> {
