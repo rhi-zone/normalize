@@ -9,6 +9,7 @@
 //! - **fetch_all**: Not supported (too large, use search instead)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+use std::collections::HashMap;
 
 /// Crates.io package index fetcher.
 pub struct CargoIndex;
@@ -36,6 +37,57 @@ impl PackageIndex for CargoIndex {
 
         let crate_data = &response["crate"];
         let latest_version = response["versions"].as_array().and_then(|v| v.first());
+
+        let mut extra = HashMap::new();
+
+        // Categories
+        if let Some(categories) = crate_data["categories"].as_array() {
+            let cats: Vec<serde_json::Value> = categories
+                .iter()
+                .filter_map(|c| c.as_str().map(|s| serde_json::Value::String(s.to_string())))
+                .collect();
+            if !cats.is_empty() {
+                extra.insert("categories".to_string(), serde_json::Value::Array(cats));
+            }
+        }
+
+        // Documentation URL
+        if let Some(docs) = crate_data["documentation"].as_str() {
+            extra.insert(
+                "documentation".to_string(),
+                serde_json::Value::String(docs.to_string()),
+            );
+        }
+
+        // Recent downloads (last 90 days)
+        if let Some(recent) = crate_data["recent_downloads"].as_u64() {
+            extra.insert(
+                "recent_downloads".to_string(),
+                serde_json::Value::Number(recent.into()),
+            );
+        }
+
+        // Rust version requirement
+        if let Some(msrv) = latest_version.and_then(|v| v["rust_version"].as_str()) {
+            extra.insert(
+                "rust_version".to_string(),
+                serde_json::Value::String(msrv.to_string()),
+            );
+        }
+
+        // Features
+        if let Some(features) = latest_version.and_then(|v| v["features"].as_object()) {
+            let features_map: serde_json::Map<String, serde_json::Value> = features
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            if !features_map.is_empty() {
+                extra.insert(
+                    "features".to_string(),
+                    serde_json::Value::Object(features_map),
+                );
+            }
+        }
 
         Ok(PackageMeta {
             name: crate_data["id"].as_str().unwrap_or(name).to_string(),
@@ -79,7 +131,7 @@ impl PackageIndex for CargoIndex {
             checksum: latest_version
                 .and_then(|v| v["checksum"].as_str())
                 .map(|h| format!("sha256:{}", h)),
-            extra: Default::default(),
+            extra,
         })
     }
 

@@ -9,6 +9,7 @@
 //! - **fetch_all**: Not supported (millions of packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+use std::collections::HashMap;
 
 /// npm package index fetcher.
 pub struct NpmIndex;
@@ -39,6 +40,61 @@ impl PackageIndex for NpmIndex {
             .as_str()
             .unwrap_or("unknown");
         let latest = &response["versions"][latest_version];
+
+        let mut extra = HashMap::new();
+
+        // Full bin mapping (command -> script path)
+        if let Some(bin) = latest["bin"].as_object() {
+            let bin_map: serde_json::Map<String, serde_json::Value> =
+                bin.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            if !bin_map.is_empty() {
+                extra.insert("bin".to_string(), serde_json::Value::Object(bin_map));
+            }
+        }
+
+        // Engines (node/npm version requirements)
+        if let Some(engines) = latest["engines"].as_object() {
+            let engines_map: serde_json::Map<String, serde_json::Value> = engines
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            if !engines_map.is_empty() {
+                extra.insert(
+                    "engines".to_string(),
+                    serde_json::Value::Object(engines_map),
+                );
+            }
+        }
+
+        // TypeScript types
+        if let Some(types) = latest["types"]
+            .as_str()
+            .or_else(|| latest["typings"].as_str())
+        {
+            extra.insert(
+                "types".to_string(),
+                serde_json::Value::String(types.to_string()),
+            );
+        }
+
+        // Peer dependencies
+        if let Some(peers) = latest["peerDependencies"].as_object() {
+            let peers_map: serde_json::Map<String, serde_json::Value> =
+                peers.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            if !peers_map.is_empty() {
+                extra.insert(
+                    "peerDependencies".to_string(),
+                    serde_json::Value::Object(peers_map),
+                );
+            }
+        }
+
+        // Funding info
+        if let Some(funding) = response.get("funding") {
+            if !funding.is_null() {
+                extra.insert("funding".to_string(), funding.clone());
+            }
+        }
 
         Ok(PackageMeta {
             name: response["name"].as_str().unwrap_or(name).to_string(),
@@ -80,7 +136,7 @@ impl PackageIndex for NpmIndex {
             checksum: latest["dist"]["shasum"]
                 .as_str()
                 .map(|h| format!("sha1:{}", h)),
-            extra: Default::default(),
+            extra,
         })
     }
 
