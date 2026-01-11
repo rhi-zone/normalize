@@ -194,6 +194,62 @@ Within-project parallelization makes sense when you're *forced* to work on one c
   - **Maintenance**: GitHub Actions for scheduled quality checks
   - **Patterns for moss**: Scoring-based script/workflow selection, formalized severity levels, expanded hook triggering
 
+### Confucius Code Agent (Meta + Harvard)
+- **Paper**: https://arxiv.org/abs/2512.10398
+- **Blog**: https://www.marktechpost.com/2026/01/09/meta-and-harvard-researchers-introduce-the-confucius-code-agent-cca/
+- **What it is**: Software engineering agent designed for large-scale codebases (Jan 2026)
+
+**Key Architecture Insights:**
+
+**The Confucius SDK** structures agent design around three axes:
+- **Agent Experience (AX)**: Internal cognitive workspace with distilled, hierarchical memory
+- **User Experience (UX)**: Transparent execution traces and readable logs for human oversight
+- **Developer Experience (DX)**: Observability and modular interfaces for agent iteration
+
+**Five Core Components:**
+
+1. **Orchestrator**: Minimal execution loop invoking LLM, parsing outputs, routing through extensions. Supports both JSON tool-use and XML-style tags for broad model compatibility.
+
+2. **Hierarchical Working Memory (F1)**: Adaptive context compression when prompts approach token limits. An "Architect" agent summarizes conversation history into structured summaries preserving "task goals, decisions made, open TODOs, and critical error traces" while maintaining a rolling window of recent interactions. Achieves 40%+ context compression without omitting key reasoning chains.
+
+3. **Note-Taking System (F2)**: Persistent cross-session memory that distills trajectories into Markdown files. Captures "hindsight notes" documenting failures, compilation errors, and workarounds—enabling retrieval of known fixes rather than rediscovering solutions. Reduces average turns from 64→61, tokens from ~104k→93k, +1.4% resolution improvement.
+
+4. **Extension System (F3)**: Modular typed components handling perception, reasoning, and action. Extensions register callbacks that intercept prompts, parse outputs, and inject results into memory.
+
+5. **Meta-Agent (F4)**: Automates "build-test-improve" loop that synthesizes agent configurations, evaluates on test suites, and proposes refinements. The production CCA emerged from this automated process, improving resolve rates by ~7 percentage points over hand-engineered alternatives.
+
+**Performance (SWE-Bench):**
+| Model | Scaffold | Resolve Rate |
+|-------|----------|--------------|
+| Claude 4 Sonnet | CCA | 45.5% |
+| Claude 4.5 Sonnet | CCA | 52.7% |
+| Claude 4.5 Opus | CCA | 54.3% |
+| Claude 4.5 Sonnet | Baseline | 45.0% |
+| Claude 4.5 Opus | Baseline | 52.0% |
+
+Key finding: **Scaffolding can outweigh raw model scale.** Sonnet+CCA beats Opus+baseline.
+
+**Multi-file performance**: 57.8% resolve rate for 1-2 files, 44.1% for 5-6 files, recovering to 52.6% for 7-10 files.
+
+**Novel Techniques:**
+1. **Dual information flows**: Users see rich logs; agents see compressed memory—prevents context degradation
+2. **Hindsight failure documentation**: Systematic recording of error modes with resolutions
+3. **Automated agent synthesis**: Meta-agent learns tool-use conventions better than hand-designed
+4. **Adaptive compression**: Planner-driven summarization outperforms naive truncation (1.4→2.7 planning iterations/trajectory)
+
+**Moss Observations:**
+- **Hierarchical memory validates moss's approach**: Moss uses composable loops with structured handoffs rather than append-only conversation
+- **Note-taking for cross-session learning**: Moss could adopt hindsight notes pattern—document failures in `.moss/notes/` for retrieval
+- **Dual visibility pattern**: Moss's "user sees summary, agent sees structured data" aligns with AX/UX separation
+- **Meta-agent**: Automated agent tuning is interesting—could apply to moss prompt/tool refinement
+- **Extension system**: Similar to moss's tool architecture, validates modular approach
+- **Key insight**: "Tool sophistication matters as much as model upgrades" matches moss philosophy
+
+**Implications for Moss Agent:**
+- [ ] Add hindsight note-taking: Record failures + resolutions in `.moss/agent/notes/`
+- [ ] Consider planner-driven compression: Summarize based on task structure, not just token count
+- [ ] Evaluate meta-agent approach for prompt tuning
+
 ### Cursor IDE
 - **Site**: https://cursor.com
 - **What it is**: VS Code fork with deep AI integration
