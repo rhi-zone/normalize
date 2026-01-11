@@ -444,9 +444,31 @@ fn test_fdroid() {
     test_search(&index, "browser");
 }
 
+#[test]
+fn test_termux() {
+    let index = termux::Termux;
+    test_fetch(&index, "bash");
+    test_versions(&index, "bash");
+    // Note: search not implemented (requires GitHub API)
+}
+
 // =============================================================================
 // Language package managers
 // =============================================================================
+
+#[test]
+fn test_vcpkg() {
+    let index = vcpkg::Vcpkg;
+    test_fetch(&index, "zlib");
+    test_versions(&index, "zlib");
+    test_search(&index, "json");
+}
+
+#[test]
+fn test_vcpkg_fetch_all() {
+    let index = vcpkg::Vcpkg;
+    test_fetch_all(&index);
+}
 
 #[test]
 fn test_clojars() {
@@ -672,8 +694,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 50,
-        "should have at least 50 indices, got {}",
+        indices.len() >= 52,
+        "should have at least 52 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);

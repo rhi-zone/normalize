@@ -9,7 +9,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 
 ### Debian/Ubuntu Family
 - [x] apt (Debian/Ubuntu) - debian/ubuntu/linuxmint/pop_os/elementary/mx_linux/devuan/pureos/raspbian/tails/antiX/lmde/deepin/kali/parrot
-- [ ] termux - Android terminal packages
+- [x] termux - Android terminal packages
 
 ### Arch Family
 - [x] pacman (Arch Linux official repos)
@@ -87,7 +87,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 - [x] scoop - Scoop package manager
 - [x] choco - Chocolatey
 - [x] msys2 - MSYS2/MinGW packages
-- [ ] vcpkg - Microsoft C++ package manager
+- [x] vcpkg - Microsoft C++ package manager
 - [ ] cygwin - Cygwin packages
 - [ ] npackd - Npackd Windows packages
 
@@ -177,7 +177,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 
 ### C/C++
 - [~] conan - Conan Center (CLI only, no REST API)
-- [ ] vcpkg - vcpkg (see Windows section)
+- [x] vcpkg - vcpkg (GitHub baseline.json)
 - [ ] hunter - Hunter C++ package manager
 - [ ] biicode - Biicode (discontinued)
 
@@ -216,7 +216,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 ### Medium Priority
 1. [ ] manjaro - Popular Arch derivative
 2. [x] msys2 - Windows development **DONE**
-3. [ ] vcpkg - C++ ecosystem
+3. [x] vcpkg - C++ ecosystem **DONE**
 4. [x] pub - Dart/Flutter **DONE**
 5. [x] opam - OCaml **DONE**
 6. [x] cran - R packages **DONE**

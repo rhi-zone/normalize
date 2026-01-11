@@ -50,6 +50,7 @@ pub mod docker;
 
 // Mobile
 pub mod fdroid;
+pub mod termux;
 
 // Language package managers
 pub mod cargo;
@@ -75,6 +76,7 @@ pub mod nuget;
 pub mod opam;
 pub mod pip;
 pub mod pub_dev;
+pub mod vcpkg;
 
 pub use types::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 
@@ -117,7 +119,9 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &docker::Docker,
         // Mobile
         &fdroid::FDroid,
+        &termux::Termux,
         // Language
+        &vcpkg::Vcpkg,
         &clojars::Clojars,
         &cargo::CargoIndex,
         &composer::Composer,
