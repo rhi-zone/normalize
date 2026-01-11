@@ -293,6 +293,15 @@ fn test_endeavouros() {
 }
 
 #[test]
+fn test_manjaro() {
+    // Manjaro uses its own repos + AUR
+    let index = manjaro::Manjaro;
+    test_fetch(&index, "firefox");
+    test_versions(&index, "firefox");
+    test_search(&index, "browser");
+}
+
+#[test]
 fn test_dnf() {
     let index = dnf::Dnf;
     test_fetch(&index, "curl");
@@ -694,8 +703,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 52,
-        "should have at least 52 indices, got {}",
+        indices.len() >= 53,
+        "should have at least 53 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);

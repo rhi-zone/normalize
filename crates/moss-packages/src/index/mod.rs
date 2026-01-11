@@ -22,6 +22,7 @@ pub mod endeavouros;
 pub mod freebsd;
 pub mod gentoo;
 pub mod guix;
+pub mod manjaro;
 pub mod netbsd;
 pub mod nix;
 pub mod openbsd;
@@ -96,6 +97,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &freebsd::FreeBsd,
         &gentoo::Gentoo,
         &guix::Guix,
+        &manjaro::Manjaro,
         &netbsd::NetBsd,
         &nix::Nix,
         &openbsd::OpenBsd,

@@ -214,7 +214,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 6. [x] conda - Data science ecosystem **DONE**
 
 ### Medium Priority
-1. [ ] manjaro - Popular Arch derivative
+1. [x] manjaro - Popular Arch derivative **DONE**
 2. [x] msys2 - Windows development **DONE**
 3. [x] vcpkg - C++ ecosystem **DONE**
 4. [x] pub - Dart/Flutter **DONE**
