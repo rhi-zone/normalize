@@ -60,6 +60,7 @@ pub mod composer;
 pub mod conan;
 pub mod conda;
 pub mod cran;
+pub mod ctan;
 pub mod deno;
 pub mod dub;
 pub mod gem;
@@ -77,6 +78,7 @@ pub mod nuget;
 pub mod opam;
 pub mod pip;
 pub mod pub_dev;
+pub mod racket;
 pub mod vcpkg;
 
 pub use types::{IndexError, PackageIndex, PackageMeta, VersionMeta};
@@ -126,6 +128,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &vcpkg::Vcpkg,
         &clojars::Clojars,
         &cargo::CargoIndex,
+        &ctan::Ctan,
         &composer::Composer,
         &conan::Conan,
         &conda::Conda,
@@ -147,6 +150,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &opam::Opam,
         &pip::PipIndex,
         &pub_dev::Pub,
+        &racket::Racket,
     ]
 }
 

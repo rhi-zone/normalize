@@ -688,6 +688,22 @@ fn test_dub() {
     test_search(&index, "http");
 }
 
+#[test]
+fn test_ctan() {
+    let index = ctan::Ctan;
+    test_fetch(&index, "pgf");
+    test_versions(&index, "pgf");
+    test_search(&index, "tikz");
+}
+
+#[test]
+fn test_racket() {
+    let index = racket::Racket;
+    test_fetch(&index, "racket-doc");
+    test_versions(&index, "racket-doc");
+    test_search(&index, "web");
+}
+
 // =============================================================================
 // Registry tests
 // =============================================================================
@@ -703,8 +719,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 53,
-        "should have at least 53 indices, got {}",
+        indices.len() >= 55,
+        "should have at least 55 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);

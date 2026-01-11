@@ -164,7 +164,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 - [x] julia - Julia General registry (GitHub)
 
 ### Racket
-- [ ] racket - Racket packages
+- [x] racket - Racket packages (pkgs.racket-lang.org)
 
 ### Nim
 - [x] nimble - Nimble (GitHub packages.json)
@@ -182,7 +182,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 - [ ] biicode - Biicode (discontinued)
 
 ### TeX
-- [ ] ctan - CTAN (TeX packages)
+- [x] ctan - CTAN (TeX packages via ctan.org JSON API)
 - [ ] texlive - TeX Live
 
 ## Mobile/App Stores
