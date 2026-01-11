@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from CRAN (Comprehensive R Archive Network).
 //! Uses the crandb API for JSON access.
+//!
+//! ## API Strategy
+//! - **fetch**: `crandb.r-pkg.org/{name}` - crandb JSON API
+//! - **fetch_versions**: `crandb.r-pkg.org/{name}/all` - all versions
+//! - **search**: `crandb.r-pkg.org/-/search?q=` - crandb search endpoint
+//! - **fetch_all**: Not supported (no bulk endpoint)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

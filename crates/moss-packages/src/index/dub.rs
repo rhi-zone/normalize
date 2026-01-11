@@ -1,6 +1,12 @@
 //! DUB package index fetcher (D language).
 //!
 //! Fetches package metadata from the DUB package registry at code.dlang.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `code.dlang.org/api/packages/{name}` - Official DUB JSON API
+//! - **fetch_versions**: Same API, extracts versions array
+//! - **search**: `code.dlang.org/api/packages/search?q=`
+//! - **fetch_all**: `code.dlang.org/api/packages` (all packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

@@ -1,6 +1,12 @@
 //! Hex package index fetcher (Elixir/Erlang).
 //!
 //! Fetches package metadata from hex.pm.
+//!
+//! ## API Strategy
+//! - **fetch**: `hex.pm/api/packages/{name}` - Official Hex JSON API
+//! - **fetch_versions**: Same API, extracts releases array
+//! - **search**: `hex.pm/api/packages?search=` - Hex search
+//! - **fetch_all**: `hex.pm/api/packages` with pagination
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

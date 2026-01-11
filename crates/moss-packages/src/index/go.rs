@@ -1,6 +1,12 @@
 //! Go module index fetcher.
 //!
 //! Fetches package metadata from pkg.go.dev and proxy.golang.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `proxy.golang.org/{module}/@v/list` + `@latest` - Official Go proxy
+//! - **fetch_versions**: `proxy.golang.org/{module}/@v/list` - version list
+//! - **search**: Not supported (Go has no search API, use pkg.go.dev website)
+//! - **fetch_all**: Not supported (decentralized registry)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

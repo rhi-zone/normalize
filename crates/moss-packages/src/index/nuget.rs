@@ -1,6 +1,12 @@
 //! NuGet package index fetcher (.NET).
 //!
 //! Fetches package metadata from nuget.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `api.nuget.org/v3/registration5-gz-semver2/{name}/index.json` - NuGet v3 API
+//! - **fetch_versions**: Same API, extracts versions from catalog pages
+//! - **search**: `api.nuget.org/v3/query?q=`
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

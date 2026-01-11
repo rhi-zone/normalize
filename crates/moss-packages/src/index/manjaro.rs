@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from Manjaro repositories.
 //! Uses the search.manjaro-sway.download API.
+//!
+//! ## API Strategy
+//! - **fetch**: `search.manjaro-sway.download/{name}` - Community JSON API + AUR fallback
+//! - **fetch_versions**: Same API, single version
+//! - **search**: `search.manjaro-sway.download/search?q=`
+//! - **fetch_all**: AUR `packages-meta-ext-v1.json.gz` via arch_common
 
 use super::arch_common;
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};

@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from LuaRocks. Uses the manifest file for package
 //! listing and individual rockspec files for metadata.
+//!
+//! ## API Strategy
+//! - **fetch**: `luarocks.org/manifests/root/{name}-{version}.rockspec`
+//! - **fetch_versions**: Parses `luarocks.org/manifest` (Lua table format)
+//! - **search**: Not supported (would require HTML scraping)
+//! - **fetch_all**: Parses manifest file (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

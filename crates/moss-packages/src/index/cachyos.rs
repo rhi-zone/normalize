@@ -2,6 +2,12 @@
 //!
 //! CachyOS is an Arch-based distro with its own repositories.
 //! Uses the same package format as Arch but with additional CachyOS repos.
+//!
+//! ## API Strategy
+//! - **fetch**: `archlinux.org/packages/search/json/` + AUR fallback - Arch JSON API
+//! - **fetch_versions**: Same API, returns single version
+//! - **search**: Same API with query parameter
+//! - **fetch_all**: AUR `packages-meta-ext-v1.json.gz` (comprehensive list)
 
 use super::arch_common;
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};

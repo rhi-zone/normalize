@@ -1,6 +1,12 @@
 //! DNF package index fetcher (Fedora/RHEL).
 //!
 //! Fetches package metadata from Fedora repositories.
+//!
+//! ## API Strategy
+//! - **fetch**: `mdapi.fedoraproject.org/rawhide/pkg/{name}` - Fedora MDAPI JSON
+//! - **fetch_versions**: `mdapi.fedoraproject.org/rawhide/files/{name}` - file list
+//! - **search**: `apps.fedoraproject.org/packages/fcomm_connector/xapian/query/search_packages`
+//! - **fetch_all**: Not supported (no bulk endpoint)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

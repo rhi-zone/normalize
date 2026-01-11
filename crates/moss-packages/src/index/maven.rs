@@ -1,6 +1,12 @@
 //! Maven Central package index fetcher (Java).
 //!
 //! Fetches package metadata from Maven Central.
+//!
+//! ## API Strategy
+//! - **fetch**: `search.maven.org/solrsearch/select?q=g:{group}+AND+a:{artifact}`
+//! - **fetch_versions**: Same API with `core=gav` for all versions
+//! - **search**: `search.maven.org/solrsearch/select?q=`
+//! - **fetch_all**: Not supported (millions of artifacts)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

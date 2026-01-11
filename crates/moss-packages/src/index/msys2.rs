@@ -1,6 +1,12 @@
 //! MSYS2 package index fetcher (Windows development).
 //!
 //! Fetches package metadata from the MSYS2 packages API.
+//!
+//! ## API Strategy
+//! - **fetch**: `packages.msys2.org/api/package/{name}` - Official MSYS2 JSON API
+//! - **fetch_versions**: Same API, single version
+//! - **search**: `packages.msys2.org/api/search?q=`
+//! - **fetch_all**: `packages.msys2.org/api/packages` (all packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

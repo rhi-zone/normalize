@@ -1,6 +1,12 @@
 //! F-Droid package index fetcher (Android FOSS).
 //!
 //! Fetches package metadata from the F-Droid repository API.
+//!
+//! ## API Strategy
+//! - **fetch**: `f-droid.org/api/v1/packages/{name}` - Official F-Droid JSON API
+//! - **fetch_versions**: Same API, extracts packages array
+//! - **search**: `search.f-droid.org/api/v1/?q=` - F-Droid search API
+//! - **fetch_all**: `f-droid.org/api/v1/packages` (all packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

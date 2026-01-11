@@ -1,6 +1,12 @@
 //! JSR package index fetcher (JavaScript Registry).
 //!
 //! Fetches package metadata from jsr.io.
+//!
+//! ## API Strategy
+//! - **fetch**: `api.jsr.io/packages/@{scope}/{name}` - Official JSR JSON API
+//! - **fetch_versions**: Same API, extracts versions array
+//! - **search**: `api.jsr.io/packages?query=` - JSR search
+//! - **fetch_all**: Not supported (use search instead)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from Debian/Ubuntu repositories by parsing
 //! Sources/Packages files from mirror indices.
+//!
+//! ## API Strategy
+//! - **fetch**: Parses Packages.gz from `deb.debian.org` (official mirror)
+//! - **fetch_versions**: Same index, single version per package in repo
+//! - **search**: Filters cached Packages entries
+//! - **fetch_all**: Returns all packages from Packages.gz (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

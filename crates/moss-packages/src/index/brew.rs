@@ -1,6 +1,12 @@
 //! Homebrew package index fetcher (macOS/Linux).
 //!
 //! Fetches package metadata from Homebrew's formula JSON API.
+//!
+//! ## API Strategy
+//! - **fetch**: `formulae.brew.sh/api/formula/{name}.json` - Official JSON API
+//! - **fetch_versions**: `formulae.brew.sh/api/formula/{name}.json` versions array
+//! - **search**: Filters `formulae.brew.sh/api/formula.json` (all formulas)
+//! - **fetch_all**: `formulae.brew.sh/api/formula.json` (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

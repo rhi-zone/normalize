@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from pkgs.racket-lang.org.
 //! Uses the pkgs-all.json.gz endpoint which contains all package data.
+//!
+//! ## API Strategy
+//! - **fetch**: Searches cached `pkgs.racket-lang.org/pkgs-all.json.gz`
+//! - **fetch_versions**: Same, single version per package
+//! - **search**: Filters cached pkgs-all.json
+//! - **fetch_all**: `pkgs.racket-lang.org/pkgs-all.json.gz` (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

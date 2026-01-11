@@ -1,6 +1,12 @@
 //! npm package index fetcher (JavaScript/TypeScript).
 //!
 //! Fetches package metadata from the npm registry.
+//!
+//! ## API Strategy
+//! - **fetch**: `registry.npmjs.org/{name}` - Official npm JSON API
+//! - **fetch_versions**: Same API, extracts versions object
+//! - **search**: `registry.npmjs.org/-/v1/search?text=`
+//! - **fetch_all**: Not supported (millions of packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

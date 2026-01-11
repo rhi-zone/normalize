@@ -1,6 +1,12 @@
 //! Flathub package index fetcher (Flatpak apps).
 //!
 //! Fetches package metadata from Flathub API.
+//!
+//! ## API Strategy
+//! - **fetch**: `flathub.org/api/v2/appstream/{app_id}` - Official Flathub JSON API
+//! - **fetch_versions**: Same API, extracts releases array
+//! - **search**: `flathub.org/api/v2/search?q=` - Flathub search
+//! - **fetch_all**: `flathub.org/api/v2/appstream` (all apps)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

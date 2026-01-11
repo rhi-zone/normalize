@@ -1,6 +1,12 @@
 //! Packagist package index fetcher (PHP/Composer).
 //!
 //! Fetches package metadata from packagist.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `packagist.org/packages/{vendor}/{name}.json` - Official JSON API
+//! - **fetch_versions**: Same API, extracts versions object
+//! - **search**: `packagist.org/search.json?q=` - Official search endpoint
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

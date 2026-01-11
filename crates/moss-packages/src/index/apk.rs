@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from Alpine Linux repositories by parsing
 //! APKINDEX.tar.gz files from mirrors.
+//!
+//! ## API Strategy
+//! - **fetch**: Parses APKINDEX.tar.gz from `dl-cdn.alpinelinux.org` (official mirror)
+//! - **fetch_versions**: Same index, single version per package
+//! - **search**: Filters cached APKINDEX entries
+//! - **fetch_all**: Returns all packages from APKINDEX (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

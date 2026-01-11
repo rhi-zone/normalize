@@ -1,6 +1,12 @@
 //! Deno.land package index fetcher.
 //!
 //! Fetches package metadata from deno.land/x (third-party modules).
+//!
+//! ## API Strategy
+//! - **fetch**: `apiland.deno.dev/v2/modules/{name}` - Official Deno API
+//! - **fetch_versions**: Same API, extracts versions array
+//! - **search**: `apiland.deno.dev/v2/modules?query=` - Official search
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

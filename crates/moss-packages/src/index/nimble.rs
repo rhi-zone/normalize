@@ -1,6 +1,12 @@
 //! Nimble package index fetcher (Nim).
 //!
 //! Fetches package metadata from the Nim packages repository on GitHub.
+//!
+//! ## API Strategy
+//! - **fetch**: Searches cached `github.com/nim-lang/packages/packages.json`
+//! - **fetch_versions**: Same, parses package URL for tags
+//! - **search**: Filters cached packages.json
+//! - **fetch_all**: `github.com/nim-lang/packages/packages.json` (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

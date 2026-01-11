@@ -1,6 +1,12 @@
 //! Termux package index fetcher (Android terminal).
 //!
 //! Fetches package metadata from the termux-packages GitHub repository.
+//!
+//! ## API Strategy
+//! - **fetch**: `github.com/termux/termux-packages/.../build.sh` - GitHub raw files
+//! - **fetch_versions**: Same, single version per package
+//! - **search**: Filters GitHub directory listing via API
+//! - **fetch_all**: GitHub API to list all package directories
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

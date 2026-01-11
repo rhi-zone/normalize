@@ -1,6 +1,12 @@
 //! pub.dev package index fetcher (Dart/Flutter).
 //!
 //! Fetches package metadata from pub.dev API.
+//!
+//! ## API Strategy
+//! - **fetch**: `pub.dev/api/packages/{name}` - Official pub.dev JSON API
+//! - **fetch_versions**: Same API, extracts versions array
+//! - **search**: `pub.dev/api/search?q=`
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

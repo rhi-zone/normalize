@@ -1,6 +1,12 @@
 //! MacPorts package index fetcher (macOS).
 //!
 //! Fetches package metadata from the MacPorts ports API.
+//!
+//! ## API Strategy
+//! - **fetch**: `ports.macports.org/api/v1/ports/{name}` - Official MacPorts JSON API
+//! - **fetch_versions**: Same API, extracts version info
+//! - **search**: `ports.macports.org/api/v1/ports/?search=`
+//! - **fetch_all**: `ports.macports.org/api/v1/ports/` (all ports)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

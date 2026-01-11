@@ -1,6 +1,12 @@
 //! Julia package index fetcher.
 //!
 //! Fetches package metadata from the Julia General registry on GitHub.
+//!
+//! ## API Strategy
+//! - **fetch**: `github.com/JuliaRegistries/General/.../Package.toml` - GitHub raw files
+//! - **fetch_versions**: `github.com/JuliaRegistries/General/.../Versions.toml`
+//! - **search**: Not supported (would need to download full registry)
+//! - **fetch_all**: Not supported (too many packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

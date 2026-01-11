@@ -1,6 +1,12 @@
 //! MetaCPAN package index fetcher (Perl).
 //!
 //! Fetches package metadata from metacpan.org API.
+//!
+//! ## API Strategy
+//! - **fetch**: `fastapi.metacpan.org/v1/release/{distribution}` - MetaCPAN JSON API
+//! - **fetch_versions**: `fastapi.metacpan.org/v1/release/_search` with distribution filter
+//! - **search**: `fastapi.metacpan.org/v1/release/_search?q=`
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

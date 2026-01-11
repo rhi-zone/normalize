@@ -1,6 +1,12 @@
 //! Hackage package index fetcher (Haskell).
 //!
 //! Fetches package metadata from hackage.haskell.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `hackage.haskell.org/package/{name}/preferred` - Official JSON API
+//! - **fetch_versions**: `hackage.haskell.org/package/{name}` - version list
+//! - **search**: `hackage.haskell.org/packages/search?terms=` - Hackage search
+//! - **fetch_all**: Not supported (no bulk endpoint)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

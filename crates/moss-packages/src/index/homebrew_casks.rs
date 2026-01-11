@@ -1,6 +1,12 @@
 //! Homebrew Casks package index fetcher (macOS GUI apps).
 //!
 //! Fetches package metadata from formulae.brew.sh Casks API.
+//!
+//! ## API Strategy
+//! - **fetch**: Searches cached `formulae.brew.sh/api/cask.json`
+//! - **fetch_versions**: Same, single version per cask
+//! - **search**: Filters cached cask.json
+//! - **fetch_all**: `formulae.brew.sh/api/cask.json` (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

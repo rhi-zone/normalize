@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from Artix Linux repositories.
 //! Artix is an Arch-based distro without systemd.
+//!
+//! ## API Strategy
+//! - **fetch**: `packages.artixlinux.org/packages/search/json/` - Official JSON API
+//! - **fetch_versions**: Same API, returns single version
+//! - **search**: Same API with query parameter
+//! - **fetch_all**: Not supported (no bulk endpoint)
 
 use super::arch_common;
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};

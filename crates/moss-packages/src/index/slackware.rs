@@ -1,6 +1,12 @@
 //! Slackware package index fetcher (SlackBuilds).
 //!
 //! Fetches package metadata from slackbuilds.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `github.com/SlackBuildsOrg/slackbuilds/.../info` - GitHub raw files
+//! - **fetch_versions**: Same, single version per package
+//! - **search**: Not supported (no search API)
+//! - **fetch_all**: Not supported (would need to enumerate all directories)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

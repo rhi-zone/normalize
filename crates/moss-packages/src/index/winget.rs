@@ -1,6 +1,12 @@
 //! Winget package index fetcher (Windows Package Manager).
 //!
 //! Fetches package metadata from the winget-pkgs repository.
+//!
+//! ## API Strategy
+//! - **fetch**: `api.winget.run/v2/packages/{id}` - Community winget.run JSON API
+//! - **fetch_versions**: Same API, extracts versions array
+//! - **search**: `api.winget.run/v2/packages?query=`
+//! - **fetch_all**: `api.winget.run/v2/packages` (all packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

@@ -1,6 +1,12 @@
 //! Snap package index fetcher (Ubuntu/Linux).
 //!
 //! Fetches package metadata from the Snapcraft.io API.
+//!
+//! ## API Strategy
+//! - **fetch**: `api.snapcraft.io/v2/snaps/info/{name}` - Official Snapcraft JSON API
+//! - **fetch_versions**: Same API, extracts channel-map
+//! - **search**: `api.snapcraft.io/v2/snaps/find?q=`
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

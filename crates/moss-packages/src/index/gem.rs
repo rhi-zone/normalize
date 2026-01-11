@@ -1,6 +1,12 @@
 //! RubyGems package index fetcher (Ruby).
 //!
 //! Fetches package metadata from rubygems.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `rubygems.org/api/v1/gems/{name}.json` - Official RubyGems JSON API
+//! - **fetch_versions**: `rubygems.org/api/v1/versions/{name}.json`
+//! - **search**: `rubygems.org/api/v1/search.json?query=`
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

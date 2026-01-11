@@ -1,6 +1,12 @@
 //! Scoop package index fetcher (Windows).
 //!
 //! Fetches package metadata from Scoop buckets (main, extras, versions).
+//!
+//! ## API Strategy
+//! - **fetch**: `scoop.sh/api/apps/{name}` - Community Scoop API (unofficial)
+//! - **fetch_versions**: Same API, single version
+//! - **search**: `scoop.sh/api/apps?q=`
+//! - **fetch_all**: `scoop.sh/api/apps` (all apps from main buckets)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

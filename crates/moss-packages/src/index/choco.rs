@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from the Chocolatey community repository.
 //! Uses the NuGet v2 OData API which returns XML (Atom feed format).
+//!
+//! ## API Strategy
+//! - **fetch**: `community.chocolatey.org/api/v2/Packages(Id='{name}')` - NuGet OData XML
+//! - **fetch_versions**: `community.chocolatey.org/api/v2/FindPackagesById()?id='{name}'`
+//! - **search**: `community.chocolatey.org/api/v2/Search()?searchTerm='{query}'`
+//! - **fetch_all**: Not supported (API requires search terms)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use quick_xml::de::from_str;

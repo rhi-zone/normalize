@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from guix.gnu.org/packages.json.
 //! The server returns gzip-compressed JSON which ureq decompresses automatically.
+//!
+//! ## API Strategy
+//! - **fetch**: Searches cached `guix.gnu.org/packages.json`
+//! - **fetch_versions**: Same, single version per package
+//! - **search**: Filters cached packages.json
+//! - **fetch_all**: `guix.gnu.org/packages.json` (cached 6 hours, ~25MB)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

@@ -1,6 +1,12 @@
 //! Clojars package index fetcher (Clojure/Java).
 //!
 //! Fetches package metadata from the Clojars repository API.
+//!
+//! ## API Strategy
+//! - **fetch**: `clojars.org/api/artifacts/{group}/{name}` - Official JSON API
+//! - **fetch_versions**: Same API, extracts recent_versions array
+//! - **search**: `clojars.org/api/search?q=` - Official search endpoint
+//! - **fetch_all**: Not supported (no bulk endpoint)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

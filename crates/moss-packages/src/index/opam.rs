@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from the opam-repository on GitHub.
 //! OPAM doesn't have a public JSON API, so we parse opam files from GitHub.
+//!
+//! ## API Strategy
+//! - **fetch**: `github.com/ocaml/opam-repository/.../opam` - GitHub raw files
+//! - **fetch_versions**: GitHub API to list version directories
+//! - **search**: Not supported (would need GitHub API pagination)
+//! - **fetch_all**: Not supported (too many packages)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

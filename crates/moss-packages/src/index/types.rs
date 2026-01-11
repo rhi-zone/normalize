@@ -77,6 +77,8 @@ pub enum IndexError {
     Io(std::io::Error),
     /// Decompression error.
     Decompress(String),
+    /// Feature not implemented for this index.
+    NotImplemented(String),
 }
 
 impl std::fmt::Display for IndexError {
@@ -87,6 +89,7 @@ impl std::fmt::Display for IndexError {
             Self::NotFound(pkg) => write!(f, "package not found: {pkg}"),
             Self::Io(err) => write!(f, "IO error: {err}"),
             Self::Decompress(msg) => write!(f, "decompression error: {msg}"),
+            Self::NotImplemented(msg) => write!(f, "not implemented: {msg}"),
         }
     }
 }

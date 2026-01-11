@@ -1,6 +1,12 @@
 //! Docker Hub package index fetcher.
 //!
 //! Fetches image metadata from Docker Hub API.
+//!
+//! ## API Strategy
+//! - **fetch**: `hub.docker.com/v2/repositories/{namespace}/{name}` - Docker Hub API
+//! - **fetch_versions**: `hub.docker.com/v2/repositories/{namespace}/{name}/tags`
+//! - **search**: `hub.docker.com/v2/search/repositories?query=`
+//! - **fetch_all**: Not supported (millions of images)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

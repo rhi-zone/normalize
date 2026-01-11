@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from Bioconductor via r-universe.dev API.
 //! Bioconductor provides bioinformatics packages for R.
+//!
+//! ## API Strategy
+//! - **fetch**: `bioconductor.r-universe.dev/api/packages/{name}` - r-universe JSON API
+//! - **fetch_versions**: Same API, extracts version history
+//! - **search**: `bioconductor.r-universe.dev/api/search?q=` - r-universe search
+//! - **fetch_all**: `bioconductor.r-universe.dev/api/packages` (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use std::collections::HashMap;

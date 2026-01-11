@@ -1,6 +1,12 @@
 //! Crates.io package index fetcher (Rust).
 //!
 //! Fetches package metadata from crates.io API.
+//!
+//! ## API Strategy
+//! - **fetch**: `crates.io/api/v1/crates/{name}` - Official JSON API
+//! - **fetch_versions**: Same API, extracts versions array
+//! - **search**: `crates.io/api/v1/crates?q=` - Official search endpoint
+//! - **fetch_all**: Not supported (too large, use search instead)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

@@ -2,6 +2,13 @@
 //!
 //! Fetches package metadata from Copr (Community Projects).
 //! Copr is Fedora's community build system, similar to AUR for Arch.
+//!
+//! ## API Strategy
+//! - **fetch**: `copr.fedorainfracloud.org/api_3/project?ownername=&projectname=`
+//! - **fetch_versions**: `copr.fedorainfracloud.org/api_3/build/list` - build history
+//! - **search**: `copr.fedorainfracloud.org/api_3/project/search?query=`
+//! - **fetch_all**: Not supported (would need to enumerate all users)
+//!
 //! API docs: https://copr.fedorainfracloud.org/api_3/
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};

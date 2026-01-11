@@ -1,6 +1,12 @@
 //! Pacman package index fetcher (Arch Linux).
 //!
 //! Fetches package metadata from Arch Linux repositories and AUR.
+//!
+//! ## API Strategy
+//! - **fetch**: `archlinux.org/packages/search/json/` + AUR fallback - Official Arch JSON API
+//! - **fetch_versions**: Same API, single version
+//! - **search**: Same API with query parameter
+//! - **fetch_all**: AUR `packages-meta-ext-v1.json.gz` (cached, ~150k packages)
 
 use super::arch_common;
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};

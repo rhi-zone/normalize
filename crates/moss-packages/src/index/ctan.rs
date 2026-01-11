@@ -1,6 +1,13 @@
 //! CTAN (Comprehensive TeX Archive Network) package index fetcher.
 //!
 //! Fetches package metadata from the CTAN JSON API.
+//!
+//! ## API Strategy
+//! - **fetch**: `ctan.org/json/1.1/pkg/{name}` - Official JSON API
+//! - **fetch_versions**: Same API, single version (CTAN doesn't track versions)
+//! - **search**: Filters fetch_all results (CTAN search API returns HTML)
+//! - **fetch_all**: `ctan.org/json/1.2/packages` (cached 1 hour)
+//!
 //! See: https://ctan.org/help/json
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};

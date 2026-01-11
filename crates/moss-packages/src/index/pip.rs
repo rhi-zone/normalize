@@ -1,6 +1,12 @@
 //! PyPI package index fetcher (Python).
 //!
 //! Fetches package metadata from the Python Package Index.
+//!
+//! ## API Strategy
+//! - **fetch**: `pypi.org/pypi/{name}/json` - Official PyPI JSON API
+//! - **fetch_versions**: Same API, extracts releases object keys
+//! - **search**: Not supported (PyPI deprecated search API)
+//! - **fetch_all**: Not supported (too large)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

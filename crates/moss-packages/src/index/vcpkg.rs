@@ -1,6 +1,12 @@
 //! vcpkg package index fetcher (C++ packages).
 //!
 //! Fetches package metadata from the vcpkg registry on GitHub.
+//!
+//! ## API Strategy
+//! - **fetch**: `github.com/microsoft/vcpkg/.../baseline.json` + port CONTROL/vcpkg.json
+//! - **fetch_versions**: baseline.json (single version)
+//! - **search**: Filters cached baseline.json
+//! - **fetch_all**: Parses baseline.json from GitHub (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

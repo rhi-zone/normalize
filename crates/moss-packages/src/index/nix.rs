@@ -2,6 +2,12 @@
 //!
 //! Fetches package metadata from nixpkgs via the NixOS search API.
 //! Uses the Bonsai Elasticsearch cluster that powers search.nixos.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `search.nixos.org` Elasticsearch API - Official NixOS search
+//! - **fetch_versions**: Same API, single version per channel
+//! - **search**: `search.nixos.org` Elasticsearch query
+//! - **fetch_all**: Not supported (too large, use search instead)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 

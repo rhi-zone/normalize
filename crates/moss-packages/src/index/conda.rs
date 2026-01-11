@@ -1,6 +1,12 @@
 //! Conda package index fetcher (conda-forge).
 //!
 //! Fetches package metadata from conda-forge repodata.
+//!
+//! ## API Strategy
+//! - **fetch**: Searches `conda.anaconda.org/conda-forge/linux-64/repodata.json`
+//! - **fetch_versions**: Same index, collects all versions of package
+//! - **search**: Filters cached repodata entries
+//! - **fetch_all**: Full repodata.json (cached 1 hour, large download)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;

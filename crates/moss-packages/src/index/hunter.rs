@@ -3,6 +3,12 @@
 //! Fetches package metadata from Hunter's GitHub repository.
 //! Hunter is a CMake-driven cross-platform package manager for C/C++.
 //! Parses the cmake/configs/default.cmake file for package versions.
+//!
+//! ## API Strategy
+//! - **fetch**: Searches cached `github.com/cpp-pm/hunter/.../default.cmake`
+//! - **fetch_versions**: Same, single version per package
+//! - **search**: Filters cached cmake config
+//! - **fetch_all**: Parses default.cmake from GitHub (cached 1 hour)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;
