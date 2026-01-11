@@ -212,10 +212,11 @@ impl Docker {
                         .unwrap_or(namespace)
                         .to_string(),
                 ],
-                downloads: response["pull_count"].as_u64(),
                 published: response["last_updated"].as_str().map(String::from),
+                downloads: response["pull_count"].as_u64(),
+                archive_url: None,
+                checksum: None,
                 extra,
-                ..Default::default()
             },
             DockerRegistry::DockerHub,
         ))
@@ -293,8 +294,13 @@ impl Docker {
                 repository: None,
                 license: None,
                 binaries: Vec::new(),
+                keywords: Vec::new(),
+                maintainers: vec![namespace.to_string()],
+                published: None,
+                downloads: None,
+                archive_url: None,
+                checksum: None,
                 extra,
-                ..Default::default()
             },
             DockerRegistry::Quay,
         ))
@@ -367,9 +373,17 @@ impl Docker {
                     name,
                     version: "latest".to_string(),
                     description: img["short_description"].as_str().map(String::from),
+                    homepage: None,
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
                     downloads: img["pull_count"].as_u64(),
+                    archive_url: None,
+                    checksum: None,
                     extra: extra.clone(),
-                    ..Default::default()
                 })
             })
             .collect())
@@ -400,8 +414,17 @@ impl Docker {
                     name: format!("quay.io/{}/{}", namespace, name),
                     version: "latest".to_string(),
                     description: repo["description"].as_str().map(String::from),
+                    homepage: None,
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: vec![namespace.to_string()],
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra: extra.clone(),
-                    ..Default::default()
                 })
             })
             .collect())
@@ -439,8 +462,17 @@ impl PackageIndex for Docker {
                         name: format!("{}{}", detected_registry.prefix(), clean_name),
                         version: "latest".to_string(),
                         description: None,
+                        homepage: None,
+                        repository: None,
+                        license: None,
+                        binaries: Vec::new(),
+                        keywords: Vec::new(),
+                        maintainers: Vec::new(),
+                        published: None,
+                        downloads: None,
+                        archive_url: None,
+                        checksum: None,
                         extra,
-                        ..Default::default()
                     })
                 }
             };

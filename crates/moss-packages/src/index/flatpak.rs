@@ -152,8 +152,13 @@ impl Flatpak {
                     repository: None,
                     license: None,
                     binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra,
-                    ..Default::default()
                 })
             })
             .collect())
@@ -180,8 +185,13 @@ impl Flatpak {
                 repository: None,
                 license: None,
                 binaries: Vec::new(),
+                keywords: Vec::new(),
+                maintainers: Vec::new(),
+                published: None,
+                downloads: None,
+                archive_url: None,
+                checksum: None,
                 extra: extra.clone(),
-                ..Default::default()
             })
             .collect())
     }
@@ -267,6 +277,12 @@ fn app_to_meta(app: &serde_json::Value, fallback_name: &str, remote: FlatpakRemo
         serde_json::Value::String(remote.name().to_string()),
     );
 
+    let published = app["releases"]
+        .as_array()
+        .and_then(|r| r.first())
+        .and_then(|r| r["timestamp"].as_str())
+        .map(String::from);
+
     PackageMeta {
         name: app["id"].as_str().unwrap_or(fallback_name).to_string(),
         version: version.to_string(),
@@ -275,7 +291,22 @@ fn app_to_meta(app: &serde_json::Value, fallback_name: &str, remote: FlatpakRemo
         repository: app["vcs_url"].as_str().map(String::from),
         license: app["project_license"].as_str().map(String::from),
         binaries: Vec::new(),
+        keywords: app["categories"]
+            .as_array()
+            .map(|c| {
+                c.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        maintainers: app["developer_name"]
+            .as_str()
+            .map(|d| vec![d.to_string()])
+            .unwrap_or_default(),
+        published,
+        downloads: app["installs_last_month"].as_u64(),
+        archive_url: None,
+        checksum: None,
         extra,
-        ..Default::default()
     }
 }

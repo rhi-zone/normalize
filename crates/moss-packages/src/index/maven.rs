@@ -193,7 +193,12 @@ impl Maven {
                 license: None,
                 binaries: Vec::new(),
                 extra,
-                ..Default::default()
+                keywords: Vec::new(),
+                maintainers: Vec::new(),
+                published: None,
+                downloads: None,
+                archive_url: None,
+                checksum: None,
             },
             MavenRepo::Central,
         ))
@@ -241,7 +246,12 @@ impl Maven {
                     license: None,
                     binaries: Vec::new(),
                     extra: extra.clone(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                 })
             })
             .collect())
@@ -298,7 +308,12 @@ impl PackageIndex for Maven {
                     license: None,
                     binaries: Vec::new(),
                     extra,
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                 });
             }
         }

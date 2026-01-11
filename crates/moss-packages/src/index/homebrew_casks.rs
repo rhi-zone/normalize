@@ -110,6 +110,12 @@ impl PackageIndex for HomebrewCasks {
 }
 
 fn cask_to_meta(cask: &serde_json::Value) -> PackageMeta {
+    // Extract first name from array
+    let display_name = cask["name"]
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|n| n.as_str());
+
     PackageMeta {
         name: cask["token"].as_str().unwrap_or("").to_string(),
         version: cask["version"].as_str().unwrap_or("unknown").to_string(),
@@ -117,9 +123,27 @@ fn cask_to_meta(cask: &serde_json::Value) -> PackageMeta {
         homepage: cask["homepage"].as_str().map(String::from),
         repository: None,
         license: None,
-        binaries: Vec::new(),
+        binaries: cask["binary"]
+            .as_array()
+            .map(|b| {
+                b.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        keywords: display_name
+            .map(|n| vec![n.to_string()])
+            .unwrap_or_default(),
+        maintainers: Vec::new(),
+        published: cask["generated_date"].as_str().map(String::from),
+        downloads: cask["analytics"]["install"]["365d"]
+            .as_object()
+            .and_then(|obj| obj.values().filter_map(|v| v.as_u64()).next()),
         archive_url: cask["url"].as_str().map(String::from),
-        checksum: cask["sha256"].as_str().map(|s| format!("sha256:{}", s)),
-        ..Default::default()
+        checksum: cask["sha256"]
+            .as_str()
+            .filter(|s| *s != "no_check")
+            .map(|s| format!("sha256:{}", s)),
+        extra: Default::default(),
     }
 }

@@ -222,8 +222,11 @@ impl PackageIndex for Snap {
             binaries: Vec::new(),
             keywords,
             maintainers,
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
@@ -295,9 +298,16 @@ impl PackageIndex for Snap {
                     version: result["version"].as_str().unwrap_or("unknown").to_string(),
                     description: snap["summary"].as_str().map(String::from),
                     homepage: snap["website"].as_str().map(String::from),
+                    repository: None,
                     license: snap["license"].as_str().map(String::from),
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra,
-                    ..Default::default()
                 })
             })
             .collect())

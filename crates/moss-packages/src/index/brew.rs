@@ -203,13 +203,16 @@ impl PackageIndex for Brew {
                     homepage: formula["homepage"].as_str().map(String::from),
                     repository: extract_repository(&formula),
                     license: formula["license"].as_str().map(String::from),
+                    binaries: Vec::new(),
                     keywords,
+                    maintainers: Vec::new(),
+                    published: formula["generated_date"].as_str().map(String::from),
                     downloads,
                     archive_url: formula["urls"]["stable"]["url"].as_str().map(String::from),
                     checksum: formula["urls"]["stable"]["checksum"]
                         .as_str()
                         .map(|h| format!("sha256:{}", h)),
-                    ..Default::default()
+                    extra: Default::default(),
                 })
             })
             .collect())

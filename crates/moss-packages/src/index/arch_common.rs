@@ -60,11 +60,20 @@ pub fn parse_official_package(pkg: &serde_json::Value, name: &str) -> Option<Pac
             .and_then(|l| l.as_str())
             .map(String::from),
         binaries: Vec::new(),
+        keywords: Vec::new(),
+        maintainers: pkg["maintainers"]
+            .as_array()
+            .map(|m| {
+                m.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        published: pkg["last_update"].as_str().map(String::from),
+        downloads: None,
         archive_url: build_arch_download_url(pkg),
-        // Note: Arch official API doesn't provide checksums directly
-        // They're in the .sig files at the same URL with .sig appended
+        checksum: None, // Arch uses .sig files for checksums
         extra,
-        ..Default::default()
     })
 }
 
@@ -112,10 +121,23 @@ pub fn parse_aur_package(pkg: &serde_json::Value, name: &str) -> Option<PackageM
             .and_then(|l| l.as_str())
             .map(String::from),
         binaries: Vec::new(),
+        keywords: pkg["Keywords"]
+            .as_array()
+            .map(|k| {
+                k.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        maintainers: pkg["Maintainer"]
+            .as_str()
+            .map(|m| vec![m.to_string()])
+            .unwrap_or_default(),
+        published: pkg["LastModified"].as_u64().map(|t| format!("{}", t)),
+        downloads: pkg["NumVotes"].as_u64(),
         archive_url,
-        // AUR doesn't provide binary checksums - packages are built from source
+        checksum: None, // AUR packages are built from source
         extra,
-        ..Default::default()
     })
 }
 
