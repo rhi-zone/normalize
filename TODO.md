@@ -199,12 +199,12 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - [x] Homebrew: formula.json
 - [x] Deno: paginated API
 - [x] Guix: packages.json
-- Arch official: has package databases per repo (not yet implemented)
-- Crates.io: has db-dump.tar.gz (not real-time, could implement)
-- npm: has registry replicate API (massive - may not be practical)
-- PyPI: has simple index but no bulk JSON API
-- RubyGems: has versions dump at /versions endpoint
-- NuGet: has catalog API for incremental updates
+- [x] Arch official: .db.tar.zst databases (gzip + zstd decompression)
+- [x] RubyGems: Compact Index /versions endpoint (streaming)
+- [x] NuGet: Catalog API (incremental updates)
+- Crates.io: has db-dump.tar.gz (~800MB - could implement, low priority)
+- npm: has registry replicate API (massive - probably not practical)
+- PyPI: no bulk API (BigQuery only alternative)
 
 **Struct completeness audit**: Each fetcher should populate all available fields from their APIs:
 - keywords, maintainers, published dates where available
@@ -263,39 +263,41 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 
 ### Package Index Backlog (simplest → complex)
 
-**1. Struct completeness audit** (easiest - enhance existing fetchers)
-- [ ] Audit all 57 fetchers for missing fields (keywords, maintainers, published, downloads)
-- [ ] Add archive_url and checksum where APIs provide them
-- [ ] Document which fields each API supports
+**1. Struct completeness audit** (DONE)
+- [x] Audited 10 high-value fetchers: cargo, npm, pip, gem, go, hex, hackage, pub_dev, composer, choco
+- [x] Added keywords, maintainers, published, downloads, archive_url, checksum where APIs provide them
+- [x] Remaining fetchers use ..Default::default() - lower priority
 
-**2. Chocolatey XML parsing** (medium - single fetcher)
-- [ ] Add quick-xml dependency
-- [ ] Parse NuGet v2 OData/Atom XML responses
-- [ ] Extract full metadata from XML (currently basic)
+**2. Chocolatey XML parsing** (DONE)
+- [x] quick-xml already in deps, full OData/Atom XML parsing implemented
+- [x] Extracts full metadata from XML
 
-**3. RubyGems fetch_all** (medium - known endpoint)
-- [ ] Implement /versions endpoint parsing
-- [ ] Handle large response (~100MB compressed)
+**3. RubyGems fetch_all** (DONE)
+- [x] Implemented Compact Index /versions endpoint with streaming GemVersionsIter
+- [x] Deduplicates gems (versions file is append-only)
 
-**4. NuGet catalog API** (medium - incremental updates)
-- [ ] Implement catalog/index.json traversal
-- [ ] Support incremental updates via cursor
+**4. NuGet catalog API** (DONE)
+- [x] Implemented catalog/index.json traversal with NuGetCatalogIter
+- [x] Supports incremental updates (pages loaded on demand)
 
-**5. Arch official fetch_all** (medium-hard - custom format)
-- [ ] Parse .db.tar.zst package databases
-- [ ] Handle desc files within archives
+**5. Arch official fetch_all** (DONE)
+- [x] Parse .db.tar.zst package databases (added zstd decompression)
+- [x] Handles desc files within archives
 
-**6. Crates.io db-dump** (medium-hard - large dataset)
-- [ ] Download and parse db-dump.tar.gz
+**6. Crates.io db-dump** (hard - large dataset)
+- [ ] Download and parse db-dump.tar.gz (~800MB compressed)
 - [ ] ~150k crates, refreshed daily
+- [ ] Would need tar + csv parsing
 
 **7. npm registry** (hard - massive scale)
 - [ ] Evaluate registry replicate API feasibility
-- [ ] ~3M packages, may need incremental approach
+- [ ] ~3M packages, would need incremental CouchDB replication
+- [ ] Consider: is this worth implementing? Search/fetch covers most use cases
 
 **8. PyPI bulk** (hard - no native API)
 - [ ] Research alternatives to simple index scraping
-- [ ] Consider BigQuery dataset or warehouse.pypi.org
+- [ ] Consider BigQuery dataset (google-cloud-pypi) or warehouse.pypi.org
+- [ ] Consider: is this worth implementing? fetch() covers most use cases
 
 ### Code Quality
 - [x] `--allow` for duplicate-functions: accept line range like output suggests (e.g., `--allow src/foo.rs:10-20`)
