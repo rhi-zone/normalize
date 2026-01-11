@@ -311,6 +311,13 @@ fn test_dnf() {
 }
 
 #[test]
+fn test_copr() {
+    let index = copr::Copr;
+    // Copr uses owner/project format
+    test_search(&index, "vim");
+}
+
+#[test]
 fn test_dnf_enhanced_metadata() {
     let index = dnf::Dnf;
     let curl = index.fetch("curl").unwrap();
@@ -735,8 +742,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 57,
-        "should have at least 57 indices, got {}",
+        indices.len() >= 58,
+        "should have at least 58 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);

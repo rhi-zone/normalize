@@ -26,6 +26,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 
 ### Red Hat Family
 - [x] dnf (Fedora/RHEL/CentOS)
+- [x] copr - Fedora Copr (community builds, like AUR for Fedora)
 - [ ] epel - Extra Packages for Enterprise Linux
 - [ ] centos - CentOS Stream
 - [ ] almalinux - AlmaLinux
