@@ -172,7 +172,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - [x] openSUSE: zstd XML parsing (repodata/primary.xml.zst)
 - [x] CachyOS: Arch-based, uses arch_common
 - [x] EndeavourOS: Arch-based, uses arch_common
-- [x] Manjaro: search.manjaro-sway.download API + AUR
+- [x] Manjaro: repo.manjaro.org database parsing + AUR
 - [x] Copr: Fedora community builds (copr.fedorainfracloud.org API)
 - [x] Chaotic-AUR: chaotic-backend.garudalinux.org JSON API
 - [x] MSYS2: packages.msys2.org API (Windows development)
@@ -224,11 +224,11 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - [x] FreeBSD: 5 repos (FreeBSD 13/14/15 × quarterly/latest)
 - [x] Void Linux: 8 repos (x86_64/aarch64 × glibc/musl × free/nonfree)
 
-**Multi-repo coverage needed**:
-- [ ] Manjaro: stable, testing, unstable branches
-- [ ] Debian/APT: stable, testing, unstable, experimental, backports
-- [ ] Fedora/DNF: multiple Fedora versions (39, 40, 41, rawhide)
-- [ ] Ubuntu: multiple releases (22.04, 24.04, etc) + universe/multiverse
+**Multi-repo coverage done**:
+- [x] Manjaro: 10 repos (stable/testing/unstable × core/extra/multilib + AUR)
+- [x] Debian/APT: 21 repos (stable/testing/unstable/experimental/oldstable × main/contrib/non-free + backports)
+- [x] Fedora/DNF: 6 repos (Fedora 39/40/41, Rawhide, EPEL 8/9)
+- [x] Ubuntu: 22 repos (Noble 24.04/Jammy 22.04/Oracular 24.10 × main/restricted/universe/multiverse + updates/security/backports)
 
 ### Complexity Hotspots (58 functions >21)
 - [ ] `crates/moss/src/commands/edit.rs:handle_glob_edit` (76)

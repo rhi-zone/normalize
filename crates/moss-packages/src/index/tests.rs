@@ -107,7 +107,7 @@ fn test_fetch_all(index: &dyn PackageIndex) {
 
 #[test]
 fn test_apt() {
-    let index = apt::Apt;
+    let index = apt::Apt::stable();
     // apt uses source package names, "rust-ripgrep" not "ripgrep"
     test_fetch(&index, "curl");
     test_versions(&index, "curl");
@@ -116,13 +116,13 @@ fn test_apt() {
 
 #[test]
 fn test_apt_fetch_all() {
-    let index = apt::Apt;
+    let index = apt::Apt::stable();
     test_fetch_all(&index);
 }
 
 #[test]
 fn test_apt_enhanced_metadata() {
-    let index = apt::Apt;
+    let index = apt::Apt::stable();
     let packages = index.fetch_all().unwrap();
 
     // Find curl package to verify enhanced metadata
@@ -144,6 +144,20 @@ fn test_apt_enhanced_metadata() {
     } else {
         panic!("curl package not found in apt index");
     }
+}
+
+#[test]
+fn test_ubuntu() {
+    let index = ubuntu::Ubuntu::noble();
+    test_fetch(&index, "curl");
+    test_versions(&index, "curl");
+    test_search(&index, "curl");
+}
+
+#[test]
+fn test_ubuntu_fetch_all() {
+    let index = ubuntu::Ubuntu::noble();
+    test_fetch_all(&index);
 }
 
 #[test]
@@ -271,7 +285,7 @@ fn test_endeavouros() {
 #[test]
 fn test_manjaro() {
     // Manjaro uses its own repos + AUR
-    let index = manjaro::Manjaro;
+    let index = manjaro::Manjaro::stable();
     test_fetch(&index, "firefox");
     test_versions(&index, "firefox");
     test_search(&index, "browser");
@@ -279,7 +293,7 @@ fn test_manjaro() {
 
 #[test]
 fn test_dnf() {
-    let index = dnf::Dnf;
+    let index = dnf::Dnf::stable();
     test_fetch(&index, "curl");
     test_versions(&index, "curl");
     // Search API is currently broken (fcomm_connector redirects to 404)
@@ -302,7 +316,7 @@ fn test_chaotic_aur() {
 
 #[test]
 fn test_dnf_enhanced_metadata() {
-    let index = dnf::Dnf;
+    let index = dnf::Dnf::stable();
     let curl = index.fetch("curl").unwrap();
     println!("Package: {}", curl.name);
     println!("Version: {}", curl.version);

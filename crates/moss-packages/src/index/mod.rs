@@ -29,6 +29,7 @@ pub mod nix;
 pub mod opensuse;
 pub mod pacman;
 pub mod slackware;
+pub mod ubuntu;
 pub mod void;
 
 // Windows package managers
@@ -94,26 +95,31 @@ static ARTIX_INDEX: OnceLock<artix::Artix> = OnceLock::new();
 static APK_INDEX: OnceLock<apk::Apk> = OnceLock::new();
 static FREEBSD_INDEX: OnceLock<freebsd::FreeBsd> = OnceLock::new();
 static VOID_INDEX: OnceLock<void::Void> = OnceLock::new();
+static MANJARO_INDEX: OnceLock<manjaro::Manjaro> = OnceLock::new();
+static APT_INDEX: OnceLock<apt::Apt> = OnceLock::new();
+static DNF_INDEX: OnceLock<dnf::Dnf> = OnceLock::new();
+static UBUNTU_INDEX: OnceLock<ubuntu::Ubuntu> = OnceLock::new();
 
 fn init_builtin() -> Vec<&'static dyn PackageIndex> {
     vec![
         // Distro
         APK_INDEX.get_or_init(apk::Apk::all),
-        &apt::Apt,
+        APT_INDEX.get_or_init(apt::Apt::all),
         ARTIX_INDEX.get_or_init(artix::Artix::all),
         &cachyos::CachyOs,
         &chaotic_aur::ChaoticAur,
         &copr::Copr,
-        &dnf::Dnf,
+        DNF_INDEX.get_or_init(dnf::Dnf::all),
         &endeavouros::EndeavourOs,
         FREEBSD_INDEX.get_or_init(freebsd::FreeBsd::all),
         &gentoo::Gentoo,
         &guix::Guix,
-        &manjaro::Manjaro,
+        MANJARO_INDEX.get_or_init(manjaro::Manjaro::all),
         &nix::Nix,
         OPENSUSE_INDEX.get_or_init(opensuse::OpenSuse::all),
         PACMAN_INDEX.get_or_init(pacman::Pacman::all),
         &slackware::Slackware,
+        UBUNTU_INDEX.get_or_init(ubuntu::Ubuntu::all),
         VOID_INDEX.get_or_init(void::Void::all),
         // Windows
         &choco::Choco,
