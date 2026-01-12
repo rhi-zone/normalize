@@ -12,6 +12,14 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "moss";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          buildInputs = with pkgs; [ sqlite ];
+        };
+
         devShells.default = pkgs.mkShell rec {
           buildInputs = with pkgs; [
             stdenv.cc.cc
