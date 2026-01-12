@@ -206,6 +206,12 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - npm: has registry replicate API (massive - probably not practical)
 - PyPI: no bulk API (BigQuery only alternative)
 
+**fetch_all design**: Should return one PackageMeta per *version*, not per package:
+- Distro indexes already do this (different repos have different versions)
+- When implementing for npm/crates.io, expand to all versions
+- Keep `fetch()` returning single latest for quick lookups
+- Consider `fetch_all_versions(name)` for per-package version expansion
+
 **Struct completeness audit**: Each fetcher should populate all available fields from their APIs:
 - keywords, maintainers, published dates where available
 - downloads counts from APIs that provide them
