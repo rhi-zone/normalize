@@ -182,10 +182,11 @@ impl SessionAnalysis {
             lines.push("## Token Usage".to_string());
             lines.push(String::new());
             lines.push(format!("- **API calls**: {}", ts.api_calls));
-            lines.push(format!("- **Avg context**: {} tokens", ts.avg_context()));
+            lines.push(format!("- **Input tokens**: {}", ts.total_input));
+            lines.push(format!("- **Output tokens**: {}", ts.total_output));
             lines.push(format!(
-                "- **Context range**: {} - {}",
-                ts.min_context, ts.max_context
+                "- **Total tokens**: {}",
+                ts.total_input + ts.total_output
             ));
             if ts.cache_read > 0 {
                 lines.push(format!("- **Cache read**: {} tokens", ts.cache_read));
@@ -193,6 +194,11 @@ impl SessionAnalysis {
             if ts.cache_create > 0 {
                 lines.push(format!("- **Cache create**: {} tokens", ts.cache_create));
             }
+            lines.push(format!("- **Avg context**: {} tokens", ts.avg_context()));
+            lines.push(format!(
+                "- **Context range**: {} - {}",
+                ts.min_context, ts.max_context
+            ));
             lines.push(String::new());
         }
 

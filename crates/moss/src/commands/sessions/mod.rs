@@ -65,6 +65,26 @@ pub struct SessionsArgs {
     /// Limit number of sessions to list
     #[arg(short, long, default_value = "20", global = true)]
     pub limit: usize,
+
+    /// Filter sessions from the last N days
+    #[arg(long, global = true)]
+    pub days: Option<u32>,
+
+    /// Filter sessions since date (YYYY-MM-DD)
+    #[arg(long, global = true)]
+    pub since: Option<String>,
+
+    /// Filter sessions until date (YYYY-MM-DD)
+    #[arg(long, global = true)]
+    pub until: Option<String>,
+
+    /// Filter by specific project path
+    #[arg(long, global = true)]
+    pub project: Option<PathBuf>,
+
+    /// Show sessions from all projects (not just current)
+    #[arg(long, global = true)]
+    pub all_projects: bool,
 }
 
 #[derive(Subcommand)]
@@ -104,6 +124,11 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             args.limit,
             args.format.as_deref(),
             args.grep.as_deref(),
+            args.days,
+            args.since.as_deref(),
+            args.until.as_deref(),
+            args.project.as_deref(),
+            args.all_projects,
             json,
             pretty,
         )
