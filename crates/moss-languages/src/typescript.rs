@@ -135,7 +135,7 @@ impl Language for TypeScript {
             return Some(body);
         }
         // Fallback: find interface_body or class_body child
-        for i in 0..node.child_count() {
+        for i in 0..node.child_count() as u32 {
             if let Some(child) = node.child(i) {
                 if child.kind() == "interface_body" || child.kind() == "class_body" {
                     return Some(child);
@@ -385,7 +385,7 @@ impl Language for Tsx {
             return Some(body);
         }
         // Fallback: find interface_body or class_body child
-        for i in 0..node.child_count() {
+        for i in 0..node.child_count() as u32 {
             if let Some(child) = node.child(i) {
                 if child.kind() == "interface_body" || child.kind() == "class_body" {
                     return Some(child);

@@ -59,6 +59,9 @@ pub struct AnalyzeConfig {
     /// Syntax rules configuration
     #[serde(default)]
     pub rules: RulesConfig,
+    /// Default lines of context to show in query preview
+    #[serde(rename = "query-context-lines")]
+    pub query_context_lines: Option<usize>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -579,10 +582,21 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         Some(AnalyzeCommand::Ast { file, at, sexp }) => ast::cmd_ast(&file, at, sexp, json),
 
         Some(AnalyzeCommand::Query {
-            file,
-            query,
+            pattern,
+            path,
             show_source,
-        }) => query::cmd_query(&file, &query, show_source, json),
+            context,
+        }) => {
+            let context_lines = context.or(config.analyze.query_context_lines).unwrap_or(10);
+            query::cmd_query(
+                &pattern,
+                path.as_deref(),
+                filter.as_ref(),
+                show_source,
+                context_lines,
+                &format,
+            )
+        }
 
         Some(AnalyzeCommand::Rules {
             rule,

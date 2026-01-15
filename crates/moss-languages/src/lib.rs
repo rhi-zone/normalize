@@ -25,6 +25,7 @@
 //! }
 //! ```
 
+pub mod ast_grep;
 pub mod c_cpp;
 mod component;
 pub mod ecmascript;

@@ -5,12 +5,13 @@ edition = "2024"
 description = "Language support traits and implementations for moss"
 
 [dependencies]
-tree-sitter = "0.25"
+tree-sitter = "0.26"
 tree-sitter-language = "0.1"
 libloading.workspace = true
 dirs = "5"
 libsql = { workspace = true }
 serde_json = { workspace = true }
+ast-grep-core = "0.40.5"
 
 [dev-dependencies]
 tokio = { workspace = true }

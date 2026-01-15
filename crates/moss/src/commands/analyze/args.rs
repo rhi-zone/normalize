@@ -239,17 +239,25 @@ pub enum AnalyzeCommand {
         sexp: bool,
     },
 
-    /// Test a tree-sitter query against a file
+    /// Test a tree-sitter query against files
+    ///
+    /// Supports two pattern syntaxes (auto-detected):
+    /// - Tree-sitter S-expression: (call_expression function: (identifier) @fn)
+    /// - ast-grep pattern: $FN($ARGS)
     Query {
-        /// File to query
-        file: PathBuf,
+        /// Pattern to search for (tree-sitter S-expr or ast-grep pattern)
+        pattern: String,
 
-        /// Tree-sitter query pattern (S-expression)
-        query: String,
+        /// File or directory to search (searches all files if omitted)
+        path: Option<PathBuf>,
 
         /// Show full matched source code
         #[arg(long)]
         show_source: bool,
+
+        /// Lines of context to show in preview
+        #[arg(short = 'C', long)]
+        context: Option<usize>,
     },
 
     /// Run syntax rules from .moss/rules/*.scm

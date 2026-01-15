@@ -684,7 +684,7 @@ fn collect_identifiers(
         }
 
         if kind == "scoped_identifier" || kind == "scoped_type_identifier" {
-            if let Some(last_child) = node.child(node.child_count().saturating_sub(1)) {
+            if let Some(last_child) = node.child(node.child_count().saturating_sub(1) as u32) {
                 if let Ok(text) = last_child.utf8_text(source) {
                     identifiers.insert(text.to_string());
                 }
@@ -734,7 +734,7 @@ fn collect_type_identifiers(
 
         // For scoped types like std::Vec, extract the last component
         if kind == "scoped_type_identifier" {
-            if let Some(last_child) = node.child(node.child_count().saturating_sub(1)) {
+            if let Some(last_child) = node.child(node.child_count().saturating_sub(1) as u32) {
                 if let Ok(text) = last_child.utf8_text(source) {
                     types.insert(text.to_string());
                 }

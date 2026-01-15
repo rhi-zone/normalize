@@ -308,7 +308,7 @@ impl DepsExtractor {
                     let mut module = String::new();
                     let mut names = Vec::new();
 
-                    for i in 0..node.child_count() {
+                    for i in 0..node.child_count() as u32 {
                         if let Some(child) = node.child(i) {
                             match child.kind() {
                                 "string" | "string_fragment" => {
@@ -350,7 +350,7 @@ impl DepsExtractor {
                     let mut is_star = false;
                     let mut named_exports: Vec<String> = Vec::new();
 
-                    for i in 0..node.child_count() {
+                    for i in 0..node.child_count() as u32 {
                         if let Some(child) = node.child(i) {
                             match child.kind() {
                                 "string" => {
@@ -466,7 +466,7 @@ impl DepsExtractor {
         names: &mut Vec<String>,
     ) {
         // Walk through children directly
-        for i in 0..node.child_count() {
+        for i in 0..node.child_count() as u32 {
             if let Some(child) = node.child(i) {
                 match child.kind() {
                     "export_specifier" => {
@@ -476,7 +476,7 @@ impl DepsExtractor {
                             names.push(content[name.byte_range()].to_string());
                         } else {
                             // Find first identifier child
-                            for j in 0..child.child_count() {
+                            for j in 0..child.child_count() as u32 {
                                 if let Some(id) = child.child(j) {
                                     if id.kind() == "identifier" {
                                         names.push(content[id.byte_range()].to_string());
@@ -516,7 +516,7 @@ impl DepsExtractor {
                 }
                 "namespace_import" => {
                     // import * as foo - we want "foo"
-                    for i in 0..child.child_count() {
+                    for i in 0..child.child_count() as u32 {
                         if let Some(id) = child.child(i) {
                             if id.kind() == "identifier" {
                                 names.push(content[id.byte_range()].to_string());

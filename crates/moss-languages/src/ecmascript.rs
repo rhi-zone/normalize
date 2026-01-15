@@ -144,16 +144,16 @@ pub fn extract_container(node: &Node, content: &str, name: &str) -> Symbol {
     // Extract implements/extends clauses for semantic interface detection
     let mut implements = Vec::new();
     // Find class_heritage child node (not a field)
-    for i in 0..node.child_count() {
+    for i in 0..node.child_count() as u32 {
         if let Some(heritage) = node.child(i) {
             if heritage.kind() == "class_heritage" {
                 // heritage can contain extends_clause and/or implements_clause
-                for j in 0..heritage.child_count() {
+                for j in 0..heritage.child_count() as u32 {
                     if let Some(clause) = heritage.child(j) {
                         if clause.kind() == "extends_clause" || clause.kind() == "implements_clause"
                         {
                             // Each clause contains type identifiers
-                            for k in 0..clause.child_count() {
+                            for k in 0..clause.child_count() as u32 {
                                 if let Some(type_node) = clause.child(k) {
                                     if type_node.kind() == "type_identifier"
                                         || type_node.kind() == "identifier"
