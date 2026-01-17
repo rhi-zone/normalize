@@ -3,24 +3,33 @@
 //! Parses session logs from various AI coding agents:
 //! - Claude Code (JSONL)
 //! - Gemini CLI (JSON)
+//! - OpenAI Codex CLI (JSONL)
+//! - Moss Agent (JSONL)
 //!
-//! # Plugin Architecture
+//! # Architecture
 //!
-//! Each log format implements the `LogFormat` trait, which provides:
-//! - Format detection from file content
-//! - Parsing into a common `SessionAnalysis` structure
+//! This crate separates parsing from analysis:
+//!
+//! - **Parsing**: `LogFormat::parse()` converts format-specific logs into a unified `Session` type
+//! - **Analysis**: Consumers compute their own metrics from `Session` data
+//!
+//! Each log format implements the `LogFormat` trait for format detection and parsing.
 //!
 //! # Example
 //!
 //! ```ignore
-//! use rhizome_moss_sessions::{analyze_session, SessionAnalysis};
+//! use moss_sessions::{parse_session, Session};
 //!
-//! let analysis = analyze_session("~/.claude/projects/foo/session.jsonl")?;
-//! println!("{}", analysis.to_markdown());
+//! let session = parse_session("~/.claude/projects/foo/session.jsonl")?;
+//! for turn in &session.turns {
+//!     for msg in &turn.messages {
+//!         println!("{}: {} blocks", msg.role, msg.content.len());
+//!     }
+//! }
 //! ```
 
-mod analysis;
 mod formats;
+mod session;
 
-pub use analysis::*;
 pub use formats::*;
+pub use session::*;

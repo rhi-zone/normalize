@@ -541,6 +541,12 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - Pattern: auditor role executes parallel searches efficiently (5 commands turn 1, synthesized turn 2)
 
 ### Session Analysis
+
+**moss-sessions refactor** - see `docs/design/sessions-refactor.md`
+- [x] Split parsing from analysis: `LogFormat::parse()` → unified `Session` type
+- [x] Move analysis to consumers (moss CLI uses `parse()` + local `analyze_session()`)
+- [x] Remove `analyze()` from LogFormat trait (analysis now in `crates/moss/src/sessions/analysis.rs`)
+
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
   - Option A: embed tree-sitter WASM runtime, load .so grammars
   - Option B: `/api/highlight` endpoint, server-side highlighting

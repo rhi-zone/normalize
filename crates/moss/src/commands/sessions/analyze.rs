@@ -1,34 +1,40 @@
 //! Session analysis functions.
 
-use crate::sessions::{SessionAnalysis, ToolStats, analyze_session};
+use crate::sessions::{
+    SessionAnalysis, ToolStats, analyze_session, parse_session, parse_session_with_format,
+};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 /// Analyze a session and output statistics.
 pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool, pretty: bool) -> i32 {
-    let analysis = if let Some(fmt) = format {
-        crate::sessions::analyze_session_with_format(path, fmt)
+    // Parse the session
+    let session = if let Some(fmt) = format {
+        parse_session_with_format(path, fmt)
     } else {
-        analyze_session(path)
+        parse_session(path)
     };
 
-    match analysis {
-        Ok(a) => {
-            if json {
-                println!("{}", serde_json::to_string_pretty(&a).unwrap());
-            } else if pretty {
-                println!("{}", a.to_pretty());
-            } else {
-                println!("{}", a.to_markdown());
-            }
-            0
-        }
+    let session = match session {
+        Ok(s) => s,
         Err(e) => {
-            eprintln!("Analysis failed: {}", e);
-            1
+            eprintln!("Failed to parse session: {}", e);
+            return 1;
         }
+    };
+
+    // Analyze the parsed session
+    let analysis = analyze_session(&session);
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&analysis).unwrap());
+    } else if pretty {
+        println!("{}", analysis.to_pretty());
+    } else {
+        println!("{}", analysis.to_markdown());
     }
+    0
 }
 
 /// Analyze multiple sessions and aggregate statistics.
@@ -42,14 +48,16 @@ pub fn cmd_sessions_analyze_multi(
     let mut session_count = 0;
 
     for path in paths {
-        let analysis = if let Some(fmt) = format {
-            crate::sessions::analyze_session_with_format(path, fmt)
+        // Parse the session
+        let session = if let Some(fmt) = format {
+            parse_session_with_format(path, fmt)
         } else {
-            analyze_session(path)
+            parse_session(path)
         };
 
-        match analysis {
-            Ok(a) => {
+        match session {
+            Ok(s) => {
+                let a = analyze_session(&s);
                 session_count += 1;
 
                 // Aggregate message counts
@@ -93,7 +101,7 @@ pub fn cmd_sessions_analyze_multi(
                 aggregate.parallel_opportunities += a.parallel_opportunities;
             }
             Err(e) => {
-                eprintln!("Warning: Failed to analyze {}: {}", path.display(), e);
+                eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
             }
         }
     }

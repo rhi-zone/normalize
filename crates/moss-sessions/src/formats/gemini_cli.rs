@@ -1,9 +1,8 @@
 //! Gemini CLI JSON format parser.
 
 use super::{LogFormat, SessionFile, read_file};
-use crate::{SessionAnalysis, TokenStats, ToolStats, normalize_path};
+use crate::{ContentBlock, Message, Role, Session, TokenUsage, Turn};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Gemini CLI session log format (JSON with messages array).
@@ -75,11 +74,18 @@ impl LogFormat for GeminiCliFormat {
         0.0
     }
 
-    fn analyze(&self, path: &Path) -> Result<SessionAnalysis, String> {
+    fn parse(&self, path: &Path) -> Result<Session, String> {
         let content = read_file(path)?;
         let data: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
-        let mut analysis = SessionAnalysis::new(path.to_path_buf(), self.name());
+        let mut session = Session::new(path.to_path_buf(), self.name());
+
+        // Extract metadata
+        session.metadata.session_id = data
+            .get("sessionId")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        session.metadata.provider = Some("google".to_string());
 
         let messages = data
             .get("messages")
@@ -87,130 +93,130 @@ impl LogFormat for GeminiCliFormat {
             .cloned()
             .unwrap_or_default();
 
-        // Count message types
+        let mut current_turn = Turn::default();
+
         for msg in &messages {
-            if let Some(msg_type) = msg.get("type").and_then(|v| v.as_str()) {
-                *analysis
-                    .message_counts
-                    .entry(msg_type.to_string())
-                    .or_insert(0) += 1;
-            }
-        }
+            let msg_type = msg.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-        // Analyze tools
-        analysis.tool_stats = analyze_tools(&messages);
+            match msg_type {
+                "user" => {
+                    // Flush previous turn
+                    if !current_turn.messages.is_empty() {
+                        session.turns.push(std::mem::take(&mut current_turn));
+                    }
 
-        // Analyze tokens
-        analysis.token_stats = analyze_tokens(&messages);
+                    let message = parse_user_message(msg);
+                    current_turn.messages.push(message);
+                }
+                "gemini" => {
+                    // Extract model from first gemini message
+                    if session.metadata.model.is_none() {
+                        session.metadata.model =
+                            msg.get("model").and_then(|v| v.as_str()).map(String::from);
+                    }
 
-        // Analyze file token usage
-        analysis.file_tokens = analyze_file_tokens(&messages);
+                    let message = parse_gemini_message(msg);
+                    current_turn.messages.push(message);
 
-        // Count turns
-        analysis.total_turns = messages
-            .iter()
-            .filter(|m| m.get("type").and_then(|t| t.as_str()) == Some("gemini"))
-            .count();
-
-        Ok(analysis)
-    }
-}
-
-fn analyze_tools(messages: &[Value]) -> HashMap<String, ToolStats> {
-    let mut stats: HashMap<String, ToolStats> = HashMap::new();
-
-    for msg in messages {
-        if msg.get("type").and_then(|t| t.as_str()) != Some("gemini") {
-            continue;
-        }
-
-        let Some(tool_calls) = msg.get("toolCalls").and_then(|t| t.as_array()) else {
-            continue;
-        };
-
-        for tc in tool_calls {
-            let tool_name = tc.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
-
-            let stat = stats
-                .entry(tool_name.to_string())
-                .or_insert_with(|| ToolStats::new(tool_name));
-            stat.calls += 1;
-
-            // Check for errors
-            if tc.get("status").and_then(|s| s.as_str()) == Some("error") {
-                stat.errors += 1;
-            }
-        }
-    }
-
-    stats
-}
-
-fn analyze_tokens(messages: &[Value]) -> TokenStats {
-    let mut stats = TokenStats::default();
-
-    for msg in messages {
-        if msg.get("type").and_then(|t| t.as_str()) != Some("gemini") {
-            continue;
-        }
-
-        let Some(tokens) = msg.get("tokens") else {
-            continue;
-        };
-
-        stats.api_calls += 1;
-        stats.total_input += tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0);
-        stats.total_output += tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0);
-        stats.cache_read += tokens.get("cached").and_then(|v| v.as_u64()).unwrap_or(0);
-
-        let context = tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0)
-            + tokens.get("cached").and_then(|v| v.as_u64()).unwrap_or(0);
-        stats.update_context(context);
-    }
-
-    stats
-}
-
-fn analyze_file_tokens(messages: &[Value]) -> HashMap<String, u64> {
-    let mut file_tokens: HashMap<String, u64> = HashMap::new();
-
-    for msg in messages {
-        if msg.get("type").and_then(|t| t.as_str()) != Some("gemini") {
-            continue;
-        }
-
-        let output_tokens = msg
-            .get("tokens")
-            .and_then(|t| t.get("output"))
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
-
-        if output_tokens == 0 {
-            continue;
-        }
-
-        // Extract files from tool calls
-        let mut files: Vec<String> = Vec::new();
-        if let Some(tool_calls) = msg.get("toolCalls").and_then(|t| t.as_array()) {
-            for tc in tool_calls {
-                if let Some(args) = tc.get("args") {
-                    // read_file, write_file have file_path
-                    if let Some(fp) = args.get("file_path").and_then(|v| v.as_str()) {
-                        files.push(fp.to_string());
+                    // Extract token usage
+                    if let Some(tokens) = msg.get("tokens") {
+                        current_turn.token_usage = Some(TokenUsage {
+                            input: tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0),
+                            output: tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0),
+                            cache_read: tokens.get("cached").and_then(|v| v.as_u64()),
+                            cache_create: None,
+                        });
                     }
                 }
+                _ => {}
             }
         }
 
-        // Distribute tokens to files
-        if !files.is_empty() {
-            let per_file = output_tokens / files.len() as u64;
-            for f in files {
-                let norm = normalize_path(&f);
-                *file_tokens.entry(norm).or_insert(0) += per_file;
+        // Flush final turn
+        if !current_turn.messages.is_empty() {
+            session.turns.push(current_turn);
+        }
+
+        Ok(session)
+    }
+}
+
+/// Parse a user message from Gemini CLI format.
+fn parse_user_message(msg: &Value) -> Message {
+    let mut content = Vec::new();
+
+    if let Some(text) = msg.get("content").and_then(|v| v.as_str()) {
+        content.push(ContentBlock::Text {
+            text: text.to_string(),
+        });
+    }
+
+    Message {
+        role: Role::User,
+        content,
+        timestamp: msg
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+    }
+}
+
+/// Parse a gemini (assistant) message from Gemini CLI format.
+fn parse_gemini_message(msg: &Value) -> Message {
+    let mut content = Vec::new();
+
+    // Text content
+    if let Some(text) = msg.get("content").and_then(|v| v.as_str()) {
+        content.push(ContentBlock::Text {
+            text: text.to_string(),
+        });
+    }
+
+    // Tool calls
+    if let Some(tool_calls) = msg.get("toolCalls").and_then(|t| t.as_array()) {
+        for tc in tool_calls {
+            let id = tc
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let name = tc
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let input = tc.get("args").cloned().unwrap_or(Value::Null);
+
+            content.push(ContentBlock::ToolUse {
+                id: id.clone(),
+                name,
+                input,
+            });
+
+            // Tool result (Gemini includes result in the same message)
+            if let Some(result) = tc.get("result") {
+                let tool_use_id = id;
+                let result_content = if let Some(s) = result.as_str() {
+                    s.to_string()
+                } else {
+                    result.to_string()
+                };
+                let is_error = tc.get("status").and_then(|s| s.as_str()) == Some("error");
+                content.push(ContentBlock::ToolResult {
+                    tool_use_id,
+                    content: result_content,
+                    is_error,
+                });
             }
         }
     }
 
-    file_tokens
+    Message {
+        role: Role::Assistant,
+        content,
+        timestamp: msg
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+    }
 }

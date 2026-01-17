@@ -1,7 +1,7 @@
 //! Moss @agent JSONL format parser.
 
 use super::{LogFormat, SessionFile, list_jsonl_sessions, peek_lines};
-use crate::{SessionAnalysis, ToolStats};
+use crate::{ContentBlock, Message, Role, Session, Turn};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -196,13 +196,13 @@ impl LogFormat for MossAgentFormat {
         0.0
     }
 
-    fn analyze(&self, path: &Path) -> Result<SessionAnalysis, String> {
+    fn parse(&self, path: &Path) -> Result<Session, String> {
         let file = File::open(path).map_err(|e| e.to_string())?;
         let reader = BufReader::new(file);
 
-        let mut analysis = SessionAnalysis::new(path.to_path_buf(), self.name());
-        let mut commands_by_name: HashMap<String, ToolStats> = HashMap::new();
-        let mut total_turns = 0u32;
+        let mut session = Session::new(path.to_path_buf(), self.name());
+        let mut current_turn = Turn::default();
+        let mut current_turn_num = 0u32;
 
         for line in reader.lines() {
             let line = line.map_err(|e| e.to_string())?;
@@ -210,62 +210,89 @@ impl LogFormat for MossAgentFormat {
                 continue;
             }
 
-            if let Ok(event) = serde_json::from_str::<AgentEvent>(&line) {
-                match event {
-                    AgentEvent::SessionStart { .. } => {
-                        *analysis
-                            .message_counts
-                            .entry("session_start".into())
-                            .or_insert(0) += 1;
-                    }
-                    AgentEvent::Task { .. } => {
-                        *analysis.message_counts.entry("task".into()).or_insert(0) += 1;
-                    }
-                    AgentEvent::TurnStart { turn, state, .. } => {
-                        total_turns = total_turns.max(turn);
-                        let state_key = state.unwrap_or_else(|| "unknown".into());
-                        *analysis
-                            .message_counts
-                            .entry(format!("turn:{}", state_key))
-                            .or_insert(0) += 1;
-                    }
-                    AgentEvent::LlmResponse { .. } => {
-                        *analysis
-                            .message_counts
-                            .entry("llm_response".into())
-                            .or_insert(0) += 1;
-                    }
-                    AgentEvent::Command { cmd, success, .. } => {
-                        // Extract command name (first word)
-                        let cmd_name = cmd.split_whitespace().next().unwrap_or("unknown");
-                        let stat = commands_by_name
-                            .entry(cmd_name.to_string())
-                            .or_insert_with(|| ToolStats::new(cmd_name));
-                        stat.calls += 1;
-                        if !success {
-                            stat.errors += 1;
-                        }
-                    }
-                    AgentEvent::SessionEnd { .. } => {
-                        *analysis
-                            .message_counts
-                            .entry("session_end".into())
-                            .or_insert(0) += 1;
-                    }
-                    AgentEvent::MaxTurnsReached { .. } => {
-                        *analysis
-                            .message_counts
-                            .entry("max_turns_reached".into())
-                            .or_insert(0) += 1;
-                    }
-                    _ => {}
+            let Ok(event) = serde_json::from_str::<AgentEvent>(&line) else {
+                continue;
+            };
+
+            match event {
+                AgentEvent::SessionStart {
+                    session_id,
+                    timestamp,
+                    ..
+                } => {
+                    session.metadata.session_id = Some(session_id);
+                    session.metadata.timestamp = Some(timestamp);
                 }
+                AgentEvent::Task {
+                    user_prompt,
+                    provider,
+                    model,
+                    ..
+                } => {
+                    session.metadata.provider = provider;
+                    session.metadata.model = model;
+
+                    // Add user message for the task
+                    current_turn.messages.push(Message {
+                        role: Role::User,
+                        content: vec![ContentBlock::Text { text: user_prompt }],
+                        timestamp: None,
+                    });
+                }
+                AgentEvent::TurnStart { turn, .. } => {
+                    // Flush previous turn when starting a new one
+                    if turn > current_turn_num && !current_turn.messages.is_empty() {
+                        session.turns.push(std::mem::take(&mut current_turn));
+                    }
+                    current_turn_num = turn;
+                }
+                AgentEvent::LlmResponse { response, .. } => {
+                    current_turn.messages.push(Message {
+                        role: Role::Assistant,
+                        content: vec![ContentBlock::Text { text: response }],
+                        timestamp: None,
+                    });
+                }
+                AgentEvent::Command { cmd, success, .. } => {
+                    // Extract command name for tool use
+                    let cmd_name = cmd.split_whitespace().next().unwrap_or("shell").to_string();
+
+                    // Add tool use
+                    let tool_id = format!("cmd-{}", current_turn_num);
+                    current_turn.messages.push(Message {
+                        role: Role::Assistant,
+                        content: vec![ContentBlock::ToolUse {
+                            id: tool_id.clone(),
+                            name: cmd_name,
+                            input: serde_json::json!({ "command": cmd }),
+                        }],
+                        timestamp: None,
+                    });
+
+                    // Add tool result
+                    current_turn.messages.push(Message {
+                        role: Role::User,
+                        content: vec![ContentBlock::ToolResult {
+                            tool_use_id: tool_id,
+                            content: if success {
+                                "(success)".to_string()
+                            } else {
+                                "(failed)".to_string()
+                            },
+                            is_error: !success,
+                        }],
+                        timestamp: None,
+                    });
+                }
+                _ => {}
             }
         }
 
-        analysis.total_turns = total_turns as usize;
-        analysis.tool_stats = commands_by_name;
+        // Flush final turn
+        if !current_turn.messages.is_empty() {
+            session.turns.push(current_turn);
+        }
 
-        Ok(analysis)
+        Ok(session)
     }
 }

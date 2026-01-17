@@ -1,5 +1,10 @@
-//! Common analysis types shared across all log formats.
+//! Session analysis types and functions.
+//!
+//! This module computes analytics from parsed Session data.
+//! Analysis is intentionally in the CLI, not the parsing library,
+//! because what metrics matter is subjective and consumer-specific.
 
+use rhizome_moss_sessions::{ContentBlock, Session};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -408,4 +413,94 @@ pub fn normalize_path(path: &str) -> String {
         }
     }
     path.to_string()
+}
+
+/// Analyze a parsed session and compute statistics.
+pub fn analyze_session(session: &Session) -> SessionAnalysis {
+    let mut analysis = SessionAnalysis::new(session.path.clone(), &session.format);
+
+    // Count message types by role
+    for turn in &session.turns {
+        for msg in &turn.messages {
+            let role_str = msg.role.to_string();
+            *analysis.message_counts.entry(role_str).or_insert(0) += 1;
+        }
+    }
+
+    // Analyze tool usage
+    for turn in &session.turns {
+        let mut tool_uses_in_turn = 0;
+
+        for msg in &turn.messages {
+            for block in &msg.content {
+                match block {
+                    ContentBlock::ToolUse { name, .. } => {
+                        let stat = analysis
+                            .tool_stats
+                            .entry(name.clone())
+                            .or_insert_with(|| ToolStats::new(name));
+                        stat.calls += 1;
+                        tool_uses_in_turn += 1;
+                    }
+                    ContentBlock::ToolResult {
+                        is_error, content, ..
+                    } => {
+                        if *is_error {
+                            // Try to attribute error to most recent tool
+                            // For now, just track in error patterns
+                            let category = categorize_error(content);
+                            let pattern = analysis
+                                .error_patterns
+                                .iter_mut()
+                                .find(|p| p.category == category);
+
+                            if let Some(p) = pattern {
+                                p.count += 1;
+                                if p.examples.len() < 3 {
+                                    p.examples.push(content.chars().take(100).collect());
+                                }
+                            } else {
+                                let mut p = ErrorPattern::new(category);
+                                p.count = 1;
+                                p.examples.push(content.chars().take(100).collect());
+                                analysis.error_patterns.push(p);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Track parallel opportunities (turns with single tool call)
+        if tool_uses_in_turn == 1 {
+            analysis.parallel_opportunities += 1;
+        }
+    }
+
+    // Analyze token usage
+    analysis.total_turns = session.turns.len();
+    for turn in &session.turns {
+        if let Some(usage) = &turn.token_usage {
+            analysis.token_stats.api_calls += 1;
+            analysis.token_stats.total_input += usage.input;
+            analysis.token_stats.total_output += usage.output;
+            if let Some(cr) = usage.cache_read {
+                analysis.token_stats.cache_read += cr;
+            }
+            if let Some(cc) = usage.cache_create {
+                analysis.token_stats.cache_create += cc;
+            }
+
+            let context = usage.input + usage.cache_read.unwrap_or(0);
+            analysis.token_stats.update_context(context);
+        }
+    }
+
+    // Sort error patterns by count
+    analysis
+        .error_patterns
+        .sort_by(|a, b| b.count.cmp(&a.count));
+
+    analysis
 }

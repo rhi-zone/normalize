@@ -34,7 +34,7 @@ pub use codex::CodexFormat;
 pub use gemini_cli::GeminiCliFormat;
 pub use moss_agent::MossAgentFormat;
 
-use crate::SessionAnalysis;
+use crate::Session;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -85,8 +85,8 @@ pub trait LogFormat: Send + Sync {
     /// Returns a confidence score 0.0-1.0.
     fn detect(&self, path: &Path) -> f64;
 
-    /// Parse the log file and produce analysis.
-    fn analyze(&self, path: &Path) -> Result<SessionAnalysis, String>;
+    /// Parse the log file into a unified Session structure.
+    fn parse(&self, path: &Path) -> Result<Session, String>;
 }
 
 /// Get a format by name from the global registry.
@@ -205,25 +205,22 @@ impl FormatRegistry {
     }
 }
 
-/// Analyze a session log with auto-format detection.
-pub fn analyze_session(path: &Path) -> Result<SessionAnalysis, String> {
+/// Parse a session log with auto-format detection.
+pub fn parse_session(path: &Path) -> Result<Session, String> {
     let registry = FormatRegistry::new();
     let format = registry
         .detect(path)
         .ok_or_else(|| format!("Unknown log format: {}", path.display()))?;
-    format.analyze(path)
+    format.parse(path)
 }
 
-/// Analyze a session log with explicit format.
-pub fn analyze_session_with_format(
-    path: &Path,
-    format_name: &str,
-) -> Result<SessionAnalysis, String> {
+/// Parse a session log with explicit format.
+pub fn parse_session_with_format(path: &Path, format_name: &str) -> Result<Session, String> {
     let registry = FormatRegistry::new();
     let format = registry
         .get(format_name)
         .ok_or_else(|| format!("Unknown format: {}", format_name))?;
-    format.analyze(path)
+    format.parse(path)
 }
 
 /// Helper: read first N lines of a file.
