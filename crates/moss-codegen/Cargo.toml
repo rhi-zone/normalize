@@ -1,0 +1,38 @@
+[package]
+name = "rhizome-moss-codegen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Polyglot type and validator generation from schemas"
+
+[features]
+default = ["typescript", "python", "go", "rust-types"]
+
+# Language umbrella flags
+typescript = ["typescript-types", "typescript-validators"]
+python = ["python-types", "python-validators"]
+go = ["go-types"]
+rust-types = []
+
+# Per-language types
+typescript-types = []
+python-types = []
+go-types = []
+
+# Per-language validators (umbrella)
+typescript-validators = ["zod"]
+python-validators = ["pydantic"]
+
+# Individual validators
+zod = []
+valibot = []
+yup = []
+pydantic = []
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = "2"
+
+[dev-dependencies]
+insta = { version = "1", features = ["json"] }

@@ -133,6 +133,8 @@ May or may not reuse existing crates depending on fit:
 
 Likely new dependencies: dedicated parsing crates for input formats.
 
+**Note:** `moss-openapi` already has client codegen but no IR. Plan: once `moss-codegen` is solid, migrate functionality and delete `moss-openapi`.
+
 ### New Crate: `moss-codegen`
 
 ```

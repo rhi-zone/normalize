@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Status": {
+      "description": "User account status",
+      "enum": ["pending", "active", "suspended", "deleted"]
+    },
+    "Address": {
+      "type": "object",
+      "description": "Physical address",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "postalCode": { "type": "string" }
+      },
+      "required": ["street", "city", "country"]
+    },
+    "User": {
+      "type": "object",
+      "description": "A user account",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address"
+        },
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "status": { "$ref": "#/$defs/Status" },
+        "address": { "$ref": "#/$defs/Address" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["id", "email", "status"]
+    }
+  }
+}
