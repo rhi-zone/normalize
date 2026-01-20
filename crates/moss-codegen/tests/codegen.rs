@@ -272,3 +272,44 @@ fn openapi_petstore_zod() {
 
     insta::assert_snapshot!(output);
 }
+
+// === Tagged Unions ===
+
+#[test]
+fn tagged_union_typescript() {
+    let input = load_fixture("events");
+    let schema = parse_json_schema(&input).unwrap();
+    let output = generate_typescript_types(
+        &schema,
+        &TypeScriptOptions {
+            export: true,
+            ..Default::default()
+        },
+    );
+
+    insta::assert_snapshot!(output);
+}
+
+#[test]
+fn tagged_union_zod() {
+    let input = load_fixture("events");
+    let schema = parse_json_schema(&input).unwrap();
+    let output = generate_zod(
+        &schema,
+        &ZodOptions {
+            export: true,
+            infer_types: true,
+        },
+    );
+
+    insta::assert_snapshot!(output);
+}
+
+#[test]
+fn tagged_union_rust() {
+    let input = load_fixture("events");
+    let schema = parse_json_schema(&input).unwrap();
+    let output = generate_rust_types(&schema, &RustOptions::with_serde());
+
+    insta::assert_snapshot!(output);
+}

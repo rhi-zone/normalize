@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp"
+    },
+    "UserCreatedPayload": {
+      "type": "object",
+      "description": "Payload for user creation events",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["userId", "email", "name"]
+    },
+    "UserDeletedPayload": {
+      "type": "object",
+      "description": "Payload for user deletion events",
+      "properties": {
+        "userId": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "OrderPlacedPayload": {
+      "type": "object",
+      "description": "Payload for order placement events",
+      "properties": {
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OrderItem" }
+        },
+        "total": { "type": "number" }
+      },
+      "required": ["orderId", "userId", "items", "total"]
+    },
+    "OrderItem": {
+      "type": "object",
+      "description": "An item in an order",
+      "properties": {
+        "productId": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "price": { "type": "number" }
+      },
+      "required": ["productId", "quantity", "price"]
+    },
+    "Event": {
+      "description": "A domain event with discriminated payload",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "user.created" },
+            "timestamp": { "$ref": "#/$defs/Timestamp" },
+            "payload": { "$ref": "#/$defs/UserCreatedPayload" }
+          },
+          "required": ["type", "timestamp", "payload"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "user.deleted" },
+            "timestamp": { "$ref": "#/$defs/Timestamp" },
+            "payload": { "$ref": "#/$defs/UserDeletedPayload" }
+          },
+          "required": ["type", "timestamp", "payload"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "order.placed" },
+            "timestamp": { "$ref": "#/$defs/Timestamp" },
+            "payload": { "$ref": "#/$defs/OrderPlacedPayload" }
+          },
+          "required": ["type", "timestamp", "payload"]
+        }
+      ],
+      "discriminator": {
+        "propertyName": "type"
+      }
+    },
+    "Result": {
+      "description": "A result type that can be success or error",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": { "const": "success" },
+            "data": {}
+          },
+          "required": ["status", "data"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": { "const": "error" },
+            "error": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string" },
+                "message": { "type": "string" }
+              },
+              "required": ["code", "message"]
+            }
+          },
+          "required": ["status", "error"]
+        }
+      ],
+      "discriminator": {
+        "propertyName": "status"
+      }
+    }
+  }
+}
