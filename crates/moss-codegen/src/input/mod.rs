@@ -2,6 +2,8 @@
 //!
 //! Each parser reads a schema format and produces an IR [`Schema`](crate::ir::Schema).
 
-mod jsonschema;
+pub(crate) mod jsonschema;
+mod openapi;
 
-pub use jsonschema::parse_json_schema;
+pub use jsonschema::{ParseError, parse_json_schema};
+pub use openapi::parse_openapi;

@@ -1,7 +1,7 @@
 //! Integration tests for moss-codegen.
 
 use rhizome_moss_codegen::{
-    input::parse_json_schema,
+    input::{parse_json_schema, parse_openapi},
     output::{
         go::{GoOptions, generate_go_types},
         pydantic::{PydanticOptions, generate_pydantic},
@@ -235,6 +235,38 @@ fn rust_types_no_serde() {
             partial_eq: true,
             public: true,
             ..Default::default()
+        },
+    );
+
+    insta::assert_snapshot!(output);
+}
+
+// === OpenAPI Input ===
+
+#[test]
+fn openapi_petstore_typescript() {
+    let input = load_fixture("petstore");
+    let schema = parse_openapi(&input).unwrap();
+    let output = generate_typescript_types(
+        &schema,
+        &TypeScriptOptions {
+            export: true,
+            ..Default::default()
+        },
+    );
+
+    insta::assert_snapshot!(output);
+}
+
+#[test]
+fn openapi_petstore_zod() {
+    let input = load_fixture("petstore");
+    let schema = parse_openapi(&input).unwrap();
+    let output = generate_zod(
+        &schema,
+        &ZodOptions {
+            export: true,
+            infer_types: true,
         },
     );
 

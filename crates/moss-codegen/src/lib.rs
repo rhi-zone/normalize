@@ -62,7 +62,7 @@ pub mod ir;
 pub mod output;
 
 // Re-export commonly used items
-pub use input::parse_json_schema;
+pub use input::{ParseError, parse_json_schema, parse_openapi};
 
 #[cfg(feature = "typescript-types")]
 pub use output::generate_typescript_types;
