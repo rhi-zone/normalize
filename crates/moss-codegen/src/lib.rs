@@ -9,11 +9,11 @@
 //! Input Formats          IR              Output Backends
 //! ──────────────     ─────────────     ─────────────────
 //! JSON Schema   ─┐                  ┌─> TypeScript types
-//! OpenAPI       ─┼─> Schema ────────┼─> TypeScript validators (Zod, etc.)
-//! Protobuf      ─┘   (ir.rs)        ├─> Python types
+//! OpenAPI       ─┼─> Schema ────────┼─> TypeScript validators (Zod, Valibot)
+//! Protobuf      ─┘   (ir.rs)        ├─> Python types (dataclasses, TypedDict)
 //!                                   ├─> Python validators (Pydantic)
-//!                                   ├─> Go types
-//!                                   └─> Rust types
+//!                                   ├─> Go types (structs)
+//!                                   └─> Rust types (serde structs)
 //! ```
 //!
 //! # Example
@@ -41,16 +41,21 @@
 //!
 //! # Feature Flags
 //!
-//! - `typescript` - TypeScript types + all validators (default)
-//! - `typescript-types` - Just TypeScript interfaces
-//! - `typescript-validators` - All TypeScript validators
+//! Language umbrella flags (enable types + validators):
+//! - `typescript` - TypeScript types + Zod + Valibot (default)
+//! - `python` - Python types + Pydantic (default)
+//! - `go` - Go structs (default)
+//! - `rust-types` - Rust structs with serde (default)
+//!
+//! Per-language type flags:
+//! - `typescript-types` - TypeScript interfaces/types
+//! - `python-types` - Python dataclasses/TypedDict
+//! - `go-types` - Go structs with json tags
+//!
+//! Validator flags:
 //! - `zod` - Zod schema generation
-//! - `valibot` - Valibot schema generation (TODO)
-//! - `python` - Python types + validators (default)
-//! - `python-types` - Just Python dataclasses/TypedDict
-//! - `pydantic` - Pydantic model generation (TODO)
-//! - `go` - Go struct generation (default)
-//! - `rust-types` - Rust struct generation (default)
+//! - `valibot` - Valibot schema generation
+//! - `pydantic` - Pydantic model generation
 
 pub mod input;
 pub mod ir;
@@ -64,3 +69,18 @@ pub use output::generate_typescript_types;
 
 #[cfg(feature = "zod")]
 pub use output::generate_zod;
+
+#[cfg(feature = "valibot")]
+pub use output::generate_valibot;
+
+#[cfg(feature = "python-types")]
+pub use output::generate_python_types;
+
+#[cfg(feature = "pydantic")]
+pub use output::generate_pydantic;
+
+#[cfg(feature = "go-types")]
+pub use output::generate_go_types;
+
+#[cfg(feature = "rust-types")]
+pub use output::generate_rust_types;
