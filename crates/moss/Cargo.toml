@@ -36,6 +36,7 @@ dirs = "5"
 rhizome-moss-core = { path = "../moss-core" }
 rhizome-moss-derive = { path = "../moss-derive" }
 rhizome-moss-languages = { path = "../moss-languages" }
+rhizome-moss-codegen = { path = "../moss-codegen" }
 rhizome-moss-jsonschema = { path = "../moss-jsonschema" }
 rhizome-moss-rules = { path = "../moss-rules" }
 rhizome-moss-openapi = { path = "../moss-openapi" }

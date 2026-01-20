@@ -12,17 +12,20 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type")]
 #[serde(rename_all = "camelCase")]
 pub enum Event {
-    User.created {
-    pub payload: UserCreatedPayload,
-    pub timestamp: Timestamp,
+    #[serde(rename = "user.created")]
+    UserCreated {
+        payload: UserCreatedPayload,
+        timestamp: Timestamp,
     },
-    User.deleted {
-    pub payload: UserDeletedPayload,
-    pub timestamp: Timestamp,
+    #[serde(rename = "user.deleted")]
+    UserDeleted {
+        payload: UserDeletedPayload,
+        timestamp: Timestamp,
     },
-    Order.placed {
-    pub payload: OrderPlacedPayload,
-    pub timestamp: Timestamp,
+    #[serde(rename = "order.placed")]
+    OrderPlaced {
+        payload: OrderPlacedPayload,
+        timestamp: Timestamp,
     },
 }
 
@@ -51,10 +54,10 @@ pub struct OrderPlacedPayload {
 #[serde(rename_all = "camelCase")]
 pub enum Result {
     Success {
-    pub data: serde_json::Value,
+        data: serde_json::Value,
     },
     Error {
-    pub error: serde_json::Value,
+        error: serde_json::Value,
     },
 }
 

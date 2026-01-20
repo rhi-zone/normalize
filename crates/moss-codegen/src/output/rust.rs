@@ -101,7 +101,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &RustOptions) {
             out.push_str(" {\n");
 
             for field in &s.fields {
-                generate_field(out, field, options);
+                generate_field(out, field, options, false);
             }
 
             out.push_str("}\n");
@@ -211,7 +211,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &RustOptions) {
                     } else {
                         out.push_str(" {\n");
                         for field in &variant.fields {
-                            generate_field(out, field, options);
+                            generate_field(out, field, options, true);
                         }
                         out.push_str("    },\n");
                     }
@@ -231,22 +231,33 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &RustOptions) {
     }
 }
 
-fn generate_field(out: &mut String, field: &Field, options: &RustOptions) {
+fn generate_field(out: &mut String, field: &Field, options: &RustOptions, in_enum_variant: bool) {
+    let indent = if in_enum_variant { "        " } else { "    " };
+
     // Doc comment
     if let Some(docs) = &field.docs {
-        out.push_str("    /// ");
+        out.push_str(indent);
+        out.push_str("/// ");
         out.push_str(docs);
         out.push('\n');
     }
 
     // Serde skip_serializing_if for optional fields
     if options.serde && !field.required {
-        out.push_str("    #[serde(skip_serializing_if = \"Option::is_none\")]\n");
+        out.push_str(indent);
+        out.push_str("#[serde(skip_serializing_if = \"Option::is_none\")]\n");
     }
 
-    let vis = if options.public { "pub " } else { "" };
+    // Enum variant fields don't have visibility modifiers (inherently public)
+    let vis = if in_enum_variant {
+        ""
+    } else if options.public {
+        "pub "
+    } else {
+        ""
+    };
 
-    out.push_str("    ");
+    out.push_str(indent);
     out.push_str(vis);
     out.push_str(&to_snake_case(&field.name));
     out.push_str(": ");
@@ -323,7 +334,7 @@ fn to_pascal_case(s: &str) -> String {
     let mut result = String::new();
     let mut capitalize_next = true;
     for c in s.chars() {
-        if c == '_' || c == '-' {
+        if c == '_' || c == '-' || c == '.' {
             capitalize_next = true;
         } else if capitalize_next {
             result.push(c.to_uppercase().next().unwrap());
