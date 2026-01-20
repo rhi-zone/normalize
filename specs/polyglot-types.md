@@ -121,14 +121,17 @@ polytypes generate --watch specs/ --out generated/
 
 Fits naturally in the moss monorepo as a new crate.
 
-### Existing Infrastructure to Leverage
+### Potential Infrastructure to Leverage
 
-| Crate | Provides |
-|-------|----------|
-| `moss-jsonschema` | JSON Schema parsing |
-| `moss-openapi` | OpenAPI parsing |
-| `moss-languages` | Per-language modules (98 languages) |
-| `moss-grammars` | Tree-sitter grammars for formatting |
+May or may not reuse existing crates depending on fit:
+
+| Crate | Might Provide |
+|-------|---------------|
+| `moss-jsonschema` | JSON Schema parsing (if it exists/fits) |
+| `moss-openapi` | OpenAPI parsing (if it exists/fits) |
+| `moss-languages` | Language metadata (extensions, conventions) |
+
+Likely new dependencies: dedicated parsing crates for input formats.
 
 ### New Crate: `moss-codegen`
 
@@ -216,17 +219,32 @@ Before a language backend is "ready":
 - [ ] Output is formatted (prettier, gofmt, rustfmt, black)
 - [ ] Has integration tests against real-world schemas
 
-## Open Questions
+## Design Decisions
 
 1. ~~**Where does this live?**~~ → `moss-codegen` crate in moss monorepo
 
-2. **Validation codegen?** Just types, or also runtime validators?
-   - Types only = simpler, broader use
-   - With validators = more useful, more complex
+2. **Validation codegen?** Both types and runtime validators, both optional.
+   - Some validators support type inference (e.g., Zod, Valibot infer TS types from schemas)
+   - In those cases, explicit interface declarations become optional
+   - Note: 10+ TypeScript validators exist (Zod, Yup, Joi, io-ts, Valibot, ArkType, Typia, etc.)
 
-3. **Client codegen?** Just types, or also API clients?
-   - Types only = simpler, composable with any HTTP client
-   - Full clients = more useful, much more complex
+   Feature flag structure:
+   - `typescript` = `typescript-types` + `typescript-validators`
+   - `typescript-types` = just interfaces/types
+   - `typescript-validators` = all TS validators (maybe, TBD)
+   - Individual validators: `zod`, `valibot`, `yup`, `pydantic`, etc.
+   - Same pattern for other languages: `python`, `python-types`, `python-validators`, etc.
+   - Not mutually exclusive (can enable `typescript-types` + `zod`, or just `zod` alone if inferring types)
+
+3. **Client codegen?** Nice-to-have, lower priority.
+   - Tooling sprawl: many HTTP client options per language
+   - Complex to do well (auth, retries, pagination, streaming...)
+   - May punt to v2 or leave as extension point
+
+   Same flag pattern if implemented:
+   - `typescript-clients` = all TS clients (maybe)
+   - Individual clients: `fetch`, `axios`, `ky`, `openapi-fetch`, `requests`, `httpx`, etc.
+   - `typescript` would then = `typescript-types` + `typescript-validators` + `typescript-clients`
 
 4. **Relationship to trellis?** Trellis outputs specs, moss-codegen consumes them. Clean boundary:
    ```
@@ -234,19 +252,17 @@ Before a language backend is "ready":
    ```
    Separate repos, complementary tools.
 
-5. **Name?**
-   - `polytypes` - clear but generic
-   - `moss codegen` - if it lives in moss
-   - `arbor` - tree theme (types branch out)
-   - `spore` - already taken in Rhizome
-   - Something else?
+5. ~~**Name?**~~ → `moss-codegen` (no clever names)
 
-## Non-Goals (for now)
+## Phase 1 Scope (eventual goals, deferred)
 
-- Full API client generation (just types)
-- Runtime validation (just static types)
 - Every language (start with 4, do them well)
 - Every spec format (start with 3)
+- Every validator library (pick 1-2 per language initially)
+- Full API client generation (nice-to-have, see Design Decisions)
+
+## Non-Goals
+
 - Backward compatibility with OpenAPI Generator templates
 
 ## Success Criteria
