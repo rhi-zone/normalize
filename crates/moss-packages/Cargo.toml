@@ -5,8 +5,33 @@ edition = "2024"
 description = "Package registry queries for multiple ecosystems"
 
 [features]
-default = ["ecosystem", "index"]
-ecosystem = []  # Project dependency management (Ecosystem trait)
+default = ["ecosystems-all", "index"]
+
+# Base ecosystem feature (enabled by any individual ecosystem)
+ecosystem = []
+
+# All ecosystems
+ecosystems-all = [
+    "ecosystem-cargo", "ecosystem-npm", "ecosystem-deno", "ecosystem-python",
+    "ecosystem-go", "ecosystem-hex", "ecosystem-gem", "ecosystem-composer",
+    "ecosystem-maven", "ecosystem-nuget", "ecosystem-nix", "ecosystem-conan",
+]
+
+# Individual ecosystems (each enables base "ecosystem" feature)
+ecosystem-cargo = ["ecosystem"]     # Rust (Cargo.toml)
+ecosystem-npm = ["ecosystem"]       # JavaScript/TypeScript (package.json)
+ecosystem-deno = ["ecosystem"]      # Deno (deno.json)
+ecosystem-python = ["ecosystem"]    # Python (pyproject.toml, requirements.txt, etc.)
+ecosystem-go = ["ecosystem"]        # Go (go.mod)
+ecosystem-hex = ["ecosystem"]       # Elixir/Erlang (mix.exs)
+ecosystem-gem = ["ecosystem"]       # Ruby (Gemfile)
+ecosystem-composer = ["ecosystem"]  # PHP (composer.json)
+ecosystem-maven = ["ecosystem"]     # Java (pom.xml)
+ecosystem-nuget = ["ecosystem"]     # .NET (*.csproj)
+ecosystem-nix = ["ecosystem"]       # Nix (flake.nix)
+ecosystem-conan = ["ecosystem"]     # C++ (conanfile.txt)
+
+# Other features
 index = ["flate2", "xz2", "quick-xml", "tar", "zstd", "rayon"]  # Package index ingestion (PackageIndex trait)
 test-network = ["index"]  # Enable tests that hit real APIs (disabled in CI)
 

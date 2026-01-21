@@ -22,34 +22,58 @@
 //! register_ecosystem(&MyEcosystem);
 //! ```
 
+#[cfg(feature = "ecosystem-cargo")]
 mod cargo;
+#[cfg(feature = "ecosystem-composer")]
 mod composer;
+#[cfg(feature = "ecosystem-conan")]
 mod conan;
+#[cfg(feature = "ecosystem-deno")]
 mod deno;
+#[cfg(feature = "ecosystem-gem")]
 mod gem;
+#[cfg(feature = "ecosystem-go")]
 mod go;
+#[cfg(feature = "ecosystem-hex")]
 mod hex;
+#[cfg(feature = "ecosystem-maven")]
 mod maven;
+#[cfg(feature = "ecosystem-nix")]
 mod nix;
+#[cfg(feature = "ecosystem-npm")]
 mod npm;
+#[cfg(feature = "ecosystem-nuget")]
 mod nuget;
+#[cfg(feature = "ecosystem-python")]
 mod python;
 
 use crate::Ecosystem;
 use std::path::Path;
 use std::sync::{OnceLock, RwLock};
 
+#[cfg(feature = "ecosystem-cargo")]
 pub use cargo::Cargo;
+#[cfg(feature = "ecosystem-composer")]
 pub use composer::Composer;
+#[cfg(feature = "ecosystem-conan")]
 pub use conan::Conan;
+#[cfg(feature = "ecosystem-deno")]
 pub use deno::Deno;
+#[cfg(feature = "ecosystem-gem")]
 pub use gem::Gem;
+#[cfg(feature = "ecosystem-go")]
 pub use go::Go;
+#[cfg(feature = "ecosystem-hex")]
 pub use hex::Hex;
+#[cfg(feature = "ecosystem-maven")]
 pub use maven::Maven;
+#[cfg(feature = "ecosystem-nix")]
 pub use nix::Nix;
+#[cfg(feature = "ecosystem-npm")]
 pub use npm::Npm;
+#[cfg(feature = "ecosystem-nuget")]
 pub use nuget::Nuget;
+#[cfg(feature = "ecosystem-python")]
 pub use python::Python;
 
 /// Global registry of ecosystem plugins.
@@ -68,17 +92,29 @@ pub fn register(ecosystem: &'static dyn Ecosystem) {
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
         let mut ecosystems = ECOSYSTEMS.write().unwrap();
+        #[cfg(feature = "ecosystem-cargo")]
         ecosystems.push(&Cargo);
+        #[cfg(feature = "ecosystem-npm")]
         ecosystems.push(&Npm);
+        #[cfg(feature = "ecosystem-deno")]
         ecosystems.push(&Deno);
+        #[cfg(feature = "ecosystem-python")]
         ecosystems.push(&Python);
+        #[cfg(feature = "ecosystem-go")]
         ecosystems.push(&Go);
+        #[cfg(feature = "ecosystem-hex")]
         ecosystems.push(&Hex);
+        #[cfg(feature = "ecosystem-gem")]
         ecosystems.push(&Gem);
+        #[cfg(feature = "ecosystem-composer")]
         ecosystems.push(&Composer);
+        #[cfg(feature = "ecosystem-maven")]
         ecosystems.push(&Maven);
+        #[cfg(feature = "ecosystem-nuget")]
         ecosystems.push(&Nuget);
+        #[cfg(feature = "ecosystem-nix")]
         ecosystems.push(&Nix);
+        #[cfg(feature = "ecosystem-conan")]
         ecosystems.push(&Conan);
     });
 }

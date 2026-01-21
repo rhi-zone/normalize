@@ -96,7 +96,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 Add feature flags to crates so consumers can opt out of implementations they don't need.
 Use consistent prefixes within each crate:
 - [x] moss-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) and groups `langs-*` (e.g., `langs-core`, `langs-functional`)
-- moss-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-pip`)
+- [x] moss-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-python`)
 - moss-sessions: `format-*` (e.g., `format-claude`, `format-cursor`, `format-aider`)
 - moss-tools: `tool-*` (e.g., `tool-jest`, `tool-pytest`)
 
