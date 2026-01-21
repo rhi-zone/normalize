@@ -50,6 +50,20 @@ Patterns from `docs/log-analysis.md` correction analysis:
 
 When unsure of syntax: `moss <cmd> --help`. Fall back to Read only for exact line content needed by Edit.
 
+## Commit Convention
+
+Use conventional commits: `type(scope): message`
+
+Types:
+- `feat` - New feature
+- `fix` - Bug fix
+- `refactor` - Code change that neither fixes a bug nor adds a feature
+- `docs` - Documentation only
+- `chore` - Maintenance (deps, CI, etc.)
+- `test` - Adding or updating tests
+
+Scope is optional but recommended for multi-crate repos.
+
 ## Negative Constraints
 
 Do not:
