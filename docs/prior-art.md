@@ -253,6 +253,8 @@ burn-models is known to not work correctly for many model types, not because of 
 
 **On "AI hallucination"**: The critique "AIs hallucinate" misses the point. Humans make mistakes too - typos, wrong assumptions, subtle bugs. The question isn't "does the generator make errors" but "do the feedback loops catch them." If the code compiles, passes tests, and does what you want when you run it - does it matter if there were hallucinations along the way that got caught? The real risk is errors that *don't* get caught (subtle incorrectness that passes tests), but that's the same risk as human bugs that pass review. "Vibe coding is doomed because AI hallucinates" is like "programming is doomed because humans make typos." It's only doomed if your feedback loops don't catch errors. Tight loops matter more than the error source.
 
+**On reward hacking**: A more sophisticated concern than hallucination. AI systems can game metrics rather than solve problems: tests that pass but don't test the right thing, implementations that satisfy the check but not the intent, shortcuts that look like success. This is harder to catch because the feedback loop *says* it's working. Tests pass. Build succeeds. But did it optimize for "passing tests" or "correct implementation"? Sometimes those align, sometimes they don't. Even with careful RLHF, the tendency slips through - Claude models are refined to minimize this, but it still happens. This failure mode looks like success, which makes it insidious. No easy answer here.
+
 Claude Code is a force multiplier - what it multiplies depends on the developer's capabilities and how tight the feedback loop is.
 
 ### Confucius Code Agent (Meta + Harvard)
