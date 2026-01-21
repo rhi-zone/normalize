@@ -194,6 +194,59 @@ Within-project parallelization makes sense when you're *forced* to work on one c
   - **Maintenance**: GitHub Actions for scheduled quality checks
   - **Patterns for moss**: Scoring-based script/workflow selection, formalized severity levels, expanded hook triggering
 
+**Practitioner Experiences:**
+
+Two contrasting experiences with Claude Code at different scales:
+
+**David Gewirtz (ZDNet, Jan 2026)** - "Vibe Coding a Mac App":
+- **Source**: https://www.zdnet.com/article/i-used-claude-code-to-vibe-code-mac-app/
+- **Project**: 3D printing filament tracker (iPhone → Mac port)
+- **Timeline**: 8 hours over 1 month
+- **Mental model**: "Managing a remote junior developer" - no flow state, constant planning/cajoling/correcting
+- **Key observations**:
+  - First version in 10 min was "crap" but functional starting point (vs ~10 days manual)
+  - Cross-platform pitfall: Adding Mac features broke iPhone app (Claude shared UI screens across platforms). Had to explicitly tell it to create separate screens. **Insight**: Claude doesn't infer architectural boundaries - make them explicit.
+  - Performance issues required human diagnosis (slow list → needed thumbnail caching). **Caveat**: This is a tooling limitation - Claude Code can't run GUI apps and observe "this is slow." With visual/interactive feedback, Claude could diagnose too.
+  - "Switch 90% of attention to testing. Don't assume anything will be built as you have asked."
+  - Features silently omitted until explicitly pointed out. **Insight**: Don't assume completeness - verify against requirements.
+  - Knowledge accumulation: Instructed Claude to build notes about everything worked on + lessons learned, so lessons became project rules.
+  - Experience matters: can guide architectural decisions, not just define features
+- **Conclusion**: Force multiplier, but requires experienced developer oversight
+
+**Rhizome Ecosystem (moss authors, Dec 2025 - ongoing)** - Large-scale systems development:
+- **Scale**: 13 projects, ~493k lines of code (scc counts)
+- **Projects**: moss (126k), resin (111k), burn-models (97k), rescribe (35k), ooxml (35k), dew (34k), cambium (12k), trellis (11k), spore (10k), flora (9k), pith (7k), nursery (5k), claude-code-hub (2k)
+- **Timeline**: ~5 weeks (started Dec 17, 2025)
+- **Tool**: Vanilla Claude Code - same tool as Gewirtz
+- **Mental model**: Collaborative peer with domain expertise gaps, not "junior developer"
+- **Key observations**:
+  - **CLAUDE.md as institutional memory**: Corrections become rules, mistakes don't repeat
+  - **Architecture requires human judgment**: Claude proposes, human validates structural decisions
+  - **Testing is table stakes**: Run tests constantly, don't trust "it compiles"
+  - **Cross-project coherence**: Shared conventions (crate naming, feature flags, trait patterns) require explicit documentation
+  - **Pattern establishment**: Feature flags, trait patterns, registry designs - Claude implements correctly once pattern is established and documented
+  - **Same tools, different output**: No special tooling beyond vanilla Claude Code - the difference is developer guidance and architectural vision
+
+| Aspect | Gewirtz (Single App) | Rhizome (Ecosystem) |
+|--------|---------------------|---------------------|
+| Scale | ~1 app | 13 projects, ~493k lines |
+| Timeline | 8 hours over 1 month | ~5 weeks continuous |
+| Tool | Claude Code | Claude Code (identical) |
+| Mental model | Managing junior dev | Collaborative peer |
+| Architecture | Human diagnoses issues | Human validates proposals |
+| Knowledge persistence | Project-specific notes | Cross-project CLAUDE.md |
+
+**Key insight**: Identical tools, very different output. Both use vanilla Claude Code with its built-in search/exploration capabilities (Grep, Glob, Read, etc.) - Claude Code is already non-linear in how it explores codebases. So what explains the difference?
+
+Several factors likely compound:
+- **Developer experience**: Architectural vision, knowing what to ask for, validating proposals
+- **Testing integration**: Tight automated feedback loops enable faster iteration. The single-app project explicitly had limited automated testing ("90% of attention to testing" = manual). More tests = faster feedback = more confident iteration.
+- **Knowledge capture**: Systematic CLAUDE.md discipline vs ad-hoc project notes
+
+**Epistemic honesty**: Is ~493k lines in 5 weeks actually good, or just voluminous? Unknown. The Rhizome projects compile and pass their tests, but that doesn't mean the code is correct, maintainable, or well-designed. It's possible the output is fragile and the authors just don't know it yet. Volume is not velocity, and velocity is not quality. This comparison should be read as "here's what happened" not "here's what you should expect."
+
+Claude Code is a force multiplier - what it multiplies depends on the developer's capabilities and how tight the feedback loop is.
+
 ### Confucius Code Agent (Meta + Harvard)
 - **Paper**: https://arxiv.org/abs/2512.10398
 - **Blog**: https://www.marktechpost.com/2026/01/09/meta-and-harvard-researchers-introduce-the-confucius-code-agent-cca/
