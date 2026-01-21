@@ -78,11 +78,19 @@ Audit found fragmentation across commands. Fix for consistent UX:
 
 ## Backlog
 
+### moss-typegen
+- Add `Backend` trait with registry (hybrid pattern for user-defined backends)
+- Feature flags: `backend-*` prefix (e.g., `backend-typescript`, `backend-rust`, `backend-zod`)
+- CLI: support stdin input, multiple output files
+- Tests: snapshot tests for all backends
+
 ### moss-surface-syntax
-- Add `Reader` and `Writer` traits with registry (see architecture-decisions.md hybrid pattern)
+- [x] Add `Reader` and `Writer` traits with registry (hybrid pattern for user-defined readers/writers)
+- [x] Feature flags: `read-*` and `write-*` prefixes
 - Roundtrip tests: TS → IR → Lua → IR → TS (verify structure preservation)
 - Implement Lua reader (tree-sitter based)
 - Implement TypeScript writer
+- CLI: `moss translate` command
 
 ### Feature flags for customizability
 Add feature flags to crates so consumers can opt out of implementations they don't need.

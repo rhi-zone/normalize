@@ -1,22 +1,30 @@
 //! Tree-sitter based TypeScript reader.
 
 use crate::ir::*;
-use thiserror::Error;
+use crate::traits::{ReadError, Reader};
 use tree_sitter::{Node, Parser, Tree};
 
-#[derive(Debug, Error)]
-pub enum ReadError {
-    #[error("parse error: {0}")]
-    Parse(String),
+/// Static instance of the TypeScript reader for registry.
+pub static TYPESCRIPT_READER: TypeScriptReader = TypeScriptReader;
 
-    #[error("unsupported syntax: {0}")]
-    Unsupported(String),
+/// TypeScript/TSX reader using tree-sitter.
+pub struct TypeScriptReader;
 
-    #[error("expected {expected}, got {got}")]
-    UnexpectedNode { expected: String, got: String },
+impl Reader for TypeScriptReader {
+    fn language(&self) -> &'static str {
+        "typescript"
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &["ts", "tsx", "mts", "cts"]
+    }
+
+    fn read(&self, source: &str) -> Result<Program, ReadError> {
+        read_typescript(source)
+    }
 }
 
-/// Parse TypeScript source into reed IR.
+/// Parse TypeScript source into surface-syntax IR.
 pub fn read_typescript(source: &str) -> Result<Program, ReadError> {
     let mut parser = Parser::new();
     parser

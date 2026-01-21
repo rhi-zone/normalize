@@ -1,9 +1,30 @@
-//! Lua writer for reed IR.
+//! Lua writer for surface-syntax IR.
 //!
-//! Emits reed IR as Lua source code.
+//! Emits surface-syntax IR as Lua source code.
 
 use crate::ir::*;
+use crate::traits::Writer;
 use std::fmt::Write;
+
+/// Static instance of the Lua writer for registry.
+pub static LUA_WRITER: LuaWriterImpl = LuaWriterImpl;
+
+/// Lua writer implementing the Writer trait.
+pub struct LuaWriterImpl;
+
+impl Writer for LuaWriterImpl {
+    fn language(&self) -> &'static str {
+        "lua"
+    }
+
+    fn extension(&self) -> &'static str {
+        "lua"
+    }
+
+    fn write(&self, program: &Program) -> String {
+        LuaWriter::emit(program)
+    }
+}
 
 /// Emits IR as Lua source code.
 pub struct LuaWriter {

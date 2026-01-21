@@ -4,4 +4,4 @@
 pub mod lua;
 
 #[cfg(feature = "write-lua")]
-pub use lua::LuaWriter;
+pub use lua::{LUA_WRITER, LuaWriter, LuaWriterImpl};

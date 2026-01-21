@@ -4,4 +4,4 @@
 pub mod typescript;
 
 #[cfg(feature = "read-typescript")]
-pub use typescript::{ReadError, read_typescript};
+pub use typescript::{TYPESCRIPT_READER, TypeScriptReader, read_typescript};

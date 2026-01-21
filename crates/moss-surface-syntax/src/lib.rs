@@ -43,6 +43,8 @@
 //! are handled by the runtime (e.g., spore).
 
 pub mod ir;
+pub mod registry;
+pub mod traits;
 
 #[cfg(feature = "sexpr")]
 pub mod sexpr;
@@ -50,14 +52,29 @@ pub mod sexpr;
 pub mod input;
 pub mod output;
 
-// Re-exports
+// Re-exports: IR types
 pub use ir::{BinaryOp, Expr, Function, Literal, Program, Stmt, UnaryOp};
 
+// Re-exports: Traits
+pub use traits::{ReadError, Reader, Writer};
+
+// Re-exports: Registry
+pub use registry::{
+    reader_for_extension, reader_for_language, readers, register_reader, register_writer,
+    writer_for_language, writers,
+};
+
+// Re-exports: Built-in readers
 #[cfg(feature = "read-typescript")]
 pub use input::read_typescript;
+#[cfg(feature = "read-typescript")]
+pub use input::typescript::TypeScriptReader;
 
+// Re-exports: Built-in writers
 #[cfg(feature = "write-lua")]
 pub use output::LuaWriter;
+#[cfg(feature = "write-lua")]
+pub use output::lua::LuaWriterImpl;
 
 #[cfg(feature = "sexpr")]
 pub use sexpr::{SExpr, SExprError, from_sexpr, to_sexpr};
