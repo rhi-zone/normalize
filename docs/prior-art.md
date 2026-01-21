@@ -245,6 +245,8 @@ Several factors likely compound:
 
 **Epistemic honesty**: Is ~493k lines in 5 weeks actually good, or just voluminous? Unknown. The Rhizome projects compile and pass their tests, but that doesn't mean the code is correct, maintainable, or well-designed. It's possible the output is fragile and the authors just don't know it yet. Volume is not velocity, and velocity is not quality. This comparison should be read as "here's what happened" not "here's what you should expect."
 
+Spot-checking architecture (ooxml, dew, resin, burn-models) shows clean structure: domain-driven crate splits, trait-based APIs, good docs. But spot-checks don't catch everything. At this scale, you're producing more code than you can personally review. The authors genuinely don't know if something is deeply wrong somewhere in 493k lines - nobody is reading all of it. That's both powerful and terrifying. burn-models is known to not work correctly for many model types, not because of bad architecture, but because ML reimplementation is inherently hard (undocumented details, numeric precision). Clean code ≠ correct code.
+
 Claude Code is a force multiplier - what it multiplies depends on the developer's capabilities and how tight the feedback loop is.
 
 ### Confucius Code Agent (Meta + Harvard)
