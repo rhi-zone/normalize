@@ -3605,7 +3605,6 @@ dependencies = [
  "nucleo-matcher",
  "rayon",
  "regex",
- "rhizome-moss-codegen",
  "rhizome-moss-core",
  "rhizome-moss-derive",
  "rhizome-moss-jsonschema",
@@ -3615,6 +3614,7 @@ dependencies = [
  "rhizome-moss-rules",
  "rhizome-moss-sessions",
  "rhizome-moss-tools",
+ "rhizome-moss-typegen",
  "rmcp",
  "schemars",
  "serde",
@@ -3640,16 +3640,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "rhizome-moss-codegen"
-version = "0.1.0"
-dependencies = [
- "insta",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3854,6 +3844,16 @@ dependencies = [
  "thiserror 2.0.18",
  "toml",
  "which 7.0.3",
+]
+
+[[package]]
+name = "rhizome-moss-typegen"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

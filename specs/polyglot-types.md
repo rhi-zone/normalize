@@ -117,7 +117,7 @@ For development workflows:
 polytypes generate --watch specs/ --out generated/
 ```
 
-## Architecture: `moss-codegen` Crate
+## Architecture: `moss-typegen` Crate
 
 Fits naturally in the moss monorepo as a new crate.
 
@@ -133,12 +133,12 @@ May or may not reuse existing crates depending on fit:
 
 Likely new dependencies: dedicated parsing crates for input formats.
 
-**Note:** `moss-openapi` already has client codegen but no IR. Plan: once `moss-codegen` is solid, migrate functionality and delete `moss-openapi`.
+**Note:** `moss-openapi` already has client codegen but no IR. Plan: once `moss-typegen` is solid, migrate functionality and delete `moss-openapi`.
 
-### New Crate: `moss-codegen`
+### New Crate: `moss-typegen`
 
 ```
-moss-codegen/
+moss-typegen/
 ├── src/
 │   ├── lib.rs
 │   ├── input/           # Input format adapters
@@ -200,7 +200,7 @@ struct Field {
 ### Relationship to `moss-languages`
 
 `moss-languages` = parsing (extracting symbols from existing code)
-`moss-codegen` = generation (producing new code from specs)
+`moss-typegen` = generation (producing new code from specs)
 
 Could share:
 - Language metadata (extensions, naming conventions)
@@ -223,7 +223,7 @@ Before a language backend is "ready":
 
 ## Design Decisions
 
-1. ~~**Where does this live?**~~ → `moss-codegen` crate in moss monorepo
+1. ~~**Where does this live?**~~ → `moss-typegen` crate in moss monorepo
 
 2. **Validation codegen?** Both types and runtime validators, both optional.
    - Some validators support type inference (e.g., Zod, Valibot infer TS types from schemas)
@@ -248,13 +248,13 @@ Before a language backend is "ready":
    - Individual clients: `fetch`, `axios`, `ky`, `openapi-fetch`, `requests`, `httpx`, etc.
    - `typescript` would then = `typescript-types` + `typescript-validators` + `typescript-clients`
 
-4. **Relationship to trellis?** Trellis outputs specs, moss-codegen consumes them. Clean boundary:
+4. **Relationship to trellis?** Trellis outputs specs, moss-typegen consumes them. Clean boundary:
    ```
    trellis (Rust impl → specs) → moss codegen (specs → polyglot types)
    ```
    Separate repos, complementary tools.
 
-5. ~~**Name?**~~ → `moss-codegen` (no clever names)
+5. ~~**Name?**~~ → `moss-typegen` (no clever names)
 
 ## Phase 1 Scope (eventual goals, deferred)
 

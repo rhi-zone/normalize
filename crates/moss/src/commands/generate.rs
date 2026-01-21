@@ -43,8 +43,8 @@ pub enum GenerateTarget {
         output: Option<PathBuf>,
     },
     /// Generate types/validators from schema (new IR-based)
-    #[command(name = "codegen")]
-    Codegen {
+    #[command(name = "typegen")]
+    Typegen {
         /// Input schema file (JSON Schema or OpenAPI)
         input: PathBuf,
 
@@ -116,7 +116,7 @@ pub fn run(args: GenerateArgs) -> i32 {
             lang,
             output,
         } => run_legacy_types(schema, name, lang, output),
-        GenerateTarget::Codegen {
+        GenerateTarget::Typegen {
             input,
             format,
             backend,
@@ -125,7 +125,7 @@ pub fn run(args: GenerateArgs) -> i32 {
             infer_types,
             readonly,
             package,
-        } => run_codegen(
+        } => run_typegen(
             input,
             format,
             backend,
@@ -215,7 +215,7 @@ fn run_legacy_types(schema: PathBuf, name: String, lang: String, output: Option<
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run_codegen(
+fn run_typegen(
     input: PathBuf,
     format: InputFormat,
     backend: Backend,
@@ -225,7 +225,7 @@ fn run_codegen(
     readonly: bool,
     package: String,
 ) -> i32 {
-    use rhizome_moss_codegen::{
+    use rhizome_moss_typegen::{
         ir::Schema,
         output::{
             go::{GoOptions, generate_go_types},

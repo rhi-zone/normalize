@@ -5,7 +5,7 @@ exclude = ["crates/moss-cli-parser/fixtures"]
 members = [
     "crates/moss",
     "crates/moss-cli-parser",
-    "crates/moss-codegen",
+    "crates/moss-typegen",
     "crates/moss-core",
     "crates/moss-derive",
     "crates/moss-grammars",
