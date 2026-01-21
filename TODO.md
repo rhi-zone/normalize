@@ -95,7 +95,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 ### Feature flags for customizability
 Add feature flags to crates so consumers can opt out of implementations they don't need.
 Use consistent prefixes within each crate:
-- moss-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) or groups `langs-*` (e.g., `langs-web`, `langs-systems`)
+- [x] moss-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) and groups `langs-*` (e.g., `langs-core`, `langs-functional`)
 - moss-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-pip`)
 - moss-sessions: `format-*` (e.g., `format-claude`, `format-cursor`, `format-aider`)
 - moss-tools: `tool-*` (e.g., `tool-jest`, `tool-pytest`)
@@ -625,6 +625,14 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 
 ### CI/Infrastructure
 (No current issues)
+
+## Known Issues
+
+### moss-languages: ast-grep test broken
+The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mismatch:
+- `DynLang.parse()` method not found
+- `ast_grep_core::tree_sitter::LanguageExt` trait may need explicit import or implementation
+- Pre-existing issue, not caused by feature flag changes
 
 ## Deferred
 

@@ -24,200 +24,202 @@ pub fn register(lang: &'static dyn Language) {
 /// Initialize built-in languages (called once).
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
+        #[cfg(feature = "lang-python")]
         register(&crate::python::Python);
-
+        #[cfg(feature = "lang-rust")]
         register(&crate::rust::Rust);
-
+        #[cfg(feature = "lang-javascript")]
         register(&crate::javascript::JavaScript);
-
-        register(&crate::typescript::TypeScript);
-
-        register(&crate::typescript::Tsx);
-
+        #[cfg(feature = "lang-typescript")]
+        {
+            register(&crate::typescript::TypeScript);
+            register(&crate::typescript::Tsx);
+        }
+        #[cfg(feature = "lang-go")]
         register(&crate::go::Go);
-
+        #[cfg(feature = "lang-java")]
         register(&crate::java::Java);
-
+        #[cfg(feature = "lang-kotlin")]
         register(&crate::kotlin::Kotlin);
-
+        #[cfg(feature = "lang-csharp")]
         register(&crate::csharp::CSharp);
-
+        #[cfg(feature = "lang-swift")]
         register(&crate::swift::Swift);
-
+        #[cfg(feature = "lang-php")]
         register(&crate::php::Php);
-
+        #[cfg(feature = "lang-dockerfile")]
         register(&crate::dockerfile::Dockerfile);
-
+        #[cfg(feature = "lang-c")]
         register(&crate::c::C);
-
+        #[cfg(feature = "lang-cpp")]
         register(&crate::cpp::Cpp);
-
+        #[cfg(feature = "lang-ruby")]
         register(&crate::ruby::Ruby);
-
+        #[cfg(feature = "lang-scala")]
         register(&crate::scala::Scala);
-
+        #[cfg(feature = "lang-vue")]
         register(&crate::vue::Vue);
-
+        #[cfg(feature = "lang-markdown")]
         register(&crate::markdown::Markdown);
-
+        #[cfg(feature = "lang-json")]
         register(&crate::json::Json);
-
+        #[cfg(feature = "lang-yaml")]
         register(&crate::yaml::Yaml);
-
+        #[cfg(feature = "lang-toml")]
         register(&crate::toml::Toml);
-
+        #[cfg(feature = "lang-html")]
         register(&crate::html::Html);
-
+        #[cfg(feature = "lang-css")]
         register(&crate::css::Css);
-
+        #[cfg(feature = "lang-bash")]
         register(&crate::bash::Bash);
-
+        #[cfg(feature = "lang-lua")]
         register(&crate::lua::Lua);
-
+        #[cfg(feature = "lang-zig")]
         register(&crate::zig::Zig);
-
+        #[cfg(feature = "lang-elixir")]
         register(&crate::elixir::Elixir);
-
+        #[cfg(feature = "lang-erlang")]
         register(&crate::erlang::Erlang);
-
+        #[cfg(feature = "lang-dart")]
         register(&crate::dart::Dart);
-
+        #[cfg(feature = "lang-fsharp")]
         register(&crate::fsharp::FSharp);
-
+        #[cfg(feature = "lang-sql")]
         register(&crate::sql::Sql);
-
+        #[cfg(feature = "lang-graphql")]
         register(&crate::graphql::GraphQL);
-
+        #[cfg(feature = "lang-hcl")]
         register(&crate::hcl::Hcl);
-
+        #[cfg(feature = "lang-scss")]
         register(&crate::scss::Scss);
-
+        #[cfg(feature = "lang-svelte")]
         register(&crate::svelte::Svelte);
-
+        #[cfg(feature = "lang-xml")]
         register(&crate::xml::Xml);
-
+        #[cfg(feature = "lang-clojure")]
         register(&crate::clojure::Clojure);
-
+        #[cfg(feature = "lang-haskell")]
         register(&crate::haskell::Haskell);
-
+        #[cfg(feature = "lang-ocaml")]
         register(&crate::ocaml::OCaml);
-
+        #[cfg(feature = "lang-nix")]
         register(&crate::nix::Nix);
-
+        #[cfg(feature = "lang-perl")]
         register(&crate::perl::Perl);
-
+        #[cfg(feature = "lang-r")]
         register(&crate::r::R);
-
+        #[cfg(feature = "lang-julia")]
         register(&crate::julia::Julia);
-
+        #[cfg(feature = "lang-elm")]
         register(&crate::elm::Elm);
-
+        #[cfg(feature = "lang-cmake")]
         register(&crate::cmake::CMake);
-
+        #[cfg(feature = "lang-vim")]
         register(&crate::vim::Vim);
-
+        #[cfg(feature = "lang-awk")]
         register(&crate::awk::Awk);
-
+        #[cfg(feature = "lang-fish")]
         register(&crate::fish::Fish);
-
+        #[cfg(feature = "lang-jq")]
         register(&crate::jq::Jq);
-
+        #[cfg(feature = "lang-powershell")]
         register(&crate::powershell::PowerShell);
-
+        #[cfg(feature = "lang-zsh")]
         register(&crate::zsh::Zsh);
-
+        #[cfg(feature = "lang-groovy")]
         register(&crate::groovy::Groovy);
-
+        #[cfg(feature = "lang-glsl")]
         register(&crate::glsl::Glsl);
-
+        #[cfg(feature = "lang-hlsl")]
         register(&crate::hlsl::Hlsl);
-
+        #[cfg(feature = "lang-commonlisp")]
         register(&crate::commonlisp::CommonLisp);
-
+        #[cfg(feature = "lang-elisp")]
         register(&crate::elisp::Elisp);
-
+        #[cfg(feature = "lang-gleam")]
         register(&crate::gleam::Gleam);
-
+        #[cfg(feature = "lang-scheme")]
         register(&crate::scheme::Scheme);
-
+        #[cfg(feature = "lang-ini")]
         register(&crate::ini::Ini);
-
+        #[cfg(feature = "lang-diff")]
         register(&crate::diff::Diff);
-
+        #[cfg(feature = "lang-dot")]
         register(&crate::dot::Dot);
-
+        #[cfg(feature = "lang-kdl")]
         register(&crate::kdl::Kdl);
-
+        #[cfg(feature = "lang-ada")]
         register(&crate::ada::Ada);
-
+        #[cfg(feature = "lang-agda")]
         register(&crate::agda::Agda);
-
+        #[cfg(feature = "lang-d")]
         register(&crate::d::D);
-
+        #[cfg(feature = "lang-matlab")]
         register(&crate::matlab::Matlab);
-
+        #[cfg(feature = "lang-meson")]
         register(&crate::meson::Meson);
-
+        #[cfg(feature = "lang-nginx")]
         register(&crate::nginx::Nginx);
-
+        #[cfg(feature = "lang-prolog")]
         register(&crate::prolog::Prolog);
-
+        #[cfg(feature = "lang-batch")]
         register(&crate::batch::Batch);
-
+        #[cfg(feature = "lang-asm")]
         register(&crate::asm::Asm);
-
+        #[cfg(feature = "lang-objc")]
         register(&crate::objc::ObjC);
-
+        #[cfg(feature = "lang-typst")]
         register(&crate::typst::Typst);
-
+        #[cfg(feature = "lang-asciidoc")]
         register(&crate::asciidoc::AsciiDoc);
-
+        #[cfg(feature = "lang-vb")]
         register(&crate::vb::VB);
-
+        #[cfg(feature = "lang-idris")]
         register(&crate::idris::Idris);
-
+        #[cfg(feature = "lang-rescript")]
         register(&crate::rescript::ReScript);
-
+        #[cfg(feature = "lang-lean")]
         register(&crate::lean::Lean);
-
+        #[cfg(feature = "lang-caddy")]
         register(&crate::caddy::Caddy);
-
+        #[cfg(feature = "lang-capnp")]
         register(&crate::capnp::Capnp);
-
+        #[cfg(feature = "lang-devicetree")]
         register(&crate::devicetree::DeviceTree);
-
+        #[cfg(feature = "lang-jinja2")]
         register(&crate::jinja2::Jinja2);
-
+        #[cfg(feature = "lang-ninja")]
         register(&crate::ninja::Ninja);
-
+        #[cfg(feature = "lang-postscript")]
         register(&crate::postscript::PostScript);
-
+        #[cfg(feature = "lang-query")]
         register(&crate::query::Query);
-
+        #[cfg(feature = "lang-ron")]
         register(&crate::ron::Ron);
-
+        #[cfg(feature = "lang-sparql")]
         register(&crate::sparql::Sparql);
-
+        #[cfg(feature = "lang-sshconfig")]
         register(&crate::sshconfig::SshConfig);
-
+        #[cfg(feature = "lang-starlark")]
         register(&crate::starlark::Starlark);
-
+        #[cfg(feature = "lang-textproto")]
         register(&crate::textproto::TextProto);
-
+        #[cfg(feature = "lang-thrift")]
         register(&crate::thrift::Thrift);
-
+        #[cfg(feature = "lang-tlaplus")]
         register(&crate::tlaplus::TlaPlus);
-
+        #[cfg(feature = "lang-uiua")]
         register(&crate::uiua::Uiua);
-
+        #[cfg(feature = "lang-verilog")]
         register(&crate::verilog::Verilog);
-
+        #[cfg(feature = "lang-vhdl")]
         register(&crate::vhdl::Vhdl);
-
+        #[cfg(feature = "lang-wit")]
         register(&crate::wit::Wit);
-
+        #[cfg(feature = "lang-x86asm")]
         register(&crate::x86asm::X86Asm);
-
+        #[cfg(feature = "lang-yuri")]
         register(&crate::yuri::Yuri);
     });
 }
