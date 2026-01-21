@@ -24,14 +24,22 @@
 //! register(&MyAgentFormat);
 //! ```
 
+#[cfg(feature = "format-claude")]
 mod claude_code;
+#[cfg(feature = "format-codex")]
 mod codex;
+#[cfg(feature = "format-gemini")]
 mod gemini_cli;
+#[cfg(feature = "format-moss")]
 mod moss_agent;
 
+#[cfg(feature = "format-claude")]
 pub use claude_code::ClaudeCodeFormat;
+#[cfg(feature = "format-codex")]
 pub use codex::CodexFormat;
+#[cfg(feature = "format-gemini")]
 pub use gemini_cli::GeminiCliFormat;
+#[cfg(feature = "format-moss")]
 pub use moss_agent::MossAgentFormat;
 
 use crate::Session;
@@ -56,9 +64,13 @@ pub fn register(format: &'static dyn LogFormat) {
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
         let mut formats = FORMATS.write().unwrap();
+        #[cfg(feature = "format-claude")]
         formats.push(&ClaudeCodeFormat);
+        #[cfg(feature = "format-codex")]
         formats.push(&CodexFormat);
+        #[cfg(feature = "format-gemini")]
         formats.push(&GeminiCliFormat);
+        #[cfg(feature = "format-moss")]
         formats.push(&MossAgentFormat);
     });
 }
@@ -157,14 +169,16 @@ impl Default for FormatRegistry {
 impl FormatRegistry {
     /// Create a new registry with all built-in formats.
     pub fn new() -> Self {
-        Self {
-            formats: vec![
-                Box::new(ClaudeCodeFormat),
-                Box::new(CodexFormat),
-                Box::new(GeminiCliFormat),
-                Box::new(MossAgentFormat),
-            ],
-        }
+        let mut formats: Vec<Box<dyn LogFormat>> = Vec::new();
+        #[cfg(feature = "format-claude")]
+        formats.push(Box::new(ClaudeCodeFormat));
+        #[cfg(feature = "format-codex")]
+        formats.push(Box::new(CodexFormat));
+        #[cfg(feature = "format-gemini")]
+        formats.push(Box::new(GeminiCliFormat));
+        #[cfg(feature = "format-moss")]
+        formats.push(Box::new(MossAgentFormat));
+        Self { formats }
     }
 
     /// Create an empty registry (no built-in formats).

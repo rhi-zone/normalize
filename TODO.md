@@ -97,7 +97,7 @@ Add feature flags to crates so consumers can opt out of implementations they don
 Use consistent prefixes within each crate:
 - [x] moss-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) and groups `langs-*` (e.g., `langs-core`, `langs-functional`)
 - [x] moss-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-python`)
-- moss-sessions: `format-*` (e.g., `format-claude`, `format-cursor`, `format-aider`)
+- [x] moss-sessions: `format-*` (e.g., `format-claude`, `format-codex`, `format-gemini`, `format-moss`)
 - moss-tools: `tool-*` (e.g., `tool-jest`, `tool-pytest`)
 
 ### Workflow Engine
