@@ -78,6 +78,11 @@ Audit found fragmentation across commands. Fix for consistent UX:
 
 ## Backlog
 
+### moss-surface-syntax
+- Roundtrip tests: TS → IR → Lua → IR → TS (verify structure preservation)
+- Implement Lua reader (tree-sitter based)
+- Implement TypeScript writer
+
 ### Workflow Engine
 - [x] Streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)

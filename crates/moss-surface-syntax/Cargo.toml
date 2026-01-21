@@ -6,16 +6,12 @@ license.workspace = true
 description = "Surface-level syntax translation between languages via a common IR"
 
 [features]
-default = ["typescript", "lua"]
+default = ["read-typescript", "write-lua"]
 
-# Language support
-typescript = ["read-typescript", "write-typescript"]
-lua = ["read-lua", "write-lua"]
-
-# Individual readers/writers
+# Readers
 read-typescript = ["tree-sitter", "arborium-typescript"]
-read-lua = ["tree-sitter", "arborium-lua"]
-write-typescript = []
+
+# Writers
 write-lua = []
 
 # S-expression serialization format
@@ -27,7 +23,6 @@ serde_json = { workspace = true }
 thiserror = "2"
 tree-sitter = { version = "0.26", optional = true }
 arborium-typescript = { version = "2", optional = true }
-arborium-lua = { version = "2", optional = true }
 
 [dev-dependencies]
 insta = { version = "1", features = ["json"] }
