@@ -251,6 +251,8 @@ But also: human code is equally imperfect. Good reviewers catch each other's mis
 
 burn-models is known to not work correctly for many model types, not because of bad architecture, but because ML reimplementation is inherently hard (undocumented details, numeric precision, no ground truth to test against). A human team would likely have similar issues. Clean code ≠ correct code, and comprehensive tests only test what you thought to test - true for all code, not just AI-generated.
 
+**On "AI hallucination"**: The critique "AIs hallucinate" misses the point. Humans make mistakes too - typos, wrong assumptions, subtle bugs. The question isn't "does the generator make errors" but "do the feedback loops catch them." If the code compiles, passes tests, and does what you want when you run it - does it matter if there were hallucinations along the way that got caught? The real risk is errors that *don't* get caught (subtle incorrectness that passes tests), but that's the same risk as human bugs that pass review. "Vibe coding is doomed because AI hallucinates" is like "programming is doomed because humans make typos." It's only doomed if your feedback loops don't catch errors. Tight loops matter more than the error source.
+
 Claude Code is a force multiplier - what it multiplies depends on the developer's capabilities and how tight the feedback loop is.
 
 ### Confucius Code Agent (Meta + Harvard)
