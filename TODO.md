@@ -84,6 +84,14 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - Implement Lua reader (tree-sitter based)
 - Implement TypeScript writer
 
+### Feature flags for customizability
+Add feature flags to crates so consumers can opt out of implementations they don't need.
+Use consistent prefixes within each crate:
+- moss-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) or groups `langs-*` (e.g., `langs-web`, `langs-systems`)
+- moss-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-pip`)
+- moss-sessions: `format-*` (e.g., `format-claude`, `format-cursor`, `format-aider`)
+- moss-tools: `tool-*` (e.g., `tool-jest`, `tool-pytest`)
+
 ### Workflow Engine
 - [x] Streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
