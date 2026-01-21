@@ -15,15 +15,32 @@ Key architectural decisions and their rationale.
 
 ### Crate Structure
 
+**Decision**: Prefer single crates with modules over multiple crates. Split only when necessary.
+
+**When to split into a separate crate:**
+- **Different consumers**: The code is used by external crates independently (e.g., `moss-derive` for proc macros)
+- **Different domains**: The code represents a distinct, self-contained domain (e.g., `moss-languages` vs `moss-packages`)
+- **Compile time**: The code significantly impacts compile time when changed (isolate it)
+
+**When to keep in one crate:**
+- **Small implementations**: Each module is ~100-1000 lines (readers, writers, backends)
+- **Shared core**: All modules depend on shared types (e.g., an IR)
+- **Single consumer**: Only one crate uses this code
+- **Coherent domain**: The modules are conceptually part of one thing
+
+**Rule of thumb**: If you'd have 3+ crates each under 500 lines, keep them as modules in one crate. Crate overhead (Cargo.toml, lib.rs, versioning, publishing) isn't worth it for small code.
+
 ```
 crates/
-├── moss/              # Core library + CLI
-├── moss-languages/    # 98 language definitions
-├── moss-packages/     # Package ecosystem support
-├── moss-tools/        # MCP tool generation
-├── moss-derive/       # Proc macros
-├── moss-jsonschema/   # Schema generation
-└── moss-openapi/      # OpenAPI generation
+├── moss/                    # Core library + CLI
+├── moss-languages/          # 98 language definitions
+├── moss-packages/           # Package ecosystem support
+├── moss-tools/              # MCP tool generation
+├── moss-derive/             # Proc macros (must be separate)
+├── moss-jsonschema/         # Schema generation
+├── moss-openapi/            # OpenAPI generation
+├── moss-typegen/            # Type codegen (single crate, multiple backends)
+└── moss-surface-syntax/     # Syntax translation (single crate, multiple readers/writers)
 ```
 
 ## Dynamic Grammar Loading
@@ -182,24 +199,60 @@ Use this pattern when:
 
 ```toml
 [features]
-default = ["read-typescript", "write-lua"]
-read-typescript = ["tree-sitter", "arborium-typescript"]
-write-lua = []
+default = ["backend-typescript", "backend-rust"]
+backend-typescript = []
+backend-rust = []
 ```
 
-**Crates using feature flags:**
+**Crates using feature flags only:**
 
 | Crate | Features | Rationale |
 |-------|----------|-----------|
 | moss-typegen | Backend selection (ts, rust, python, etc.) | Backends known at compile time, no runtime extensibility needed |
-| moss-surface-syntax | Readers/writers (read-typescript, write-lua) | Tree-sitter grammars are heavy; consumers know which languages they need |
 | moss-rules | Optional linting backends | Heavy optional dependencies |
+
+### Hybrid: Traits + Feature Flags
+
+Some crates need both:
+- **Traits + registry**: For user extensibility (custom implementations)
+- **Feature flags**: For consumer customizability (include only what you need)
+
+Use this when users should be able to add custom implementations, AND consumers should be able to opt out of built-ins they don't need.
+
+```toml
+[features]
+default = ["read-typescript", "write-lua"]
+read-typescript = ["tree-sitter", "arborium-typescript"]  # Heavy dep
+write-lua = []
+```
+
+```rust
+// Trait for extensibility
+pub trait Reader: Send + Sync {
+    fn language(&self) -> &str;
+    fn read(&self, source: &str) -> Result<Program, ReadError>;
+}
+
+// Registry for custom implementations
+pub fn register_reader(reader: &'static dyn Reader) { ... }
+
+// Built-in readers behind feature flags (heavy deps)
+#[cfg(feature = "read-typescript")]
+pub use typescript::TypeScriptReader;
+```
+
+**Crates using hybrid approach:**
+
+| Crate | Pattern | Rationale |
+|-------|---------|-----------|
+| moss-surface-syntax | `Reader`/`Writer` traits + feature flags | Users can add languages; built-in readers need tree-sitter grammars |
 
 ### Key Insight
 
 The distinction is about **who decides what's available**:
 - **Runtime dispatch**: The running program decides (user can register custom implementations)
 - **Compile-time dispatch**: The build decides (developer picks features in Cargo.toml)
+- **Hybrid**: Build decides which built-ins to include; runtime allows additions
 
 Both patterns support single-crate design. Runtime dispatch doesn't require splitting crates (traits + registry in one crate). Compile-time dispatch doesn't require separate crates either (feature flags in one crate).
 

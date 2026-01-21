@@ -79,6 +79,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 ## Backlog
 
 ### moss-surface-syntax
+- Add `Reader` and `Writer` traits with registry (see architecture-decisions.md hybrid pattern)
 - Roundtrip tests: TS → IR → Lua → IR → TS (verify structure preservation)
 - Implement Lua reader (tree-sitter based)
 - Implement TypeScript writer
