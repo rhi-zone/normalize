@@ -1,0 +1,33 @@
+[package]
+name = "rhizome-moss-surface-syntax"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Surface-level syntax translation between languages via a common IR"
+
+[features]
+default = ["typescript", "lua"]
+
+# Language support
+typescript = ["read-typescript", "write-typescript"]
+lua = ["read-lua", "write-lua"]
+
+# Individual readers/writers
+read-typescript = ["tree-sitter", "arborium-typescript"]
+read-lua = ["tree-sitter", "arborium-lua"]
+write-typescript = []
+write-lua = []
+
+# S-expression serialization format
+sexpr = []
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = "2"
+tree-sitter = { version = "0.26", optional = true }
+arborium-typescript = { version = "2", optional = true }
+arborium-lua = { version = "2", optional = true }
+
+[dev-dependencies]
+insta = { version = "1", features = ["json"] }

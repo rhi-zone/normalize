@@ -3835,6 +3835,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rhizome-moss-surface-syntax"
+version = "0.1.0"
+dependencies = [
+ "arborium-lua",
+ "arborium-typescript",
+ "insta",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tree-sitter",
+]
+
+[[package]]
 name = "rhizome-moss-tools"
 version = "0.1.0"
 dependencies = [
