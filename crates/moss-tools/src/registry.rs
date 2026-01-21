@@ -40,47 +40,108 @@ pub fn register(tool: &'static dyn Tool) {
 
 /// Initialize built-in tools (called automatically on first use).
 fn init_builtin() {
-    use crate::adapters::*;
-
     INITIALIZED.get_or_init(|| {
         let mut tools = TOOLS.write().unwrap();
-        // Python tools
-        static RUFF: Ruff = Ruff;
-        static MYPY: Mypy = Mypy;
-        static PYRIGHT: Pyright = Pyright;
-        // JavaScript/TypeScript tools
-        static OXLINT: Oxlint = Oxlint;
-        static OXFMT: Oxfmt = Oxfmt;
-        static ESLINT: Eslint = Eslint;
-        static BIOME_LINT: BiomeLint = BiomeLint;
-        static BIOME_FORMAT: BiomeFormat = BiomeFormat;
-        static PRETTIER: Prettier = Prettier;
-        static TSGO: Tsgo = Tsgo;
-        static TSC: Tsc = Tsc;
-        static DENO: Deno = Deno;
-        // Rust tools
-        static CLIPPY: Clippy = Clippy;
-        static RUSTFMT: Rustfmt = Rustfmt;
-        // Go tools
-        static GOFMT: Gofmt = Gofmt;
-        static GOVET: Govet = Govet;
 
-        tools.push(&RUFF);
-        tools.push(&MYPY);
-        tools.push(&PYRIGHT);
-        tools.push(&OXLINT);
-        tools.push(&OXFMT);
-        tools.push(&ESLINT);
-        tools.push(&BIOME_LINT);
-        tools.push(&BIOME_FORMAT);
-        tools.push(&PRETTIER);
-        tools.push(&TSGO);
-        tools.push(&TSC);
-        tools.push(&DENO);
-        tools.push(&CLIPPY);
-        tools.push(&RUSTFMT);
-        tools.push(&GOFMT);
-        tools.push(&GOVET);
+        // Python tools
+        #[cfg(feature = "tool-ruff")]
+        {
+            use crate::adapters::Ruff;
+            static RUFF: Ruff = Ruff;
+            tools.push(&RUFF);
+        }
+        #[cfg(feature = "tool-mypy")]
+        {
+            use crate::adapters::Mypy;
+            static MYPY: Mypy = Mypy;
+            tools.push(&MYPY);
+        }
+        #[cfg(feature = "tool-pyright")]
+        {
+            use crate::adapters::Pyright;
+            static PYRIGHT: Pyright = Pyright;
+            tools.push(&PYRIGHT);
+        }
+
+        // JavaScript/TypeScript tools
+        #[cfg(feature = "tool-oxlint")]
+        {
+            use crate::adapters::Oxlint;
+            static OXLINT: Oxlint = Oxlint;
+            tools.push(&OXLINT);
+        }
+        #[cfg(feature = "tool-oxfmt")]
+        {
+            use crate::adapters::Oxfmt;
+            static OXFMT: Oxfmt = Oxfmt;
+            tools.push(&OXFMT);
+        }
+        #[cfg(feature = "tool-eslint")]
+        {
+            use crate::adapters::Eslint;
+            static ESLINT: Eslint = Eslint;
+            tools.push(&ESLINT);
+        }
+        #[cfg(feature = "tool-biome")]
+        {
+            use crate::adapters::{BiomeFormat, BiomeLint};
+            static BIOME_LINT: BiomeLint = BiomeLint;
+            static BIOME_FORMAT: BiomeFormat = BiomeFormat;
+            tools.push(&BIOME_LINT);
+            tools.push(&BIOME_FORMAT);
+        }
+        #[cfg(feature = "tool-prettier")]
+        {
+            use crate::adapters::Prettier;
+            static PRETTIER: Prettier = Prettier;
+            tools.push(&PRETTIER);
+        }
+        #[cfg(feature = "tool-tsgo")]
+        {
+            use crate::adapters::Tsgo;
+            static TSGO: Tsgo = Tsgo;
+            tools.push(&TSGO);
+        }
+        #[cfg(feature = "tool-tsc")]
+        {
+            use crate::adapters::Tsc;
+            static TSC: Tsc = Tsc;
+            tools.push(&TSC);
+        }
+        #[cfg(feature = "tool-deno")]
+        {
+            use crate::adapters::Deno;
+            static DENO: Deno = Deno;
+            tools.push(&DENO);
+        }
+
+        // Rust tools
+        #[cfg(feature = "tool-clippy")]
+        {
+            use crate::adapters::Clippy;
+            static CLIPPY: Clippy = Clippy;
+            tools.push(&CLIPPY);
+        }
+        #[cfg(feature = "tool-rustfmt")]
+        {
+            use crate::adapters::Rustfmt;
+            static RUSTFMT: Rustfmt = Rustfmt;
+            tools.push(&RUSTFMT);
+        }
+
+        // Go tools
+        #[cfg(feature = "tool-gofmt")]
+        {
+            use crate::adapters::Gofmt;
+            static GOFMT: Gofmt = Gofmt;
+            tools.push(&GOFMT);
+        }
+        #[cfg(feature = "tool-govet")]
+        {
+            use crate::adapters::Govet;
+            static GOVET: Govet = Govet;
+            tools.push(&GOVET);
+        }
     });
 }
 

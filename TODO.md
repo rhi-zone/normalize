@@ -98,7 +98,7 @@ Use consistent prefixes within each crate:
 - [x] moss-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) and groups `langs-*` (e.g., `langs-core`, `langs-functional`)
 - [x] moss-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-python`)
 - [x] moss-sessions: `format-*` (e.g., `format-claude`, `format-codex`, `format-gemini`, `format-moss`)
-- moss-tools: `tool-*` (e.g., `tool-jest`, `tool-pytest`)
+- [x] moss-tools: `tool-*` individual (e.g., `tool-ruff`, `tool-clippy`) + `tools-*` language groups (e.g., `tools-python`, `tools-rust`)
 
 ### Workflow Engine
 - [x] Streaming output for `auto{}` driver

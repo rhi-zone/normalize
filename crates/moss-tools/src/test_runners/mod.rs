@@ -23,16 +23,26 @@
 //! register(&MyTestRunner);
 //! ```
 
+#[cfg(feature = "tool-bun")]
 mod bun;
+#[cfg(feature = "tool-cargo")]
 mod cargo;
+#[cfg(feature = "tool-go")]
 mod go;
+#[cfg(feature = "tool-npm")]
 mod npm;
+#[cfg(feature = "tool-pytest")]
 mod pytest;
 
+#[cfg(feature = "tool-bun")]
 pub use bun::BunTest;
+#[cfg(feature = "tool-cargo")]
 pub use cargo::CargoTest;
+#[cfg(feature = "tool-go")]
 pub use go::GoTest;
+#[cfg(feature = "tool-npm")]
 pub use npm::NpmTest;
+#[cfg(feature = "tool-pytest")]
 pub use pytest::Pytest;
 
 use std::path::Path;
@@ -90,16 +100,31 @@ pub fn register(runner: &'static dyn TestRunner) {
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
         let mut runners = RUNNERS.write().unwrap();
-        static CARGO: CargoTest = CargoTest;
-        static GO: GoTest = GoTest;
-        static BUN: BunTest = BunTest;
-        static NPM: NpmTest = NpmTest;
-        static PYTEST: Pytest = Pytest;
-        runners.push(&CARGO);
-        runners.push(&GO);
-        runners.push(&BUN);
-        runners.push(&NPM);
-        runners.push(&PYTEST);
+        #[cfg(feature = "tool-cargo")]
+        {
+            static CARGO: CargoTest = CargoTest;
+            runners.push(&CARGO);
+        }
+        #[cfg(feature = "tool-go")]
+        {
+            static GO: GoTest = GoTest;
+            runners.push(&GO);
+        }
+        #[cfg(feature = "tool-bun")]
+        {
+            static BUN: BunTest = BunTest;
+            runners.push(&BUN);
+        }
+        #[cfg(feature = "tool-npm")]
+        {
+            static NPM: NpmTest = NpmTest;
+            runners.push(&NPM);
+        }
+        #[cfg(feature = "tool-pytest")]
+        {
+            static PYTEST: Pytest = Pytest;
+            runners.push(&PYTEST);
+        }
     });
 }
 
@@ -133,13 +158,18 @@ pub fn all_runners() -> Vec<&'static dyn TestRunner> {
 
 /// Get all available test runners (returns boxed runners for backwards compatibility).
 pub fn all_test_runners() -> Vec<Box<dyn TestRunner>> {
-    vec![
-        Box::new(CargoTest::new()),
-        Box::new(GoTest::new()),
-        Box::new(BunTest::new()),
-        Box::new(NpmTest::new()),
-        Box::new(Pytest::new()),
-    ]
+    let mut runners: Vec<Box<dyn TestRunner>> = Vec::new();
+    #[cfg(feature = "tool-cargo")]
+    runners.push(Box::new(CargoTest::new()));
+    #[cfg(feature = "tool-go")]
+    runners.push(Box::new(GoTest::new()));
+    #[cfg(feature = "tool-bun")]
+    runners.push(Box::new(BunTest::new()));
+    #[cfg(feature = "tool-npm")]
+    runners.push(Box::new(NpmTest::new()));
+    #[cfg(feature = "tool-pytest")]
+    runners.push(Box::new(Pytest::new()));
+    runners
 }
 
 /// Find the best test runner for a project using the global registry.
