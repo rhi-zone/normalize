@@ -121,11 +121,16 @@ For future local LLM/embedding integration:
 3. **Small NN**: Embeddings, abstractive summary
 4. **LLM**: Only when simpler methods insufficient
 
-## Trait-Based Extensibility
+## Extensibility Patterns: Runtime vs Compile-Time
 
-**Decision**: All trait-based crates use a global registry with runtime registration.
+**Decision**: Use runtime dispatch (traits + registry) when users need extensibility. Use compile-time dispatch (feature flags) when the set is fixed and dependencies are heavy.
 
-### Pattern
+### When to Use Runtime Dispatch (Traits + Registry)
+
+Use this pattern when:
+- Users might register custom implementations at runtime
+- The feature set is open-ended (new languages, tools, package managers)
+- Implementations are lightweight (~200 lines, no heavy deps)
 
 ```rust
 use std::sync::{OnceLock, RwLock};
@@ -155,14 +160,7 @@ pub fn get(name: &str) -> Option<&'static dyn MyTrait> {
 }
 ```
 
-### Why This Pattern?
-
-1. **Pure Rust extensibility**: Users implement traits in their code, no Lua/plugins needed
-2. **Library-friendly**: Crates stay pure Rust, no embedded interpreters
-3. **Lazy init**: Built-ins registered on first use, not at startup
-4. **Thread-safe**: `RwLock` + `OnceLock` for concurrent access
-
-### Crates Using This Pattern
+**Crates using runtime dispatch:**
 
 | Crate | Trait | Purpose |
 |-------|-------|---------|
@@ -174,15 +172,36 @@ pub fn get(name: &str) -> Option<&'static dyn MyTrait> {
 | moss-jsonschema | `JsonSchemaGenerator` | Type generation |
 | moss-openapi | `OpenApiClientGenerator` | API client generation |
 
-### Why No Feature Gates?
+### When to Use Compile-Time Dispatch (Feature Flags)
 
-Unlike tree-sitter grammars (megabytes each), trait implementations are ~200 lines each. Feature gates add:
-- Cargo.toml complexity
-- CI matrix explosion
-- Documentation burden
-- User confusion
+Use this pattern when:
+- The set of implementations is fixed (known at compile time)
+- Dependencies are heavy (tree-sitter grammars, large codegen templates)
+- No use case for runtime registration
+- Consumer knows what they need when compiling
 
-Not worth it for small implementations. All built-ins are always compiled.
+```toml
+[features]
+default = ["read-typescript", "write-lua"]
+read-typescript = ["tree-sitter", "arborium-typescript"]
+write-lua = []
+```
+
+**Crates using feature flags:**
+
+| Crate | Features | Rationale |
+|-------|----------|-----------|
+| moss-typegen | Backend selection (ts, rust, python, etc.) | Backends known at compile time, no runtime extensibility needed |
+| moss-surface-syntax | Readers/writers (read-typescript, write-lua) | Tree-sitter grammars are heavy; consumers know which languages they need |
+| moss-rules | Optional linting backends | Heavy optional dependencies |
+
+### Key Insight
+
+The distinction is about **who decides what's available**:
+- **Runtime dispatch**: The running program decides (user can register custom implementations)
+- **Compile-time dispatch**: The build decides (developer picks features in Cargo.toml)
+
+Both patterns support single-crate design. Runtime dispatch doesn't require splitting crates (traits + registry in one crate). Compile-time dispatch doesn't require separate crates either (feature flags in one crate).
 
 ## Allowlist Conventions
 
