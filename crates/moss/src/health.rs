@@ -44,7 +44,10 @@ impl HealthReport {
 
         lines.push("## Files".to_string());
         lines.push(format!("  Total: {}", self.total_files));
-        for (lang, count) in &self.files_by_language {
+        // Sort by count descending
+        let mut by_language: Vec<_> = self.files_by_language.iter().collect();
+        by_language.sort_by(|a, b| b.1.cmp(a.1));
+        for (lang, count) in by_language {
             if *count > 0 {
                 lines.push(format!("  {}: {}", lang, count));
             }
