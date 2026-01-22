@@ -565,13 +565,21 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 ### Code Quality / Consistency
 
 **OutputFormatter migration** - Ensure all user-facing output uses the trait:
-- [x] SessionAnalysis (sessions analysis.rs)
-- [ ] Audit other commands for manual format handling
-  - Likely candidates: analyze commands, package commands, view commands
-  - Check for manual `if json { } else if pretty { } else { }` patterns
-  - Migrate to `impl OutputFormatter` + `.print(&format)`
-- [ ] Add helper macros if repetitive boilerplate emerges
-- Benefits: consistent --compact/--pretty/--json/--jq, respects NO_COLOR, TTY detection
+- [x] SessionAnalysis (sessions/analysis.rs)
+- [x] DocCoverageReport (commands/analyze/docs.rs) - removed manual to_json()
+- [x] FileLengthReport (commands/analyze/files.rs) - removed manual to_json()
+- [x] SecurityReport (commands/analyze/report.rs) - auto Serialize
+- [x] AnalyzeReport (commands/analyze/report.rs) - removed 133 lines of to_json()
+- [x] ComplexityReport (analyze/complexity.rs) - removed 80+ lines of print functions
+- [x] LengthReport (analyze/function_length.rs) - removed 80+ lines of print functions
+- [ ] Remaining commands with manual format handling (~18 commands):
+  - Hotspots, check_refs, duplicates, stale_docs, check_examples
+  - View commands (symbol, tree, file, history, lines)
+  - Sessions commands (stats, plans, list)
+  - Daemon commands (11+ manual branches)
+  - Edit commands (15+ manual branches)
+  - Index, rules, history commands
+- Benefits: ~475 lines of boilerplate removed so far, automatic --compact/--pretty/--json/--jq support
 
 ### Session Analysis
 
