@@ -19,6 +19,14 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/sessions/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
       - name: Install sessions SPA deps
         run: bun install
         working-directory: web/sessions
@@ -59,6 +67,14 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/sessions/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
       - name: Install sessions SPA deps
         run: bun install
         working-directory: web/sessions
@@ -70,7 +86,6 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --workspace --all-features -- -D warnings
-        continue-on-error: true  # Don't fail CI on clippy warnings initially
 
   test:
     name: Test & Clone Detection
@@ -83,6 +98,14 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/sessions/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
 
       - name: Install sessions SPA deps
         run: bun install
@@ -148,6 +171,14 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/sessions/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
 
       - name: Install sessions SPA deps
         run: bun install
@@ -219,3 +250,32 @@ jobs:
           else:
               print("All benchmarks within thresholds")
           EOF
+
+  public-api:
+    name: Public API
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates -> target"
+
+      - name: Install cargo-public-api
+        run: cargo install cargo-public-api
+
+      - name: Check public API diff
+        run: |
+          # Compare public API between PR branch and base
+          cargo public-api diff ${{ github.event.pull_request.base.sha }}..${{ github.sha }} \
+            --deny changed --deny removed \
+            -p rhizome-moss
