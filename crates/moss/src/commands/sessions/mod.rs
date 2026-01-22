@@ -158,6 +158,14 @@ pub enum SessionsCommand {
         /// Show only error tool results (implies --filter tool_result)
         #[arg(long)]
         errors_only: bool,
+
+        /// Extract common word sequences (ngrams) of length N (2-4)
+        #[arg(long)]
+        ngrams: Option<usize>,
+
+        /// Case-insensitive ngram matching
+        #[arg(long)]
+        case_insensitive: bool,
     },
 
     /// Show aggregate statistics across sessions
@@ -236,6 +244,8 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             filter,
             grep,
             errors_only,
+            ngrams,
+            case_insensitive,
         }) => cmd_sessions_show(
             &session,
             args.root.as_deref(),
@@ -247,6 +257,8 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             filter.as_deref(),
             grep.as_deref(),
             errors_only,
+            ngrams,
+            case_insensitive,
         ),
 
         Some(SessionsCommand::Stats {
@@ -256,6 +268,7 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             until,
             project,
             all_projects,
+            by_repo: _,
         }) => cmd_sessions_stats(
             args.root.as_deref(),
             args.limit,

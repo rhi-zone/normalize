@@ -8,6 +8,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
 /// Show/analyze a specific session or sessions matching a pattern.
+#[allow(clippy::too_many_arguments)]
 pub fn cmd_sessions_show(
     session_id: &str,
     project: Option<&Path>,
@@ -19,6 +20,8 @@ pub fn cmd_sessions_show(
     filter: Option<&str>,
     grep_pattern: Option<&str>,
     errors_only: bool,
+    ngrams: Option<usize>,
+    case_insensitive: bool,
 ) -> i32 {
     // Find matching session files
     let paths = resolve_session_paths(session_id, project, format);
@@ -50,8 +53,8 @@ pub fn cmd_sessions_show(
         return exit_code;
     }
 
-    // If --filter or --grep with message filtering
-    if filter.is_some() || grep_pattern.is_some() || errors_only {
+    // If --filter or --grep or --ngrams with message analysis
+    if filter.is_some() || grep_pattern.is_some() || errors_only || ngrams.is_some() {
         use rhizome_moss_sessions::{FormatRegistry, LogFormat};
 
         let registry = FormatRegistry::new();
@@ -74,6 +77,10 @@ pub fn cmd_sessions_show(
                 return 1;
             }
         };
+
+        if let Some(n) = ngrams {
+            return cmd_sessions_ngrams(&session, n, case_insensitive);
+        }
 
         return cmd_sessions_filter(&session, filter, grep_pattern, errors_only);
     }
@@ -229,4 +236,77 @@ fn format_role_and_type(role: &Role, block: &ContentBlock) -> String {
     };
 
     format!("{}/{}", role_str, type_str)
+}
+
+/// Extract and display common n-grams (word sequences) from session messages.
+fn cmd_sessions_ngrams(session: &Session, n: usize, case_insensitive: bool) -> i32 {
+    // Validate n is in reasonable range
+    if n < 2 || n > 4 {
+        eprintln!("N-gram length must be 2-4");
+        return 1;
+    }
+
+    use std::collections::HashMap;
+
+    let mut ngram_counts: HashMap<Vec<String>, usize> = HashMap::new();
+
+    // Extract text from all assistant messages
+    for turn in &session.turns {
+        for msg in &turn.messages {
+            if msg.role != Role::Assistant {
+                continue;
+            }
+
+            for block in &msg.content {
+                let text = match block {
+                    ContentBlock::Text { text } => text.as_str(),
+                    ContentBlock::Thinking { text } => text.as_str(),
+                    _ => continue,
+                };
+
+                // Tokenize: split on whitespace and punctuation, filter empty
+                let words: Vec<String> = text
+                    .split(|c: char| c.is_whitespace() || c.is_ascii_punctuation())
+                    .filter(|w| !w.is_empty())
+                    .map(|w| {
+                        if case_insensitive {
+                            w.to_lowercase()
+                        } else {
+                            w.to_string()
+                        }
+                    })
+                    .collect();
+
+                // Generate n-grams
+                for window in words.windows(n) {
+                    let ngram = window.to_vec();
+                    *ngram_counts.entry(ngram).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    // Filter out single occurrences and sort by frequency
+    let mut ngrams: Vec<_> = ngram_counts
+        .into_iter()
+        .filter(|(_, count)| *count > 1)
+        .collect();
+    ngrams.sort_by(|a, b| b.1.cmp(&a.1));
+
+    if ngrams.is_empty() {
+        eprintln!("No repeated {}-grams found", n);
+        return 1;
+    }
+
+    // Display top 30
+    println!("=== Top {}-grams ===\n", n);
+    for (ngram, count) in ngrams.iter().take(30) {
+        println!("{}× {}", count, ngram.join(" "));
+    }
+
+    if ngrams.len() > 30 {
+        println!("\n({} more unique {}-grams)", ngrams.len() - 30, n);
+    }
+
+    0
 }
