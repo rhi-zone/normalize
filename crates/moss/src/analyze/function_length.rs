@@ -1,6 +1,7 @@
 //! Function length analysis.
 //!
 //! Identifies long functions that may be candidates for refactoring.
+use crate::output::OutputFormatter;
 use crate::parsers;
 use rhizome_moss_languages::{Language, support_for_path};
 use serde::Serialize;
@@ -101,6 +102,198 @@ impl LengthReport {
             .count()
     }
 }
+
+impl OutputFormatter for LengthReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("# Function Length Analysis".to_string());
+        lines.push(String::new());
+
+        if let Some(ref stats) = self.full_stats {
+            let shown = self.functions.len();
+            if stats.total_count > shown {
+                lines.push(format!(
+                    "Functions: {} (showing {})",
+                    stats.total_count, shown
+                ));
+            } else {
+                lines.push(format!("Functions: {}", stats.total_count));
+            }
+            lines.push(format!("Average: {:.1} lines", stats.total_avg));
+            lines.push(format!("Maximum: {} lines", stats.total_max));
+
+            if stats.critical_count > 0 {
+                lines.push(format!("Too Long (>100): {}", stats.critical_count));
+            }
+            if stats.high_count > 0 || stats.critical_count == 0 {
+                lines.push(format!("Long (51-100): {}", stats.high_count));
+            }
+        } else {
+            lines.push(format!("Functions: {}", self.functions.len()));
+            lines.push(format!("Average: {:.1} lines", self.avg_length()));
+            lines.push(format!("Maximum: {} lines", self.max_length()));
+
+            let too_long = self.too_long_count();
+            let long = self.long_count();
+            if too_long > 0 {
+                lines.push(format!("Too Long (>100): {}", too_long));
+            }
+            if long > 0 || too_long == 0 {
+                lines.push(format!("Long (51-100): {}", long));
+            }
+        }
+
+        if !self.functions.is_empty() {
+            lines.push(String::new());
+            lines.push("## Longest Functions".to_string());
+
+            let mut current_cat: Option<LengthCategory> = None;
+            for func in &self.functions {
+                let cat = func.category();
+                if Some(cat) != current_cat {
+                    lines.push(format!("### {}", cat.as_title()));
+                    current_cat = Some(cat);
+                }
+                let display_name = if let Some(ref fp) = func.file_path {
+                    format!("{}:{}", fp, func.short_name())
+                } else {
+                    func.short_name()
+                };
+                lines.push(format!("{} {}", func.lines, display_name));
+            }
+        }
+
+        lines.join("\n")
+    }
+
+    fn format_pretty(&self) -> String {
+        use nu_ansi_term::{Color, Style};
+
+        let mut lines = Vec::new();
+        lines.push(
+            Style::new()
+                .bold()
+                .paint("Function Length Analysis")
+                .to_string(),
+        );
+        lines.push(String::new());
+
+        if let Some(ref stats) = self.full_stats {
+            let shown = self.functions.len();
+            if stats.total_count > shown {
+                lines.push(format!(
+                    "{}: {} (showing {})",
+                    Style::new().bold().paint("Functions"),
+                    stats.total_count,
+                    shown
+                ));
+            } else {
+                lines.push(format!(
+                    "{}: {}",
+                    Style::new().bold().paint("Functions"),
+                    stats.total_count
+                ));
+            }
+            lines.push(format!(
+                "{}: {:.1} lines",
+                Style::new().bold().paint("Average"),
+                stats.total_avg
+            ));
+            lines.push(format!(
+                "{}: {} lines",
+                Style::new().bold().paint("Maximum"),
+                stats.total_max
+            ));
+
+            if stats.critical_count > 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Red.bold().paint("Too Long (>100)"),
+                    stats.critical_count
+                ));
+            }
+            if stats.high_count > 0 || stats.critical_count == 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Yellow.bold().paint("Long (51-100)"),
+                    stats.high_count
+                ));
+            }
+        } else {
+            lines.push(format!(
+                "{}: {}",
+                Style::new().bold().paint("Functions"),
+                self.functions.len()
+            ));
+            lines.push(format!(
+                "{}: {:.1} lines",
+                Style::new().bold().paint("Average"),
+                self.avg_length()
+            ));
+            lines.push(format!(
+                "{}: {} lines",
+                Style::new().bold().paint("Maximum"),
+                self.max_length()
+            ));
+
+            let too_long = self.too_long_count();
+            let long = self.long_count();
+            if too_long > 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Red.bold().paint("Too Long (>100)"),
+                    too_long
+                ));
+            }
+            if long > 0 || too_long == 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Yellow.bold().paint("Long (51-100)"),
+                    long
+                ));
+            }
+        }
+
+        if !self.functions.is_empty() {
+            lines.push(String::new());
+            lines.push(Style::new().bold().paint("Longest Functions").to_string());
+
+            let mut current_cat: Option<LengthCategory> = None;
+            for func in &self.functions {
+                let cat = func.category();
+                if Some(cat) != current_cat {
+                    let cat_color = match cat {
+                        LengthCategory::TooLong => Color::Red,
+                        LengthCategory::Long => Color::Yellow,
+                        LengthCategory::Medium => Color::Blue,
+                        LengthCategory::Short => Color::Green,
+                    };
+                    lines.push(cat_color.bold().paint(cat.as_title()).to_string());
+                    current_cat = Some(cat);
+                }
+                let display_name = if let Some(ref fp) = func.file_path {
+                    format!("{}:{}", fp, func.short_name())
+                } else {
+                    func.short_name()
+                };
+                let lines_str = match func.category() {
+                    LengthCategory::TooLong => {
+                        Color::Red.bold().paint(func.lines.to_string()).to_string()
+                    }
+                    LengthCategory::Long => Color::Yellow
+                        .bold()
+                        .paint(func.lines.to_string())
+                        .to_string(),
+                    _ => func.lines.to_string(),
+                };
+                lines.push(format!("{} {}", lines_str, display_name));
+            }
+        }
+
+        lines.join("\n")
+    }
+}
+
 pub struct LengthAnalyzer {}
 impl LengthAnalyzer {
     pub fn new() -> Self {

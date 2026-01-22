@@ -19,8 +19,6 @@ pub mod security;
 pub mod stale_docs;
 pub mod trace;
 
-use crate::analyze::complexity::{ComplexityReport, RiskLevel};
-use crate::analyze::function_length::LengthReport;
 use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
@@ -345,13 +343,14 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 // Note: kind filter not applicable to complexity (no kind field)
                 let _ = kind;
 
-                if json {
-                    println!("{}", serde_json::to_string(&report).unwrap_or_default());
-                } else if pretty {
-                    print_complexity_report_pretty(&report);
-                } else {
-                    print_complexity_report(&report);
-                }
+                let format = crate::output::OutputFormat::from_cli(
+                    json,
+                    None,
+                    pretty,
+                    false,
+                    &config.pretty,
+                );
+                report.print(&format);
                 0
             }
         }
@@ -399,13 +398,14 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                     &allowlist,
                 );
 
-                if json {
-                    println!("{}", serde_json::to_string(&report).unwrap_or_default());
-                } else if pretty {
-                    print_length_report_pretty(&report);
-                } else {
-                    print_length_report(&report);
-                }
+                let format = crate::output::OutputFormat::from_cli(
+                    json,
+                    None,
+                    pretty,
+                    false,
+                    &config.pretty,
+                );
+                report.print(&format);
                 0
             }
         }
@@ -950,289 +950,4 @@ fn run_all_passes(
 /// Check if a path is a source file we can analyze.
 pub(crate) fn is_source_file(path: &Path) -> bool {
     rhizome_moss_languages::support_for_path(path).is_some()
-}
-
-/// Print complexity report in plain format
-fn print_complexity_report(report: &ComplexityReport) {
-    println!("# Complexity Analysis");
-    println!();
-
-    // Use full_stats if available (computed before truncation), otherwise use report methods
-    if let Some(ref stats) = report.full_stats {
-        let shown = report.functions.len();
-        if stats.total_count > shown {
-            println!("Functions: {} (showing {})", stats.total_count, shown);
-        } else {
-            println!("Functions: {}", stats.total_count);
-        }
-        println!("Average: {:.1}", stats.total_avg);
-        println!("Maximum: {}", stats.total_max);
-
-        if stats.critical_count > 0 {
-            println!("Critical (>20): {}", stats.critical_count);
-        }
-        if stats.high_count > 0 || stats.critical_count == 0 {
-            println!("High risk (11-20): {}", stats.high_count);
-        }
-    } else {
-        println!("Functions: {}", report.functions.len());
-        println!("Average: {:.1}", report.avg_complexity());
-        println!("Maximum: {}", report.max_complexity());
-
-        let crit = report.critical_risk_count();
-        let high = report.high_risk_count();
-        if crit > 0 {
-            println!("Critical (>20): {}", crit);
-        }
-        if high > 0 || crit == 0 {
-            println!("High risk (11-20): {}", high);
-        }
-    }
-
-    if !report.functions.is_empty() {
-        println!();
-        println!("## Complex Functions");
-
-        let mut current_risk: Option<RiskLevel> = None;
-        for func in &report.functions {
-            let risk = func.risk_level();
-            if Some(risk) != current_risk {
-                println!("### {}", risk.as_title());
-                current_risk = Some(risk);
-            }
-            let display_name = if let Some(ref fp) = func.file_path {
-                format!("{}:{}", fp, func.short_name())
-            } else {
-                func.short_name()
-            };
-            println!("{} {}", func.complexity, display_name);
-        }
-    }
-}
-
-/// Print complexity report in pretty format with colors
-fn print_complexity_report_pretty(report: &ComplexityReport) {
-    use nu_ansi_term::{Color, Style};
-
-    println!("{}", Style::new().bold().paint("Complexity Analysis"));
-    println!();
-
-    // Use full_stats if available (computed before truncation), otherwise use report methods
-    if let Some(ref stats) = report.full_stats {
-        let shown = report.functions.len();
-        if stats.total_count > shown {
-            println!("Functions: {} (showing {})", stats.total_count, shown);
-        } else {
-            println!("Functions: {}", stats.total_count);
-        }
-        println!("Average: {:.1}", stats.total_avg);
-        println!("Maximum: {}", stats.total_max);
-
-        if stats.critical_count > 0 {
-            println!(
-                "{}: {}",
-                Color::Red.paint("Critical (>20)"),
-                stats.critical_count
-            );
-        }
-        if stats.high_count > 0 || stats.critical_count == 0 {
-            println!(
-                "{}: {}",
-                Color::Yellow.paint("High risk (11-20)"),
-                stats.high_count
-            );
-        }
-    } else {
-        println!("Functions: {}", report.functions.len());
-        println!("Average: {:.1}", report.avg_complexity());
-        println!("Maximum: {}", report.max_complexity());
-
-        let crit = report.critical_risk_count();
-        let high = report.high_risk_count();
-        if crit > 0 {
-            println!("{}: {}", Color::Red.paint("Critical (>20)"), crit);
-        }
-        if high > 0 || crit == 0 {
-            println!("{}: {}", Color::Yellow.paint("High risk (11-20)"), high);
-        }
-    }
-
-    if !report.functions.is_empty() {
-        println!();
-        println!("{}", Style::new().bold().paint("Complex Functions"));
-
-        let mut current_risk: Option<RiskLevel> = None;
-        for func in &report.functions {
-            let risk = func.risk_level();
-            if Some(risk) != current_risk {
-                let title = risk.as_title();
-                let colored_title = match risk {
-                    RiskLevel::Critical => Color::Red.paint(title),
-                    RiskLevel::High => Color::Yellow.paint(title),
-                    RiskLevel::Moderate => Color::Cyan.paint(title),
-                    RiskLevel::Low => Color::Green.paint(title),
-                };
-                println!();
-                println!("{}", colored_title);
-                current_risk = Some(risk);
-            }
-            let display_name = if let Some(ref fp) = func.file_path {
-                format!("{}:{}", fp, func.short_name())
-            } else {
-                func.short_name()
-            };
-            let complexity_str = format!("{:3}", func.complexity);
-            let colored_complexity = match risk {
-                RiskLevel::Critical => Color::Red.paint(&complexity_str),
-                RiskLevel::High => Color::Yellow.paint(&complexity_str),
-                RiskLevel::Moderate => Color::Cyan.paint(&complexity_str),
-                RiskLevel::Low => Color::Green.paint(&complexity_str),
-            };
-            println!("  {} {}", colored_complexity, display_name);
-        }
-    }
-}
-
-/// Print length report in plain format
-fn print_length_report(report: &LengthReport) {
-    use crate::analyze::function_length::LengthCategory;
-
-    println!("# Function Length Analysis");
-    println!();
-
-    // Use full_stats if available (computed before truncation), otherwise use report methods
-    if let Some(ref stats) = report.full_stats {
-        let shown = report.functions.len();
-        if stats.total_count > shown {
-            println!("Functions: {} (showing {})", stats.total_count, shown);
-        } else {
-            println!("Functions: {}", stats.total_count);
-        }
-        println!("Average: {:.1} lines", stats.total_avg);
-        println!("Maximum: {} lines", stats.total_max);
-
-        if stats.critical_count > 0 {
-            println!("Too Long (>100): {}", stats.critical_count);
-        }
-        if stats.high_count > 0 || stats.critical_count == 0 {
-            println!("Long (51-100): {}", stats.high_count);
-        }
-    } else {
-        println!("Functions: {}", report.functions.len());
-        println!("Average: {:.1} lines", report.avg_length());
-        println!("Maximum: {} lines", report.max_length());
-
-        let too_long = report.too_long_count();
-        let long = report.long_count();
-        if too_long > 0 {
-            println!("Too Long (>100): {}", too_long);
-        }
-        if long > 0 || too_long == 0 {
-            println!("Long (51-100): {}", long);
-        }
-    }
-
-    if !report.functions.is_empty() {
-        println!();
-        println!("## Longest Functions");
-
-        let mut current_cat: Option<LengthCategory> = None;
-        for func in &report.functions {
-            let cat = func.category();
-            if Some(cat) != current_cat {
-                println!("### {}", cat.as_title());
-                current_cat = Some(cat);
-            }
-            let display_name = if let Some(ref fp) = func.file_path {
-                format!("{}:{}", fp, func.short_name())
-            } else {
-                func.short_name()
-            };
-            println!("{} lines  {}", func.lines, display_name);
-        }
-    }
-}
-
-/// Print length report in pretty format with colors
-fn print_length_report_pretty(report: &LengthReport) {
-    use crate::analyze::function_length::LengthCategory;
-    use nu_ansi_term::{Color, Style};
-
-    println!("{}", Style::new().bold().paint("Function Length Analysis"));
-    println!();
-
-    // Use full_stats if available (computed before truncation), otherwise use report methods
-    if let Some(ref stats) = report.full_stats {
-        let shown = report.functions.len();
-        if stats.total_count > shown {
-            println!("Functions: {} (showing {})", stats.total_count, shown);
-        } else {
-            println!("Functions: {}", stats.total_count);
-        }
-        println!("Average: {:.1} lines", stats.total_avg);
-        println!("Maximum: {} lines", stats.total_max);
-
-        if stats.critical_count > 0 {
-            println!(
-                "{}: {}",
-                Color::Red.paint("Too Long (>100)"),
-                stats.critical_count
-            );
-        }
-        if stats.high_count > 0 || stats.critical_count == 0 {
-            println!(
-                "{}: {}",
-                Color::Yellow.paint("Long (51-100)"),
-                stats.high_count
-            );
-        }
-    } else {
-        println!("Functions: {}", report.functions.len());
-        println!("Average: {:.1} lines", report.avg_length());
-        println!("Maximum: {} lines", report.max_length());
-
-        let too_long = report.too_long_count();
-        let long = report.long_count();
-        if too_long > 0 {
-            println!("{}: {}", Color::Red.paint("Too Long (>100)"), too_long);
-        }
-        if long > 0 || too_long == 0 {
-            println!("{}: {}", Color::Yellow.paint("Long (51-100)"), long);
-        }
-    }
-
-    if !report.functions.is_empty() {
-        println!();
-        println!("{}", Style::new().bold().paint("Longest Functions"));
-
-        let mut current_cat: Option<LengthCategory> = None;
-        for func in &report.functions {
-            let cat = func.category();
-            if Some(cat) != current_cat {
-                let title = cat.as_title();
-                let colored_title = match cat {
-                    LengthCategory::TooLong => Color::Red.paint(title),
-                    LengthCategory::Long => Color::Yellow.paint(title),
-                    LengthCategory::Medium => Color::Cyan.paint(title),
-                    LengthCategory::Short => Color::Green.paint(title),
-                };
-                println!();
-                println!("{}", colored_title);
-                current_cat = Some(cat);
-            }
-            let display_name = if let Some(ref fp) = func.file_path {
-                format!("{}:{}", fp, func.short_name())
-            } else {
-                func.short_name()
-            };
-            let lines_str = format!("{:4} lines", func.lines);
-            let colored_lines = match cat {
-                LengthCategory::TooLong => Color::Red.paint(&lines_str),
-                LengthCategory::Long => Color::Yellow.paint(&lines_str),
-                LengthCategory::Medium => Color::Cyan.paint(&lines_str),
-                LengthCategory::Short => Color::Green.paint(&lines_str),
-            };
-            println!("  {} {}", colored_lines, display_name);
-        }
-    }
 }

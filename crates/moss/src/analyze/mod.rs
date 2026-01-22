@@ -5,6 +5,10 @@ pub mod function_length;
 
 use serde::Serialize;
 
+// Re-exports for convenience
+pub use complexity::FunctionComplexity;
+pub use function_length::FunctionLength;
+
 /// Generic report for file-level analysis (shared by complexity and length).
 #[derive(Debug, Serialize)]
 pub struct FileReport<T: Serialize> {

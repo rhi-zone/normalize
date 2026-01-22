@@ -3,6 +3,7 @@
 //! Calculates McCabe cyclomatic complexity for functions.
 //! Complexity = number of decision points + 1
 
+use crate::output::OutputFormatter;
 use crate::parsers;
 use rhizome_moss_languages::{Language, support_for_path};
 use serde::Serialize;
@@ -147,6 +148,193 @@ impl ComplexityReport {
         }
         let ratio = high_risk as f64 / total as f64;
         (100.0 * (1.0 - ratio)).max(0.0)
+    }
+}
+
+impl OutputFormatter for ComplexityReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("# Complexity Analysis".to_string());
+        lines.push(String::new());
+
+        if let Some(ref stats) = self.full_stats {
+            let shown = self.functions.len();
+            if stats.total_count > shown {
+                lines.push(format!(
+                    "Functions: {} (showing {})",
+                    stats.total_count, shown
+                ));
+            } else {
+                lines.push(format!("Functions: {}", stats.total_count));
+            }
+            lines.push(format!("Average: {:.1}", stats.total_avg));
+            lines.push(format!("Maximum: {}", stats.total_max));
+
+            if stats.critical_count > 0 {
+                lines.push(format!("Critical (>20): {}", stats.critical_count));
+            }
+            if stats.high_count > 0 || stats.critical_count == 0 {
+                lines.push(format!("High risk (11-20): {}", stats.high_count));
+            }
+        } else {
+            lines.push(format!("Functions: {}", self.functions.len()));
+            lines.push(format!("Average: {:.1}", self.avg_complexity()));
+            lines.push(format!("Maximum: {}", self.max_complexity()));
+
+            let crit = self.critical_risk_count();
+            let high = self.high_risk_count();
+            if crit > 0 {
+                lines.push(format!("Critical (>20): {}", crit));
+            }
+            if high > 0 || crit == 0 {
+                lines.push(format!("High risk (11-20): {}", high));
+            }
+        }
+
+        if !self.functions.is_empty() {
+            lines.push(String::new());
+            lines.push("## Complex Functions".to_string());
+
+            let mut current_risk: Option<RiskLevel> = None;
+            for func in &self.functions {
+                let risk = func.risk_level();
+                if Some(risk) != current_risk {
+                    lines.push(format!("### {}", risk.as_title()));
+                    current_risk = Some(risk);
+                }
+                let display_name = if let Some(ref fp) = func.file_path {
+                    format!("{}:{}", fp, func.short_name())
+                } else {
+                    func.short_name()
+                };
+                lines.push(format!("{} {}", func.complexity, display_name));
+            }
+        }
+
+        lines.join("\n")
+    }
+
+    fn format_pretty(&self) -> String {
+        use nu_ansi_term::{Color, Style};
+
+        let mut lines = Vec::new();
+        lines.push(Style::new().bold().paint("Complexity Analysis").to_string());
+        lines.push(String::new());
+
+        if let Some(ref stats) = self.full_stats {
+            let shown = self.functions.len();
+            if stats.total_count > shown {
+                lines.push(format!(
+                    "{}: {} (showing {})",
+                    Style::new().bold().paint("Functions"),
+                    stats.total_count,
+                    shown
+                ));
+            } else {
+                lines.push(format!(
+                    "{}: {}",
+                    Style::new().bold().paint("Functions"),
+                    stats.total_count
+                ));
+            }
+            lines.push(format!(
+                "{}: {:.1}",
+                Style::new().bold().paint("Average"),
+                stats.total_avg
+            ));
+            lines.push(format!(
+                "{}: {}",
+                Style::new().bold().paint("Maximum"),
+                stats.total_max
+            ));
+
+            if stats.critical_count > 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Red.bold().paint("Critical (>20)"),
+                    stats.critical_count
+                ));
+            }
+            if stats.high_count > 0 || stats.critical_count == 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Yellow.bold().paint("High risk (11-20)"),
+                    stats.high_count
+                ));
+            }
+        } else {
+            lines.push(format!(
+                "{}: {}",
+                Style::new().bold().paint("Functions"),
+                self.functions.len()
+            ));
+            lines.push(format!(
+                "{}: {:.1}",
+                Style::new().bold().paint("Average"),
+                self.avg_complexity()
+            ));
+            lines.push(format!(
+                "{}: {}",
+                Style::new().bold().paint("Maximum"),
+                self.max_complexity()
+            ));
+
+            let crit = self.critical_risk_count();
+            let high = self.high_risk_count();
+            if crit > 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Red.bold().paint("Critical (>20)"),
+                    crit
+                ));
+            }
+            if high > 0 || crit == 0 {
+                lines.push(format!(
+                    "{}: {}",
+                    Color::Yellow.bold().paint("High risk (11-20)"),
+                    high
+                ));
+            }
+        }
+
+        if !self.functions.is_empty() {
+            lines.push(String::new());
+            lines.push(Style::new().bold().paint("Complex Functions").to_string());
+
+            let mut current_risk: Option<RiskLevel> = None;
+            for func in &self.functions {
+                let risk = func.risk_level();
+                if Some(risk) != current_risk {
+                    let risk_color = match risk {
+                        RiskLevel::Critical => Color::Red,
+                        RiskLevel::High => Color::Yellow,
+                        RiskLevel::Moderate => Color::Blue,
+                        RiskLevel::Low => Color::Green,
+                    };
+                    lines.push(risk_color.bold().paint(risk.as_title()).to_string());
+                    current_risk = Some(risk);
+                }
+                let display_name = if let Some(ref fp) = func.file_path {
+                    format!("{}:{}", fp, func.short_name())
+                } else {
+                    func.short_name()
+                };
+                let complexity_str = match func.risk_level() {
+                    RiskLevel::Critical => Color::Red
+                        .bold()
+                        .paint(func.complexity.to_string())
+                        .to_string(),
+                    RiskLevel::High => Color::Yellow
+                        .bold()
+                        .paint(func.complexity.to_string())
+                        .to_string(),
+                    _ => func.complexity.to_string(),
+                };
+                lines.push(format!("{} {}", complexity_str, display_name));
+            }
+        }
+
+        lines.join("\n")
     }
 }
 
