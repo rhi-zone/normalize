@@ -562,6 +562,17 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - Auditor: 2 turns for unwrap() audit, parallel search commands, accurate file:line findings
   - Pattern: auditor role executes parallel searches efficiently (5 commands turn 1, synthesized turn 2)
 
+### Code Quality / Consistency
+
+**OutputFormatter migration** - Ensure all user-facing output uses the trait:
+- [x] SessionAnalysis (sessions analysis.rs)
+- [ ] Audit other commands for manual format handling
+  - Likely candidates: analyze commands, package commands, view commands
+  - Check for manual `if json { } else if pretty { } else { }` patterns
+  - Migrate to `impl OutputFormatter` + `.print(&format)`
+- [ ] Add helper macros if repetitive boilerplate emerges
+- Benefits: consistent --compact/--pretty/--json/--jq, respects NO_COLOR, TTY detection
+
 ### Session Analysis
 
 **moss-sessions refactor** - see `docs/design/sessions-refactor.md`
