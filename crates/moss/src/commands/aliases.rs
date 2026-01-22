@@ -1,10 +1,73 @@
 //! Aliases command - list filter aliases used by --exclude/--only.
 
 use clap::Args;
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 use crate::config::MossConfig;
 use crate::filter::{AliasStatus, list_aliases};
+use crate::output::OutputFormatter;
+
+/// Alias for serialization
+#[derive(Debug, Serialize)]
+struct AliasItem {
+    name: String,
+    patterns: Vec<String>,
+    status: String,
+}
+
+/// Aliases report
+#[derive(Debug, Serialize)]
+struct AliasesReport {
+    aliases: Vec<AliasItem>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    detected_languages: Vec<String>,
+}
+
+impl OutputFormatter for AliasesReport {
+    fn format_text(&self) -> String {
+        let mut lines = vec!["Aliases:".to_string()];
+
+        for alias in &self.aliases {
+            let status_suffix = match alias.status.as_str() {
+                "builtin" => "",
+                "custom" => "  (custom)",
+                "disabled" => "  (disabled)",
+                "overridden" => "  (overridden)",
+                _ => "",
+            };
+
+            if alias.patterns.is_empty() {
+                lines.push(format!("  @{:<12} (disabled){}", alias.name, status_suffix));
+            } else {
+                // Show first few patterns
+                let patterns_str = if alias.patterns.len() > 3 {
+                    format!(
+                        "{}, ... (+{})",
+                        alias.patterns[..3].join(", "),
+                        alias.patterns.len() - 3
+                    )
+                } else {
+                    alias.patterns.join(", ")
+                };
+                lines.push(format!(
+                    "  @{:<12} {}{}",
+                    alias.name, patterns_str, status_suffix
+                ));
+            }
+        }
+
+        if !self.detected_languages.is_empty() {
+            lines.push(String::new());
+            lines.push(format!(
+                "Detected languages: {}",
+                self.detected_languages.join(", ")
+            ));
+        }
+
+        lines.join("\n")
+    }
+}
 
 /// Aliases command arguments
 #[derive(Args)]
@@ -30,56 +93,30 @@ fn cmd_aliases(root: &Path, json: bool) -> i32 {
     let languages = detect_project_languages(root);
     let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
 
-    let aliases = list_aliases(&config.aliases, &lang_refs);
+    let aliases_list = list_aliases(&config.aliases, &lang_refs);
 
-    if json {
-        let output: Vec<_> = aliases
-            .iter()
-            .map(|a| {
-                serde_json::json!({
-                    "name": a.name,
-                    "patterns": a.patterns,
-                    "status": match a.status {
-                        AliasStatus::Builtin => "builtin",
-                        AliasStatus::Custom => "custom",
-                        AliasStatus::Disabled => "disabled",
-                        AliasStatus::Overridden => "overridden",
-                    }
-                })
-            })
-            .collect();
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Aliases:");
-        for alias in &aliases {
-            let status_suffix = match alias.status {
-                AliasStatus::Builtin => "",
-                AliasStatus::Custom => "  (custom)",
-                AliasStatus::Disabled => "  (disabled)",
-                AliasStatus::Overridden => "  (overridden)",
-            };
-
-            if alias.patterns.is_empty() {
-                println!("  @{:<12} (disabled){}", alias.name, status_suffix);
-            } else {
-                // Show first few patterns
-                let patterns_str = if alias.patterns.len() > 3 {
-                    format!(
-                        "{}, ... (+{})",
-                        alias.patterns[..3].join(", "),
-                        alias.patterns.len() - 3
-                    )
-                } else {
-                    alias.patterns.join(", ")
-                };
-                println!("  @{:<12} {}{}", alias.name, patterns_str, status_suffix);
+    let alias_items: Vec<AliasItem> = aliases_list
+        .iter()
+        .map(|a| AliasItem {
+            name: a.name.clone(),
+            patterns: a.patterns.clone(),
+            status: match a.status {
+                AliasStatus::Builtin => "builtin",
+                AliasStatus::Custom => "custom",
+                AliasStatus::Disabled => "disabled",
+                AliasStatus::Overridden => "overridden",
             }
-        }
+            .to_string(),
+        })
+        .collect();
 
-        if !languages.is_empty() {
-            println!("\nDetected languages: {}", languages.join(", "));
-        }
-    }
+    let report = AliasesReport {
+        aliases: alias_items,
+        detected_languages: languages,
+    };
+
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
     0
 }

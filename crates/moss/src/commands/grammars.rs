@@ -1,9 +1,61 @@
 //! Grammar management commands.
 
+use crate::output::OutputFormatter;
 use crate::parsers;
 use clap::Subcommand;
+use serde::Serialize;
 use std::io::Read;
 use std::path::PathBuf;
+
+/// Grammar list report
+#[derive(Debug, Serialize)]
+struct GrammarListReport {
+    grammars: Vec<String>,
+}
+
+impl OutputFormatter for GrammarListReport {
+    fn format_text(&self) -> String {
+        if self.grammars.is_empty() {
+            let mut lines = vec!["No grammars installed.".to_string(), String::new()];
+            lines.push("Install grammars with: moss grammars install".to_string());
+            lines.push(
+                "Or set MOSS_GRAMMAR_PATH to a directory containing .so/.dylib files".to_string(),
+            );
+            lines.join("\n")
+        } else {
+            let mut lines = vec![format!("Installed grammars ({}):", self.grammars.len())];
+            for name in &self.grammars {
+                lines.push(name.clone());
+            }
+            lines.join("\n")
+        }
+    }
+}
+
+/// Grammar path item
+#[derive(Debug, Serialize)]
+struct GrammarPath {
+    source: String,
+    path: String,
+    exists: bool,
+}
+
+/// Grammar paths report
+#[derive(Debug, Serialize)]
+struct GrammarPathsReport {
+    paths: Vec<GrammarPath>,
+}
+
+impl OutputFormatter for GrammarPathsReport {
+    fn format_text(&self) -> String {
+        let mut lines = vec!["Grammar search paths:".to_string()];
+        for item in &self.paths {
+            let exists = if item.exists { "" } else { " (not found)" };
+            lines.push(format!("  [{}] {}{}", item.source, item.path, exists));
+        }
+        lines.join("\n")
+    }
+}
 
 #[derive(Subcommand)]
 pub enum GrammarAction {
@@ -37,65 +89,44 @@ pub fn cmd_grammars(action: GrammarAction, json: bool) -> i32 {
 fn cmd_list(json: bool) -> i32 {
     let grammars = parsers::available_external_grammars();
 
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "grammars": grammars,
-                "count": grammars.len()
-            })
-        );
-    } else if grammars.is_empty() {
-        println!("No grammars installed.");
-        println!();
-        println!("Install grammars with: moss grammars install");
-        println!("Or set MOSS_GRAMMAR_PATH to a directory containing .so/.dylib files");
-    } else {
-        println!("Installed grammars ({}):", grammars.len());
-        for name in &grammars {
-            println!("{}", name);
-        }
-    }
+    let report = GrammarListReport { grammars };
+    let config = crate::config::MossConfig::default();
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
     0
 }
 
 fn cmd_paths(json: bool) -> i32 {
-    let mut paths = Vec::new();
+    let mut raw_paths = Vec::new();
 
     // Environment variable
     if let Ok(env_path) = std::env::var("MOSS_GRAMMAR_PATH") {
         for p in env_path.split(':') {
             if !p.is_empty() {
-                paths.push(("env", PathBuf::from(p)));
+                raw_paths.push(("env", PathBuf::from(p)));
             }
         }
     }
 
     // User config directory
     if let Some(config) = dirs::config_dir() {
-        paths.push(("config", config.join("moss/grammars")));
+        raw_paths.push(("config", config.join("moss/grammars")));
     }
 
-    if json {
-        let path_objs: Vec<_> = paths
-            .iter()
-            .map(|(source, path)| {
-                serde_json::json!({
-                    "source": source,
-                    "path": path.display().to_string(),
-                    "exists": path.exists()
-                })
-            })
-            .collect();
-        println!("{}", serde_json::json!({ "paths": path_objs }));
-    } else {
-        println!("Grammar search paths:");
-        for (source, path) in &paths {
-            let exists = if path.exists() { "" } else { " (not found)" };
-            println!("  [{}] {}{}", source, path.display(), exists);
-        }
-    }
+    let paths: Vec<GrammarPath> = raw_paths
+        .iter()
+        .map(|(source, path)| GrammarPath {
+            source: source.to_string(),
+            path: path.display().to_string(),
+            exists: path.exists(),
+        })
+        .collect();
+
+    let report = GrammarPathsReport { paths };
+    let config = crate::config::MossConfig::default();
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
     0
 }
