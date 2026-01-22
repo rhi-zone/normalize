@@ -736,15 +736,30 @@ impl SessionAnalysis {
                 let filled = (op.total() as f64 / max_total as f64 * bar_width as f64) as usize;
                 let bar: String = "█".repeat(filled) + &"░".repeat(bar_width - filled);
 
-                let ops_str = if op.edits > 0 && op.reads > 0 {
-                    format!("\x1b[33m{}E\x1b[0m \x1b[36m{}R\x1b[0m", op.edits, op.reads)
-                } else if op.edits > 0 {
-                    format!("\x1b[33m{} edits\x1b[0m", op.edits)
-                } else if op.writes > 0 {
-                    format!("\x1b[32m{} writes\x1b[0m", op.writes)
-                } else {
-                    format!("\x1b[36m{} reads\x1b[0m", op.reads)
-                };
+                // Build readable operation summary
+                let mut parts = Vec::new();
+                if op.reads > 0 {
+                    parts.push(format!(
+                        "\x1b[36m{} read{}\x1b[0m",
+                        op.reads,
+                        if op.reads == 1 { "" } else { "s" }
+                    ));
+                }
+                if op.edits > 0 {
+                    parts.push(format!(
+                        "\x1b[33m{} edit{}\x1b[0m",
+                        op.edits,
+                        if op.edits == 1 { "" } else { "s" }
+                    ));
+                }
+                if op.writes > 0 {
+                    parts.push(format!(
+                        "\x1b[32m{} write{}\x1b[0m",
+                        op.writes,
+                        if op.writes == 1 { "" } else { "s" }
+                    ));
+                }
+                let ops_str = parts.join(", ");
                 writeln!(out, "{} {} {}", bar, ops_str, op.path).unwrap();
             }
             writeln!(out).unwrap();
