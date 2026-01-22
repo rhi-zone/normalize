@@ -173,6 +173,21 @@ impl ToolChain {
     pub fn is_empty(&self) -> bool {
         self.tools.is_empty()
     }
+
+    /// Estimate potential API call savings if parallelized.
+    pub fn potential_savings(&self) -> usize {
+        if self.len() <= 1 { 0 } else { self.len() - 1 }
+    }
+
+    /// Check if chain contains only read-like operations (safe to parallelize).
+    pub fn is_safe_parallel(&self) -> bool {
+        self.tools.iter().all(|tool| {
+            matches!(
+                tool.as_str(),
+                "Read" | "Glob" | "Grep" | "Bash" | "Task" | "WebFetch" | "WebSearch"
+            )
+        })
+    }
 }
 
 /// Type of correction made by the assistant.
@@ -204,6 +219,21 @@ pub struct Correction {
     pub category: CorrectionType,
 }
 
+/// File operation statistics.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FileOperation {
+    pub path: String,
+    pub reads: usize,
+    pub edits: usize,
+    pub writes: usize,
+}
+
+impl FileOperation {
+    pub fn total(&self) -> usize {
+        self.reads + self.edits + self.writes
+    }
+}
+
 /// Complete analysis of a session.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionAnalysis {
@@ -224,6 +254,8 @@ pub struct SessionAnalysis {
     pub corrections: Vec<Correction>,
     /// Context size per turn (input + cache_read)
     pub context_per_turn: Vec<u64>,
+    /// File operation frequency (Read/Edit/Write)
+    pub file_operations: HashMap<String, FileOperation>,
 }
 
 impl SessionAnalysis {
@@ -430,6 +462,71 @@ impl SessionAnalysis {
             lines.push(String::new());
         }
 
+        // File operations heatmap
+        if !self.file_operations.is_empty() {
+            lines.push("## File Operations".to_string());
+            lines.push(String::new());
+            let mut ops: Vec<_> = self.file_operations.values().collect();
+            ops.sort_by(|a, b| b.total().cmp(&a.total()));
+            lines.push("| File | Reads | Edits | Writes | Total |".to_string());
+            lines.push("|------|-------|-------|--------|-------|".to_string());
+            for op in ops.iter().take(20) {
+                lines.push(format!(
+                    "| {} | {} | {} | {} | {} |",
+                    op.path,
+                    op.reads,
+                    op.edits,
+                    op.writes,
+                    op.total()
+                ));
+            }
+            lines.push(String::new());
+        }
+
+        // Parallelization hints
+        if !self.tool_chains.is_empty() {
+            let mut sorted_chains = self.tool_chains.clone();
+            sorted_chains.sort_by(|a, b| b.potential_savings().cmp(&a.potential_savings()));
+
+            let top_opportunities: Vec<_> = sorted_chains
+                .iter()
+                .filter(|c| c.potential_savings() >= 2)
+                .take(5)
+                .collect();
+
+            if !top_opportunities.is_empty() {
+                lines.push("## Parallelization Opportunities".to_string());
+                lines.push(String::new());
+
+                let total_savings: usize =
+                    self.tool_chains.iter().map(|c| c.potential_savings()).sum();
+                lines.push(format!(
+                    "**Estimated savings**: {} API calls could be reduced by running tools in parallel",
+                    total_savings
+                ));
+                lines.push(String::new());
+
+                for chain in &top_opportunities {
+                    let tools_str = chain.tools.join(" → ");
+                    let safe_marker = if chain.is_safe_parallel() {
+                        " ✓ Safe"
+                    } else {
+                        ""
+                    };
+                    lines.push(format!(
+                        "- **Turns {}-{}**: {} API calls → 1 call (save {}){}",
+                        chain.turn_range.0,
+                        chain.turn_range.1,
+                        chain.len(),
+                        chain.potential_savings(),
+                        safe_marker
+                    ));
+                    lines.push(format!("  Tools: {}", tools_str));
+                }
+                lines.push(String::new());
+            }
+        }
+
         // Tool chains
         if !self.tool_chains.is_empty() {
             lines.push("## Tool Chains".to_string());
@@ -627,6 +724,32 @@ impl SessionAnalysis {
             }
         }
 
+        // File operations heatmap
+        if !self.file_operations.is_empty() {
+            writeln!(out, "\x1b[1;36m━━━ File Operations ━━━\x1b[0m").unwrap();
+            let mut ops: Vec<_> = self.file_operations.values().collect();
+            ops.sort_by(|a, b| b.total().cmp(&a.total()));
+
+            for op in ops.iter().take(15) {
+                let bar_width = 20;
+                let max_total = ops.first().map(|o| o.total()).unwrap_or(1);
+                let filled = (op.total() as f64 / max_total as f64 * bar_width as f64) as usize;
+                let bar: String = "█".repeat(filled) + &"░".repeat(bar_width - filled);
+
+                let ops_str = if op.edits > 0 && op.reads > 0 {
+                    format!("\x1b[33m{}E\x1b[0m \x1b[36m{}R\x1b[0m", op.edits, op.reads)
+                } else if op.edits > 0 {
+                    format!("\x1b[33m{} edits\x1b[0m", op.edits)
+                } else if op.writes > 0 {
+                    format!("\x1b[32m{} writes\x1b[0m", op.writes)
+                } else {
+                    format!("\x1b[36m{} reads\x1b[0m", op.reads)
+                };
+                writeln!(out, "{} {} {}", bar, ops_str, op.path).unwrap();
+            }
+            writeln!(out).unwrap();
+        }
+
         // Token hotspots
         if !self.file_tokens.is_empty() {
             writeln!(out, "\x1b[1;36m━━━ Token Hotspots ━━━\x1b[0m").unwrap();
@@ -656,6 +779,52 @@ impl SessionAnalysis {
                 .map(|(k, v)| format!("{}:{}", k, v))
                 .collect();
             writeln!(out, "{}", items.join("  ")).unwrap();
+        }
+
+        // Parallelization opportunities
+        if !self.tool_chains.is_empty() {
+            let mut sorted_chains = self.tool_chains.clone();
+            sorted_chains.sort_by(|a, b| b.potential_savings().cmp(&a.potential_savings()));
+
+            let top_opportunities: Vec<_> = sorted_chains
+                .iter()
+                .filter(|c| c.potential_savings() >= 2)
+                .take(5)
+                .collect();
+
+            if !top_opportunities.is_empty() {
+                writeln!(out).unwrap();
+                writeln!(out, "\x1b[1;36m━━━ Parallelization Hints ━━━\x1b[0m").unwrap();
+
+                let total_savings: usize =
+                    self.tool_chains.iter().map(|c| c.potential_savings()).sum();
+                writeln!(
+                    out,
+                    "Potential savings: \x1b[33m{} API calls\x1b[0m",
+                    total_savings
+                )
+                .unwrap();
+
+                for chain in &top_opportunities {
+                    let safe_marker = if chain.is_safe_parallel() {
+                        "\x1b[32m✓\x1b[0m"
+                    } else {
+                        "\x1b[33m⚠\x1b[0m"
+                    };
+                    writeln!(
+                        out,
+                        "{} Turns {}-{}: \x1b[33m{} → 1\x1b[0m (save {})",
+                        safe_marker,
+                        chain.turn_range.0,
+                        chain.turn_range.1,
+                        chain.len(),
+                        chain.potential_savings()
+                    )
+                    .unwrap();
+                    let tools_str = chain.tools.join(" → ");
+                    writeln!(out, "   {}", tools_str).unwrap();
+                }
+            }
         }
 
         // Tool chains
@@ -794,6 +963,19 @@ pub fn categorize_error(error_text: &str) -> &'static str {
     }
 }
 
+/// Extract file path from tool input JSON.
+fn extract_file_path(tool_name: &str, input: &serde_json::Value) -> Option<String> {
+    match tool_name {
+        "Read" | "Write" | "Edit" => {
+            if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
+                return Some(normalize_path(path));
+            }
+        }
+        _ => {}
+    }
+    None
+}
+
 /// Detect correction patterns in assistant text.
 /// Returns (category, excerpt) if a correction is found.
 pub fn detect_correction(text: &str) -> Option<(CorrectionType, String)> {
@@ -898,7 +1080,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
 
             for block in &msg.content {
                 match block {
-                    ContentBlock::ToolUse { name, .. } => {
+                    ContentBlock::ToolUse { name, input, .. } => {
                         let stat = analysis
                             .tool_stats
                             .entry(name.clone())
@@ -906,6 +1088,23 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
                         stat.calls += 1;
                         tool_uses_in_turn += 1;
                         tool_name_in_turn = Some(name.clone());
+
+                        // Track file operations
+                        if let Some(file_path) = extract_file_path(name, input) {
+                            let op = analysis
+                                .file_operations
+                                .entry(file_path.clone())
+                                .or_insert_with(|| FileOperation {
+                                    path: file_path.clone(),
+                                    ..Default::default()
+                                });
+                            match name.as_str() {
+                                "Read" => op.reads += 1,
+                                "Edit" => op.edits += 1,
+                                "Write" => op.writes += 1,
+                                _ => {}
+                            }
+                        }
                     }
                     ContentBlock::ToolResult {
                         is_error, content, ..
