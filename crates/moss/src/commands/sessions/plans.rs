@@ -1,7 +1,39 @@
 //! Plans command - list and view Claude Code plans from ~/.claude/plans/
 
+use crate::output::OutputFormatter;
+use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
+
+/// Plan item for serialization
+#[derive(Debug, Serialize)]
+struct PlanListItem {
+    name: String,
+    title: String,
+    modified: String,
+    size: u64,
+}
+
+/// Plans list report
+#[derive(Debug, Serialize)]
+struct PlansListReport {
+    plans: Vec<PlanListItem>,
+}
+
+impl OutputFormatter for PlansListReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        for plan in &self.plans {
+            lines.push(format!(
+                "{} [{}] {} ({}B)",
+                plan.modified, plan.name, plan.title, plan.size
+            ));
+        }
+        lines.push(String::new());
+        lines.push(format!("{} plans found", self.plans.len()));
+        lines.join("\n")
+    }
+}
 
 /// Get the plans directory path
 fn plans_dir() -> Option<PathBuf> {
@@ -211,39 +243,25 @@ pub fn cmd_plans(name: Option<&str>, limit: usize, json: bool) -> i32 {
         let plans = list_plans(limit);
 
         if plans.is_empty() {
-            if json {
-                println!("[]");
-            } else {
-                eprintln!("No plans found in {}", dir.display());
-            }
+            eprintln!("No plans found in {}", dir.display());
             return 0;
         }
 
-        if json {
-            let output: Vec<_> = plans
-                .iter()
-                .map(|p| {
-                    serde_json::json!({
-                        "name": p.name,
-                        "title": p.title,
-                        "modified": format_time(p.modified),
-                        "size": p.size
-                    })
-                })
-                .collect();
-            println!("{}", serde_json::to_string(&output).unwrap());
-        } else {
-            for plan in &plans {
-                println!(
-                    "{} [{}] {} ({}B)",
-                    format_time(plan.modified),
-                    plan.name,
-                    plan.title,
-                    plan.size
-                );
-            }
-            eprintln!("\n{} plans found", plans.len());
-        }
+        let items: Vec<PlanListItem> = plans
+            .iter()
+            .map(|p| PlanListItem {
+                name: p.name.clone(),
+                title: p.title.clone(),
+                modified: format_time(p.modified),
+                size: p.size,
+            })
+            .collect();
+
+        let report = PlansListReport { plans: items };
+        let config = crate::config::MossConfig::default();
+        let format =
+            crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+        report.print(&format);
         0
     }
 }

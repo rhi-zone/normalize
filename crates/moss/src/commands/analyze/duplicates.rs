@@ -2,27 +2,189 @@
 
 use crate::extract::Extractor;
 use crate::filter::Filter;
+use crate::output::OutputFormatter;
 use crate::parsers;
 use rhizome_moss_languages::support_for_path;
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 /// A group of duplicate functions
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct DuplicateFunctionGroup {
+    #[serde(serialize_with = "serialize_hash")]
     hash: u64,
     locations: Vec<DuplicateFunctionLocation>,
     line_count: usize,
 }
 
+fn serialize_hash<S>(hash: &u64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&format!("{:016x}", hash))
+}
+
 /// Location of a duplicate function instance
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct DuplicateFunctionLocation {
     file: String,
     symbol: String,
     start_line: usize,
     end_line: usize,
+}
+
+/// Duplicate functions analysis report
+#[derive(Debug, Serialize)]
+struct DuplicateFunctionsReport {
+    files_scanned: usize,
+    functions_hashed: usize,
+    #[serde(skip)]
+    total_duplicates: usize,
+    duplicated_lines: usize,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    groups: Vec<DuplicateFunctionGroup>,
+    #[serde(skip)]
+    root: PathBuf,
+    #[serde(skip)]
+    show_source: bool,
+}
+
+impl OutputFormatter for DuplicateFunctionsReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Duplicate Function Detection".to_string());
+        lines.push(String::new());
+        lines.push(format!("Files scanned: {}", self.files_scanned));
+        lines.push(format!("Functions hashed: {}", self.functions_hashed));
+        lines.push(format!("Duplicate groups: {}", self.groups.len()));
+        lines.push(format!("Total duplicates: {}", self.total_duplicates));
+        lines.push(format!("Duplicated lines: ~{}", self.duplicated_lines));
+        lines.push(String::new());
+
+        if self.groups.is_empty() {
+            lines.push("No duplicate functions detected.".to_string());
+        } else {
+            lines.push("Duplicate Groups (sorted by size):".to_string());
+            lines.push(String::new());
+
+            for (i, group) in self.groups.iter().take(20).enumerate() {
+                lines.push(format!(
+                    "{}. {} lines, {} instances:",
+                    i + 1,
+                    group.line_count,
+                    group.locations.len()
+                ));
+
+                for loc in &group.locations {
+                    lines.push(format!(
+                        "   {}:{}-{} ({})",
+                        loc.file, loc.start_line, loc.end_line, loc.symbol
+                    ));
+
+                    if self.show_source {
+                        let file_path = self.root.join(&loc.file);
+                        if let Ok(content) = std::fs::read_to_string(&file_path) {
+                            let file_lines: Vec<&str> = content.lines().collect();
+                            let start = loc.start_line.saturating_sub(1);
+                            let end = loc.end_line.min(file_lines.len());
+                            for (j, line) in file_lines[start..end].iter().enumerate() {
+                                lines.push(format!("        {:4} │ {}", start + j + 1, line));
+                            }
+                            lines.push(String::new());
+                        }
+                    }
+                }
+                lines.push(String::new());
+            }
+
+            if self.groups.len() > 20 {
+                lines.push(format!("... and {} more groups", self.groups.len() - 20));
+            }
+        }
+
+        lines.join("\n")
+    }
+}
+
+/// Type information
+#[derive(Debug, Clone, Serialize)]
+struct TypeInfo {
+    file: String,
+    name: String,
+    start_line: usize,
+    fields: Vec<String>,
+}
+
+/// A pair of duplicate types
+#[derive(Debug, Serialize)]
+struct DuplicatePair {
+    type1: TypeInfo,
+    type2: TypeInfo,
+    overlap_percent: usize,
+    common_fields: Vec<String>,
+}
+
+/// Duplicate types analysis report
+#[derive(Debug, Serialize)]
+struct DuplicateTypesReport {
+    files_scanned: usize,
+    types_analyzed: usize,
+    min_overlap_percent: usize,
+    duplicates: Vec<DuplicatePair>,
+}
+
+impl OutputFormatter for DuplicateTypesReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Duplicate Type Detection".to_string());
+        lines.push(String::new());
+        lines.push(format!("Files scanned: {}", self.files_scanned));
+        lines.push(format!("Types analyzed: {}", self.types_analyzed));
+        lines.push(format!("Duplicate pairs: {}", self.duplicates.len()));
+        lines.push(format!("Min overlap: {}%", self.min_overlap_percent));
+        lines.push(String::new());
+
+        if self.duplicates.is_empty() {
+            lines.push("No duplicate types detected.".to_string());
+        } else {
+            lines.push("Potential Duplicates (sorted by overlap):".to_string());
+            lines.push(String::new());
+
+            for (i, dup) in self.duplicates.iter().take(20).enumerate() {
+                lines.push(format!(
+                    "{}. {}% overlap ({} common fields):",
+                    i + 1,
+                    dup.overlap_percent,
+                    dup.common_fields.len()
+                ));
+                lines.push(format!(
+                    "   {} ({}:{}) - {} fields",
+                    dup.type1.name,
+                    dup.type1.file,
+                    dup.type1.start_line,
+                    dup.type1.fields.len()
+                ));
+                lines.push(format!(
+                    "   {} ({}:{}) - {} fields",
+                    dup.type2.name,
+                    dup.type2.file,
+                    dup.type2.start_line,
+                    dup.type2.fields.len()
+                ));
+                lines.push(format!("   Common: {}", dup.common_fields.join(", ")));
+                lines.push(String::new());
+            }
+
+            if self.duplicates.len() > 20 {
+                lines.push(format!("... and {} more pairs", self.duplicates.len() - 20));
+            }
+        }
+
+        lines.join("\n")
+    }
 }
 
 /// Result from duplicate function detection.
@@ -411,86 +573,24 @@ pub fn cmd_duplicate_functions_with_count(
         .map(|g| g.line_count * g.locations.len())
         .sum();
 
-    if json {
-        let output = serde_json::json!({
-            "files_scanned": files_scanned,
-            "functions_hashed": functions_hashed,
-            "duplicate_groups": groups.len(),
-            "total_duplicates": total_duplicates,
-            "duplicated_lines": duplicated_lines,
-            "elide_identifiers": elide_identifiers,
-            "elide_literals": elide_literals,
-            "groups": groups.iter().map(|g| {
-                serde_json::json!({
-                    "hash": format!("{:016x}", g.hash),
-                    "line_count": g.line_count,
-                    "instances": g.locations.len(),
-                    "locations": g.locations.iter().map(|l| {
-                        serde_json::json!({
-                            "file": l.file,
-                            "symbol": l.symbol,
-                            "start_line": l.start_line,
-                            "end_line": l.end_line,
-                        })
-                    }).collect::<Vec<_>>(),
-                })
-            }).collect::<Vec<_>>(),
-        });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Duplicate Function Detection");
-        println!();
-        println!("Files scanned: {}", files_scanned);
-        println!("Functions hashed: {}", functions_hashed);
-        println!("Duplicate groups: {}", groups.len());
-        println!("Total duplicates: {}", total_duplicates);
-        println!("Duplicated lines: ~{}", duplicated_lines);
-        println!();
-
-        if groups.is_empty() {
-            println!("No duplicate functions detected.");
-        } else {
-            println!("Duplicate Groups (sorted by size):");
-            println!();
-
-            for (i, group) in groups.iter().take(20).enumerate() {
-                println!(
-                    "{}. {} lines, {} instances:",
-                    i + 1,
-                    group.line_count,
-                    group.locations.len()
-                );
-
-                for loc in &group.locations {
-                    println!(
-                        "   {}:{}-{} ({})",
-                        loc.file, loc.start_line, loc.end_line, loc.symbol
-                    );
-
-                    // Show source code if requested
-                    if show_source {
-                        let file_path = root.join(&loc.file);
-                        if let Ok(content) = std::fs::read_to_string(&file_path) {
-                            let lines: Vec<&str> = content.lines().collect();
-                            let start = loc.start_line.saturating_sub(1);
-                            let end = loc.end_line.min(lines.len());
-                            for (j, line) in lines[start..end].iter().enumerate() {
-                                println!("        {:4} │ {}", start + j + 1, line);
-                            }
-                            println!();
-                        }
-                    }
-                }
-                println!();
-            }
-
-            if groups.len() > 20 {
-                println!("... and {} more groups", groups.len() - 20);
-            }
-        }
-    }
-
     let group_count = groups.len();
+
+    let report = DuplicateFunctionsReport {
+        files_scanned,
+        functions_hashed,
+        total_duplicates,
+        duplicated_lines,
+        elide_identifiers,
+        elide_literals,
+        groups,
+        root: root.to_path_buf(),
+        show_source,
+    };
+
+    let config = crate::config::MossConfig::load(root);
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
+
     let exit_code = if group_count == 0 { 0 } else { 1 };
     DuplicateFunctionResult {
         exit_code,
@@ -530,15 +630,6 @@ pub fn cmd_duplicate_types(
             }
         })
         .collect();
-
-    // Type location info
-    #[derive(Debug, Clone)]
-    struct TypeInfo {
-        file: String,
-        name: String,
-        start_line: usize,
-        fields: Vec<String>,
-    }
 
     // Collect types with their fields
     let mut types: Vec<TypeInfo> = Vec::new();
@@ -623,14 +714,6 @@ pub fn cmd_duplicate_types(
     }
 
     // Find duplicate pairs based on field overlap
-    #[derive(Debug)]
-    struct DuplicatePair {
-        type1: TypeInfo,
-        type2: TypeInfo,
-        overlap_percent: usize,
-        common_fields: Vec<String>,
-    }
-
     let mut duplicates: Vec<DuplicatePair> = Vec::new();
 
     for i in 0..types.len() {
@@ -680,80 +763,18 @@ pub fn cmd_duplicate_types(
     // Sort by overlap percentage (highest first)
     duplicates.sort_by(|a, b| b.overlap_percent.cmp(&a.overlap_percent));
 
-    // Output results
-    if json {
-        let output = serde_json::json!({
-            "files_scanned": files_scanned,
-            "types_analyzed": types.len(),
-            "duplicate_pairs": duplicates.len(),
-            "min_overlap_percent": min_overlap_percent,
-            "duplicates": duplicates.iter().map(|d| {
-                serde_json::json!({
-                    "overlap_percent": d.overlap_percent,
-                    "common_fields": d.common_fields,
-                    "type1": {
-                        "file": d.type1.file,
-                        "name": d.type1.name,
-                        "line": d.type1.start_line,
-                        "fields": d.type1.fields,
-                    },
-                    "type2": {
-                        "file": d.type2.file,
-                        "name": d.type2.name,
-                        "line": d.type2.start_line,
-                        "fields": d.type2.fields,
-                    },
-                })
-            }).collect::<Vec<_>>(),
-        });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Duplicate Type Detection");
-        println!();
-        println!("Files scanned: {}", files_scanned);
-        println!("Types analyzed: {}", types.len());
-        println!("Duplicate pairs: {}", duplicates.len());
-        println!("Min overlap: {}%", min_overlap_percent);
-        println!();
+    let report = DuplicateTypesReport {
+        files_scanned,
+        types_analyzed: types.len(),
+        min_overlap_percent,
+        duplicates,
+    };
 
-        if duplicates.is_empty() {
-            println!("No duplicate types detected.");
-        } else {
-            println!("Potential Duplicates (sorted by overlap):");
-            println!();
+    let config = crate::config::MossConfig::load(root);
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
-            for (i, dup) in duplicates.iter().take(20).enumerate() {
-                println!(
-                    "{}. {}% overlap ({} common fields):",
-                    i + 1,
-                    dup.overlap_percent,
-                    dup.common_fields.len()
-                );
-                println!(
-                    "   {} ({}:{}) - {} fields",
-                    dup.type1.name,
-                    dup.type1.file,
-                    dup.type1.start_line,
-                    dup.type1.fields.len()
-                );
-                println!(
-                    "   {} ({}:{}) - {} fields",
-                    dup.type2.name,
-                    dup.type2.file,
-                    dup.type2.start_line,
-                    dup.type2.fields.len()
-                );
-                println!("   Common: {}", dup.common_fields.join(", "));
-                println!();
-            }
-
-            if duplicates.len() > 20 {
-                println!("... and {} more pairs", duplicates.len() - 20);
-            }
-        }
-    }
-
-    if duplicates.is_empty() { 0 } else { 1 }
+    if report.duplicates.is_empty() { 0 } else { 1 }
 }
 
 /// Allow a duplicate type pair by adding to .moss/duplicate-types-allow

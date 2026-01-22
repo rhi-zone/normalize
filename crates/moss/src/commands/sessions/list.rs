@@ -1,8 +1,35 @@
 //! List sessions command.
 
 use super::{format_age, session_matches_grep};
+use crate::output::OutputFormatter;
 use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
-use std::path::Path;
+use serde::Serialize;
+use std::path::{Path, PathBuf};
+
+/// A session in the list
+#[derive(Debug, Serialize)]
+struct SessionListItem {
+    id: String,
+    path: PathBuf,
+    age_seconds: u64,
+}
+
+/// Session list report
+#[derive(Debug, Serialize)]
+struct SessionListReport {
+    sessions: Vec<SessionListItem>,
+}
+
+impl OutputFormatter for SessionListReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        for item in &self.sessions {
+            let age = format_age(item.age_seconds);
+            lines.push(format!("{} ({})", item.id, age));
+        }
+        lines.join("\n")
+    }
+}
 
 /// List available sessions for a format.
 pub fn cmd_sessions_list(
@@ -45,39 +72,32 @@ pub fn cmd_sessions_list(
     sessions.truncate(limit);
 
     if sessions.is_empty() {
-        if json {
-            println!("[]");
-        } else {
-            eprintln!("No {} sessions found", format_name.unwrap_or("Claude Code"));
-        }
+        eprintln!("No {} sessions found", format_name.unwrap_or("Claude Code"));
         return 0;
     }
 
-    if json {
-        let output: Vec<_> = sessions
-            .iter()
-            .map(|s| {
-                let id = s.path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                let age = s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
-                serde_json::json!({
-                    "id": id,
-                    "path": s.path,
-                    "age_seconds": age
-                })
-            })
-            .collect();
-        println!("{}", serde_json::to_string(&output).unwrap());
-    } else {
-        for s in &sessions {
+    let items: Vec<SessionListItem> = sessions
+        .iter()
+        .map(|s| {
             let id = s
                 .path
                 .file_stem()
-                .and_then(|stem| stem.to_str())
-                .unwrap_or("");
-            let age = format_age(s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0));
-            println!("{} ({})", id, age);
-        }
-    }
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            let age_seconds = s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
+            SessionListItem {
+                id,
+                path: s.path.clone(),
+                age_seconds,
+            }
+        })
+        .collect();
+
+    let report = SessionListReport { sessions: items };
+    let config = crate::config::MossConfig::default();
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
     0
 }
