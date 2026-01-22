@@ -82,6 +82,9 @@ Do not:
 - Mark as done prematurely - note what remains
 - Fear "over-modularization" - 100 lines is fine for a module
 - Consider time constraints - we're NOT short on time; optimize for correctness
+- Use path dependencies in Cargo.toml - causes clippy to stash changes across repos
+- Use `--no-verify` - fix the issue or fix the hook
+- Assume tools are missing - check if `nix develop` is available for the right environment
 
 ## Design Principles
 
