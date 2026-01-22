@@ -580,6 +580,12 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - [x] Move analysis to consumers (moss CLI uses `parse()` + local `analyze_session()`)
 - [x] Remove `analyze()` from LogFormat trait (analysis now in `crates/moss/src/sessions/analysis.rs`)
 
+**Recently Added (2026-01-24)**:
+- [x] Tool patterns: common sequences across sessions (e.g., "Read → Edit" 42×)
+  - Extracts subsequences length 2-5 from all tool chains
+  - Shows top 10 by frequency (2+ occurrences)
+  - Reveals workflow patterns: sequential bash, read-edit cycles, edit-test patterns
+
 **Recently Added (2026-01-23)**:
 - [x] Tool chains detection: sequences of consecutive single-tool calls (3+ length)
   - Shows turn ranges and tool sequence (e.g., "Turns 0-8: Grep → Read → Glob → ...")
@@ -593,7 +599,27 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 
 **Backlog - Analysis Features**:
 
-1. **Token growth visualization** (HIGH VALUE)
+1. **Cross-repo comparison** (MEDIUM VALUE)
+   - Group sessions by repository (extract from path)
+   - Compare metrics: tool usage, error rates, parallelization, costs
+   - Table format: | Repo | Sessions | Tools | Errors | Cost |
+   - Use case: identify which repos have friction, high costs, or inefficient workflows
+   - Implementation: add `--by-repo` flag to stats command (already added to CLI)
+
+2. **Ngram analysis** (HIGH VALUE for text understanding)
+   - Extract common word sequences from assistant messages
+   - Support n=2,3,4 (bigrams, trigrams, 4-grams)
+   - Optional case-insensitive matching
+   - Filter by message type (assistant, error messages, thinking)
+   - Use cases:
+     - Find common error messages across sessions
+     - Identify repeated explanations/apologies
+     - Detect boilerplate/templated responses
+   - Implementation: tokenize text blocks, count ngram frequencies, rank by occurrence
+   - Output: `moss sessions show <id> --ngrams N [--case-insensitive]`
+   - Example: "I apologize for" 5×, "let me fix" 8×, "failed to parse" 12×
+
+3. **Token growth visualization** (HIGH VALUE) [DONE]
    - Track context size per turn, visualize growth curve
    - Flag bloat: warn when approaching context limits (e.g., 80K+ on Sonnet)
    - ASCII bar chart per turn: `Turn 1: ▓▓░░░░░░░░ 13K` → `Turn 40: ▓▓▓▓▓▓▓▓░░ 78K [!]`

@@ -185,6 +185,10 @@ pub enum SessionsCommand {
         /// Show sessions from all projects (not just current)
         #[arg(long)]
         all_projects: bool,
+
+        /// Group statistics by repository
+        #[arg(long)]
+        by_repo: bool,
     },
 
     /// Start web server for viewing sessions
