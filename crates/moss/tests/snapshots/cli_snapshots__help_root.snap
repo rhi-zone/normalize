@@ -1,0 +1,36 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 26
+expression: "snapshot_help(&[])"
+---
+Fast code intelligence CLI
+
+Usage: moss [OPTIONS] <COMMAND>
+
+Commands:
+  view         View a node in the codebase tree (directory, file, or symbol)
+  edit         Edit a node in the codebase tree (structural code modification)
+  history      View shadow git edit history
+  index        Manage file index
+  init         Initialize moss in current directory
+  daemon       Manage the global moss daemon
+  update       Check for and install updates
+  grammars     Manage tree-sitter grammars for parsing
+  analyze      Analyze codebase (health, complexity, security, duplicates, docs)
+  aliases      List filter aliases (used by --exclude/--only)
+  context      Show directory context (hierarchical .context.md files)
+  text-search  Search for text patterns in files (fast ripgrep-based search)
+  sessions     Analyze Claude Code and other agent session logs
+  package      Package management: info, list, tree, outdated
+  tools        External ecosystem tools (linters, formatters, test runners)
+  serve        Start a moss server (MCP, HTTP, LSP)
+  generate     Generate code from API spec
+  rules        Manage custom analysis rules
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

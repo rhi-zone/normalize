@@ -1,0 +1,16 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 62
+expression: "snapshot_help(&[\"update\"])"
+---
+Check for and install updates
+
+Usage: moss update [OPTIONS]
+
+Options:
+  -c, --check      Check for updates without installing
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

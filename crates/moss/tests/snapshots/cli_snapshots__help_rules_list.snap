@@ -1,0 +1,16 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 423
+expression: "snapshot_help(&[\"rules\", \"list\"])"
+---
+List installed rules
+
+Usage: moss rules list [OPTIONS]
+
+Options:
+      --sources    Show source URLs for imported rules
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

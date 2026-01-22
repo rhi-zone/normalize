@@ -1,0 +1,20 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 412
+expression: "snapshot_help(&[\"generate\", \"cli-snapshot\"])"
+---
+Generate CLI snapshot tests for a binary
+
+Usage: moss generate cli-snapshot [OPTIONS] <BINARY>
+
+Arguments:
+  <BINARY>  Path to the CLI binary
+
+Options:
+  -o, --output <OUTPUT>  Output file for the test (stdout if not specified)
+      --name <NAME>      Binary name to use in test (defaults to file stem)
+      --json             Output as JSON
+      --jq <EXPR>        Filter JSON output with jq expression (implies --json)
+      --pretty           Human-friendly output with colors and formatting
+      --compact          Compact output without colors (overrides TTY detection)
+  -h, --help             Print help

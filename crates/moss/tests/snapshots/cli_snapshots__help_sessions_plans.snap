@@ -1,0 +1,21 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 338
+expression: "snapshot_help(&[\"sessions\", \"plans\"])"
+---
+List and view agent plans (from ~/.claude/plans/, etc.)
+
+Usage: moss sessions plans [OPTIONS] [NAME]
+
+Arguments:
+  [NAME]  Plan name to view (omit to list all plans)
+
+Options:
+  -r, --root <ROOT>      Root directory (defaults to current directory)
+      --format <FORMAT>  Force specific format: claude, codex, gemini, moss
+  -l, --limit <LIMIT>    Limit number of sessions [default: 20]
+      --json             Output as JSON
+      --jq <EXPR>        Filter JSON output with jq expression (implies --json)
+      --pretty           Human-friendly output with colors and formatting
+      --compact          Compact output without colors (overrides TTY detection)
+  -h, --help             Print help

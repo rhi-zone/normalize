@@ -1,0 +1,20 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 82
+expression: "snapshot_help(&[\"context\"])"
+---
+Show directory context (hierarchical .context.md files)
+
+Usage: moss context [OPTIONS] [TARGET]
+
+Arguments:
+  [TARGET]  Target path to collect context for [default: .]
+
+Options:
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --list         Show only file paths, not content
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

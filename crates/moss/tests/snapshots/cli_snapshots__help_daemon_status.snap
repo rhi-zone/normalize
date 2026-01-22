@@ -1,0 +1,15 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 175
+expression: "snapshot_help(&[\"daemon\", \"status\"])"
+---
+Show daemon status
+
+Usage: moss daemon status [OPTIONS]
+
+Options:
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

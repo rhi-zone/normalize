@@ -1,0 +1,38 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 154
+expression: "snapshot_help(&[\"index\", \"rebuild\"])"
+---
+Rebuild the file index
+
+Usage: moss index rebuild [OPTIONS]
+
+Options:
+      --include <INCLUDE>
+          What to extract: symbols, calls, imports (default: all)
+
+          Possible values:
+          - none:    Skip content extraction (files only)
+          - symbols: Function and type definitions
+          - calls:   Function call relationships
+          - imports: Import statements
+          
+          [default: symbols calls imports]
+
+  -r, --root <ROOT>
+          Root directory (defaults to current directory)
+
+      --json
+          Output as JSON
+
+      --jq <EXPR>
+          Filter JSON output with jq expression (implies --json)
+
+      --pretty
+          Human-friendly output with colors and formatting
+
+      --compact
+          Compact output without colors (overrides TTY detection)
+
+  -h, --help
+          Print help (see a summary with '-h')

@@ -1,0 +1,17 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 364
+expression: "snapshot_help(&[\"package\", \"outdated\"])"
+---
+Show outdated packages (installed vs latest)
+
+Usage: moss package outdated [OPTIONS]
+
+Options:
+  -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)
+  -r, --root <ROOT>            Root directory (defaults to current directory)
+      --json                   Output as JSON
+      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+      --pretty                 Human-friendly output with colors and formatting
+      --compact                Compact output without colors (overrides TTY detection)
+  -h, --help                   Print help

@@ -1,0 +1,20 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 359
+expression: "snapshot_help(&[\"package\", \"why\"])"
+---
+Show why a dependency is in the tree
+
+Usage: moss package why [OPTIONS] <PACKAGE>
+
+Arguments:
+  <PACKAGE>  Package name to trace
+
+Options:
+  -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)
+  -r, --root <ROOT>            Root directory (defaults to current directory)
+      --json                   Output as JSON
+      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+      --pretty                 Human-friendly output with colors and formatting
+      --compact                Compact output without colors (overrides TTY detection)
+  -h, --help                   Print help

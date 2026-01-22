@@ -1,0 +1,21 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 102
+expression: "snapshot_help(&[\"tools\"])"
+---
+External ecosystem tools (linters, formatters, test runners)
+
+Usage: moss tools [OPTIONS] <COMMAND>
+
+Commands:
+  lint  Run linters, formatters, and type checkers
+  test  Run native test runners (cargo test, go test, bun test, etc.)
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

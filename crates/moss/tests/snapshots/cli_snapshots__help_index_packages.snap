@@ -1,0 +1,18 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 169
+expression: "snapshot_help(&[\"index\", \"packages\"])"
+---
+Index external packages (stdlib, site-packages) into global cache
+
+Usage: moss index packages [OPTIONS]
+
+Options:
+      --only <ONLY>  Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available
+      --clear        Clear existing index before re-indexing
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

@@ -1,0 +1,18 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 200
+expression: "snapshot_help(&[\"daemon\", \"remove\"])"
+---
+Remove a root from watching
+
+Usage: moss daemon remove [OPTIONS] [PATH]
+
+Arguments:
+  [PATH]  Path to the project root [default: .]
+
+Options:
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

@@ -1,0 +1,21 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 67
+expression: "snapshot_help(&[\"grammars\"])"
+---
+Manage tree-sitter grammars for parsing
+
+Usage: moss grammars [OPTIONS] <COMMAND>
+
+Commands:
+  list     List installed grammars
+  install  Install grammars from GitHub release
+  paths    Show grammar search paths
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

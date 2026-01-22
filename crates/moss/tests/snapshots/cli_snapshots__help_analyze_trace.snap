@@ -1,0 +1,26 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 257
+expression: "snapshot_help(&[\"analyze\", \"trace\"])"
+---
+Trace value provenance for a symbol
+
+Usage: moss analyze trace [OPTIONS] <SYMBOL>
+
+Arguments:
+  <SYMBOL>  Symbol to trace (format: symbol or file:line or file/symbol)
+
+Options:
+      --target <TARGET>        Target file to search in
+      --max-depth <MAX_DEPTH>  Maximum trace depth [default: 10]
+      --recursive              Trace into called functions (show what they return)
+  -i, --case-insensitive       Case-insensitive symbol matching
+      --json                   Output as JSON
+      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+  -r, --root <ROOT>            Root directory (defaults to current directory)
+      --exclude <PATTERN>      Exclude paths matching pattern or @alias
+      --pretty                 Human-friendly output with colors and formatting
+      --compact                Compact output without colors (overrides TTY detection)
+      --only <PATTERN>         Include only paths matching pattern or @alias
+      --diff [<BASE>]          Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
+  -h, --help                   Print help

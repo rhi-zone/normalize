@@ -1,0 +1,22 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 117
+expression: "snapshot_help(&[\"rules\"])"
+---
+Manage custom analysis rules
+
+Usage: moss rules [OPTIONS] <COMMAND>
+
+Commands:
+  add     Add a rule from a URL
+  list    List installed rules
+  update  Update imported rules from their sources
+  remove  Remove an imported rule
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

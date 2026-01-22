@@ -1,0 +1,57 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 138
+expression: "snapshot_help(&[\"edit\", \"insert\"])"
+---
+Insert content relative to target
+
+Usage: moss edit insert [OPTIONS] --at <AT> <CONTENT>
+
+Arguments:
+  <CONTENT>
+          Content to insert
+
+Options:
+      --at <AT>
+          Where to insert: before, after, prepend, append
+
+          Possible values:
+          - before:  Before the destination (sibling)
+          - after:   After the destination (sibling)
+          - prepend: At start of container
+          - append:  At end of container
+
+  -r, --root <ROOT>
+          Root directory (defaults to current directory)
+
+      --dry-run
+          Dry run - show what would be changed without applying
+
+      --exclude <EXCLUDE>
+          Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
+
+      --only <ONLY>
+          Only include files matching patterns or aliases
+
+      --multiple
+          Allow glob patterns to match multiple symbols
+
+  -m, --message <MESSAGE>
+          Message describing the edit (for shadow git history)
+          
+          [aliases: --reason]
+
+      --json
+          Output as JSON
+
+      --jq <EXPR>
+          Filter JSON output with jq expression (implies --json)
+
+      --pretty
+          Human-friendly output with colors and formatting
+
+      --compact
+          Compact output without colors (overrides TTY detection)
+
+  -h, --help
+          Print help (see a summary with '-h')

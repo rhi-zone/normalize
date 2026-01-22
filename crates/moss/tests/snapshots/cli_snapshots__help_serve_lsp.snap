@@ -1,0 +1,16 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 396
+expression: "snapshot_help(&[\"serve\", \"lsp\"])"
+---
+Start LSP server for IDE integration
+
+Usage: moss serve lsp [OPTIONS]
+
+Options:
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

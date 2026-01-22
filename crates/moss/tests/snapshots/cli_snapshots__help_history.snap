@@ -1,0 +1,24 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 42
+expression: "snapshot_help(&[\"history\"])"
+---
+View shadow git edit history
+
+Usage: moss history [OPTIONS] [FILE]
+
+Arguments:
+  [FILE]  Filter history to specific file
+
+Options:
+  -r, --root <ROOT>    Root directory (defaults to current directory)
+      --all            Show full tree structure (all branches)
+      --status         Show uncommitted shadow edits since last git commit
+      --diff <REF>     Show diff for a specific commit
+  -n, --limit <LIMIT>  Maximum number of entries to show [default: 20]
+      --prune <KEEP>   Prune shadow history, keeping only the last N commits
+      --json           Output as JSON
+      --jq <EXPR>      Filter JSON output with jq expression (implies --json)
+      --pretty         Human-friendly output with colors and formatting
+      --compact        Compact output without colors (overrides TTY detection)
+  -h, --help           Print help

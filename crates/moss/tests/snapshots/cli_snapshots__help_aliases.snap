@@ -1,0 +1,16 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 77
+expression: "snapshot_help(&[\"aliases\"])"
+---
+List filter aliases (used by --exclude/--only)
+
+Usage: moss aliases [OPTIONS]
+
+Options:
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

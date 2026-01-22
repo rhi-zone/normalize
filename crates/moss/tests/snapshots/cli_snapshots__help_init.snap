@@ -1,0 +1,16 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 52
+expression: "snapshot_help(&[\"init\"])"
+---
+Initialize moss in current directory
+
+Usage: moss init [OPTIONS]
+
+Options:
+      --index      Index the codebase after initialization
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

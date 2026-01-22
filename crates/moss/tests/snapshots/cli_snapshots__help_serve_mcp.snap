@@ -1,0 +1,16 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 386
+expression: "snapshot_help(&[\"serve\", \"mcp\"])"
+---
+Start MCP server for LLM integration (stdio transport)
+
+Usage: moss serve mcp [OPTIONS]
+
+Options:
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

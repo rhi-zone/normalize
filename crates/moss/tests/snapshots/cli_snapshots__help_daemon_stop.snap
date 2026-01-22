@@ -1,0 +1,15 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 180
+expression: "snapshot_help(&[\"daemon\", \"stop\"])"
+---
+Stop the daemon
+
+Usage: moss daemon stop [OPTIONS]
+
+Options:
+      --json       Output as JSON
+      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
+      --pretty     Human-friendly output with colors and formatting
+      --compact    Compact output without colors (overrides TTY detection)
+  -h, --help       Print help

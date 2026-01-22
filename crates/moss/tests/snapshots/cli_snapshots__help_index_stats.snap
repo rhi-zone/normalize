@@ -1,0 +1,17 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 159
+expression: "snapshot_help(&[\"index\", \"stats\"])"
+---
+Show index statistics (DB size vs codebase size)
+
+Usage: moss index stats [OPTIONS]
+
+Options:
+      --storage      Show storage usage for index and caches
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

@@ -1,0 +1,25 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 237
+expression: "snapshot_help(&[\"analyze\", \"length\"])"
+---
+Run function length analysis
+
+Usage: moss analyze length [OPTIONS] [TARGET]
+
+Arguments:
+  [TARGET]  Target file or directory
+
+Options:
+      --sarif              Output in SARIF format for IDE integration
+      --allow <SYMBOL>     Add function to .moss/length-allow
+      --reason <REASON>    Reason for allowing
+      --json               Output as JSON
+      --jq <EXPR>          Filter JSON output with jq expression (implies --json)
+  -r, --root <ROOT>        Root directory (defaults to current directory)
+      --exclude <PATTERN>  Exclude paths matching pattern or @alias
+      --pretty             Human-friendly output with colors and formatting
+      --compact            Compact output without colors (overrides TTY detection)
+      --only <PATTERN>     Include only paths matching pattern or @alias
+      --diff [<BASE>]      Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
+  -h, --help               Print help

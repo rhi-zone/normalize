@@ -1,0 +1,20 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 402
+expression: "snapshot_help(&[\"generate\", \"client\"])"
+---
+Generate API client from OpenAPI spec (legacy)
+
+Usage: moss generate client [OPTIONS] --lang <LANG> <SPEC>
+
+Arguments:
+  <SPEC>  OpenAPI spec JSON file
+
+Options:
+  -l, --lang <LANG>      Target language: typescript, python, rust
+  -o, --output <OUTPUT>  Output file (stdout if not specified)
+      --json             Output as JSON
+      --jq <EXPR>        Filter JSON output with jq expression (implies --json)
+      --pretty           Human-friendly output with colors and formatting
+      --compact          Compact output without colors (overrides TTY detection)
+  -h, --help             Print help

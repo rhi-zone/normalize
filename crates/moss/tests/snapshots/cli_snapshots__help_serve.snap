@@ -1,0 +1,22 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 107
+expression: "snapshot_help(&[\"serve\"])"
+---
+Start a moss server (MCP, HTTP, LSP)
+
+Usage: moss serve [OPTIONS] <COMMAND>
+
+Commands:
+  mcp   Start MCP server for LLM integration (stdio transport)
+  http  Start HTTP server (REST API)
+  lsp   Start LSP server for IDE integration
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

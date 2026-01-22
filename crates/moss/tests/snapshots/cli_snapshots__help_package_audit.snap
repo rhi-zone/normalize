@@ -1,0 +1,17 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 369
+expression: "snapshot_help(&[\"package\", \"audit\"])"
+---
+Check for security vulnerabilities
+
+Usage: moss package audit [OPTIONS]
+
+Options:
+  -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)
+  -r, --root <ROOT>            Root directory (defaults to current directory)
+      --json                   Output as JSON
+      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+      --pretty                 Human-friendly output with colors and formatting
+      --compact                Compact output without colors (overrides TTY detection)
+  -h, --help                   Print help

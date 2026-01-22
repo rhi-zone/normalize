@@ -1,0 +1,18 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 391
+expression: "snapshot_help(&[\"serve\", \"http\"])"
+---
+Start HTTP server (REST API)
+
+Usage: moss serve http [OPTIONS]
+
+Options:
+  -p, --port <PORT>  Port to listen on [default: 8080]
+      --openapi      Output OpenAPI spec and exit (don't start server)
+  -r, --root <ROOT>  Root directory (defaults to current directory)
+      --json         Output as JSON
+      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
+      --pretty       Human-friendly output with colors and formatting
+      --compact      Compact output without colors (overrides TTY detection)
+  -h, --help         Print help

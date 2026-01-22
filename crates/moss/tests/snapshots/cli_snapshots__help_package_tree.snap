@@ -1,0 +1,17 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 354
+expression: "snapshot_help(&[\"package\", \"tree\"])"
+---
+Show dependency tree from lockfile
+
+Usage: moss package tree [OPTIONS]
+
+Options:
+  -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)
+  -r, --root <ROOT>            Root directory (defaults to current directory)
+      --json                   Output as JSON
+      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+      --pretty                 Human-friendly output with colors and formatting
+      --compact                Compact output without colors (overrides TTY detection)
+  -h, --help                   Print help

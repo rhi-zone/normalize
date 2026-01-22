@@ -1,0 +1,29 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 375
+expression: "snapshot_help(&[\"tools\", \"lint\"])"
+---
+Run linters, formatters, and type checkers
+
+Usage: moss tools lint [OPTIONS] [TARGET] [COMMAND]
+
+Commands:
+  run   Run linters (default)
+  list  List available linting tools
+  help  Print this message or the help of the given subcommand(s)
+
+Arguments:
+  [TARGET]  Target path to check (defaults to current directory)
+
+Options:
+  -f, --fix                  Fix issues automatically where possible
+  -r, --root <ROOT>          Root directory (defaults to current directory)
+  -t, --tools <TOOLS>        Specific tools to run (comma-separated, e.g., "ruff,oxlint")
+  -c, --category <CATEGORY>  Filter by category: lint, fmt, type
+      --sarif                Output in SARIF format
+  -w, --watch                Watch for file changes and re-run on save
+      --json                 Output as JSON
+      --jq <EXPR>            Filter JSON output with jq expression (implies --json)
+      --pretty               Human-friendly output with colors and formatting
+      --compact              Compact output without colors (overrides TTY detection)
+  -h, --help                 Print help

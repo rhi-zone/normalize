@@ -1,0 +1,42 @@
+---
+source: crates/moss/tests/cli_snapshots.rs
+assertion_line: 37
+expression: "snapshot_help(&[\"edit\"])"
+---
+Edit a node in the codebase tree (structural code modification)
+
+Usage: moss edit [OPTIONS] [TARGET] [COMMAND]
+
+Commands:
+  delete   Delete the target symbol
+  replace  Replace target with new content
+  swap     Swap target with another symbol
+  insert   Insert content relative to target
+  move     Move target to a new location
+  copy     Copy target to a new location
+  help     Print this message or the help of the given subcommand(s)
+
+Arguments:
+  [TARGET]  Target to edit (path like src/main.py/Foo/bar)
+
+Options:
+  -r, --root <ROOT>        Root directory (defaults to current directory)
+      --dry-run            Dry run - show what would be changed without applying
+      --exclude <EXCLUDE>  Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
+      --only <ONLY>        Only include files matching patterns or aliases
+      --multiple           Allow glob patterns to match multiple symbols
+  -m, --message <MESSAGE>  Message describing the edit (for shadow git history) [aliases: --reason]
+      --undo [<N>]         Undo the last N edits (default: 1)
+      --redo               Redo the last undone edit
+      --force              Force undo even if files were modified externally
+      --goto <REF>         Jump to a specific shadow commit (restores file state from that point)
+      --file <PATH>        Undo changes only for specific file(s) (used with --undo)
+      --cross-checkpoint   Allow undo to cross git commit boundaries (checkpoints)
+      --json               Output as JSON
+  -y, --yes                Confirm destructive operations (delete) without prompting
+  -i, --case-insensitive   Case-insensitive symbol matching
+      --jq <EXPR>          Filter JSON output with jq expression (implies --json)
+      --batch <FILE>       Apply batch edits from JSON file (or - for stdin)
+      --pretty             Human-friendly output with colors and formatting
+      --compact            Compact output without colors (overrides TTY detection)
+  -h, --help               Print help
