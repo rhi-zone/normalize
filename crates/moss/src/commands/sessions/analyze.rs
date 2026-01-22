@@ -30,9 +30,9 @@ pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool, prett
     if json {
         println!("{}", serde_json::to_string_pretty(&analysis).unwrap());
     } else if pretty {
-        println!("{}", analysis.to_pretty());
+        println!("{}", analysis.format_pretty());
     } else {
-        println!("{}", analysis.to_markdown());
+        println!("{}", analysis.format_text());
     }
     0
 }
@@ -117,9 +117,9 @@ pub fn cmd_sessions_analyze_multi(
     if json {
         println!("{}", serde_json::to_string_pretty(&aggregate).unwrap());
     } else if pretty {
-        println!("{}", aggregate.to_pretty());
+        println!("{}", aggregate.format_pretty());
     } else {
-        println!("{}", aggregate.to_markdown());
+        println!("{}", aggregate.format_text());
     }
 
     0

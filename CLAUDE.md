@@ -101,3 +101,36 @@ Do not:
 **Dynamic context > append-only.** Chatbot model (growing conversation log) is wrong for agents. Moss uses context that can be reshaped, not just accumulated.
 
 **When stuck (2+ attempts):** Step back. Am I solving the right problem? Check docs/philosophy.md before questioning design.
+
+## Code Conventions
+
+**OutputFormatter trait** (`crates/moss/src/output.rs`):
+
+All types that produce user-facing output should implement `OutputFormatter`:
+
+```rust
+impl OutputFormatter for YourType {
+    fn format_text(&self) -> String {
+        // Compact text (markdown, LLM-friendly, no colors)
+        // Default format, used with --compact or no flags
+        // Good for: piping, LLM consumption, copy/paste
+    }
+
+    fn format_pretty(&self) -> String {
+        // Pretty text with colors and visualizations
+        // Used with --pretty flag
+        // Good for: terminal viewing, debugging
+    }
+}
+```
+
+Benefits:
+- Consistent `--pretty`/`--compact`/`--json`/`--jq` across all commands
+- No manual flag checking - use `OutputFormat::from_cli()` + `analysis.print(&format)`
+- Respects `NO_COLOR` env var and TTY detection automatically
+- `format_text()` is required, `format_pretty()` defaults to `format_text()` if not overridden
+
+**When to use:**
+- Analysis results (`SessionAnalysis`, complexity reports, etc.)
+- Structured command output (stats, summaries, listings)
+- **Not for:** Raw data dumps, interactive prompts, error messages

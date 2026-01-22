@@ -4,6 +4,7 @@
 //! Analysis is intentionally in the CLI, not the parsing library,
 //! because what metrics matter is subjective and consumer-specific.
 
+use crate::output::OutputFormatter;
 use rhizome_moss_sessions::{ContentBlock, Session};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -284,8 +285,8 @@ impl SessionAnalysis {
         }
     }
 
-    /// Format as markdown report.
-    pub fn to_markdown(&self) -> String {
+    /// Format as compact text (markdown, LLM-friendly, no colors).
+    pub fn format_text(&self) -> String {
         let mut lines = vec![
             "# Session Analysis".to_string(),
             String::new(),
@@ -580,8 +581,8 @@ impl SessionAnalysis {
         lines.join("\n")
     }
 
-    /// Format as pretty output with bar charts.
-    pub fn to_pretty(&self) -> String {
+    /// Format as pretty text with colors and bar charts.
+    pub fn format_pretty(&self) -> String {
         use std::fmt::Write;
         let mut out = String::new();
 
@@ -883,6 +884,19 @@ impl SessionAnalysis {
         }
 
         out
+    }
+}
+
+/// Implement OutputFormatter trait for consistent output handling.
+impl OutputFormatter for SessionAnalysis {
+    fn format_text(&self) -> String {
+        // Call the inherent method (markdown format)
+        SessionAnalysis::format_text(self)
+    }
+
+    fn format_pretty(&self) -> String {
+        // Call the inherent method (colored bar charts)
+        SessionAnalysis::format_pretty(self)
     }
 }
 
