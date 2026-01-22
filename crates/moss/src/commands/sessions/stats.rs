@@ -56,6 +56,7 @@ pub fn cmd_sessions_stats(
     until: Option<&str>,
     project_filter: Option<&Path>,
     all_projects: bool,
+    by_repo: bool,
     json: bool,
     pretty: bool,
 ) -> i32 {
@@ -181,6 +182,11 @@ pub fn cmd_sessions_stats(
         );
     }
 
+    // Group by repo if requested
+    if by_repo {
+        return cmd_sessions_stats_by_repo(&sessions, format_name, json, pretty);
+    }
+
     // Collect paths and analyze
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
     cmd_sessions_analyze_multi(&paths, format_name, json, pretty)
@@ -227,4 +233,79 @@ pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFi
     }
 
     all_sessions
+}
+
+/// Extract repository name from session path.
+/// For paths like ~/.claude/projects/-home-me-git-moss/session.jsonl, returns "moss"
+/// For other paths, returns the parent directory name.
+fn extract_repo_name(path: &Path) -> String {
+    // Try to find .claude/projects/ in the path
+    let path_str = path.to_string_lossy();
+
+    if let Some(projects_idx) = path_str.find(".claude/projects/") {
+        let after_projects = &path_str[projects_idx + ".claude/projects/".len()..];
+        if let Some(slash_idx) = after_projects.find('/') {
+            let proj_dir = &after_projects[..slash_idx];
+
+            // Clean up the project directory name
+            // -home-me-git-moss -> moss
+            if let Some(last_dash) = proj_dir.rfind('-') {
+                return proj_dir[last_dash + 1..].to_string();
+            }
+            return proj_dir.to_string();
+        }
+    }
+
+    // Fallback: use parent directory name
+    path.parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+/// Show statistics grouped by repository.
+fn cmd_sessions_stats_by_repo(
+    sessions: &[SessionFile],
+    format_name: Option<&str>,
+    json: bool,
+    pretty: bool,
+) -> i32 {
+    use std::collections::HashMap;
+
+    // Group sessions by repository
+    let mut by_repo: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for session in sessions {
+        let repo = extract_repo_name(&session.path);
+        by_repo
+            .entry(repo)
+            .or_insert_with(Vec::new)
+            .push(session.path.clone());
+    }
+
+    // Sort repos by name for consistent output
+    let mut repos: Vec<_> = by_repo.into_iter().collect();
+    repos.sort_by(|a, b| a.0.cmp(&b.0));
+
+    if json {
+        // For JSON output, analyze each repo and collect results
+        // This would need a more sophisticated structure - defer for now
+        eprintln!("JSON output not yet supported for --by-repo");
+        return 1;
+    }
+
+    // Analyze each repository separately
+    for (repo_name, paths) in repos {
+        println!("=== {} ({} sessions) ===\n", repo_name, paths.len());
+
+        let result = cmd_sessions_analyze_multi(&paths, format_name, false, pretty);
+        if result != 0 {
+            eprintln!("Failed to analyze sessions for {}", repo_name);
+            return result;
+        }
+
+        println!("\n");
+    }
+
+    0
 }

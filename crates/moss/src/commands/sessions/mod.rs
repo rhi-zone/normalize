@@ -268,7 +268,7 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             until,
             project,
             all_projects,
-            by_repo: _,
+            by_repo,
         }) => cmd_sessions_stats(
             args.root.as_deref(),
             args.limit,
@@ -279,6 +279,7 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             until.as_deref(),
             project.as_deref(),
             all_projects,
+            by_repo,
             json,
             pretty,
         ),
