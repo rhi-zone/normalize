@@ -25,6 +25,7 @@ use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;
+use crate::output::OutputFormatter;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
 use rhizome_moss_derive::Merge;
 pub use rhizome_moss_rules::{RuleOverride, RulesConfig};
@@ -803,13 +804,11 @@ fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<Filt
 
 /// Print analysis report in appropriate format
 fn print_report(report: &report::AnalyzeReport, json: bool, pretty: bool) -> i32 {
-    if json {
-        println!("{}", report.to_json());
-    } else if pretty {
-        println!("{}", report.format_pretty());
-    } else {
-        println!("{}", report.format());
-    }
+    use crate::output::OutputFormat;
+
+    let config = crate::config::MossConfig::load(std::env::current_dir().unwrap().as_path());
+    let format = OutputFormat::from_cli(json, None, pretty, false, &config.pretty);
+    report.print(&format);
     0
 }
 
@@ -844,13 +843,9 @@ fn run_all_passes(
         scores.push((security_report.score(), weights.security()));
     }
 
-    if json {
-        println!("{}", report.to_json());
-    } else if pretty {
-        println!("{}", report.format_pretty());
-    } else {
-        println!("{}", report.format());
-    }
+    let config = crate::config::MossConfig::load(root);
+    let format = crate::output::OutputFormat::from_cli(json, None, pretty, false, &config.pretty);
+    report.print(&format);
 
     // 2. Duplicate functions
     if !json {

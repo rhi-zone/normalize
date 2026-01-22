@@ -10,7 +10,9 @@ use crate::analyze::complexity::{ComplexityReport, RiskLevel};
 use crate::analyze::function_length::{LengthCategory, LengthReport};
 use crate::filter::Filter;
 use crate::health::{HealthReport, analyze_health};
+use crate::output::OutputFormatter;
 use crate::path_resolve;
+use serde::Serialize;
 use std::path::PathBuf;
 
 use super::{complexity, length, security};
@@ -24,7 +26,8 @@ pub struct Grade {
 }
 
 /// Severity levels for security findings
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Severity {
     Low,
     Medium,
@@ -53,7 +56,7 @@ impl Severity {
 }
 
 /// A security finding from analysis tools
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SecurityFinding {
     pub file: String,
     pub line: usize,
@@ -64,7 +67,7 @@ pub struct SecurityFinding {
 }
 
 /// Security analysis results
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct SecurityReport {
     pub findings: Vec<SecurityFinding>,
     pub tools_run: Vec<String>,
@@ -95,8 +98,10 @@ impl SecurityReport {
             + counts["low"] * 5;
         (100.0 - penalty as f64).max(0.0)
     }
+}
 
-    pub fn format(&self) -> String {
+impl OutputFormatter for SecurityReport {
+    fn format_text(&self) -> String {
         let mut lines = Vec::new();
         lines.push("# Security Analysis".to_string());
         lines.push(String::new());
@@ -149,7 +154,7 @@ impl SecurityReport {
 }
 
 /// Combined analysis report
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct AnalyzeReport {
     pub health: Option<HealthReport>,
     pub complexity: Option<ComplexityReport>,
@@ -159,8 +164,8 @@ pub struct AnalyzeReport {
     pub skipped: Vec<String>,
 }
 
-impl AnalyzeReport {
-    pub fn format(&self) -> String {
+impl OutputFormatter for AnalyzeReport {
+    fn format_text(&self) -> String {
         let mut sections = Vec::new();
 
         sections.push(format!("# Analysis: {}", self.target_path));
@@ -255,7 +260,7 @@ impl AnalyzeReport {
         }
 
         if let Some(ref security) = self.security {
-            sections.push(security.format());
+            sections.push(security.format_text());
         }
 
         if !self.skipped.is_empty() {
@@ -269,142 +274,8 @@ impl AnalyzeReport {
         sections.join("\n")
     }
 
-    pub fn to_json(&self) -> serde_json::Value {
-        let mut obj = serde_json::Map::new();
-        obj.insert(
-            "target".to_string(),
-            serde_json::Value::String(self.target_path.clone()),
-        );
-
-        if let Some(ref health) = self.health {
-            let large_files: Vec<_> = health
-                .large_files
-                .iter()
-                .map(|lf| {
-                    serde_json::json!({
-                        "path": lf.path,
-                        "lines": lf.lines,
-                    })
-                })
-                .collect();
-            obj.insert(
-                "health".to_string(),
-                serde_json::json!({
-                    "total_files": health.total_files,
-                    "files_by_language": health.files_by_language,
-                    "total_lines": health.total_lines,
-                    "avg_complexity": health.avg_complexity,
-                    "max_complexity": health.max_complexity,
-                    "high_risk_functions": health.high_risk_functions,
-                    "total_functions": health.total_functions,
-                    "large_files": large_files,
-                }),
-            );
-        }
-
-        if let Some(ref complexity) = self.complexity {
-            let functions: Vec<_> = complexity
-                .functions
-                .iter()
-                .map(|f| {
-                    serde_json::json!({
-                        "name": f.name,
-                        "parent": f.parent,
-                        "short_name": f.short_name(),
-                        "qualified_name": f.qualified_name(),
-                        "complexity": f.complexity,
-                        "line": f.start_line,
-                        "risk_level": f.risk_level().as_str(),
-                    })
-                })
-                .collect();
-
-            obj.insert(
-                "complexity".to_string(),
-                serde_json::json!({
-                    "file": complexity.file_path,
-                    "functions": functions,
-                    "avg_complexity": complexity.avg_complexity(),
-                    "max_complexity": complexity.max_complexity(),
-                    "high_risk_count": complexity.high_risk_count(),
-                }),
-            );
-        }
-
-        if let Some(ref length) = self.length {
-            let functions: Vec<_> = length
-                .functions
-                .iter()
-                .map(|f| {
-                    serde_json::json!({
-                        "name": f.name,
-                        "parent": f.parent,
-                        "short_name": f.short_name(),
-                        "lines": f.lines,
-                        "start_line": f.start_line,
-                        "end_line": f.end_line,
-                        "category": f.category().as_str(),
-                    })
-                })
-                .collect();
-
-            obj.insert(
-                "length".to_string(),
-                serde_json::json!({
-                    "file": length.file_path,
-                    "functions": functions,
-                    "avg_length": length.avg_length(),
-                    "max_length": length.max_length(),
-                    "long_count": length.long_count(),
-                    "too_long_count": length.too_long_count(),
-                }),
-            );
-        }
-
-        if let Some(ref security) = self.security {
-            let findings: Vec<_> = security
-                .findings
-                .iter()
-                .map(|f| {
-                    serde_json::json!({
-                        "file": f.file,
-                        "line": f.line,
-                        "severity": f.severity.as_str(),
-                        "rule_id": f.rule_id,
-                        "message": f.message,
-                        "tool": f.tool,
-                    })
-                })
-                .collect();
-
-            obj.insert(
-                "security".to_string(),
-                serde_json::json!({
-                    "findings": findings,
-                    "counts": security.count_by_severity(),
-                    "tools_run": security.tools_run,
-                    "tools_skipped": security.tools_skipped,
-                }),
-            );
-        }
-
-        if !self.skipped.is_empty() {
-            obj.insert(
-                "skipped".to_string(),
-                serde_json::Value::Array(
-                    self.skipped
-                        .iter()
-                        .map(|s| serde_json::Value::String(s.clone()))
-                        .collect(),
-                ),
-            );
-        }
-
-        serde_json::Value::Object(obj)
-    }
-
     /// Format as pretty text with colors (human-friendly).
-    pub fn format_pretty(&self) -> String {
+    fn format_pretty(&self) -> String {
         use nu_ansi_term::Color::{Red, Yellow};
 
         let mut sections = Vec::new();
@@ -510,7 +381,7 @@ impl AnalyzeReport {
         }
 
         if let Some(ref security) = self.security {
-            sections.push(security.format());
+            sections.push(security.format_text());
         }
 
         if !self.skipped.is_empty() {

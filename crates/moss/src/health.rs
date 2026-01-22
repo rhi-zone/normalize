@@ -4,6 +4,7 @@
 //! complexity summary, and structural metrics.
 
 use glob::Pattern;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -11,7 +12,7 @@ use crate::commands::analyze::complexity::analyze_codebase_complexity;
 use crate::index::FileIndex;
 
 /// Large file info for reporting
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LargeFile {
     pub path: String,
     pub lines: usize,
@@ -23,7 +24,7 @@ const VERY_LARGE_THRESHOLD: usize = 1000;
 const MASSIVE_THRESHOLD: usize = 2000;
 
 /// Health metrics for a codebase
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct HealthReport {
     pub total_files: usize,
     pub files_by_language: HashMap<String, usize>,
