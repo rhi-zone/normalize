@@ -46,6 +46,7 @@ pub fn cmd_sessions_analyze_multi(
 ) -> i32 {
     let mut aggregate = SessionAnalysis::new(PathBuf::from("."), "aggregate");
     let mut session_count = 0;
+    let mut all_chains = Vec::new();
 
     for path in paths {
         // Parse the session
@@ -99,6 +100,9 @@ pub fn cmd_sessions_analyze_multi(
 
                 aggregate.total_turns += a.total_turns;
                 aggregate.parallel_opportunities += a.parallel_opportunities;
+
+                // Collect tool chains for pattern analysis
+                all_chains.extend(a.tool_chains);
             }
             Err(e) => {
                 eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
@@ -110,6 +114,10 @@ pub fn cmd_sessions_analyze_multi(
         eprintln!("No sessions could be analyzed");
         return 1;
     }
+
+    // Extract common tool patterns from all chains
+    use crate::sessions::extract_tool_patterns;
+    aggregate.tool_patterns = extract_tool_patterns(&all_chains);
 
     // Update format to show aggregate info
     aggregate.format = format!("aggregate ({} sessions)", session_count);

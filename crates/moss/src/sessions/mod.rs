@@ -15,5 +15,5 @@ pub use rhizome_moss_sessions::{
 // Export analysis types from this crate
 pub use analysis::{
     ErrorPattern, SessionAnalysis, TokenStats, ToolStats, analyze_session, categorize_error,
-    normalize_path,
+    extract_tool_patterns, normalize_path,
 };

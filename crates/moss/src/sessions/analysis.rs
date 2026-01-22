@@ -235,6 +235,19 @@ impl FileOperation {
     }
 }
 
+/// A common tool pattern across sessions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolPattern {
+    pub tools: Vec<String>,
+    pub occurrences: usize,
+}
+
+impl ToolPattern {
+    pub fn pattern_str(&self) -> String {
+        self.tools.join(" → ")
+    }
+}
+
 /// Complete analysis of a session.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionAnalysis {
@@ -257,6 +270,8 @@ pub struct SessionAnalysis {
     pub context_per_turn: Vec<u64>,
     /// File operation frequency (Read/Edit/Write)
     pub file_operations: HashMap<String, FileOperation>,
+    /// Common tool patterns (multi-session aggregate only)
+    pub tool_patterns: Vec<ToolPattern>,
 }
 
 impl SessionAnalysis {
@@ -526,6 +541,22 @@ impl SessionAnalysis {
                 }
                 lines.push(String::new());
             }
+        }
+
+        // Tool patterns (multi-session only)
+        if !self.tool_patterns.is_empty() {
+            lines.push("## Common Tool Patterns".to_string());
+            lines.push(String::new());
+            lines.push("Frequent sequences across all sessions:".to_string());
+            lines.push(String::new());
+            for pattern in self.tool_patterns.iter().take(10) {
+                lines.push(format!(
+                    "- **{}×**: {}",
+                    pattern.occurrences,
+                    pattern.pattern_str()
+                ));
+            }
+            lines.push(String::new());
         }
 
         // Tool chains
@@ -843,6 +874,23 @@ impl SessionAnalysis {
             }
         }
 
+        // Tool patterns (multi-session aggregate)
+        if !self.tool_patterns.is_empty() {
+            writeln!(out).unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Common Tool Patterns ━━━\x1b[0m").unwrap();
+            writeln!(out, "Frequent sequences across all sessions:").unwrap();
+            writeln!(out).unwrap();
+            for pattern in self.tool_patterns.iter().take(10) {
+                writeln!(
+                    out,
+                    "\x1b[33m{:>3}×\x1b[0m {}",
+                    pattern.occurrences,
+                    pattern.pattern_str()
+                )
+                .unwrap();
+            }
+        }
+
         // Tool chains
         if !self.tool_chains.is_empty() {
             writeln!(out).unwrap();
@@ -1070,6 +1118,38 @@ pub fn normalize_path(path: &str) -> String {
         }
     }
     path.to_string()
+}
+
+/// Extract all subsequences of length 2-5 from tool chains.
+pub fn extract_tool_patterns(chains: &[ToolChain]) -> Vec<ToolPattern> {
+    let mut pattern_counts: HashMap<Vec<String>, usize> = HashMap::new();
+
+    for chain in chains {
+        // Extract all subsequences of length 2-5
+        for len in 2..=5.min(chain.tools.len()) {
+            for start in 0..=chain.tools.len().saturating_sub(len) {
+                let subsequence: Vec<String> =
+                    chain.tools[start..start + len].iter().cloned().collect();
+                *pattern_counts.entry(subsequence).or_insert(0) += 1;
+            }
+        }
+    }
+
+    // Convert to ToolPattern vec and filter out single occurrences
+    let mut patterns: Vec<ToolPattern> = pattern_counts
+        .into_iter()
+        .filter(|(_, count)| *count >= 2) // Only keep patterns that occur 2+ times
+        .map(|(tools, occurrences)| ToolPattern { tools, occurrences })
+        .collect();
+
+    // Sort by occurrence count (descending), then by pattern length (descending)
+    patterns.sort_by(|a, b| {
+        b.occurrences
+            .cmp(&a.occurrences)
+            .then(b.tools.len().cmp(&a.tools.len()))
+    });
+
+    patterns
 }
 
 /// Analyze a parsed session and compute statistics.
