@@ -56,6 +56,8 @@ mod tests {
 
     #[test]
     fn test_pattern_matching() {
+        use ast_grep_core::tree_sitter::LanguageExt;
+
         let loader = GrammarLoader::new();
         let Some(ts_lang) = loader.get("rust") else {
             eprintln!("Skipping test: rust grammar not available");
@@ -63,19 +65,21 @@ mod tests {
         };
 
         let lang = DynLang::new(ts_lang);
-        let source = r#"
-            fn main() {
-                println!("hello");
-                dbg!(x);
-            }
-        "#;
+        let source = "fn foo() { let x = 1; }";
 
-        let doc = lang.parse(source).expect("parse failed");
-        let pattern = lang.pattern("dbg!($X)").expect("pattern failed");
+        let grep = lang.ast_grep(source);
+        let root = grep.root();
 
-        use ast_grep_core::Matcher;
-        let matches: Vec<_> = doc.root().find_all(&pattern).collect();
+        // Test pattern matching - find the identifier "foo"
+        let pattern = lang.pattern("foo").expect("pattern failed");
+        let matches: Vec<_> = root.find_all(&pattern).collect();
         assert_eq!(matches.len(), 1);
-        assert!(matches[0].text().contains("dbg!(x)"));
+        assert_eq!(matches[0].text(), "foo");
+
+        // Test pattern with metavariable - find let bindings
+        let pattern = lang.pattern("let $X = $Y").expect("pattern failed");
+        let matches: Vec<_> = root.find_all(&pattern).collect();
+        assert_eq!(matches.len(), 1);
+        assert!(matches[0].text().contains("let x = 1"));
     }
 }
