@@ -146,6 +146,18 @@ pub enum SessionsCommand {
         /// Run full analysis instead of dumping raw log
         #[arg(short, long)]
         analyze: bool,
+
+        /// Filter messages by role/type: user, assistant, system, tool_use, tool_result, thinking
+        #[arg(long)]
+        filter: Option<String>,
+
+        /// Search for pattern in filtered messages (requires --filter or shows all matching)
+        #[arg(long)]
+        grep: Option<String>,
+
+        /// Show only error tool results (implies --filter tool_result)
+        #[arg(long)]
+        errors_only: bool,
     },
 
     /// Show aggregate statistics across sessions
@@ -217,6 +229,9 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             session,
             jq,
             analyze,
+            filter,
+            grep,
+            errors_only,
         }) => cmd_sessions_show(
             &session,
             args.root.as_deref(),
@@ -225,6 +240,9 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
             analyze,
             json,
             pretty,
+            filter.as_deref(),
+            grep.as_deref(),
+            errors_only,
         ),
 
         Some(SessionsCommand::Stats {

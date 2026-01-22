@@ -47,6 +47,80 @@ pub struct TokenStats {
     pub api_calls: usize,
 }
 
+/// Model pricing information (per million tokens).
+#[derive(Debug, Clone, Copy)]
+pub struct ModelPricing {
+    pub name: &'static str,
+    pub input_per_mtok: f64,
+    pub output_per_mtok: f64,
+    pub cache_write_per_mtok: f64,
+    pub cache_read_per_mtok: f64,
+}
+
+impl ModelPricing {
+    /// Anthropic Claude pricing (as of Jan 2025).
+    pub const SONNET_4_5: ModelPricing = ModelPricing {
+        name: "Claude Sonnet 4.5",
+        input_per_mtok: 3.0,
+        output_per_mtok: 15.0,
+        cache_write_per_mtok: 3.75,
+        cache_read_per_mtok: 0.30,
+    };
+
+    pub const OPUS_4_5: ModelPricing = ModelPricing {
+        name: "Claude Opus 4.5",
+        input_per_mtok: 15.0,
+        output_per_mtok: 75.0,
+        cache_write_per_mtok: 18.75,
+        cache_read_per_mtok: 1.50,
+    };
+
+    pub const HAIKU_4: ModelPricing = ModelPricing {
+        name: "Claude Haiku 4",
+        input_per_mtok: 0.80,
+        output_per_mtok: 4.0,
+        cache_write_per_mtok: 1.0,
+        cache_read_per_mtok: 0.08,
+    };
+
+    /// Calculate cost for given token usage.
+    pub fn calculate_cost(&self, stats: &TokenStats) -> CostBreakdown {
+        let input_cost = (stats.total_input as f64 / 1_000_000.0) * self.input_per_mtok;
+        let output_cost = (stats.total_output as f64 / 1_000_000.0) * self.output_per_mtok;
+        let cache_write_cost =
+            (stats.cache_create as f64 / 1_000_000.0) * self.cache_write_per_mtok;
+        let cache_read_cost = (stats.cache_read as f64 / 1_000_000.0) * self.cache_read_per_mtok;
+
+        // Cache savings = what we would have paid without cache
+        let without_cache_input = stats.total_input + stats.cache_read;
+        let without_cache_cost = (without_cache_input as f64 / 1_000_000.0) * self.input_per_mtok;
+        let with_cache_cost = input_cost + cache_read_cost;
+        let cache_savings = without_cache_cost - with_cache_cost;
+
+        CostBreakdown {
+            model: self.name,
+            input_cost,
+            output_cost,
+            cache_write_cost,
+            cache_read_cost,
+            total_cost: input_cost + output_cost + cache_write_cost + cache_read_cost,
+            cache_savings,
+        }
+    }
+}
+
+/// Cost breakdown for a session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostBreakdown {
+    pub model: &'static str,
+    pub input_cost: f64,
+    pub output_cost: f64,
+    pub cache_write_cost: f64,
+    pub cache_read_cost: f64,
+    pub total_cost: f64,
+    pub cache_savings: f64,
+}
+
 impl TokenStats {
     pub fn avg_context(&self) -> u64 {
         if self.api_calls == 0 {
@@ -148,6 +222,8 @@ pub struct SessionAnalysis {
     pub tool_chains: Vec<ToolChain>,
     /// Assistant corrections and apologies
     pub corrections: Vec<Correction>,
+    /// Context size per turn (input + cache_read)
+    pub context_per_turn: Vec<u64>,
 }
 
 impl SessionAnalysis {
@@ -255,6 +331,89 @@ impl SessionAnalysis {
                 ts.min_context, ts.max_context
             ));
             lines.push(String::new());
+
+            // Cost breakdown
+            lines.push("## Cost Estimate".to_string());
+            lines.push(String::new());
+            let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
+            lines.push(format!(
+                "**{} (default)**: ${:.2}",
+                sonnet.model, sonnet.total_cost
+            ));
+            lines.push(format!("  - Input: ${:.2}", sonnet.input_cost));
+            lines.push(format!("  - Output: ${:.2}", sonnet.output_cost));
+            if sonnet.cache_write_cost > 0.0 {
+                lines.push(format!("  - Cache write: ${:.2}", sonnet.cache_write_cost));
+            }
+            if sonnet.cache_read_cost > 0.0 {
+                lines.push(format!("  - Cache read: ${:.2}", sonnet.cache_read_cost));
+            }
+            if sonnet.cache_savings > 0.0 {
+                let savings_pct =
+                    (sonnet.cache_savings / (sonnet.total_cost + sonnet.cache_savings)) * 100.0;
+                lines.push(format!(
+                    "  - Cache savings: ${:.2} ({:.1}%)",
+                    sonnet.cache_savings, savings_pct
+                ));
+            }
+            lines.push(String::new());
+
+            // Alternative models
+            let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
+            let haiku = ModelPricing::HAIKU_4.calculate_cost(ts);
+            lines.push("**Alternative models:**".to_string());
+            lines.push(format!(
+                "  - {}: ${:.2} ({:.1}x)",
+                opus.model,
+                opus.total_cost,
+                opus.total_cost / sonnet.total_cost
+            ));
+            lines.push(format!(
+                "  - {}: ${:.2} ({:.1}x)",
+                haiku.model,
+                haiku.total_cost,
+                haiku.total_cost / sonnet.total_cost
+            ));
+            lines.push(String::new());
+
+            // Token growth
+            if !self.context_per_turn.is_empty() && self.context_per_turn.iter().any(|&c| c > 0) {
+                lines.push("## Context Growth".to_string());
+                lines.push(String::new());
+
+                // Show growth at key intervals
+                let intervals = if self.context_per_turn.len() <= 10 {
+                    (0..self.context_per_turn.len()).collect::<Vec<_>>()
+                } else {
+                    let step = self.context_per_turn.len() / 10;
+                    (0..10)
+                        .map(|i| i * step)
+                        .chain(std::iter::once(self.context_per_turn.len() - 1))
+                        .collect()
+                };
+
+                for idx in intervals {
+                    if idx < self.context_per_turn.len() {
+                        let context = self.context_per_turn[idx];
+                        if context > 0 {
+                            let warning = if context >= 100_000 {
+                                " ⚠️ APPROACHING LIMIT"
+                            } else if context >= 80_000 {
+                                " ⚠️ High"
+                            } else {
+                                ""
+                            };
+                            lines.push(format!(
+                                "- Turn {}: {}{}",
+                                idx,
+                                format_tokens(context),
+                                warning
+                            ));
+                        }
+                    }
+                }
+                lines.push(String::new());
+            }
         }
 
         // Token hotspots
@@ -416,6 +575,56 @@ impl SessionAnalysis {
                 .unwrap();
             }
             writeln!(out).unwrap();
+
+            // Cost breakdown
+            writeln!(out, "\x1b[1;36m━━━ Cost Estimate ━━━\x1b[0m").unwrap();
+            let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
+            writeln!(
+                out,
+                "\x1b[1m{}\x1b[0m: \x1b[32m${:.2}\x1b[0m",
+                sonnet.model, sonnet.total_cost
+            )
+            .unwrap();
+            if sonnet.cache_savings > 0.0 {
+                let savings_pct =
+                    (sonnet.cache_savings / (sonnet.total_cost + sonnet.cache_savings)) * 100.0;
+                writeln!(
+                    out,
+                    "  Cache savings: \x1b[33m${:.2}\x1b[0m ({:.1}%)",
+                    sonnet.cache_savings, savings_pct
+                )
+                .unwrap();
+            }
+            writeln!(
+                out,
+                "  Input: ${:.2} | Output: ${:.2}",
+                sonnet.input_cost, sonnet.output_cost
+            )
+            .unwrap();
+
+            let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
+            let haiku = ModelPricing::HAIKU_4.calculate_cost(ts);
+            writeln!(
+                out,
+                "If {}: ${:.2} (\x1b[31m{:.1}x\x1b[0m) | If {}: ${:.2} (\x1b[32m{:.1}x\x1b[0m)",
+                opus.model,
+                opus.total_cost,
+                opus.total_cost / sonnet.total_cost,
+                haiku.model,
+                haiku.total_cost,
+                haiku.total_cost / sonnet.total_cost
+            )
+            .unwrap();
+            writeln!(out).unwrap();
+
+            // Token growth visualization
+            if !self.context_per_turn.is_empty() && self.context_per_turn.iter().any(|&c| c > 0) {
+                writeln!(out, "\x1b[1;36m━━━ Context Growth ━━━\x1b[0m").unwrap();
+                for line in token_growth_chart(&self.context_per_turn, 20) {
+                    writeln!(out, "{}", line).unwrap();
+                }
+                writeln!(out).unwrap();
+            }
         }
 
         // Token hotspots
@@ -502,6 +711,67 @@ fn format_tokens(tokens: u64) -> String {
     } else {
         tokens.to_string()
     }
+}
+
+/// Generate ASCII bar chart for token growth.
+fn token_growth_chart(context_per_turn: &[u64], width: usize) -> Vec<String> {
+    if context_per_turn.is_empty() {
+        return vec![];
+    }
+
+    let max_context = *context_per_turn.iter().max().unwrap_or(&1);
+    let threshold_80k = 80_000;
+    let threshold_100k = 100_000;
+
+    let mut lines = Vec::new();
+
+    // Sample turns if too many (show every Nth turn)
+    let sample_rate = if context_per_turn.len() > 20 {
+        context_per_turn.len() / 20
+    } else {
+        1
+    };
+
+    for (idx, &context) in context_per_turn.iter().enumerate() {
+        if context == 0 {
+            continue; // Skip turns without token usage
+        }
+        if idx % sample_rate != 0 && idx != context_per_turn.len() - 1 {
+            continue; // Skip non-sampled turns, but always show last
+        }
+
+        let filled = ((context as f64 / max_context as f64) * width as f64) as usize;
+        let bar = "▓".repeat(filled) + &"░".repeat(width.saturating_sub(filled));
+
+        // Color based on threshold
+        let color = if context >= threshold_100k {
+            "\x1b[31m" // Red: dangerous
+        } else if context >= threshold_80k {
+            "\x1b[33m" // Yellow: warning
+        } else {
+            "\x1b[32m" // Green: ok
+        };
+
+        let warning = if context >= threshold_100k {
+            " [!] APPROACHING LIMIT"
+        } else if context >= threshold_80k {
+            " [!] High context"
+        } else {
+            ""
+        };
+
+        lines.push(format!(
+            "Turn {:>3}: {}{}{}\x1b[0m {}{}",
+            idx,
+            color,
+            bar,
+            " ",
+            format_tokens(context),
+            warning
+        ));
+    }
+
+    lines
 }
 
 /// Categorize an error by its content.
@@ -719,6 +989,10 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
 
             let context = usage.input + usage.cache_read.unwrap_or(0);
             analysis.token_stats.update_context(context);
+            analysis.context_per_turn.push(context);
+        } else {
+            // No token usage for this turn (user message)
+            analysis.context_per_turn.push(0);
         }
     }
 
