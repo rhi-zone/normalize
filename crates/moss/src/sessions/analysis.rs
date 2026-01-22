@@ -84,6 +84,52 @@ impl ErrorPattern {
     }
 }
 
+/// A sequence of consecutive single-tool calls (potential parallelization).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolChain {
+    pub tools: Vec<String>,
+    pub turn_range: (usize, usize),
+}
+
+impl ToolChain {
+    pub fn len(&self) -> usize {
+        self.tools.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tools.is_empty()
+    }
+}
+
+/// Type of correction made by the assistant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CorrectionType {
+    Apology,
+    Mistake,
+    LetMeFix,
+    Actually,
+}
+
+impl CorrectionType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CorrectionType::Apology => "Apology",
+            CorrectionType::Mistake => "Mistake",
+            CorrectionType::LetMeFix => "Let me fix",
+            CorrectionType::Actually => "Actually",
+        }
+    }
+}
+
+/// An assistant correction or apology.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Correction {
+    pub turn: usize,
+    pub text: String,
+    pub category: CorrectionType,
+}
+
 /// Complete analysis of a session.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionAnalysis {
@@ -98,6 +144,10 @@ pub struct SessionAnalysis {
     /// Turns with single tool call (parallelization opportunity)
     pub parallel_opportunities: usize,
     pub total_turns: usize,
+    /// Sequences of consecutive single-tool calls
+    pub tool_chains: Vec<ToolChain>,
+    /// Assistant corrections and apologies
+    pub corrections: Vec<Correction>,
 }
 
 impl SessionAnalysis {
@@ -217,6 +267,43 @@ impl SessionAnalysis {
             paths.sort_by(|a, b| b.1.cmp(a.1));
             for (path, tokens) in paths.iter().take(10) {
                 lines.push(format!("| {} | {} |", path, tokens));
+            }
+            lines.push(String::new());
+        }
+
+        // Tool chains
+        if !self.tool_chains.is_empty() {
+            lines.push("## Tool Chains".to_string());
+            lines.push(String::new());
+            lines.push(
+                "Sequences of consecutive single-tool calls (potential parallelization):"
+                    .to_string(),
+            );
+            lines.push(String::new());
+            for chain in &self.tool_chains {
+                let tools_str = chain.tools.join(" → ");
+                lines.push(format!(
+                    "- **Turns {}-{}** ({} tools): {}",
+                    chain.turn_range.0,
+                    chain.turn_range.1,
+                    chain.len(),
+                    tools_str
+                ));
+            }
+            lines.push(String::new());
+        }
+
+        // Corrections
+        if !self.corrections.is_empty() {
+            lines.push("## Corrections & Apologies".to_string());
+            lines.push(String::new());
+            for correction in &self.corrections {
+                lines.push(format!(
+                    "- **Turn {}** [{}]: {}",
+                    correction.turn,
+                    correction.category.as_str(),
+                    correction.text
+                ));
             }
             lines.push(String::new());
         }
@@ -362,6 +449,46 @@ impl SessionAnalysis {
             writeln!(out, "{}", items.join("  ")).unwrap();
         }
 
+        // Tool chains
+        if !self.tool_chains.is_empty() {
+            writeln!(out).unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Tool Chains ━━━\x1b[0m").unwrap();
+            writeln!(
+                out,
+                "Found {} sequences of consecutive single-tool calls:",
+                self.tool_chains.len()
+            )
+            .unwrap();
+            for chain in self.tool_chains.iter().take(10) {
+                let tools_str = chain.tools.join(" → ");
+                writeln!(
+                    out,
+                    "\x1b[33m▸\x1b[0m Turns {}-{} ({}): {}",
+                    chain.turn_range.0,
+                    chain.turn_range.1,
+                    chain.len(),
+                    tools_str
+                )
+                .unwrap();
+            }
+        }
+
+        // Corrections
+        if !self.corrections.is_empty() {
+            writeln!(out).unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Corrections & Apologies ━━━\x1b[0m").unwrap();
+            for correction in &self.corrections {
+                writeln!(
+                    out,
+                    "\x1b[31m⚠\x1b[0m Turn {} [{}]: {}",
+                    correction.turn,
+                    correction.category.as_str(),
+                    correction.text.chars().take(60).collect::<String>()
+                )
+                .unwrap();
+            }
+        }
+
         out
     }
 }
@@ -397,6 +524,55 @@ pub fn categorize_error(error_text: &str) -> &'static str {
     }
 }
 
+/// Detect correction patterns in assistant text.
+/// Returns (category, excerpt) if a correction is found.
+pub fn detect_correction(text: &str) -> Option<(CorrectionType, String)> {
+    let lower = text.to_lowercase();
+
+    // Look for apology patterns
+    let apology_phrases = ["i apologize", "i'm sorry", "sorry about", "my apologies"];
+    for phrase in &apology_phrases {
+        if let Some(pos) = lower.find(phrase) {
+            let excerpt = text.chars().skip(pos).take(80).collect();
+            return Some((CorrectionType::Apology, excerpt));
+        }
+    }
+
+    // Look for mistake acknowledgment
+    let mistake_phrases = [
+        "i made a mistake",
+        "i was wrong",
+        "that was incorrect",
+        "my mistake",
+    ];
+    for phrase in &mistake_phrases {
+        if let Some(pos) = lower.find(phrase) {
+            let excerpt = text.chars().skip(pos).take(80).collect();
+            return Some((CorrectionType::Mistake, excerpt));
+        }
+    }
+
+    // Look for "let me fix" patterns
+    let fix_phrases = ["let me fix", "i'll fix", "let me correct"];
+    for phrase in &fix_phrases {
+        if let Some(pos) = lower.find(phrase) {
+            let excerpt = text.chars().skip(pos).take(80).collect();
+            return Some((CorrectionType::LetMeFix, excerpt));
+        }
+    }
+
+    // Look for "actually" corrections
+    let actually_phrases = ["actually,", "actually i", "actually that"];
+    for phrase in &actually_phrases {
+        if let Some(pos) = lower.find(phrase) {
+            let excerpt = text.chars().skip(pos).take(80).collect();
+            return Some((CorrectionType::Actually, excerpt));
+        }
+    }
+
+    None
+}
+
 /// Normalize a file path for aggregation.
 pub fn normalize_path(path: &str) -> String {
     if !path.starts_with('/') {
@@ -427,11 +603,29 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
         }
     }
 
-    // Analyze tool usage
-    for turn in &session.turns {
+    // Analyze tool usage and detect tool chains
+    let mut current_chain: Option<Vec<(usize, String)>> = None;
+
+    for (turn_idx, turn) in session.turns.iter().enumerate() {
         let mut tool_uses_in_turn = 0;
+        let mut tool_name_in_turn: Option<String> = None;
 
         for msg in &turn.messages {
+            // Detect corrections in assistant messages
+            if msg.role == rhizome_moss_sessions::Role::Assistant {
+                for block in &msg.content {
+                    if let ContentBlock::Text { text } = block {
+                        if let Some((category, excerpt)) = detect_correction(text) {
+                            analysis.corrections.push(Correction {
+                                turn: turn_idx,
+                                text: excerpt,
+                                category,
+                            });
+                        }
+                    }
+                }
+            }
+
             for block in &msg.content {
                 match block {
                     ContentBlock::ToolUse { name, .. } => {
@@ -441,6 +635,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
                             .or_insert_with(|| ToolStats::new(name));
                         stat.calls += 1;
                         tool_uses_in_turn += 1;
+                        tool_name_in_turn = Some(name.clone());
                     }
                     ContentBlock::ToolResult {
                         is_error, content, ..
@@ -475,6 +670,36 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
         // Track parallel opportunities (turns with single tool call)
         if tool_uses_in_turn == 1 {
             analysis.parallel_opportunities += 1;
+
+            // Build tool chains
+            if let Some(tool_name) = tool_name_in_turn {
+                match &mut current_chain {
+                    Some(chain) => {
+                        chain.push((turn_idx, tool_name));
+                    }
+                    None => {
+                        current_chain = Some(vec![(turn_idx, tool_name)]);
+                    }
+                }
+            }
+        } else {
+            // Chain broken - save if length >= 3
+            if let Some(chain) = current_chain.take() {
+                if chain.len() >= 3 {
+                    let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
+                    let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
+                    analysis.tool_chains.push(ToolChain { tools, turn_range });
+                }
+            }
+        }
+    }
+
+    // Handle final chain
+    if let Some(chain) = current_chain {
+        if chain.len() >= 3 {
+            let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
+            let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
+            analysis.tool_chains.push(ToolChain { tools, turn_range });
         }
     }
 

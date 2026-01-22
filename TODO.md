@@ -569,6 +569,73 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - [x] Move analysis to consumers (moss CLI uses `parse()` + local `analyze_session()`)
 - [x] Remove `analyze()` from LogFormat trait (analysis now in `crates/moss/src/sessions/analysis.rs`)
 
+**Recently Added (2026-01-23)**:
+- [x] Tool chains detection: sequences of consecutive single-tool calls (3+ length)
+  - Shows turn ranges and tool sequence (e.g., "Turns 0-8: Grep → Read → Glob → ...")
+  - Identifies parallelization opportunities more granularly than single count
+  - Visible in both markdown and pretty output
+- [x] Corrections/apologies detection: agent self-corrections and mistake acknowledgments
+  - Detects: "I apologize", "my mistake", "let me fix", "actually" patterns
+  - Categorized by type: Apology, Mistake, LetMeFix, Actually
+  - Shows turn number and excerpt for each correction
+  - Quality signal: fewer corrections = better prompts/tools
+
+**Backlog - Analysis Features**:
+
+1. **Token growth visualization** (HIGH VALUE)
+   - Track context size per turn, visualize growth curve
+   - Flag bloat: warn when approaching context limits (e.g., 80K+ on Sonnet)
+   - ASCII bar chart per turn: `Turn 1: ▓▓░░░░░░░░ 13K` → `Turn 40: ▓▓▓▓▓▓▓▓░░ 78K [!]`
+   - Identify inflection points: when did context explode?
+   - Use case: understand when/why sessions hit context limits
+   - Implementation: add `per_turn_context: Vec<u64>` to SessionAnalysis
+
+2. **Parallelization hints** (HIGH VALUE)
+   - Beyond counting: show specific turns with sequential independent calls
+   - Example: `Turn 12: ⚠️ Could parallelize: Read(foo.rs) → Read(bar.rs) → Read(baz.rs)`
+   - Estimate savings: "2 API calls, ~15s latency saved"
+   - Detect common anti-patterns: sequential reads, sequential edits
+   - Implementation: analyze tool_chains for parallelizable sequences
+
+3. **File edit heatmap**
+   - Which files churned most? `src/main.rs (5 edits), lib.rs (4 edits)`
+   - Files read but never edited: potential test gaps
+   - Files edited multiple times: fragile design or iterative refinement?
+   - Cross-reference with error patterns: files with failed edits
+   - Implementation: track Read/Edit/Write targets, build frequency map
+
+4. **Cost breakdown** (MEDIUM VALUE)
+   - Model-specific pricing with current rates
+   - Show cache savings: `Cache saved $0.76 (32% reduction)`
+   - Compare models: "If Opus 4.5: $8.91 (4x more expensive than Sonnet 4.5)"
+   - Per-turn cost tracking: identify expensive operations
+   - Implementation: add pricing table, calculate from token_stats
+
+5. **Tool chain pattern analysis**
+   - Detect common sequences across sessions: `Read → Edit → Bash (git): 12 occurrences`
+   - Identify workflows: test/commit cycle, search-and-replace pattern
+   - Suggest optimizations: "Grep → Read → Edit detected 3 times: consider Grep+Edit fusion"
+   - Implementation: aggregate tool_chains across sessions, find frequent subsequences
+
+6. **Cross-repo comparison**
+   - Aggregate metrics across ecosystem projects
+   - Compare tool usage: `moss: 78% Edit, spore: 45% Bash, resin: 89% Read`
+   - Compare parallelization: which repos have most sequential patterns?
+   - Compare error rates: which repos have fragile tooling?
+   - Implementation: `moss sessions stats --by-repo` with repo detection
+
+7. **Message filtering subcommand** (NEW REQUEST)
+   - Filter session messages by type: user, assistant, system, tool_use, tool_result
+   - Keyword search within message text: `moss sessions show <id> --filter user --grep "test"`
+   - Use cases:
+     - Extract all user prompts: `moss sessions show <id> --filter user`
+     - Find tool errors: `moss sessions show <id> --filter tool_result --errors-only`
+     - Search assistant reasoning: `moss sessions show <id> --filter assistant --grep "because"`
+   - Output modes: full messages, excerpts, counts
+   - Implementation: new `moss sessions show <id> --filter <type> [--grep PATTERN]`
+   - Combine with existing jq: `moss sessions show <id> --filter tool_use --jq '.name'`
+
+**Other Session Analysis Backlog**:
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
   - Option A: embed tree-sitter WASM runtime, load .so grammars
   - Option B: `/api/highlight` endpoint, server-side highlighting
@@ -585,7 +652,6 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `moss sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
 - `moss sessions mark <id>`: mark as reviewed (store in `.moss/sessions-reviewed`)
-- Friction signal detection: correction patterns, tool chains, avoidance
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions
