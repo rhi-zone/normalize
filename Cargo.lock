@@ -3655,6 +3655,7 @@ dependencies = [
  "nucleo-matcher",
  "rayon",
  "regex",
+ "rhizome-moss-cli-parser",
  "rhizome-moss-core",
  "rhizome-moss-derive",
  "rhizome-moss-jsonschema",

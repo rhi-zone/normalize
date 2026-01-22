@@ -42,6 +42,20 @@ pub enum GenerateTarget {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+    /// Generate CLI snapshot tests for a binary
+    #[command(name = "cli-snapshot")]
+    CliSnapshot {
+        /// Path to the CLI binary
+        binary: PathBuf,
+
+        /// Output file for the test (stdout if not specified)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Binary name to use in test (defaults to file stem)
+        #[arg(long)]
+        name: Option<String>,
+    },
     /// Generate types/validators from schema (new IR-based)
     #[command(name = "typegen")]
     Typegen {
@@ -116,6 +130,11 @@ pub fn run(args: GenerateArgs) -> i32 {
             lang,
             output,
         } => run_legacy_types(schema, name, lang, output),
+        GenerateTarget::CliSnapshot {
+            binary,
+            output,
+            name,
+        } => run_cli_snapshot(binary, output, name),
         GenerateTarget::Typegen {
             input,
             format,
@@ -350,6 +369,145 @@ fn run_typegen(
             return 1;
         }
         eprintln!("Generated {}", path.display());
+    } else {
+        print!("{}", code);
+    }
+
+    0
+}
+
+fn run_cli_snapshot(binary: PathBuf, output: Option<PathBuf>, name: Option<String>) -> i32 {
+    use std::collections::HashSet;
+    use std::process::Command;
+
+    let bin_name = name.unwrap_or_else(|| {
+        binary
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "cli".to_string())
+    });
+
+    // Verify binary exists and runs
+    if let Err(e) = Command::new(&binary).arg("--help").output() {
+        eprintln!("Failed to run {}: {}", binary.display(), e);
+        return 1;
+    }
+
+    // Recursively discover all commands using moss-cli-parser
+    fn discover_commands(
+        binary: &std::path::Path,
+        prefix: &[String],
+        visited: &mut HashSet<String>,
+    ) -> Vec<Vec<String>> {
+        let key = prefix.join(" ");
+        if visited.contains(&key) {
+            return vec![];
+        }
+        visited.insert(key);
+
+        let mut result = vec![prefix.to_vec()];
+
+        // Get help for this command
+        let mut cmd = Command::new(binary);
+        for arg in prefix {
+            cmd.arg(arg);
+        }
+        cmd.arg("--help");
+
+        let help = match cmd.output() {
+            Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
+            Err(_) => return result,
+        };
+
+        // Parse help output using moss-cli-parser
+        let spec = match rhizome_moss_cli_parser::parse_help(&help) {
+            Ok(s) => s,
+            Err(_) => return result,
+        };
+
+        // Recurse into subcommands
+        for subcmd in spec.commands {
+            let mut new_prefix = prefix.to_vec();
+            new_prefix.push(subcmd.name);
+            result.extend(discover_commands(binary, &new_prefix, visited));
+        }
+
+        result
+    }
+
+    let mut visited = HashSet::new();
+    let commands = discover_commands(&binary, &[], &mut visited);
+
+    eprintln!("Discovered {} commands", commands.len());
+
+    // Generate test file
+    let mut code = String::new();
+    code.push_str(&format!(
+        r#"//! CLI snapshot tests for {} - verify --help output doesn't change unexpectedly.
+//!
+//! These tests ensure CLI breaking changes are detected during review.
+//! Run `cargo insta review` to update snapshots after intentional changes.
+
+use assert_cmd::Command;
+
+fn {}() -> Command {{
+    Command::cargo_bin("{}").unwrap()
+}}
+
+fn snapshot_help(args: &[&str]) -> String {{
+    let mut cmd = {}();
+    for arg in args {{
+        cmd.arg(arg);
+    }}
+    cmd.arg("--help");
+
+    let output = cmd.output().expect("failed to execute");
+    String::from_utf8_lossy(&output.stdout).to_string()
+}}
+
+"#,
+        bin_name, bin_name, bin_name, bin_name
+    ));
+
+    // Generate test for each command
+    for cmd_path in &commands {
+        let test_name = if cmd_path.is_empty() {
+            "root".to_string()
+        } else {
+            cmd_path.join("_").replace('-', "_")
+        };
+
+        let args_str = if cmd_path.is_empty() {
+            "&[]".to_string()
+        } else {
+            format!(
+                "&[{}]",
+                cmd_path
+                    .iter()
+                    .map(|s| format!("\"{}\"", s))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+
+        code.push_str(&format!(
+            r#"#[test]
+fn test_help_{}() {{
+    insta::assert_snapshot!(snapshot_help({}));
+}}
+
+"#,
+            test_name, args_str
+        ));
+    }
+
+    // Output
+    if let Some(path) = output {
+        if let Err(e) = std::fs::write(&path, &code) {
+            eprintln!("Failed to write {}: {}", path.display(), e);
+            return 1;
+        }
+        eprintln!("Generated {} ({} tests)", path.display(), commands.len());
     } else {
         print!("{}", code);
     }

@@ -43,6 +43,7 @@ rhizome-moss-openapi = { path = "../moss-openapi" }
 rhizome-moss-packages = { path = "../moss-packages" }
 rhizome-moss-sessions = { path = "../moss-sessions" }
 rhizome-moss-tools = { path = "../moss-tools" }
+rhizome-moss-cli-parser = { path = "../moss-cli-parser" }
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true
