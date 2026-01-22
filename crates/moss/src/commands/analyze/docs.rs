@@ -1,11 +1,13 @@
 //! Documentation coverage analysis
 
 use crate::filter::Filter;
+use crate::output::OutputFormatter;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
 /// Doc coverage info for a single file
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FileDocCoverage {
     pub file_path: String,
     pub documented: usize,
@@ -29,6 +31,7 @@ impl FileDocCoverage {
 }
 
 /// Documentation coverage report
+#[derive(Serialize)]
 pub struct DocCoverageReport {
     pub total_callables: usize,
     pub documented: usize,
@@ -37,8 +40,8 @@ pub struct DocCoverageReport {
     pub worst_files: Vec<FileDocCoverage>,
 }
 
-impl DocCoverageReport {
-    pub fn format(&self) -> String {
+impl OutputFormatter for DocCoverageReport {
+    fn format_text(&self) -> String {
         let mut lines = Vec::new();
 
         lines.push("# Documentation Coverage".to_string());
@@ -96,45 +99,18 @@ impl DocCoverageReport {
 
         lines.join("\n")
     }
-
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "total_callables": self.total_callables,
-            "documented": self.documented,
-            "coverage_percent": (self.coverage_percent * 10.0).round() / 10.0,
-            "by_language": self.by_language.iter().map(|(lang, (doc, total))| {
-                (lang.clone(), serde_json::json!({
-                    "documented": doc,
-                    "total": total,
-                    "percent": if *total > 0 { (1000.0 * *doc as f64 / *total as f64).round() / 10.0 } else { 0.0 }
-                }))
-            }).collect::<serde_json::Map<String, serde_json::Value>>(),
-            "worst_files": self.worst_files.iter().map(|fc| {
-                serde_json::json!({
-                    "file": fc.file_path,
-                    "documented": fc.documented,
-                    "total": fc.total,
-                    "percent": (fc.coverage_percent() * 10.0).round() / 10.0
-                })
-            }).collect::<Vec<_>>()
-        })
-    }
 }
 
 /// Run documentation coverage analysis
 pub fn cmd_docs(root: &Path, limit: usize, json: bool, filter: Option<&Filter>) -> i32 {
+    use crate::output::OutputFormat;
+
     let config = crate::config::MossConfig::load(root);
     let exclude_interface_impls = config.analyze.exclude_interface_impls();
     let report = analyze_docs(root, limit, exclude_interface_impls, filter);
 
-    if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&report.to_json()).unwrap()
-        );
-    } else {
-        println!("{}", report.format());
-    }
+    let format = OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
     0
 }

@@ -1,13 +1,15 @@
 //! File length analysis - find longest files in codebase
 
+use crate::output::OutputFormatter;
 use crate::path_resolve;
 use glob::Pattern;
 use rayon::prelude::*;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
 /// File length info
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FileLength {
     pub path: String,
     pub lines: usize,
@@ -15,15 +17,15 @@ pub struct FileLength {
 }
 
 /// File length report
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct FileLengthReport {
     pub files: Vec<FileLength>,
     pub total_lines: usize,
     pub by_language: HashMap<String, usize>,
 }
 
-impl FileLengthReport {
-    pub fn format(&self) -> String {
+impl OutputFormatter for FileLengthReport {
+    fn format_text(&self) -> String {
         let mut lines = Vec::new();
 
         lines.push("# Longest Files".to_string());
@@ -54,34 +56,17 @@ impl FileLengthReport {
 
         lines.join("\n")
     }
-
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "total_lines": self.total_lines,
-            "files": self.files.iter().map(|f| {
-                serde_json::json!({
-                    "path": f.path,
-                    "lines": f.lines,
-                    "language": f.language
-                })
-            }).collect::<Vec<_>>(),
-            "by_language": self.by_language
-        })
-    }
 }
 
 /// Run file length analysis
 pub fn cmd_files(root: &Path, limit: usize, exclude: &[String], json: bool) -> i32 {
+    use crate::output::OutputFormat;
+
+    let config = crate::config::MossConfig::load(root);
     let report = analyze_files(root, limit, exclude);
 
-    if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&report.to_json()).unwrap()
-        );
-    } else {
-        println!("{}", report.format());
-    }
+    let format = OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
     0
 }
