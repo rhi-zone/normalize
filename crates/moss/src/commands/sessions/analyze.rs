@@ -1,5 +1,6 @@
 //! Session analysis functions.
 
+use crate::output::OutputFormatter;
 use crate::sessions::{
     SessionAnalysis, ToolStats, analyze_session, parse_session, parse_session_with_format,
 };
@@ -27,13 +28,10 @@ pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool, prett
     // Analyze the parsed session
     let analysis = analyze_session(&session);
 
-    if json {
-        println!("{}", serde_json::to_string_pretty(&analysis).unwrap());
-    } else if pretty {
-        println!("{}", analysis.format_pretty());
-    } else {
-        println!("{}", analysis.format_text());
-    }
+    let config = crate::config::MossConfig::default();
+    let output_format =
+        crate::output::OutputFormat::from_cli(json, None, false, pretty, &config.pretty);
+    analysis.print(&output_format);
     0
 }
 
@@ -122,13 +120,10 @@ pub fn cmd_sessions_analyze_multi(
     // Update format to show aggregate info
     aggregate.format = format!("aggregate ({} sessions)", session_count);
 
-    if json {
-        println!("{}", serde_json::to_string_pretty(&aggregate).unwrap());
-    } else if pretty {
-        println!("{}", aggregate.format_pretty());
-    } else {
-        println!("{}", aggregate.format_text());
-    }
+    let config = crate::config::MossConfig::default();
+    let output_format =
+        crate::output::OutputFormat::from_cli(json, None, false, pretty, &config.pretty);
+    aggregate.print(&output_format);
 
     0
 }
