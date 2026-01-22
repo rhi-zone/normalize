@@ -1,9 +1,11 @@
 //! Find stale documentation where covered code has changed
 
+use crate::output::OutputFormatter;
+use serde::Serialize;
 use std::path::Path;
 
 /// A doc file with stale code coverage
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct StaleDoc {
     doc_path: String,
     doc_modified: u64,
@@ -11,11 +13,51 @@ struct StaleDoc {
 }
 
 /// A stale coverage declaration
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct StaleCover {
     pattern: String,
     code_modified: u64,
     matching_files: Vec<String>,
+}
+
+/// Stale docs analysis report
+#[derive(Debug, Serialize)]
+struct StaleDocsReport {
+    stale_docs: Vec<StaleDoc>,
+    files_checked: usize,
+    files_with_covers: usize,
+}
+
+impl OutputFormatter for StaleDocsReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Stale Documentation Check".to_string());
+        lines.push(String::new());
+        lines.push(format!("Files checked: {}", self.files_checked));
+        lines.push(format!("Files with covers: {}", self.files_with_covers));
+        lines.push(String::new());
+
+        if self.stale_docs.is_empty() {
+            lines.push("No stale docs found. All covered code is older than docs.".to_string());
+        } else {
+            lines.push(format!("Stale docs ({}):", self.stale_docs.len()));
+            lines.push(String::new());
+            for doc in &self.stale_docs {
+                lines.push(format!("  {}", doc.doc_path));
+                for cover in &doc.stale_covers {
+                    let days_stale = (cover.code_modified - doc.doc_modified) / 86400;
+                    lines.push(format!(
+                        "    {} ({} files, ~{} days stale)",
+                        cover.pattern,
+                        cover.matching_files.len(),
+                        days_stale
+                    ));
+                }
+            }
+        }
+
+        lines.join("\n")
+    }
 }
 
 /// Find docs with stale code coverage
@@ -39,11 +81,15 @@ pub fn cmd_stale_docs(root: &Path, json: bool) -> i32 {
         .collect();
 
     if md_files.is_empty() {
-        if json {
-            println!("{{\"stale_docs\": [], \"files_checked\": 0}}");
-        } else {
-            println!("No markdown files found.");
-        }
+        let report = StaleDocsReport {
+            stale_docs: Vec::new(),
+            files_checked: 0,
+            files_with_covers: 0,
+        };
+        let config = crate::config::MossConfig::load(root);
+        let format =
+            crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+        report.print(&format);
         return 0;
     }
 
@@ -127,53 +173,16 @@ pub fn cmd_stale_docs(root: &Path, json: bool) -> i32 {
         }
     }
 
-    if json {
-        let output = serde_json::json!({
-            "stale_docs": stale_docs.iter().map(|d| {
-                serde_json::json!({
-                    "doc": d.doc_path,
-                    "doc_modified": d.doc_modified,
-                    "stale_covers": d.stale_covers.iter().map(|c| {
-                        serde_json::json!({
-                            "pattern": c.pattern,
-                            "code_modified": c.code_modified,
-                            "files": c.matching_files,
-                        })
-                    }).collect::<Vec<_>>(),
-                })
-            }).collect::<Vec<_>>(),
-            "files_checked": md_files.len(),
-            "files_with_covers": files_with_covers,
-        });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Stale Documentation Check");
-        println!();
-        println!("Files checked: {}", md_files.len());
-        println!("Files with covers: {}", files_with_covers);
-        println!();
+    let report = StaleDocsReport {
+        stale_docs,
+        files_checked: md_files.len(),
+        files_with_covers,
+    };
+    let config = crate::config::MossConfig::load(root);
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
-        if stale_docs.is_empty() {
-            println!("No stale docs found. All covered code is older than docs.");
-        } else {
-            println!("Stale docs ({}):", stale_docs.len());
-            println!();
-            for doc in &stale_docs {
-                println!("  {}", doc.doc_path);
-                for cover in &doc.stale_covers {
-                    let days_stale = (cover.code_modified - doc.doc_modified) / 86400;
-                    println!(
-                        "    {} ({} files, ~{} days stale)",
-                        cover.pattern,
-                        cover.matching_files.len(),
-                        days_stale
-                    );
-                }
-            }
-        }
-    }
-
-    if stale_docs.is_empty() { 0 } else { 1 }
+    if report.stale_docs.is_empty() { 0 } else { 1 }
 }
 
 /// Find files matching a cover pattern (glob or path prefix)

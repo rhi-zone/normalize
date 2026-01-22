@@ -1,15 +1,51 @@
 //! Check documentation references for broken links
 
 use crate::index;
+use crate::output::OutputFormatter;
+use serde::Serialize;
 use std::path::Path;
 
 /// A broken reference found in documentation
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 struct BrokenRef {
     file: String,
     line: usize,
     reference: String,
     context: String,
+}
+
+/// Documentation reference check report
+#[derive(Debug, Serialize)]
+struct CheckRefsReport {
+    broken_refs: Vec<BrokenRef>,
+    files_checked: usize,
+    symbols_indexed: usize,
+}
+
+impl OutputFormatter for CheckRefsReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Documentation Reference Check".to_string());
+        lines.push(String::new());
+        lines.push(format!("Files checked: {}", self.files_checked));
+        lines.push(format!("Symbols indexed: {}", self.symbols_indexed));
+        lines.push(String::new());
+
+        if self.broken_refs.is_empty() {
+            lines.push("No broken references found.".to_string());
+        } else {
+            lines.push(format!("Broken references ({}):", self.broken_refs.len()));
+            lines.push(String::new());
+            for r in &self.broken_refs {
+                lines.push(format!("  {}:{}: `{}`", r.file, r.line, r.reference));
+                if r.context.len() <= 80 {
+                    lines.push(format!("    {}", r.context));
+                }
+            }
+        }
+
+        lines.join("\n")
+    }
 }
 
 /// Check documentation references for broken links
@@ -53,14 +89,15 @@ async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
         .collect();
 
     if md_files.is_empty() {
-        if json {
-            println!(
-                "{{\"broken_refs\": [], \"files_checked\": 0, \"symbols_indexed\": {}}}",
-                all_symbols.len()
-            );
-        } else {
-            println!("No markdown files found to check.");
-        }
+        let report = CheckRefsReport {
+            broken_refs: Vec::new(),
+            files_checked: 0,
+            symbols_indexed: all_symbols.len(),
+        };
+        let config = crate::config::MossConfig::load(root);
+        let format =
+            crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+        report.print(&format);
         return 0;
     }
 
@@ -114,40 +151,14 @@ async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
         }
     }
 
-    if json {
-        let output = serde_json::json!({
-            "broken_refs": broken_refs.iter().map(|r| {
-                serde_json::json!({
-                    "file": r.file,
-                    "line": r.line,
-                    "reference": r.reference,
-                    "context": r.context,
-                })
-            }).collect::<Vec<_>>(),
-            "files_checked": md_files.len(),
-            "symbols_indexed": all_symbols.len(),
-        });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Documentation Reference Check");
-        println!();
-        println!("Files checked: {}", md_files.len());
-        println!("Symbols indexed: {}", all_symbols.len());
-        println!();
-
-        if broken_refs.is_empty() {
-            println!("No broken references found.");
-        } else {
-            println!("Broken references ({}):", broken_refs.len());
-            println!();
-            for r in &broken_refs {
-                println!("  {}:{}: `{}`", r.file, r.line, r.reference);
-                if r.context.len() <= 80 {
-                    println!("    {}", r.context);
-                }
-            }
-        }
-    }
+    let report = CheckRefsReport {
+        broken_refs: broken_refs.clone(),
+        files_checked: md_files.len(),
+        symbols_indexed: all_symbols.len(),
+    };
+    let config = crate::config::MossConfig::load(root);
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
     if broken_refs.is_empty() { 0 } else { 1 }
 }

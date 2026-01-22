@@ -1,13 +1,49 @@
 //! Validate example references in documentation
 
+use crate::output::OutputFormatter;
+use serde::Serialize;
 use std::path::Path;
 
 /// A missing example reference
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct MissingExample {
     doc_file: String,
     line: usize,
     reference: String, // path#name
+}
+
+/// Example references check report
+#[derive(Debug, Serialize)]
+struct CheckExamplesReport {
+    defined_examples: usize,
+    references_found: usize,
+    missing: Vec<MissingExample>,
+}
+
+impl OutputFormatter for CheckExamplesReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Example Reference Check".to_string());
+        lines.push(String::new());
+        lines.push(format!("Defined examples: {}", self.defined_examples));
+        lines.push(format!("References found: {}", self.references_found));
+        lines.push(String::new());
+
+        if self.missing.is_empty() {
+            lines.push("All example references are valid.".to_string());
+        } else {
+            lines.push(format!("Missing examples ({}):", self.missing.len()));
+            lines.push(String::new());
+            for m in &self.missing {
+                lines.push(format!(
+                    "  {}:{}: {{{{{}}}}}",
+                    m.doc_file, m.line, m.reference
+                ));
+            }
+        }
+
+        lines.join("\n")
+    }
 }
 
 /// Check that all example references have matching markers
@@ -131,36 +167,14 @@ pub fn cmd_check_examples(root: &Path, json: bool) -> i32 {
         }
     }
 
-    if json {
-        let output = serde_json::json!({
-            "defined_examples": defined_examples.len(),
-            "references_found": refs_found,
-            "missing": missing.iter().map(|m| {
-                serde_json::json!({
-                    "doc": m.doc_file,
-                    "line": m.line,
-                    "reference": m.reference,
-                })
-            }).collect::<Vec<_>>(),
-        });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Example Reference Check");
-        println!();
-        println!("Defined examples: {}", defined_examples.len());
-        println!("References found: {}", refs_found);
-        println!();
+    let report = CheckExamplesReport {
+        defined_examples: defined_examples.len(),
+        references_found: refs_found,
+        missing,
+    };
+    let config = crate::config::MossConfig::load(root);
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
 
-        if missing.is_empty() {
-            println!("All example references are valid.");
-        } else {
-            println!("Missing examples ({}):", missing.len());
-            println!();
-            for m in &missing {
-                println!("  {}:{}: {{{{{}}}}}", m.doc_file, m.line, m.reference);
-            }
-        }
-    }
-
-    if missing.is_empty() { 0 } else { 1 }
+    if report.missing.is_empty() { 0 } else { 1 }
 }

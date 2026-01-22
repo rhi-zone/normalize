@@ -2,17 +2,62 @@
 
 use super::is_source_file;
 use crate::index;
+use crate::output::OutputFormatter;
 use glob::Pattern;
+use serde::Serialize;
 use std::path::Path;
 
 /// Hotspot data for a file
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct FileHotspot {
     path: String,
     commits: usize,
     lines_added: usize,
     lines_deleted: usize,
+    #[serde(skip)]
     score: f64,
+}
+
+/// Hotspots analysis report
+#[derive(Debug, Serialize)]
+struct HotspotsReport {
+    hotspots: Vec<FileHotspot>,
+}
+
+impl OutputFormatter for HotspotsReport {
+    fn format_text(&self) -> String {
+        if self.hotspots.is_empty() {
+            return "No hotspots found (no git history or source files)".to_string();
+        }
+
+        let mut lines = Vec::new();
+        lines.push("Git Hotspots (high churn)".to_string());
+        lines.push(String::new());
+        lines.push(format!(
+            "{:<50} {:>8} {:>8} {:>8}",
+            "File", "Commits", "Churn", "Score"
+        ));
+        lines.push("-".repeat(80));
+
+        for h in &self.hotspots {
+            let churn = h.lines_added + h.lines_deleted;
+            let display_path = if h.path.len() > 48 {
+                format!("...{}", &h.path[h.path.len() - 45..])
+            } else {
+                h.path.clone()
+            };
+            lines.push(format!(
+                "{:<50} {:>8} {:>8} {:>8.0}",
+                display_path, h.commits, churn, h.score
+            ));
+        }
+
+        lines.push(String::new());
+        lines.push("Score = commits × √churn".to_string());
+        lines.push("High scores indicate bug-prone files that change often.".to_string());
+
+        lines.join("\n")
+    }
 }
 
 /// Analyze git history hotspots
@@ -99,7 +144,12 @@ pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], json: bool) -> i32
             hotspots.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
             hotspots.truncate(20);
 
-            return print_hotspots(&hotspots, json);
+            let report = HotspotsReport { hotspots };
+            let config = crate::config::MossConfig::load(root);
+            let format =
+                crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+            report.print(&format);
+            return 0;
         }
     };
 
@@ -133,61 +183,9 @@ pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], json: bool) -> i32
     hotspots.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
     hotspots.truncate(20);
 
-    print_hotspots(&hotspots, json)
-}
-
-/// Print hotspots report
-fn print_hotspots(hotspots: &[FileHotspot], json: bool) -> i32 {
-    if hotspots.is_empty() {
-        if json {
-            println!("[]");
-        } else {
-            println!("No hotspots found (no git history or source files)");
-        }
-        return 0;
-    }
-
-    if json {
-        let output: Vec<_> = hotspots
-            .iter()
-            .map(|h| {
-                serde_json::json!({
-                    "path": h.path,
-                    "commits": h.commits,
-                    "lines_added": h.lines_added,
-                    "lines_deleted": h.lines_deleted,
-                    "churn": h.lines_added + h.lines_deleted,
-                    "score": (h.score * 10.0).round() / 10.0,
-                })
-            })
-            .collect();
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    } else {
-        println!("Git Hotspots (high churn)");
-        println!();
-        println!(
-            "{:<50} {:>8} {:>8} {:>8}",
-            "File", "Commits", "Churn", "Score"
-        );
-        println!("{}", "-".repeat(80));
-
-        for h in hotspots {
-            let churn = h.lines_added + h.lines_deleted;
-            let display_path = if h.path.len() > 48 {
-                format!("...{}", &h.path[h.path.len() - 45..])
-            } else {
-                h.path.clone()
-            };
-            println!(
-                "{:<50} {:>8} {:>8} {:>8.0}",
-                display_path, h.commits, churn, h.score
-            );
-        }
-
-        println!();
-        println!("Score = commits × √churn");
-        println!("High scores indicate bug-prone files that change often.");
-    }
-
+    let report = HotspotsReport { hotspots };
+    let config = crate::config::MossConfig::load(root);
+    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    report.print(&format);
     0
 }
