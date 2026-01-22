@@ -832,7 +832,7 @@ fn test_highlight_elixir_keywords() {
     // NOTE: Elixir grammar uses anonymous nodes for keywords (do*, end*, etc.)
     // The 'def' identifier gets highlighted but do/end are anonymous
     let code = "def hello do :ok end";
-    let spans = get_spans(code, "elixir");
+    let _spans = get_spans(code, "elixir");
     // Just verify grammar loads - most tokens are anonymous in this grammar
     assert!(code.len() > 0);
 }

@@ -233,6 +233,7 @@ mod tests {
     use super::*;
 
     #[derive(Serialize)]
+    #[allow(dead_code)]
     struct TestOutput {
         name: String,
         count: usize,

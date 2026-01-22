@@ -378,6 +378,7 @@ pub(crate) fn session_matches_grep(path: &Path, pattern: &regex::Regex) -> bool 
 }
 
 /// Get the Claude Code sessions directory for a project.
+#[cfg(feature = "sessions-web")]
 pub(crate) fn get_sessions_dir(project: Option<&Path>) -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
     let claude_dir = PathBuf::from(home).join(".claude/projects");

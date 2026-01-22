@@ -1,12 +1,19 @@
 //! Build script for moss - rebuilds SPA when source changes.
 
+#[cfg(feature = "sessions-web")]
 use std::fs;
+#[cfg(feature = "sessions-web")]
 use std::io::Write;
+#[cfg(feature = "sessions-web")]
 use std::path::Path;
+#[cfg(feature = "sessions-web")]
 use std::process::Command;
+#[cfg(feature = "sessions-web")]
 use std::time::SystemTime;
 
+#[cfg(feature = "sessions-web")]
 use flate2::Compression;
+#[cfg(feature = "sessions-web")]
 use flate2::write::GzEncoder;
 
 fn main() {
@@ -16,6 +23,7 @@ fn main() {
     rebuild_spa_if_needed();
 }
 
+#[cfg(feature = "sessions-web")]
 fn rebuild_spa_if_needed() {
     let web_dir = Path::new("../../web/sessions");
     let src_dir = web_dir.join("src");
@@ -90,6 +98,7 @@ fn rebuild_spa_if_needed() {
     }
 }
 
+#[cfg(feature = "sessions-web")]
 fn gzip_file(path: &Path) {
     let content = fs::read(path).expect("Failed to read file for gzip");
     let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
@@ -102,22 +111,27 @@ fn gzip_file(path: &Path) {
     fs::write(&gz_path, compressed).expect("Failed to write gzipped file");
 }
 
+#[cfg(feature = "sessions-web")]
 fn newest_mtime(dir: &Path) -> Option<SystemTime> {
     walkdir(dir).filter_map(|p| file_mtime(&p)).max()
 }
 
+#[cfg(feature = "sessions-web")]
 fn oldest_mtime(dir: &Path) -> Option<SystemTime> {
     walkdir(dir).filter_map(|p| file_mtime(&p)).min()
 }
 
+#[cfg(feature = "sessions-web")]
 fn file_mtime(path: &Path) -> Option<SystemTime> {
     std::fs::metadata(path).ok()?.modified().ok()
 }
 
+#[cfg(feature = "sessions-web")]
 fn walkdir(dir: &Path) -> impl Iterator<Item = std::path::PathBuf> {
     walkdir_impl(dir).into_iter()
 }
 
+#[cfg(feature = "sessions-web")]
 fn walkdir_impl(dir: &Path) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {

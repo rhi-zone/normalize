@@ -263,7 +263,6 @@ struct AncestorInfo<'a> {
 
 /// Result from finding a symbol with its ancestors.
 struct SymbolWithAncestors<'a> {
-    symbol: Option<&'a skeleton::SkeletonSymbol>,
     ancestors: Vec<AncestorInfo<'a>>,
 }
 
@@ -310,8 +309,8 @@ fn find_symbol_with_parent<'a>(
     case_insensitive: bool,
 ) -> SymbolWithAncestors<'a> {
     let mut ancestors = Vec::new();
-    let symbol = find_symbol_with_ancestors(symbols, name, &mut ancestors, case_insensitive);
-    SymbolWithAncestors { symbol, ancestors }
+    let _symbol = find_symbol_with_ancestors(symbols, name, &mut ancestors, case_insensitive);
+    SymbolWithAncestors { ancestors }
 }
 
 /// Find a symbol's signature in a skeleton
