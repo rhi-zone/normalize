@@ -87,3 +87,4 @@ cache/
 !.moss/hotspots-allow
 !.moss/large-files-allow
 !.moss/memory/
+.normalize/shadow
