@@ -1,0 +1,8 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 241
+expression: "emit(&Program\n{\n    body:\n    vec![Stmt::while_loop(Expr::binary(Expr::ident(\"i\"), BinaryOp::Lt,\n    Expr::number(10)),\n    Stmt::block(vec![Stmt::expr(Expr::assign(Expr::ident(\"i\"),\n    Expr::binary(Expr::ident(\"i\"), BinaryOp::Add, Expr::number(1))))]))]\n})"
+---
+while (i < 10) do
+  i = (i + 1)
+end

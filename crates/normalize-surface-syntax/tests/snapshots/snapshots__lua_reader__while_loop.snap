@@ -1,0 +1,52 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 147
+expression: "parse(\"while i < 10 do i = i + 1 end\")"
+---
+{
+  "body": [
+    {
+      "While": {
+        "test": {
+          "Binary": {
+            "left": {
+              "Ident": "i"
+            },
+            "op": "Lt",
+            "right": {
+              "Literal": {
+                "Number": 10.0
+              }
+            }
+          }
+        },
+        "body": {
+          "Block": [
+            {
+              "Expr": {
+                "Assign": {
+                  "target": {
+                    "Ident": "i"
+                  },
+                  "value": {
+                    "Binary": {
+                      "left": {
+                        "Ident": "i"
+                      },
+                      "op": "Add",
+                      "right": {
+                        "Literal": {
+                          "Number": 1.0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

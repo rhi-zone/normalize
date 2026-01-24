@@ -1,0 +1,39 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 76
+expression: "parse(\"const add = (a, b) => a + b;\")"
+---
+{
+  "body": [
+    {
+      "Let": {
+        "name": "add",
+        "init": {
+          "Function": {
+            "name": "",
+            "params": [
+              "a",
+              "b"
+            ],
+            "body": [
+              {
+                "Return": {
+                  "Binary": {
+                    "left": {
+                      "Ident": "a"
+                    },
+                    "op": "Add",
+                    "right": {
+                      "Ident": "b"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "mutable": false
+      }
+    }
+  ]
+}

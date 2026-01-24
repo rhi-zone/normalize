@@ -1,0 +1,40 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 115
+expression: "parse(\"local result = 1 + 2 * 3\")"
+---
+{
+  "body": [
+    {
+      "Let": {
+        "name": "result",
+        "init": {
+          "Binary": {
+            "left": {
+              "Literal": {
+                "Number": 1.0
+              }
+            },
+            "op": "Add",
+            "right": {
+              "Binary": {
+                "left": {
+                  "Literal": {
+                    "Number": 2.0
+                  }
+                },
+                "op": "Mul",
+                "right": {
+                  "Literal": {
+                    "Number": 3.0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "mutable": true
+      }
+    }
+  ]
+}

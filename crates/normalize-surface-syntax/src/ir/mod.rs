@@ -8,9 +8,11 @@
 
 mod expr;
 mod stmt;
+mod structure_eq;
 
 pub use expr::*;
 pub use stmt::*;
+pub use structure_eq::StructureEq;
 
 use serde::{Deserialize, Serialize};
 

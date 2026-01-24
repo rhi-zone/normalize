@@ -1,0 +1,66 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 140
+expression: "parse(\"if x > 0 then print(\\\"positive\\\") else print(\\\"non-positive\\\") end\")"
+---
+{
+  "body": [
+    {
+      "If": {
+        "test": {
+          "Binary": {
+            "left": {
+              "Ident": "x"
+            },
+            "op": "Gt",
+            "right": {
+              "Literal": {
+                "Number": 0.0
+              }
+            }
+          }
+        },
+        "consequent": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Ident": "print"
+                  },
+                  "args": [
+                    {
+                      "Literal": {
+                        "String": "positive"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "alternate": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Ident": "print"
+                  },
+                  "args": [
+                    {
+                      "Literal": {
+                        "String": "non-positive"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

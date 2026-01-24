@@ -1,0 +1,34 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 81
+expression: "parse(\"const arr = [1, 2, 3];\")"
+---
+{
+  "body": [
+    {
+      "Let": {
+        "name": "arr",
+        "init": {
+          "Array": [
+            {
+              "Literal": {
+                "Number": 1.0
+              }
+            },
+            {
+              "Literal": {
+                "Number": 2.0
+              }
+            },
+            {
+              "Literal": {
+                "Number": 3.0
+              }
+            }
+          ]
+        },
+        "mutable": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 27
+expression: "parse(\"let y = \\\"hello\\\";\")"
+---
+{
+  "body": [
+    {
+      "Let": {
+        "name": "y",
+        "init": {
+          "Literal": {
+            "String": "hello"
+          }
+        },
+        "mutable": true
+      }
+    }
+  ]
+}

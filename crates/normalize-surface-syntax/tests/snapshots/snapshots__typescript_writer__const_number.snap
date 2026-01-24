@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 275
+expression: "emit(&ir_const(\"x\", Expr::number(42)))"
+---
+const x = 42;

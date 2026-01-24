@@ -1,0 +1,55 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 52
+expression: "parse(\"if (x > 0) { console.log(x); }\")"
+---
+{
+  "body": [
+    {
+      "If": {
+        "test": {
+          "Binary": {
+            "left": {
+              "Ident": "x"
+            },
+            "op": "Gt",
+            "right": {
+              "Literal": {
+                "Number": 0.0
+              }
+            }
+          }
+        },
+        "consequent": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Member": {
+                      "object": {
+                        "Ident": "console"
+                      },
+                      "property": {
+                        "Literal": {
+                          "String": "log"
+                        }
+                      },
+                      "computed": false
+                    }
+                  },
+                  "args": [
+                    {
+                      "Ident": "x"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "alternate": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 342
+expression: "emit(&ir_const(\"obj\",\nExpr::object(vec![(\"x\".into(), Expr::number(1)),\n(\"y\".into(), Expr::number(2))])))"
+---
+const obj = { x: 1, y: 2 };

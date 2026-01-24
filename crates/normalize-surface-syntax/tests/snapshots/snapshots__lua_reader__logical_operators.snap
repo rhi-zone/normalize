@@ -1,0 +1,46 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 120
+expression: "parse(\"local check = x > 0 and y <= 10\")"
+---
+{
+  "body": [
+    {
+      "Let": {
+        "name": "check",
+        "init": {
+          "Binary": {
+            "left": {
+              "Binary": {
+                "left": {
+                  "Ident": "x"
+                },
+                "op": "Gt",
+                "right": {
+                  "Literal": {
+                    "Number": 0.0
+                  }
+                }
+              }
+            },
+            "op": "And",
+            "right": {
+              "Binary": {
+                "left": {
+                  "Ident": "y"
+                },
+                "op": "Le",
+                "right": {
+                  "Literal": {
+                    "Number": 10.0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "mutable": true
+      }
+    }
+  ]
+}

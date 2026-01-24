@@ -1,0 +1,34 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 167
+expression: "parse(\"function greet(name) return \\\"Hello, \\\" .. name end\")"
+---
+{
+  "body": [
+    {
+      "Function": {
+        "name": "greet",
+        "params": [
+          "name"
+        ],
+        "body": [
+          {
+            "Return": {
+              "Binary": {
+                "left": {
+                  "Literal": {
+                    "String": "Hello, "
+                  }
+                },
+                "op": "Concat",
+                "right": {
+                  "Ident": "name"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

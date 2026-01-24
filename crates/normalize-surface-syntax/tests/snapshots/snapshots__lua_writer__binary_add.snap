@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 207
+expression: "emit(&ir_const(\"sum\",\nExpr::binary(Expr::number(1), BinaryOp::Add, Expr::number(2))))"
+---
+local sum = (1 + 2)

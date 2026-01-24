@@ -1,0 +1,75 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 152
+expression: "parse(\"for i = 1, 10 do print(i) end\")"
+---
+{
+  "body": [
+    {
+      "For": {
+        "init": {
+          "Let": {
+            "name": "i",
+            "init": {
+              "Literal": {
+                "Number": 1.0
+              }
+            },
+            "mutable": true
+          }
+        },
+        "test": {
+          "Binary": {
+            "left": {
+              "Ident": "i"
+            },
+            "op": "Le",
+            "right": {
+              "Literal": {
+                "Number": 10.0
+              }
+            }
+          }
+        },
+        "update": {
+          "Assign": {
+            "target": {
+              "Ident": "i"
+            },
+            "value": {
+              "Binary": {
+                "left": {
+                  "Ident": "i"
+                },
+                "op": "Add",
+                "right": {
+                  "Literal": {
+                    "Number": 1.0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "body": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Ident": "print"
+                  },
+                  "args": [
+                    {
+                      "Ident": "i"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

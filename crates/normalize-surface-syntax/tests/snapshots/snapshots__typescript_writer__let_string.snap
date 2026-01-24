@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 280
+expression: "emit(&ir_let(\"msg\", Expr::string(\"hello\")))"
+---
+let msg = "hello";

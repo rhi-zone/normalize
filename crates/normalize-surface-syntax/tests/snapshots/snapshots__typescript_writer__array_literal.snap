@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 353
+expression: "emit(&ir_const(\"arr\",\nExpr::array(vec![Expr::number(1), Expr::number(2), Expr::number(3)])))"
+---
+const arr = [1, 2, 3];

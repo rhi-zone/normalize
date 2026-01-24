@@ -1,0 +1,8 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 226
+expression: "emit(&Program\n{\n    body:\n    vec![Stmt::if_stmt(Expr::binary(Expr::ident(\"x\"), BinaryOp::Gt,\n    Expr::number(0)),\n    Stmt::block(vec![Stmt::expr(Expr::call(Expr::ident(\"print\"),\n    vec![Expr::ident(\"x\")]))]), None)]\n})"
+---
+if (x > 0) then
+  print(x)
+end

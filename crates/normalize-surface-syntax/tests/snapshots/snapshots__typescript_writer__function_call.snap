@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 294
+expression: "emit(&Program\n{\n    body:\n    vec![Stmt::expr(Expr::call(Expr::member(Expr::ident(\"console\"), \"log\"),\n    vec![Expr::string(\"hello\")]))]\n})"
+---
+console.log("hello");

@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 196
+expression: "emit(&ir_const(\"x\", Expr::number(42)))"
+---
+local x = 42

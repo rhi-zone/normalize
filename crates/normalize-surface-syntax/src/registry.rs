@@ -95,6 +95,7 @@ pub fn writers() -> Vec<&'static dyn Writer> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ir::StructureEq;
 
     #[test]
     #[cfg(feature = "read-typescript")]
@@ -166,5 +167,165 @@ mod tests {
         let ts = writer.write(&ir);
 
         assert!(ts.contains("const x"));
+    }
+
+    // ========================================================================
+    // Roundtrip tests with structure_eq
+    // ========================================================================
+    //
+    // These tests verify that IR is preserved through:
+    //   Source₁ → IR₁ → Source₂ → IR₂
+    // Using structure_eq to ignore surface hints (mutable, computed, etc.)
+
+    #[test]
+    #[cfg(all(
+        feature = "read-typescript",
+        feature = "write-lua",
+        feature = "read-lua"
+    ))]
+    fn test_structure_eq_ts_lua_variable() {
+        let ts_reader = reader_for_language("typescript").unwrap();
+        let lua_writer = writer_for_language("lua").unwrap();
+        let lua_reader = reader_for_language("lua").unwrap();
+
+        // TS → IR₁
+        let ir1 = ts_reader.read("const x = 42;").unwrap();
+        // IR₁ → Lua
+        let lua = lua_writer.write(&ir1);
+        // Lua → IR₂
+        let ir2 = lua_reader.read(&lua).unwrap();
+
+        assert!(
+            ir1.structure_eq(&ir2),
+            "IR mismatch:\nIR₁: {:?}\nLua: {}\nIR₂: {:?}",
+            ir1,
+            lua,
+            ir2
+        );
+    }
+
+    #[test]
+    #[cfg(all(
+        feature = "read-typescript",
+        feature = "write-lua",
+        feature = "read-lua"
+    ))]
+    fn test_structure_eq_ts_lua_binary_expr() {
+        let ts_reader = reader_for_language("typescript").unwrap();
+        let lua_writer = writer_for_language("lua").unwrap();
+        let lua_reader = reader_for_language("lua").unwrap();
+
+        let ir1 = ts_reader.read("let result = 1 + 2 * 3;").unwrap();
+        let lua = lua_writer.write(&ir1);
+        let ir2 = lua_reader.read(&lua).unwrap();
+
+        assert!(
+            ir1.structure_eq(&ir2),
+            "IR mismatch:\nIR₁: {:?}\nLua: {}\nIR₂: {:?}",
+            ir1,
+            lua,
+            ir2
+        );
+    }
+
+    #[test]
+    #[cfg(all(
+        feature = "read-typescript",
+        feature = "write-lua",
+        feature = "read-lua"
+    ))]
+    fn test_structure_eq_ts_lua_function_call() {
+        let ts_reader = reader_for_language("typescript").unwrap();
+        let lua_writer = writer_for_language("lua").unwrap();
+        let lua_reader = reader_for_language("lua").unwrap();
+
+        let ir1 = ts_reader.read("console.log(\"hello\", 42);").unwrap();
+        let lua = lua_writer.write(&ir1);
+        let ir2 = lua_reader.read(&lua).unwrap();
+
+        assert!(
+            ir1.structure_eq(&ir2),
+            "IR mismatch:\nIR₁: {:?}\nLua: {}\nIR₂: {:?}",
+            ir1,
+            lua,
+            ir2
+        );
+    }
+
+    #[test]
+    #[cfg(all(
+        feature = "read-typescript",
+        feature = "write-lua",
+        feature = "read-lua"
+    ))]
+    fn test_structure_eq_ts_lua_if_statement() {
+        let ts_reader = reader_for_language("typescript").unwrap();
+        let lua_writer = writer_for_language("lua").unwrap();
+        let lua_reader = reader_for_language("lua").unwrap();
+
+        let ir1 = ts_reader.read("if (x > 0) { console.log(x); }").unwrap();
+        let lua = lua_writer.write(&ir1);
+        let ir2 = lua_reader.read(&lua).unwrap();
+
+        assert!(
+            ir1.structure_eq(&ir2),
+            "IR mismatch:\nIR₁: {:?}\nLua: {}\nIR₂: {:?}",
+            ir1,
+            lua,
+            ir2
+        );
+    }
+
+    #[test]
+    #[cfg(all(
+        feature = "read-lua",
+        feature = "write-typescript",
+        feature = "read-typescript"
+    ))]
+    fn test_structure_eq_lua_ts_variable() {
+        let lua_reader = reader_for_language("lua").unwrap();
+        let ts_writer = writer_for_language("typescript").unwrap();
+        let ts_reader = reader_for_language("typescript").unwrap();
+
+        // Lua → IR₁
+        let ir1 = lua_reader.read("local x = 42").unwrap();
+        // IR₁ → TS
+        let ts = ts_writer.write(&ir1);
+        // TS → IR₂
+        let ir2 = ts_reader.read(&ts).unwrap();
+
+        assert!(
+            ir1.structure_eq(&ir2),
+            "IR mismatch:\nIR₁: {:?}\nTS: {}\nIR₂: {:?}",
+            ir1,
+            ts,
+            ir2
+        );
+    }
+
+    #[test]
+    #[cfg(all(
+        feature = "read-lua",
+        feature = "write-typescript",
+        feature = "read-typescript"
+    ))]
+    fn test_structure_eq_lua_ts_function() {
+        let lua_reader = reader_for_language("lua").unwrap();
+        let ts_writer = writer_for_language("typescript").unwrap();
+        let ts_reader = reader_for_language("typescript").unwrap();
+
+        let ir1 = lua_reader
+            .read("function add(a, b) return a + b end")
+            .unwrap();
+        let ts = ts_writer.write(&ir1);
+        let ir2 = ts_reader.read(&ts).unwrap();
+
+        assert!(
+            ir1.structure_eq(&ir2),
+            "IR mismatch:\nIR₁: {:?}\nTS: {}\nIR₂: {:?}",
+            ir1,
+            ts,
+            ir2
+        );
     }
 }

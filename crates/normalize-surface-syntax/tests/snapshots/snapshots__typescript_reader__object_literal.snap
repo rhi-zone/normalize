@@ -1,0 +1,35 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 86
+expression: "parse(\"const obj = { x: 1, y: 2 };\")"
+---
+{
+  "body": [
+    {
+      "Let": {
+        "name": "obj",
+        "init": {
+          "Object": [
+            [
+              "x",
+              {
+                "Literal": {
+                  "Number": 1.0
+                }
+              }
+            ],
+            [
+              "y",
+              {
+                "Literal": {
+                  "Number": 2.0
+                }
+              }
+            ]
+          ]
+        },
+        "mutable": false
+      }
+    }
+  ]
+}

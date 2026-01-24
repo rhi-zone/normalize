@@ -1,0 +1,35 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 130
+expression: "parse(\"console.log(\\\"hello\\\")\")"
+---
+{
+  "body": [
+    {
+      "Expr": {
+        "Call": {
+          "callee": {
+            "Member": {
+              "object": {
+                "Ident": "console"
+              },
+              "property": {
+                "Literal": {
+                  "String": "log"
+                }
+              },
+              "computed": false
+            }
+          },
+          "args": [
+            {
+              "Literal": {
+                "String": "hello"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

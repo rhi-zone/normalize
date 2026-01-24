@@ -1,0 +1,8 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 320
+expression: "emit(&Program\n{\n    body:\n    vec![Stmt::for_loop(Some(Stmt::let_decl(\"i\", Some(Expr::number(0)))),\n    Some(Expr::binary(Expr::ident(\"i\"), BinaryOp::Lt, Expr::number(10))),\n    Some(Expr::assign(Expr::ident(\"i\"),\n    Expr::binary(Expr::ident(\"i\"), BinaryOp::Add, Expr::number(1)))),\n    Stmt::block(vec![Stmt::expr(Expr::call(Expr::member(Expr::ident(\"console\"),\n    \"log\"), vec![Expr::ident(\"i\")]))]))]\n})"
+---
+for (let i = 0; (i < 10); i = (i + 1)) {
+  console.log(i);
+}

@@ -1,0 +1,6 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 201
+expression: "emit(&ir_const(\"msg\", Expr::string(\"hello\")))"
+---
+local msg = "hello"

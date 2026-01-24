@@ -1,0 +1,30 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 125
+expression: "parse(\"print(\\\"hello\\\", 42)\")"
+---
+{
+  "body": [
+    {
+      "Expr": {
+        "Call": {
+          "callee": {
+            "Ident": "print"
+          },
+          "args": [
+            {
+              "Literal": {
+                "String": "hello"
+              }
+            },
+            {
+              "Literal": {
+                "Number": 42.0
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

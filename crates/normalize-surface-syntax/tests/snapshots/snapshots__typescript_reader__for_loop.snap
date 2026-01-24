@@ -1,0 +1,85 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 69
+expression: "parse(\"for (let i = 0; i < 10; i = i + 1) { console.log(i); }\")"
+---
+{
+  "body": [
+    {
+      "For": {
+        "init": {
+          "Let": {
+            "name": "i",
+            "init": {
+              "Literal": {
+                "Number": 0.0
+              }
+            },
+            "mutable": true
+          }
+        },
+        "test": {
+          "Binary": {
+            "left": {
+              "Ident": "i"
+            },
+            "op": "Lt",
+            "right": {
+              "Literal": {
+                "Number": 10.0
+              }
+            }
+          }
+        },
+        "update": {
+          "Assign": {
+            "target": {
+              "Ident": "i"
+            },
+            "value": {
+              "Binary": {
+                "left": {
+                  "Ident": "i"
+                },
+                "op": "Add",
+                "right": {
+                  "Literal": {
+                    "Number": 1.0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "body": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Member": {
+                      "object": {
+                        "Ident": "console"
+                      },
+                      "property": {
+                        "Literal": {
+                          "String": "log"
+                        }
+                      },
+                      "computed": false
+                    }
+                  },
+                  "args": [
+                    {
+                      "Ident": "i"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

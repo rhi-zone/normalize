@@ -1,0 +1,62 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 47
+expression: "parse(\"Math.max(Math.min(x, 10), 0);\")"
+---
+{
+  "body": [
+    {
+      "Expr": {
+        "Call": {
+          "callee": {
+            "Member": {
+              "object": {
+                "Ident": "Math"
+              },
+              "property": {
+                "Literal": {
+                  "String": "max"
+                }
+              },
+              "computed": false
+            }
+          },
+          "args": [
+            {
+              "Call": {
+                "callee": {
+                  "Member": {
+                    "object": {
+                      "Ident": "Math"
+                    },
+                    "property": {
+                      "Literal": {
+                        "String": "min"
+                      }
+                    },
+                    "computed": false
+                  }
+                },
+                "args": [
+                  {
+                    "Ident": "x"
+                  },
+                  {
+                    "Literal": {
+                      "Number": 10.0
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "Literal": {
+                "Number": 0.0
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

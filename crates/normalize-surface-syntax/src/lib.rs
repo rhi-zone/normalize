@@ -53,7 +53,7 @@ pub mod input;
 pub mod output;
 
 // Re-exports: IR types
-pub use ir::{BinaryOp, Expr, Function, Literal, Program, Stmt, UnaryOp};
+pub use ir::{BinaryOp, Expr, Function, Literal, Program, Stmt, StructureEq, UnaryOp};
 
 // Re-exports: Traits
 pub use traits::{ReadError, Reader, Writer};

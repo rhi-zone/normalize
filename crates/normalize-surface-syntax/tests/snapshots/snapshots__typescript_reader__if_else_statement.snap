@@ -1,0 +1,86 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+assertion_line: 57
+expression: "parse(\"if (x > 0) { console.log(\\\"positive\\\"); } else { console.log(\\\"non-positive\\\"); }\")"
+---
+{
+  "body": [
+    {
+      "If": {
+        "test": {
+          "Binary": {
+            "left": {
+              "Ident": "x"
+            },
+            "op": "Gt",
+            "right": {
+              "Literal": {
+                "Number": 0.0
+              }
+            }
+          }
+        },
+        "consequent": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Member": {
+                      "object": {
+                        "Ident": "console"
+                      },
+                      "property": {
+                        "Literal": {
+                          "String": "log"
+                        }
+                      },
+                      "computed": false
+                    }
+                  },
+                  "args": [
+                    {
+                      "Literal": {
+                        "String": "positive"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "alternate": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Member": {
+                      "object": {
+                        "Ident": "console"
+                      },
+                      "property": {
+                        "Literal": {
+                          "String": "log"
+                        }
+                      },
+                      "computed": false
+                    }
+                  },
+                  "args": [
+                    {
+                      "Literal": {
+                        "String": "non-positive"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
