@@ -44,6 +44,7 @@ normalize-packages = { path = "../normalize-packages" }
 normalize-sessions = { path = "../normalize-sessions" }
 normalize-tools = { path = "../normalize-tools" }
 normalize-cli-parser = { path = "../normalize-cli-parser" }
+normalize-surface-syntax = { path = "../normalize-surface-syntax", features = ["read-typescript", "read-lua", "write-typescript", "write-lua"] }
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true

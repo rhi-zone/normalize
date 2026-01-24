@@ -13,6 +13,7 @@ use normalize::commands::rules::RulesAction;
 use normalize::commands::sessions::SessionsArgs;
 use normalize::commands::text_search::TextSearchArgs;
 use normalize::commands::tools::ToolsAction;
+use normalize::commands::translate::TranslateArgs;
 use normalize::commands::view::ViewArgs;
 use normalize::serve::{self, ServeArgs};
 
@@ -134,6 +135,9 @@ enum Commands {
         #[command(subcommand)]
         action: RulesAction,
     },
+
+    /// Translate code between programming languages
+    Translate(TranslateArgs),
 }
 
 /// Help output styling.
@@ -256,6 +260,7 @@ fn main() {
         Commands::Serve(args) => serve::run(args, cli.json),
         Commands::Generate(args) => commands::generate::run(args),
         Commands::Rules { action } => commands::rules::cmd_rules(action, cli.json),
+        Commands::Translate(args) => commands::translate::run(args),
     };
 
     std::process::exit(exit_code);

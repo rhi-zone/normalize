@@ -3193,6 +3193,7 @@ dependencies = [
  "normalize-packages",
  "normalize-rules",
  "normalize-sessions",
+ "normalize-surface-syntax",
  "normalize-tools",
  "normalize-typegen",
  "notify",

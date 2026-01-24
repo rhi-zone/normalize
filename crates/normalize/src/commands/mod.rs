@@ -15,5 +15,6 @@ pub mod rules;
 pub mod sessions;
 pub mod text_search;
 pub mod tools;
+pub mod translate;
 pub mod update;
 pub mod view;
