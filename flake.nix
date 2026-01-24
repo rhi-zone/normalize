@@ -1,5 +1,5 @@
 {
-  description = "moss agent interconnect layer";
+  description = "normalize - structural code intelligence";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
