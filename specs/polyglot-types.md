@@ -117,9 +117,9 @@ For development workflows:
 polytypes generate --watch specs/ --out generated/
 ```
 
-## Architecture: `moss-typegen` Crate
+## Architecture: `normalize-typegen` Crate
 
-Fits naturally in the moss monorepo as a new crate.
+Fits naturally in the normalize monorepo as a new crate.
 
 ### Potential Infrastructure to Leverage
 
@@ -127,18 +127,18 @@ May or may not reuse existing crates depending on fit:
 
 | Crate | Might Provide |
 |-------|---------------|
-| `moss-jsonschema` | JSON Schema parsing (if it exists/fits) |
-| `moss-openapi` | OpenAPI parsing (if it exists/fits) |
-| `moss-languages` | Language metadata (extensions, conventions) |
+| `normalize-jsonschema` | JSON Schema parsing (if it exists/fits) |
+| `normalize-openapi` | OpenAPI parsing (if it exists/fits) |
+| `normalize-languages` | Language metadata (extensions, conventions) |
 
 Likely new dependencies: dedicated parsing crates for input formats.
 
-**Note:** `moss-openapi` already has client codegen but no IR. Plan: once `moss-typegen` is solid, migrate functionality and delete `moss-openapi`.
+**Note:** `normalize-openapi` already has client codegen but no IR. Plan: once `normalize-typegen` is solid, migrate functionality and delete `normalize-openapi`.
 
-### New Crate: `moss-typegen`
+### New Crate: `normalize-typegen`
 
 ```
-moss-typegen/
+normalize-typegen/
 ├── src/
 │   ├── lib.rs
 │   ├── input/           # Input format adapters
@@ -157,7 +157,7 @@ moss-typegen/
 ### CLI Integration
 
 ```bash
-moss codegen \
+normalize codegen \
   --input api.json \
   --format openapi \
   --lang typescript \
@@ -197,10 +197,10 @@ struct Field {
 }
 ```
 
-### Relationship to `moss-languages`
+### Relationship to `normalize-languages`
 
-`moss-languages` = parsing (extracting symbols from existing code)
-`moss-typegen` = generation (producing new code from specs)
+`normalize-languages` = parsing (extracting symbols from existing code)
+`normalize-typegen` = generation (producing new code from specs)
 
 Could share:
 - Language metadata (extensions, naming conventions)
@@ -223,7 +223,7 @@ Before a language backend is "ready":
 
 ## Design Decisions
 
-1. ~~**Where does this live?**~~ → `moss-typegen` crate in moss monorepo
+1. ~~**Where does this live?**~~ → `normalize-typegen` crate in normalize monorepo
 
 2. **Validation codegen?** Both types and runtime validators, both optional.
    - Some validators support type inference (e.g., Zod, Valibot infer TS types from schemas)
@@ -248,13 +248,13 @@ Before a language backend is "ready":
    - Individual clients: `fetch`, `axios`, `ky`, `openapi-fetch`, `requests`, `httpx`, etc.
    - `typescript` would then = `typescript-types` + `typescript-validators` + `typescript-clients`
 
-4. **Relationship to trellis?** Trellis outputs specs, moss-typegen consumes them. Clean boundary:
+4. **Relationship to trellis?** Trellis outputs specs, normalize-typegen consumes them. Clean boundary:
    ```
-   trellis (Rust impl → specs) → moss codegen (specs → polyglot types)
+   trellis (Rust impl → specs) → normalize codegen (specs → polyglot types)
    ```
    Separate repos, complementary tools.
 
-5. ~~**Name?**~~ → `moss-typegen` (no clever names)
+5. ~~**Name?**~~ → `normalize-typegen` (no clever names)
 
 ## Phase 1 Scope (eventual goals, deferred)
 

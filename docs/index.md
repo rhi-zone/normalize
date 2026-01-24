@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: "Moss"
+  name: "Normalize"
   text: "Code intelligence CLI"
   tagline: "Navigate, analyze, and modify codebases using AST structure instead of text."
   actions:

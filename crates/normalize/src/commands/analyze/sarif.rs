@@ -94,7 +94,7 @@ pub fn print_complexity_sarif(functions: &[FunctionComplexity], root: &Path) {
                 "driver": {
                     "name": "moss",
                     "version": env!("CARGO_PKG_VERSION"),
-                    "informationUri": "https://github.com/rhizome-lab/moss",
+                    "informationUri": "https://github.com/rhi-zone/normalize",
                     "rules": rules
                 }
             },
@@ -181,7 +181,7 @@ pub fn print_length_sarif(functions: &[FunctionLength], root: &Path) {
                 "driver": {
                     "name": "moss",
                     "version": env!("CARGO_PKG_VERSION"),
-                    "informationUri": "https://github.com/rhizome-lab/moss",
+                    "informationUri": "https://github.com/rhi-zone/normalize",
                     "rules": rules
                 }
             },
