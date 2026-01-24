@@ -10,9 +10,11 @@ default = ["read-typescript", "write-lua"]
 
 # Readers
 read-typescript = ["tree-sitter", "arborium-typescript"]
+read-lua = ["tree-sitter", "arborium-lua"]
 
 # Writers
 write-lua = []
+write-typescript = []
 
 # S-expression serialization format
 sexpr = []
@@ -23,6 +25,7 @@ serde_json = { workspace = true }
 thiserror = "2"
 tree-sitter = { version = "0.26", optional = true }
 arborium-typescript = { version = "2", optional = true }
+arborium-lua = { version = "2", optional = true }
 
 [dev-dependencies]
 insta = { version = "1", features = ["json"] }

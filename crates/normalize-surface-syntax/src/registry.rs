@@ -27,6 +27,10 @@ fn init_readers() {
         {
             register_reader(&crate::input::typescript::TYPESCRIPT_READER);
         }
+        #[cfg(feature = "read-lua")]
+        {
+            register_reader(&crate::input::lua::LUA_READER);
+        }
     });
 }
 
@@ -35,6 +39,10 @@ fn init_writers() {
         #[cfg(feature = "write-lua")]
         {
             register_writer(&crate::output::lua::LUA_WRITER);
+        }
+        #[cfg(feature = "write-typescript")]
+        {
+            register_writer(&crate::output::typescript::TYPESCRIPT_WRITER);
         }
     });
 }
@@ -117,5 +125,46 @@ mod tests {
         let lua = writer.write(&ir);
 
         assert!(lua.contains("local x"));
+    }
+
+    #[test]
+    #[cfg(feature = "read-lua")]
+    fn test_lua_reader_lookup() {
+        let reader = reader_for_language("lua").expect("lua reader");
+        assert_eq!(reader.language(), "lua");
+        assert!(reader.extensions().contains(&"lua"));
+    }
+
+    #[test]
+    #[cfg(feature = "write-typescript")]
+    fn test_typescript_writer_lookup() {
+        let writer = writer_for_language("typescript").expect("typescript writer");
+        assert_eq!(writer.language(), "typescript");
+        assert_eq!(writer.extension(), "ts");
+    }
+
+    #[test]
+    #[cfg(all(feature = "read-lua", feature = "write-typescript"))]
+    fn test_lua_to_typescript_roundtrip() {
+        let reader = reader_for_language("lua").unwrap();
+        let writer = writer_for_language("typescript").unwrap();
+
+        let ir = reader.read("local x = 1 + 2").unwrap();
+        let ts = writer.write(&ir);
+
+        assert!(ts.contains("let x") || ts.contains("const x"));
+        assert!(ts.contains("1 + 2") || ts.contains("(1 + 2)"));
+    }
+
+    #[test]
+    #[cfg(all(feature = "read-typescript", feature = "write-typescript"))]
+    fn test_typescript_roundtrip() {
+        let reader = reader_for_language("typescript").unwrap();
+        let writer = writer_for_language("typescript").unwrap();
+
+        let ir = reader.read("const x = 1 + 2;").unwrap();
+        let ts = writer.write(&ir);
+
+        assert!(ts.contains("const x"));
     }
 }

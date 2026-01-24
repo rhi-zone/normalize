@@ -3,6 +3,7 @@
 //! Generates Go structs with json tags.
 
 use crate::ir::{EnumKind, Field, Schema, Type, TypeDef, TypeDefKind};
+use crate::traits::{Backend, BackendCategory};
 
 /// Options for Go code generation.
 #[derive(Debug, Clone, Default)]
@@ -270,6 +271,51 @@ fn to_pascal_case(s: &str) -> String {
         }
     }
     result
+}
+
+/// Static backend instance with default options.
+pub static GO_BACKEND: GoBackend = GoBackend {
+    options: GoOptions {
+        package: String::new(), // Will use "types" as default
+        json_tags: true,
+        pointer_optionals: true,
+        omitempty: true,
+    },
+};
+
+/// Go backend with configurable options.
+pub struct GoBackend {
+    /// Generation options.
+    pub options: GoOptions,
+}
+
+impl GoBackend {
+    /// Create a new Go backend with the given options.
+    pub fn new(options: GoOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl Backend for GoBackend {
+    fn name(&self) -> &'static str {
+        "go"
+    }
+
+    fn language(&self) -> &'static str {
+        "go"
+    }
+
+    fn extension(&self) -> &'static str {
+        "go"
+    }
+
+    fn category(&self) -> BackendCategory {
+        BackendCategory::Types
+    }
+
+    fn generate(&self, schema: &Schema) -> String {
+        generate_go_types(schema, &self.options)
+    }
 }
 
 #[cfg(test)]

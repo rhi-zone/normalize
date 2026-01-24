@@ -4,6 +4,7 @@
 //! Valibot is a lightweight alternative to Zod with tree-shakeable design.
 
 use crate::ir::{EnumKind, Field, Schema, Type, TypeDef, TypeDefKind};
+use crate::traits::{Backend, BackendCategory};
 
 /// Options for Valibot code generation.
 #[derive(Debug, Clone, Default)]
@@ -249,6 +250,49 @@ fn type_to_valibot(ty: &Type) -> String {
 
 fn schema_name(type_name: &str) -> String {
     format!("{}Schema", type_name)
+}
+
+/// Static backend instance with default options.
+pub static VALIBOT_BACKEND: ValibotBackend = ValibotBackend {
+    options: ValibotOptions {
+        export: true,
+        infer_types: true,
+    },
+};
+
+/// Valibot backend with configurable options.
+pub struct ValibotBackend {
+    /// Generation options.
+    pub options: ValibotOptions,
+}
+
+impl ValibotBackend {
+    /// Create a new Valibot backend with the given options.
+    pub fn new(options: ValibotOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl Backend for ValibotBackend {
+    fn name(&self) -> &'static str {
+        "valibot"
+    }
+
+    fn language(&self) -> &'static str {
+        "typescript"
+    }
+
+    fn extension(&self) -> &'static str {
+        "ts"
+    }
+
+    fn category(&self) -> BackendCategory {
+        BackendCategory::Validators
+    }
+
+    fn generate(&self, schema: &Schema) -> String {
+        generate_valibot(schema, &self.options)
+    }
 }
 
 #[cfg(test)]

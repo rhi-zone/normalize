@@ -8,26 +8,33 @@ description = "Polyglot type and validator generation from schemas"
 [features]
 default = ["typescript", "python", "go", "rust-types"]
 
-# Language umbrella flags
-typescript = ["typescript-types", "typescript-validators"]
-python = ["python-types", "python-validators"]
-go = ["go-types"]
-rust-types = []
-
-# Per-language types
-typescript-types = []
-python-types = []
-go-types = []
+# Language umbrella flags (convenience)
+typescript = ["backend-typescript", "typescript-validators"]
+python = ["backend-python", "python-validators"]
+go = ["backend-go"]
+rust-types = ["backend-rust"]
 
 # Per-language validators (umbrella)
-typescript-validators = ["zod", "valibot"]
-python-validators = ["pydantic"]
+typescript-validators = ["backend-zod", "backend-valibot"]
+python-validators = ["backend-pydantic"]
 
-# Individual validators
-zod = ["typescript-types"]
-valibot = ["typescript-types"]
-yup = ["typescript-types"]
-pydantic = ["python-types"]
+# Backend flags (primary)
+backend-typescript = []
+backend-zod = []
+backend-valibot = []
+backend-python = []
+backend-pydantic = []
+backend-go = []
+backend-rust = []
+
+# Legacy aliases (for backwards compatibility)
+typescript-types = ["backend-typescript"]
+python-types = ["backend-python"]
+go-types = ["backend-go"]
+zod = ["backend-zod"]
+valibot = ["backend-valibot"]
+pydantic = ["backend-pydantic"]
+yup = ["backend-typescript"]
 
 [dependencies]
 serde = { workspace = true }

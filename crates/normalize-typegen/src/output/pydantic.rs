@@ -3,6 +3,7 @@
 //! Generates Pydantic v2 models for runtime validation.
 
 use crate::ir::{EnumKind, Field, Schema, Type, TypeDef, TypeDefKind};
+use crate::traits::{Backend, BackendCategory};
 
 /// Options for Pydantic code generation.
 #[derive(Debug, Clone, Default)]
@@ -307,6 +308,50 @@ fn to_pascal_case(s: &str) -> String {
         }
     }
     result
+}
+
+/// Static backend instance with default options.
+pub static PYDANTIC_BACKEND: PydanticBackend = PydanticBackend {
+    options: PydanticOptions {
+        version: PydanticVersion::V2,
+        strict: false,
+        frozen: false,
+    },
+};
+
+/// Pydantic backend with configurable options.
+pub struct PydanticBackend {
+    /// Generation options.
+    pub options: PydanticOptions,
+}
+
+impl PydanticBackend {
+    /// Create a new Pydantic backend with the given options.
+    pub fn new(options: PydanticOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl Backend for PydanticBackend {
+    fn name(&self) -> &'static str {
+        "pydantic"
+    }
+
+    fn language(&self) -> &'static str {
+        "python"
+    }
+
+    fn extension(&self) -> &'static str {
+        "py"
+    }
+
+    fn category(&self) -> BackendCategory {
+        BackendCategory::Validators
+    }
+
+    fn generate(&self, schema: &Schema) -> String {
+        generate_pydantic(schema, &self.options)
+    }
 }
 
 #[cfg(test)]

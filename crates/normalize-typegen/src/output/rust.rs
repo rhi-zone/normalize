@@ -3,6 +3,7 @@
 //! Generates Rust structs with serde derives.
 
 use crate::ir::{EnumKind, Field, Schema, Type, TypeDef, TypeDefKind};
+use crate::traits::{Backend, BackendCategory};
 
 /// Options for Rust code generation.
 #[derive(Debug, Clone, Default)]
@@ -344,6 +345,62 @@ fn to_pascal_case(s: &str) -> String {
         }
     }
     result
+}
+
+/// Static backend instance with default options.
+pub static RUST_BACKEND: RustBackend = RustBackend {
+    options: RustOptions {
+        serde: true,
+        debug: true,
+        clone: true,
+        partial_eq: false,
+        rename_all: None, // Will be set in generate
+        public: true,
+    },
+};
+
+/// Rust backend with configurable options.
+pub struct RustBackend {
+    /// Generation options.
+    pub options: RustOptions,
+}
+
+impl RustBackend {
+    /// Create a new Rust backend with the given options.
+    pub fn new(options: RustOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl Backend for RustBackend {
+    fn name(&self) -> &'static str {
+        "rust"
+    }
+
+    fn language(&self) -> &'static str {
+        "rust"
+    }
+
+    fn extension(&self) -> &'static str {
+        "rs"
+    }
+
+    fn category(&self) -> BackendCategory {
+        BackendCategory::Types
+    }
+
+    fn generate(&self, schema: &Schema) -> String {
+        // Use with_serde defaults if using default RUST_BACKEND
+        let options = if self.options.rename_all.is_none() && self.options.serde {
+            RustOptions {
+                rename_all: Some("camelCase".to_string()),
+                ..self.options.clone()
+            }
+        } else {
+            self.options.clone()
+        };
+        generate_rust_types(schema, &options)
+    }
 }
 
 #[cfg(test)]

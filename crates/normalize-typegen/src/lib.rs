@@ -1,6 +1,6 @@
 //! Polyglot type and validator generation from schemas.
 //!
-//! `moss-typegen` converts schema formats (JSON Schema, OpenAPI, Protobuf) into
+//! `normalize-typegen` converts schema formats (JSON Schema, OpenAPI, Protobuf) into
 //! idiomatic type definitions and runtime validators for multiple languages.
 //!
 //! # Architecture
@@ -39,48 +39,98 @@
 //! assert!(ts.contains("interface User"));
 //! ```
 //!
+//! # Using the Backend Registry
+//!
+//! ```ignore
+//! use normalize_typegen::{get_backend, backend_names};
+//!
+//! // List all available backends
+//! for name in backend_names() {
+//!     println!("Backend: {}", name);
+//! }
+//!
+//! // Get and use a specific backend
+//! if let Some(backend) = get_backend("typescript") {
+//!     let output = backend.generate(&schema);
+//!     println!("{}", output);
+//! }
+//! ```
+//!
 //! # Feature Flags
 //!
-//! Language umbrella flags (enable types + validators):
-//! - `typescript` - TypeScript types + Zod + Valibot (default)
-//! - `python` - Python types + Pydantic (default)
-//! - `go` - Go structs (default)
-//! - `rust-types` - Rust structs with serde (default)
+//! Backend flags (use `backend-*` prefix):
+//! - `backend-typescript` - TypeScript interfaces/types
+//! - `backend-zod` - Zod schema generation
+//! - `backend-valibot` - Valibot schema generation
+//! - `backend-python` - Python dataclasses/TypedDict
+//! - `backend-pydantic` - Pydantic model generation
+//! - `backend-go` - Go structs with json tags
+//! - `backend-rust` - Rust structs with serde
 //!
-//! Per-language type flags:
-//! - `typescript-types` - TypeScript interfaces/types
-//! - `python-types` - Python dataclasses/TypedDict
-//! - `go-types` - Go structs with json tags
-//!
-//! Validator flags:
-//! - `zod` - Zod schema generation
-//! - `valibot` - Valibot schema generation
-//! - `pydantic` - Pydantic model generation
+//! Language umbrella flags (convenience, enable types + validators):
+//! - `typescript` - backend-typescript + backend-zod + backend-valibot
+//! - `python` - backend-python + backend-pydantic
+//! - `go` - backend-go
+//! - `rust-types` - backend-rust
 
 pub mod input;
 pub mod ir;
 pub mod output;
+pub mod registry;
+pub mod traits;
 
 // Re-export commonly used items
 pub use input::{ParseError, parse_json_schema, parse_openapi};
 
-#[cfg(feature = "typescript-types")]
+// Re-export traits
+pub use traits::{Backend, BackendCategory};
+
+// Re-export registry functions
+pub use registry::{
+    backend_names, backends, backends_by_category, backends_for_language, get_backend,
+    register_backend,
+};
+
+// Re-export generators (kept for backwards compatibility)
+#[cfg(feature = "backend-typescript")]
 pub use output::generate_typescript_types;
 
-#[cfg(feature = "zod")]
+#[cfg(feature = "backend-zod")]
 pub use output::generate_zod;
 
-#[cfg(feature = "valibot")]
+#[cfg(feature = "backend-valibot")]
 pub use output::generate_valibot;
 
-#[cfg(feature = "python-types")]
+#[cfg(feature = "backend-python")]
 pub use output::generate_python_types;
 
-#[cfg(feature = "pydantic")]
+#[cfg(feature = "backend-pydantic")]
 pub use output::generate_pydantic;
 
-#[cfg(feature = "go-types")]
+#[cfg(feature = "backend-go")]
 pub use output::generate_go_types;
 
-#[cfg(feature = "rust-types")]
+#[cfg(feature = "backend-rust")]
 pub use output::generate_rust_types;
+
+// Re-export backend structs
+#[cfg(feature = "backend-typescript")]
+pub use output::typescript::TypeScriptBackend;
+
+#[cfg(feature = "backend-zod")]
+pub use output::zod::ZodBackend;
+
+#[cfg(feature = "backend-valibot")]
+pub use output::valibot::ValibotBackend;
+
+#[cfg(feature = "backend-python")]
+pub use output::python::PythonBackend;
+
+#[cfg(feature = "backend-pydantic")]
+pub use output::pydantic::PydanticBackend;
+
+#[cfg(feature = "backend-go")]
+pub use output::go::GoBackend;
+
+#[cfg(feature = "backend-rust")]
+pub use output::rust::RustBackend;

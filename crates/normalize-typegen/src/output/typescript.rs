@@ -1,6 +1,7 @@
 //! TypeScript type definitions output backend.
 
 use crate::ir::{EnumKind, Field, Schema, Type, TypeDef, TypeDefKind};
+use crate::traits::{Backend, BackendCategory};
 
 /// Options for TypeScript code generation.
 #[derive(Debug, Clone, Default)]
@@ -206,6 +207,50 @@ fn type_to_ts(ty: &Type) -> String {
         Type::IntLiteral(i) => i.to_string(),
         Type::BoolLiteral(b) => b.to_string(),
         Type::Any => "unknown".to_string(),
+    }
+}
+
+/// Static backend instance with default options.
+pub static TYPESCRIPT_BACKEND: TypeScriptBackend = TypeScriptBackend {
+    options: TypeScriptOptions {
+        readonly: false,
+        optional_style: OptionalStyle::Question,
+        export: true,
+    },
+};
+
+/// TypeScript backend with configurable options.
+pub struct TypeScriptBackend {
+    /// Generation options.
+    pub options: TypeScriptOptions,
+}
+
+impl TypeScriptBackend {
+    /// Create a new TypeScript backend with the given options.
+    pub fn new(options: TypeScriptOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl Backend for TypeScriptBackend {
+    fn name(&self) -> &'static str {
+        "typescript"
+    }
+
+    fn language(&self) -> &'static str {
+        "typescript"
+    }
+
+    fn extension(&self) -> &'static str {
+        "ts"
+    }
+
+    fn category(&self) -> BackendCategory {
+        BackendCategory::Types
+    }
+
+    fn generate(&self, schema: &Schema) -> String {
+        generate_typescript_types(schema, &self.options)
     }
 }
 

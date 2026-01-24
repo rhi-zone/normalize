@@ -4,6 +4,7 @@
 //! Types can be inferred from Zod schemas using `z.infer<typeof schema>`.
 
 use crate::ir::{EnumKind, Field, Schema, Type, TypeDef, TypeDefKind};
+use crate::traits::{Backend, BackendCategory};
 
 /// Options for Zod code generation.
 #[derive(Debug, Clone, Default)]
@@ -202,6 +203,49 @@ fn type_to_zod(ty: &Type) -> String {
 fn schema_name(type_name: &str) -> String {
     // Convention: UserSchema for User type
     format!("{}Schema", type_name)
+}
+
+/// Static backend instance with default options.
+pub static ZOD_BACKEND: ZodBackend = ZodBackend {
+    options: ZodOptions {
+        export: true,
+        infer_types: true,
+    },
+};
+
+/// Zod backend with configurable options.
+pub struct ZodBackend {
+    /// Generation options.
+    pub options: ZodOptions,
+}
+
+impl ZodBackend {
+    /// Create a new Zod backend with the given options.
+    pub fn new(options: ZodOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl Backend for ZodBackend {
+    fn name(&self) -> &'static str {
+        "zod"
+    }
+
+    fn language(&self) -> &'static str {
+        "typescript"
+    }
+
+    fn extension(&self) -> &'static str {
+        "ts"
+    }
+
+    fn category(&self) -> BackendCategory {
+        BackendCategory::Validators
+    }
+
+    fn generate(&self, schema: &Schema) -> String {
+        generate_zod(schema, &self.options)
+    }
 }
 
 #[cfg(test)]

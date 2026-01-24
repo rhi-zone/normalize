@@ -5,3 +5,9 @@ pub mod typescript;
 
 #[cfg(feature = "read-typescript")]
 pub use typescript::{TYPESCRIPT_READER, TypeScriptReader, read_typescript};
+
+#[cfg(feature = "read-lua")]
+pub mod lua;
+
+#[cfg(feature = "read-lua")]
+pub use lua::{LUA_READER, LuaReader, read_lua};

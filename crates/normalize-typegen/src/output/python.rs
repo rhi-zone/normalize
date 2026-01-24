@@ -3,6 +3,7 @@
 //! Generates Python dataclasses with type hints (3.10+).
 
 use crate::ir::{EnumKind, Field, Schema, Type, TypeDef, TypeDefKind};
+use crate::traits::{Backend, BackendCategory};
 
 /// Options for Python code generation.
 #[derive(Debug, Clone, Default)]
@@ -343,6 +344,50 @@ fn to_pascal_case(s: &str) -> String {
         }
     }
     result
+}
+
+/// Static backend instance with default options.
+pub static PYTHON_BACKEND: PythonBackend = PythonBackend {
+    options: PythonOptions {
+        style: PythonStyle::Dataclass,
+        future_annotations: true,
+        frozen: false,
+    },
+};
+
+/// Python backend with configurable options.
+pub struct PythonBackend {
+    /// Generation options.
+    pub options: PythonOptions,
+}
+
+impl PythonBackend {
+    /// Create a new Python backend with the given options.
+    pub fn new(options: PythonOptions) -> Self {
+        Self { options }
+    }
+}
+
+impl Backend for PythonBackend {
+    fn name(&self) -> &'static str {
+        "python"
+    }
+
+    fn language(&self) -> &'static str {
+        "python"
+    }
+
+    fn extension(&self) -> &'static str {
+        "py"
+    }
+
+    fn category(&self) -> BackendCategory {
+        BackendCategory::Types
+    }
+
+    fn generate(&self, schema: &Schema) -> String {
+        generate_python_types(schema, &self.options)
+    }
 }
 
 #[cfg(test)]

@@ -1,52 +1,56 @@
 //! Output backends for code generation.
 //!
 //! Each backend takes an IR [`Schema`](crate::ir::Schema) and produces code.
+//! All backends implement the [`Backend`](crate::traits::Backend) trait for
+//! uniform access via the registry.
 
 // TypeScript
-#[cfg(feature = "typescript-types")]
+#[cfg(feature = "backend-typescript")]
 pub mod typescript;
 
-#[cfg(feature = "typescript-types")]
-pub use typescript::{OptionalStyle, TypeScriptOptions, generate_typescript_types};
+#[cfg(feature = "backend-typescript")]
+pub use typescript::{
+    OptionalStyle, TypeScriptBackend, TypeScriptOptions, generate_typescript_types,
+};
 
 // Zod (TypeScript validator)
-#[cfg(feature = "zod")]
+#[cfg(feature = "backend-zod")]
 pub mod zod;
 
-#[cfg(feature = "zod")]
-pub use zod::{ZodOptions, generate_zod};
+#[cfg(feature = "backend-zod")]
+pub use zod::{ZodBackend, ZodOptions, generate_zod};
 
 // Valibot (TypeScript validator)
-#[cfg(feature = "valibot")]
+#[cfg(feature = "backend-valibot")]
 pub mod valibot;
 
-#[cfg(feature = "valibot")]
-pub use valibot::{ValibotOptions, generate_valibot};
+#[cfg(feature = "backend-valibot")]
+pub use valibot::{ValibotBackend, ValibotOptions, generate_valibot};
 
 // Python
-#[cfg(feature = "python-types")]
+#[cfg(feature = "backend-python")]
 pub mod python;
 
-#[cfg(feature = "python-types")]
-pub use python::{PythonOptions, PythonStyle, generate_python_types};
+#[cfg(feature = "backend-python")]
+pub use python::{PythonBackend, PythonOptions, PythonStyle, generate_python_types};
 
 // Pydantic (Python validator)
-#[cfg(feature = "pydantic")]
+#[cfg(feature = "backend-pydantic")]
 pub mod pydantic;
 
-#[cfg(feature = "pydantic")]
-pub use pydantic::{PydanticOptions, PydanticVersion, generate_pydantic};
+#[cfg(feature = "backend-pydantic")]
+pub use pydantic::{PydanticBackend, PydanticOptions, PydanticVersion, generate_pydantic};
 
 // Go
-#[cfg(feature = "go-types")]
+#[cfg(feature = "backend-go")]
 pub mod go;
 
-#[cfg(feature = "go-types")]
-pub use go::{GoOptions, generate_go_types};
+#[cfg(feature = "backend-go")]
+pub use go::{GoBackend, GoOptions, generate_go_types};
 
 // Rust
-#[cfg(feature = "rust-types")]
+#[cfg(feature = "backend-rust")]
 pub mod rust;
 
-#[cfg(feature = "rust-types")]
-pub use rust::{RustOptions, generate_rust_types};
+#[cfg(feature = "backend-rust")]
+pub use rust::{RustBackend, RustOptions, generate_rust_types};
