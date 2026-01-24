@@ -6,7 +6,7 @@ Archived insights from using the moss agent on itself. Agent functionality now l
 
 - **Ephemeral context model**: 1-turn output visibility forces explicit memory curation via `$(keep)`/`$(note)`
 - **State machine (explorer/evaluator)**: Prevents pre-answering; evaluator curates, explorer acts
-- **Session logging**: JSONL logs in `.moss/agent/logs/` enable post-hoc analysis
+- **Session logging**: JSONL logs in `.normalize/agent/logs/` enable post-hoc analysis
 - **`moss sessions --format moss`**: List/grep agent sessions for debugging
 - **Working memory**: Synthesized notes (`$(note)`) survive longer than raw outputs
 

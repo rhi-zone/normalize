@@ -75,7 +75,7 @@ This removes both the rule file and its entry in the lock file.
 
 ## Lock File
 
-Imported rules are tracked in `.moss/rules.lock` (project) or `~/.config/moss/rules.lock` (global):
+Imported rules are tracked in `.normalize/rules.lock` (project) or `~/.config/moss/rules.lock` (global):
 
 ```toml
 [rules.no-console-log]

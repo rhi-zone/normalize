@@ -13,7 +13,7 @@ Goal state for `moss @agent` - autonomous coding agent.
 
 Agent can run indefinitely. When context fills or session ends:
 1. Summarize progress and open questions
-2. Write checkpoint to `.moss/agent/session-<id>.json`
+2. Write checkpoint to `.normalize/agent/session-<id>.json`
 3. New session picks up from checkpoint
 
 Stops ONLY when:
@@ -23,7 +23,7 @@ Stops ONLY when:
 
 ## Validation Pipeline
 
-Configurable in `.moss/config.toml` - fully arbitrary schema:
+Configurable in `.normalize/config.toml` - fully arbitrary schema:
 
 ```toml
 [agent]
@@ -136,19 +136,19 @@ Long-term: `memorize` tool for cross-session persistence
 memorize("auth module uses JWT tokens, see src/auth/jwt.rs")
 memorize("user prefers functional style over OOP")
 
--- Stored in .moss/memory/ (version controlled)
+-- Stored in .normalize/memory/ (version controlled)
 -- Accessible via recall()
 ```
 
-Memory storage: `.moss/memory/` directory, checked into git
+Memory storage: `.normalize/memory/` directory, checked into git
 - `facts.md` - general project knowledge
 - `preferences.md` - user/team preferences
 - `decisions.md` - past design decisions and rationale
 
-Note: `moss init` gitignore must NOT exclude `.moss/memory/` (unlike other `.moss/` contents)
+Note: `moss init` gitignore must NOT exclude `.normalize/memory/` (unlike other `.normalize/` contents)
 
 Organization: both manual and LLM-assisted
-- User can edit `.moss/memory/*.md` directly
+- User can edit `.normalize/memory/*.md` directly
 - Agent can reorganize/consolidate via LLM when prompted
 - `moss memory organize` - LLM pass to dedupe/categorize
 
@@ -159,7 +159,7 @@ Organization: both manual and LLM-assisted
 - [x] Error escalation: retry → rollback → ask user (automatic after 3 failures)
 - [x] Working memory IDs: random 4-char strings to avoid LLM autocomplete
 - [x] Batch edit: $(batch-edit target1 action content | target2 action content)
-- [x] Session logging: JSONL logs in .moss/agent/logs/, --list-logs to view
+- [x] Session logging: JSONL logs in .normalize/agent/logs/, --list-logs to view
 - [x] Non-interactive mode: --non-interactive / -n for CI usage
 
 ## Open Questions

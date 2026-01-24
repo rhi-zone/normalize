@@ -1,6 +1,6 @@
 //! Custom tool support - run arbitrary commands that output SARIF or JSON.
 //!
-//! Tools are configured in `.moss/tools.toml`:
+//! Tools are configured in `.normalize/tools.toml`:
 //!
 //! ```toml
 //! [tools.semgrep]
@@ -291,7 +291,7 @@ fn run_custom_command(
 
 /// Load custom tools from a config file.
 pub fn load_custom_tools(root: &Path) -> Vec<Box<dyn Tool>> {
-    let config_path = root.join(".moss").join("tools.toml");
+    let config_path = root.join(".normalize").join("tools.toml");
 
     if !config_path.exists() {
         return Vec::new();

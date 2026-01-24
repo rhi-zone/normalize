@@ -8,7 +8,7 @@ When `moss edit` modifies files, there's no easy way to undo changes. Users must
 
 ## Solution
 
-Maintain a hidden git repository (`.moss/shadow/`) that automatically commits after each `moss edit` operation, preserving full edit history as a tree.
+Maintain a hidden git repository (`.normalize/shadow/`) that automatically commits after each `moss edit` operation, preserving full edit history as a tree.
 
 ## Why Shadow Git?
 
@@ -152,7 +152,7 @@ moss edit --goto 2            # Go to commit 2 (by number from --history)
 
 ### Directory Structure
 ```
-.moss/
+.normalize/
   shadow/
     .git/                     # Shadow repository
       refs/
@@ -262,7 +262,7 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - **Problem**: User may have multiple git worktrees of the same repo. Each worktree has its own file state.
 - **Decision**: Each worktree gets its own shadow repo, sharing nothing
 - **Rationale**: Shadow tracks file state, which differs per worktree. Config consistency with current worktree state is cleaner.
-- **Implementation**: Shadow repo at `.moss/shadow/` within each worktree's directory
+- **Implementation**: Shadow repo at `.normalize/shadow/` within each worktree's directory
 - **Pruning across worktrees**:
   - `--prune` detects if same file has shadow history in other worktrees
   - Interactive: prompts "Also prune in N other worktrees? [Y/n]" (default: yes)
@@ -272,7 +272,7 @@ Uses `git filter-branch` or similar under the hood. Important for:
 ## Implementation Plan
 
 ### Phase 1: Basic Infrastructure
-- [ ] Create `.moss/shadow/` git repo on first `moss edit`
+- [ ] Create `.normalize/shadow/` git repo on first `moss edit`
 - [ ] Commit file state before each edit
 - [ ] `--message`/`--reason` flag for edit descriptions
 - [ ] `moss history` command (list recent edits)

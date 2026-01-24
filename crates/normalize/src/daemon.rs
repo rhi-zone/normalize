@@ -281,11 +281,11 @@ impl DaemonServer {
 
             for res in notify_rx {
                 if let Ok(event) = res {
-                    // Skip .moss directory
+                    // Skip .normalize directory
                     if event
                         .paths
                         .iter()
-                        .all(|p| p.to_string_lossy().contains(".moss"))
+                        .all(|p| p.to_string_lossy().contains(".normalize"))
                     {
                         continue;
                     }

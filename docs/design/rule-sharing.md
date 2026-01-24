@@ -16,7 +16,7 @@ Users want to:
 Rules are loaded from:
 1. Builtins (embedded in binary)
 2. User global (`~/.config/moss/rules/*.scm`)
-3. Project (`.moss/rules/*.scm`)
+3. Project (`.normalize/rules/*.scm`)
 
 No mechanism for importing from external sources.
 
@@ -39,8 +39,8 @@ moss rules list --sources
 
 **Behavior:**
 - Downloads .scm file
-- Saves to `.moss/rules/` (or `~/.config/moss/rules/` with `--global`)
-- Creates `.moss/rules.lock` tracking source URLs
+- Saves to `.normalize/rules/` (or `~/.config/moss/rules/` with `--global`)
+- Creates `.normalize/rules.lock` tracking source URLs
 
 **rules.lock format:**
 ```toml
@@ -67,12 +67,12 @@ Reference a git repo with multiple rules:
 # Add all rules from a repo
 moss rules add-repo https://github.com/user/rust-rules.git
 
-# Saves to .moss/rules/vendor/rust-rules/
+# Saves to .normalize/rules/vendor/rust-rules/
 ```
 
 Or reference in config:
 ```toml
-# .moss/config.toml
+# .normalize/config.toml
 [rules]
 extends = [
     "https://github.com/user/rust-rules.git#v1.0",
@@ -92,14 +92,14 @@ moss rules add rust-best-practices@1.0
 ### Phase 1 scope
 
 1. Add `moss rules add <url>` command
-2. Add `.moss/rules.lock` tracking
+2. Add `.normalize/rules.lock` tracking
 3. Add `moss rules update` command
 4. Add `moss rules list --sources`
 
 ### File structure
 
 ```
-.moss/
+.normalize/
 ├── config.toml
 ├── rules/
 │   ├── no-dbg.scm           # Downloaded rule

@@ -46,7 +46,7 @@ moss view MyClass
 
 ## Configuration
 
-Create `.moss/config.toml`:
+Create `.normalize/config.toml`:
 
 ```toml
 [index]

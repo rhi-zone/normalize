@@ -3,7 +3,7 @@
 //! Rules are loaded in this order (later overrides earlier by `id`):
 //! 1. Embedded builtins (compiled into moss)
 //! 2. User global rules (`~/.config/moss/rules/*.scm`)
-//! 3. Project rules (`.moss/rules/*.scm`)
+//! 3. Project rules (`.normalize/rules/*.scm`)
 
 use crate::builtin::BUILTIN_RULES;
 use crate::{Rule, Severity};
@@ -34,7 +34,7 @@ pub struct RuleOverride {
 }
 
 /// Load all rules from all sources, merged by ID.
-/// Order: builtins → ~/.config/moss/rules/ → .moss/rules/
+/// Order: builtins → ~/.config/moss/rules/ → .normalize/rules/
 /// Then applies config overrides (severity, disable).
 pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
     let mut rules_by_id: HashMap<String, Rule> = HashMap::new();
@@ -54,8 +54,8 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
         }
     }
 
-    // 3. Load project rules (.moss/rules/)
-    let project_rules_dir = project_root.join(".moss").join("rules");
+    // 3. Load project rules (.normalize/rules/)
+    let project_rules_dir = project_root.join(".normalize").join("rules");
     for rule in load_rules_from_dir(&project_rules_dir) {
         rules_by_id.insert(rule.id.clone(), rule);
     }

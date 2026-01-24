@@ -8,9 +8,9 @@ Rules are loaded in this order (later overrides earlier by `id`):
 
 1. **Embedded builtins** - compiled into the moss binary
 2. **User global** - `~/.config/moss/rules/*.scm`
-3. **Project** - `.moss/rules/*.scm`
+3. **Project** - `.normalize/rules/*.scm`
 
-To disable a builtin, add to `.moss/config.toml`:
+To disable a builtin, add to `.normalize/config.toml`:
 
 ```toml
 [analyze.rules."rust/println-debug"]

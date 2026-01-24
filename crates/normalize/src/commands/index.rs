@@ -572,8 +572,8 @@ async fn index_package_symbols(
 
 /// Show storage usage for index and caches
 fn cmd_storage(root: &Path, json: bool) -> i32 {
-    // Project index: .moss/index.sqlite
-    let index_path = root.join(".moss").join("index.sqlite");
+    // Project index: .normalize/index.sqlite
+    let index_path = root.join(".normalize").join("index.sqlite");
     let index_size = std::fs::metadata(&index_path).map(|m| m.len()).unwrap_or(0);
 
     // Package cache: ~/.cache/moss/packages/

@@ -22,7 +22,7 @@ struct ParsedFileData {
     type_methods: Vec<(String, String)>,
 }
 
-// Not yet public - just delete .moss/index.sqlite on schema changes
+// Not yet public - just delete .normalize/index.sqlite on schema changes
 const SCHEMA_VERSION: i64 = 1;
 
 /// Check if a file path has a supported source extension.
@@ -90,7 +90,7 @@ pub struct FileIndex {
 
 impl FileIndex {
     /// Open or create an index for a directory.
-    /// Index is stored in .moss/index.sqlite (or MOSS_INDEX_DIR if set)
+    /// Index is stored in .normalize/index.sqlite (or MOSS_INDEX_DIR if set)
     /// On corruption, automatically deletes and recreates the index.
     pub async fn open(root: &Path) -> Result<Self, libsql::Error> {
         let moss_dir = get_moss_dir(root);

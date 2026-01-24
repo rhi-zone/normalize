@@ -302,14 +302,14 @@ Key finding: **Scaffolding can outweigh raw model scale.** Sonnet+CCA beats Opus
 
 **Moss Observations:**
 - **Hierarchical memory validates moss's approach**: Moss uses composable loops with structured handoffs rather than append-only conversation
-- **Note-taking for cross-session learning**: Moss could adopt hindsight notes pattern—document failures in `.moss/notes/` for retrieval
+- **Note-taking for cross-session learning**: Moss could adopt hindsight notes pattern—document failures in `.normalize/notes/` for retrieval
 - **Dual visibility pattern**: Moss's "user sees summary, agent sees structured data" aligns with AX/UX separation
 - **Meta-agent**: Automated agent tuning is interesting—could apply to moss prompt/tool refinement
 - **Extension system**: Similar to moss's tool architecture, validates modular approach
 - **Key insight**: "Tool sophistication matters as much as model upgrades" matches moss philosophy
 
 **Implications for Moss Agent:**
-- [ ] Add hindsight note-taking: Record failures + resolutions in `.moss/agent/notes/`
+- [ ] Add hindsight note-taking: Record failures + resolutions in `.normalize/agent/notes/`
 - [ ] Consider planner-driven compression: Summarize based on task structure, not just token count
 - [ ] Evaluate meta-agent approach for prompt tuning
 

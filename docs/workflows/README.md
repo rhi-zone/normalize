@@ -182,4 +182,4 @@ Treat each workflow as a starting point, not a complete prescription. Update as 
 
 - `docs/research/recursive-language-models.md` - RLM paper insights on decomposition
 - `docs/design/agent.md` - Agent architecture
-- `.moss/scripts/` - Lua workflow implementations
+- `.normalize/scripts/` - Lua workflow implementations

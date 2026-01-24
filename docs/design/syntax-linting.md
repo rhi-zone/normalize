@@ -17,10 +17,10 @@ Tree-sitter query-based rules with location allowlists.
 
 ### Rule Definition
 
-Rules in `.moss/rules/` as `.scm` files with TOML frontmatter:
+Rules in `.normalize/rules/` as `.scm` files with TOML frontmatter:
 
 ```scm
-# .moss/rules/no-grammar-loader-new.scm
+# .normalize/rules/no-grammar-loader-new.scm
 # ---
 # id = "no-grammar-loader-new"
 # severity = "error"
@@ -87,13 +87,13 @@ $ moss analyze query src/main.rs '(call_expression function: (scoped_identifier)
 
 ### Rule Storage
 
-1. **Project rules**: `.moss/rules/*.scm`
+1. **Project rules**: `.normalize/rules/*.scm`
 2. **Global rules**: `~/.config/moss/rules/*.scm`
 3. **Builtin rules**: Compiled into moss (optional, curated set)
 
 ### Configuration
 
-In `.moss/config.toml`:
+In `.normalize/config.toml`:
 
 ```toml
 [rules]

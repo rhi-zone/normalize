@@ -2,7 +2,7 @@
 //!
 //! Loads config from:
 //! 1. Global: ~/.config/moss/config.toml
-//! 2. Per-project: .moss/config.toml (overrides global)
+//! 2. Per-project: .normalize/config.toml (overrides global)
 //!
 //! Example config.toml:
 //! ```toml
@@ -19,7 +19,7 @@
 //!
 //! [aliases]
 //! todo = ["TODO.md", "TASKS.md"]   # @todo for command targets AND filters
-//! config = [".moss/config.toml"]   # overrides built-in @config
+//! config = [".normalize/config.toml"]   # overrides built-in @config
 //! vendor = ["vendor/**"]           # custom alias for filters
 //! tests = []                       # disable built-in @tests
 //!
@@ -75,7 +75,7 @@ pub struct IndexConfig {
 /// ```toml
 /// [aliases]
 /// todo = ["TODO.md"]              # @todo → specific file
-/// config = [".moss/config.toml"]  # overrides built-in @config
+/// config = [".normalize/config.toml"]  # overrides built-in @config
 /// vendor = ["vendor/**"]          # custom filter alias
 /// tests = []                      # disable built-in @tests
 /// ```
@@ -214,7 +214,7 @@ impl NormalizeConfig {
     /// Load configuration for a project.
     ///
     /// Loads global config from ~/.config/moss/config.toml,
-    /// then merges with per-project config from .moss/config.toml.
+    /// then merges with per-project config from .normalize/config.toml.
     pub fn load(root: &Path) -> Self {
         let mut config = Self::default_enabled();
 
@@ -226,7 +226,7 @@ impl NormalizeConfig {
         }
 
         // Load per-project config (overrides global)
-        let project_path = root.join(".moss").join("config.toml");
+        let project_path = root.join(".normalize").join("config.toml");
         if let Some(project) = Self::load_file(&project_path) {
             config = config.merge(project);
         }
@@ -272,7 +272,7 @@ mod tests {
     #[test]
     fn test_load_project_config() {
         let dir = TempDir::new().unwrap();
-        let moss_dir = dir.path().join(".moss");
+        let moss_dir = dir.path().join(".normalize");
         std::fs::create_dir_all(&moss_dir).unwrap();
 
         let config_path = moss_dir.join("config.toml");
@@ -299,7 +299,7 @@ enabled = true
     #[test]
     fn test_partial_config() {
         let dir = TempDir::new().unwrap();
-        let moss_dir = dir.path().join(".moss");
+        let moss_dir = dir.path().join(".normalize");
         std::fs::create_dir_all(&moss_dir).unwrap();
 
         let config_path = moss_dir.join("config.toml");
@@ -322,7 +322,7 @@ auto_start = false
     #[test]
     fn test_aliases_config() {
         let dir = TempDir::new().unwrap();
-        let moss_dir = dir.path().join(".moss");
+        let moss_dir = dir.path().join(".normalize");
         std::fs::create_dir_all(&moss_dir).unwrap();
 
         let config_path = moss_dir.join("config.toml");
@@ -384,7 +384,7 @@ config = []
         use crate::output::ColorMode;
 
         let dir = TempDir::new().unwrap();
-        let moss_dir = dir.path().join(".moss");
+        let moss_dir = dir.path().join(".normalize");
         std::fs::create_dir_all(&moss_dir).unwrap();
 
         let config_path = moss_dir.join("config.toml");

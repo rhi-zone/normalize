@@ -25,7 +25,7 @@ pub fn cmd_rules(
     if rules.is_empty() {
         if !list_only {
             eprintln!("No rules found.");
-            eprintln!("Create .scm files with TOML frontmatter in .moss/rules/");
+            eprintln!("Create .scm files with TOML frontmatter in .normalize/rules/");
         }
         return 0;
     }

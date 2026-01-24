@@ -162,7 +162,7 @@ impl LogFormat for NormalizeAgentFormat {
         let project_root = project
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        project_root.join(".moss/agent/logs")
+        project_root.join(".normalize/agent/logs")
     }
 
     fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {

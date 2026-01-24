@@ -85,7 +85,7 @@ view/
 
 ## Config
 
-In `.moss/config.toml`:
+In `.normalize/config.toml`:
 
 ```toml
 [view]

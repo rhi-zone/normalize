@@ -10,8 +10,8 @@ moss init [--index]
 
 ## What It Does
 
-1. Creates `.moss/` directory
-2. Creates `.moss/config.toml` with defaults
+1. Creates `.normalize/` directory
+2. Creates `.normalize/config.toml` with defaults
 3. Detects TODO files (TODO.md, TASKS.md, etc.) and adds to aliases
 4. Updates `.gitignore` with moss entries
 
@@ -21,7 +21,7 @@ moss init [--index]
 
 ## Generated Files
 
-### .moss/config.toml
+### .normalize/config.toml
 
 ```toml
 # Moss configuration
@@ -47,16 +47,16 @@ todo = ["TODO.md"]  # If TODO.md exists
 ### .gitignore Entries
 
 ```gitignore
-# Moss - ignore .moss/ in subdirectories entirely
-**/.moss/
+# Moss - ignore .normalize/ in subdirectories entirely
+**/.normalize/
 
-# Root .moss/ - ignore all but config/allow files
-/.moss/*
-!/.moss/config.toml
-!/.moss/duplicate-functions-allow
-!/.moss/duplicate-types-allow
-!/.moss/hotspots-allow
-!/.moss/large-files-allow
+# Root .normalize/ - ignore all but config/allow files
+/.normalize/*
+!/.normalize/config.toml
+!/.normalize/duplicate-functions-allow
+!/.normalize/duplicate-types-allow
+!/.normalize/hotspots-allow
+!/.normalize/large-files-allow
 ```
 
 ## Idempotent

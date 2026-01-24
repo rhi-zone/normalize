@@ -195,9 +195,9 @@ pub struct DuplicateFunctionResult {
     pub group_count: usize,
 }
 
-/// Load allowed duplicate function locations from .moss/duplicate-functions-allow file
+/// Load allowed duplicate function locations from .normalize/duplicate-functions-allow file
 fn load_duplicate_functions_allowlist(root: &Path) -> HashSet<String> {
-    let path = root.join(".moss/duplicate-functions-allow");
+    let path = root.join(".normalize/duplicate-functions-allow");
     let mut allowed = HashSet::new();
     if let Ok(content) = std::fs::read_to_string(&path) {
         for line in content.lines() {
@@ -316,7 +316,7 @@ fn detect_duplicate_function_groups(
     groups
 }
 
-/// Allow a specific duplicate function group by adding it to .moss/duplicate-functions-allow
+/// Allow a specific duplicate function group by adding it to .normalize/duplicate-functions-allow
 pub fn cmd_allow_duplicate_function(
     root: &Path,
     location: &str,
@@ -356,7 +356,7 @@ pub fn cmd_allow_duplicate_function(
     };
 
     // Load existing allowlist to check for overlap
-    let allowlist_path = root.join(".moss/duplicate-functions-allow");
+    let allowlist_path = root.join(".normalize/duplicate-functions-allow");
     let existing_content = std::fs::read_to_string(&allowlist_path).unwrap_or_default();
     let existing_lines: Vec<&str> = existing_content.lines().collect();
 
@@ -419,12 +419,15 @@ pub fn cmd_allow_duplicate_function(
     // Write back
     let new_content = new_lines.join("\n") + "\n";
     if let Err(e) = std::fs::write(&allowlist_path, new_content) {
-        eprintln!("Failed to write .moss/duplicate-functions-allow: {}", e);
+        eprintln!(
+            "Failed to write .normalize/duplicate-functions-allow: {}",
+            e
+        );
         return 1;
     }
 
     println!(
-        "Added {} entries to .moss/duplicate-functions-allow:",
+        "Added {} entries to .normalize/duplicate-functions-allow:",
         to_add.len()
     );
     for entry in &to_add {
@@ -610,7 +613,7 @@ pub fn cmd_duplicate_types(
     let extractor = Extractor::new();
 
     // Load allowlist
-    let allowlist_path = config_root.join(".moss/duplicate-types-allow");
+    let allowlist_path = config_root.join(".normalize/duplicate-types-allow");
     let allowed_pairs: HashSet<(String, String)> = std::fs::read_to_string(&allowlist_path)
         .unwrap_or_default()
         .lines()
@@ -777,7 +780,7 @@ pub fn cmd_duplicate_types(
     if report.duplicates.is_empty() { 0 } else { 1 }
 }
 
-/// Allow a duplicate type pair by adding to .moss/duplicate-types-allow
+/// Allow a duplicate type pair by adding to .normalize/duplicate-types-allow
 pub fn cmd_allow_duplicate_type(
     root: &Path,
     type1: &str,
@@ -793,7 +796,7 @@ pub fn cmd_allow_duplicate_type(
     let entry = format!("{} {}", type1, type2);
 
     // Load existing allowlist
-    let allowlist_path = root.join(".moss/duplicate-types-allow");
+    let allowlist_path = root.join(".normalize/duplicate-types-allow");
     let existing_content = std::fs::read_to_string(&allowlist_path).unwrap_or_default();
     let existing_lines: Vec<&str> = existing_content.lines().collect();
 
@@ -829,11 +832,11 @@ pub fn cmd_allow_duplicate_type(
     }
     new_lines.push(entry.clone());
 
-    // Ensure .moss directory exists
-    let moss_dir = root.join(".moss");
+    // Ensure .normalize directory exists
+    let moss_dir = root.join(".normalize");
     if !moss_dir.exists() {
         if let Err(e) = std::fs::create_dir_all(&moss_dir) {
-            eprintln!("Failed to create .moss directory: {}", e);
+            eprintln!("Failed to create .normalize directory: {}", e);
             return 1;
         }
     }
@@ -841,11 +844,11 @@ pub fn cmd_allow_duplicate_type(
     // Write back
     let new_content = new_lines.join("\n") + "\n";
     if let Err(e) = std::fs::write(&allowlist_path, new_content) {
-        eprintln!("Failed to write .moss/duplicate-types-allow: {}", e);
+        eprintln!("Failed to write .normalize/duplicate-types-allow: {}", e);
         return 1;
     }
 
-    println!("Added to .moss/duplicate-types-allow: {}", entry);
+    println!("Added to .normalize/duplicate-types-allow: {}", entry);
     0
 }
 

@@ -83,7 +83,7 @@ Built-in aliases (language-aware, no config needed):
 
 Override or extend in config:
 ```toml
-# .moss/config.toml
+# .normalize/config.toml
 [filter.aliases]
 tests = ["*_test.*", "my_custom_tests/**"]  # override built-in
 vendor = ["vendor/**", "third_party/**"]     # add new alias

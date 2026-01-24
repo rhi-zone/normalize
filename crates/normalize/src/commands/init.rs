@@ -30,14 +30,14 @@ const TODO_CANDIDATES: &[&str] = &[
 fn cmd_init(root: &Path, do_index: bool) -> i32 {
     let mut changes = Vec::new();
 
-    // 1. Create .moss directory if needed
-    let moss_dir = root.join(".moss");
+    // 1. Create .normalize directory if needed
+    let moss_dir = root.join(".normalize");
     if !moss_dir.exists() {
         if let Err(e) = fs::create_dir_all(&moss_dir) {
-            eprintln!("Failed to create .moss directory: {}", e);
+            eprintln!("Failed to create .normalize directory: {}", e);
             return 1;
         }
-        changes.push("Created .moss/".to_string());
+        changes.push("Created .normalize/".to_string());
     }
 
     // 2. Detect TODO files for sigil config
@@ -80,7 +80,7 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
             eprintln!("Failed to create config.toml: {}", e);
             return 1;
         }
-        changes.push("Created .moss/config.toml".to_string());
+        changes.push("Created .normalize/config.toml".to_string());
         for f in &todo_files {
             changes.push(format!("Detected TODO file: {}", f));
         }
@@ -134,17 +134,17 @@ fn detect_todo_files(root: &Path) -> Vec<String> {
 }
 
 /// Entries we want in .gitignore
-/// - .moss/* ignores root .moss/ contents (patterns with / only match at root)
-/// - !.moss/... un-ignores specific files (works because /* ignores contents, not the dir)
-/// NOTE: We omit **/.moss/ because it would block un-ignore patterns entirely.
+/// - .normalize/* ignores root .normalize/ contents (patterns with / only match at root)
+/// - !.normalize/... un-ignores specific files (works because /* ignores contents, not the dir)
+/// NOTE: We omit **/.normalize/ because it would block un-ignore patterns entirely.
 const GITIGNORE_ENTRIES: &[&str] = &[
-    ".moss/*",
-    "!.moss/config.toml",
-    "!.moss/duplicate-functions-allow",
-    "!.moss/duplicate-types-allow",
-    "!.moss/hotspots-allow",
-    "!.moss/large-files-allow",
-    "!.moss/memory/",
+    ".normalize/*",
+    "!.normalize/config.toml",
+    "!.normalize/duplicate-functions-allow",
+    "!.normalize/duplicate-types-allow",
+    "!.normalize/hotspots-allow",
+    "!.normalize/large-files-allow",
+    "!.normalize/memory/",
 ];
 
 /// Update .gitignore with moss entries. Returns list of changes made.
@@ -251,8 +251,8 @@ mod tests {
         let tmp = tempdir().unwrap();
         let result = cmd_init(tmp.path(), false);
         assert_eq!(result, 0);
-        assert!(tmp.path().join(".moss").exists());
-        assert!(tmp.path().join(".moss/config.toml").exists());
+        assert!(tmp.path().join(".normalize").exists());
+        assert!(tmp.path().join(".normalize/config.toml").exists());
     }
 
     #[test]
@@ -272,45 +272,45 @@ mod tests {
         cmd_init(tmp.path(), false);
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
-        assert!(content.contains(".moss/*"));
-        assert!(content.contains("!.moss/config.toml"));
+        assert!(content.contains(".normalize/*"));
+        assert!(content.contains("!.normalize/config.toml"));
     }
 
     #[test]
     fn test_init_skips_commented_entries() {
         let tmp = tempdir().unwrap();
-        fs::write(tmp.path().join(".gitignore"), "# .moss\n").unwrap();
+        fs::write(tmp.path().join(".gitignore"), "# .normalize\n").unwrap();
 
         cmd_init(tmp.path(), false);
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
 
-        // .moss should remain commented (not added as active entry)
-        assert!(lines.iter().any(|l| l.trim() == "# .moss"));
-        assert!(!lines.iter().any(|l| l.trim() == ".moss"));
+        // .normalize should remain commented (not added as active entry)
+        assert!(lines.iter().any(|l| l.trim() == "# .normalize"));
+        assert!(!lines.iter().any(|l| l.trim() == ".normalize"));
 
         // But negation entries should still be added
-        assert!(lines.iter().any(|l| l.trim() == "!.moss/config.toml"));
+        assert!(lines.iter().any(|l| l.trim() == "!.normalize/config.toml"));
         assert!(
             lines
                 .iter()
-                .any(|l| l.trim() == "!.moss/duplicate-functions-allow")
+                .any(|l| l.trim() == "!.normalize/duplicate-functions-allow")
         );
         assert!(
             lines
                 .iter()
-                .any(|l| l.trim() == "!.moss/duplicate-types-allow")
+                .any(|l| l.trim() == "!.normalize/duplicate-types-allow")
         );
     }
 
     #[test]
     fn test_init_inserts_near_existing() {
         let tmp = tempdir().unwrap();
-        // Existing .gitignore already has .moss/*
+        // Existing .gitignore already has .normalize/*
         fs::write(
             tmp.path().join(".gitignore"),
-            "node_modules\n.moss/*\nother_stuff\n",
+            "node_modules\n.normalize/*\nother_stuff\n",
         )
         .unwrap();
 
@@ -319,16 +319,16 @@ mod tests {
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
 
-        // New entries should be inserted after .moss/*, before other_stuff
-        let moss_idx = lines.iter().position(|l| *l == ".moss/*").unwrap();
+        // New entries should be inserted after .normalize/*, before other_stuff
+        let moss_idx = lines.iter().position(|l| *l == ".normalize/*").unwrap();
         let other_idx = lines.iter().position(|l| *l == "other_stuff").unwrap();
         let config_idx = lines
             .iter()
-            .position(|l| *l == "!.moss/config.toml")
+            .position(|l| *l == "!.normalize/config.toml")
             .unwrap();
 
-        // All new entries should be between .moss/* and other_stuff
-        assert!(config_idx > moss_idx, "config should be after .moss/*");
+        // All new entries should be between .normalize/* and other_stuff
+        assert!(config_idx > moss_idx, "config should be after .normalize/*");
         assert!(
             config_idx < other_idx,
             "config should be before other_stuff"
@@ -343,7 +343,7 @@ mod tests {
 
         cmd_init(tmp.path(), false);
 
-        let config = fs::read_to_string(tmp.path().join(".moss/config.toml")).unwrap();
+        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
         assert!(config.contains("[aliases]"));
         assert!(config.contains("TODO.md"));
         assert!(config.contains("TASKS.md"));
@@ -355,7 +355,7 @@ mod tests {
 
         cmd_init(tmp.path(), false);
 
-        let config = fs::read_to_string(tmp.path().join(".moss/config.toml")).unwrap();
+        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
         // Should not have aliases section if no TODO files found
         assert!(!config.contains("[aliases]"));
     }

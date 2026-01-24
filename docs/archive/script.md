@@ -7,7 +7,7 @@ Run Lua scripts with moss bindings.
 ```bash
 moss script <PATH>
 moss <PATH>           # Direct invocation for .lua files
-moss @<script-name>   # Run from .moss/scripts/
+moss @<script-name>   # Run from .normalize/scripts/
 ```
 
 ## Examples
@@ -19,7 +19,7 @@ moss script analyze.lua
 # Direct invocation
 moss ./my-script.lua
 
-# Named script from .moss/scripts/
+# Named script from .normalize/scripts/
 moss @todo list
 moss @cleanup
 ```
@@ -28,8 +28,8 @@ moss @cleanup
 
 Scripts are searched in:
 1. Direct path (if provided)
-2. `.moss/scripts/` directory
-3. `~/.moss/scripts/` (global)
+2. `.normalize/scripts/` directory
+3. `~/.normalize/scripts/` (global)
 
 ## Lua Bindings
 

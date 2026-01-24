@@ -62,7 +62,7 @@ pub fn cmd_lint_run(
     let root = root.unwrap_or_else(|| Path::new("."));
     let use_colors = format.use_colors();
     let json = format.is_json();
-    // Load built-in tools + custom tools from .moss/tools.toml
+    // Load built-in tools + custom tools from .normalize/tools.toml
     let registry = registry_with_custom(root);
 
     // Parse category filter

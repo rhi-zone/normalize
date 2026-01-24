@@ -12,7 +12,7 @@
 //! - `path` - file path matching (glob patterns)
 //! - `env` - environment variables
 //! - `git` - repository state (branch, staged, dirty)
-//! - `config` - .moss/config.toml values
+//! - `config` - .normalize/config.toml values
 //! - Language sources: `rust`, `typescript`, `python`, `go`, etc.
 
 use std::collections::HashMap;

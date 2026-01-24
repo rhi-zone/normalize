@@ -36,7 +36,7 @@ moss index clear
 
 ## Index Contents
 
-The index (`.moss/index.db`) stores:
+The index (`.normalize/index.db`) stores:
 - File metadata (paths, sizes, modification times)
 - Symbols (functions, classes, types)
 - Call graph (who calls what)
@@ -56,7 +56,7 @@ The index provides:
 
 ## Config
 
-In `.moss/config.toml`:
+In `.normalize/config.toml`:
 
 ```toml
 [index]

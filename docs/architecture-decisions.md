@@ -260,7 +260,7 @@ Both patterns support single-crate design. Runtime dispatch doesn't require spli
 
 Two mechanisms for allowing/ignoring findings, used for different cases:
 
-### Global Allowlist Files (`.moss/*-allow`)
+### Global Allowlist Files (`.normalize/*-allow`)
 
 For **file-level or cross-location findings**:
 
@@ -306,7 +306,7 @@ This is a third option for "don't lint these files at all" - coarser than inline
 
 | Finding type | Mechanism | Example |
 |--------------|-----------|---------|
-| Whole-file property | `.moss/*-allow` | Large files, hotspots |
-| Cross-location relationship | `.moss/*-allow` | Duplicate functions |
+| Whole-file property | `.normalize/*-allow` | Large files, hotspots |
+| Cross-location relationship | `.normalize/*-allow` | Duplicate functions |
 | Code pattern (file exclusion) | Config `allow` patterns | Skip tests for unwrap rule |
 | Code pattern (specific instance) | Inline comment | Allow this one unwrap |

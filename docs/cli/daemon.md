@@ -28,7 +28,7 @@ The daemon provides:
 
 ## Config
 
-In `.moss/config.toml`:
+In `.normalize/config.toml`:
 
 ```toml
 [daemon]

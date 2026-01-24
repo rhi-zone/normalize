@@ -12,7 +12,7 @@ Moss uses Lua (LuaJIT) for workflow scripting. Lua was chosen over TOML because 
 ## Directory Structure
 
 ```
-.moss/
+.normalize/
   workflows/
     test.lua           # Custom workflow
     deploy.lua         # Another workflow
@@ -124,7 +124,7 @@ Presents a menu of actions, loops until user selects "quit".
 ## Example Workflow
 
 ```lua
--- .moss/workflows/validate.lua
+-- .normalize/workflows/validate.lua
 -- Run validation and fix errors
 
 print("Checking codebase health...")
@@ -158,7 +158,7 @@ end
 For IDE support, moss generates LuaCats type definitions:
 
 ```lua
--- .moss/workflows/moss.lua (auto-generated)
+-- .normalize/workflows/moss.lua (auto-generated)
 ---@class ViewOpts
 ---@field target? string
 ---@field depth? integer
@@ -172,10 +172,10 @@ function view(opts) end
 
 ## Configuration
 
-Workflow-related config in `.moss/config.toml`:
+Workflow-related config in `.normalize/config.toml`:
 
 ```toml
 [workflow]
 # Default workflow directory
-directory = ".moss/workflows"
+directory = ".normalize/workflows"
 ```

@@ -11,7 +11,7 @@
 //!
 //! # Custom Tools
 //!
-//! Tools can be configured in `.moss/tools.toml`:
+//! Tools can be configured in `.normalize/tools.toml`:
 //!
 //! ```toml
 //! [tools.semgrep]

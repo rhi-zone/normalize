@@ -1,6 +1,6 @@
 //! Shadow Git - automatic edit history tracking.
 //!
-//! Maintains a hidden git repository (`.moss/shadow/`) that automatically
+//! Maintains a hidden git repository (`.normalize/shadow/`) that automatically
 //! commits after each `moss edit` operation, preserving full edit history.
 
 use normalize_derive::Merge;
@@ -62,18 +62,18 @@ pub struct ValidationResult {
 
 /// Shadow git repository manager.
 pub struct Shadow {
-    /// Root of the project (where .moss/ lives)
+    /// Root of the project (where .normalize/ lives)
     root: PathBuf,
-    /// Path to shadow git directory (.moss/shadow/)
+    /// Path to shadow git directory (.normalize/shadow/)
     shadow_dir: PathBuf,
-    /// Path to shadow worktree (.moss/shadow/worktree/)
+    /// Path to shadow worktree (.normalize/shadow/worktree/)
     worktree: PathBuf,
 }
 
 impl Shadow {
     /// Create a new Shadow instance for a project root.
     pub fn new(root: &Path) -> Self {
-        let shadow_dir = root.join(".moss").join("shadow");
+        let shadow_dir = root.join(".normalize").join("shadow");
         let worktree = shadow_dir.join("worktree");
         Self {
             root: root.to_path_buf(),
@@ -1076,7 +1076,10 @@ mod tests {
         let shadow = Shadow::new(dir.path());
 
         assert!(!shadow.exists());
-        assert_eq!(shadow.shadow_dir, dir.path().join(".moss").join("shadow"));
+        assert_eq!(
+            shadow.shadow_dir,
+            dir.path().join(".normalize").join("shadow")
+        );
     }
 
     #[test]

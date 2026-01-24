@@ -56,7 +56,7 @@ Sources are Lua modules that populate memory via `store()`. Not a special API - 
 ### Builtin sources
 
 ```lua
--- .moss/sources/session.lua
+-- .normalize/sources/session.lua
 -- Remembers current session automatically
 moss.on("file_opened", function(file)
   store("Working on " .. file, {context = file, weight = 0.5})
@@ -64,7 +64,7 @@ end)
 ```
 
 ```lua
--- .moss/sources/git.lua
+-- .normalize/sources/git.lua
 -- Learn from git history
 for commit in git.log({limit = 100}) do
   if commit.message:match("fix") then
@@ -77,9 +77,9 @@ end
 ```
 
 ```lua
--- .moss/sources/toml.lua
+-- .normalize/sources/toml.lua
 -- Read static knowledge from TOML
-local data = toml.parse(".moss/memory.toml")
+local data = toml.parse(".normalize/memory.toml")
 for _, item in ipairs(data.memory or {}) do
   store(item.content, {
     context = item.context,
@@ -92,7 +92,7 @@ end
 ### User-defined sources
 
 ```lua
--- .moss/sources/jira.lua
+-- .normalize/sources/jira.lua
 local issues = jira.fetch(config.project)
 for _, issue in ipairs(issues) do
   store(issue.summary, {context = issue.key})
@@ -130,8 +130,8 @@ local prompt = template(
 If you want declarative template config, a source can read it:
 
 ```lua
--- .moss/sources/toml_template.lua
-local cfg = toml.parse(".moss/config.toml")
+-- .normalize/sources/toml_template.lua
+local cfg = toml.parse(".normalize/config.toml")
 if cfg.memory and cfg.memory.template then
   -- Store template structure for later use
   _G.prompt_template = cfg.memory.template
@@ -140,7 +140,7 @@ end
 ```
 
 ```toml
-# .moss/config.toml
+# .normalize/config.toml
 [memory]
 template = [
   "<system>\n",
@@ -175,7 +175,7 @@ Slots have no special meaning to the memory system. They're just queryable metad
 
 ## Persistence
 
-Memory persists to `.moss/memory.db` (SQLite) or similar.
+Memory persists to `.normalize/memory.db` (SQLite) or similar.
 
 - `store()` writes to DB
 - `recall()` queries DB

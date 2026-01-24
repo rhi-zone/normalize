@@ -69,7 +69,7 @@ All commands support these global flags:
 
 ## Configuration
 
-Configuration in `.moss/config.toml` or `~/.config/moss/config.toml`:
+Configuration in `.normalize/config.toml` or `~/.config/moss/config.toml`:
 
 ```toml
 [daemon]

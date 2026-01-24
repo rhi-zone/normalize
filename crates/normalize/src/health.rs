@@ -250,9 +250,9 @@ fn is_lockfile(path: &str) -> bool {
     )
 }
 
-/// Load patterns from an allow file (.moss/large-files-allow or similar)
+/// Load patterns from an allow file (.normalize/large-files-allow or similar)
 fn load_allow_patterns(root: &Path, filename: &str) -> Vec<Pattern> {
-    let path = root.join(".moss").join(filename);
+    let path = root.join(".normalize").join(filename);
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
         Err(_) => return Vec::new(),

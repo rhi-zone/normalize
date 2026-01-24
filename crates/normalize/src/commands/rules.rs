@@ -83,7 +83,7 @@ fn rules_dir(global: bool) -> Option<PathBuf> {
     if global {
         dirs::config_dir().map(|d| d.join("moss").join("rules"))
     } else {
-        Some(PathBuf::from(".moss").join("rules"))
+        Some(PathBuf::from(".normalize").join("rules"))
     }
 }
 
@@ -91,7 +91,7 @@ fn lock_file_path(global: bool) -> Option<PathBuf> {
     if global {
         dirs::config_dir().map(|d| d.join("moss").join("rules.lock"))
     } else {
-        Some(PathBuf::from(".moss").join("rules.lock"))
+        Some(PathBuf::from(".normalize").join("rules.lock"))
     }
 }
 

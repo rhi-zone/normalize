@@ -3,7 +3,7 @@ site/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 
-# Moss runtime data (see bottom for exceptions)
+# Normalize runtime data (see bottom for exceptions)
 
 # Python
 __pycache__/
@@ -68,23 +68,23 @@ cache/
 
 *.cpuprofile
 
-# Moss - ignore .moss/ in subdirectories (but not root)
-*/**/.moss/
+# Normalize - ignore .normalize/ in subdirectories (but not root)
+*/**/.normalize/
 
-# Root .moss/ - ignore all but config/allow files
-/.moss/*
-!/.moss/config.toml
-!/.moss/duplicate-functions-allow
-!/.moss/duplicate-types-allow
-!/.moss/hotspots-allow
-!/.moss/large-files-allow
+# Root .normalize/ - ignore all but config/allow files
+/.normalize/*
+!/.normalize/config.toml
+!/.normalize/duplicate-functions-allow
+!/.normalize/duplicate-types-allow
+!/.normalize/hotspots-allow
+!/.normalize/large-files-allow
 
-# Moss
-.moss/*
-!.moss/config.toml
-!.moss/duplicate-functions-allow
-!.moss/duplicate-types-allow
-!.moss/hotspots-allow
-!.moss/large-files-allow
-!.moss/memory/
+# Normalize
+.normalize/*
+!.normalize/config.toml
+!.normalize/duplicate-functions-allow
+!.normalize/duplicate-types-allow
+!.normalize/hotspots-allow
+!.normalize/large-files-allow
+!.normalize/memory/
 .normalize/shadow

@@ -56,7 +56,7 @@ pub enum AnalyzeCommand {
         #[arg(long)]
         sarif: bool,
 
-        /// Add function to .moss/complexity-allow
+        /// Add function to .normalize/complexity-allow
         #[arg(long, value_name = "SYMBOL")]
         allow: Option<String>,
 
@@ -74,7 +74,7 @@ pub enum AnalyzeCommand {
         #[arg(long)]
         sarif: bool,
 
-        /// Add function to .moss/length-allow
+        /// Add function to .normalize/length-allow
         #[arg(long, value_name = "SYMBOL")]
         allow: Option<String>,
 
@@ -102,7 +102,7 @@ pub enum AnalyzeCommand {
         #[arg(short = 'l', long, default_value = "20")]
         limit: usize,
 
-        /// Add pattern to .moss/large-files-allow
+        /// Add pattern to .normalize/large-files-allow
         #[arg(long, value_name = "PATTERN")]
         allow: Option<String>,
 
@@ -155,7 +155,7 @@ pub enum AnalyzeCommand {
 
     /// Show git history hotspots (frequently changed files)
     Hotspots {
-        /// Add pattern to .moss/hotspots-allow
+        /// Add pattern to .normalize/hotspots-allow
         #[arg(long, value_name = "PATTERN")]
         allow: Option<String>,
 
@@ -191,7 +191,7 @@ pub enum AnalyzeCommand {
         #[arg(long, default_value = "1")]
         min_lines: usize,
 
-        /// Allow a duplicate function group (add to .moss/duplicate-functions-allow)
+        /// Allow a duplicate function group (add to .normalize/duplicate-functions-allow)
         /// Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
         #[arg(long, value_name = "LOCATION")]
         allow: Option<String>,
@@ -210,7 +210,7 @@ pub enum AnalyzeCommand {
         #[arg(long, default_value = "70")]
         min_overlap: usize,
 
-        /// Allow a duplicate type pair (add to .moss/duplicate-types-allow)
+        /// Allow a duplicate type pair (add to .normalize/duplicate-types-allow)
         #[arg(long, num_args = 2, value_names = ["TYPE1", "TYPE2"])]
         allow: Option<Vec<String>>,
 
@@ -260,7 +260,7 @@ pub enum AnalyzeCommand {
         context: Option<usize>,
     },
 
-    /// Run syntax rules from .moss/rules/*.scm
+    /// Run syntax rules from .normalize/rules/*.scm
     Rules {
         /// Run only this specific rule
         #[arg(long)]

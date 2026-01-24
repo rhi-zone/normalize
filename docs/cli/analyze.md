@@ -24,7 +24,7 @@ Analyze codebase quality: health, complexity, security, duplicates, hotspots.
 | `check-refs` | Check documentation for broken links |
 | `stale-docs` | Find docs with stale code references |
 | `check-examples` | Check example references in docs |
-| `rules` | Run syntax rules from .moss/rules/*.scm |
+| `rules` | Run syntax rules from .normalize/rules/*.scm |
 | `ast` | Show AST for a file (for authoring rules) |
 | `query` | Test a tree-sitter query against a file |
 | `all` | Run all analysis passes with overall grade |
@@ -109,14 +109,14 @@ moss analyze rules --sarif      # SARIF output for IDEs
 
 ## Allow Files
 
-Patterns can be excluded via `.moss/` allow files:
+Patterns can be excluded via `.normalize/` allow files:
 
 | File | Purpose |
 |------|---------|
-| `.moss/large-files-allow` | Exclude from `analyze files` |
-| `.moss/hotspots-allow` | Exclude from `analyze hotspots` |
-| `.moss/duplicate-functions-allow` | Exclude from duplicate detection |
-| `.moss/duplicate-types-allow` | Exclude type pairs |
+| `.normalize/large-files-allow` | Exclude from `analyze files` |
+| `.normalize/hotspots-allow` | Exclude from `analyze hotspots` |
+| `.normalize/duplicate-functions-allow` | Exclude from duplicate detection |
+| `.normalize/duplicate-types-allow` | Exclude type pairs |
 
 Add via CLI:
 ```bash
@@ -126,7 +126,7 @@ moss analyze hotspots --allow "CHANGELOG.md" --reason "expected to change often"
 
 ## Config
 
-In `.moss/config.toml`:
+In `.normalize/config.toml`:
 
 ```toml
 [analyze]

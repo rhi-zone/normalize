@@ -193,7 +193,7 @@ fn handle_schema_flag() -> bool {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(|s| s.as_str()) == Some("--schema") {
         let response = serde_json::json!({
-            "config_path": ".moss/config.toml",
+            "config_path": ".normalize/config.toml",
             "format": "toml",
             "schema": schemars::schema_for!(normalize::config::NormalizeConfig)
         });

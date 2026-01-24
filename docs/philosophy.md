@@ -263,7 +263,7 @@ When structure is ambiguous, make a reasonable choice. When truly unclear, askâ€
 
 If you have a workflow, the intuitive way to proceed should be to codify it. Custom presets are first-class citizens:
 - **Capture patterns**: Repeated sequences of actions should become single commands
-- **User-defined skills**: `.moss/skills/` for domain-specific behaviors
+- **User-defined skills**: `.normalize/skills/` for domain-specific behaviors
 - **Progressive formalization**: Start ad-hoc, graduate to preset when patterns emerge
 - **Shareable**: Presets should be easy to share, version, and compose
 

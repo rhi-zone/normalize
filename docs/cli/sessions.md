@@ -36,7 +36,7 @@ moss sessions plans [NAME]
 | `claude` | `~/.claude/projects/<encoded-path>/` | `*.jsonl` |
 | `codex` | `~/.codex/sessions/YYYY/MM/DD/` | `*.jsonl` |
 | `gemini` | `~/.gemini/tmp/<hash>/` | `logs.json` |
-| `normalize` | `.moss/agent/logs/` | `*.jsonl` |
+| `normalize` | `.normalize/agent/logs/` | `*.jsonl` |
 
 ## Examples
 

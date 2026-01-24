@@ -22,7 +22,7 @@ moss aliases --root <DIR> # Specify project root
 
 ## Custom Aliases
 
-Define in `.moss/config.toml`:
+Define in `.normalize/config.toml`:
 
 ```toml
 [aliases]
