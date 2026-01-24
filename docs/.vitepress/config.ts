@@ -15,13 +15,13 @@ export default withMermaid(
     },
   },
 
-  title: 'Moss',
+  title: 'Normalize',
   description: 'Code intelligence CLI with structural awareness',
 
-  base: '/moss/',
+  base: '/normalize/',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/moss/logo.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/normalize/logo.svg' }],
   ],
 
   themeConfig: {
@@ -31,7 +31,7 @@ export default withMermaid(
       { text: 'Guide', link: '/introduction' },
       { text: 'CLI Reference', link: '/cli/commands' },
       { text: 'Design', link: '/philosophy' },
-      { text: 'Rhizome', link: 'https://rhizome-lab.github.io/' },
+      { text: 'rhi', link: 'https://docs.rhi.zone/' },
     ],
 
     sidebar: {
