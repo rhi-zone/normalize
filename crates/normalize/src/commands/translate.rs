@@ -6,10 +6,10 @@ use std::path::PathBuf;
 /// Translate command arguments
 #[derive(Args)]
 pub struct TranslateArgs {
-    /// Input source file
+    /// Input source file, use - for stdin
     pub input: PathBuf,
 
-    /// Source language (auto-detect from extension if not specified)
+    /// Source language (required when using stdin, auto-detect from extension otherwise)
     #[arg(short, long)]
     pub from: Option<SourceLanguage>,
 
@@ -28,6 +28,8 @@ pub enum SourceLanguage {
     Typescript,
     /// Lua
     Lua,
+    /// Python
+    Python,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -36,6 +38,8 @@ pub enum TargetLanguage {
     Typescript,
     /// Lua
     Lua,
+    /// Python
+    Python,
 }
 
 impl SourceLanguage {
@@ -43,6 +47,7 @@ impl SourceLanguage {
         match self {
             SourceLanguage::Typescript => "typescript",
             SourceLanguage::Lua => "lua",
+            SourceLanguage::Python => "python",
         }
     }
 }
@@ -52,18 +57,31 @@ impl TargetLanguage {
         match self {
             TargetLanguage::Typescript => "typescript",
             TargetLanguage::Lua => "lua",
+            TargetLanguage::Python => "python",
         }
     }
 }
 
 /// Run the translate command
 pub fn run(args: TranslateArgs) -> i32 {
-    // Read input file
-    let content = match std::fs::read_to_string(&args.input) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Failed to read {}: {}", args.input.display(), e);
+    let is_stdin = args.input.as_os_str() == "-";
+
+    // Read input (file or stdin)
+    let content = if is_stdin {
+        use std::io::Read;
+        let mut buf = String::new();
+        if let Err(e) = std::io::stdin().read_to_string(&mut buf) {
+            eprintln!("Failed to read stdin: {}", e);
             return 1;
+        }
+        buf
+    } else {
+        match std::fs::read_to_string(&args.input) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to read {}: {}", args.input.display(), e);
+                return 1;
+            }
         }
     };
 
@@ -71,10 +89,15 @@ pub fn run(args: TranslateArgs) -> i32 {
     let source_lang = match args.from {
         Some(lang) => lang.as_str(),
         None => {
+            if is_stdin {
+                eprintln!("--from is required when reading from stdin");
+                return 1;
+            }
             // Auto-detect from extension
             match args.input.extension().and_then(|e| e.to_str()) {
                 Some("ts") | Some("tsx") | Some("js") | Some("jsx") => "typescript",
                 Some("lua") => "lua",
+                Some("py") => "python",
                 _ => {
                     eprintln!(
                         "Cannot detect language from extension. Use --from to specify source language."

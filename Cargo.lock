@@ -3425,6 +3425,7 @@ name = "normalize-surface-syntax"
 version = "0.1.0"
 dependencies = [
  "arborium-lua",
+ "arborium-python",
  "arborium-typescript",
  "insta",
  "serde",

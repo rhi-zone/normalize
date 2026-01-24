@@ -59,7 +59,7 @@ pub enum GenerateTarget {
     /// Generate types/validators from schema (new IR-based)
     #[command(name = "typegen")]
     Typegen {
-        /// Input schema file (JSON Schema or OpenAPI)
+        /// Input schema file (JSON Schema or OpenAPI), use - for stdin
         input: PathBuf,
 
         /// Input format
@@ -258,12 +258,22 @@ fn run_typegen(
         parse_json_schema, parse_openapi,
     };
 
-    // Read input file
-    let content = match std::fs::read_to_string(&input) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Failed to read {}: {}", input.display(), e);
+    // Read input (file or stdin)
+    let content = if input.as_os_str() == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        if let Err(e) = std::io::stdin().read_to_string(&mut buf) {
+            eprintln!("Failed to read stdin: {}", e);
             return 1;
+        }
+        buf
+    } else {
+        match std::fs::read_to_string(&input) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to read {}: {}", input.display(), e);
+                return 1;
+            }
         }
     };
 
