@@ -2,19 +2,19 @@ use clap::builder::styling::{AnsiColor, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
-use rhi_normalize::commands;
-use rhi_normalize::commands::aliases::AliasesArgs;
-use rhi_normalize::commands::analyze::AnalyzeArgs;
-use rhi_normalize::commands::context::ContextArgs;
-use rhi_normalize::commands::edit::EditArgs;
-use rhi_normalize::commands::generate::GenerateArgs;
-use rhi_normalize::commands::history::HistoryArgs;
-use rhi_normalize::commands::rules::RulesAction;
-use rhi_normalize::commands::sessions::SessionsArgs;
-use rhi_normalize::commands::text_search::TextSearchArgs;
-use rhi_normalize::commands::tools::ToolsAction;
-use rhi_normalize::commands::view::ViewArgs;
-use rhi_normalize::serve::{self, ServeArgs};
+use normalize::commands;
+use normalize::commands::aliases::AliasesArgs;
+use normalize::commands::analyze::AnalyzeArgs;
+use normalize::commands::context::ContextArgs;
+use normalize::commands::edit::EditArgs;
+use normalize::commands::generate::GenerateArgs;
+use normalize::commands::history::HistoryArgs;
+use normalize::commands::rules::RulesAction;
+use normalize::commands::sessions::SessionsArgs;
+use normalize::commands::text_search::TextSearchArgs;
+use normalize::commands::tools::ToolsAction;
+use normalize::commands::view::ViewArgs;
+use normalize::serve::{self, ServeArgs};
 
 #[derive(Parser)]
 #[command(name = "moss")]
@@ -164,10 +164,10 @@ fn help_color_choice() -> ColorChoice {
     }
 
     // Check config for color preference
-    let config = rhi_normalize::config::NormalizeConfig::load(Path::new("."));
+    let config = normalize::config::NormalizeConfig::load(Path::new("."));
     match config.pretty.colors {
-        Some(rhi_normalize::output::ColorMode::Always) => ColorChoice::Always,
-        Some(rhi_normalize::output::ColorMode::Never) => ColorChoice::Never,
+        Some(normalize::output::ColorMode::Always) => ColorChoice::Always,
+        Some(normalize::output::ColorMode::Never) => ColorChoice::Never,
         _ => ColorChoice::Auto,
     }
 }
@@ -195,7 +195,7 @@ fn handle_schema_flag() -> bool {
         let response = serde_json::json!({
             "config_path": ".moss/config.toml",
             "format": "toml",
-            "schema": schemars::schema_for!(rhi_normalize::config::NormalizeConfig)
+            "schema": schemars::schema_for!(normalize::config::NormalizeConfig)
         });
         println!("{}", serde_json::to_string_pretty(&response).unwrap());
         true
@@ -220,8 +220,8 @@ fn main() {
     let cli = Cli::from_arg_matches(&cli).expect("clap mismatch");
 
     // Resolve output format at top level - pretty config is TTY-based, not root-specific
-    let config = rhi_normalize::config::NormalizeConfig::load(Path::new("."));
-    let format = rhi_normalize::output::OutputFormat::from_cli(
+    let config = normalize::config::NormalizeConfig::load(Path::new("."));
+    let format = normalize::output::OutputFormat::from_cli(
         cli.json,
         cli.jq.as_deref(),
         cli.pretty,

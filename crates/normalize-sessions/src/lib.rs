@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rhi_normalize_sessions::{parse_session, Session};
+//! use normalize_sessions::{parse_session, Session};
 //!
 //! let session = parse_session("~/.claude/projects/foo/session.jsonl")?;
 //! for turn in &session.turns {

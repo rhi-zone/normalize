@@ -10,7 +10,7 @@
 //!
 //! ## Multi-source Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::winget::{Winget, WingetSource};
+//! use normalize_packages::index::winget::{Winget, WingetSource};
 //!
 //! // All sources (default)
 //! let all = Winget::all();

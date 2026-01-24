@@ -4,7 +4,7 @@ use crate::index;
 use crate::paths::get_moss_dir;
 use crate::skeleton;
 use clap::Subcommand;
-use rhi_normalize_languages::external_packages;
+use normalize_languages::external_packages;
 use std::path::{Path, PathBuf};
 
 /// What to extract during indexing (files are always indexed).
@@ -376,7 +376,7 @@ async fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: b
     let mut results: std::collections::HashMap<&str, IndexedCounts> =
         std::collections::HashMap::new();
 
-    let available: Vec<&str> = rhi_normalize_languages::supported_languages()
+    let available: Vec<&str> = normalize_languages::supported_languages()
         .iter()
         .map(|l| l.lang_key())
         .filter(|k| !k.is_empty())
@@ -401,7 +401,7 @@ async fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: b
         }
     }
 
-    for lang in rhi_normalize_languages::supported_languages() {
+    for lang in normalize_languages::supported_languages() {
         let lang_key = lang.lang_key();
         if lang_key.is_empty() || !ecosystems.contains(&lang_key) {
             continue;
@@ -462,7 +462,7 @@ async fn count_and_insert_symbols(
 }
 
 async fn index_language_packages(
-    lang: &dyn rhi_normalize_languages::Language,
+    lang: &dyn normalize_languages::Language,
     pkg_index: &external_packages::PackageIndex,
     project_root: &Path,
     json: bool,
@@ -547,7 +547,7 @@ async fn index_language_packages(
 }
 
 async fn index_package_symbols(
-    lang: &dyn rhi_normalize_languages::Language,
+    lang: &dyn normalize_languages::Language,
     pkg_index: &external_packages::PackageIndex,
     extractor: &mut skeleton::SkeletonExtractor,
     pkg_id: i64,

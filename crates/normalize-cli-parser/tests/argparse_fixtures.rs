@@ -1,6 +1,6 @@
 //! Integration tests using captured --help output from argparse CLIs.
 
-use rhi_normalize_cli_parser::{parse_help, parse_help_with_format};
+use normalize_cli_parser::{parse_help, parse_help_with_format};
 
 const EXAMPLE_HELP: &str = include_str!("../fixtures/argparse/example.help");
 

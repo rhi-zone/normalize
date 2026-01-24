@@ -7,7 +7,7 @@
 //! Users can register custom formats via [`register()`]:
 //!
 //! ```ignore
-//! use rhi_normalize_sessions::{LogFormat, SessionAnalysis, SessionFile, register};
+//! use normalize_sessions::{LogFormat, SessionAnalysis, SessionFile, register};
 //! use std::path::{Path, PathBuf};
 //!
 //! struct MyAgentFormat;

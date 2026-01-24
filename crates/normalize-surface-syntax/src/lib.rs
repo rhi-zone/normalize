@@ -17,7 +17,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rhi_normalize_surface_syntax::{input, output};
+//! use normalize_surface_syntax::{input, output};
 //!
 //! // Read TypeScript
 //! let ir = input::read_typescript("const x = 1 + 2;")?;

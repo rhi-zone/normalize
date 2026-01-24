@@ -10,7 +10,7 @@
 //!
 //! ## Multi-bucket Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::scoop::{Scoop, ScoopBucket};
+//! use normalize_packages::index::scoop::{Scoop, ScoopBucket};
 //!
 //! // All buckets (default)
 //! let all = Scoop::all();

@@ -6,7 +6,7 @@ use clap::{Args, Subcommand};
 use serde::Deserialize;
 use std::path::PathBuf;
 
-use rhi_normalize_derive::Merge;
+use normalize_derive::Merge;
 
 pub mod http;
 pub mod lsp;

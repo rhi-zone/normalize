@@ -11,7 +11,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::artix::{Artix, ArtixRepo};
+//! use normalize_packages::index::artix::{Artix, ArtixRepo};
 //!
 //! // All repos (default)
 //! let all = Artix::all();

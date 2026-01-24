@@ -7,7 +7,7 @@
 //! Users can register custom test runners via [`register()`]:
 //!
 //! ```ignore
-//! use rhi_normalize_tools::test_runners::{TestRunner, TestRunnerInfo, TestResult, register};
+//! use normalize_tools::test_runners::{TestRunner, TestRunnerInfo, TestResult, register};
 //! use std::path::Path;
 //!
 //! struct MyTestRunner;

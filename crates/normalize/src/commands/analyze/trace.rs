@@ -84,7 +84,7 @@ async fn cmd_trace_async(
     };
 
     // Parse the file
-    let lang = match rhi_normalize_languages::support_for_path(&full_path) {
+    let lang = match normalize_languages::support_for_path(&full_path) {
         Some(l) => l,
         None => {
             eprintln!("No language support for file");
@@ -109,7 +109,7 @@ async fn cmd_trace_async(
     let extract_result = extractor.extract(&full_path, &content);
     let mut signature_map: HashMap<String, FunctionInfo> = HashMap::new();
     fn collect_signatures(
-        sym: &rhi_normalize_languages::Symbol,
+        sym: &normalize_languages::Symbol,
         map: &mut HashMap<String, FunctionInfo>,
     ) {
         if !sym.signature.is_empty() {
@@ -820,7 +820,7 @@ async fn trace_cross_file_returns_async(
     // Read and parse the file
     let full_path = root.join(&sym.file);
     let content = std::fs::read_to_string(&full_path).ok()?;
-    let lang = rhi_normalize_languages::support_for_path(&full_path)?;
+    let lang = normalize_languages::support_for_path(&full_path)?;
     let tree = parsers::parse_with_grammar(lang.grammar_name(), &content)?;
 
     // Trace returns

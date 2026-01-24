@@ -3161,6 +3161,299 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize"
+version = "0.1.0"
+dependencies = [
+ "assert_cmd",
+ "ast-grep-core",
+ "axum 0.8.8",
+ "chrono",
+ "clap",
+ "dirs",
+ "dotenvy",
+ "flate2",
+ "git2",
+ "glob",
+ "grep-matcher",
+ "grep-regex",
+ "grep-searcher",
+ "ignore",
+ "insta",
+ "jaq-core",
+ "jaq-json",
+ "jaq-std",
+ "libc",
+ "libsql",
+ "normalize-cli-parser",
+ "normalize-core",
+ "normalize-derive",
+ "normalize-jsonschema",
+ "normalize-languages",
+ "normalize-openapi",
+ "normalize-packages",
+ "normalize-rules",
+ "normalize-sessions",
+ "normalize-tools",
+ "normalize-typegen",
+ "notify",
+ "nu-ansi-term",
+ "nucleo-matcher",
+ "rayon",
+ "regex",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "streaming-iterator",
+ "tar",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tower-lsp",
+ "tree-sitter",
+ "ureq",
+ "utoipa",
+ "walkdir",
+ "zip",
+]
+
+[[package]]
+name = "normalize-cli-parser"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "normalize-core"
+version = "0.1.0"
+
+[[package]]
+name = "normalize-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "normalize-grammars"
+version = "0.1.0"
+dependencies = [
+ "arborium-ada",
+ "arborium-agda",
+ "arborium-asciidoc",
+ "arborium-asm",
+ "arborium-awk",
+ "arborium-bash",
+ "arborium-batch",
+ "arborium-c",
+ "arborium-c-sharp",
+ "arborium-caddy",
+ "arborium-capnp",
+ "arborium-clojure",
+ "arborium-cmake",
+ "arborium-commonlisp",
+ "arborium-cpp",
+ "arborium-css",
+ "arborium-d",
+ "arborium-dart",
+ "arborium-devicetree",
+ "arborium-diff",
+ "arborium-dockerfile",
+ "arborium-dot",
+ "arborium-elisp",
+ "arborium-elixir",
+ "arborium-elm",
+ "arborium-erlang",
+ "arborium-fish",
+ "arborium-fsharp",
+ "arborium-gleam",
+ "arborium-glsl",
+ "arborium-go",
+ "arborium-graphql",
+ "arborium-groovy",
+ "arborium-haskell",
+ "arborium-hcl",
+ "arborium-hlsl",
+ "arborium-html",
+ "arborium-idris",
+ "arborium-ini",
+ "arborium-java",
+ "arborium-javascript",
+ "arborium-jinja2",
+ "arborium-jq",
+ "arborium-json",
+ "arborium-julia",
+ "arborium-kdl",
+ "arborium-kotlin",
+ "arborium-lean",
+ "arborium-lua",
+ "arborium-markdown",
+ "arborium-matlab",
+ "arborium-meson",
+ "arborium-nginx",
+ "arborium-ninja",
+ "arborium-nix",
+ "arborium-objc",
+ "arborium-ocaml",
+ "arborium-perl",
+ "arborium-php",
+ "arborium-postscript",
+ "arborium-powershell",
+ "arborium-prolog",
+ "arborium-python",
+ "arborium-query",
+ "arborium-r",
+ "arborium-rescript",
+ "arborium-ron",
+ "arborium-ruby",
+ "arborium-rust",
+ "arborium-scala",
+ "arborium-scheme",
+ "arborium-scss",
+ "arborium-sparql",
+ "arborium-sql",
+ "arborium-ssh-config",
+ "arborium-starlark",
+ "arborium-svelte",
+ "arborium-swift",
+ "arborium-textproto",
+ "arborium-thrift",
+ "arborium-tlaplus",
+ "arborium-toml",
+ "arborium-tsx",
+ "arborium-typescript",
+ "arborium-typst",
+ "arborium-uiua",
+ "arborium-vb",
+ "arborium-verilog",
+ "arborium-vhdl",
+ "arborium-vim",
+ "arborium-vue",
+ "arborium-wit",
+ "arborium-x86asm",
+ "arborium-xml",
+ "arborium-yaml",
+ "arborium-yuri",
+ "arborium-zig",
+ "arborium-zsh",
+]
+
+[[package]]
+name = "normalize-jsonschema"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "normalize-languages"
+version = "0.1.0"
+dependencies = [
+ "ast-grep-core",
+ "dirs",
+ "libloading",
+ "libsql",
+ "serde_json",
+ "tokio",
+ "tree-sitter",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "normalize-openapi"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "normalize-packages"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "flate2",
+ "quick-xml",
+ "rayon",
+ "serde",
+ "serde_json",
+ "serde_json_lenient",
+ "serde_yaml",
+ "tar",
+ "toml",
+ "ureq",
+ "urlencoding",
+ "xz2",
+ "zstd",
+]
+
+[[package]]
+name = "normalize-rules"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "glob",
+ "ignore",
+ "normalize-core",
+ "normalize-derive",
+ "normalize-languages",
+ "regex",
+ "schemars",
+ "serde",
+ "streaming-iterator",
+ "toml",
+ "tree-sitter",
+]
+
+[[package]]
+name = "normalize-sessions"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "normalize-surface-syntax"
+version = "0.1.0"
+dependencies = [
+ "arborium-typescript",
+ "insta",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tree-sitter",
+]
+
+[[package]]
+name = "normalize-tools"
+version = "0.1.0"
+dependencies = [
+ "rayon",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "toml",
+ "which 7.0.3",
+]
+
+[[package]]
+name = "normalize-typegen"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "notify"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3625,299 +3918,6 @@ name = "regex-syntax"
 version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
-
-[[package]]
-name = "rhi-normalize"
-version = "0.1.0"
-dependencies = [
- "assert_cmd",
- "ast-grep-core",
- "axum 0.8.8",
- "chrono",
- "clap",
- "dirs",
- "dotenvy",
- "flate2",
- "git2",
- "glob",
- "grep-matcher",
- "grep-regex",
- "grep-searcher",
- "ignore",
- "insta",
- "jaq-core",
- "jaq-json",
- "jaq-std",
- "libc",
- "libsql",
- "notify",
- "nu-ansi-term",
- "nucleo-matcher",
- "rayon",
- "regex",
- "rhi-normalize-cli-parser",
- "rhi-normalize-core",
- "rhi-normalize-derive",
- "rhi-normalize-jsonschema",
- "rhi-normalize-languages",
- "rhi-normalize-openapi",
- "rhi-normalize-packages",
- "rhi-normalize-rules",
- "rhi-normalize-sessions",
- "rhi-normalize-tools",
- "rhi-normalize-typegen",
- "rmcp",
- "schemars",
- "serde",
- "serde_json",
- "streaming-iterator",
- "tar",
- "tempfile",
- "tokio",
- "toml",
- "tower-lsp",
- "tree-sitter",
- "ureq",
- "utoipa",
- "walkdir",
- "zip",
-]
-
-[[package]]
-name = "rhi-normalize-cli-parser"
-version = "0.1.0"
-dependencies = [
- "insta",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rhi-normalize-core"
-version = "0.1.0"
-
-[[package]]
-name = "rhi-normalize-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "rhi-normalize-grammars"
-version = "0.1.0"
-dependencies = [
- "arborium-ada",
- "arborium-agda",
- "arborium-asciidoc",
- "arborium-asm",
- "arborium-awk",
- "arborium-bash",
- "arborium-batch",
- "arborium-c",
- "arborium-c-sharp",
- "arborium-caddy",
- "arborium-capnp",
- "arborium-clojure",
- "arborium-cmake",
- "arborium-commonlisp",
- "arborium-cpp",
- "arborium-css",
- "arborium-d",
- "arborium-dart",
- "arborium-devicetree",
- "arborium-diff",
- "arborium-dockerfile",
- "arborium-dot",
- "arborium-elisp",
- "arborium-elixir",
- "arborium-elm",
- "arborium-erlang",
- "arborium-fish",
- "arborium-fsharp",
- "arborium-gleam",
- "arborium-glsl",
- "arborium-go",
- "arborium-graphql",
- "arborium-groovy",
- "arborium-haskell",
- "arborium-hcl",
- "arborium-hlsl",
- "arborium-html",
- "arborium-idris",
- "arborium-ini",
- "arborium-java",
- "arborium-javascript",
- "arborium-jinja2",
- "arborium-jq",
- "arborium-json",
- "arborium-julia",
- "arborium-kdl",
- "arborium-kotlin",
- "arborium-lean",
- "arborium-lua",
- "arborium-markdown",
- "arborium-matlab",
- "arborium-meson",
- "arborium-nginx",
- "arborium-ninja",
- "arborium-nix",
- "arborium-objc",
- "arborium-ocaml",
- "arborium-perl",
- "arborium-php",
- "arborium-postscript",
- "arborium-powershell",
- "arborium-prolog",
- "arborium-python",
- "arborium-query",
- "arborium-r",
- "arborium-rescript",
- "arborium-ron",
- "arborium-ruby",
- "arborium-rust",
- "arborium-scala",
- "arborium-scheme",
- "arborium-scss",
- "arborium-sparql",
- "arborium-sql",
- "arborium-ssh-config",
- "arborium-starlark",
- "arborium-svelte",
- "arborium-swift",
- "arborium-textproto",
- "arborium-thrift",
- "arborium-tlaplus",
- "arborium-toml",
- "arborium-tsx",
- "arborium-typescript",
- "arborium-typst",
- "arborium-uiua",
- "arborium-vb",
- "arborium-verilog",
- "arborium-vhdl",
- "arborium-vim",
- "arborium-vue",
- "arborium-wit",
- "arborium-x86asm",
- "arborium-xml",
- "arborium-yaml",
- "arborium-yuri",
- "arborium-zig",
- "arborium-zsh",
-]
-
-[[package]]
-name = "rhi-normalize-jsonschema"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "rhi-normalize-languages"
-version = "0.1.0"
-dependencies = [
- "ast-grep-core",
- "dirs",
- "libloading",
- "libsql",
- "serde_json",
- "tokio",
- "tree-sitter",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "rhi-normalize-openapi"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "rhi-normalize-packages"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "flate2",
- "quick-xml",
- "rayon",
- "serde",
- "serde_json",
- "serde_json_lenient",
- "serde_yaml",
- "tar",
- "toml",
- "ureq",
- "urlencoding",
- "xz2",
- "zstd",
-]
-
-[[package]]
-name = "rhi-normalize-rules"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "glob",
- "ignore",
- "regex",
- "rhi-normalize-core",
- "rhi-normalize-derive",
- "rhi-normalize-languages",
- "schemars",
- "serde",
- "streaming-iterator",
- "toml",
- "tree-sitter",
-]
-
-[[package]]
-name = "rhi-normalize-sessions"
-version = "0.1.0"
-dependencies = [
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rhi-normalize-surface-syntax"
-version = "0.1.0"
-dependencies = [
- "arborium-typescript",
- "insta",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tree-sitter",
-]
-
-[[package]]
-name = "rhi-normalize-tools"
-version = "0.1.0"
-dependencies = [
- "rayon",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "toml",
- "which 7.0.3",
-]
-
-[[package]]
-name = "rhi-normalize-typegen"
-version = "0.1.0"
-dependencies = [
- "insta",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
-]
 
 [[package]]
 name = "ring"

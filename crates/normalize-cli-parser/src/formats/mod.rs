@@ -5,7 +5,7 @@
 //! Users can register custom formats via [`register()`]:
 //!
 //! ```ignore
-//! use rhi_normalize_cli_parser::{CliFormat, CliSpec, register};
+//! use normalize_cli_parser::{CliFormat, CliSpec, register};
 //!
 //! struct MyFormat;
 //!

@@ -7,7 +7,7 @@
 //! Users can register custom generators via [`register()`]:
 //!
 //! ```ignore
-//! use rhi_normalize_jsonschema::{JsonSchemaGenerator, register};
+//! use normalize_jsonschema::{JsonSchemaGenerator, register};
 //! use serde_json::Value;
 //!
 //! struct MyGenerator;

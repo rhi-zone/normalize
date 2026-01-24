@@ -1,7 +1,7 @@
 //! Line range viewing for view command.
 
 use crate::{parsers, path_resolve, tree};
-use rhi_normalize_languages::support_for_path;
+use normalize_languages::support_for_path;
 use std::collections::HashSet;
 use std::path::Path;
 

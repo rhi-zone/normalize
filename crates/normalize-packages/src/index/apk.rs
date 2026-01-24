@@ -11,7 +11,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::apk::{Apk, AlpineRepo};
+//! use normalize_packages::index::apk::{Apk, AlpineRepo};
 //!
 //! // All repos (default)
 //! let all = Apk::all();

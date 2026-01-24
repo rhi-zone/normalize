@@ -2,8 +2,8 @@
 //!
 //! Provides consistent JSON/text output across all commands via the `OutputFormatter` trait.
 
-use rhi_normalize_core::Merge;
-use rhi_normalize_derive::Merge;
+use normalize_core::Merge;
+use normalize_derive::Merge;
 use serde::{Deserialize, Serialize};
 use std::io::IsTerminal;
 

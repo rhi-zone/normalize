@@ -3,7 +3,7 @@
 use super::symbol::find_symbol_signature;
 use crate::tree::{DocstringDisplay, FormatOptions};
 use crate::{deps, skeleton, tree};
-use rhi_normalize_languages::support_for_path;
+use normalize_languages::support_for_path;
 use std::path::{Path, PathBuf};
 
 /// Format a skeleton for a file path and return formatted lines.
@@ -128,7 +128,7 @@ fn print_fisheye_imports(
 
 /// Resolve an import to a local file path based on the source file's language.
 fn resolve_import(module: &str, current_file: &Path, root: &Path) -> Option<PathBuf> {
-    let lang = rhi_normalize_languages::support_for_path(current_file)?;
+    let lang = normalize_languages::support_for_path(current_file)?;
 
     if let Some(path) = lang.resolve_local_import(module, current_file, root) {
         return Some(path);

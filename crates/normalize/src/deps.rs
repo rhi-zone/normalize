@@ -3,7 +3,7 @@
 //! Extracts imports and exports from source files.
 
 use crate::parsers;
-use rhi_normalize_languages::{
+use normalize_languages::{
     Export, Import, Language, SymbolKind, support_for_grammar, support_for_path,
 };
 use std::path::Path;

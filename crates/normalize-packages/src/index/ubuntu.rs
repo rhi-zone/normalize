@@ -11,7 +11,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::ubuntu::{Ubuntu, UbuntuRepo};
+//! use normalize_packages::index::ubuntu::{Ubuntu, UbuntuRepo};
 //!
 //! // All repos (default)
 //! let all = Ubuntu::all();

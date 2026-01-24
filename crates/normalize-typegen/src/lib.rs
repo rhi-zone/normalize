@@ -19,7 +19,7 @@
 //! # Example
 //!
 //! ```
-//! use rhi_normalize_typegen::{input, output, ir::Schema};
+//! use normalize_typegen::{input, output, ir::Schema};
 //!
 //! let json_schema = serde_json::json!({
 //!     "type": "object",

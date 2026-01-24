@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::manjaro::{Manjaro, ManjaroRepo};
+//! use normalize_packages::index::manjaro::{Manjaro, ManjaroRepo};
 //!
 //! // All repos (default)
 //! let all = Manjaro::all();

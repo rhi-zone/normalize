@@ -199,10 +199,10 @@ fn process_file(
     file_coverages: &mut Vec<FileDocCoverage>,
 ) {
     use crate::skeleton::SkeletonExtractor;
-    use rhi_normalize_languages::SymbolKind;
+    use normalize_languages::SymbolKind;
 
     let path = root.join(&file.path);
-    let lang = rhi_normalize_languages::support_for_path(&path);
+    let lang = normalize_languages::support_for_path(&path);
 
     if lang.is_none() || !lang.unwrap().has_symbols() {
         return;

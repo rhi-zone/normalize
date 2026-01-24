@@ -5,8 +5,8 @@
 
 use crate::config::NormalizeConfig;
 use crate::index::FileIndex;
+use normalize_derive::Merge;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use rhi_normalize_derive::Merge;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};

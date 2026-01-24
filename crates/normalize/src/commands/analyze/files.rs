@@ -91,7 +91,7 @@ pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengt
             }
 
             let path = root.join(&file.path);
-            let lang = rhi_normalize_languages::support_for_path(&path)?;
+            let lang = normalize_languages::support_for_path(&path)?;
 
             let content = std::fs::read_to_string(&path).ok()?;
             let lines = content.lines().count();

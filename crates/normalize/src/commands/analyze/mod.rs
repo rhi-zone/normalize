@@ -25,8 +25,8 @@ use crate::daemon;
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
-use rhi_normalize_derive::Merge;
-pub use rhi_normalize_rules::{RuleOverride, RulesConfig};
+use normalize_derive::Merge;
+pub use normalize_rules::{RuleOverride, RulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -611,7 +611,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 .as_ref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| effective_root.clone());
-            let debug_flags = rhi_normalize_rules::DebugFlags::from_args(&debug);
+            let debug_flags = normalize_rules::DebugFlags::from_args(&debug);
             rules_cmd::cmd_rules(
                 &target_root,
                 rule.as_deref(),
@@ -949,5 +949,5 @@ fn run_all_passes(
 
 /// Check if a path is a source file we can analyze.
 pub(crate) fn is_source_file(path: &Path) -> bool {
-    rhi_normalize_languages::support_for_path(path).is_some()
+    normalize_languages::support_for_path(path).is_some()
 }

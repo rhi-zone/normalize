@@ -25,7 +25,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rhi_normalize_tools::{ToolRegistry, OutputFormat};
+//! use normalize_tools::{ToolRegistry, OutputFormat};
 //!
 //! let registry = ToolRegistry::default();
 //! let results = registry.run_all(&["src/"], &["*.rs", "*.ts"])?;

@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repository Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::maven::{Maven, MavenRepo};
+//! use normalize_packages::index::maven::{Maven, MavenRepo};
 //!
 //! // All repositories (default)
 //! let all = Maven::all();

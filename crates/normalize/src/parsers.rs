@@ -2,7 +2,7 @@
 //!
 //! Provides free functions for parsing using a global singleton GrammarLoader.
 
-use rhi_normalize_languages::GrammarLoader;
+use normalize_languages::GrammarLoader;
 use std::sync::{Arc, OnceLock};
 use tree_sitter::Parser;
 

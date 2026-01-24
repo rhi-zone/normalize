@@ -3,7 +3,7 @@
 use crate::skeleton::SymbolExt;
 use crate::tree::{DocstringDisplay, FormatOptions};
 use crate::{deps, parsers, path_resolve, skeleton, symbols, tree};
-use rhi_normalize_languages::support_for_path;
+use normalize_languages::support_for_path;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -324,7 +324,7 @@ fn print_smart_imports(
     grammar: &str,
     full_path: &Path,
     content: &str,
-    imports: &[rhi_normalize_languages::Import],
+    imports: &[normalize_languages::Import],
 ) {
     let used_ids = extract_identifiers(source, grammar);
     let lang = support_for_path(full_path);
@@ -773,12 +773,12 @@ fn find_type_definitions<'a>(
         // Check if this is a type definition
         let is_type_def = matches!(
             sym.kind,
-            rhi_normalize_languages::SymbolKind::Struct
-                | rhi_normalize_languages::SymbolKind::Enum
-                | rhi_normalize_languages::SymbolKind::Type
-                | rhi_normalize_languages::SymbolKind::Trait
-                | rhi_normalize_languages::SymbolKind::Interface
-                | rhi_normalize_languages::SymbolKind::Class
+            normalize_languages::SymbolKind::Struct
+                | normalize_languages::SymbolKind::Enum
+                | normalize_languages::SymbolKind::Type
+                | normalize_languages::SymbolKind::Trait
+                | normalize_languages::SymbolKind::Interface
+                | normalize_languages::SymbolKind::Class
         );
 
         if is_type_def && type_names.contains(&sym.name) {

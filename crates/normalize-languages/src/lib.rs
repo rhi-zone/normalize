@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rhi_normalize_languages::{Python, Language, support_for_path, GrammarLoader};
+//! use normalize_languages::{Python, Language, support_for_path, GrammarLoader};
 //! use std::path::Path;
 //!
 //! // Load grammars

@@ -2,7 +2,7 @@
 
 use super::analyze::{cmd_sessions_analyze, cmd_sessions_analyze_multi, cmd_sessions_jq};
 use super::resolve_session_paths;
-use rhi_normalize_sessions::{ContentBlock, Role, Session};
+use normalize_sessions::{ContentBlock, Role, Session};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
@@ -55,7 +55,7 @@ pub fn cmd_sessions_show(
 
     // If --filter or --grep or --ngrams with message analysis
     if filter.is_some() || grep_pattern.is_some() || errors_only || ngrams.is_some() {
-        use rhi_normalize_sessions::{FormatRegistry, LogFormat};
+        use normalize_sessions::{FormatRegistry, LogFormat};
 
         let registry = FormatRegistry::new();
         let log_format: &dyn LogFormat = match format {

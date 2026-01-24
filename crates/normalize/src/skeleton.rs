@@ -5,11 +5,11 @@
 
 use crate::extract::Extractor;
 use crate::tree::{ViewNode, ViewNodeKind};
-use rhi_normalize_languages::{Symbol, SymbolKind};
+use normalize_languages::{Symbol, SymbolKind};
 use std::path::Path;
 
 /// Re-export Symbol as SkeletonSymbol for backwards compatibility.
-/// This is the canonical Symbol type from rhi_normalize_languages.
+/// This is the canonical Symbol type from normalize_languages.
 pub type SkeletonSymbol = Symbol;
 
 /// Extension trait for converting Symbol to ViewNode
@@ -122,7 +122,7 @@ impl SkeletonResult {
     /// Filter out test functions and test modules.
     /// Uses Language::is_test_symbol() for language-specific detection.
     pub fn filter_tests(&self) -> SkeletonResult {
-        use rhi_normalize_languages::{Language, support_for_path};
+        use normalize_languages::{Language, support_for_path};
         use std::path::Path;
 
         let lang = support_for_path(Path::new(&self.file_path));
@@ -211,7 +211,7 @@ impl SkeletonExtractor {
         let result = self.extractor.extract(path, content);
         if result.symbols.is_empty() {
             // Check if this is a supported file type that just has no symbols
-            use rhi_normalize_languages::support_for_path;
+            use normalize_languages::support_for_path;
             if support_for_path(path).is_none() {
                 return None;
             }

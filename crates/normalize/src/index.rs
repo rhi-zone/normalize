@@ -2,8 +2,8 @@ use crate::config::NormalizeConfig;
 use crate::paths::get_moss_dir;
 use ignore::WalkBuilder;
 use libsql::{Connection, Database, params};
+use normalize_languages::support_for_path;
 use rayon::prelude::*;
-use rhi_normalize_languages::support_for_path;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -27,13 +27,13 @@ const SCHEMA_VERSION: i64 = 1;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
-    rhi_normalize_languages::support_for_path(std::path::Path::new(path)).is_some()
+    normalize_languages::support_for_path(std::path::Path::new(path)).is_some()
 }
 
 /// Generate SQL WHERE clause for filtering source files.
 /// Returns: "path LIKE '%.py' OR path LIKE '%.rs' OR ..."
 fn source_extensions_sql_filter() -> String {
-    let mut extensions: Vec<&str> = rhi_normalize_languages::supported_languages()
+    let mut extensions: Vec<&str> = normalize_languages::supported_languages()
         .iter()
         .flat_map(|lang| lang.extensions().iter().copied())
         .collect();
@@ -1249,14 +1249,14 @@ impl FileIndex {
                 for sym in &extract_result.symbols {
                     if matches!(
                         sym.kind,
-                        rhi_normalize_languages::SymbolKind::Interface
-                            | rhi_normalize_languages::SymbolKind::Class
+                        normalize_languages::SymbolKind::Interface
+                            | normalize_languages::SymbolKind::Class
                     ) {
                         for child in &sym.children {
                             if matches!(
                                 child.kind,
-                                rhi_normalize_languages::SymbolKind::Method
-                                    | rhi_normalize_languages::SymbolKind::Function
+                                normalize_languages::SymbolKind::Method
+                                    | normalize_languages::SymbolKind::Function
                             ) {
                                 type_methods.push((sym.name.clone(), child.name.clone()));
                             }

@@ -10,7 +10,7 @@
 //!
 //! ## Multi-remote Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::flatpak::{Flatpak, FlatpakRemote};
+//! use normalize_packages::index::flatpak::{Flatpak, FlatpakRemote};
 //!
 //! // All remotes (default)
 //! let all = Flatpak::all();

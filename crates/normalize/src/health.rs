@@ -331,7 +331,7 @@ async fn analyze_health_indexed(
             if let Ok(path_result) = row.get::<String>(0) {
                 total_files += 1;
                 let path = std::path::Path::new(&path_result);
-                if let Some(lang) = rhi_normalize_languages::support_for_path(path) {
+                if let Some(lang) = normalize_languages::support_for_path(path) {
                     *files_by_language
                         .entry(lang.name().to_string())
                         .or_insert(0) += 1;
@@ -399,7 +399,7 @@ fn analyze_health_unindexed(
 
         total_files += 1;
 
-        if let Some(lang) = rhi_normalize_languages::support_for_path(path) {
+        if let Some(lang) = normalize_languages::support_for_path(path) {
             *files_by_language
                 .entry(lang.name().to_string())
                 .or_insert(0) += 1;

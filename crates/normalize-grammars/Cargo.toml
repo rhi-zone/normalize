@@ -1,12 +1,12 @@
 [package]
-name = "rhi-normalize-grammars"
+name = "normalize-grammars"
 version = "0.1.0"
 edition = "2024"
 publish = false
 description = "Normalize"
 
 # This crate exists solely to download arborium grammars.
-# Run `cargo fetch -p rhi-normalize-grammars` to populate ~/.cargo/registry.
+# Run `cargo fetch -p normalize-grammars` to populate ~/.cargo/registry.
 # Then `cargo xtask build-grammars` can find and compile them.
 
 [dependencies]

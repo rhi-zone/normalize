@@ -10,7 +10,7 @@
 //!
 //! ## Multi-registry Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::docker::{Docker, DockerRegistry};
+//! use normalize_packages::index::docker::{Docker, DockerRegistry};
 //!
 //! // All registries (default)
 //! let all = Docker::all();

@@ -11,7 +11,7 @@
 //!
 //! ## Multi-source Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::choco::{Choco, ChocoSource};
+//! use normalize_packages::index::choco::{Choco, ChocoSource};
 //!
 //! // All sources (default)
 //! let all = Choco::all();

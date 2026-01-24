@@ -3,7 +3,7 @@
 //! Identifies long functions that may be candidates for refactoring.
 use crate::output::OutputFormatter;
 use crate::parsers;
-use rhi_normalize_languages::{Language, support_for_path};
+use normalize_languages::{Language, support_for_path};
 use serde::Serialize;
 use std::path::Path;
 /// Length classification for functions.

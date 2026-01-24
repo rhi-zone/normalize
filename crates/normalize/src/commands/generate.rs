@@ -158,9 +158,9 @@ pub fn run(args: GenerateArgs) -> i32 {
 }
 
 fn run_legacy_client(spec: PathBuf, lang: String, output: Option<PathBuf>) -> i32 {
-    let Some(generator) = rhi_normalize_openapi::find_generator(&lang) else {
+    let Some(generator) = normalize_openapi::find_generator(&lang) else {
         eprintln!("Unknown language: {}. Available:", lang);
-        for (lang, variant) in rhi_normalize_openapi::list_generators() {
+        for (lang, variant) in normalize_openapi::list_generators() {
             eprintln!("  {} ({})", lang, variant);
         }
         return 1;
@@ -196,9 +196,9 @@ fn run_legacy_client(spec: PathBuf, lang: String, output: Option<PathBuf>) -> i3
 }
 
 fn run_legacy_types(schema: PathBuf, name: String, lang: String, output: Option<PathBuf>) -> i32 {
-    let Some(generator) = rhi_normalize_jsonschema::find_generator(&lang) else {
+    let Some(generator) = normalize_jsonschema::find_generator(&lang) else {
         eprintln!("Unknown language: {}. Available:", lang);
-        for l in rhi_normalize_jsonschema::list_generators() {
+        for l in normalize_jsonschema::list_generators() {
             eprintln!("  {}", l);
         }
         return 1;
@@ -244,7 +244,7 @@ fn run_typegen(
     readonly: bool,
     package: String,
 ) -> i32 {
-    use rhi_normalize_typegen::{
+    use normalize_typegen::{
         ir::Schema,
         output::{
             go::{GoOptions, generate_go_types},
@@ -420,7 +420,7 @@ fn run_cli_snapshot(binary: PathBuf, output: Option<PathBuf>, name: Option<Strin
         };
 
         // Parse help output using moss-cli-parser
-        let spec = match rhi_normalize_cli_parser::parse_help(&help) {
+        let spec = match normalize_cli_parser::parse_help(&help) {
             Ok(s) => s,
             Err(_) => return result,
         };

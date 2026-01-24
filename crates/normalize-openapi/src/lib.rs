@@ -7,7 +7,7 @@
 //! Users can register custom generators via [`register()`]:
 //!
 //! ```ignore
-//! use rhi_normalize_openapi::{OpenApiClientGenerator, register};
+//! use normalize_openapi::{OpenApiClientGenerator, register};
 //! use serde_json::Value;
 //!
 //! struct MyGenerator;

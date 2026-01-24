@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::pacman::{Pacman, ArchRepo};
+//! use normalize_packages::index::pacman::{Pacman, ArchRepo};
 //!
 //! // All repos (default)
 //! let all = Pacman::all();

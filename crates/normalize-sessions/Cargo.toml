@@ -1,5 +1,5 @@
 [package]
-name = "rhi-normalize-sessions"
+name = "normalize-sessions"
 version = "0.1.0"
 edition = "2024"
 description = "Session log parsing for AI coding agents"

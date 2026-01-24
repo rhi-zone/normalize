@@ -1,6 +1,6 @@
 //! Integration tests for moss-typegen.
 
-use rhi_normalize_typegen::{
+use normalize_typegen::{
     input::{parse_json_schema, parse_openapi},
     output::{
         go::{GoOptions, generate_go_types},

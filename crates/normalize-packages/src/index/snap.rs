@@ -10,7 +10,7 @@
 //!
 //! ## Multi-channel Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::snap::{Snap, SnapChannel};
+//! use normalize_packages::index::snap::{Snap, SnapChannel};
 //!
 //! // All channels (default)
 //! let all = Snap::all();

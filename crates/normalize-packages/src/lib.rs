@@ -11,7 +11,7 @@
 //! # Example (ecosystem feature)
 //!
 //! ```ignore
-//! use rhi_normalize_packages::{detect_ecosystem, PackageInfo};
+//! use normalize_packages::{detect_ecosystem, PackageInfo};
 //! use std::path::Path;
 //!
 //! if let Some(ecosystem) = detect_ecosystem(Path::new(".")) {
@@ -24,7 +24,7 @@
 //! # Example (index feature)
 //!
 //! ```ignore
-//! use rhi_normalize_packages::index::{get_index, PackageMeta};
+//! use normalize_packages::index::{get_index, PackageMeta};
 //!
 //! if let Some(brew) = get_index("brew") {
 //!     if let Ok(pkg) = brew.fetch("ripgrep") {

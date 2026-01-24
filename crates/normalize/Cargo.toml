@@ -1,12 +1,12 @@
 [package]
-name = "rhi-normalize"
+name = "normalize"
 version.workspace = true
 edition = "2024"
 license.workspace = true
 description = "Fast code intelligence CLI and library"
 
 [lib]
-name = "rhi_normalize"
+name = "normalize"
 path = "src/lib.rs"
 
 [[bin]]
@@ -33,17 +33,17 @@ libsql.workspace = true
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 dirs = "5"
-rhi-normalize-core = { path = "../normalize-core" }
-rhi-normalize-derive = { path = "../normalize-derive" }
-rhi-normalize-languages = { path = "../normalize-languages" }
-rhi-normalize-typegen = { path = "../normalize-typegen" }
-rhi-normalize-jsonschema = { path = "../normalize-jsonschema" }
-rhi-normalize-rules = { path = "../normalize-rules" }
-rhi-normalize-openapi = { path = "../normalize-openapi" }
-rhi-normalize-packages = { path = "../normalize-packages" }
-rhi-normalize-sessions = { path = "../normalize-sessions" }
-rhi-normalize-tools = { path = "../normalize-tools" }
-rhi-normalize-cli-parser = { path = "../normalize-cli-parser" }
+normalize-core = { path = "../normalize-core" }
+normalize-derive = { path = "../normalize-derive" }
+normalize-languages = { path = "../normalize-languages" }
+normalize-typegen = { path = "../normalize-typegen" }
+normalize-jsonschema = { path = "../normalize-jsonschema" }
+normalize-rules = { path = "../normalize-rules" }
+normalize-openapi = { path = "../normalize-openapi" }
+normalize-packages = { path = "../normalize-packages" }
+normalize-sessions = { path = "../normalize-sessions" }
+normalize-tools = { path = "../normalize-tools" }
+normalize-cli-parser = { path = "../normalize-cli-parser" }
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true

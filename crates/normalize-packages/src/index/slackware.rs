@@ -10,7 +10,7 @@
 //!
 //! ## Multi-version Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::slackware::{Slackware, SlackwareVersion};
+//! use normalize_packages::index::slackware::{Slackware, SlackwareVersion};
 //!
 //! // All versions (default)
 //! let all = Slackware::all();

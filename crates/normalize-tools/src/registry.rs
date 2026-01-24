@@ -5,7 +5,7 @@
 //! Users can register custom tools via [`register()`]:
 //!
 //! ```ignore
-//! use rhi_normalize_tools::{Tool, ToolInfo, ToolCategory, ToolResult, ToolError, register_tool};
+//! use normalize_tools::{Tool, ToolInfo, ToolCategory, ToolResult, ToolError, register_tool};
 //! use std::path::Path;
 //!
 //! struct MyTool;

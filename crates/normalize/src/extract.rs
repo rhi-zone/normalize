@@ -4,9 +4,7 @@
 //! skeleton.rs (for viewing) and symbols.rs (for indexing).
 
 use crate::parsers;
-use rhi_normalize_languages::{
-    Language, Symbol, Visibility, support_for_grammar, support_for_path,
-};
+use normalize_languages::{Language, Symbol, Visibility, support_for_grammar, support_for_path};
 use std::path::Path;
 use tree_sitter;
 
@@ -102,7 +100,7 @@ impl<'a> OnDemandResolver<'a> {
 
 impl InterfaceResolver for OnDemandResolver<'_> {
     fn resolve_interface_methods(&self, name: &str, current_file: &str) -> Option<Vec<String>> {
-        use rhi_normalize_languages::support_for_path;
+        use normalize_languages::support_for_path;
 
         let current_path = std::path::Path::new(current_file);
         let current_dir = current_path.parent()?;
@@ -144,8 +142,8 @@ impl InterfaceResolver for OnDemandResolver<'_> {
                 if sym.name == name
                     && matches!(
                         sym.kind,
-                        rhi_normalize_languages::SymbolKind::Interface
-                            | rhi_normalize_languages::SymbolKind::Class
+                        normalize_languages::SymbolKind::Interface
+                            | normalize_languages::SymbolKind::Class
                     )
                 {
                     let methods: Vec<String> = sym
@@ -154,8 +152,8 @@ impl InterfaceResolver for OnDemandResolver<'_> {
                         .filter(|c| {
                             matches!(
                                 c.kind,
-                                rhi_normalize_languages::SymbolKind::Method
-                                    | rhi_normalize_languages::SymbolKind::Function
+                                normalize_languages::SymbolKind::Method
+                                    | normalize_languages::SymbolKind::Function
                             )
                         })
                         .map(|c| c.name.clone())
@@ -375,8 +373,7 @@ impl Extractor {
         for sym in symbols.iter_mut() {
             if matches!(
                 sym.kind,
-                rhi_normalize_languages::SymbolKind::Struct
-                    | rhi_normalize_languages::SymbolKind::Enum
+                normalize_languages::SymbolKind::Struct | normalize_languages::SymbolKind::Enum
             ) {
                 if let Some(methods) = impl_methods.remove(&sym.name) {
                     sym.children.extend(methods);
@@ -389,7 +386,7 @@ impl Extractor {
             if !methods.is_empty() {
                 symbols.push(Symbol {
                     name: name.clone(),
-                    kind: rhi_normalize_languages::SymbolKind::Module, // impl as module-like
+                    kind: normalize_languages::SymbolKind::Module, // impl as module-like
                     signature: format!("impl {}", name),
                     docstring: None,
                     attributes: Vec::new(),
@@ -428,8 +425,8 @@ impl Extractor {
             for sym in symbols {
                 if matches!(
                     sym.kind,
-                    rhi_normalize_languages::SymbolKind::Interface
-                        | rhi_normalize_languages::SymbolKind::Class
+                    normalize_languages::SymbolKind::Interface
+                        | normalize_languages::SymbolKind::Class
                 ) {
                     let methods: HashSet<String> = sym
                         .children
@@ -437,8 +434,8 @@ impl Extractor {
                         .filter(|c| {
                             matches!(
                                 c.kind,
-                                rhi_normalize_languages::SymbolKind::Method
-                                    | rhi_normalize_languages::SymbolKind::Function
+                                normalize_languages::SymbolKind::Method
+                                    | normalize_languages::SymbolKind::Function
                             )
                         })
                         .map(|c| c.name.clone())
@@ -493,8 +490,8 @@ impl Extractor {
                     for child in &mut sym.children {
                         if matches!(
                             child.kind,
-                            rhi_normalize_languages::SymbolKind::Method
-                                | rhi_normalize_languages::SymbolKind::Function
+                            normalize_languages::SymbolKind::Method
+                                | normalize_languages::SymbolKind::Function
                         ) && interface_methods.contains(&child.name)
                         {
                             child.is_interface_impl = true;

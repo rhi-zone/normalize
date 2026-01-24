@@ -1,5 +1,5 @@
 [package]
-name = "rhi-normalize-core"
+name = "normalize-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,9 +1,9 @@
 //! CLI command handler for syntax rules.
 //!
-//! Uses rhi_normalize_rules for core functionality, handles CLI output.
+//! Uses normalize_rules for core functionality, handles CLI output.
 
 use crate::parsers::grammar_loader;
-use rhi_normalize_rules::{
+use normalize_rules::{
     DebugFlags, Finding, Rule, RulesConfig, Severity, apply_fixes, load_all_rules, run_rules,
 };
 use std::path::Path;

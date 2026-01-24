@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::dnf::{Dnf, DnfRepo};
+//! use normalize_packages::index::dnf::{Dnf, DnfRepo};
 //!
 //! // All repos (default)
 //! let all = Dnf::all();

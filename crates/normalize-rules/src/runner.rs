@@ -2,7 +2,7 @@
 
 use crate::sources::{SourceContext, SourceRegistry, builtin_registry};
 use crate::{Rule, Severity};
-use rhi_normalize_languages::{GrammarLoader, support_for_path};
+use normalize_languages::{GrammarLoader, support_for_path};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
@@ -551,7 +551,7 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rhi_normalize_languages::GrammarLoader;
+    use normalize_languages::GrammarLoader;
     use streaming_iterator::StreamingIterator;
 
     fn loader() -> GrammarLoader {

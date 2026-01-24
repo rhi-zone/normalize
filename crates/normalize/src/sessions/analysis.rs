@@ -5,7 +5,7 @@
 //! because what metrics matter is subjective and consumer-specific.
 
 use crate::output::OutputFormatter;
-use rhi_normalize_sessions::{ContentBlock, Session};
+use normalize_sessions::{ContentBlock, Session};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -1173,7 +1173,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
 
         for msg in &turn.messages {
             // Detect corrections in assistant messages
-            if msg.role == rhi_normalize_sessions::Role::Assistant {
+            if msg.role == normalize_sessions::Role::Assistant {
                 for block in &msg.content {
                     if let ContentBlock::Text { text } = block {
                         if let Some((category, excerpt)) = detect_correction(text) {

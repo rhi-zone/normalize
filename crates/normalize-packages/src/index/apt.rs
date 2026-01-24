@@ -11,7 +11,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::apt::{Apt, AptRepo};
+//! use normalize_packages::index::apt::{Apt, AptRepo};
 //!
 //! // All repos (default)
 //! let all = Apt::all();

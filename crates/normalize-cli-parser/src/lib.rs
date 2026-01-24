@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rhi_normalize_cli_parser::{parse_help, CliSpec};
+//! use normalize_cli_parser::{parse_help, CliSpec};
 //!
 //! let help_text = "mycli 1.0.0\n\nUsage: mycli [OPTIONS]\n\n...";
 //! let spec = parse_help(help_text)?;

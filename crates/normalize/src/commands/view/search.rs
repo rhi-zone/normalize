@@ -1,7 +1,7 @@
 //! Symbol search functionality for view command.
 
 use crate::{index, skeleton};
-use rhi_normalize_languages::support_for_path;
+use normalize_languages::support_for_path;
 use std::path::Path;
 
 /// Parsed symbol query with optional file and parent hints.

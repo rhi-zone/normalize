@@ -10,7 +10,7 @@
 //!
 //! ## Multi-channel Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::conda::{Conda, CondaChannel};
+//! use normalize_packages::index::conda::{Conda, CondaChannel};
 //!
 //! // All channels (default)
 //! let all = Conda::all();

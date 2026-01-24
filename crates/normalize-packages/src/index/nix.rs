@@ -11,7 +11,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::nix::{Nix, NixChannel};
+//! use normalize_packages::index::nix::{Nix, NixChannel};
 //!
 //! // All channels (default)
 //! let all = Nix::all();

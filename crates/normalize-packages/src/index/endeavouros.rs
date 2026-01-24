@@ -11,7 +11,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::endeavouros::{EndeavourOs, EndeavourOsRepo};
+//! use normalize_packages::index::endeavouros::{EndeavourOs, EndeavourOsRepo};
 //!
 //! // All repos (default)
 //! let all = EndeavourOs::all();

@@ -1,5 +1,5 @@
 [package]
-name = "rhi-normalize-typegen"
+name = "normalize-typegen"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

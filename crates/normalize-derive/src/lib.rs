@@ -12,7 +12,7 @@ use syn::{Data, DeriveInput, Fields, parse_macro_input};
 /// # Example
 ///
 /// ```ignore
-/// use rhi_normalize::Merge;
+/// use normalize::Merge;
 ///
 /// #[derive(Merge)]
 /// struct Config {
@@ -33,7 +33,7 @@ pub fn derive_merge(input: TokenStream) -> TokenStream {
                 let field_merges = fields.named.iter().map(|f| {
                     let field_name = &f.ident;
                     quote! {
-                        #field_name: ::rhi_normalize_core::Merge::merge(self.#field_name, other.#field_name)
+                        #field_name: ::normalize_core::Merge::merge(self.#field_name, other.#field_name)
                     }
                 });
                 quote! {
@@ -46,7 +46,7 @@ pub fn derive_merge(input: TokenStream) -> TokenStream {
                 let field_merges = (0..fields.unnamed.len()).map(|i| {
                     let index = syn::Index::from(i);
                     quote! {
-                        ::rhi_normalize_core::Merge::merge(self.#index, other.#index)
+                        ::normalize_core::Merge::merge(self.#index, other.#index)
                     }
                 });
                 quote! {
@@ -68,7 +68,7 @@ pub fn derive_merge(input: TokenStream) -> TokenStream {
     };
 
     let expanded = quote! {
-        impl #impl_generics ::rhi_normalize_core::Merge for #name #ty_generics #where_clause {
+        impl #impl_generics ::normalize_core::Merge for #name #ty_generics #where_clause {
             fn merge(self, other: Self) -> Self {
                 #merge_impl
             }

@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::freebsd::{FreeBsd, FreeBsdRepo};
+//! use normalize_packages::index::freebsd::{FreeBsd, FreeBsdRepo};
 //!
 //! // All repos (default)
 //! let all = FreeBsd::all();

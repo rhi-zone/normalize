@@ -2,11 +2,11 @@
 
 use crate::output::OutputFormat;
 use clap::Subcommand;
-use nu_ansi_term::Color::Yellow;
-use rhi_normalize_packages::{
+use normalize_packages::{
     AuditResult, PackageError, PackageInfo, VulnerabilitySeverity, all_ecosystems,
     detect_all_ecosystems,
 };
+use nu_ansi_term::Color::Yellow;
 use std::path::Path;
 
 #[derive(Subcommand)]
@@ -96,7 +96,7 @@ pub fn cmd_package(
 }
 
 fn run_all_ecosystems_json(
-    ecosystems: &[&dyn rhi_normalize_packages::Ecosystem],
+    ecosystems: &[&dyn normalize_packages::Ecosystem],
     action: &PackageAction,
     project_root: &Path,
     format: &OutputFormat,
@@ -155,7 +155,7 @@ fn run_all_ecosystems_json(
 }
 
 fn run_for_ecosystem(
-    eco: &dyn rhi_normalize_packages::Ecosystem,
+    eco: &dyn normalize_packages::Ecosystem,
     action: &PackageAction,
     project_root: &Path,
     format: &OutputFormat,
@@ -172,7 +172,7 @@ fn run_for_ecosystem(
 }
 
 fn cmd_info(
-    eco: &dyn rhi_normalize_packages::Ecosystem,
+    eco: &dyn normalize_packages::Ecosystem,
     package: &str,
     project_root: &Path,
     format: &OutputFormat,
@@ -205,7 +205,7 @@ fn cmd_info(
 }
 
 fn cmd_list(
-    eco: &dyn rhi_normalize_packages::Ecosystem,
+    eco: &dyn normalize_packages::Ecosystem,
     project_root: &Path,
     format: &OutputFormat,
     use_colors: bool,
@@ -246,7 +246,7 @@ fn cmd_list(
 }
 
 fn cmd_tree(
-    eco: &dyn rhi_normalize_packages::Ecosystem,
+    eco: &dyn normalize_packages::Ecosystem,
     project_root: &Path,
     format: &OutputFormat,
     use_colors: bool,
@@ -271,13 +271,13 @@ fn cmd_tree(
     }
 }
 
-fn print_tree(tree: &rhi_normalize_packages::DependencyTree, use_colors: bool) {
+fn print_tree(tree: &normalize_packages::DependencyTree, use_colors: bool) {
     for root in &tree.roots {
         print_node(root, 0, use_colors);
     }
 }
 
-fn print_node(node: &rhi_normalize_packages::TreeNode, depth: usize, use_colors: bool) {
+fn print_node(node: &normalize_packages::TreeNode, depth: usize, use_colors: bool) {
     let indent = "  ".repeat(depth);
     if node.version.is_empty() {
         println!("{}{}", indent, node.name);
@@ -295,7 +295,7 @@ fn print_node(node: &rhi_normalize_packages::TreeNode, depth: usize, use_colors:
 }
 
 fn cmd_why(
-    eco: &dyn rhi_normalize_packages::Ecosystem,
+    eco: &dyn normalize_packages::Ecosystem,
     package: &str,
     project_root: &Path,
     format: &OutputFormat,
@@ -366,7 +366,7 @@ fn cmd_why(
 
 /// Find all paths from root packages to the target dependency.
 fn find_dependency_paths(
-    tree: &rhi_normalize_packages::DependencyTree,
+    tree: &normalize_packages::DependencyTree,
     target: &str,
 ) -> Vec<Vec<(String, String)>> {
     let mut all_paths = Vec::new();
@@ -380,7 +380,7 @@ fn find_dependency_paths(
 }
 
 fn find_paths_recursive(
-    node: &rhi_normalize_packages::TreeNode,
+    node: &normalize_packages::TreeNode,
     target: &str,
     current_path: &mut Vec<(String, String)>,
     all_paths: &mut Vec<Vec<(String, String)>>,
@@ -400,7 +400,7 @@ fn find_paths_recursive(
 }
 
 fn cmd_outdated(
-    eco: &dyn rhi_normalize_packages::Ecosystem,
+    eco: &dyn normalize_packages::Ecosystem,
     project_root: &Path,
     format: &OutputFormat,
     use_colors: bool,
@@ -493,7 +493,7 @@ fn cmd_outdated(
 }
 
 fn cmd_audit(
-    eco: &dyn rhi_normalize_packages::Ecosystem,
+    eco: &dyn normalize_packages::Ecosystem,
     project_root: &Path,
     format: &OutputFormat,
 ) -> i32 {
@@ -584,7 +584,7 @@ fn print_audit_human(result: &AuditResult, ecosystem: &str) {
     }
 }
 
-fn find_ecosystem_by_name(name: &str) -> Option<&'static dyn rhi_normalize_packages::Ecosystem> {
+fn find_ecosystem_by_name(name: &str) -> Option<&'static dyn normalize_packages::Ecosystem> {
     all_ecosystems().iter().find(|e| e.name() == name).copied()
 }
 

@@ -4,7 +4,7 @@ use crate::extract::Extractor;
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
 use crate::parsers;
-use rhi_normalize_languages::support_for_path;
+use normalize_languages::support_for_path;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -850,7 +850,7 @@ pub fn cmd_allow_duplicate_type(
 }
 
 /// Flatten nested symbols into a flat list
-fn flatten_symbols(sym: &rhi_normalize_languages::Symbol) -> Vec<&rhi_normalize_languages::Symbol> {
+fn flatten_symbols(sym: &normalize_languages::Symbol) -> Vec<&normalize_languages::Symbol> {
     let mut result = vec![sym];
     for child in &sym.children {
         result.extend(flatten_symbols(child));

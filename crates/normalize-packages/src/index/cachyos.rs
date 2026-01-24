@@ -11,7 +11,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::cachyos::{CachyOs, CachyOsRepo};
+//! use normalize_packages::index::cachyos::{CachyOs, CachyOsRepo};
 //!
 //! // All repos (default)
 //! let all = CachyOs::all();

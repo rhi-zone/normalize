@@ -10,7 +10,7 @@
 //!
 //! ## Multi-environment Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::msys2::{Msys2, Msys2Env};
+//! use normalize_packages::index::msys2::{Msys2, Msys2Env};
 //!
 //! // All environments (default)
 //! let all = Msys2::all();

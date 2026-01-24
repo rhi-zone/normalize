@@ -1,5 +1,5 @@
 [package]
-name = "rhi-normalize-rules"
+name = "normalize-rules"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -21,11 +21,11 @@ tree-sitter = "0.26"
 streaming-iterator = "0.1"
 
 # Language support
-rhi-normalize-languages = { path = "../normalize-languages" }
+normalize-languages = { path = "../normalize-languages" }
 
 # Schema generation
 schemars = "1"
 
 # Core traits
-rhi-normalize-core = { path = "../normalize-core" }
-rhi-normalize-derive = { path = "../normalize-derive" }
+normalize-core = { path = "../normalize-core" }
+normalize-derive = { path = "../normalize-derive" }

@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::fdroid::{FDroid, FDroidRepo};
+//! use normalize_packages::index::fdroid::{FDroid, FDroidRepo};
 //!
 //! // All repos (default)
 //! let all = FDroid::all();

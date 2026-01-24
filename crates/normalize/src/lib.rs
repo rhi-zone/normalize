@@ -10,8 +10,8 @@
 //! # Example
 //!
 //! ```ignore
-//! use rhi_normalize::index::Index;
-//! use rhi_normalize::parsers;
+//! use normalize::index::Index;
+//! use normalize::parsers;
 //!
 //! let index = Index::open("path/to/codebase")?;
 //! let tree = parsers::parse_with_grammar("rust", "fn main() {}");

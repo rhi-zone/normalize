@@ -8,7 +8,7 @@
 use crate::builtin::BUILTIN_RULES;
 use crate::{Rule, Severity};
 use glob::Pattern;
-use rhi_normalize_derive::Merge;
+use normalize_derive::Merge;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

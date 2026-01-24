@@ -11,7 +11,7 @@
 //!
 //! ## Multi-channel Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::guix::{Guix, GuixChannel};
+//! use normalize_packages::index::guix::{Guix, GuixChannel};
 //!
 //! // All channels (default)
 //! let all = Guix::all();

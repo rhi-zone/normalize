@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::void::{Void, VoidRepo};
+//! use normalize_packages::index::void::{Void, VoidRepo};
 //!
 //! // All repos (default)
 //! let all = Void::all();

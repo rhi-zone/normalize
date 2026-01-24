@@ -1,6 +1,6 @@
 use crate::extract::{ExtractOptions, Extractor};
 use crate::parsers;
-use rhi_normalize_languages::{
+use normalize_languages::{
     Language, Symbol as LangSymbol, SymbolKind, support_for_grammar, support_for_path,
 };
 use std::path::Path;

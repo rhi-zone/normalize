@@ -12,7 +12,7 @@ use crate::config::NormalizeConfig;
 use crate::filter::Filter;
 use crate::{daemon, path_resolve};
 use clap::Args;
-use rhi_normalize_derive::Merge;
+use normalize_derive::Merge;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 

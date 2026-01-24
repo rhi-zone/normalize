@@ -10,7 +10,7 @@
 //!
 //! ## Multi-repo Support
 //! ```rust,ignore
-//! use rhi_normalize_packages::index::gentoo::{Gentoo, GentooRepo};
+//! use normalize_packages::index::gentoo::{Gentoo, GentooRepo};
 //!
 //! // All repos (default)
 //! let all = Gentoo::all();
