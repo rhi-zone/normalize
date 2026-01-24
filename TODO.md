@@ -79,18 +79,104 @@ Audit found fragmentation across commands. Fix for consistent UX:
 ## Backlog
 
 ### normalize-typegen
-- Add `Backend` trait with registry (hybrid pattern for user-defined backends)
-- Feature flags: `backend-*` prefix (e.g., `backend-typescript`, `backend-rust`, `backend-zod`)
-- CLI: support stdin input, multiple output files
-- Tests: snapshot tests for all backends
+
+**Infrastructure (DONE):**
+- [x] `Backend` trait with registry (hybrid pattern for user-defined backends)
+- [x] Feature flags: `backend-*` prefix (e.g., `backend-typescript`, `backend-rust`, `backend-zod`)
+- [x] All 7 backends implement trait: TypeScript, Zod, Valibot, Python, Pydantic, Go, Rust
+- [x] Snapshot tests for all backends (20 snapshots)
+
+**Input Parsers:**
+- [x] JSON Schema parser (`parse_json_schema`)
+- [x] OpenAPI parser (`parse_openapi`)
+- [ ] Protobuf parser - read .proto files to IR
+- [ ] GraphQL schema parser - read GraphQL SDL to IR
+- [ ] TypeScript type parser - extract type definitions from .ts files
+
+**Output Backends:**
+- [ ] JSON Schema output - emit IR back to JSON Schema (for validation/documentation)
+- [ ] GraphQL SDL output - emit IR as GraphQL types
+- [ ] Protobuf output - emit IR as .proto definitions
+
+**CLI Enhancements:**
+- [ ] Support stdin input (`normalize generate typegen -` or `--stdin`)
+- [ ] Multiple output files (`--split` to emit one file per type)
+- [ ] Dry-run mode (`--dry-run` to preview without writing)
+
+**IR Improvements:**
+- [ ] Validation: ensure IR is well-formed before generating (no circular refs, valid names)
+- [ ] Nullable vs Optional distinction (some languages care)
+- [ ] Default values support in Field
+- [ ] Constraints (min/max, pattern, format) for validation libraries
 
 ### normalize-surface-syntax
-- [x] Add `Reader` and `Writer` traits with registry (hybrid pattern for user-defined readers/writers)
+
+**Infrastructure (DONE):**
+- [x] `Reader` and `Writer` traits with registry
 - [x] Feature flags: `read-*` and `write-*` prefixes
-- Roundtrip tests: TS → IR → Lua → IR → TS (verify structure preservation)
-- Implement Lua reader (tree-sitter based)
-- Implement TypeScript writer
-- CLI: `normalize translate` command
+- [x] CLI: `normalize translate` command
+
+**Readers:**
+- [x] TypeScript reader (tree-sitter based)
+  - [x] Variables (const, let), binary expressions, function calls
+  - [x] If/else, while, for loops
+  - [x] Functions (declarations, arrow functions)
+  - [x] Arrays, objects
+  - [ ] Classes, interfaces, type annotations
+  - [ ] Try/catch/finally
+  - [ ] Switch statements
+  - [ ] Spread operator, destructuring
+  - [ ] Template literals
+  - [ ] Async/await
+- [x] Lua reader (tree-sitter based)
+  - [x] Variables (local), binary expressions, function calls
+  - [x] If/elseif/else, while, for loops (numeric, generic)
+  - [x] Functions (declarations, anonymous)
+  - [x] Tables (array-like, record-like)
+  - [ ] Metatables, metamethods
+  - [ ] Varargs (`...`)
+  - [ ] Repeat-until loops
+  - [ ] Multiple return values, multiple assignment
+  - [ ] String methods (`:method()` syntax)
+- [ ] Python reader
+- [ ] JavaScript reader (or reuse TypeScript reader with flag?)
+
+**Writers:**
+- [x] Lua writer
+  - [x] Variables, binary ops, function calls
+  - [x] Control flow (if, while, for)
+  - [x] Functions, tables
+  - [ ] Verify idiomatic output (use `and`/`or` vs `&&`/`||`)
+  - [ ] String escaping edge cases
+- [x] TypeScript writer
+  - [x] Variables (const, let), binary ops, function calls
+  - [x] Control flow (if, while, for)
+  - [x] Arrow functions, objects/arrays
+  - [ ] Type annotations (when available in IR)
+  - [ ] Verify semicolon placement
+  - [ ] Template literal output for complex strings
+- [ ] Python writer
+- [ ] JavaScript writer (or reuse TypeScript writer?)
+
+**Testing:**
+- [x] Basic roundtrip tests in registry.rs
+- [ ] Roundtrip tests with `structure_eq`: TS → IR₁ → Lua → IR₂ → assert `ir1.structure_eq(&ir2)`
+  - IR is "reasonable middle ground", not strict LCD
+  - Core fields: must match (names, expressions, control flow structure)
+  - Hint fields: normalized in comparison (`mutable`, `computed` on string-literal member access)
+  - `structure_eq(&self, &other) -> bool`: in-place comparison, no cloning
+- [ ] Snapshot tests for reader outputs (verify parsed IR is correct)
+- [ ] Snapshot tests for writer outputs (verify emitted code is correct)
+- [ ] Edge case tests: nested expressions, complex control flow, Unicode strings
+
+**IR Improvements:**
+- [ ] Comments preservation (for documentation translation)
+- [ ] Source locations (for error messages, debugging)
+- [ ] Import/export statements
+- [ ] Class definitions, method definitions
+- [ ] Type annotations (optional, for typed languages)
+- [ ] Pattern matching / destructuring
+- [ ] Exception handling (try/catch)
 
 ### Feature flags for customizability
 Add feature flags to crates so consumers can opt out of implementations they don't need.
