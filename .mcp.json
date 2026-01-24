@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "moss": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "moss.mcp_server"]
-    }
-  }
-}
