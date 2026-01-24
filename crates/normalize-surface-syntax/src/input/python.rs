@@ -78,14 +78,6 @@ impl<'a> ReadContext<'a> {
             // Comments
             "comment" => Ok(None),
 
-            // Expression statements
-            "expression_statement" => {
-                let expr_node = node
-                    .child(0)
-                    .ok_or_else(|| ReadError::Parse("expression_statement has no child".into()))?;
-                Ok(Some(Stmt::expr(self.read_expr(expr_node)?)))
-            }
-
             // Assignment (x = value)
             "assignment" => self.read_assignment(node).map(Some),
 
