@@ -74,7 +74,7 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build CLI
-        run: cargo build --release --target ${{ matrix.target }} -p rhizome-moss --features sessions-web
+        run: cargo build --release --target ${{ matrix.target }} -p rhi-normalize --features sessions-web
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
@@ -86,17 +86,17 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/moss dist/
+          cp target/${{ matrix.target }}/release/normalize dist/
           cd dist
-          tar -czf moss-${{ matrix.target }}.tar.gz moss
-          rm moss
+          tar -czf normalize-${{ matrix.target }}.tar.gz normalize
+          rm normalize
 
       - name: Prepare grammars artifact (Unix)
         if: runner.os != 'Windows' && matrix.target != 'aarch64-unknown-linux-gnu'
         run: |
           cd target/grammars
-          tar -czf ../../dist/moss-grammars-${{ matrix.target }}.tar.gz *.so 2>/dev/null || \
-          tar -czf ../../dist/moss-grammars-${{ matrix.target }}.tar.gz *.dylib 2>/dev/null || \
+          tar -czf ../../dist/normalize-grammars-${{ matrix.target }}.tar.gz *.so 2>/dev/null || \
+          tar -czf ../../dist/normalize-grammars-${{ matrix.target }}.tar.gz *.dylib 2>/dev/null || \
           true
 
       - name: Prepare artifact (Windows)
@@ -104,30 +104,30 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
-          Copy-Item "target/${{ matrix.target }}/release/moss.exe" -Destination "dist/"
-          Compress-Archive -Path "dist/moss.exe" -DestinationPath "dist/moss-${{ matrix.target }}.zip"
-          Remove-Item "dist/moss.exe"
+          Copy-Item "target/${{ matrix.target }}/release/normalize.exe" -Destination "dist/"
+          Compress-Archive -Path "dist/normalize.exe" -DestinationPath "dist/normalize-${{ matrix.target }}.zip"
+          Remove-Item "dist/normalize.exe"
 
       - name: Prepare grammars artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           if (Test-Path "target/grammars/*.dll") {
-            Compress-Archive -Path "target/grammars/*.dll" -DestinationPath "dist/moss-grammars-${{ matrix.target }}.zip"
+            Compress-Archive -Path "target/grammars/*.dll" -DestinationPath "dist/normalize-grammars-${{ matrix.target }}.zip"
           }
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: moss-${{ matrix.target }}
-          path: dist/moss-${{ matrix.target }}.*
+          name: normalize-${{ matrix.target }}
+          path: dist/normalize-${{ matrix.target }}.*
 
       - name: Upload grammars artifact
         if: matrix.target != 'aarch64-unknown-linux-gnu'
         uses: actions/upload-artifact@v4
         with:
-          name: moss-grammars-${{ matrix.target }}
-          path: dist/moss-grammars-${{ matrix.target }}.*
+          name: normalize-grammars-${{ matrix.target }}
+          path: dist/normalize-grammars-${{ matrix.target }}.*
           if-no-files-found: ignore
 
   release:
@@ -179,24 +179,24 @@ jobs:
 
             **Linux (x86_64)**
             ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/moss-x86_64-unknown-linux-gnu.tar.gz | tar xz
-            sudo mv moss /usr/local/bin/
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-x86_64-unknown-linux-gnu.tar.gz | tar xz
+            sudo mv normalize /usr/local/bin/
             ```
 
             **macOS (Apple Silicon)**
             ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/moss-aarch64-apple-darwin.tar.gz | tar xz
-            sudo mv moss /usr/local/bin/
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-aarch64-apple-darwin.tar.gz | tar xz
+            sudo mv normalize /usr/local/bin/
             ```
 
             **macOS (Intel)**
             ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/moss-x86_64-apple-darwin.tar.gz | tar xz
-            sudo mv moss /usr/local/bin/
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-x86_64-apple-darwin.tar.gz | tar xz
+            sudo mv normalize /usr/local/bin/
             ```
 
             **Windows**
-            Download `moss-x86_64-pc-windows-msvc.zip` and extract to your PATH.
+            Download `normalize-x86_64-pc-windows-msvc.zip` and extract to your PATH.
 
             ### Grammars (Optional)
 
@@ -204,15 +204,15 @@ jobs:
 
             ```bash
             # Linux
-            mkdir -p ~/.config/moss/grammars
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/moss-grammars-x86_64-unknown-linux-gnu.tar.gz | tar xz -C ~/.config/moss/grammars
+            mkdir -p ~/.config/normalize/grammars
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-grammars-x86_64-unknown-linux-gnu.tar.gz | tar xz -C ~/.config/normalize/grammars
 
             # macOS (Apple Silicon)
-            mkdir -p ~/.config/moss/grammars
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/moss-grammars-aarch64-apple-darwin.tar.gz | tar xz -C ~/.config/moss/grammars
+            mkdir -p ~/.config/normalize/grammars
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-grammars-aarch64-apple-darwin.tar.gz | tar xz -C ~/.config/normalize/grammars
             ```
 
-            Or use `moss grammars install` after installing the CLI.
+            Or use `normalize grammars install` after installing the CLI.
 
             ### Checksums
 

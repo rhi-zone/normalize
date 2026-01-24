@@ -1,0 +1,28 @@
+[package]
+name = "rhi-normalize-surface-syntax"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Surface-level syntax translation between languages via a common IR"
+
+[features]
+default = ["read-typescript", "write-lua"]
+
+# Readers
+read-typescript = ["tree-sitter", "arborium-typescript"]
+
+# Writers
+write-lua = []
+
+# S-expression serialization format
+sexpr = []
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = "2"
+tree-sitter = { version = "0.26", optional = true }
+arborium-typescript = { version = "2", optional = true }
+
+[dev-dependencies]
+insta = { version = "1", features = ["json"] }

@@ -1,0 +1,7 @@
+{"event": "session_start","timestamp": "2026-01-05T14:54:58Z", "timestamp": "2026-01-05T14:54:58Z", "session_id": "jfzhqn26", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-05T14:54:58Z", "max_turns": 1, "system_prompt": "state_machine_v2", "role": "investigator", "user_prompt": "how does the view command work?", "use_planner": false, "machine_start": "explorer", "provider": "gemini", "model": "default"}
+{"event": "turn_start","timestamp": "2026-01-05T14:54:58Z", "turn": 1, "working_memory_count": 0, "notes_count": 0, "state": "explorer", "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-05T14:54:59Z", "response": "$(run ls -R)", "turn": 1, "state": "explorer"}
+{"event": "command","timestamp": "2026-01-05T14:55:00Z", "cmd": "run ls -R", "success": true, "turn": 1, "output_length": 1197632}
+{"event": "max_turns_reached","timestamp": "2026-01-05T14:55:00Z", "turn": 1}
+{"event": "session_end","timestamp": "2026-01-05T14:55:00Z", "duration_seconds": 2, "total_turns": 1}

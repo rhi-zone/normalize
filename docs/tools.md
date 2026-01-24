@@ -78,7 +78,7 @@ Analyze agent session logs (Claude Code, Codex, Gemini, Moss).
 moss sessions [session_id] [options]
 ```
 
-- `--format <fmt>` — `claude` (default), `codex`, `gemini`, `moss`
+- `--format <fmt>` — `claude` (default), `codex`, `gemini`, `normalize`
 - `--grep <pattern>` — filter sessions by content
 - `--analyze` — full session analysis
 - `--jq <expr>` — apply jq expression

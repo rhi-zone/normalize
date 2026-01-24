@@ -1,0 +1,9 @@
+{"event": "session_start","timestamp": "2026-01-04T13:42:37Z", "session_id": "s4upd5kn", "timestamp": "2026-01-04T13:42:37Z", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-04T13:42:37Z", "max_turns": 15, "provider": "anthropic", "prompt": "How many Provider variants are in llm.rs?", "model": "default", "resumed": false}
+{"event": "turn_start","timestamp": "2026-01-04T13:42:37Z", "turn": 1, "has_error_state": false, "prompt_length": 60, "working_memory_count": 0}
+{"event": "llm_response","timestamp": "2026-01-04T13:42:49Z", "turn": 1, "retries": 0, "response_length": 2529}
+{"event": "command","timestamp": "2026-01-04T13:42:49Z", "turn": 1, "success": true, "cmd": "view ./src/llm.rs", "output_length": 28}
+{"event": "command","timestamp": "2026-01-04T13:42:49Z", "turn": 1, "success": true, "cmd": "text-search \"llm.rs\"", "output_length": 160}
+{"event": "command","timestamp": "2026-01-04T13:42:49Z", "turn": 1, "success": false, "cmd": "run `find . -name \"llm.rs\" -type f`", "output_length": 0}
+{"event": "done","timestamp": "2026-01-04T13:42:49Z", "summary": "There are **4 Provider variants** in llm.rs:"}
+{"event": "session_end","timestamp": "2026-01-04T13:42:49Z", "duration_seconds": 12, "total_turns": 1}

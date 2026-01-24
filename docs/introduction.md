@@ -8,7 +8,7 @@ Moss understands code structure (functions, classes, imports) rather than treati
 
 ```bash
 # Build from source
-git clone https://github.com/rhizome-lab/moss
+git clone https://github.com/rhi-zone/normalize
 cd moss
 cargo build --release
 

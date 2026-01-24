@@ -1,0 +1,10 @@
+{
+"session_id": "b53g4ytq",
+"task": "What crates does moss depend on?",
+"turn": 5,
+"timestamp": "2026-01-05T00:40:30",
+"working_memory": [
+],
+"progress": "Session ended at max turns",
+"open_questions": "Review working memory for context"
+}

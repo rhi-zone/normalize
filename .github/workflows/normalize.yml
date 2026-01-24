@@ -1,0 +1,46 @@
+# Normalize CI workflow
+# Runs Rust analysis and uploads SARIF results to GitHub Code Scanning
+
+name: Normalize Analysis
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  analyze:
+    name: Rust Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates -> target"
+
+      - name: Install clippy-sarif
+        run: cargo install clippy-sarif sarif-fmt
+
+      - name: Run clippy (SARIF output)
+        run: |
+          cargo clippy --workspace --all-features --message-format=json 2>&1 | clippy-sarif | tee results.sarif || true
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+        if: always()

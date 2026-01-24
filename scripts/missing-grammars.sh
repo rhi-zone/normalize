@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Find arborium grammars not yet implemented in moss-languages
+# Find arborium grammars not yet implemented in normalize-languages
 # Usage: ./scripts/missing-grammars.sh
 
 set -euo pipefail
@@ -9,14 +9,14 @@ arborium_langs=$(curl -sL "https://crates.io/api/v1/crates/arborium/2.4.5" | \
     jq -r '.version.features | keys[]' | \
     grep '^lang-' | cut -d- -f2- | sort -u)
 
-# Get implemented languages from moss-languages Cargo.toml (exclude comments)
-moss_langs=$(grep -v '^#' crates/moss-languages/Cargo.toml | \
+# Get implemented languages from normalize-languages Cargo.toml (exclude comments)
+moss_langs=$(grep -v '^#' crates/normalize-languages/Cargo.toml | \
     grep -oE 'lang-[a-z0-9-]+' | cut -d- -f2- | sort -u)
 
 arborium_count=$(echo "$arborium_langs" | wc -l)
 moss_count=$(echo "$moss_langs" | wc -l)
 
-echo "=== moss-languages: $moss_count implemented ==="
+echo "=== normalize-languages: $moss_count implemented ==="
 echo "$moss_langs" | tr '\n' ' '
 echo -e "\n"
 

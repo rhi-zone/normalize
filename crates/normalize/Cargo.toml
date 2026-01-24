@@ -1,0 +1,83 @@
+[package]
+name = "rhi-normalize"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+description = "Fast code intelligence CLI and library"
+
+[lib]
+name = "rhi_normalize"
+path = "src/lib.rs"
+
+[[bin]]
+name = "normalize"
+path = "src/main.rs"
+
+[features]
+default = []
+
+# Optional MCP server support
+mcp = ["rmcp"]
+
+# Build sessions web UI (requires bun/npm, enable in CI)
+sessions-web = []
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+walkdir.workspace = true
+ignore.workspace = true
+nucleo-matcher.workspace = true
+libsql.workspace = true
+tree-sitter = "0.26"
+streaming-iterator = "0.1"
+dirs = "5"
+rhi-normalize-core = { path = "../normalize-core" }
+rhi-normalize-derive = { path = "../normalize-derive" }
+rhi-normalize-languages = { path = "../normalize-languages" }
+rhi-normalize-typegen = { path = "../normalize-typegen" }
+rhi-normalize-jsonschema = { path = "../normalize-jsonschema" }
+rhi-normalize-rules = { path = "../normalize-rules" }
+rhi-normalize-openapi = { path = "../normalize-openapi" }
+rhi-normalize-packages = { path = "../normalize-packages" }
+rhi-normalize-sessions = { path = "../normalize-sessions" }
+rhi-normalize-tools = { path = "../normalize-tools" }
+rhi-normalize-cli-parser = { path = "../normalize-cli-parser" }
+grep-matcher.workspace = true
+grep-regex.workspace = true
+grep-searcher.workspace = true
+rayon.workspace = true
+tokio.workspace = true
+axum.workspace = true
+utoipa = { version = "5", features = ["axum_extras"] }
+notify.workspace = true
+ureq = { version = "2", features = ["json"] }
+flate2 = "1"
+tar = "0.4"
+zip = "2"
+regex = "1"
+jaq-core = "2"
+jaq-std = "2"
+jaq-json = { version = "1", features = ["serde_json"] }
+toml = "0.8"
+rmcp = { version = "0.12", features = ["server", "macros", "schemars", "transport-io"], optional = true }
+schemars = "1"
+tower-lsp = "0.20"
+git2 = { version = "0.19", default-features = false }
+glob = "0.3.3"
+nu-ansi-term = "0.50"
+dotenvy = "0.15.7"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+ast-grep-core = "0.40.5"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+insta = "1"
+assert_cmd = "2"
+
+[build-dependencies]
+flate2 = "1"

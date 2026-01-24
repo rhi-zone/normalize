@@ -1,0 +1,4 @@
+{"event": "session_start","timestamp": "2026-01-06T12:11:49Z", "session_id": "rwa5fjpt", "moss_root": ".", "timestamp": "2026-01-06T12:11:49Z"}
+{"event": "task","timestamp": "2026-01-06T12:11:49Z", "system_prompt": "state_machine_v2", "role": "investigator", "user_prompt": "What files are in the agent submodule?", "provider": "gemini", "machine_start": "explorer", "model": "default", "use_planner": false, "max_turns": 3}
+{"event": "max_turns_reached","timestamp": "2026-01-06T12:11:49Z", "turn": 5}
+{"event": "session_end","timestamp": "2026-01-06T12:11:49Z", "total_turns": 0, "duration_seconds": 0}

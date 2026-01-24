@@ -1,9 +1,0 @@
-[package]
-name = "rhizome-moss-jsonschema"
-version.workspace = true
-edition = "2024"
-license.workspace = true
-description = "JSON Schema type generation"
-
-[dependencies]
-serde_json.workspace = true

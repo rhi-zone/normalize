@@ -1,0 +1,6 @@
+{"event": "session_start","timestamp": "2026-01-04T13:14:38Z", "timestamp": "2026-01-04T13:14:38Z", "moss_root": ".", "session_id": "7d489957"}
+{"event": "task","timestamp": "2026-01-04T13:14:38Z", "max_turns": 15, "provider": "anthropic", "prompt": "How many Lua scripts are in crates/moss/src/commands/scripts/? List their names.", "resumed": false, "model": "default"}
+{"event": "turn_start","timestamp": "2026-01-04T13:14:38Z", "turn": 1, "working_memory_count": 0, "has_error_state": false, "prompt_length": 99}
+{"event": "llm_response","timestamp": "2026-01-04T13:14:44Z", "turn": 1, "retries": 0, "response_length": 803}
+{"event": "done","timestamp": "2026-01-04T13:14:44Z", "summary": "There are **10 Lua scripts** in `crates/moss/src/commands/scripts/`:\n\n1. db.lua\n2. disk.lua\n3. init.lua\n4. install.lua\n5. list.lua\n6. remove.lua\n7. state.lua\n8. sync.lua\n9. triggers.lua\n10. version.lu"}
+{"event": "session_end","timestamp": "2026-01-04T13:14:44Z", "duration_seconds": 6, "total_turns": 1}

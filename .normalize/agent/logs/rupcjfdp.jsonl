@@ -1,0 +1,4 @@
+{"event": "session_start","timestamp": "2026-01-06T11:59:23Z", "session_id": "rupcjfdp", "moss_root": ".", "timestamp": "2026-01-06T11:59:23Z"}
+{"event": "task","timestamp": "2026-01-06T11:59:23Z", "machine_start": "explorer", "model": "default", "use_planner": false, "role": "investigator", "system_prompt": "state_machine_v2", "max_turns": 3, "user_prompt": "test", "provider": "anthropic"}
+{"event": "turn_start","timestamp": "2026-01-06T11:59:23Z", "working_memory_count": 0, "turn": 1, "state": "explorer", "notes_count": 0, "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-06T11:59:26Z", "turn": 1, "state": "explorer", "response": "I'll help you explore the codebase. Let me start by gathering information about the project structure and contents.\n\n$(view .)\n\n$(view package.json)\n\n$(view README.md)\n\n$(text-search \"test\")\n\n$(text-search \"main\")\n\n$(text-search \"entry point\")"}

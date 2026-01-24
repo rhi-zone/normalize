@@ -1,0 +1,196 @@
+//! Test runner adapters for different ecosystems.
+//!
+//! Each test runner detects whether it applies to a project and runs the native test command.
+//!
+//! # Extensibility
+//!
+//! Users can register custom test runners via [`register()`]:
+//!
+//! ```ignore
+//! use rhi_normalize_tools::test_runners::{TestRunner, TestRunnerInfo, TestResult, register};
+//! use std::path::Path;
+//!
+//! struct MyTestRunner;
+//!
+//! impl TestRunner for MyTestRunner {
+//!     fn info(&self) -> TestRunnerInfo { /* ... */ }
+//!     fn is_available(&self) -> bool { /* ... */ }
+//!     fn detect(&self, root: &Path) -> f32 { /* ... */ }
+//!     fn run(&self, root: &Path, args: &[&str]) -> std::io::Result<TestResult> { /* ... */ }
+//! }
+//!
+//! // Register before first use
+//! register(&MyTestRunner);
+//! ```
+
+#[cfg(feature = "tool-bun")]
+mod bun;
+#[cfg(feature = "tool-cargo")]
+mod cargo;
+#[cfg(feature = "tool-go")]
+mod go;
+#[cfg(feature = "tool-npm")]
+mod npm;
+#[cfg(feature = "tool-pytest")]
+mod pytest;
+
+#[cfg(feature = "tool-bun")]
+pub use bun::BunTest;
+#[cfg(feature = "tool-cargo")]
+pub use cargo::CargoTest;
+#[cfg(feature = "tool-go")]
+pub use go::GoTest;
+#[cfg(feature = "tool-npm")]
+pub use npm::NpmTest;
+#[cfg(feature = "tool-pytest")]
+pub use pytest::Pytest;
+
+use std::path::Path;
+use std::process::ExitStatus;
+use std::sync::{OnceLock, RwLock};
+
+/// Information about a test runner.
+#[derive(Debug, Clone)]
+pub struct TestRunnerInfo {
+    pub name: &'static str,
+    pub description: &'static str,
+}
+
+/// Result of running tests.
+#[derive(Debug)]
+pub struct TestResult {
+    pub runner: String,
+    pub status: ExitStatus,
+}
+
+impl TestResult {
+    pub fn success(&self) -> bool {
+        self.status.success()
+    }
+}
+
+/// A test runner that can detect and run tests for a project type.
+pub trait TestRunner: Send + Sync {
+    /// Info about this test runner.
+    fn info(&self) -> TestRunnerInfo;
+
+    /// Check if this test runner is available (binary exists).
+    fn is_available(&self) -> bool;
+
+    /// Detect if this runner applies to the project. Returns confidence 0.0-1.0.
+    fn detect(&self, root: &Path) -> f32;
+
+    /// Run tests, streaming output to stdout/stderr.
+    fn run(&self, root: &Path, args: &[&str]) -> std::io::Result<TestResult>;
+}
+
+/// Global registry of test runner plugins.
+static RUNNERS: RwLock<Vec<&'static dyn TestRunner>> = RwLock::new(Vec::new());
+static INITIALIZED: OnceLock<()> = OnceLock::new();
+
+/// Register a custom test runner plugin.
+///
+/// Call this before any detection operations to add custom runners.
+/// Built-in runners are registered automatically on first use.
+pub fn register(runner: &'static dyn TestRunner) {
+    RUNNERS.write().unwrap().push(runner);
+}
+
+/// Initialize built-in runners (called automatically on first use).
+fn init_builtin() {
+    INITIALIZED.get_or_init(|| {
+        let mut runners = RUNNERS.write().unwrap();
+        #[cfg(feature = "tool-cargo")]
+        {
+            static CARGO: CargoTest = CargoTest;
+            runners.push(&CARGO);
+        }
+        #[cfg(feature = "tool-go")]
+        {
+            static GO: GoTest = GoTest;
+            runners.push(&GO);
+        }
+        #[cfg(feature = "tool-bun")]
+        {
+            static BUN: BunTest = BunTest;
+            runners.push(&BUN);
+        }
+        #[cfg(feature = "tool-npm")]
+        {
+            static NPM: NpmTest = NpmTest;
+            runners.push(&NPM);
+        }
+        #[cfg(feature = "tool-pytest")]
+        {
+            static PYTEST: Pytest = Pytest;
+            runners.push(&PYTEST);
+        }
+    });
+}
+
+/// Get a test runner by name from the global registry.
+pub fn get_runner(name: &str) -> Option<&'static dyn TestRunner> {
+    init_builtin();
+    RUNNERS
+        .read()
+        .unwrap()
+        .iter()
+        .find(|r| r.info().name == name)
+        .copied()
+}
+
+/// List all available runner names from the global registry.
+pub fn list_runners() -> Vec<&'static str> {
+    init_builtin();
+    RUNNERS
+        .read()
+        .unwrap()
+        .iter()
+        .map(|r| r.info().name)
+        .collect()
+}
+
+/// Get all runners from the global registry.
+pub fn all_runners() -> Vec<&'static dyn TestRunner> {
+    init_builtin();
+    RUNNERS.read().unwrap().clone()
+}
+
+/// Get all available test runners (returns boxed runners for backwards compatibility).
+pub fn all_test_runners() -> Vec<Box<dyn TestRunner>> {
+    let mut runners: Vec<Box<dyn TestRunner>> = Vec::new();
+    #[cfg(feature = "tool-cargo")]
+    runners.push(Box::new(CargoTest::new()));
+    #[cfg(feature = "tool-go")]
+    runners.push(Box::new(GoTest::new()));
+    #[cfg(feature = "tool-bun")]
+    runners.push(Box::new(BunTest::new()));
+    #[cfg(feature = "tool-npm")]
+    runners.push(Box::new(NpmTest::new()));
+    #[cfg(feature = "tool-pytest")]
+    runners.push(Box::new(Pytest::new()));
+    runners
+}
+
+/// Find the best test runner for a project using the global registry.
+pub fn detect_test_runner(root: &Path) -> Option<&'static dyn TestRunner> {
+    init_builtin();
+    let runners = RUNNERS.read().unwrap();
+
+    let mut best: Option<(&'static dyn TestRunner, f32)> = None;
+
+    for runner in runners.iter() {
+        if !runner.is_available() {
+            continue;
+        }
+
+        let score = runner.detect(root);
+        if score > 0.0 {
+            if best.is_none() || score > best.unwrap().1 {
+                best = Some((*runner, score));
+            }
+        }
+    }
+
+    best.map(|(runner, _)| runner)
+}

@@ -18,8 +18,8 @@ Key architectural decisions and their rationale.
 **Decision**: Prefer single crates with modules over multiple crates. Split only when necessary.
 
 **When to split into a separate crate:**
-- **Different consumers**: The code is used by external crates independently (e.g., `moss-derive` for proc macros)
-- **Different domains**: The code represents a distinct, self-contained domain (e.g., `moss-languages` vs `moss-packages`)
+- **Different consumers**: The code is used by external crates independently (e.g., `normalize-derive` for proc macros)
+- **Different domains**: The code represents a distinct, self-contained domain (e.g., `normalize-languages` vs `normalize-packages`)
 - **Compile time**: The code significantly impacts compile time when changed (isolate it)
 
 **When to keep in one crate:**
@@ -33,14 +33,14 @@ Key architectural decisions and their rationale.
 ```
 crates/
 ├── moss/                    # Core library + CLI
-├── moss-languages/          # 98 language definitions
-├── moss-packages/           # Package ecosystem support
-├── moss-tools/              # MCP tool generation
-├── moss-derive/             # Proc macros (must be separate)
-├── moss-jsonschema/         # Schema generation
-├── moss-openapi/            # OpenAPI generation
-├── moss-typegen/            # Type codegen (single crate, multiple backends)
-└── moss-surface-syntax/     # Syntax translation (single crate, multiple readers/writers)
+├── normalize-languages/          # 98 language definitions
+├── normalize-packages/           # Package ecosystem support
+├── normalize-tools/              # MCP tool generation
+├── normalize-derive/             # Proc macros (must be separate)
+├── normalize-jsonschema/         # Schema generation
+├── normalize-openapi/            # OpenAPI generation
+├── normalize-typegen/            # Type codegen (single crate, multiple backends)
+└── normalize-surface-syntax/     # Syntax translation (single crate, multiple readers/writers)
 ```
 
 ## Dynamic Grammar Loading
@@ -181,13 +181,13 @@ pub fn get(name: &str) -> Option<&'static dyn MyTrait> {
 
 | Crate | Trait | Purpose |
 |-------|-------|---------|
-| moss-languages | `Language` | Language support (98 built-in) |
-| moss-cli-parser | `CliFormat` | CLI help parsing |
-| moss-sessions | `LogFormat` | Agent session log parsing |
-| moss-tools | `Tool`, `TestRunner` | Tool/runner adapters |
-| moss-packages | `Ecosystem` | Package manager support |
-| moss-jsonschema | `JsonSchemaGenerator` | Type generation |
-| moss-openapi | `OpenApiClientGenerator` | API client generation |
+| normalize-languages | `Language` | Language support (98 built-in) |
+| normalize-cli-parser | `CliFormat` | CLI help parsing |
+| normalize-sessions | `LogFormat` | Agent session log parsing |
+| normalize-tools | `Tool`, `TestRunner` | Tool/runner adapters |
+| normalize-packages | `Ecosystem` | Package manager support |
+| normalize-jsonschema | `JsonSchemaGenerator` | Type generation |
+| normalize-openapi | `OpenApiClientGenerator` | API client generation |
 
 ### When to Use Compile-Time Dispatch (Feature Flags)
 
@@ -208,8 +208,8 @@ backend-rust = []
 
 | Crate | Features | Rationale |
 |-------|----------|-----------|
-| moss-typegen | Backend selection (ts, rust, python, etc.) | Backends known at compile time, no runtime extensibility needed |
-| moss-rules | Optional linting backends | Heavy optional dependencies |
+| normalize-typegen | Backend selection (ts, rust, python, etc.) | Backends known at compile time, no runtime extensibility needed |
+| normalize-rules | Optional linting backends | Heavy optional dependencies |
 
 ### Hybrid: Traits + Feature Flags
 
@@ -245,7 +245,7 @@ pub use typescript::TypeScriptReader;
 
 | Crate | Pattern | Rationale |
 |-------|---------|-----------|
-| moss-surface-syntax | `Reader`/`Writer` traits + feature flags | Users can add languages; built-in readers need tree-sitter grammars |
+| normalize-surface-syntax | `Reader`/`Writer` traits + feature flags | Users can add languages; built-in readers need tree-sitter grammars |
 
 ### Key Insight
 
@@ -281,7 +281,7 @@ These can't be inline comments because:
 For **single-location code findings** (syntax rules):
 
 ```rust
-// moss-allow: rust/unwrap-in-impl - input validated above
+// normalize-allow: rust/unwrap-in-impl - input validated above
 let value = result.unwrap();
 ```
 

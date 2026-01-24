@@ -1,10 +1,10 @@
-# moss-sessions Refactor: Unified Parsing
+# normalize-sessions Refactor: Unified Parsing
 
-**Status: Complete** - Implemented in moss-sessions, analysis moved to `crates/moss/src/sessions/analysis.rs`.
+**Status: Complete** - Implemented in normalize-sessions, analysis moved to `crates/moss/src/sessions/analysis.rs`.
 
 ## Problem
 
-moss-sessions previously conflated two concerns:
+normalize-sessions previously conflated two concerns:
 
 1. **Parsing** - converting format-specific logs (Claude Code JSONL, Gemini CLI JSON, Codex, Moss Agent) into structured data
 2. **Analysis** - computing statistics (tool call counts, token usage, error patterns, parallelization opportunities)
@@ -35,7 +35,7 @@ Split parsing from analysis into two layers:
 
 ### 1. Unified Session Type
 
-A format-agnostic representation of session data (from `moss-sessions/src/session.rs`):
+A format-agnostic representation of session data (from `normalize-sessions/src/session.rs`):
 
 ```rust
 pub struct Session {
@@ -118,7 +118,7 @@ pub trait LogFormat: Send + Sync {
 
 ### 3. Analysis as Consumer Code
 
-Analysis moves out of moss-sessions entirely. Consumers (moss CLI, spore-sessions Lua bindings, Iris) compute their own metrics:
+Analysis moves out of normalize-sessions entirely. Consumers (moss CLI, spore-sessions Lua bindings, Iris) compute their own metrics:
 
 ```lua
 -- In Lua (via spore-sessions)
@@ -137,7 +137,7 @@ for _, turn in ipairs(session.turns) do
 end
 ```
 
-For `moss sessions` CLI, analysis helpers can live in moss-cli or a separate `moss-sessions-analysis` crate that operates on `Session`.
+For `moss sessions` CLI, analysis helpers can live in normalize-cli or a separate `normalize-sessions-analysis` crate that operates on `Session`.
 
 ## Rationale
 
@@ -147,7 +147,7 @@ For `moss sessions` CLI, analysis helpers can live in moss-cli or a separate `mo
 
 3. **Performance is fine** - Session files are small (KB-MB). LuaJIT analyzing a parsed session is fast enough. The bottleneck is never "computing stats over hundreds of messages."
 
-4. **Simpler core** - moss-sessions becomes a pure parser. Smaller API surface, easier to maintain, clearer purpose.
+4. **Simpler core** - normalize-sessions becomes a pure parser. Smaller API surface, easier to maintain, clearer purpose.
 
 5. **Composability** - Different consumers can share the parser but compute different analyses. `moss sessions --compact` and Iris insights don't need to agree on what to track.
 
@@ -159,12 +159,12 @@ For `moss sessions` CLI, analysis helpers can live in moss-cli or a separate `mo
 4. ~~Remove `analyze()` from trait~~ Done
 5. ~~`SessionAnalysis` becomes internal to moss CLI~~ Done
 
-## spore-moss-sessions Integration
+## spore-normalize-sessions Integration
 
-With parsing exposed, `spore-moss-sessions` provides Lua bindings:
+With parsing exposed, `spore-normalize-sessions` provides Lua bindings:
 
 ```rust
-// spore-moss-sessions/src/lib.rs
+// spore-normalize-sessions/src/lib.rs
 pub struct MossSessionsIntegration;
 
 impl Integration for MossSessionsIntegration {

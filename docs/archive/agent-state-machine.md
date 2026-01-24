@@ -213,7 +213,7 @@ $(answer moss detects language by file extension via support_for_extension())"
 **Results** (post-fix):
 - "How does moss detect language?" → 4 turns, correct answer (was 12 turns, no answer)
 - "What CLI commands?" → 2 turns, comprehensive answer
-- "Purpose of moss-languages?" → 2 turns (Gemini), correct answer
+- "Purpose of normalize-languages?" → 2 turns (Gemini), correct answer
 
 ## Planning State (--plan flag)
 

@@ -17,7 +17,7 @@ Behavioral rules for Claude Code in this repository.
 - Design decisions → docs/ or code comments
 - Future work → TODO.md
 - Key insights → this file
-- Friction with moss → TODO.md (we dogfood, friction = improvement opportunity)
+- Friction with normalize → TODO.md (we dogfood, friction = improvement opportunity)
 
 **Triggers:** User corrects you, 2+ failed attempts, "aha" moment, framework quirk discovered → document before proceeding.
 
@@ -39,16 +39,16 @@ Patterns from `docs/log-analysis.md` correction analysis:
 
 ## Dogfooding
 
-**Use moss, not builtin tools.** Avoid Read/Grep/Glob - they waste tokens.
+**Use normalize, not builtin tools.** Avoid Read/Grep/Glob - they waste tokens.
 
 ```
-./target/debug/moss view [path[/symbol]] [--types-only]
-./target/debug/moss view path:start-end
-./target/debug/moss analyze [--complexity] [path]
-./target/debug/moss text-search <pattern> [--only <glob>]
+./target/debug/normalize view [path[/symbol]] [--types-only]
+./target/debug/normalize view path:start-end
+./target/debug/normalize analyze [--complexity] [path]
+./target/debug/normalize text-search <pattern> [--only <glob>]
 ```
 
-When unsure of syntax: `moss <cmd> --help`. Fall back to Read only for exact line content needed by Edit.
+When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exact line content needed by Edit.
 
 ## Commit Convention
 
@@ -98,13 +98,13 @@ Do not:
 
 **Separate niche from shared.** Don't bloat config.toml with feature-specific data. Use separate files for specialized data.
 
-**Dynamic context > append-only.** Chatbot model (growing conversation log) is wrong for agents. Moss uses context that can be reshaped, not just accumulated.
+**Dynamic context > append-only.** Chatbot model (growing conversation log) is wrong for agents. Normalize uses context that can be reshaped, not just accumulated.
 
 **When stuck (2+ attempts):** Step back. Am I solving the right problem? Check docs/philosophy.md before questioning design.
 
 ## Code Conventions
 
-**OutputFormatter trait** (`crates/moss/src/output.rs`):
+**OutputFormatter trait** (`crates/normalize/src/output.rs`):
 
 All types that produce user-facing output should implement `OutputFormatter`:
 

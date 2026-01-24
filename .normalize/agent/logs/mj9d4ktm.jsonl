@@ -1,0 +1,42 @@
+{"event": "session_start","timestamp": "2026-01-04T13:21:11Z", "timestamp": "2026-01-04T13:21:11Z", "session_id": "mj9d4ktm", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-04T13:21:11Z", "prompt": "What Rust edition does this workspace use?", "max_turns": 15, "provider": "anthropic", "resumed": false, "model": "default"}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:11Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 61, "turn": 1}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:16Z", "retries": 0, "response_length": 121, "turn": 1}
+{"event": "command","timestamp": "2026-01-04T13:21:16Z", "success": true, "cmd": "view .", "output_length": 541, "turn": 1}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:16Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 713, "turn": 2}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:39Z", "retries": 0, "response_length": 18, "turn": 2}
+{"event": "command","timestamp": "2026-01-04T13:21:39Z", "success": true, "cmd": "view Cargo.toml", "output_length": 200, "turn": 2}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:39Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 381, "turn": 3}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:42Z", "retries": 0, "response_length": 18, "turn": 3}
+{"event": "command","timestamp": "2026-01-04T13:21:42Z", "success": true, "cmd": "view Cargo.toml", "output_length": 200, "turn": 3}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:42Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 381, "turn": 4}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:46Z", "retries": 0, "response_length": 18, "turn": 4}
+{"event": "command","timestamp": "2026-01-04T13:21:46Z", "success": true, "cmd": "view Cargo.toml", "output_length": 200, "turn": 4}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:46Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 381, "turn": 5}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:49Z", "retries": 0, "response_length": 105, "turn": 5}
+{"event": "command","timestamp": "2026-01-04T13:21:49Z", "success": true, "cmd": "view Cargo.toml", "output_length": 200, "turn": 5}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:49Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 381, "turn": 6}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:52Z", "retries": 0, "response_length": 24, "turn": 6}
+{"event": "command","timestamp": "2026-01-04T13:21:52Z", "success": false, "cmd": "view Cargo.toml 17-23", "output_length": 0, "turn": 6}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:52Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 196, "turn": 7}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:55Z", "retries": 0, "response_length": 87, "turn": 7}
+{"event": "command","timestamp": "2026-01-04T13:21:55Z", "success": true, "cmd": "view .", "output_length": 541, "turn": 7}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:55Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 713, "turn": 8}
+{"event": "llm_response","timestamp": "2026-01-04T13:21:58Z", "retries": 0, "response_length": 18, "turn": 8}
+{"event": "command","timestamp": "2026-01-04T13:21:58Z", "success": true, "cmd": "view Cargo.toml", "output_length": 200, "turn": 8}
+{"event": "turn_start","timestamp": "2026-01-04T13:21:58Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 381, "turn": 9}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:01Z", "retries": 0, "response_length": 24, "turn": 9}
+{"event": "command","timestamp": "2026-01-04T13:22:01Z", "success": false, "cmd": "view Cargo.toml 17-23", "output_length": 0, "turn": 9}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:01Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 196, "turn": 10}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:04Z", "retries": 0, "response_length": 96, "turn": 10}
+{"event": "command","timestamp": "2026-01-04T13:22:04Z", "success": true, "cmd": "view .", "output_length": 541, "turn": 10}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:04Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 713, "turn": 11}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:07Z", "retries": 0, "response_length": 18, "turn": 11}
+{"event": "command","timestamp": "2026-01-04T13:22:07Z", "success": true, "cmd": "view Cargo.toml", "output_length": 200, "turn": 11}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:07Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 381, "turn": 12}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:10Z", "retries": 0, "response_length": 24, "turn": 12}
+{"event": "command","timestamp": "2026-01-04T13:22:10Z", "success": true, "cmd": "view Cargo.toml:17-23", "output_length": 167, "turn": 12}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:10Z", "has_error_state": false, "working_memory_count": 0, "prompt_length": 354, "turn": 13}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:13Z", "retries": 0, "response_length": 136, "turn": 13}
+{"event": "done","timestamp": "2026-01-04T13:22:13Z", "summary": "The workspace uses Rust edition \"2024\" as specified in the `[workspace.package]` section of the root Cargo.toml file at line 19."}
+{"event": "session_end","timestamp": "2026-01-04T13:22:13Z", "total_turns": 13, "duration_seconds": 62}

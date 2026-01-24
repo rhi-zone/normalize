@@ -7,7 +7,7 @@ Using moss on itself. Patterns and observations from CLI usage.
 **What Works:**
 - Fuzzy path resolution: `view skeleton.rs` finds `crates/moss/src/skeleton.rs`
 - Symbol paths: `view skeleton.rs/SkeletonExtractor`
-- Underscore/hyphen equivalence: `moss-api` matches `moss_api`
+- Underscore/hyphen equivalence: `normalize-api` matches `moss_api`
 - `--depth` controls expansion level
 - `--json` for structured output
 

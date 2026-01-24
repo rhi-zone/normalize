@@ -1,0 +1,3 @@
+{"event": "session_start","timestamp": "2026-01-04T09:19:33Z", "timestamp": "2026-01-04T09:19:33Z", "session_id": "zs5fayrr", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-04T09:19:33Z", "model": "default", "resumed": false, "prompt": "How many Lua scripts are in crates/moss/src/commands/scripts/? List their names.", "max_turns": 15, "provider": "gemini"}
+{"event": "turn_start","timestamp": "2026-01-04T09:19:33Z", "working_memory_count": 0, "has_error_state": false, "turn": 1, "prompt_length": 99}

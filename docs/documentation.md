@@ -1,6 +1,6 @@
 # Documentation Strategy
 
-<!-- covers: crates/moss-cli/src/tree.rs, crates/moss-cli/src/commands/view.rs -->
+<!-- covers: crates/normalize-cli/src/tree.rs, crates/normalize-cli/src/commands/view.rs -->
 
 Keep docs in sync with code through tooling, not discipline.
 

@@ -18,7 +18,7 @@ This is fundamental to how LLMs work with limited context windows and session bo
 
 Exploration of redundancy in Rust and Python CLIs revealed systemic inconsistencies.
 
-### Rust CLI (`crates/moss-cli/`)
+### Rust CLI (`crates/normalize-cli/`)
 
 | Issue | Scope | Notes |
 |-------|-------|-------|
@@ -30,7 +30,7 @@ Exploration of redundancy in Rust and Python CLIs revealed systemic inconsistenc
 | `deps` vs `imports` | Overlapping | Different flags, same domain |
 | `health`/`overview`/`analyze` | Fragmented | Three commands for related analysis |
 
-### Python CLI (`packages/moss-cli/`)
+### Python CLI (`packages/normalize-cli/`)
 
 | Issue | Scope | Notes |
 |-------|-------|-------|

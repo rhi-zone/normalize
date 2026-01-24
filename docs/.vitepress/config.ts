@@ -99,7 +99,7 @@ export default withMermaid(
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/rhizome-lab/moss' }
+      { icon: 'github', link: 'https://github.com/rhi-zone/normalize' }
     ],
 
     search: {
@@ -107,7 +107,7 @@ export default withMermaid(
     },
 
     editLink: {
-      pattern: 'https://github.com/rhizome-lab/moss/edit/master/docs/:path',
+      pattern: 'https://github.com/rhi-zone/normalize/edit/master/docs/:path',
       text: 'Edit this page on GitHub'
     },
   },

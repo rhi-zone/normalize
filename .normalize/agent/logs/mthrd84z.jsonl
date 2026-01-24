@@ -1,0 +1,10 @@
+{"event": "session_start","timestamp": "2026-01-05T14:44:45Z", "timestamp": "2026-01-05T14:44:45Z", "moss_root": ".", "session_id": "mthrd84z"}
+{"event": "task","timestamp": "2026-01-05T14:44:45Z", "user_prompt": "what language is this codebase written in?", "use_planner": false, "machine_start": "explorer", "role": "investigator", "provider": "gemini", "max_turns": 3, "system_prompt": "state_machine_v2", "model": "default"}
+{"event": "turn_start","timestamp": "2026-01-05T14:44:45Z", "turn": 1, "working_memory_count": 0, "notes_count": 0, "state": "explorer", "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-05T14:44:47Z", "turn": 1, "response": "$(view .) $(run ls -R)", "state": "explorer"}
+{"event": "command","timestamp": "2026-01-05T14:44:47Z", "success": true, "output_length": 541, "cmd": "view .", "turn": 1}
+{"event": "command","timestamp": "2026-01-05T14:44:47Z", "success": true, "output_length": 1197632, "cmd": "run ls -R", "turn": 1}
+{"event": "turn_start","timestamp": "2026-01-05T14:44:47Z", "turn": 2, "working_memory_count": 0, "notes_count": 0, "state": "evaluator", "pending_outputs": 2}
+{"event": "llm_response","timestamp": "2026-01-05T14:44:54Z", "turn": 2, "response": "The codebase is primarily written in **Rust**.\n\nEvidence for this includes:\n- The presence of `Cargo.toml` and `Cargo.lock` in the root directory, indicating a Rust workspace.\n- A `crates/` directory containing multiple Rust crates (`moss`, `moss-derive`, `moss-languages`, etc.), each filled with `.rs` files.\n- Core logic, including the CLI, server components (`lsp.rs`, `http.rs`), and language support, is implemented in Rust.\n\nThe project also utilizes:\n- **TypeScript/JavaScript**: Used for the", "state": "evaluator"}
+{"event": "done","timestamp": "2026-01-05T14:44:54Z", "turn": 2, "answer": "Rust is the primary language, with TypeScript and Lua used for specific components."}
+{"event": "session_end","timestamp": "2026-01-05T14:44:54Z", "total_turns": 2, "duration_seconds": 9}

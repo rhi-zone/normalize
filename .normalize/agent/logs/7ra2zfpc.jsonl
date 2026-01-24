@@ -1,0 +1,18 @@
+{"event": "session_start","timestamp": "2026-01-05T16:47:13Z", "timestamp": "2026-01-05T16:47:13Z", "session_id": "7ra2zfpc", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-05T16:47:13Z", "role": "auditor", "provider": "gemini", "model": "default", "max_turns": 3, "use_planner": false, "machine_start": "explorer", "user_prompt": "find security issues", "system_prompt": "state_machine_v2"}
+{"event": "turn_start","timestamp": "2026-01-05T16:47:13Z", "working_memory_count": 0, "notes_count": 0, "state": "explorer", "turn": 1, "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-05T16:47:15Z", "state": "explorer", "turn": 1, "response": "$(view .) $(analyze security) $(text-search \"password|secret|key|token|auth\") $(analyze complexity)"}
+{"event": "command","timestamp": "2026-01-05T16:47:15Z", "turn": 1, "output_length": 541, "success": true, "cmd": "view ."}
+{"event": "command","timestamp": "2026-01-05T16:47:15Z", "turn": 1, "output_length": 120, "success": true, "cmd": "analyze security"}
+{"event": "command","timestamp": "2026-01-05T16:47:16Z", "turn": 1, "output_length": 12370, "success": true, "cmd": "text-search \"password|secret|key|token|auth\""}
+{"event": "command","timestamp": "2026-01-05T16:47:16Z", "turn": 1, "output_length": 622, "success": true, "cmd": "analyze complexity"}
+{"event": "turn_start","timestamp": "2026-01-05T16:47:16Z", "working_memory_count": 0, "notes_count": 0, "state": "evaluator", "turn": 2, "pending_outputs": 4}
+{"event": "llm_response","timestamp": "2026-01-05T16:47:19Z", "state": "evaluator", "turn": 2, "response": "$(note SECURITY:LOW crates/moss/src/commands/edit.rs:76 - The `handle_glob_edit` function has high complexity (76), which often correlates with edge-case handling bugs in file system operations or pattern matching.)\n$(note SECURITY:MEDIUM crates/moss-languages/src/caddy.rs:256 - Use of \"matcher_token\" in a web-server configuration context suggests potential exposure of sensitive authentication tokens if they are treated as generic navigable symbols without elision.)\n$(note SECURITY:LOW crates/mo"}
+{"event": "turn_start","timestamp": "2026-01-05T16:47:19Z", "working_memory_count": 0, "notes_count": 3, "state": "explorer", "turn": 3, "pending_outputs": 4}
+{"event": "llm_response","timestamp": "2026-01-05T16:47:23Z", "state": "explorer", "turn": 3, "response": "$(view crates/moss/src/commands/edit.rs:76-150)$(view crates/moss-languages/src/caddy.rs:250-270)$(view crates/moss/src/commands/daemon.rs:60-130)$(text-search \"std::env::var\")"}
+{"event": "command","timestamp": "2026-01-05T16:47:24Z", "turn": 3, "output_length": 1684, "success": true, "cmd": "view crates/moss/src/commands/edit.rs:76-150"}
+{"event": "command","timestamp": "2026-01-05T16:47:24Z", "turn": 3, "output_length": 678, "success": true, "cmd": "view crates/moss-languages/src/caddy.rs:250-270"}
+{"event": "command","timestamp": "2026-01-05T16:47:24Z", "turn": 3, "output_length": 2572, "success": true, "cmd": "view crates/moss/src/commands/daemon.rs:60-130"}
+{"event": "command","timestamp": "2026-01-05T16:47:24Z", "turn": 3, "output_length": 6545, "success": true, "cmd": "text-search \"std::env::var\""}
+{"event": "max_turns_reached","timestamp": "2026-01-05T16:47:24Z", "turn": 3}
+{"event": "session_end","timestamp": "2026-01-05T16:47:24Z", "total_turns": 3, "duration_seconds": 11}

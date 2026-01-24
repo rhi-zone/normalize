@@ -1,0 +1,5 @@
+{"event": "session_start","timestamp": "2026-01-04T14:32:46Z", "session_id": "9spcy828", "moss_root": ".", "timestamp": "2026-01-04T14:32:46Z"}
+{"event": "task","timestamp": "2026-01-04T14:32:46Z", "resumed": false, "max_turns": 3, "provider": "gemini", "model": "default", "user_prompt": "How many Lua scripts are in crates/moss/src/commands/scripts/", "system_prompt": "Respond with commands to accomplish the task.\n"}
+{"event": "turn_start","timestamp": "2026-01-04T14:32:46Z", "has_error_state": false, "turn": 1, "working_memory_count": 0, "prompt": "Task: How many Lua scripts are in crates/moss/src/commands/scripts/\nDirectory: ."}
+{"event": "llm_response","timestamp": "2026-01-04T14:32:48Z", "response": "$(view crates/moss/src/commands/scripts/)", "turn": 1, "retries": 0}
+{"event": "session_end","timestamp": "2026-01-04T14:32:48Z", "total_turns": 1, "duration_seconds": 2}

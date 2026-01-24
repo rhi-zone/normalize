@@ -1,0 +1,3 @@
+{"event": "session_start","timestamp": "2026-01-07T03:35:00Z", "moss_root": ".", "session_id": "yvsd2ge3", "timestamp": "2026-01-07T03:35:00Z"}
+{"event": "task","timestamp": "2026-01-07T03:35:00Z", "user_prompt": "What configuration sections exist in moss and how are they loaded?", "provider": "openrouter", "machine_start": "explorer", "model": "default", "use_planner": false, "role": "investigator", "system_prompt": "state_machine_v2", "max_turns": 10}
+{"event": "turn_start","timestamp": "2026-01-07T03:35:00Z", "working_memory_count": 0, "notes_count": 0, "pending_outputs": 0, "turn": 1, "state": "explorer"}

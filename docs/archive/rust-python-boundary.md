@@ -31,7 +31,7 @@ Put it in **Python** if:
 
 ## Current Division
 
-### Rust (moss-cli, moss-core, moss-daemon)
+### Rust (normalize-cli, normalize-core, normalize-daemon)
 
 | Category | Examples |
 |----------|----------|

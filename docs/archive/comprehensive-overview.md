@@ -155,7 +155,7 @@ Use case: Get entire architectural map for ~5k tokens instead of 100k.
 ┌─────────────────────────────│────────────────────────────────┐
 │                     Rust (crates/)                           │
 │  ┌─────────────────────────────────────────────────────────┐│
-│  │                    moss-cli/src/                         ││
+│  │                    normalize-cli/src/                         ││
 │  │  main.rs ─┬─► view, edit, analyze (commands)            ││
 │  │           ├─► skeleton.rs (AST → signatures)            ││
 │  │           ├─► symbols.rs (symbol extraction)            ││
@@ -163,7 +163,7 @@ Use case: Get entire architectural map for ~5k tokens instead of 100k.
 │  │           └─► path_resolve.rs (fuzzy resolution)        ││
 │  └─────────────────────────────────────────────────────────┘│
 │  ┌─────────────────────────────────────────────────────────┐│
-│  │                    moss-core/                            ││
+│  │                    normalize-core/                            ││
 │  │  Shared: tree-sitter parsers, Language, SymbolKind      ││
 │  └─────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
@@ -187,7 +187,7 @@ Goal: Reduce overlap. Python wraps Rust, doesn't reimplement.
 |------|-------|-------|
 | `src/moss/cli.py` | 5687 | ~40 `cmd_*` functions in one file |
 | `src/moss/moss_api.py` | 4148 | ~15 API classes in one file |
-| `crates/moss-cli/src/main.rs` | 3655 | Monolithic Rust CLI |
+| `crates/normalize-cli/src/main.rs` | 3655 | Monolithic Rust CLI |
 | `src/moss/tui.py` | 2028 | TUI app + 6 mode classes |
 
 ### Recommended Splits

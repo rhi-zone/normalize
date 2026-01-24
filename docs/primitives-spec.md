@@ -13,7 +13,7 @@ moss view <target> [options]
 ### Target Resolution
 
 Fuzzy, forgiving:
-- `crates/moss-cli/src/skeleton.rs` - exact path
+- `crates/normalize-cli/src/skeleton.rs` - exact path
 - `skeleton.rs` - filename
 - `skeleton` - stem
 - `SkeletonExtractor` - symbol name

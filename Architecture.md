@@ -1,10 +1,10 @@
-# Moss Architecture
+# Normalize Architecture
 
 High-level architecture for in-context learning. See `docs/` for detailed documentation.
 
 ## Core Concept
 
-Moss is a **tooling orchestration layer** with structural awareness. It understands code structure (AST, CFG, dependencies) rather than treating code as raw text.
+Normalize is a **tooling orchestration layer** with structural awareness. It understands code structure (AST, CFG, dependencies) rather than treating code as raw text.
 
 ## Key Components
 
@@ -41,7 +41,7 @@ Moss is a **tooling orchestration layer** with structural awareness. It understa
 ## Module Organization
 
 ```
-src/moss/
+src/normalize/
 ├── cli.py              # Command-line interface
 ├── skeleton.py         # AST → function/class signatures
 ├── cfg.py              # Control flow graph builder
@@ -68,9 +68,9 @@ src/moss/
 
 ### Plugin System
 Views are provided by plugins discovered via entry points:
-- `moss.plugins` - View plugins (skeleton, cfg, deps)
-- `moss.synthesis.generators` - Code generators
-- `moss.synthesis.validators` - Code validators
+- `normalize.plugins` - View plugins (skeleton, cfg, deps)
+- `normalize.synthesis.generators` - Code generators
+- `normalize.synthesis.validators` - Code validators
 
 ### Synthesis Loop
 ```

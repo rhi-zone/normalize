@@ -1,0 +1,25 @@
+{"event": "session_start","timestamp": "2026-01-05T16:24:48Z", "timestamp": "2026-01-05T16:24:48Z", "session_id": "urprvhew", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-05T16:24:48Z", "model": "default", "use_planner": false, "role": "investigator", "system_prompt": "state_machine_v2", "provider": "gemini", "user_prompt": "What does the ephemeral context system do in the agent?", "max_turns": 5, "machine_start": "explorer"}
+{"event": "turn_start","timestamp": "2026-01-05T16:24:48Z", "state": "explorer", "pending_outputs": 0, "turn": 1, "working_memory_count": 0, "notes_count": 0}
+{"event": "llm_response","timestamp": "2026-01-05T16:24:50Z", "state": "explorer", "turn": 1, "response": "$(text-search \"ephemeral context\") $(text-search \"EphemeralContext\") $(run find . -maxdepth 2 -not -path '*/.*')"}
+{"event": "command","timestamp": "2026-01-05T16:24:50Z", "cmd": "text-search \"ephemeral context\"", "output_length": 749, "turn": 1, "success": true}
+{"event": "command","timestamp": "2026-01-05T16:24:50Z", "cmd": "text-search \"EphemeralContext\"", "output_length": 0, "turn": 1, "success": false}
+{"event": "command","timestamp": "2026-01-05T16:24:50Z", "cmd": "run find . -maxdepth 2 -not -path '*/.*'", "output_length": 2014, "turn": 1, "success": true}
+{"event": "turn_start","timestamp": "2026-01-05T16:24:50Z", "state": "evaluator", "pending_outputs": 3, "turn": 2, "working_memory_count": 0, "notes_count": 0}
+{"event": "llm_response","timestamp": "2026-01-05T16:24:54Z", "state": "evaluator", "turn": 2, "response": "$(note Ephemeral context in the explorer provides only the last outputs to the model to limit context size.)\n$(note Documentation indicates that deleting evidence each turn causes models to re-explore and struggle with synthesizing information.)\n$(answer The ephemeral context system is a mechanism in the agent's Explorer that limits the model's visible context to only the most recent tool outputs. According to the project's documentation and changelog, its primary purpose is to suggest commands "}
+{"event": "turn_start","timestamp": "2026-01-05T16:24:54Z", "state": "explorer", "pending_outputs": 3, "turn": 3, "working_memory_count": 0, "notes_count": 2}
+{"event": "llm_response","timestamp": "2026-01-05T16:24:57Z", "state": "explorer", "turn": 3, "response": "$(text-search \"ephemeral\") $(view src) $(view crates/moss-sessions) $(view crates/moss)"}
+{"event": "command","timestamp": "2026-01-05T16:24:57Z", "cmd": "text-search \"ephemeral\"", "output_length": 2439, "turn": 3, "success": true}
+{"event": "command","timestamp": "2026-01-05T16:24:57Z", "cmd": "view src", "output_length": 28, "turn": 3, "success": true}
+{"event": "command","timestamp": "2026-01-05T16:24:57Z", "cmd": "view crates/moss-sessions", "output_length": 86, "turn": 3, "success": true}
+{"event": "command","timestamp": "2026-01-05T16:24:57Z", "cmd": "view crates/moss", "output_length": 383, "turn": 3, "success": true}
+{"event": "turn_start","timestamp": "2026-01-05T16:24:57Z", "state": "evaluator", "pending_outputs": 4, "turn": 4, "working_memory_count": 0, "notes_count": 2}
+{"event": "llm_response","timestamp": "2026-01-05T16:25:02Z", "state": "evaluator", "turn": 4, "response": "$(note Ephemeral context in the explorer limits the context window by providing only the outputs from the most recent turn.)\n$(note Tool outputs are \"ephemeral by default\"—shown once and then removed unless explicitly kept in working memory.)\n$(note Large MCP responses (>500 chars) use an ephemeral cache and ResourceLinks to manage size.)\n$(note Documentation suggests this system prevents context bloat but can cause models to re-explore or struggle with synthesis if they don't capture evidence"}
+{"event": "turn_start","timestamp": "2026-01-05T16:25:02Z", "state": "explorer", "pending_outputs": 4, "turn": 5, "working_memory_count": 0, "notes_count": 5}
+{"event": "llm_response","timestamp": "2026-01-05T16:25:06Z", "state": "explorer", "turn": 5, "response": "$(view crates/moss/src/commands/scripts/agent.lua:690-710) $(view crates/moss/src/commands/scripts/agent.lua:1090-1130) $(view crates/moss/src/commands/scripts/agent.lua:1310-1350) $(view docs/design/agent-v2.md)"}
+{"event": "command","timestamp": "2026-01-05T16:25:06Z", "cmd": "view crates/moss/src/commands/scripts/agent.lua:690-710", "output_length": 574, "turn": 5, "success": true}
+{"event": "command","timestamp": "2026-01-05T16:25:06Z", "cmd": "view crates/moss/src/commands/scripts/agent.lua:1090-1130", "output_length": 1331, "turn": 5, "success": true}
+{"event": "command","timestamp": "2026-01-05T16:25:06Z", "cmd": "view crates/moss/src/commands/scripts/agent.lua:1310-1350", "output_length": 1174, "turn": 5, "success": true}
+{"event": "command","timestamp": "2026-01-05T16:25:06Z", "cmd": "view docs/design/agent-v2.md", "output_length": 461, "turn": 5, "success": true}
+{"event": "max_turns_reached","timestamp": "2026-01-05T16:25:06Z", "turn": 5}
+{"event": "session_end","timestamp": "2026-01-05T16:25:06Z", "total_turns": 5, "duration_seconds": 18}

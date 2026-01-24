@@ -143,20 +143,20 @@ Other:
 - Uiua (`lang-uiua`)
 - Yuri (`lang-yuri`)
 
-## Architecture: `moss-languages` Crate
+## Architecture: `normalize-languages` Crate
 
 ### Directory Structure
 
 ```
 crates/
-  moss-core/                    # Unchanged
+  normalize-core/                    # Unchanged
     src/
       lib.rs
       language.rs               # Language enum, extensions
       parsers.rs                # Parsers (arborium wrapper)
       paths.rs
 
-  moss-languages/               # NEW CRATE
+  normalize-languages/               # NEW CRATE
     Cargo.toml
     src/
       lib.rs                    # Trait + registry + re-exports
@@ -176,7 +176,7 @@ crates/
       swift.rs
       # ... 60+ more
 
-  moss-cli/                     # Consumes moss-languages
+  normalize-cli/                     # Consumes normalize-languages
     src/
       skeleton.rs               # Thin wrapper calling trait methods
       deps.rs                   # Thin wrapper
@@ -187,12 +187,12 @@ crates/
 
 ```toml
 [package]
-name = "moss-languages"
+name = "normalize-languages"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-moss-core = { path = "../moss-core" }
+normalize-core = { path = "../normalize-core" }
 arborium = { workspace = true }
 
 [features]
@@ -235,7 +235,7 @@ lang-scala = ["arborium/lang-scala"]
 ### Core Trait
 
 ```rust
-// moss-languages/src/traits.rs
+// normalize-languages/src/traits.rs
 
 use rhizome_moss_core::{tree_sitter::Node, Language};
 
@@ -346,7 +346,7 @@ pub struct Export {
 ### Example Language Implementation
 
 ```rust
-// moss-languages/src/python.rs
+// normalize-languages/src/python.rs
 
 use crate::traits::*;
 use rhizome_moss_core::{tree_sitter::Node, Language};
@@ -493,7 +493,7 @@ impl LanguageSupport for PythonSupport {
 ### Registry
 
 ```rust
-// moss-languages/src/registry.rs
+// normalize-languages/src/registry.rs
 
 use crate::traits::LanguageSupport;
 use rhizome_moss_core::Language;
@@ -526,10 +526,10 @@ pub fn supported_languages() -> Vec<Language> {
 }
 ```
 
-### Usage in moss-cli
+### Usage in normalize-cli
 
 ```rust
-// moss-cli/src/skeleton.rs (after refactor)
+// normalize-cli/src/skeleton.rs (after refactor)
 
 use rhizome_moss_languages::{get_support, LanguageSupport, Symbol};
 
@@ -589,7 +589,7 @@ fn collect_symbols(
 2. Add to `all-languages` feature list
 3. Create `src/kotlin.rs` implementing `LanguageSupport` (~50-100 lines)
 4. Add to registry in `src/registry.rs`
-5. Add `Kotlin` variant to `Language` enum in moss-core
+5. Add `Kotlin` variant to `Language` enum in normalize-core
 6. Add tests
 
 Total: ~60 lines of code vs ~200+ lines scattered across 8 files.
@@ -602,10 +602,10 @@ The `validate_node_kinds` test in `registry.rs` checks that all node kind string
 
 ```bash
 # 1. See which kinds are invalid for a language
-cargo test -p rhizome-moss-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
+cargo test -p rhizome-normalize-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
 
 # 2. Dump valid node kinds for that grammar
-DUMP_GRAMMAR=python cargo test -p rhizome-moss-languages dump_node_kinds -- --nocapture --ignored
+DUMP_GRAMMAR=python cargo test -p rhizome-normalize-languages dump_node_kinds -- --nocapture --ignored
 
 # 3. Find the correct node kind name
 # e.g., "async_function_definition" doesn't exist, but "function_definition" does
@@ -615,7 +615,7 @@ DUMP_GRAMMAR=python cargo test -p rhizome-moss-languages dump_node_kinds -- --no
 # Replace invalid kind with correct one, or remove if not applicable
 
 # 5. Re-run validation to confirm fix
-cargo test -p rhizome-moss-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
+cargo test -p rhizome-normalize-languages validate_node_kinds -- --ignored 2>&1 | grep "Python:"
 ```
 
 **Common patterns:**

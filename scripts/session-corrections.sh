@@ -13,7 +13,7 @@ set -e
 PATTERN="${1:-*}"
 
 # Build once, run fast
-cargo build --quiet --package moss-cli --release 2>/dev/null
+cargo build --quiet --package normalize-cli --release 2>/dev/null
 MOSS="./target/release/moss"
 
 # Single pass: extract all Claude text responses with category tags

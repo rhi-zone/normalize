@@ -1,6 +1,6 @@
 # Package Repository Coverage
 
-This document tracks moss-packages coverage against known package repositories.
+This document tracks normalize-packages coverage against known package repositories.
 Source: [Repology Statistics](https://repology.org/repositories/statistics)
 
 Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verification

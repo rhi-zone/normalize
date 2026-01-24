@@ -6,7 +6,7 @@
   "publisher": "moss",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pterror/moss"
+    "url": "https://github.com/rhi-zone/normalize"
   },
   "engines": {
     "vscode": "^1.85.0"

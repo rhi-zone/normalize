@@ -1,0 +1,22 @@
+[package]
+name = "rhi-normalize-sessions"
+version = "0.1.0"
+edition = "2024"
+description = "Session log parsing for AI coding agents"
+
+[features]
+default = ["formats-all"]
+
+# All formats
+formats-all = ["format-claude", "format-codex", "format-gemini", "format-normalize"]
+
+# Individual formats
+format-claude = []  # Claude Code sessions
+format-codex = []   # OpenAI Codex CLI sessions
+format-gemini = []  # Gemini CLI sessions
+format-normalize = []    # normalize agent sessions
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"

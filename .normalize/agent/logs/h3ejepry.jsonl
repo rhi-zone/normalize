@@ -1,0 +1,10 @@
+{"event": "session_start","timestamp": "2026-01-05T09:20:24Z", "timestamp": "2026-01-05T09:20:24Z", "moss_root": ".", "session_id": "h3ejepry"}
+{"event": "task","timestamp": "2026-01-05T09:20:24Z", "system_prompt": "state_machine_v2", "max_turns": 8, "provider": "gemini", "model": "default", "machine_start": "explorer", "use_planner": false, "user_prompt": "How many Rust files are in crates/moss/src/?"}
+{"event": "turn_start","timestamp": "2026-01-05T09:20:24Z", "working_memory_count": 0, "notes_count": 0, "state": "explorer", "pending_outputs": 0, "turn": 1}
+{"event": "llm_response","timestamp": "2026-01-05T09:20:26Z", "response": "$(run find crates/moss/src/ -maxdepth 1 -name \"*.rs\" | wc -l)\n$(view crates/moss/src/)", "state": "explorer", "turn": 1}
+{"event": "command","timestamp": "2026-01-05T09:20:26Z", "turn": 1, "cmd": "run find crates/moss/src/ -maxdepth 1 -name \"*.rs\" | wc -l", "success": true, "output_length": 3}
+{"event": "command","timestamp": "2026-01-05T09:20:26Z", "turn": 1, "cmd": "view crates/moss/src/", "success": true, "output_length": 295}
+{"event": "turn_start","timestamp": "2026-01-05T09:20:26Z", "working_memory_count": 0, "notes_count": 0, "state": "evaluator", "pending_outputs": 2, "turn": 2}
+{"event": "llm_response","timestamp": "2026-01-05T09:20:30Z", "response": "I have found 21 Rust files in the top level of `crates/moss/src/`.\n\n$(answer 21)", "state": "evaluator", "turn": 2}
+{"event": "done","timestamp": "2026-01-05T09:20:30Z", "turn": 2, "answer": "21"}
+{"event": "session_end","timestamp": "2026-01-05T09:20:30Z", "total_turns": 2, "duration_seconds": 6}

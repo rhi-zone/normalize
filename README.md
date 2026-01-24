@@ -1,4 +1,4 @@
-# Moss
+# Normalize
 
 Fast code intelligence CLI. Structural awareness of codebases through AST-based analysis.
 
@@ -6,11 +6,11 @@ Fast code intelligence CLI. Structural awareness of codebases through AST-based 
 
 ```bash
 # From source
-cargo install --path crates/moss
+cargo install --path crates/normalize
 
 # Or build locally
 cargo build --release
-./target/release/moss --help
+./target/release/normalize --help
 
 # With Nix
 nix develop
@@ -21,22 +21,22 @@ cargo build --release
 
 ```bash
 # View project structure
-moss view
+normalize view
 
 # View a specific file's symbols
-moss view src/main.rs
+normalize view src/main.rs
 
 # View a specific symbol
-moss view src/main.rs/main
+normalize view src/main.rs/main
 
 # Analyze codebase health
-moss analyze health
+normalize analyze health
 
 # Search for text patterns
-moss text-search "TODO"
+normalize text-search "TODO"
 
 # Run linters
-moss tools lint
+normalize tools lint
 ```
 
 ## Commands
@@ -46,14 +46,14 @@ moss tools lint
 View directories, files, and symbols as a unified tree:
 
 ```bash
-moss view                       # Current directory tree
-moss view src/                  # Specific directory
-moss view src/main.rs           # File with symbols
-moss view src/main.rs/MyClass   # Specific symbol
-moss view src/main.rs -d 2      # Depth 2 (show nested symbols)
-moss view --full src/foo.rs/bar # Full source code of symbol
-moss view --deps src/foo.rs     # Show imports/exports
-moss view --focus src/foo.rs    # Resolve and show imported symbols
+normalize view                       # Current directory tree
+normalize view src/                  # Specific directory
+normalize view src/main.rs           # File with symbols
+normalize view src/main.rs/MyClass   # Specific symbol
+normalize view src/main.rs -d 2      # Depth 2 (show nested symbols)
+normalize view --full src/foo.rs/bar # Full source code of symbol
+normalize view --deps src/foo.rs     # Show imports/exports
+normalize view --focus src/foo.rs    # Resolve and show imported symbols
 ```
 
 ### analyze - Codebase Analysis
@@ -61,15 +61,15 @@ moss view --focus src/foo.rs    # Resolve and show imported symbols
 Unified analysis with subcommands:
 
 ```bash
-moss analyze health             # Codebase metrics and health score
-moss analyze complexity         # Cyclomatic complexity report
-moss analyze length             # Function length analysis
-moss analyze security           # Security vulnerability scan
-moss analyze hotspots           # Git history analysis (churn + complexity)
-moss analyze duplicate-functions # Detect code clones
-moss analyze duplicate-types    # Detect duplicate type definitions
-moss analyze docs               # Documentation coverage
-moss analyze all                # Run all analysis passes
+normalize analyze health             # Codebase metrics and health score
+normalize analyze complexity         # Cyclomatic complexity report
+normalize analyze length             # Function length analysis
+normalize analyze security           # Security vulnerability scan
+normalize analyze hotspots           # Git history analysis (churn + complexity)
+normalize analyze duplicate-functions # Detect code clones
+normalize analyze duplicate-types    # Detect duplicate type definitions
+normalize analyze docs               # Documentation coverage
+normalize analyze all                # Run all analysis passes
 ```
 
 ### tools - Linters and Test Runners
@@ -77,14 +77,14 @@ moss analyze all                # Run all analysis passes
 Unified interface to linters, formatters, and type checkers:
 
 ```bash
-moss tools lint                 # Auto-detect and run relevant tools
-moss tools lint --fix           # Auto-fix where possible
-moss tools lint --sarif         # Output in SARIF format
-moss tools lint --category type # Only type checkers
-moss tools lint --tools ruff,clippy # Specific tools
-moss tools lint --list          # List available tools
+normalize tools lint                 # Auto-detect and run relevant tools
+normalize tools lint --fix           # Auto-fix where possible
+normalize tools lint --sarif         # Output in SARIF format
+normalize tools lint --category type # Only type checkers
+normalize tools lint --tools ruff,clippy # Specific tools
+normalize tools lint --list          # List available tools
 
-moss tools test                 # Run native test runners
+normalize tools test                 # Run native test runners
 ```
 
 Supported tools: ruff, clippy, rustfmt, oxlint, biome, prettier, tsc, mypy, pyright, eslint, gofmt, go-vet, deno-check, and more.
@@ -94,10 +94,10 @@ Supported tools: ruff, clippy, rustfmt, oxlint, biome, prettier, tsc, mypy, pyri
 Fast ripgrep-based search:
 
 ```bash
-moss text-search "pattern"            # Search all files
-moss text-search "TODO" --only "*.rs" # Filter by extension
-moss text-search "fn main" -i         # Case insensitive
-moss text-search "error" --limit 50   # Limit results
+normalize text-search "pattern"            # Search all files
+normalize text-search "TODO" --only "*.rs" # Filter by extension
+normalize text-search "fn main" -i         # Case insensitive
+normalize text-search "error" --limit 50   # Limit results
 ```
 
 ### package - Package Management
@@ -105,24 +105,24 @@ moss text-search "error" --limit 50   # Limit results
 Query package registries and analyze dependencies:
 
 ```bash
-moss package info tokio         # Package info from registry
-moss package list               # List project dependencies
-moss package tree               # Dependency tree
-moss package outdated           # Check for updates
-moss package why tokio          # Why is this dependency included?
-moss package audit              # Security vulnerability scan
+normalize package info tokio         # Package info from registry
+normalize package list               # List project dependencies
+normalize package tree               # Dependency tree
+normalize package outdated           # Check for updates
+normalize package why tokio          # Why is this dependency included?
+normalize package audit              # Security vulnerability scan
 ```
 
 Supports: Cargo, npm, pip, Go modules, Bundler, Composer, Hex, Maven, NuGet, Nix, Conan.
 
 ### serve - Server Modes
 
-Run moss as a server for integration:
+Run normalize as a server for integration:
 
 ```bash
-moss serve mcp                  # MCP server for LLM tools (stdio)
-moss serve http --port 8080     # REST API server
-moss serve lsp                  # LSP server for IDEs
+normalize serve mcp                  # MCP server for LLM tools (stdio)
+normalize serve http --port 8080     # REST API server
+normalize serve lsp                  # LSP server for IDEs
 ```
 
 ### index - Manage Index
@@ -130,10 +130,10 @@ moss serve lsp                  # LSP server for IDEs
 Control the file and symbol index:
 
 ```bash
-moss index status               # Index stats
-moss index refresh              # Refresh file index
-moss index reindex              # Full reindex
-moss index reindex --call-graph # Include call graph
+normalize index status               # Index stats
+normalize index refresh              # Refresh file index
+normalize index reindex              # Full reindex
+normalize index reindex --call-graph # Include call graph
 ```
 
 ### script - Lua Scripts
@@ -141,8 +141,8 @@ moss index reindex --call-graph # Include call graph
 Run Lua scripts for automation:
 
 ```bash
-moss script run my_script.lua   # Run a Lua script
-moss script list                # List available scripts
+normalize script run my_script.lua   # Run a Lua script
+normalize script list                # List available scripts
 ```
 
 ### sessions - Session Analysis
@@ -150,15 +150,15 @@ moss script list                # List available scripts
 Analyze Claude Code and other agent session logs:
 
 ```bash
-moss sessions                   # List recent sessions
-moss sessions <id>              # Show session details
-moss sessions <id> --analyze    # Full session analysis
-moss sessions --serve           # Web viewer at localhost:3939
+normalize sessions                   # List recent sessions
+normalize sessions <id>              # Show session details
+normalize sessions <id> --analyze    # Full session analysis
+normalize sessions --serve           # Web viewer at localhost:3939
 ```
 
 ## Configuration
 
-Create `.moss/config.toml`:
+Create `.normalize/config.toml`:
 
 ```toml
 [index]
@@ -174,7 +174,7 @@ tests = ["**/test_*.py", "**/*_test.go"]
 
 ### Custom Lint Tools
 
-Add custom tools in `.moss/tools.toml`:
+Add custom tools in `.normalize/tools.toml`:
 
 ```toml
 [[tools]]
@@ -190,14 +190,14 @@ output_format = "sarif"
 Most commands support `--json` for structured output:
 
 ```bash
-moss view src/main.rs --json
-moss analyze health --json
-moss tools lint --json
+normalize view src/main.rs --json
+normalize analyze health --json
+normalize tools lint --json
 ```
 
 ## Language Support
 
-Moss supports 98 languages via tree-sitter grammars including:
+Normalize supports 98 languages via tree-sitter grammars including:
 Python, Rust, TypeScript, JavaScript, Go, Java, C, C++, Ruby, PHP, Swift, Kotlin, Scala, and many more.
 
 ## Development
@@ -213,7 +213,7 @@ cargo test
 cargo xtask build-grammars
 
 # Install locally
-cargo install --path crates/moss
+cargo install --path crates/normalize
 ```
 
 ### Prerequisites

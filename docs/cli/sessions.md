@@ -19,7 +19,7 @@ moss sessions plans [NAME]
 
 | Option | Description |
 |--------|-------------|
-| `--format <FORMAT>` | Log format: `claude` (default), `codex`, `gemini`, `moss` |
+| `--format <FORMAT>` | Log format: `claude` (default), `codex`, `gemini`, `normalize` |
 | `--grep <PATTERN>` | Filter sessions by regex pattern (searches content) |
 | `--root <PATH>` | Project root directory |
 | `--limit <N>` | Maximum sessions to list (default: 20) |
@@ -36,7 +36,7 @@ moss sessions plans [NAME]
 | `claude` | `~/.claude/projects/<encoded-path>/` | `*.jsonl` |
 | `codex` | `~/.codex/sessions/YYYY/MM/DD/` | `*.jsonl` |
 | `gemini` | `~/.gemini/tmp/<hash>/` | `logs.json` |
-| `moss` | `.moss/agent/logs/` | `*.jsonl` |
+| `normalize` | `.moss/agent/logs/` | `*.jsonl` |
 
 ## Examples
 

@@ -1,0 +1,18 @@
+{"event": "session_start","timestamp": "2026-01-04T09:25:15Z", "session_id": "g4n93rvr", "timestamp": "2026-01-04T09:25:15Z", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-04T09:25:15Z", "resumed": false, "max_turns": 15, "provider": "anthropic", "prompt": "How many Provider variants are defined in the llm.rs Provider enum? List them.", "model": "default"}
+{"event": "turn_start","timestamp": "2026-01-04T09:25:15Z", "turn": 1, "has_error_state": false, "working_memory_count": 0, "prompt_length": 97}
+{"event": "llm_response","timestamp": "2026-01-04T09:25:18Z", "turn": 1, "response_length": 113, "retries": 0}
+{"event": "command","timestamp": "2026-01-04T09:25:18Z", "turn": 1, "output_length": 0, "cmd": "find . -name \"llm.rs\" -type f", "success": false}
+{"event": "turn_start","timestamp": "2026-01-04T09:25:18Z", "turn": 2, "has_error_state": false, "working_memory_count": 0, "prompt_length": 240}
+{"event": "llm_response","timestamp": "2026-01-04T09:25:22Z", "turn": 2, "response_length": 109, "retries": 0}
+{"event": "command","timestamp": "2026-01-04T09:25:22Z", "turn": 2, "output_length": 34, "cmd": "run find . -name \"*.rs\" -type f | grep -i llm", "success": true}
+{"event": "turn_start","timestamp": "2026-01-04T09:25:22Z", "turn": 3, "has_error_state": false, "working_memory_count": 0, "prompt_length": 281}
+{"event": "llm_response","timestamp": "2026-01-04T09:25:25Z", "turn": 3, "response_length": 126, "retries": 0}
+{"event": "command","timestamp": "2026-01-04T09:25:25Z", "turn": 3, "output_length": 1627, "cmd": "view ./crates/moss/src/workflow/llm.rs", "success": true}
+{"event": "turn_start","timestamp": "2026-01-04T09:25:25Z", "turn": 4, "has_error_state": false, "working_memory_count": 0, "prompt_length": 1867}
+{"event": "llm_response","timestamp": "2026-01-04T09:25:28Z", "turn": 4, "response_length": 50, "retries": 0}
+{"event": "command","timestamp": "2026-01-04T09:25:28Z", "turn": 4, "output_length": 354, "cmd": "view ./crates/moss/src/workflow/llm.rs/Provider", "success": true}
+{"event": "turn_start","timestamp": "2026-01-04T09:25:28Z", "turn": 5, "has_error_state": false, "working_memory_count": 0, "prompt_length": 603}
+{"event": "llm_response","timestamp": "2026-01-04T09:25:34Z", "turn": 5, "response_length": 601, "retries": 0}
+{"event": "done","timestamp": "2026-01-04T09:25:34Z", "summary": "There are **13 Provider variants** defined in the llm.rs Provider enum:\n\n1. Anthropic\n2. OpenAI\n3. Azure\n4. Gemini\n5. Cohere\n6. DeepSeek\n7. Groq\n8. Mistral\n9. Ollama\n10. OpenRouter\n11. Perplexity\n12. "}
+{"event": "session_end","timestamp": "2026-01-04T09:25:34Z", "duration_seconds": 19, "total_turns": 5}

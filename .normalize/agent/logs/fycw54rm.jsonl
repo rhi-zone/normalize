@@ -1,0 +1,6 @@
+{"event": "session_start","timestamp": "2026-01-05T08:38:25Z", "timestamp": "2026-01-05T08:38:25Z", "session_id": "fycw54rm", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-05T08:38:25Z", "model": "default", "system_prompt": "state_machine_v2", "machine_start": "explorer", "user_prompt": "What is the first struct in crates/moss/src/main.rs?", "max_turns": 6, "provider": "gemini"}
+{"event": "turn_start","timestamp": "2026-01-05T08:38:25Z", "state": "explorer", "turn": 1, "working_memory_count": 0, "notes_count": 0, "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-05T08:38:26Z", "state": "explorer", "turn": 1, "response": "$(view crates/moss/src/main.rs)"}
+{"event": "command","timestamp": "2026-01-05T08:38:26Z", "cmd": "view crates/moss/src/main.rs", "success": true, "output_length": 685, "turn": 1}
+{"event": "turn_start","timestamp": "2026-01-05T08:38:26Z", "state": "evaluator", "turn": 2, "working_memory_count": 0, "notes_count": 0, "pending_outputs": 1}

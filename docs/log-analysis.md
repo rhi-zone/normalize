@@ -144,7 +144,7 @@ Subagents don't edit files - they gather information for the main session.
 ### For This Project
 
 1. **LSP tests need attention**: Multiple failures in test_lsp_server.py
-2. **Consider log analysis tooling**: This manual analysis could be automated as a `moss` command
+2. **Consider log analysis tooling**: This manual analysis could be automated as a `normalize` command
 
 ## Future Work
 
@@ -367,7 +367,7 @@ Not exposing what's built, hardcoding what should be configurable.
 
 - "You're right. `fetch_versions()` exists on the trait but isn't exposed in the CLI"
 - "You're right - the `ToolsAction` enum and its dispatch should live in `commands/tools/mod.rs`"
-- "The crates stay pure Rust with no Lua dependency... `moss` can optionally wrap these in Lua bindings - that's an application concern, not a library concern"
+- "The crates stay pure Rust with no Lua dependency... `normalize` can optionally wrap these in Lua bindings - that's an application concern, not a library concern"
 
 #### 6. Wrong Assumptions
 

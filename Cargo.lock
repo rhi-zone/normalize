@@ -3627,7 +3627,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
-name = "rhizome-moss"
+name = "rhi-normalize"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",
@@ -3655,17 +3655,17 @@ dependencies = [
  "nucleo-matcher",
  "rayon",
  "regex",
- "rhizome-moss-cli-parser",
- "rhizome-moss-core",
- "rhizome-moss-derive",
- "rhizome-moss-jsonschema",
- "rhizome-moss-languages",
- "rhizome-moss-openapi",
- "rhizome-moss-packages",
- "rhizome-moss-rules",
- "rhizome-moss-sessions",
- "rhizome-moss-tools",
- "rhizome-moss-typegen",
+ "rhi-normalize-cli-parser",
+ "rhi-normalize-core",
+ "rhi-normalize-derive",
+ "rhi-normalize-jsonschema",
+ "rhi-normalize-languages",
+ "rhi-normalize-openapi",
+ "rhi-normalize-packages",
+ "rhi-normalize-rules",
+ "rhi-normalize-sessions",
+ "rhi-normalize-tools",
+ "rhi-normalize-typegen",
  "rmcp",
  "schemars",
  "serde",
@@ -3684,7 +3684,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-cli-parser"
+name = "rhi-normalize-cli-parser"
 version = "0.1.0"
 dependencies = [
  "insta",
@@ -3694,11 +3694,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-core"
+name = "rhi-normalize-core"
 version = "0.1.0"
 
 [[package]]
-name = "rhizome-moss-derive"
+name = "rhi-normalize-derive"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -3707,7 +3707,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-grammars"
+name = "rhi-normalize-grammars"
 version = "0.1.0"
 dependencies = [
  "arborium-ada",
@@ -3811,14 +3811,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-jsonschema"
+name = "rhi-normalize-jsonschema"
 version = "0.1.0"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
-name = "rhizome-moss-languages"
+name = "rhi-normalize-languages"
 version = "0.1.0"
 dependencies = [
  "ast-grep-core",
@@ -3832,14 +3832,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-openapi"
+name = "rhi-normalize-openapi"
 version = "0.1.0"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
-name = "rhizome-moss-packages"
+name = "rhi-normalize-packages"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
@@ -3859,16 +3859,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-rules"
+name = "rhi-normalize-rules"
 version = "0.1.0"
 dependencies = [
  "dirs",
  "glob",
  "ignore",
  "regex",
- "rhizome-moss-core",
- "rhizome-moss-derive",
- "rhizome-moss-languages",
+ "rhi-normalize-core",
+ "rhi-normalize-derive",
+ "rhi-normalize-languages",
  "schemars",
  "serde",
  "streaming-iterator",
@@ -3877,7 +3877,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-sessions"
+name = "rhi-normalize-sessions"
 version = "0.1.0"
 dependencies = [
  "regex",
@@ -3886,7 +3886,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-surface-syntax"
+name = "rhi-normalize-surface-syntax"
 version = "0.1.0"
 dependencies = [
  "arborium-typescript",
@@ -3898,7 +3898,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-tools"
+name = "rhi-normalize-tools"
 version = "0.1.0"
 dependencies = [
  "rayon",
@@ -3910,7 +3910,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhizome-moss-typegen"
+name = "rhi-normalize-typegen"
 version = "0.1.0"
 dependencies = [
  "insta",

@@ -1,0 +1,4 @@
+{"event": "session_start","timestamp": "2026-01-05T14:55:09Z", "session_id": "un4d36m4", "moss_root": ".", "timestamp": "2026-01-05T14:55:09Z"}
+{"event": "task","timestamp": "2026-01-05T14:55:09Z", "user_prompt": "find security vulnerabilities", "use_planner": false, "machine_start": "explorer", "provider": "gemini", "model": "default", "max_turns": 1, "system_prompt": "state_machine_v2", "role": "auditor"}
+{"event": "turn_start","timestamp": "2026-01-05T14:55:09Z", "working_memory_count": 0, "notes_count": 0, "state": "explorer", "pending_outputs": 0, "turn": 1}
+{"event": "llm_response","timestamp": "2026-01-05T14:55:12Z", "turn": 1, "response": "$(run ls -R)\n$(text-search \"password|secret|key|token|api_key\")\n$(text-search \"SELECT.*FROM.*WHERE.*=\")\n$(text-search \"eval\\(|exec\\(|system\\(|spawn\\(\")\n$(text-search \"unwrap\\(\\)|expect\\(\\)\")\n$(text-search \"dangerouslySetInnerHTML\")", "state": "explorer"}

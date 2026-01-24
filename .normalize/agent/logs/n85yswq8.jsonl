@@ -1,0 +1,14 @@
+{"event": "session_start","timestamp": "2026-01-04T13:20:43Z", "session_id": "n85yswq8", "moss_root": ".", "timestamp": "2026-01-04T13:20:43Z"}
+{"event": "task","timestamp": "2026-01-04T13:20:43Z", "max_turns": 15, "provider": "anthropic", "prompt": "What is the name of the main binary crate in this workspace?", "model": "default", "resumed": false}
+{"event": "turn_start","timestamp": "2026-01-04T13:20:43Z", "working_memory_count": 0, "turn": 1, "has_error_state": false, "prompt_length": 79}
+{"event": "llm_response","timestamp": "2026-01-04T13:20:49Z", "response_length": 713, "retries": 0, "turn": 1}
+{"event": "command","timestamp": "2026-01-04T13:20:49Z", "output_length": 541, "turn": 1, "success": true, "cmd": "view ."}
+{"event": "command","timestamp": "2026-01-04T13:20:49Z", "output_length": 200, "turn": 1, "success": true, "cmd": "view Cargo.toml"}
+{"event": "command","timestamp": "2026-01-04T13:20:49Z", "output_length": 181, "turn": 1, "success": true, "cmd": "view crates"}
+{"event": "command","timestamp": "2026-01-04T13:20:49Z", "output_length": 181, "turn": 1, "success": true, "cmd": "view crates/cli/Cargo.toml"}
+{"event": "command","timestamp": "2026-01-04T13:20:49Z", "output_length": 181, "turn": 1, "success": true, "cmd": "view crates/core/Cargo.toml"}
+{"event": "command","timestamp": "2026-01-04T13:20:49Z", "output_length": 181, "turn": 1, "success": true, "cmd": "view crates/server/Cargo.toml"}
+{"event": "command","timestamp": "2026-01-04T13:20:50Z", "output_length": 181, "turn": 1, "success": true, "cmd": "view crates/cli/src"}
+{"event": "command","timestamp": "2026-01-04T13:20:50Z", "output_length": 181, "turn": 1, "success": true, "cmd": "view crates/cli/src/main.rs"}
+{"event": "done","timestamp": "2026-01-04T13:20:50Z", "summary": "The main binary crate in this workspace is **\"cli\"** (defined in `crates/cli`"}
+{"event": "session_end","timestamp": "2026-01-04T13:20:50Z", "total_turns": 1, "duration_seconds": 7}

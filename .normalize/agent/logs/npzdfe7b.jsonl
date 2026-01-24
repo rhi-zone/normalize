@@ -1,0 +1,11 @@
+{"event": "session_start","timestamp": "2026-01-05T16:27:29Z", "session_id": "npzdfe7b", "moss_root": ".", "timestamp": "2026-01-05T16:27:29Z"}
+{"event": "task","timestamp": "2026-01-05T16:27:29Z", "role": "investigator", "use_planner": false, "system_prompt": "state_machine_v2", "provider": "gemini", "user_prompt": "How does user input from the CLI get to the LLM? Trace the data flow.", "max_turns": 6, "machine_start": "explorer", "model": "default"}
+{"event": "turn_start","timestamp": "2026-01-05T16:27:29Z", "pending_outputs": 0, "turn": 1, "working_memory_count": 0, "notes_count": 0, "state": "explorer"}
+{"event": "llm_response","timestamp": "2026-01-05T16:27:31Z", "turn": 1, "response": "$(run ls -R)$(text-search \"clap\")$(text-search \"llm\")", "state": "explorer"}
+{"event": "command","timestamp": "2026-01-05T16:27:31Z", "success": true, "turn": 1, "cmd": "run ls -R", "output_length": 1197705}
+{"event": "command","timestamp": "2026-01-05T16:27:31Z", "success": true, "turn": 1, "cmd": "text-search \"clap\"", "output_length": 1810}
+{"event": "command","timestamp": "2026-01-05T16:27:31Z", "success": true, "turn": 1, "cmd": "text-search \"llm\"", "output_length": 8720}
+{"event": "turn_start","timestamp": "2026-01-05T16:27:31Z", "pending_outputs": 3, "turn": 2, "working_memory_count": 0, "notes_count": 0, "state": "evaluator"}
+{"event": "llm_response","timestamp": "2026-01-05T16:27:38Z", "turn": 2, "response": "$(note User input starts in `crates/moss/src/main.rs` where `clap` parses CLI arguments into a `Cli` struct.)\n$(note Subcommands are dispatched in `main.rs`. For LLM-related tasks, the `agent` or `script` commands often lead to the Lua runtime.)\n$(note `crates/moss/src/workflow/lua_runtime.rs` registers a `llm` global in the Lua environment, mapping Lua calls like `llm.chat()` to the Rust `LlmClient` in `crates/moss/src/workflow/llm.rs`.)\n$(note `crates/moss/src/workflow/llm.rs` uses the `rig-co", "state": "evaluator"}
+{"event": "done","timestamp": "2026-01-05T16:27:38Z", "answer": "User input enters via `clap` in `main.rs`, is dispatched to a command (like `agent`), which triggers a Lua script (e.g., `agent.lua`). The script calls the `llm` Lua module (registered in `lua_runtime", "turn": 2}
+{"event": "session_end","timestamp": "2026-01-05T16:27:38Z", "duration_seconds": 9, "total_turns": 2}

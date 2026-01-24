@@ -1,0 +1,30 @@
+{"event": "session_start","timestamp": "2026-01-04T13:22:22Z", "timestamp": "2026-01-04T13:22:22Z", "moss_root": ".", "session_id": "74myszjv"}
+{"event": "task","timestamp": "2026-01-04T13:22:22Z", "model": "default", "resumed": false, "prompt": "How many Provider variants are defined in the llm.rs Provider enum? Just the count.", "max_turns": 15, "provider": "anthropic"}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:22Z", "has_error_state": false, "prompt_length": 102, "working_memory_count": 0, "turn": 1}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:26Z", "retries": 0, "turn": 1, "response_length": 112}
+{"event": "command","timestamp": "2026-01-04T13:22:26Z", "output_length": 0, "cmd": "find . -name \"llm.rs\" -o -name \"*llm*\"", "success": false, "turn": 1}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:26Z", "has_error_state": false, "prompt_length": 254, "working_memory_count": 0, "turn": 2}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:29Z", "retries": 0, "turn": 2, "response_length": 115}
+{"event": "command","timestamp": "2026-01-04T13:22:29Z", "output_length": 738, "cmd": "run find . -type f -name \"*.rs\" | head -20", "success": true, "turn": 2}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:29Z", "has_error_state": false, "prompt_length": 987, "working_memory_count": 0, "turn": 3}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:32Z", "retries": 0, "turn": 3, "response_length": 101}
+{"event": "command","timestamp": "2026-01-04T13:22:32Z", "output_length": 34, "cmd": "run find . -type f -name \"llm.rs\"", "success": true, "turn": 3}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:32Z", "has_error_state": false, "prompt_length": 274, "working_memory_count": 0, "turn": 4}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:36Z", "retries": 0, "turn": 4, "response_length": 96}
+{"event": "command","timestamp": "2026-01-04T13:22:36Z", "output_length": 1627, "cmd": "view ./crates/moss/src/workflow/llm.rs", "success": true, "turn": 4}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:36Z", "has_error_state": false, "prompt_length": 1872, "working_memory_count": 0, "turn": 5}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:40Z", "retries": 0, "turn": 5, "response_length": 121}
+{"event": "command","timestamp": "2026-01-04T13:22:40Z", "output_length": 0, "cmd": "view ./crates/moss/src/workflow/llm.rs 38-55", "success": false, "turn": 5}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:40Z", "has_error_state": false, "prompt_length": 260, "working_memory_count": 0, "turn": 6}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:43Z", "retries": 0, "turn": 6, "response_length": 75}
+{"event": "command","timestamp": "2026-01-04T13:22:43Z", "output_length": 541, "cmd": "view .", "success": true, "turn": 6}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:43Z", "has_error_state": false, "prompt_length": 754, "working_memory_count": 0, "turn": 7}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:46Z", "retries": 0, "turn": 7, "response_length": 30}
+{"event": "command","timestamp": "2026-01-04T13:22:46Z", "output_length": 100, "cmd": "text-search \"enum Provider\"", "success": true, "turn": 7}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:46Z", "has_error_state": false, "prompt_length": 334, "working_memory_count": 0, "turn": 8}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:48Z", "retries": 0, "turn": 8, "response_length": 45}
+{"event": "command","timestamp": "2026-01-04T13:22:48Z", "output_length": 298, "cmd": "view crates/moss/src/workflow/llm.rs:38-55", "success": true, "turn": 8}
+{"event": "turn_start","timestamp": "2026-01-04T13:22:48Z", "has_error_state": false, "prompt_length": 547, "working_memory_count": 0, "turn": 9}
+{"event": "llm_response","timestamp": "2026-01-04T13:22:52Z", "retries": 0, "turn": 9, "response_length": 225}
+{"event": "done","timestamp": "2026-01-04T13:22:52Z", "summary": "13"}
+{"event": "session_end","timestamp": "2026-01-04T13:22:52Z", "total_turns": 9, "duration_seconds": 30}

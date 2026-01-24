@@ -1,0 +1,14 @@
+{"event": "session_start","timestamp": "2026-01-05T09:33:10Z", "timestamp": "2026-01-05T09:33:10Z", "moss_root": ".", "session_id": "wt6mju7t"}
+{"event": "task","timestamp": "2026-01-05T09:33:10Z", "user_prompt": "What CLI commands does moss support?", "model": "default", "machine_start": "explorer", "use_planner": false, "max_turns": 8, "system_prompt": "state_machine_v2", "provider": "anthropic"}
+{"event": "turn_start","timestamp": "2026-01-05T09:33:10Z", "working_memory_count": 0, "notes_count": 0, "state": "explorer", "pending_outputs": 0, "turn": 1}
+{"event": "llm_response","timestamp": "2026-01-05T09:33:13Z", "turn": 1, "response": "I'll help you explore the codebase to find information about CLI commands that moss supports.\n\n$(view .)\n$(text-search \"CLI\")\n$(text-search \"command\")\n$(text-search \"clap\")\n$(text-search \"args\")\n$(text-search \"subcommand\")", "state": "explorer"}
+{"event": "command","timestamp": "2026-01-05T09:33:13Z", "output_length": 541, "cmd": "view .", "success": true, "turn": 1}
+{"event": "command","timestamp": "2026-01-05T09:33:13Z", "output_length": 11088, "cmd": "text-search \"CLI\"", "success": true, "turn": 1}
+{"event": "command","timestamp": "2026-01-05T09:33:13Z", "output_length": 13010, "cmd": "text-search \"command\"", "success": true, "turn": 1}
+{"event": "command","timestamp": "2026-01-05T09:33:13Z", "output_length": 1810, "cmd": "text-search \"clap\"", "success": true, "turn": 1}
+{"event": "command","timestamp": "2026-01-05T09:33:14Z", "output_length": 9265, "cmd": "text-search \"args\"", "success": true, "turn": 1}
+{"event": "command","timestamp": "2026-01-05T09:33:14Z", "output_length": 2736, "cmd": "text-search \"subcommand\"", "success": true, "turn": 1}
+{"event": "turn_start","timestamp": "2026-01-05T09:33:14Z", "working_memory_count": 0, "notes_count": 0, "state": "evaluator", "pending_outputs": 6, "turn": 2}
+{"event": "llm_response","timestamp": "2026-01-05T09:33:28Z", "turn": 2, "response": "Looking at the results, I can see the CLI commands moss supports by examining the code structure and documentation.\n\n$(keep 4 5 6)\n\n$(note moss uses clap for CLI parsing with derive macros - main command enum in crates/moss/src/main.rs)\n\n$(answer moss supports these CLI commands:\n\n**Core Commands (3 primitives):**\n- `view` - Display code structure (files, symbols, skeletons)\n- `edit` - Modify code (search/replace, apply diffs)\n- `analyze` - Code analysis with subcommands (health, complexity, tra", "state": "evaluator"}
+{"event": "done","timestamp": "2026-01-05T09:33:28Z", "turn": 2, "answer": "moss supports these CLI commands:\n\n**Core Commands (3 primitives"}
+{"event": "session_end","timestamp": "2026-01-05T09:33:28Z", "total_turns": 2, "duration_seconds": 18}

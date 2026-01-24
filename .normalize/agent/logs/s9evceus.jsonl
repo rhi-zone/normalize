@@ -1,0 +1,27 @@
+{"event": "session_start","timestamp": "2026-01-04T09:24:33Z", "timestamp": "2026-01-04T09:24:33Z", "session_id": "s9evceus", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-04T09:24:33Z", "prompt": "What is the default model for Anthropic in the llm.rs provider code?", "model": "default", "resumed": false, "max_turns": 15, "provider": "anthropic"}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:33Z", "working_memory_count": 0, "prompt_length": 87, "turn": 1, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:36Z", "retries": 0, "turn": 1, "response_length": 93}
+{"event": "command","timestamp": "2026-01-04T09:24:36Z", "success": true, "output_length": 541, "turn": 1, "cmd": "view ."}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:36Z", "working_memory_count": 0, "prompt_length": 739, "turn": 2, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:39Z", "retries": 0, "turn": 2, "response_length": 42}
+{"event": "command","timestamp": "2026-01-04T09:24:39Z", "success": false, "output_length": 0, "turn": 2, "cmd": "text-search \"default.*model.*Anthropic\""}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:39Z", "working_memory_count": 0, "prompt_length": 240, "turn": 3, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:41Z", "retries": 0, "turn": 3, "response_length": 149}
+{"event": "command","timestamp": "2026-01-04T09:24:42Z", "success": true, "output_length": 541, "turn": 3, "cmd": "view ."}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:42Z", "working_memory_count": 0, "prompt_length": 739, "turn": 4, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:44Z", "retries": 0, "turn": 4, "response_length": 14}
+{"event": "command","timestamp": "2026-01-04T09:24:44Z", "success": true, "output_length": 181, "turn": 4, "cmd": "view crates"}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:44Z", "working_memory_count": 0, "prompt_length": 384, "turn": 5, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:47Z", "retries": 0, "turn": 5, "response_length": 174}
+{"event": "command","timestamp": "2026-01-04T09:24:47Z", "success": true, "output_length": 2293, "turn": 5, "cmd": "text-search \"anthropic\""}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:47Z", "working_memory_count": 0, "prompt_length": 2508, "turn": 6, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:51Z", "retries": 0, "turn": 6, "response_length": 219}
+{"event": "command","timestamp": "2026-01-04T09:24:51Z", "success": true, "output_length": 1627, "turn": 6, "cmd": "view crates/moss/src/workflow/llm.rs"}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:51Z", "working_memory_count": 1, "prompt_length": 2075, "turn": 7, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:54Z", "retries": 0, "turn": 7, "response_length": 63}
+{"event": "command","timestamp": "2026-01-04T09:24:54Z", "success": true, "output_length": 901, "turn": 7, "cmd": "view crates/moss/src/workflow/llm.rs/Provider::default_model"}
+{"event": "turn_start","timestamp": "2026-01-04T09:24:54Z", "working_memory_count": 1, "prompt_length": 1373, "turn": 8, "has_error_state": false}
+{"event": "llm_response","timestamp": "2026-01-04T09:24:58Z", "retries": 0, "turn": 8, "response_length": 274}
+{"event": "done","timestamp": "2026-01-04T09:24:58Z", "summary": "The default model for Anthropic in the llm.rs provider code is \"claude-sonnet-4-5\". \n\nEvidence: In crates/moss/src/workflow/llm.rs at lines 79-96, the Provider::default_model("}
+{"event": "session_end","timestamp": "2026-01-04T09:24:58Z", "duration_seconds": 25, "total_turns": 8}

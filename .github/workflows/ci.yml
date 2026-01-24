@@ -133,32 +133,32 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
         env:
-          MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
+          NORMALIZE_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
-      - name: Build moss
-        run: cargo build --release -p rhizome-moss
+      - name: Build normalize
+        run: cargo build --release -p rhi-normalize
 
       - name: Check for code clones
         run: |
           # --min-lines 15: Functions under 15 lines are often simple patterns
           # (constructors, getters, trait impls) where duplication is acceptable.
           # Above 15 lines usually indicates extractable shared logic.
-          ./target/release/moss analyze duplicate-functions --min-lines 15
+          ./target/release/normalize analyze duplicate-functions --min-lines 15
 
           # --min-overlap 90: Overlap = common_fields / smaller_type_fields.
           # Small types (e.g., Position{line,column}) match any type with those
           # fields, causing false positives. 90% filters coincidental matches
           # while catching genuinely duplicated domain types.
-          ./target/release/moss analyze duplicate-types --min-overlap 90
+          ./target/release/normalize analyze duplicate-types --min-overlap 90
         env:
-          MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
+          NORMALIZE_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
       - name: Check syntax rules
         run: |
           # Dogfood our own rules - tuple returns should use named structs
-          ./target/release/moss analyze rules --rule rust/tuple-return crates/
+          ./target/release/normalize analyze rules --rule rust/tuple-return crates/
         env:
-          MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
+          NORMALIZE_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
   benchmark:
     name: Benchmark
@@ -190,11 +190,11 @@ jobs:
           workspaces: "crates -> target"
 
       - name: Build release
-        run: cargo build --release -p rhizome-moss
+        run: cargo build --release -p rhi-normalize
 
       - name: Run benchmarks
         run: |
-          ./crates/moss/bench.sh --quick 2>&1 | tee benchmark-results.txt
+          ./crates/normalize/bench.sh --quick 2>&1 | tee benchmark-results.txt
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -278,4 +278,4 @@ jobs:
           # Compare public API between PR branch and base
           cargo public-api diff ${{ github.event.pull_request.base.sha }}..${{ github.sha }} \
             --deny changed --deny removed \
-            -p rhizome-moss
+            -p rhi-normalize

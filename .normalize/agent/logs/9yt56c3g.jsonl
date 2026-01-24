@@ -1,0 +1,6 @@
+{"event": "session_start","timestamp": "2026-01-05T09:27:36Z", "session_id": "9yt56c3g", "moss_root": ".", "timestamp": "2026-01-05T09:27:36Z"}
+{"event": "task","timestamp": "2026-01-05T09:27:36Z", "system_prompt": "state_machine_v2", "max_turns": 10, "provider": "gemini", "model": "default", "machine_start": "explorer", "use_planner": false, "user_prompt": "What CLI commands does moss support? Look at the Commands enum in main.rs."}
+{"event": "turn_start","timestamp": "2026-01-05T09:27:36Z", "turn": 1, "working_memory_count": 0, "notes_count": 0, "state": "explorer", "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-05T09:27:38Z", "turn": 1, "response": "$(run find . -maxdepth 2 -name \"main.rs\")", "state": "explorer"}
+{"event": "command","timestamp": "2026-01-05T09:27:38Z", "turn": 1, "output_length": 0, "cmd": "run find . -maxdepth 2 -name \"main.rs\"", "success": true}
+{"event": "turn_start","timestamp": "2026-01-05T09:27:38Z", "turn": 2, "working_memory_count": 0, "notes_count": 0, "state": "evaluator", "pending_outputs": 1}

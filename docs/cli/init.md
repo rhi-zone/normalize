@@ -25,7 +25,7 @@ moss init [--index]
 
 ```toml
 # Moss configuration
-# See: https://github.com/pterror/moss
+# See: https://github.com/rhi-zone/normalize
 
 [daemon]
 # enabled = true

@@ -1,0 +1,31 @@
+[package]
+name = "rhi-normalize-rules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Syntax-based linting rules with tree-sitter queries"
+
+[dependencies]
+# Core
+serde.workspace = true
+dirs.workspace = true
+ignore.workspace = true
+
+# Rule parsing
+glob = "0.3"
+toml = "0.8"
+regex = "1"
+
+# Tree-sitter execution
+tree-sitter = "0.26"
+streaming-iterator = "0.1"
+
+# Language support
+rhi-normalize-languages = { path = "../normalize-languages" }
+
+# Schema generation
+schemars = "1"
+
+# Core traits
+rhi-normalize-core = { path = "../normalize-core" }
+rhi-normalize-derive = { path = "../normalize-derive" }

@@ -94,7 +94,7 @@ Flags `.unwrap()` calls - suggests using `?` or `.expect()` with context.
 - Test code: tests should panic on unexpected failures
 
 ```rust
-// moss-allow: rust/unwrap-in-impl - panic correct if lock poisoned
+// normalize-allow: rust/unwrap-in-impl - panic correct if lock poisoned
 let guard = CACHE.lock().unwrap();
 ```
 
@@ -317,7 +317,7 @@ mod tests {
 **Current state:** Glob patterns cannot detect `#[cfg(test)]` structure. These are flagged.
 
 **Workarounds:**
-1. Use inline `// moss-allow: rule-id` comments
+1. Use inline `// normalize-allow: rule-id` comments
 2. Move tests to separate `tests/` directory or `*_test.rs` files
 3. Accept some false positives for rules like `rust/unwrap-in-impl`
 

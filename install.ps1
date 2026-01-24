@@ -1,10 +1,10 @@
 # Moss CLI installer for Windows
-# Usage: irm https://raw.githubusercontent.com/pterror/moss/master/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/rhi-zone/normalize/master/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "pterror/moss"
-$InstallDir = "$env:LOCALAPPDATA\moss"
+$Repo = "rhi-zone/normalize"
+$InstallDir = "$env:LOCALAPPDATA\normalize"
 
 # Create install directory
 if (-not (Test-Path $InstallDir)) {
@@ -16,12 +16,12 @@ Write-Host "Fetching latest release..."
 $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
 $Version = $Release.tag_name
 
-Write-Host "Installing moss $Version..."
+Write-Host "Installing normalize $Version..."
 
 # Download
-$Asset = "moss-x86_64-pc-windows-msvc.zip"
+$Asset = "normalize-x86_64-pc-windows-msvc.zip"
 $Url = "https://github.com/$Repo/releases/download/$Version/$Asset"
-$ZipPath = "$env:TEMP\moss.zip"
+$ZipPath = "$env:TEMP\normalize.zip"
 
 Invoke-WebRequest -Uri $Url -OutFile $ZipPath
 

@@ -25,7 +25,7 @@ Do not:
 - Skip running tests after code changes
 - Assume code works without verification
 
-Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
+Our system prompt for sub-agents (`src/normalize/agent_loop.py:LLMConfig.system_prompt`):
 "Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."
 
 ## Development Environment
@@ -40,10 +40,10 @@ uv sync --extra all --extra dev  # Install dependencies
 ## Recipes
 
 Scaffold MCP Tool:
-1. Add API class in `src/moss/moss_api.py`
-2. Add accessor property to `MossAPI` class
-3. Update `src/moss/gen/introspect.py`: add import and entry to `sub_apis`
-4. Run `moss gen --target=mcp`
+1. Add API class in `src/normalize/moss_api.py`
+2. Add accessor property to `NormalizeAPI` class
+3. Update `src/normalize/gen/introspect.py`: add import and entry to `sub_apis`
+4. Run `normalize gen --target=mcp`
 5. Reload MCP server
 
 Context Reset (before `/exit`):
@@ -53,13 +53,13 @@ Context Reset (before `/exit`):
 
 ## Dogfooding
 
-**Use moss CLI for code intelligence** via `uv run moss`. Returns structure (symbols, skeletons, anchors) instead of raw text, saving ~90% tokens. MCP has historically been non-viable.
+**Use normalize CLI for code intelligence** via `uv run normalize`. Returns structure (symbols, skeletons, anchors) instead of raw text, saving ~90% tokens. MCP has historically been non-viable.
 
 Quick reference:
-- `uv run moss skeleton <file>` - understand file structure before reading
-- `uv run moss search <query>` - find function/class definitions
-- `uv run moss complexity` - identify problem areas
-- `uv run moss explain <symbol>` - show callers/callees
+- `uv run normalize skeleton <file>` - understand file structure before reading
+- `uv run normalize search <query>` - find function/class definitions
+- `uv run normalize complexity` - identify problem areas
+- `uv run normalize explain <symbol>` - show callers/callees
 
 Fall back to generic tools (Read/Grep) only for:
 - Exact line content needed for editing

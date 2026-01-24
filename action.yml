@@ -1,15 +1,15 @@
-# Moss GitHub Action
-# Run moss analysis in your CI/CD pipeline
+# Normalize GitHub Action
+# Run normalize analysis in your CI/CD pipeline
 #
 # Usage:
-#   - uses: your-org/moss-action@v1
+#   - uses: your-org/normalize-action@v1
 #     with:
 #       directory: '.'
 #       pattern: '**/*.py'
 
-name: 'Moss Analysis'
-description: 'Run moss static analysis on your Python codebase'
-author: 'Moss Contributors'
+name: 'Normalize Analysis'
+description: 'Run normalize static analysis on your Python codebase'
+author: 'Normalize Contributors'
 
 branding:
   icon: 'code'
@@ -39,7 +39,7 @@ inputs:
   sarif-file:
     description: 'SARIF output file path'
     required: false
-    default: 'moss-results.sarif'
+    default: 'normalize-results.sarif'
   upload-sarif:
     description: 'Upload SARIF to GitHub Code Scanning'
     required: false
@@ -65,9 +65,9 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
 
-    - name: Install moss
+    - name: Install normalize
       shell: bash
-      run: pip install moss
+      run: pip install normalize
 
     - name: Run rules check
       id: rules
@@ -75,12 +75,12 @@ runs:
       shell: bash
       run: |
         if [ "${{ inputs.sarif-output }}" == "true" ]; then
-          moss rules "${{ inputs.directory }}" \
+          normalize rules "${{ inputs.directory }}" \
             --pattern "${{ inputs.pattern }}" \
             --sarif "${{ inputs.sarif-file }}" \
             --json > rules-result.json 2>&1 || true
         else
-          moss rules "${{ inputs.directory }}" \
+          normalize rules "${{ inputs.directory }}" \
             --pattern "${{ inputs.pattern }}" \
             --json > rules-result.json 2>&1 || true
         fi
@@ -105,13 +105,13 @@ runs:
       if: inputs.metrics == 'true'
       shell: bash
       run: |
-        moss metrics "${{ inputs.directory }}" \
+        normalize metrics "${{ inputs.directory }}" \
           --pattern "${{ inputs.pattern }}" \
-          --json > moss-metrics.json 2>&1 || true
+          --json > normalize-metrics.json 2>&1 || true
 
         # Extract file count
-        if [ -f moss-metrics.json ]; then
-          FILES=$(cat moss-metrics.json | python -c "import json,sys; d=json.load(sys.stdin); print(d.get('total_files', 0))" 2>/dev/null || echo "0")
+        if [ -f normalize-metrics.json ]; then
+          FILES=$(cat normalize-metrics.json | python -c "import json,sys; d=json.load(sys.stdin); print(d.get('total_files', 0))" 2>/dev/null || echo "0")
           echo "files=$FILES" >> $GITHUB_OUTPUT
         else
           echo "files=0" >> $GITHUB_OUTPUT
@@ -121,6 +121,6 @@ runs:
       if: inputs.metrics == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: moss-metrics
-        path: moss-metrics.json
+        name: normalize-metrics
+        path: normalize-metrics.json
       continue-on-error: true

@@ -1,0 +1,5 @@
+{"event": "session_start","timestamp": "2026-01-04T09:18:58Z", "session_id": "renuh3aq", "timestamp": "2026-01-04T09:18:58Z", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-04T09:18:58Z", "max_turns": 15, "provider": "anthropic", "model": "default", "resumed": false, "prompt": "How many Lua scripts are in crates/moss/src/commands/scripts/? List their names."}
+{"event": "turn_start","timestamp": "2026-01-04T09:18:58Z", "prompt_length": 99, "working_memory_count": 0, "has_error_state": false, "turn": 1}
+{"event": "llm_response","timestamp": "2026-01-04T09:19:08Z", "retries": 0, "response_length": 1759, "turn": 1}
+{"event": "session_end","timestamp": "2026-01-04T09:19:08Z", "duration_seconds": 10, "total_turns": 1}

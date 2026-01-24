@@ -1,15 +1,15 @@
-# Moss Roadmap
+# Normalize Roadmap
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Rule sharing/import: `moss rules add/update/list/remove` (Phase 1 complete)
-- [x] Auto-fix support: `moss analyze rules --fix` with fix templates
+- [x] Rule sharing/import: `normalize rules add/update/list/remove` (Phase 1 complete)
+- [x] Auto-fix support: `normalize analyze rules --fix` with fix templates
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
 
 ## Remaining Work
-- Namespace-qualified lookups: `moss view std::vector`, `moss view com.example.Foo`
+- Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
   - Requires language-specific namespace semantics - low priority
 - Shadow worktree: true shadow-first mode (edit in shadow, then apply)
   - Current: --shadow flag works, but not default for all edits
@@ -20,27 +20,27 @@ Sections: `[daemon]`, `[index]`, `[aliases]`, `[view]`, `[analyze]`, `[text-sear
 
 Adding a new section (3 places):
 1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module
-2. Add field to MossConfig
+2. Add field to NormalizeConfig
 3. Add `run(args, json)` function that loads config and merges
 
 Candidates: `[workflow]` (directory, auto-run)
 
 ### Trait-Based Extensibility
-All trait-based crates follow the moss-languages pattern for extensibility:
+All trait-based crates follow the normalize-languages pattern for extensibility:
 - Global registry with `register()` function for user implementations
 - Built-ins initialized lazily via `init_builtin()` + `OnceLock`
 - No feature gates (implementations are small, not worth the complexity)
 
 Crates with registries:
-- [x] moss-languages: `Language` trait, `register()` in registry.rs
-- [x] moss-cli-parser: `CliFormat` trait, `register()` in formats/mod.rs
-- [x] moss-sessions: `LogFormat` trait, `register()` in formats/mod.rs
-- [x] moss-tools: `Tool` trait (`register_tool()`), `TestRunner` trait (`register()`)
-- [x] moss-packages: `Ecosystem` trait, `register_ecosystem()` in ecosystems/mod.rs
-- [x] moss-jsonschema: `JsonSchemaGenerator` trait, `register()` in lib.rs
-- [x] moss-openapi: `OpenApiClientGenerator` trait, `register()` in lib.rs
+- [x] normalize-languages: `Language` trait, `register()` in registry.rs
+- [x] normalize-cli-parser: `CliFormat` trait, `register()` in formats/mod.rs
+- [x] normalize-sessions: `LogFormat` trait, `register()` in formats/mod.rs
+- [x] normalize-tools: `Tool` trait (`register_tool()`), `TestRunner` trait (`register()`)
+- [x] normalize-packages: `Ecosystem` trait, `register_ecosystem()` in ecosystems/mod.rs
+- [x] normalize-jsonschema: `JsonSchemaGenerator` trait, `register()` in lib.rs
+- [x] normalize-openapi: `OpenApiClientGenerator` trait, `register()` in lib.rs
 
-Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. moss CLI can add Lua bindings at application layer for scripting.
+Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. normalize CLI can add Lua bindings at application layer for scripting.
 
 ### CLI API Consistency
 Audit found fragmentation across commands. Fix for consistent UX:
@@ -58,47 +58,47 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--type` vs `--kind`: standardized to `--kind` (view now uses `--kind` like analyze complexity)
 
 ### CLI Cleanup
-- [x] Move `moss plans` to `moss sessions plans`: groups tool-specific data under sessions
-- [x] Rename `moss filter aliases` to `moss aliases`: removes unnecessary namespace layer
-- [x] Unify `lint`/`test` under `moss tools`: `moss tools lint [run|list]`, `moss tools test [run|list]`
-- [x] Remove `analyze lint`: duplicate of `moss lint`, adds no value
+- [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
+- [x] Rename `normalize filter aliases` to `normalize aliases`: removes unnecessary namespace layer
+- [x] Unify `lint`/`test` under `normalize tools`: `normalize tools lint [run|list]`, `normalize tools test [run|list]`
+- [x] Remove `analyze lint`: duplicate of `normalize lint`, adds no value
 
 ### Documentation Cleanup
-- [x] Remove `moss @` and `moss workflow` references from docs - spore handles workflow running now
+- [x] Remove `normalize @` and `normalize workflow` references from docs - spore handles workflow running now
   - Archived: script.md, agent*.md, lua-cli.md, agent-state-machine.md, workflow-format.md, agent-commands.md, lua-api.md, agent-dogfooding.md
   - Updated: shadow-git.md, log-analysis.md, workflows/README.md, security-audit.md, dogfooding.md, langgraph-evaluation.md, prior-art.md
-  - Kept: moss-sessions parser (format still valid for reading old logs)
+  - Kept: normalize-sessions parser (format still valid for reading old logs)
 
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration
 - Edit routing: workflow engine with LLM decision points
 - Session/checkpoint: workflow state persistence
-- PR/diff analysis: `moss analyze --pr` or similar
+- PR/diff analysis: `normalize analyze --pr` or similar
 
 ## Backlog
 
-### moss-typegen
+### normalize-typegen
 - Add `Backend` trait with registry (hybrid pattern for user-defined backends)
 - Feature flags: `backend-*` prefix (e.g., `backend-typescript`, `backend-rust`, `backend-zod`)
 - CLI: support stdin input, multiple output files
 - Tests: snapshot tests for all backends
 
-### moss-surface-syntax
+### normalize-surface-syntax
 - [x] Add `Reader` and `Writer` traits with registry (hybrid pattern for user-defined readers/writers)
 - [x] Feature flags: `read-*` and `write-*` prefixes
 - Roundtrip tests: TS → IR → Lua → IR → TS (verify structure preservation)
 - Implement Lua reader (tree-sitter based)
 - Implement TypeScript writer
-- CLI: `moss translate` command
+- CLI: `normalize translate` command
 
 ### Feature flags for customizability
 Add feature flags to crates so consumers can opt out of implementations they don't need.
 Use consistent prefixes within each crate:
-- [x] moss-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) and groups `langs-*` (e.g., `langs-core`, `langs-functional`)
-- [x] moss-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-python`)
-- [x] moss-sessions: `format-*` (e.g., `format-claude`, `format-codex`, `format-gemini`, `format-moss`)
-- [x] moss-tools: `tool-*` individual (e.g., `tool-ruff`, `tool-clippy`) + `tools-*` language groups (e.g., `tools-python`, `tools-rust`)
+- [x] normalize-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) and groups `langs-*` (e.g., `langs-core`, `langs-functional`)
+- [x] normalize-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-python`)
+- [x] normalize-sessions: `format-*` (e.g., `format-claude`, `format-codex`, `format-gemini`, `format-normalize`)
+- [x] normalize-tools: `tool-*` individual (e.g., `tool-ruff`, `tool-clippy`) + `tools-*` language groups (e.g., `tools-python`, `tools-rust`)
 
 ### Workflow Engine
 - [x] Streaming output for `auto{}` driver
@@ -147,18 +147,18 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - Agents: specialized assistants with severity levels (Critical/Warning/Suggestion)
   - Hooks: PreToolUse, PostToolUse, UserPromptSubmit, Stop lifecycle events
   - GitHub Actions: scheduled maintenance (weekly quality, monthly docs sync, dependency audit)
-  - **Actionable for moss:**
-    - Script/workflow selection scoring (match prompts to relevant `.moss/scripts/`)
+  - **Actionable for normalize:**
+    - Script/workflow selection scoring (match prompts to relevant `.normalize/scripts/`)
     - Formalize auditor severity levels in output format
     - Expand hook triggering beyond current implementation
     - CI integration patterns for automated quality checks
 
 ### Package Management
-- `moss package install/uninstall`: proxy to ecosystem tools (cargo add, npm install, etc.)
+- `normalize package install/uninstall`: proxy to ecosystem tools (cargo add, npm install, etc.)
   - Very low priority - needs concrete use case showing value beyond direct tool usage
   - Possible value-adds: install across all ecosystems, auto-audit after install, config-driven installs
 
-### Package Index Fetchers (moss-packages)
+### Package Index Fetchers (normalize-packages)
 
 **Full coverage tracking**: See `docs/repository-coverage.md` for complete repository list.
 
@@ -293,12 +293,12 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] `cmd_edit` (67→51): extracted insert_single_at_destination
 - [x] `cmd_daemon` (66→54): extracted handle_response
 - [x] `cmd_view_symbol` (65→47): extracted print_smart_imports
-- [ ] `crates/moss-rules/src/runner.rs:evaluate_predicates` (53)
-- [ ] `crates/moss/src/commands/analyze/mod.rs:run` (53)
-- [ ] `crates/moss/src/commands/tools/lint.rs:cmd_lint_run` (49)
-- [ ] `crates/moss/src/tree.rs:collect_highlight_spans` (48)
-- [ ] `crates/moss-rules/src/runner.rs:run_rules` (44)
-- [ ] `crates/moss/src/commands/analyze/report.rs:analyze` (44)
+- [ ] `crates/normalize-rules/src/runner.rs:evaluate_predicates` (53)
+- [ ] `crates/normalize/src/commands/analyze/mod.rs:run` (53)
+- [ ] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (49)
+- [ ] `crates/normalize/src/tree.rs:collect_highlight_spans` (48)
+- [ ] `crates/normalize-rules/src/runner.rs:run_rules` (44)
+- [ ] `crates/normalize/src/commands/analyze/report.rs:analyze` (44)
 
 ### Package Index Backlog (simplest → complex)
 
@@ -342,20 +342,20 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] `--allow` for duplicate-functions: accept line range like output suggests (e.g., `--allow src/foo.rs:10-20`)
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
 - [x] Chained if-let: edition 2024 allows `if let Ok(x) = foo() && let Some(y) = bar(x)`. Audit complete.
-- PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
+- PR/diff analysis: `normalize analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - [x] Validate node kinds against grammars: `validate_unused_kinds_audit()` in 99 language files, runs as test
-- [x] Directory context: `moss context`, `view --dir-context`
-- Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
+- [x] Directory context: `normalize context`, `view --dir-context`
+- Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
 - Syntax-based linting: see `docs/design/syntax-linting.md`
-  - [x] Phase 1: `moss analyze ast`, `moss analyze query` (authoring tools)
-  - [x] Phase 1b: `moss analyze rules` reads .moss/rules/*.scm with TOML frontmatter
+  - [x] Phase 1: `normalize analyze ast`, `normalize analyze query` (authoring tools)
+  - [x] Phase 1b: `normalize analyze rules` reads .normalize/rules/*.scm with TOML frontmatter
   - [x] Phase 3a: builtin rules infrastructure (embedded + override + disable)
   - [x] Phase 2: severity config override, SARIF output
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
     - [x] Extended language coverage: Python (print-debug, breakpoint), Go (fmt-print), Ruby (binding-pry)
-    - [x] Rule sharing/import mechanism (`moss rules add/update/list/remove`)
-    - [x] Auto-fix support (`moss analyze rules --fix`)
+    - [x] Rule sharing/import mechanism (`normalize rules add/update/list/remove`)
+    - [x] Auto-fix support (`normalize analyze rules --fix`)
   - [x] Project manifest parsing: extract version/config from project manifests
     - RustSource: Cargo.toml (edition, resolver, name, version)
     - TypeScriptSource: tsconfig.json + package.json (target, module, strict, node_version)
@@ -379,9 +379,9 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**
   - Builtin `workflow` runner script interprets TOML files
   - Users can also write pure Lua scripts directly
-- Lua test framework: test discovery for `.moss/tests/` (test + test.property modules done)
-  - Command naming: must clearly indicate "moss Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
-  - Alternative: no special command, just run test files directly via `moss <file>`
+- Lua test framework: test discovery for `.normalize/tests/` (test + test.property modules done)
+  - Command naming: must clearly indicate "normalize Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
+  - Alternative: no special command, just run test files directly via `normalize <file>`
 - [x] Agent module refactoring: extracted 6 submodules (parser, session, context, risk, commands, roles)
   - agent.lua reduced from ~2300 to ~1240 lines (46% reduction)
   - Remaining: run_state_machine (~400 lines), M.run (~650 lines) - core agent logic, self-contained
@@ -396,29 +396,29 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - Read .git directly instead of spawning git commands where possible
   - Default branch detection, diff file listing, etc.
   - Trade-off: faster but more fragile (worktrees, packed refs, submodules)
-- [x] Symbol history: `moss view path/Symbol --history [N]`
+- [x] Symbol history: `normalize view path/Symbol --history [N]`
   - Shows last N changes to a symbol via git log -L (default: 5)
   - Works for both symbols and files
 - Documentation freshness: tooling to keep docs in sync with code
-  - For moss itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
-  - For user projects: detect stale docs in fresh projects (full moss assistance) and legacy codebases (missing/outdated docs)
+  - For normalize itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
+  - For user projects: detect stale docs in fresh projects (full normalize assistance) and legacy codebases (missing/outdated docs)
   - Consider boy scout rule: when touching code, improve nearby docs
 - [x] Case-insensitive matching (`-i` flag): `text-search` ✓, `view` ✓, `edit` ✓ all have it
-- `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
-- [x] Multi-file batch edit: `moss edit --batch edits.json` (see docs/design/batch-edit.md)
-- Semantic refactoring: `moss edit <glob> --before 'fn extract_attributes' 'fn extract_attributes(...) { ... }'`
+- `normalize fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
+- [x] Multi-file batch edit: `normalize edit --batch edits.json` (see docs/design/batch-edit.md)
+- Semantic refactoring: `normalize edit <glob> --before 'fn extract_attributes' 'fn extract_attributes(...) { ... }'`
   - Insert method before/after another method across multiple files
   - Uses tree-sitter for semantic targeting (not regex)
   - `--batch` flag for multiple targets in one invocation
-- Cross-file refactors: `moss move src/foo.rs/my_func src/bar.rs`
+- Cross-file refactors: `normalize move src/foo.rs/my_func src/bar.rs`
   - Move functions/types between files with import updates
   - Handles visibility changes (pub when crossing module boundaries)
   - Updates callers to use new path
-- Structured config crate (`moss-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
+- Structured config crate (`normalize-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
   - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml
-  - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `moss-build`
+  - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `normalize-build`
   - Open: linter vs formatter vs typechecker config - same trait or specialized?
-  - Open: reconsider moss config format choice (TOML vs YAML, JSON, KDL) - rationalize decision
+  - Open: reconsider normalize config format choice (TOML vs YAML, JSON, KDL) - rationalize decision
 
 ### Workspace/Context Management
 - Persistent workspace concept (like Notion): files, tool results, context stored permanently
@@ -443,7 +443,7 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 **Cross-file refactoring** - rename/move symbols across codebase
 - Prerequisite: Symbol graph in indexer (callers, callees, types)
 - Prerequisite: Import/export tracking per language
-- Find all usages via `moss analyze --callers Symbol`
+- Find all usages via `normalize analyze --callers Symbol`
 - Edit each usage atomically (all-or-nothing)
 - Update imports/exports as needed
 
@@ -472,7 +472,7 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - Auditor role completes in 2-4 turns for focused tasks
 - Investigator can loop on complex questions (mitigated by cycle detection)
 - --diff flag works well for PR-focused analysis
-- Session logs: `.moss/agent/logs/*.jsonl`
+- Session logs: `.normalize/agent/logs/*.jsonl`
 
 **Ongoing**:
 - Document friction points: where does the agent get stuck?
@@ -495,7 +495,7 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 **Roles implemented**:
 - [x] Investigator (default): answers questions about the codebase
 - [x] Auditor: finds issues (security, quality, patterns)
-  - Usage: `moss @agent --audit "find unwrap on user input"`
+  - Usage: `normalize @agent --audit "find unwrap on user input"`
   - Structured output: `$(note SECURITY:HIGH file:line - description)`
   - Planner creates systematic audit strategy
 
@@ -526,7 +526,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - **FOOTGUN: Claude Code cwd**: `cd` in Bash commands persists across calls. E.g., `cd foo && perl ...` breaks subsequent calls. Always use absolute paths.
 - Claude works reliably with current prompt
 - Context compaction unreliable in practice (Claude Code + Opus 4.5 lost in-progress work)
-- Moss's dynamic context reshaping avoids append-only accumulation problems
+- Normalize's dynamic context reshaping avoids append-only accumulation problems
 - LLM code consistency: see `docs/llm-code-consistency.md`
 - Large file edits: agentic tools struggle with large deletions (Edit tool match failures)
 - **View loops**: Claude can get stuck viewing same files repeatedly without extracting info (session 67xvhqzk: 7× `view commands/`, 7× `view mod.rs`, 15 turns, task incomplete)
@@ -557,7 +557,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - Key insight: role assertion + explicit prohibitions + concrete examples beats instruction-only prompts
 - **Dogfooding session (2026-01-07)**:
   - Gemini 500 errors remain intermittent (hit on first task, next 3 succeeded)
-  - Agent occasionally uses `$(run ls -R)` instead of `$(view .)` - prefers shell over moss tools
+  - Agent occasionally uses `$(run ls -R)` instead of `$(view .)` - prefers shell over normalize tools
   - Investigator: 4 turns for config structure query, correct answer, good line-range viewing
   - Auditor: 2 turns for unwrap() audit, parallel search commands, accurate file:line findings
   - Pattern: auditor role executes parallel searches efficiently (5 commands turn 1, synthesized turn 2)
@@ -583,10 +583,10 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 
 ### Session Analysis
 
-**moss-sessions refactor** - see `docs/design/sessions-refactor.md`
+**normalize-sessions refactor** - see `docs/design/sessions-refactor.md`
 - [x] Split parsing from analysis: `LogFormat::parse()` → unified `Session` type
-- [x] Move analysis to consumers (moss CLI uses `parse()` + local `analyze_session()`)
-- [x] Remove `analyze()` from LogFormat trait (analysis now in `crates/moss/src/sessions/analysis.rs`)
+- [x] Move analysis to consumers (normalize CLI uses `parse()` + local `analyze_session()`)
+- [x] Remove `analyze()` from LogFormat trait (analysis now in `crates/normalize/src/sessions/analysis.rs`)
 
 **Recently Added (2026-01-24)**:
 - [x] Tool patterns: common sequences across sessions (e.g., "Read → Edit" 42×)
@@ -624,7 +624,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
      - Identify repeated explanations/apologies
      - Detect boilerplate/templated responses
    - Implementation: tokenize text blocks, count ngram frequencies, rank by occurrence
-   - Output: `moss sessions show <id> --ngrams N [--case-insensitive]`
+   - Output: `normalize sessions show <id> --ngrams N [--case-insensitive]`
    - Example: "I apologize for" 5×, "let me fix" 8×, "failed to parse" 12×
 
 3. **Token growth visualization** (HIGH VALUE) [DONE]
@@ -664,21 +664,21 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 
 6. **Cross-repo comparison**
    - Aggregate metrics across ecosystem projects
-   - Compare tool usage: `moss: 78% Edit, spore: 45% Bash, resin: 89% Read`
+   - Compare tool usage: `normalize: 78% Edit, spore: 45% Bash, resin: 89% Read`
    - Compare parallelization: which repos have most sequential patterns?
    - Compare error rates: which repos have fragile tooling?
-   - Implementation: `moss sessions stats --by-repo` with repo detection
+   - Implementation: `normalize sessions stats --by-repo` with repo detection
 
 7. **Message filtering subcommand** (NEW REQUEST)
    - Filter session messages by type: user, assistant, system, tool_use, tool_result
-   - Keyword search within message text: `moss sessions show <id> --filter user --grep "test"`
+   - Keyword search within message text: `normalize sessions show <id> --filter user --grep "test"`
    - Use cases:
-     - Extract all user prompts: `moss sessions show <id> --filter user`
-     - Find tool errors: `moss sessions show <id> --filter tool_result --errors-only`
-     - Search assistant reasoning: `moss sessions show <id> --filter assistant --grep "because"`
+     - Extract all user prompts: `normalize sessions show <id> --filter user`
+     - Find tool errors: `normalize sessions show <id> --filter tool_result --errors-only`
+     - Search assistant reasoning: `normalize sessions show <id> --filter assistant --grep "because"`
    - Output modes: full messages, excerpts, counts
-   - Implementation: new `moss sessions show <id> --filter <type> [--grep PATTERN]`
-   - Combine with existing jq: `moss sessions show <id> --filter tool_use --jq '.name'`
+   - Implementation: new `normalize sessions show <id> --filter <type> [--grep PATTERN]`
+   - Combine with existing jq: `normalize sessions show <id> --filter tool_use --jq '.name'`
 
 **Other Session Analysis Backlog**:
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
@@ -695,20 +695,20 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - GitHub Copilot (VS Code)
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
-- `moss sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
-- `moss sessions mark <id>`: mark as reviewed (store in `.moss/sessions-reviewed`)
+- `normalize sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
+- `normalize sessions mark <id>`: mark as reviewed (store in `.normalize/sessions-reviewed`)
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions
   - Cross-agent comparison: Claude Code, Gemini CLI, OpenAI Codex, etc.
-  - Goal: understand what behaviors to encode in moss agent (model-agnostic reliability)
+  - Goal: understand what behaviors to encode in normalize agent (model-agnostic reliability)
   - Maybe: automated agent testing harness (run same tasks across assistants)
 
 ### Friction Signals (see `docs/research/agent-adaptation.md`)
 How do we know when tools aren't working? Implicit signals from agent behavior:
 - Correction patterns: "You're right", "Should have" after tool calls
 - Long tool chains: 5+ calls without acting
-- Tool avoidance: grep instead of moss, spawning Explore agents
+- Tool avoidance: grep instead of normalize, spawning Explore agents
 - Follow-up patterns: `--types-only` → immediately view symbol
 - Repeated queries: same file viewed multiple times
 
@@ -719,14 +719,14 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
 ### Vision (Aspirational)
-- **Friction Minimization Loop**: moss should make it easier to reduce friction, which accelerates development, which makes it easier to improve moss. Workflows documented → failure modes identified → encoded as tooling → friction reduced → faster iteration. The goal is tooling that catches problems automatically (high reliability) not documentation that hopes someone reads it (low reliability).
+- **Friction Minimization Loop**: normalize should make it easier to reduce friction, which accelerates development, which makes it easier to improve normalize. Workflows documented → failure modes identified → encoded as tooling → friction reduced → faster iteration. The goal is tooling that catches problems automatically (high reliability) not documentation that hopes someone reads it (low reliability).
 - Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
-- Synthesis: decompose complex tasks into solvable subproblems (`moss synthesize`)
+- Synthesis: decompose complex tasks into solvable subproblems (`normalize synthesize`)
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
 
 ### Agent / MCP
 - Gemini Flash 3 prompt sensitivity: certain phrases ("shell", "execute", nested `[--opts]`) trigger 500 errors. Investigate if prompt can be further simplified to avoid safety filters entirely. See `docs/design/agent.md` for current workarounds.
-- `moss @agent` (crates/moss/src/commands/scripts/agent.lua): MCP support as second-class citizen
+- `normalize @agent` (crates/normalize/src/commands/scripts/agent.lua): MCP support as second-class citizen
   - Our own tools take priority, MCP as fallback/extension mechanism
   - Need to design how MCP servers are discovered/configured
 - Context view management: extend/edit/remove code views already in agent context
@@ -739,7 +739,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 
 ## Known Issues
 
-### moss-languages: ast-grep test broken
+### normalize-languages: ast-grep test broken
 The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mismatch:
 - `DynLang.parse()` method not found
 - `ast_grep_core::tree_sitter::LanguageExt` trait may need explicit import or implementation
@@ -768,7 +768,7 @@ The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mi
 
 ### Memory System
 See `docs/design/memory.md`. Core API: `store(content, opts)`, `recall(query)`, `forget(query)`.
-SQLite-backed persistence in `.moss/memory.db`. Slots are user-space (metadata), not special-cased.
+SQLite-backed persistence in `.normalize/memory.db`. Slots are user-space (metadata), not special-cased.
 
 ### Local NN Budget (from deleted docs)
 | Model | Params | FP16 RAM |
@@ -785,9 +785,9 @@ Pre-summarization tiers: extractive (free) → small NN → LLM (expensive)
 
 ## Implementation Notes
 
-### Self-update (`moss update`)
+### Self-update (`normalize update`)
 - Now in commands/update.rs
-- GITHUB_REPO constant → "pterror/moss"
+- GITHUB_REPO constant → "rhi-zone/normalize"
 - Custom SHA256 implementation (Sha256 struct)
 - Expects GitHub release with SHA256SUMS.txt
 
@@ -799,5 +799,5 @@ git tag v0.1.0
 git push --tags
 ```
 - Verify cross-platform builds in GitHub Actions
-- Test `moss update` against real release
+- Test `normalize update` against real release
 - view: directory output shows dir name as first line (tree style) - intentional?

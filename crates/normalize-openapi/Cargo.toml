@@ -1,0 +1,9 @@
+[package]
+name = "rhi-normalize-openapi"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+description = "OpenAPI client code generation"
+
+[dependencies]
+serde_json.workspace = true

@@ -1,0 +1,6 @@
+{"event": "session_start","timestamp": "2026-01-05T09:19:31Z", "timestamp": "2026-01-05T09:19:31Z", "session_id": "h9grzx8c", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-05T09:19:31Z", "user_prompt": "What languages does moss support for syntax highlighting?", "model": "default", "machine_start": "explorer", "use_planner": false, "provider": "gemini", "system_prompt": "state_machine_v2", "max_turns": 12}
+{"event": "turn_start","timestamp": "2026-01-05T09:19:31Z", "working_memory_count": 0, "notes_count": 0, "state": "explorer", "turn": 1, "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-05T09:19:32Z", "turn": 1, "response": "$(run ls -R)", "state": "explorer"}
+{"event": "command","timestamp": "2026-01-05T09:19:33Z", "output_length": 1176016, "success": true, "turn": 1, "cmd": "run ls -R"}
+{"event": "turn_start","timestamp": "2026-01-05T09:19:33Z", "working_memory_count": 0, "notes_count": 0, "state": "evaluator", "turn": 2, "pending_outputs": 1}

@@ -1,10 +1,10 @@
 #!/bin/bash
 # Moss CLI installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/pterror/moss/master/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | bash
 
 set -e
 
-REPO="pterror/moss"
+REPO="rhi-zone/normalize"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 # Detect platform
@@ -42,10 +42,10 @@ if [ -z "$LATEST" ]; then
     exit 1
 fi
 
-echo "Installing moss $LATEST for $TARGET..."
+echo "Installing normalize $LATEST for $TARGET..."
 
 # Download
-URL="https://github.com/$REPO/releases/download/$LATEST/moss-$TARGET.tar.gz"
+URL="https://github.com/$REPO/releases/download/$LATEST/normalize-$TARGET.tar.gz"
 TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
 
@@ -53,13 +53,13 @@ curl -fsSL "$URL" | tar xz -C "$TMPDIR"
 
 # Install
 if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMPDIR/moss" "$INSTALL_DIR/moss"
+    mv "$TMPDIR/normalize" "$INSTALL_DIR/normalize"
 else
     echo "Installing to $INSTALL_DIR (requires sudo)..."
-    sudo mv "$TMPDIR/moss" "$INSTALL_DIR/moss"
+    sudo mv "$TMPDIR/normalize" "$INSTALL_DIR/normalize"
 fi
 
-chmod +x "$INSTALL_DIR/moss"
+chmod +x "$INSTALL_DIR/normalize"
 
-echo "Installed moss $LATEST to $INSTALL_DIR/moss"
+echo "Installed moss $LATEST to $INSTALL_DIR/normalize"
 echo "Run 'moss --help' to get started"

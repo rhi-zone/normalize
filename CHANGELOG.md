@@ -5,14 +5,14 @@
 See `docs/` for design docs and `README.md` for usage.
 
 ### Agent Command
-- `moss @agent "task"` runs autonomous agent loop (max 15 turns)
+- `normalize @agent "task"` runs autonomous agent loop (max 15 turns)
 - Pure Lua implementation (`require("agent")` module)
 - Ephemeral context model: outputs shown once, gone next turn unless kept
   - `$(keep)` / `$(keep N)` / `$(keep N M)` - retain specific outputs
   - `$(note <fact>)` - record synthesized insights
   - `$(drop <id>)` - remove item from working memory by ID
   - `$(forget <pattern>)` - remove notes matching pattern
-  - `$(memorize <fact>)` - save to long-term memory (.moss/memory/facts.md)
+  - `$(memorize <fact>)` - save to long-term memory (.normalize/memory/facts.md)
   - Working memory replaces append-only turn history
 - Session continuity:
   - `$(checkpoint progress | questions)` - save session for later
@@ -21,7 +21,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Auto-checkpoint on max turns reached
 - Error escalation: retry → rollback → ask user (automatic after 3 failures)
 - `$(batch-edit target1 action content | target2 ...)` - multi-file batch edits
-- Session logging: JSONL logs in .moss/agent/logs/ for analysis
+- Session logging: JSONL logs in .normalize/agent/logs/ for analysis
   - `--list-logs` - show available session logs
 - `--non-interactive` / `-n` - CI mode ($(ask) returns error instead of blocking)
 - Loop detection: warns when same command repeated 3+ times
@@ -43,7 +43,7 @@ See `docs/` for design docs and `README.md` for usage.
 - Risk assessment: `--auto-approve [low|medium|high]`
 - Auto-commit: `--commit` commits after successful validation
 - See `docs/design/agent.md` and `docs/experiments/agent-state-machine.md` for design rationale
-- Prompt tuning: explicit preference for moss tools over shell commands (prevents `$(run ls)` when `$(view .)` works)
+- Prompt tuning: explicit preference for normalize tools over shell commands (prevents `$(run ls)` when `$(view .)` works)
 
 ### View Command
 - Trailing slash now means "directory only": `view agent/` matches directories, not symbols with "/" in name
@@ -57,7 +57,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Collects `.context.md` and `CONTEXT.md` files from directory hierarchy
 
 ### Context Command
-- `moss context [path]`: show merged directory context for a path
+- `normalize context [path]`: show merged directory context for a path
   - Collects `.context.md` and `CONTEXT.md` files from root to target
   - Files merge in order: root → parent → target (most general to most specific)
   - `.context.md` takes priority over `CONTEXT.md` in same directory
@@ -65,11 +65,11 @@ See `docs/` for design docs and `README.md` for usage.
   - Supports `--json` for structured output
 
 ### Analyze Command
-- Glob pattern support for target: `moss analyze 'src/**/*.rs'`
+- Glob pattern support for target: `normalize analyze 'src/**/*.rs'`
   - Matches files with glob pattern and analyzes them
   - Works with complexity, length, and security analysis
-- `moss analyze rules`: syntax-based linting with tree-sitter queries
-  - Rules load from: embedded builtins → `~/.config/moss/rules/` → `.moss/rules/`
+- `normalize analyze rules`: syntax-based linting with tree-sitter queries
+  - Rules load from: embedded builtins → `~/.config/normalize/rules/` → `.normalize/rules/`
   - Later rules override earlier by `id`; `enabled = false` disables a rule
   - Frontmatter fields: `id`, `severity`, `message`, `allow`, `languages`, `enabled`
   - Tree-sitter predicates supported: `#eq?`, `#match?`, `#any-of?`
@@ -90,48 +90,48 @@ See `docs/` for design docs and `README.md` for usage.
   - JSON output with `--json`
   - Shows file count in header: "src/**/*.rs (18 files)"
   - Language sources: `typescript.*` (tsconfig.json), `python.*` (pyproject.toml), `go.*` (go.mod)
-  - Extracted to `moss-rules` crate (library code separate from CLI)
+  - Extracted to `normalize-rules` crate (library code separate from CLI)
 - `-i/--case-insensitive` flag for trace, callers, callees subcommands
   - Matches symbol names case-insensitively
   - Consistent with view and edit command flags
 
 ### Edit Command
-- Batch edit: `moss edit --batch edits.json` for atomic multi-file edits
+- Batch edit: `normalize edit --batch edits.json` for atomic multi-file edits
   - JSON format: `[{"target": "file/sym", "action": "replace", "content": "..."}]`
-  - Stdin support: `cat edits.json | moss edit --batch -`
+  - Stdin support: `cat edits.json | normalize edit --batch -`
   - Edits grouped by file, applied bottom-up to preserve line numbers
   - Overlap detection rejects conflicting edits
   - Single shadow git snapshot for entire batch
 - Lua API: `edit.batch({{target="file/sym", action="replace", content="..."}})`
 
 ### Shadow Git (Phase 1 + Phase 2 Core)
-- Auto-track edits made via `moss edit` for undo/redo capability
-- Shadow repo created on first edit at `.moss/shadow/`
+- Auto-track edits made via `normalize edit` for undo/redo capability
+- Shadow repo created on first edit at `.normalize/shadow/`
 - `--message`/`--reason` flag on edit command for edit descriptions
-- `moss history` command for viewing edit history
-  - File filtering: `moss history src/foo.rs`
+- `normalize history` command for viewing edit history
+  - File filtering: `normalize history src/foo.rs`
   - `--json` for machine-readable output
   - `--diff <ref>` to view changes for specific commit
   - `--status` for edits since last git checkpoint
   - `--limit/-n` for controlling output count
 - `[shadow]` config section: `enabled`, `warn_on_delete`
 - **Undo/Redo (Phase 2)**:
-  - `moss edit --undo` reverts the last edit
-  - `moss edit --undo N` reverts the last N edits
-  - `moss edit --undo --dry-run` previews what would be undone
-  - `moss edit --redo` re-applies the last undone edit
+  - `normalize edit --undo` reverts the last edit
+  - `normalize edit --undo N` reverts the last N edits
+  - `normalize edit --undo --dry-run` previews what would be undone
+  - `normalize edit --redo` re-applies the last undone edit
   - Restores files to their previous state from shadow history
-  - **Conflict detection**: blocks undo if files modified externally since last moss edit
-  - `moss edit --undo --force` overrides conflict detection
+  - **Conflict detection**: blocks undo if files modified externally since last normalize edit
+  - `normalize edit --undo --force` overrides conflict detection
   - Dry-run shows which files have conflicts
-  - `moss edit --goto <ref>` jumps to arbitrary commit in shadow history
-  - `moss edit --undo --file <path>` partial undo for specific file only
-  - `moss history --all` shows full tree structure with git graph
+  - `normalize edit --goto <ref>` jumps to arbitrary commit in shadow history
+  - `normalize edit --undo --file <path>` partial undo for specific file only
+  - `normalize history --all` shows full tree structure with git graph
   - **Checkpoint integration**: undo respects git commit boundaries
     - Refuses to undo past a git commit by default
     - `--cross-checkpoint` allows undoing past real git commits
 - **Phase 3: Security + Polish**:
-  - `moss history --prune N` removes old commits, keeping last N
+  - `normalize history --prune N` removes old commits, keeping last N
   - `warn_on_delete` config option (default: true) requires `--yes`/`-y` for delete operations
 - See `docs/design/shadow-git.md` for full design
 
@@ -165,28 +165,28 @@ See `docs/` for design docs and `README.md` for usage.
   - Used for both path targets (`@todo`) and filter patterns (`--only @tests`)
   - Supports all path separators: `/`, `:`, `::`, `#` (e.g., `@todo/Section`, `@todo:Section`)
 - Added `[serve]` section for HTTP server configuration:
-  - `http_port` - default port for `moss serve http` (default: 8080)
+  - `http_port` - default port for `normalize serve http` (default: 8080)
   - `http_host` - host to bind to (default: "127.0.0.1")
 
 ### Index Command
 - `index rebuild` now includes call graph by default (symbols needed for most features)
   - Use `--include none` for files-only mode (faster)
   - Use `--include symbols,calls` to selectively extract content types
-- Source file detection now uses `moss-languages` registry instead of hardcoded lists
+- Source file detection now uses `normalize-languages` registry instead of hardcoded lists
   - All supported languages are automatically included (Lua, Shell, etc. now indexed)
 
 ### View Command
-- Path suffix matching: `moss view analyze/report.rs` now finds `crates/moss/src/commands/analyze/report.rs`
-- Glob pattern support: `moss view '**/*.lua'` and `moss view 'src/**/*.rs'`
+- Path suffix matching: `normalize view analyze/report.rs` now finds `crates/normalize/src/commands/analyze/report.rs`
+- Glob pattern support: `normalize view '**/*.lua'` and `normalize view 'src/**/*.rs'`
 - Signature highlighting fix: Lua, Ruby, Elixir signatures now highlight correctly
   - Added `Language::signature_suffix()` trait method for language-specific closing tokens
   - Replaces hardcoded Rust special case with proper trait-based solution
-- Glob pattern support for symbols: `moss view "file.rs/Symbol*"`
+- Glob pattern support for symbols: `normalize view "file.rs/Symbol*"`
 - Split view.rs into submodules (search, tree, file, symbol, lines)
 
 ### Edit Command
 - Fixed "byte index out of bounds" panic when editing files without trailing newlines
-- Glob pattern support for multi-symbol operations: `moss edit "file.py/foo*" delete --multiple`
+- Glob pattern support for multi-symbol operations: `normalize edit "file.py/foo*" delete --multiple`
   - Matches symbols using glob patterns (`*`, `**`, `?`, `[...]`)
   - Path-based matching for nested symbols: `"TODO.md/Main/Feature*"` matches sections under Main
   - `--multiple` flag required when pattern matches more than one symbol (safety)
@@ -196,9 +196,9 @@ See `docs/` for design docs and `README.md` for usage.
 - Unified glob symbol resolution with view command via shared `path_resolve` module
 
 ### Script Command
-- `moss script run` now accepts trailing arguments: `moss script run todo add "foo"`
+- `normalize script run` now accepts trailing arguments: `normalize script run todo add "foo"`
   - Args available in Lua as `args` table (1-indexed array)
-  - Consistent with `@script` syntax: `moss @todo add "foo"`
+  - Consistent with `@script` syntax: `normalize @todo add "foo"`
 
 ### Lua Script Libraries
 
@@ -226,17 +226,17 @@ See `docs/design/lua-cli.md`, `docs/design/lua-type.md`, and `docs/design/lua-te
 
 ### Test Command
 
-`moss test` - proxy to native test runners:
+`normalize test` - proxy to native test runners:
 - Auto-detects project type (Cargo.toml, go.mod, package.json, etc.)
 - Supported runners: cargo, go, bun, npm, pytest
-- Pass-through args: `moss test -- --nocapture`
-- List available runners: `moss test list`
+- Pass-through args: `normalize test -- --nocapture`
+- List available runners: `normalize test list`
 
 ### Bug Fixes
 
-- **Fixed symbol search for trait impl methods**: `moss view <function_name>` now correctly finds methods in trait implementations. Previously, methods without explicit `pub` modifiers (like trait impl methods) were filtered out by default. Changed `ExtractOptions::include_private` to default to `true` since moss is for code exploration, not API documentation. Also removed the now-redundant `--include-private` flag.
-- **Fixed qualified symbol paths**: `moss view Tsx/format_import` now works as expected. Previously, typing a qualified symbol path from the multi-match list would trigger fuzzy file matching instead of symbol lookup. Now paths like `Parent/method` are recognized as symbol queries when the first segment isn't an existing path.
-- **Fixed `moss view file --pretty` hang**: Syntax highlighting was recompiling tree-sitter queries (~117ms each) for every signature. Now queries are cached globally - a file with 80+ functions went from 10+ seconds to ~100ms.
+- **Fixed symbol search for trait impl methods**: `normalize view <function_name>` now correctly finds methods in trait implementations. Previously, methods without explicit `pub` modifiers (like trait impl methods) were filtered out by default. Changed `ExtractOptions::include_private` to default to `true` since normalize is for code exploration, not API documentation. Also removed the now-redundant `--include-private` flag.
+- **Fixed qualified symbol paths**: `normalize view Tsx/format_import` now works as expected. Previously, typing a qualified symbol path from the multi-match list would trigger fuzzy file matching instead of symbol lookup. Now paths like `Parent/method` are recognized as symbol queries when the first segment isn't an existing path.
+- **Fixed `normalize view file --pretty` hang**: Syntax highlighting was recompiling tree-sitter queries (~117ms each) for every signature. Now queries are cached globally - a file with 80+ functions went from 10+ seconds to ~100ms.
 - **Fixed `--full --pretty` performance**: Injected content highlighting was recreating GrammarLoader and Query for each block. Now uses cached loader and queries - 270ms → 50ms.
 
 ### Type Consolidation
@@ -265,11 +265,11 @@ Query-based highlighting using tree-sitter .scm files:
 
 ### View Command
 
-`moss view` improvements:
+`normalize view` improvements:
 - Smart Header: symbol view shows imports filtered by used names within multi-imports
 - Ancestor context: nested symbols show parent signatures by default (`--no-parent` to hide)
-- Line ranges: `moss view file.rs:30-55` for arbitrary sections with syntax highlighting
-- Line targets: `moss view file.rs:300` finds symbol containing that line
+- Line ranges: `normalize view file.rs:30-55` for arbitrary sections with syntax highlighting
+- Line targets: `normalize view file.rs:300` finds symbol containing that line
 - Fuzzy path resolution: `typescript.rs:300` works like `typescript.rs` (partial names supported)
 - Doc filtering: line ranges respect `--docs` flag (hides comments when false)
 - Test filtering: `--tests` flag shows test functions (hidden by default)
@@ -288,39 +288,39 @@ Grammar build tooling:
 
 ### Analyze Command
 
-`moss analyze` improvements:
+`normalize analyze` improvements:
 - `--trace <symbol>`: trace value provenance (what identifiers flow into assignments)
 - `--duplicate-functions`: detect duplicate functions (renamed from `--clones`)
-- `--allow-function`: add function pair to `.moss/duplicate-functions-allow` (renamed from `--allow-group`)
+- `--allow-function`: add function pair to `.normalize/duplicate-functions-allow` (renamed from `--allow-group`)
 - `--duplicate-types`: detect structurally similar types via field name overlap
 - `--min-overlap N`: configurable threshold (default 70%)
-- `--allow-type Type1 Type2`: add pair to `.moss/duplicate-types-allow`
+- `--allow-type Type1 Type2`: add pair to `.normalize/duplicate-types-allow`
 - Supports single file or directory scanning
 - JSON output with `--json`
 
 ### Text Search Command
 
-`moss text-search` (renamed from `grep` to avoid unix grep mental model confusion):
+`normalize text-search` (renamed from `grep` to avoid unix grep mental model confusion):
 - Shows containing symbol with line range in output (e.g., `42 (process_request L30-55): ...`)
 - Semantic context is more useful than arbitrary surrounding lines
 
 ### Init Command
 
-`moss init` for idempotent project setup:
-- Creates `.moss/` directory and default `config.toml`
-- Updates `.gitignore` with moss entries (`.moss/*`, `!.moss/config.toml`, `!.moss/duplicate-functions-allow`, `!.moss/duplicate-types-allow`)
+`normalize init` for idempotent project setup:
+- Creates `.normalize/` directory and default `config.toml`
+- Updates `.gitignore` with normalize entries (`.normalize/*`, `!.normalize/config.toml`, `!.normalize/duplicate-functions-allow`, `!.normalize/duplicate-types-allow`)
 - Logs when commented-out entries are skipped
 - `--index` flag to index codebase after init
 
 ### Duplicate Function Detection
 
-`moss analyze --duplicate-functions` for finding structural code duplicates:
+`normalize analyze --duplicate-functions` for finding structural code duplicates:
 - On-demand AST hashing (no index storage)
 - `--elide-identifiers` (default true): ignore variable/function names
 - `--elide-literals` (default false): ignore literal values
 - `--show-source`: display duplicate code inline
 - `--min-lines N`: filter trivial functions
-- Allowlist via `.moss/duplicate-functions-allow` (format: `path:symbol`)
+- Allowlist via `.normalize/duplicate-functions-allow` (format: `path:symbol`)
 - `--allow-function path:symbol` to approve duplicate groups (with `--reason` for new groups)
 - CI integration: fails if unallowed duplicates found
 
@@ -338,22 +338,22 @@ All commands now work gracefully when indexing is disabled (`[index] enabled = f
 - Symbol search falls back to filesystem walking with skeleton extraction
 - Health analysis walks filesystem for file counts and line metrics
 - Path resolution uses glob patterns instead of index queries
-- Shadow Git for hunk-level edit tracking (`.moss/.git`)
+- Shadow Git for hunk-level edit tracking (`.normalize/.git`)
 
 ### Package Command
 
-- `moss package why <pkg>` and `moss package tree` now show full transitive dependency trees for pnpm, yarn, and bun lockfiles
+- `normalize package why <pkg>` and `normalize package tree` now show full transitive dependency trees for pnpm, yarn, and bun lockfiles
 - `--jq` flag works with all package subcommands for filtering JSON output
 - Fixed docs: downgraded vitepress to stable 1.6.4, fixed mermaid CJS interop
 
 ### Todo Command
 
-`moss todo` for structured TODO.md editing:
+`normalize todo` for structured TODO.md editing:
 - Auto-detects formats: checkboxes, numbered lists, bullets, headers
 - Subcommands: `list`, `add`, `done`, `rm`, `clean`
 - Section targeting: `--section "Backlog"` or `--section "Backlog/Language Support"`
 - Filters: `--all`, `--done`, `--pending`, `--raw`
-- Config: `[todo]` in `.moss/config.toml` for file, primary_section, show_all
+- Config: `[todo]` in `.normalize/config.toml` for file, primary_section, show_all
 
 ### Build System
 
@@ -366,19 +366,19 @@ Optimizations for faster development iteration:
 
 External grammar loading for faster builds and user extensibility:
 - `cargo xtask build-grammars` compiles 97 tree-sitter grammars to shared libraries
-- Grammars load from `MOSS_GRAMMAR_PATH`, `~/.config/moss/grammars/`, then arborium fallback
+- Grammars load from `MOSS_GRAMMAR_PATH`, `~/.config/normalize/grammars/`, then arborium fallback
 - Platform support: .so (Linux), .dylib (macOS), .dll (Windows)
-- User-added grammars: drop `.so` files in `~/.config/moss/grammars/`
+- User-added grammars: drop `.so` files in `~/.config/normalize/grammars/`
 
 ### Lua Workflow Engine
 
 Replaced TOML workflow engine with Lua (LuaJIT via mlua):
-- Moss commands as typed Lua functions: `view()`, `analyze()`, `grep()`, etc.
+- Normalize commands as typed Lua functions: `view()`, `analyze()`, `grep()`, etc.
 - Accept string or table: `view("foo.rs")` or `view{target="foo.rs", context=true}`
 - Helpers: `shell()`, `is_dirty()`, `tests_pass()`, `file_exists()`, `read_file()`
 - `auto{}` driver: LLM-driven autonomous agent loop
-- LuaCats type definitions for IDE support (`.moss/workflows/moss.lua`)
-- Example: `.moss/workflows/test.lua`
+- LuaCats type definitions for IDE support (`.normalize/workflows/normalize.lua`)
+- Example: `.normalize/workflows/test.lua`
 
 ### Lua Modules
 
@@ -413,7 +413,7 @@ Coroutine-based sessions for interactive workflows:
 
 ### Docstring Display Levels
 
-Three-level docstring display for `moss view`:
+Three-level docstring display for `normalize view`:
 - Skeleton mode: no docstrings (structure only)
 - Default: summary only (up to double blank line `\n\n\n`)
 - `--docs` flag: full docstrings
@@ -422,29 +422,29 @@ The double-blank convention allows separating summary from extended docs inline.
 
 ### Stale Documentation Detection
 
-`moss analyze --stale-docs` finds docs where covered code has changed since the doc was modified:
+`normalize analyze --stale-docs` finds docs where covered code has changed since the doc was modified:
 - Add `<!-- covers: src/foo.rs, src/bar/*.rs -->` to markdown docs
 - Supports exact paths, glob patterns, and directories
 - Reports days stale and number of files changed
 
 ### Example Validation
 
-`moss analyze --check-examples` validates example references in markdown:
+`normalize analyze --check-examples` validates example references in markdown:
 - Mark examples in source: `// [example: basic-usage] ... // [/example]`
 - Reference in docs: `{{example: tests/foo.rs#basic-usage}}`
 - Reports missing examples with file and line number
 
 ### Documentation Reference Checking
 
-`moss analyze --check-refs` scans markdown files for code references in backticks and validates against indexed symbols. Reports broken references with file:line and context.
+`normalize analyze --check-refs` scans markdown files for code references in backticks and validates against indexed symbols. Reports broken references with file:line and context.
 
 ### Config System
 
-Added config loading from `.moss/config.toml` (per-project) and `~/.config/moss/config.toml` (global). Supports daemon and index configuration.
+Added config loading from `.normalize/config.toml` (per-project) and `~/.config/normalize/config.toml` (global). Supports daemon and index configuration.
 
 ### Lint Performance
 
-Reduced `moss lint list` from ~12s to ~0.5s:
+Reduced `normalize lint list` from ~12s to ~0.5s:
 - Filesystem-first tool detection: check `node_modules/.bin/`, `.venv/bin/` before spawning processes
 - Removed remote fallbacks (npx, pnpm dlx, pipx run) - only detect locally installed tools
 - Detection order: check relevance (score) before availability (expensive process spawn)
@@ -476,7 +476,7 @@ Integrated LLM calling into the workflow engine:
 - Streaming support with callback (falls back to batch when API unstable)
 - System prompt configuration in workflow TOML
 - Tool configuration framework (for future function calling support)
-- Example workflow: `.moss/workflows/llm-review.toml`
+- Example workflow: `.normalize/workflows/llm-review.toml`
 
 ### LLM Adapters
 
@@ -490,7 +490,7 @@ Expanded LLM provider support via rig crate (behind `llm` feature). 13 providers
 
 HTTP server now auto-generates OpenAPI spec using utoipa:
 - Spec served at `/openapi.json` when server is running
-- `moss serve http --openapi` outputs spec without starting server
+- `normalize serve http --openapi` outputs spec without starting server
 - Replaces stale Python-generated spec (was 117KB, now accurate 10KB)
 
 ### Session Summary Workflow
@@ -506,35 +506,35 @@ Added `session-summary` workflow for end-of-session stats:
 
 ### JSON Schema Type Codegen
 
-New `moss-jsonschema` crate for generating type definitions from JSON Schema:
-- `moss generate types <schema.json> -l typescript` - TypeScript interfaces
-- `moss generate types <schema.json> -l python` - Python dataclasses
-- `moss generate types <schema.json> -l rust` - Rust structs with serde derives
+New `normalize-jsonschema` crate for generating type definitions from JSON Schema:
+- `normalize generate types <schema.json> -l typescript` - TypeScript interfaces
+- `normalize generate types <schema.json> -l python` - Python dataclasses
+- `normalize generate types <schema.json> -l rust` - Rust structs with serde derives
 - Handles: object, array, enum, allOf, oneOf, $ref, const, nullable types
 - Trait-based design (`JsonSchemaGenerator`) for extensibility
 
 ### Context View Mode
 
-Added `--context` flag to `moss view` for LLM-friendly output:
+Added `--context` flag to `normalize view` for LLM-friendly output:
 - Shows file skeleton (symbols) + imports combined
 - Skips docstrings for brevity
 - Ideal for loading file context into LLM prompts
-- Example: `moss view src/main.rs --context`
+- Example: `normalize view src/main.rs --context`
 
 ### Plans Introspection
 
-New `moss plans` command for viewing Claude Code saved plans:
-- `moss plans` - list plans with title, date, size
-- `moss plans <name>` - view specific plan by name or title match
-- Fuzzy matching: `moss plans viewnode` finds "Unified ViewNode for view.rs"
+New `normalize plans` command for viewing Claude Code saved plans:
+- `normalize plans` - list plans with title, date, size
+- `normalize plans <name>` - view specific plan by name or title match
+- Fuzzy matching: `normalize plans viewnode` finds "Unified ViewNode for view.rs"
 - Plans stored in `~/.claude/plans/` as markdown files
 - JSON output with `--json`
 
 ### OpenAPI Client Codegen
 
-New `moss-openapi` crate for generating API clients from OpenAPI specs:
-- `moss generate client <spec.json> -l typescript` - TypeScript (fetch) client
-- `moss generate client <spec.json> -l python` - Python (urllib) client
+New `normalize-openapi` crate for generating API clients from OpenAPI specs:
+- `normalize generate client <spec.json> -l typescript` - TypeScript (fetch) client
+- `normalize generate client <spec.json> -l python` - Python (urllib) client
 - Trait-based design (`OpenApiClientGenerator`) for extensibility
 - Generates types, dataclasses, and client class with methods
 
@@ -545,14 +545,14 @@ Added `--exclude` and `--only` flags for filtering across commands (`view`, `ana
 - Built-in aliases: `--exclude=@tests`, `--only=@docs`
 - Language-aware aliases: `@tests` expands to `*_test.go` for Go, `test_*.py` for Python, etc.
 - Built-in aliases: `@tests`, `@config`, `@build`, `@docs`, `@generated`
-- Config override in `[filter.aliases]` section of `.moss/config.toml`
-- `moss filter aliases` command lists available aliases with patterns
+- Config override in `[filter.aliases]` section of `.normalize/config.toml`
+- `normalize filter aliases` command lists available aliases with patterns
 - Error for unknown aliases, warning for disabled aliases
 
 ### View Command Improvements
 
 Unified ViewNode abstraction for consistent output:
-- All `moss view` paths (directory, file, symbol) now use ViewNode
+- All `normalize view` paths (directory, file, symbol) now use ViewNode
 - Text output shows tree structure with line ranges (L{start}-{end}, N lines)
 - FormatOptions: docstrings, line_numbers, skip_root, max_depth
 - Useless docstring filtering (skips docstrings that just repeat the name)
@@ -572,15 +572,15 @@ Self-documenting flag and subcommand names:
 - **Kebab-case flags**: `--types-only`, `--call-graph` (previously snake_case)
 - **Symmetric call graph**: `--callees` and `--callers` (previously `--calls` and `--called-by`)
 - **Clearer visibility**: `--include-private` in view (previously `--all`)
-- **Lint subcommands**: `moss lint list` (previously `--list` flag), `moss lint run --watch`
+- **Lint subcommands**: `normalize lint list` (previously `--list` flag), `normalize lint run --watch`
 
 ### Server Protocols
 
 All three server protocols now implemented:
-- **moss serve mcp**: MCP server for LLM integration (stdio, `--features mcp`)
-- **moss serve http**: REST API on configurable port (axum-based)
+- **normalize serve mcp**: MCP server for LLM integration (stdio, `--features mcp`)
+- **normalize serve http**: REST API on configurable port (axum-based)
   - `/health`, `/files`, `/files/*path`, `/symbols`, `/symbols/:name`, `/search`
-- **moss serve lsp**: LSP server for IDE integration (tower-lsp)
+- **normalize serve lsp**: LSP server for IDE integration (tower-lsp)
   - Document symbols (nested structure from skeleton extraction)
   - Workspace symbol search (from index)
   - Hover (symbol kind, signature, docstring)
@@ -606,12 +606,12 @@ Detects and indexes cross-language FFI bindings:
 - **Rust → C ABI**: cdylib crates
 - **Python → C**: ctypes/cffi usage detection
 - All refs stored in `cross_refs` table, queryable via daemon
-- **Trait-based architecture**: `FfiBinding` trait in moss-languages allows custom binding detectors
+- **Trait-based architecture**: `FfiBinding` trait in normalize-languages allows custom binding detectors
 
 ### Package Management
 
-New `moss package` subcommands:
-- **why**: Show reverse dependency path for a package (`moss package why tokio`)
+New `normalize package` subcommands:
+- **why**: Show reverse dependency path for a package (`normalize package why tokio`)
 - **audit**: Security vulnerability scanning across ecosystems
   - cargo (cargo-audit), npm (npm audit), python (pip-audit), go (govulncheck), gem (bundle-audit)
   - Human-readable and `--json` output
@@ -627,22 +627,22 @@ New flags for comprehensive codebase analysis:
 
 ### Unified Linting
 
-New adapters added to moss-tools:
+New adapters added to normalize-tools:
 - **mypy**: Python type checker
 - **pyright**: Python type checker (faster)
 - **eslint**: JavaScript/TypeScript linter
 - **deno-check**: TypeScript type checking via Deno
 
-Watch mode (`moss lint --watch`):
+Watch mode (`normalize lint --watch`):
 - Monitors file changes with 500ms debounce
 - Auto-filters by relevant file extensions
 - Skips hidden files/directories
 
 ### Package Registry Queries
 
-New `moss package` command queries package registries without web search:
+New `normalize package` command queries package registries without web search:
 - **Subcommands**: `info`, `list`, `tree`, `outdated`
-- **moss-packages crate**: Ecosystem trait with implementations for 11 ecosystems
+- **normalize-packages crate**: Ecosystem trait with implementations for 11 ecosystems
 - **Ecosystems**: cargo, npm, python, go, hex, gem, composer, maven, nuget, nix, conan
 - Auto-detection from manifest files (Cargo.toml → cargo, package.json → npm, etc.)
 - **Multi-ecosystem projects**: `list` and `tree` show all ecosystems when multiple detected
@@ -675,7 +675,7 @@ Major refactoring to align with three-primitive philosophy (view, edit, analyze)
 - **CLI reduced from 29 to 8 commands** (-5000+ lines)
 - **Unified ViewNode abstraction**: Directories, files, and symbols share the same tree structure
   - JSON output returns structured ViewNode data instead of string lines
-  - `--calls`/`--called-by` moved to `moss analyze` (call graph analysis, not viewing)
+  - `--calls`/`--called-by` moved to `normalize analyze` (call graph analysis, not viewing)
 - Removed 20 redundant commands:
   - callers, callees → analyze --calls/--called-by
   - complexity → analyze --complexity
@@ -683,7 +683,7 @@ Major refactoring to align with three-primitive philosophy (view, edit, analyze)
   - symbols, anchors, expand, context → view with depth/--full
   - path, search-tree → view (fuzzy matching, lists multiple matches)
   - deps, summarize, imports → view --deps
-  - reindex, index-stats, list-files, index-packages → `moss index` subcommand
+  - reindex, index-stats, list-files, index-packages → `normalize index` subcommand
   - overview → analyze --overview
 - Fixes:
   - view --calls/--called-by semantics were swapped (now in analyze)
@@ -694,7 +694,7 @@ Major refactoring to align with three-primitive philosophy (view, edit, analyze)
 
 - **Collapse single-child folders**: `src/moss_intelligence/` shown as one line instead of two
 - **Smart display by default**: `--raw` flag to disable collapsing
-- **Removed `tree` command**: consolidated into `view` (use `moss view <dir>`)
+- **Removed `tree` command**: consolidated into `view` (use `normalize view <dir>`)
 - **Removed `skeleton` command**: consolidated into `view` (docstrings now shown by default)
 - **Added `--dirs-only` and `--raw` flags** to `view` command for directory trees
 
@@ -706,12 +706,12 @@ Major refactoring to align with three-primitive philosophy (view, edit, analyze)
 
 ### Session Analysis Command
 
-New `moss sessions` command for analyzing Claude Code and Gemini CLI logs:
-- `moss sessions` - list sessions (newest first)
-- `moss sessions <id>` - dump raw JSONL
-- `moss sessions <id> --jq '.type'` - filter with jq expressions
-- `moss sessions <id> --analyze` - full analysis report
-- `moss sessions "agent-*" --analyze` - aggregate multiple sessions
+New `normalize sessions` command for analyzing Claude Code and Gemini CLI logs:
+- `normalize sessions` - list sessions (newest first)
+- `normalize sessions <id>` - dump raw JSONL
+- `normalize sessions <id> --jq '.type'` - filter with jq expressions
+- `normalize sessions <id> --analyze` - full analysis report
+- `normalize sessions "agent-*" --analyze` - aggregate multiple sessions
 
 Plugin architecture for log formats (Claude Code JSONL, Gemini CLI JSON).
 Ported Python session_analysis.py (~1200 lines) to Rust with jaq integration.
@@ -793,7 +793,7 @@ Total languages now supported: 35
 
 - **Boilerplate-aware depth**: Directories like `src/`, `lib/`, `crates/` don't count against `max_depth` limit
   - Shows more useful content at shallow depths
-  - Example: `moss view . --depth=2` now shows files inside `src/commands/`
+  - Example: `normalize view . --depth=2` now shows files inside `src/commands/`
 - Added 2 tests for boilerplate-aware depth limiting
 
 ### CLI Cleanup
@@ -815,7 +815,7 @@ Removed all default implementations from the `Language` trait following CLAUDE.m
 
 ### Language Feature Flags
 
-Added feature flags to moss-cli for selective language support:
+Added feature flags to normalize-cli for selective language support:
 - `all-languages` (default), `tier1`, individual `lang-*` flags
 - Enables smaller builds: `--no-default-features --features lang-python,lang-rust`
 
@@ -829,7 +829,7 @@ Completed extraction of all commands from main.rs to individual modules:
 
 ### Remove Language-Specific CLI Code
 
-Removed Python subprocess calls and hardcoded language counters from moss-cli:
+Removed Python subprocess calls and hardcoded language counters from normalize-cli:
 - Deleted `run_python_test_coverage`, `run_python_scopes`, `run_python_test_health` functions
 - Removed `--test-coverage`, `--scopes`, `--test-health` CLI flags (shelled out to Python)
 - Replaced `python_files`/`rust_files`/`other_files` with dynamic `files_by_language: HashMap<String, usize>`
@@ -857,7 +857,7 @@ Added package indexing methods to `Language` trait:
 
 ### Language Module Consolidation
 
-Code deduplication in moss-languages:
+Code deduplication in normalize-languages:
 - Inlined `go_mod.rs` into `go.rs` (GoModule struct, parse/find/resolve functions)
 - Created `ecmascript.rs` with shared JS/TS/TSX implementation (~400 lines deduplicated)
 - JavaScript, TypeScript, and TSX now use shared ecmascript module while keeping separate feature flags
@@ -866,7 +866,7 @@ Code deduplication in moss-languages:
 
 Moved all import resolution logic to `Language` trait:
 - Added `resolve_local_import()` and `resolve_external_import()` methods to trait
-- Moved `external_packages.rs` and `go_mod.rs` from moss-cli to moss-languages
+- Moved `external_packages.rs` and `go_mod.rs` from normalize-cli to normalize-languages
 - Each language implements resolution: Python, Go, Rust, JavaScript, TypeScript, C, C++, Java
 - Single 12-line `resolve_import()` function in main.rs replaces 550+ lines of per-language code
 - Deleted obsolete `resolution.rs` module (ImportResolver trait merged into Language)
@@ -874,7 +874,7 @@ Moved all import resolution logic to `Language` trait:
 ### Trait-based Language Architecture
 
 Major refactor: each language struct IS its support implementation.
-- Deleted `Language` enum from moss-core - no longer needed
+- Deleted `Language` enum from normalize-core - no longer needed
 - Renamed `PythonSupport` → `Python`, `RustSupport` → `Rust`, etc.
 - Added `support_for_path()` and `support_for_extension()` for dynamic lookup
 - Replaced `parse_lang(Language::X, ...)` with `parse_with_grammar("x", ...)`
@@ -901,17 +901,17 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 
 ### Test Suite Cleanup
 
-- Removed obsolete tests for deleted MossAPI/health module (8 tests)
+- Removed obsolete tests for deleted NormalizeAPI/health module (8 tests)
 - Removed 70 obsolete DWIM NL matching tests (xfail/xpass → deleted)
 - Final count: 2098 passed, 42 skipped (all optional deps)
 
 **Executor Refactoring:**
-- CLIExecutor and MCPToolExecutor now use `_get_tool_dispatcher()` instead of MossAPI
+- CLIExecutor and MCPToolExecutor now use `_get_tool_dispatcher()` instead of NormalizeAPI
 - Fixed dispatcher bugs: complexity handler pattern=None, security handler invalid arg
 
 **Skipped Test Fixes:**
 - Deleted 14 placeholder test files (test_synthesis*.py stubs, etc.)
-- Fixed dogfooding test paths (src/moss → packages/moss-intelligence)
+- Fixed dogfooding test paths (src/normalize → packages/normalize-intelligence)
 - Added `Anchor.parse()` classmethod for MCP tool string parsing
 - Updated TestAllToolsReturnCompact to test only dispatcher-backed tools
 
@@ -928,10 +928,10 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Go stdlib resolution: finds packages in `$GOROOT/src/`
 - Go mod cache resolution: finds dependencies in `$GOMODCACHE` or `~/go/pkg/mod/`
 - `view --focus` now falls back to external packages when local resolution fails
-- Global package index database: `~/.cache/moss/packages.db` with version ranges (major, minor)
+- Global package index database: `~/.cache/normalize/packages.db` with version ranges (major, minor)
 - PackageIndex API: insert/find packages and symbols with version filtering
 - Lazy indexing: packages indexed on first resolution, cached for future lookups
-- `moss index-packages` command: pre-index packages with `--only=python,go,js,deno,java,cpp,rust`
+- `normalize index-packages` command: pre-index packages with `--only=python,go,js,deno,java,cpp,rust`
 - JavaScript/TypeScript: node_modules resolution with package.json parsing (exports/module/main)
 - Rust: cargo registry resolution in `~/.cargo/registry/src/`
 - Deno: URL import cache resolution (`~/.cache/deno/deps/`) and npm: imports
@@ -942,13 +942,13 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Binary detection in call graph: detects binary files by null byte check (8KB sample)
 - Rust in-file tests: `#[cfg(test)]` module detection in test_gaps analysis
 - Test health module: extracts pytest markers (@skip, @xfail, @skipif, @parametrize)
-- Go imports in Rust index: `moss imports file.go` works like other languages
+- Go imports in Rust index: `normalize imports file.go` works like other languages
 - Go module parsing: go_mod.rs for go.mod parsing and import resolution
 
 **CLI/MCP Integration for Analysis Modules** (Dec 24 2025)
-- Added `moss analyze --test-coverage` flag for test coverage analysis via `moss_intelligence.test_gaps`
-- Added `moss analyze --scopes` flag for public/private symbol statistics via `moss_intelligence.scopes`
-- Added `moss analyze --test-health` flag for pytest marker extraction
+- Added `normalize analyze --test-coverage` flag for test coverage analysis via `moss_intelligence.test_gaps`
+- Added `normalize analyze --scopes` flag for public/private symbol statistics via `moss_intelligence.scopes`
+- Added `normalize analyze --test-health` flag for pytest marker extraction
 - Regenerated `specs/mcp_tools.json` to include `test_gaps_*`, `scopes_*`, `test_health_*` MCP tools
 - All modules now accessible via CLI and MCP
 
@@ -978,15 +978,15 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 
 **Package Restructuring** (Dec 23 2025)
 - Extracted core functionality into separate installable packages:
-  - `moss-intelligence`: Code analysis (skeleton, complexity, security, deps, clones)
-  - `moss-context`: Generic working memory (domain-agnostic, token-budgeted)
-  - `moss-orchestration`: Agent loops, sessions, drivers, shadow git
-  - `moss-llm`: LLM adapters using litellm for provider abstraction
+  - `normalize-intelligence`: Code analysis (skeleton, complexity, security, deps, clones)
+  - `normalize-context`: Generic working memory (domain-agnostic, token-budgeted)
+  - `normalize-orchestration`: Agent loops, sessions, drivers, shadow git
+  - `normalize-llm`: LLM adapters using litellm for provider abstraction
 - Created frontend wrapper packages:
-  - `moss-mcp`: MCP server (single-tool and multi-tool modes)
-  - `moss-lsp`: Language Server Protocol for IDE integration
-  - `moss-tui`: Textual-based terminal UI
-  - `moss-acp`: Agent Client Protocol for Zed/JetBrains
+  - `normalize-mcp`: MCP server (single-tool and multi-tool modes)
+  - `normalize-lsp`: Language Server Protocol for IDE integration
+  - `normalize-tui`: Textual-based terminal UI
+  - `normalize-acp`: Agent Client Protocol for Zed/JetBrains
 - Clean separation of concerns: code intelligence, context management, orchestration
 - Plugin architecture: core packages define protocols, callers provide implementations
 - See `docs/restructuring-plan.md` and `docs/api-boundaries.md`
@@ -1007,7 +1007,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
   - `navigate()` calls `_expand_and_select_path` directly
   - Directory double-click works in all modes
 - Wired async edit execution:
-  - Edit primitive now executes using `edit()` from `moss/edit.py`
+  - Edit primitive now executes using `edit()` from `normalize/edit.py`
   - Shows real-time progress and results in explore panel
   - Background task execution with proper lifecycle management
 
@@ -1054,7 +1054,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
   - macOS (Intel, Apple Silicon)
   - Windows (x86_64)
   - SHA256 checksums for verification
-- `moss update` command for self-updating
+- `normalize update` command for self-updating
   - Downloads and installs new binary from GitHub releases
   - SHA256 checksum verification against release checksums
   - Handles tar.gz (Unix) and zip (Windows) archives
@@ -1062,14 +1062,14 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
   - JSON output for programmatic access
 
 **Variable Scope Analysis** (Dec 23 2025)
-- `moss scopes <file>`: show scope hierarchy with all variable bindings
+- `normalize scopes <file>`: show scope hierarchy with all variable bindings
   - Tracks functions, classes, loops, comprehensions, lambdas
   - Shows parameters, variables, imports, for-loop targets
   - Supports Python and Rust
-- `moss scopes <file> --line N`: show bindings visible at a specific line
+- `normalize scopes <file> --line N`: show bindings visible at a specific line
   - Lists all variables/functions in scope at that point
   - Useful for understanding what names are available
-- `moss scopes <file> --line N --find <name>`: find where a name is defined
+- `normalize scopes <file> --line N --find <name>`: find where a name is defined
   - Shows the exact definition location for a name at a given line
   - Handles shadowing correctly (returns innermost definition)
 - Type inference for Python assignments:
@@ -1078,11 +1078,11 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
   - Literals: `x = {}` → dict, `x = []` → list, `x = 1.5` → float
 
 **Import Graph Commands** (Dec 23 2025)
-- `moss imports --graph <file>`: bidirectional import graph
+- `normalize imports --graph <file>`: bidirectional import graph
   - Shows what the file imports
   - Shows what files import it (via module name resolution)
   - JSON output includes full import details
-- `moss imports --who-imports <module>`: reverse import lookup
+- `normalize imports --who-imports <module>`: reverse import lookup
   - Find all files that import a given module
   - Shows specific symbols imported and line numbers
 
@@ -1143,14 +1143,14 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Mode indicator in footer bar (right side, next to palette) - clickable, color-coded
 
 **Rust Crate Consolidation** (Dec 23 2025)
-- Merged moss-daemon into moss-cli - `moss daemon run` now runs daemon in foreground
-- Single binary: moss-cli now includes all daemon functionality
+- Merged normalize-daemon into normalize-cli - `normalize daemon run` now runs daemon in foreground
+- Single binary: normalize-cli now includes all daemon functionality
 - ~1000 lines of duplicate code removed
 
 ### Bug Fixes
 
 **CLI Fixes** (Dec 23 2025)
-- `moss tree crates/` (trailing slash) now works correctly - uses resolve_unified
+- `normalize tree crates/` (trailing slash) now works correctly - uses resolve_unified
 - Callers/callees commands use incremental call graph refresh (respects mtime)
 
 ### Documentation
@@ -1167,9 +1167,9 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Python edit assessment: EditAPI (file ops) is used; complexity-routed edit() is stubs
 
 **Workflow Unification** (Dec 23 2025)
-- Unified `moss agent` and `moss workflow run` under execution primitives
-- `moss agent "task"` is now an alias for `moss workflow run dwim --arg task="..."`
-- Removed old workflow system: AgentLoop, MossToolExecutor (2742 lines deleted)
+- Unified `normalize agent` and `normalize workflow run` under execution primitives
+- `normalize agent "task"` is now an alias for `normalize workflow run dwim --arg task="..."`
+- Removed old workflow system: AgentLoop, NormalizeToolExecutor (2742 lines deleted)
 - Removed old workflow files: generator.py, examples.py, validate-fix.toml, vanilla.toml
 - Simplified workflows/__init__.py (697 → 9 lines)
 - Updated workflow templates to new execution primitives format (agentic, step)
@@ -1179,8 +1179,8 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 ### Bug Fixes
 
 **Workflow Path Resolution** (Dec 23 2025)
-- Fixed workflow discovery after cli/ package split (was looking in cli/workflows, now moss/workflows)
-- Affected: `workflow list`, `workflow run`, `agent`, `MossAPI.run_agent()`
+- Fixed workflow discovery after cli/ package split (was looking in cli/workflows, now normalize/workflows)
+- Affected: `workflow list`, `workflow run`, `agent`, `NormalizeAPI.run_agent()`
 
 **UX Improvements** (Dec 23 2025)
 - `analyze --complexity` now shows helpful message when file target required
@@ -1201,7 +1201,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 **check-docs False Positives Fixed** (Dec 22 2025)
 - Reduced warnings from 48 to 0 (all were false positives or fixed)
 - Added project_roots check: only flag refs whose root matches project modules
-- Fixed package discovery: add names without `__init__` suffix (`moss.plugins`)
+- Fixed package discovery: add names without `__init__` suffix (`normalize.plugins`)
 - Skip config extensions (`.toml`, `.yaml`, `.json`, etc.)
 - Skip `self.*` references and incomplete refs ending with dot
 - Added entry point group detection from pyproject.toml
@@ -1210,10 +1210,10 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 
 **Synthesis Plugin Refactoring** (Dec 22 2025)
 - Aligned module paths with entry point group names
-- `moss.synthesis.generators` (was `moss.synthesis.plugins.generators`)
-- `moss.synthesis.validators` (was `moss.synthesis.plugins.validators`)
-- `moss.synthesis.libraries` (was `moss.synthesis.plugins.libraries`)
-- All plugin exports now available from `moss.synthesis`
+- `normalize.synthesis.generators` (was `normalize.synthesis.plugins.generators`)
+- `normalize.synthesis.validators` (was `normalize.synthesis.plugins.validators`)
+- `normalize.synthesis.libraries` (was `normalize.synthesis.plugins.libraries`)
+- All plugin exports now available from `normalize.synthesis`
 - Backward compatibility shims in `synthesis/plugins/`
 
 ### Features
@@ -1232,10 +1232,10 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 
 **External Index Location** (Dec 22 2025)
 - New `MOSS_INDEX_DIR` environment variable for custom data/index location
-- Absolute path: uses directory directly (`MOSS_INDEX_DIR=/tmp/moss`)
-- Relative path: uses `$XDG_DATA_HOME/moss/<path>` (`MOSS_INDEX_DIR=myproject`)
-- Falls back to `.moss` in project root if not set
-- Useful for repos that don't have `.moss` in `.gitignore`
+- Absolute path: uses directory directly (`MOSS_INDEX_DIR=/tmp/normalize`)
+- Relative path: uses `$XDG_DATA_HOME/normalize/<path>` (`MOSS_INDEX_DIR=myproject`)
+- Falls back to `.normalize` in project root if not set
+- Useful for repos that don't have `.normalize` in `.gitignore`
 
 **Multi-Language Call Graphs** (Dec 22 2025)
 - Added call extraction for TypeScript, JavaScript, Java, and Go
@@ -1262,23 +1262,23 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 **Multi-Language Symbol Support** (Dec 22 2025)
 - Extended symbol parsing to Java, TypeScript, TSX, JavaScript, Go (in addition to Python/Rust)
 - Call graph indexer now includes all supported languages
-- Added `moss index-stats` command to show DB size vs codebase size ratio
+- Added `normalize index-stats` command to show DB size vs codebase size ratio
 - Data file key extraction: JSON/YAML/TOML keys become navigable symbols
   - Objects/sections become "class" symbols with children
   - Leaf values become "variable" symbols
-  - `moss view pyproject.toml` now shows TOML structure as tree
-  - `moss symbols config.json` lists all keys hierarchically
+  - `normalize view pyproject.toml` now shows TOML structure as tree
+  - `normalize symbols config.json` lists all keys hierarchically
 - Tested on 72k file repo: 66k symbols indexed at 3.4% DB size ratio
 
 **Markdown Support** (Dec 22 2025)
 - Added tree-sitter-md to Rust CLI for proper markdown parsing
-- `moss skeleton README.md` extracts headings as nested symbols
-- `moss view README.md/Heading_Name` shows specific section content
+- `normalize skeleton README.md` extracts headings as nested symbols
+- `normalize view README.md/Heading_Name` shows specific section content
 - TUI uses unified skeleton API for Python, Rust, and Markdown files
 - Removed Python heuristic extraction (was buggy with code blocks)
 
 **Explore TUI** (Dec 22 2025)
-- New `moss explore` command with tree + primitives paradigm
+- New `normalize explore` command with tree + primitives paradigm
 - `ExploreMode` is now default TUI mode (replaces READ/WRITE)
 - Tree navigation with files + symbols (lazy-loaded)
 - Keyboard shortcuts: `v`, `e`, `a` to apply primitives to selected node
@@ -1296,9 +1296,9 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Action bar shows clickable View/Edit/Analyze buttons
 
 **Unified Resolution & Agent Improvements** (Dec 22 2025)
-- `moss analyze` now uses unified path resolution for symbol targeting
-  - Example: `moss analyze cli.py/cmd_telemetry --complexity`
-- Symbol-level token tracking in telemetry (parses `moss view file/symbol` from bash commands)
+- `normalize analyze` now uses unified path resolution for symbol targeting
+  - Example: `normalize analyze cli.py/cmd_telemetry --complexity`
+- Symbol-level token tracking in telemetry (parses `normalize view file/symbol` from bash commands)
 - Agent retry loop fallback strategy:
   - Tracks failures by normalized operation key (verb:target)
   - `retry_threshold` config (default: 3 failures before fallback)
@@ -1306,17 +1306,17 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Agent prompt now forbids guessing data ("Never guess data" rule)
 
 **Telemetry Enhancements & Analyze Filters** (Dec 22 2025)
-- Added `--kind` filter to `moss analyze` command (filter by function/method, avoids `-t` conflict)
+- Added `--kind` filter to `normalize analyze` command (filter by function/method, avoids `-t` conflict)
 - Added file token tracking to session analysis (`file_tokens` field)
-- Added `moss telemetry --watch` for real-time telemetry monitoring
+- Added `normalize telemetry --watch` for real-time telemetry monitoring
 - Added `GeminiCliAnalyzer` for Gemini CLI session logs (JSON format)
 - Auto-detection now recognizes Gemini CLI sessions
 
 **CLI Consolidation & UX** (Dec 22 2025)
 - Folded standalone commands into `analyze` primitive:
-  - `--summary`: generate file/directory summary (was `moss summarize`)
-  - `--check-docs`: check documentation freshness (was `moss check-docs`)
-  - `--check-todos`: check TODO.md accuracy (was `moss check-todos`)
+  - `--summary`: generate file/directory summary (was `normalize summarize`)
+  - `--check-docs`: check documentation freshness (was `normalize check-docs`)
+  - `--check-todos`: check TODO.md accuracy (was `normalize check-todos`)
   - `--health`: already available in Rust CLI
 - PTY auto-detection: non-TTY defaults to compact mode (machine-readable)
 - Added "Never Extract Data Manually" principle to `docs/philosophy.md`
@@ -1326,15 +1326,15 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 ### Removed
 
 **CLI Cleanup** (Dec 22 2025)
-- Removed `moss loop` CLI command and all predefined loops (simple, critic, incremental, etc.)
-- Removed `moss dwim` CLI command (module kept for alias resolution)
-- Removed `moss health`, `moss summarize`, `moss check-docs`, `moss check-todos` (use `analyze` flags)
+- Removed `normalize loop` CLI command and all predefined loops (simple, critic, incremental, etc.)
+- Removed `normalize dwim` CLI command (module kept for alias resolution)
+- Removed `normalize health`, `normalize summarize`, `normalize check-docs`, `normalize check-todos` (use `analyze` flags)
 - Use DWIMLoop or TOML workflows instead
 
 ### Features
 
 **CLI Improvements & Unified Plumbing** (Dec 22 2025)
-- Added `--compact` mode to `moss patterns` command for token-efficient output
+- Added `--compact` mode to `normalize patterns` command for token-efficient output
 - Added large file detection to `analyze --health` (shows top 10 files >500 lines)
 - Audited unified plumbing: path resolution already shared via `path_resolve::resolve_unified`
 - Evaluated `patterns` and `git-hotspots` commands: NOT slow (6s, 2.5s), keeping both
@@ -1348,9 +1348,9 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Added --verbose flag to workflow runs for debugging LLM outputs
 
 **Telemetry Command & Design Philosophy Update** (Dec 22 2025)
-- New `moss telemetry` command for session analysis:
-  - Default: aggregate stats across all moss sessions
-  - `--session ID`: specific moss session stats
+- New `normalize telemetry` command for session analysis:
+  - Default: aggregate stats across all normalize sessions
+  - `--session ID`: specific normalize session stats
   - `--logs *.jsonl`: analyze Claude Code session logs (supports multiple)
   - `--html`: HTML dashboard output
 - Log format plugin system:
@@ -1358,7 +1358,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
   - `detect_log_format()` auto-detects format from file content
   - `analyze_log()` unified entry point with auto-detection
   - `ClaudeCodeAnalyzer` for Claude Code JSONL
-  - `MossSessionAnalyzer` for internal moss sessions
+  - `NormalizeSessionAnalyzer` for internal normalize sessions
 - New design tenet: "Generalize, Don't Multiply"
   - Prefer one flexible solution over N specialized ones
   - Composability reduces cognitive load, maintenance burden, token cost
@@ -1376,13 +1376,13 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Phase 3 (Simplify tool interface) now complete
 
 **Analyze Command & Core API Consolidation** (Dec 21 2025)
-- New `moss analyze [path]` command in Rust CLI:
+- New `normalize analyze [path]` command in Rust CLI:
   - `--health`: Codebase health metrics (files, lines, complexity scores)
   - `--complexity`: Cyclomatic complexity analysis per function
   - `--security`: Security vulnerability scanning (shells out to bandit)
   - Runs all analyses by default if no flags specified
   - JSON output with `--json`
-- Consolidated MossAPI from 30 sub-APIs to 3 core primitives:
+- Consolidated NormalizeAPI from 30 sub-APIs to 3 core primitives:
   - `api.view` - ViewAPI wrapping Rust `view` command (includes find/search)
   - `api.structural_edit` - EditAPI wrapping Rust `edit` command
   - `api.analyze` - AnalyzeAPI wrapping Rust `analyze` command
@@ -1392,9 +1392,9 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 ### Fixes
 
 **Path Resolution & Test Fixes** (Dec 21 2025)
-- Fixed unicode and absolute path resolution in Rust CLI (`moss view /tmp/日本語/test.py` now works)
+- Fixed unicode and absolute path resolution in Rust CLI (`normalize view /tmp/日本語/test.py` now works)
 - Updated `test_cli.py` to use subprocess for Rust passthrough commands (skeleton, anchors)
-- Fixed `test_synthesis.py` import: TFIDFIndex moved to moss.semantic_search
+- Fixed `test_synthesis.py` import: TFIDFIndex moved to normalize.semantic_search
 - Updated synthesis router to use new TFIDFIndex interface
 
 ### Features
@@ -1445,8 +1445,8 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - `Experiment Branching`: Multiple concurrent shadow branches for parallel approach testing
 - `GBNF Grammar Support`: Constrained inference for llama.cpp with predefined and custom grammars
 - `Claude vs Gemini CLI Analysis`: Documented edit paradigm differences (strict matching vs self-correction)
-- `Lazy Imports`: Converted moss.__init__.py to lazy imports for reduced baseline memory
-- `Extensible TUI Modes`: ModeRegistry with entry point + .moss/modes/ plugin discovery
+- `Lazy Imports`: Converted normalize.__init__.py to lazy imports for reduced baseline memory
+- `Extensible TUI Modes`: ModeRegistry with entry point + .normalize/modes/ plugin discovery
 - `Brute Force Mode`: BruteForceConfig for n_samples + voting with small/local models
 - `Runtime Memory Bounds`: streaming LLM responses, context eviction (max_context_steps)
 - `Brute Force Voting`: wired to LLMGenerator with majority/consensus/first_valid strategies
@@ -1505,12 +1505,12 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 
 **Workflow externalization** (expanded)
 - Design doc for TOML-based workflow/prompt format (`docs/workflow-format.md`)
-- Prompt loader with user override support (`src/moss/prompts/`)
-- `load_prompt(name)` checks `.moss/prompts/` then built-ins
+- Prompt loader with user override support (`src/normalize/prompts/`)
+- `load_prompt(name)` checks `.normalize/prompts/` then built-ins
 - `REPAIR_ENGINE_PROMPT` externalized as proof of concept
 - `LLMConfig.system_prompt` now loads from `prompts/terse.txt` by default
 - `get_system_prompt()` method for lazy loading with explicit override support
-- Workflow loader (`src/moss/workflows/`) with TOML parsing
+- Workflow loader (`src/normalize/workflows/`) with TOML parsing
 - `@prompts/name` and `@workflows/name` reference resolution
 - `Workflow`, `WorkflowStep`, `WorkflowLimits`, `AgentDefinition` dataclasses
 - Built-in `validate-fix.toml` workflow example
@@ -1520,9 +1520,9 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - `workflow_to_agent_loop()` - convert TOML workflows to executable AgentLoop
 - `workflow_to_llm_config()` - convert workflow LLM config to LLMConfig
 - `run_workflow()` - convenience function to load and run a workflow
-- `moss workflow list` - list available workflows
-- `moss workflow show <name>` - show workflow details (human or JSON)
-- `moss workflow run <name> --file <path>` - execute a workflow
+- `normalize workflow list` - list available workflows
+- `normalize workflow show <name>` - show workflow details (human or JSON)
+- `normalize workflow run <name> --file <path>` - execute a workflow
 - `WorkflowProtocol` - protocol for static and dynamic workflows
 - `WorkflowContext` - runtime context for dynamic step generation
 - `build_steps(context)` method - enables Python workflows with conditional logic
@@ -1536,7 +1536,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Non-blocking: memory errors don't break execution
 
 **Checkpoint restore** (new)
-- `moss checkpoint restore <name>` - revert working directory to checkpoint state
+- `normalize checkpoint restore <name>` - revert working directory to checkpoint state
 - `GitAPI.restore_checkpoint()` in moss_api.py
 - Completes checkpoint lifecycle: create → diff → merge/abort/restore
 
@@ -1584,7 +1584,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Callback support via `on_complete` parameter
 
 **Graceful error handling** (new)
-- New `moss.errors` module with categorized error types
+- New `normalize.errors` module with categorized error types
 - `handle_error()` classifies exceptions and provides suggestions
 - `ErrorCollector` for batch operations with aggregated reporting
 - MCP servers now return structured error responses with suggestions
@@ -1596,14 +1596,14 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Additional prompts for meta-loop operations (analyze_loop, estimate_tokens, find_redundancy)
 
 **Rust CLI overview command** (new)
-- `moss overview` - comprehensive codebase overview in ~95ms
+- `normalize overview` - comprehensive codebase overview in ~95ms
 - Aggregates health, docs, complexity, imports, TODOs/FIXMEs
 - Health score grading (A-F) based on complexity, risk, and doc coverage
 - Compact mode (`-c`) for single-line summaries
 - JSON output mode for programmatic use
 
 **Rust CLI context command wired to Python**
-- `moss context <file>` now delegates to Rust CLI when available
+- `normalize context <file>` now delegates to Rust CLI when available
 - 10-100x faster than pure Python for large files
 - Falls back to Python implementation when Rust not found
 
@@ -1619,7 +1619,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 ### Performance Improvements
 
 **Rust CLI find-symbols command** (new)
-- `moss find-symbols <name>` - fast symbol search using indexed SQLite database
+- `normalize find-symbols <name>` - fast symbol search using indexed SQLite database
 - ~1ms for symbol queries (was 723ms with full Python codebase scan)
 - Supports fuzzy matching (`-f true`), kind filtering (`-k function`), result limits (`-l`)
 - JSON output mode with `--json` for programmatic use
@@ -1627,14 +1627,14 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Falls back to Python implementation when Rust CLI not found
 
 **Rust CLI text-search command** (new, renamed from grep)
-- `moss text-search <pattern>` - fast text search using ripgrep's grep crate
+- `normalize text-search <pattern>` - fast text search using ripgrep's grep crate
 - JSON output mode with `--json` for programmatic use
 - Supports glob patterns (`--only "*.py"`), case-insensitive (`-i`), result limits (`-l`)
 - ~4ms for codebase-wide searches (was 9.7s with pure Python)
 - Python API now calls Rust CLI when available
 
 **Parallel health analysis**
-- `moss health` now uses rayon for parallel file processing
+- `normalize health` now uses rayon for parallel file processing
 - ~95ms down from ~500ms (5x faster)
 - File counting and complexity analysis run concurrently
 
@@ -1642,7 +1642,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 ### Index Reliability
 
 **Graceful Degradation**
-- `moss imports` now falls back to direct file parsing when index unavailable
+- `normalize imports` now falls back to direct file parsing when index unavailable
 - Commands work without daemon - all have local fallback paths
 
 **Error Recovery**
@@ -1658,7 +1658,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 **File Watching (Daemon)**
 - Daemon auto-reindexes files on create/modify/delete events
 - Uses `notify` crate for cross-platform file system events
-- Skips `.moss` directory to avoid infinite loops
+- Skips `.normalize` directory to avoid infinite loops
 
 ### Rust CLI Expansion
 
@@ -1682,8 +1682,8 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 
 **Cross-file Resolution**
 - Import tracking (SQLite table: file → module, name, alias)
-- `moss imports <file>` command to query imports from index
-- `moss imports <file>:<name> --resolve` to trace name to source module
+- `normalize imports <file>` command to query imports from index
+- `normalize imports <file>:<name> --resolve` to trace name to source module
 - Cross-file resolution via import alias JOIN for callers/callees
 - Qualified names (module.func vs func) with callee_qualifier
 - Wildcard import resolution (from X import * → check X's exports)
@@ -1698,12 +1698,12 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 ### Tree Commands & Performance
 
 **New CLI Commands**
-- `moss path <query>` - Fuzzy path/symbol resolution
-- `moss view <target>` - View node in codebase tree
-- `moss search-tree <query>` - Search symbols in tree
-- `moss expand <target>` - Show full source of symbol
-- `moss callers <target>` - Find callers of a function
-- `moss callees <target>` - Find what a function calls
+- `normalize path <query>` - Fuzzy path/symbol resolution
+- `normalize view <target>` - View node in codebase tree
+- `normalize search-tree <query>` - Search symbols in tree
+- `normalize expand <target>` - Show full source of symbol
+- `normalize callers <target>` - Find callers of a function
+- `normalize callees <target>` - Find what a function calls
 
 **MCP DWIM Routing**
 - All tree commands wired to MCP single-tool interface
@@ -1720,10 +1720,10 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 ### Single-Tool MCP Server
 
 **Token Efficiency**
-- New single-tool MCP server: `moss(command: str)` - 99% token reduction (~8K → ~50 tokens)
-- Original multi-tool server preserved as `moss-mcp-full` for IDEs
-- CLI: `moss mcp-server` (single-tool, default) or `moss mcp-server --full` (multi-tool)
-- Entry points: `moss-mcp` (single) and `moss-mcp-full` (full)
+- New single-tool MCP server: `normalize(command: str)` - 99% token reduction (~8K → ~50 tokens)
+- Original multi-tool server preserved as `normalize-mcp-full` for IDEs
+- CLI: `normalize mcp-server` (single-tool, default) or `normalize mcp-server --full` (multi-tool)
+- Entry points: `normalize-mcp` (single) and `normalize-mcp-full` (full)
 
 
 ### query/search CLI Migration, Agent Learning
@@ -1738,13 +1738,13 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - `lessons_list` - List lessons, optionally filtered by category
 - `lessons_search` - Search lessons by keyword
 - `lessons_find_relevant` - Find lessons relevant to current context
-- Stored in `.moss/lessons.md` with categories and timestamps
+- Stored in `.normalize/lessons.md` with categories and timestamps
 
-**CLI Migration to MossAPI**
-- 18 commands now use MossAPI (was 16)
+**CLI Migration to NormalizeAPI**
+- 18 commands now use NormalizeAPI (was 16)
 - Newly migrated: query, search
-- `cmd_query` now uses `MossAPI.search.query()`
-- `cmd_search` now uses `MossAPI.rag` for semantic search
+- `cmd_query` now uses `NormalizeAPI.search.query()`
+- `cmd_search` now uses `NormalizeAPI.rag` for semantic search
 
 
 ### find_related_files, summarize_module, CLI Migration
@@ -1761,10 +1761,10 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - `dependencies_graph_to_dot` - Convert graph to DOT format for visualization
 - `dependencies_find_reverse` - Find files that import a given module
 
-**CLI Migration to MossAPI**
-- 16 commands now use MossAPI (was 12)
+**CLI Migration to NormalizeAPI**
+- 16 commands now use NormalizeAPI (was 12)
 - Newly migrated: anchors, cfg, deps, context
-- Pattern: Replace direct imports with `MossAPI.for_project()`
+- Pattern: Replace direct imports with `NormalizeAPI.for_project()`
 - Reduces duplication, enables generated CLI
 
 ### Module DWIM, CLI Migration, explain_symbol
@@ -1783,7 +1783,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - `skeleton_format` returns "File not found" for missing files
 
 **Dogfooding Observations**
-- Updated CLAUDE.md with stronger moss-first guidance
+- Updated CLAUDE.md with stronger normalize-first guidance
 - Added Agent Lessons section to TODO.md
 
 
@@ -1795,7 +1795,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - `search_find_files` - find files matching glob patterns
 - `search_find_usages` - find references to a symbol
 - `search_grep` - text pattern search with regex support
-- Dogfood moss search instead of raw grep/glob
+- Dogfood normalize search instead of raw grep/glob
 
 **Async Task Documentation**
 - `docs/async-tasks.md` - background task management guide
@@ -1831,9 +1831,9 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - `MCPToolExecutor` for external MCP server connections
 - `CompositeToolExecutor` for prefix-based routing
 - Loop serialization (YAML/JSON)
-- `moss loop list/run/benchmark` CLI commands
+- `normalize loop list/run/benchmark` CLI commands
 
-**Web Module** (`moss.web`)
+**Web Module** (`normalize.web`)
 - `WebFetcher` - fetch with HTML extraction, caching
 - `WebSearcher` - DuckDuckGo search with token-efficient results
 - `ContentExtractor` - strip nav/footer/script, extract main content
@@ -1848,7 +1848,7 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 
 Extract user preferences from AI coding assistant session logs and output to agent instruction formats.
 
-**LLM Provider Module** (`moss.llm`)
+**LLM Provider Module** (`normalize.llm`)
 - Protocol-based design with 9 provider implementations
 - CLI provider (zero-dep fallback using llm/claude/gemini CLIs)
 - Anthropic, OpenAI, LiteLLM (multi-provider gateway)
@@ -1884,12 +1884,12 @@ Extract user preferences from AI coding assistant session logs and output to age
 - Configurable provider and model
 
 **CLI Commands**
-- `moss extract-preferences <paths>` - Extract and format preferences
+- `normalize extract-preferences <paths>` - Extract and format preferences
   - `--format` (claude/gemini/antigravity/cursor/generic/json)
   - `--log-format` (auto/claude_code/gemini_cli/cline/roo/aider)
   - `--min-confidence` (low/medium/high)
   - `--synthesize` with `--provider` and `--model`
-- `moss diff-preferences <old.json> <new.json>` - Compare preference sets
+- `normalize diff-preferences <old.json> <new.json>` - Compare preference sets
 
 **Tests**
 - 28 tests covering models, parsing, extractors, and adapters
@@ -1900,32 +1900,32 @@ Extract user preferences from AI coding assistant session logs and output to age
 New analysis commands for comprehensive codebase insight:
 
 **Session Analysis**
-- `moss analyze-session <path>` - parse Claude Code JSONL logs
+- `normalize analyze-session <path>` - parse Claude Code JSONL logs
 - Tool call frequency and success rates
 - Token usage with proper context calculation
 - Message type distribution
 - Error pattern categorization
 
 **Git Analysis**
-- `moss git-hotspots` - identify frequently changed files
+- `normalize git-hotspots` - identify frequently changed files
 - Configurable time window (--days)
 - Author count per file
 - Last-changed timestamps
 
 **Test Coverage**
-- `moss coverage` - show pytest-cov statistics
+- `normalize coverage` - show pytest-cov statistics
 - Per-file coverage breakdown
 - Low coverage file highlighting
 - Optional test run with --run flag
 
 **Cyclomatic Complexity**
-- `moss complexity` - analyze function complexity
+- `normalize complexity` - analyze function complexity
 - McCabe cyclomatic complexity per function
 - Risk level categorization (low/moderate/high/very-high)
 - Configurable file patterns
 
 **Overview Enhancements**
-- Added symbol counts (classes, functions) to `moss overview`
+- Added symbol counts (classes, functions) to `normalize overview`
 - Critical vulnerabilities shown inline with package and ID
 - Skeleton summary showing top packages by size
 - Updated both compact and markdown output formats
@@ -1935,10 +1935,10 @@ New analysis commands for comprehensive codebase insight:
 Hyper-modular refactor with auto-generated interfaces:
 
 **29a: Core Library Refactor**
-- `MossAPI` class as canonical typed API surface
+- `NormalizeAPI` class as canonical typed API surface
 - Full type hints + docstrings for introspection
 - Library usable without CLI/server dependencies
-- `from moss import MossAPI` as primary entry point
+- `from normalize import NormalizeAPI` as primary entry point
 
 **29b: Plugin Protocol (Everything is a Plugin)**
 - `LinterPlugin` protocol for unified tool integration
@@ -1946,29 +1946,29 @@ Hyper-modular refactor with auto-generated interfaces:
 - SARIFAdapter for universal SARIF-outputting tools
 - LinterValidatorAdapter bridging to existing Validator system
 - Version detection and availability checking
-- Entry point discovery (`moss.linters`)
+- Entry point discovery (`normalize.linters`)
 
 **29c: Interface Generator Layer**
-- `moss.gen.cli` - Generate argparse CLI from API introspection
-- `moss.gen.http` - Generate FastAPI routes and OpenAPI spec from API
-- `moss.gen.mcp` - Generate MCP tool definitions from API
+- `normalize.gen.cli` - Generate argparse CLI from API introspection
+- `normalize.gen.http` - Generate FastAPI routes and OpenAPI spec from API
+- `normalize.gen.mcp` - Generate MCP tool definitions from API
 - 46 tests for interface generators
 
 **29d: Wrapper Packages**
-- `moss-server` CLI entry point with `--host`, `--port`, `--reload`
-- `moss-mcp` CLI entry point for MCP server
-- `moss[all]` meta-group for full installation
+- `normalize-server` CLI entry point with `--host`, `--port`, `--reload`
+- `normalize-mcp` CLI entry point for MCP server
+- `normalize[all]` meta-group for full installation
 - All interfaces use optional dependencies for minimal core
 
 **29e: Server Architecture**
 - ServerState with persistent caching (CacheEntry, execute_cached)
 - Cache invalidation by pattern and file mtime
-- FastAPI application with REST endpoints for all MossAPI operations
+- FastAPI application with REST endpoints for all NormalizeAPI operations
 - WebSocket endpoint for streaming operations
 - Health check and cache management endpoints
 - 20 tests for server module
 
-### CLI: moss roadmap
+### CLI: normalize roadmap
 - Parses TODO.md and visualizes project progress
 - TUI mode with box drawing and progress bars
 - Plain text mode for LLMs and piping
@@ -1977,12 +1977,12 @@ Hyper-modular refactor with auto-generated interfaces:
 
 
 ### Comprehensive Health Analysis
-Expanded `moss health` into a comprehensive project analysis tool:
+Expanded `normalize health` into a comprehensive project analysis tool:
 - **Dependency Analysis**: Circular dependency detection, god modules (high fan-in), orphan modules, coupling metrics
 - **Structural Hotspots**: Functions with too many parameters, classes with too many methods, deep nesting, long functions, complex conditionals
 - **Test Coverage Analysis**: Module-to-test mapping, test-to-code ratio, untested public API surface
 - **API Surface Analysis**: Public exports inventory, undocumented APIs, naming convention checking, breaking change risk
-- **Health Command Refactor**: Concise single-screen output, `--severity` and `--focus` flags, `moss report` for verbose output, `--ci` flag with exit codes (0=healthy, 1=warnings, 2=critical)
+- **Health Command Refactor**: Concise single-screen output, `--severity` and `--focus` flags, `normalize report` for verbose output, `--ci` flag with exit codes (0=healthy, 1=warnings, 2=critical)
 
 
 ### Advanced Library Learning
@@ -2005,7 +2005,7 @@ LLM-based code generation with mock support for testing:
 - 48 tests for LLM generation
 
 ### CLI & Edit Integration
-- `moss edit` command with intelligent complexity routing
+- `normalize edit` command with intelligent complexity routing
 - TaskComplexity analysis (simple/medium/complex/novel)
 - Structural edit handler (rename, typo fix, refactoring)
 - Synthesis fallback for complex/novel tasks
@@ -2020,13 +2020,13 @@ LLM-based code generation with mock support for testing:
 ### Strategy Auto-Discovery
 - StrategyPlugin protocol for pluggable strategies
 - StrategyRegistry with enable/disable support
-- Entry point discovery (moss.synthesis.strategies)
+- Entry point discovery (normalize.synthesis.strategies)
 
 ### Configuration System
 - SynthesisConfigWrapper for TOML-based config
 - SynthesisConfigLoader fluent builder
 - Subsystem configs: generators, validators, strategies, learning
-- load_synthesis_config() for moss.toml
+- load_synthesis_config() for normalize.toml
 
 ### Synthesis Plugin Architecture
 Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCoder, λ²):
@@ -2057,14 +2057,14 @@ Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCo
 - Session search with tag filtering
 
 ### Synthesis Framework (Scaffolding)
-- Core synthesis framework (`src/moss/synthesis/`)
+- Core synthesis framework (`src/normalize/synthesis/`)
 - Abstract interfaces: Specification, Context, Subproblem, SynthesisResult
 - DecompositionStrategy ABC with metadata
 - Composer ABC: SequentialComposer, FunctionComposer, CodeComposer
 - StrategyRouter with TF-IDF keyword matching
 - SynthesisFramework engine with depth/iteration limits
 - Strategies: TypeDriven, TestDriven, PatternBased (decomposition only)
-- CLI: `moss synthesize --dry-run --show-decomposition`
+- CLI: `normalize synthesize --dry-run --show-decomposition`
 - Caching infrastructure: SynthesisCache, SolutionCache, StrategyCache
 - Scale testing (depth 20+ problems)
 - **Note**: Code generation not implemented (returns placeholders)
@@ -2083,9 +2083,9 @@ Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCo
 
 ### Integration & Polish
 - CLI improvements: global flags, consistent output module
-- Interactive shell (`moss shell`)
+- Interactive shell (`normalize shell`)
 - Performance: caching layer, parallel file analysis
-- Configuration: `moss.toml`, per-directory overrides
+- Configuration: `normalize.toml`, per-directory overrides
 
 ### Advanced Features
 - Configurable output verbosity
@@ -2118,7 +2118,7 @@ Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCo
 
 
 ### Developer Experience
-- CLI interface (`moss init`, `moss run`, `moss status`)
+- CLI interface (`normalize init`, `normalize run`, `normalize status`)
 - README with architecture overview
 - Usage examples and tutorials in `examples/`
 - API documentation via docstrings
@@ -2137,11 +2137,11 @@ Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCo
 
 ### Production Readiness
 - FastAPI example server (`examples/server/`)
-- Structured logging module (`moss.logging`)
-- Observability module with metrics and tracing (`moss.observability`)
-- Profiling utilities (`moss.profiling`)
+- Structured logging module (`normalize.logging`)
+- Observability module with metrics and tracing (`normalize.observability`)
+- Profiling utilities (`normalize.profiling`)
 
 ### Dogfooding
-- Self-analysis test suite (Moss analyzing its own codebase)
+- Self-analysis test suite (Normalize analyzing its own codebase)
 - Performance benchmarks on real code
 - 621 tests passing with 86% coverage

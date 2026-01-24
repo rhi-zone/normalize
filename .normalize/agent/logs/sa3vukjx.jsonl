@@ -1,0 +1,7 @@
+{"event": "session_start","timestamp": "2026-01-05T09:20:41Z", "session_id": "sa3vukjx", "timestamp": "2026-01-05T09:20:41Z", "moss_root": "."}
+{"event": "task","timestamp": "2026-01-05T09:20:41Z", "system_prompt": "state_machine_v2", "max_turns": 12, "provider": "gemini", "model": "default", "machine_start": "explorer", "use_planner": false, "user_prompt": "What is the most complex function in the codebase according to moss analyze?"}
+{"event": "turn_start","timestamp": "2026-01-05T09:20:41Z", "turn": 1, "working_memory_count": 0, "notes_count": 0, "state": "explorer", "pending_outputs": 0}
+{"event": "llm_response","timestamp": "2026-01-05T09:20:43Z", "response": "$(run ls -F)\n$(run moss --help)", "state": "explorer", "turn": 1}
+{"event": "command","timestamp": "2026-01-05T09:20:43Z", "cmd": "run ls -F", "turn": 1, "output_length": 277, "success": true}
+{"event": "command","timestamp": "2026-01-05T09:20:43Z", "cmd": "run moss --help", "turn": 1, "output_length": 0, "success": false}
+{"event": "turn_start","timestamp": "2026-01-05T09:20:43Z", "turn": 2, "working_memory_count": 0, "notes_count": 0, "state": "evaluator", "pending_outputs": 2}
