@@ -53,6 +53,14 @@ pub enum Stmt {
     /// Continue statement.
     Continue,
 
+    /// Try/catch/finally statement.
+    TryCatch {
+        body: Box<Stmt>,
+        catch_param: Option<String>,
+        catch_body: Option<Box<Stmt>>,
+        finally_body: Option<Box<Stmt>>,
+    },
+
     /// Function declaration.
     Function(crate::Function),
 }
@@ -130,6 +138,20 @@ impl Stmt {
 
     pub fn continue_stmt() -> Self {
         Stmt::Continue
+    }
+
+    pub fn try_catch(
+        body: Stmt,
+        catch_param: Option<String>,
+        catch_body: Option<Stmt>,
+        finally_body: Option<Stmt>,
+    ) -> Self {
+        Stmt::TryCatch {
+            body: Box::new(body),
+            catch_param,
+            catch_body: catch_body.map(Box::new),
+            finally_body: finally_body.map(Box::new),
+        }
     }
 
     pub fn function(f: crate::Function) -> Self {

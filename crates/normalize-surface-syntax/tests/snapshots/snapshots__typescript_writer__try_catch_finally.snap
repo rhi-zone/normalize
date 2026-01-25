@@ -1,0 +1,11 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "emit(&Program\n{\n    body:\n    vec![Stmt::try_catch(Stmt::block(vec![Stmt::expr(Expr::call(Expr::member(Expr::ident(\"console\"),\n    \"log\"), vec![Expr::string(\"trying\")]))]), Some(\"e\".into()),\n    Some(Stmt::block(vec![Stmt::expr(Expr::call(Expr::member(Expr::ident(\"console\"),\n    \"error\"), vec![Expr::ident(\"e\")]))])),\n    Some(Stmt::block(vec![Stmt::expr(Expr::call(Expr::ident(\"cleanup\"),\n    vec![]))])))]\n})"
+---
+try {
+  console.log("trying");
+} catch (e) {
+  console.error(e);
+} finally {
+  cleanup();
+}

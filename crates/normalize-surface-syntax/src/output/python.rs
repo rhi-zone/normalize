@@ -183,6 +183,37 @@ impl PythonWriter {
                 self.output.push_str("continue");
             }
 
+            Stmt::TryCatch {
+                body,
+                catch_param,
+                catch_body,
+                finally_body,
+            } => {
+                self.output.push_str("try:\n");
+                self.indent += 1;
+                self.write_block_body(body);
+                self.indent -= 1;
+                if let Some(cb) = catch_body {
+                    self.write_indent();
+                    self.output.push_str("except");
+                    if let Some(param) = catch_param {
+                        self.output.push_str(" Exception as ");
+                        self.output.push_str(param);
+                    }
+                    self.output.push_str(":\n");
+                    self.indent += 1;
+                    self.write_block_body(cb);
+                    self.indent -= 1;
+                }
+                if let Some(fb) = finally_body {
+                    self.write_indent();
+                    self.output.push_str("finally:\n");
+                    self.indent += 1;
+                    self.write_block_body(fb);
+                    self.indent -= 1;
+                }
+            }
+
             Stmt::Function(func) => {
                 self.output.push_str("def ");
                 if func.name.is_empty() {

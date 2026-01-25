@@ -123,6 +123,34 @@ impl StructureEq for Stmt {
             (Stmt::Break, Stmt::Break) => true,
             (Stmt::Continue, Stmt::Continue) => true,
 
+            (
+                Stmt::TryCatch {
+                    body: b1,
+                    catch_param: cp1,
+                    catch_body: cb1,
+                    finally_body: fb1,
+                },
+                Stmt::TryCatch {
+                    body: b2,
+                    catch_param: cp2,
+                    catch_body: cb2,
+                    finally_body: fb2,
+                },
+            ) => {
+                b1.structure_eq(b2.as_ref())
+                    && cp1 == cp2
+                    && match (cb1, cb2) {
+                        (None, None) => true,
+                        (Some(a), Some(b)) => a.structure_eq(b.as_ref()),
+                        _ => false,
+                    }
+                    && match (fb1, fb2) {
+                        (None, None) => true,
+                        (Some(a), Some(b)) => a.structure_eq(b.as_ref()),
+                        _ => false,
+                    }
+            }
+
             (Stmt::Function(a), Stmt::Function(b)) => a.structure_eq(b),
 
             _ => false,

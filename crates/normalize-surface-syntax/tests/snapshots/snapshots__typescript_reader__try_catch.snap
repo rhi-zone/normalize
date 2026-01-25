@@ -1,0 +1,56 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "parse(\"try { doSomething(); } catch (e) { console.log(e); }\")"
+---
+{
+  "body": [
+    {
+      "TryCatch": {
+        "body": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Ident": "doSomething"
+                  },
+                  "args": []
+                }
+              }
+            }
+          ]
+        },
+        "catch_param": "e",
+        "catch_body": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Member": {
+                      "object": {
+                        "Ident": "console"
+                      },
+                      "property": {
+                        "Literal": {
+                          "String": "log"
+                        }
+                      },
+                      "computed": false
+                    }
+                  },
+                  "args": [
+                    {
+                      "Ident": "e"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "finally_body": null
+      }
+    }
+  ]
+}

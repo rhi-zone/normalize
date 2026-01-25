@@ -1,0 +1,42 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "parse(\"try { doSomething(); } finally { cleanup(); }\")"
+---
+{
+  "body": [
+    {
+      "TryCatch": {
+        "body": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Ident": "doSomething"
+                  },
+                  "args": []
+                }
+              }
+            }
+          ]
+        },
+        "catch_param": null,
+        "catch_body": null,
+        "finally_body": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Ident": "cleanup"
+                  },
+                  "args": []
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

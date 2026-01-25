@@ -1,0 +1,9 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "emit(&Program\n{\n    body:\n    vec![Stmt::try_catch(Stmt::block(vec![Stmt::expr(Expr::call(Expr::ident(\"doSomething\"),\n    vec![]))]), None, None,\n    Some(Stmt::block(vec![Stmt::expr(Expr::call(Expr::ident(\"cleanup\"),\n    vec![]))])))]\n})"
+---
+local _ok, _err = pcall(function()
+  doSomething()
+end)
+
+cleanup()

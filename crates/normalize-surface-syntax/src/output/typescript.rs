@@ -174,6 +174,30 @@ impl TypeScriptWriter {
                 self.output.push_str("continue;");
             }
 
+            Stmt::TryCatch {
+                body,
+                catch_param,
+                catch_body,
+                finally_body,
+            } => {
+                self.output.push_str("try ");
+                self.write_block_stmt(body);
+                if let Some(cb) = catch_body {
+                    self.output.push_str(" catch");
+                    if let Some(param) = catch_param {
+                        self.output.push_str(" (");
+                        self.output.push_str(param);
+                        self.output.push(')');
+                    }
+                    self.output.push(' ');
+                    self.write_block_stmt(cb);
+                }
+                if let Some(fb) = finally_body {
+                    self.output.push_str(" finally ");
+                    self.write_block_stmt(fb);
+                }
+            }
+
             Stmt::Function(f) => {
                 self.write_function(f);
             }

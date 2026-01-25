@@ -109,6 +109,26 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
         Stmt::Break => json!(["std.break"]),
         Stmt::Continue => json!(["std.continue"]),
 
+        Stmt::TryCatch {
+            body,
+            catch_param,
+            catch_body,
+            finally_body,
+        } => {
+            let mut parts: Vec<Value> = vec![json!("std.try"), stmt_to_sexpr(body)];
+            if let Some(cb) = catch_body {
+                let param = catch_param
+                    .as_deref()
+                    .map(|s| json!(s))
+                    .unwrap_or(Value::Null);
+                parts.push(json!(["catch", param, stmt_to_sexpr(cb)]));
+            }
+            if let Some(fb) = finally_body {
+                parts.push(json!(["finally", stmt_to_sexpr(fb)]));
+            }
+            Value::Array(parts)
+        }
+
         Stmt::Function(f) => function_to_sexpr(f),
     }
 }

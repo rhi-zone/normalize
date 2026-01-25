@@ -90,6 +90,25 @@ mod typescript_reader {
     fn function_declaration() {
         insta::assert_json_snapshot!(parse("function greet(name) { return \"Hello, \" + name; }"));
     }
+
+    #[test]
+    fn try_catch() {
+        insta::assert_json_snapshot!(parse(
+            "try { doSomething(); } catch (e) { console.log(e); }"
+        ));
+    }
+
+    #[test]
+    fn try_catch_finally() {
+        insta::assert_json_snapshot!(parse(
+            "try { doSomething(); } catch (e) { console.log(e); } finally { cleanup(); }"
+        ));
+    }
+
+    #[test]
+    fn try_finally() {
+        insta::assert_json_snapshot!(parse("try { doSomething(); } finally { cleanup(); }"));
+    }
 }
 
 mod lua_reader {
@@ -250,6 +269,54 @@ mod lua_writer {
     }
 }
 
+mod lua_try_catch {
+    use super::*;
+    use normalize_surface_syntax::output::lua::LuaWriter;
+
+    fn emit(program: &Program) -> String {
+        LuaWriter::emit(program)
+    }
+
+    #[test]
+    fn try_catch_finally() {
+        insta::assert_snapshot!(emit(&Program {
+            body: vec![Stmt::try_catch(
+                Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::ident("doSomething"),
+                    vec![]
+                ))]),
+                Some("e".into()),
+                Some(Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::member(Expr::ident("console"), "log"),
+                    vec![Expr::ident("e")]
+                ))])),
+                Some(Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::ident("cleanup"),
+                    vec![]
+                ))]))
+            )]
+        }));
+    }
+
+    #[test]
+    fn try_finally() {
+        insta::assert_snapshot!(emit(&Program {
+            body: vec![Stmt::try_catch(
+                Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::ident("doSomething"),
+                    vec![]
+                ))]),
+                None,
+                None,
+                Some(Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::ident("cleanup"),
+                    vec![]
+                ))]))
+            )]
+        }));
+    }
+}
+
 mod typescript_writer {
     use super::*;
     use normalize_surface_syntax::output::typescript::TypeScriptWriter;
@@ -354,5 +421,26 @@ mod typescript_writer {
             "arr",
             Expr::array(vec![Expr::number(1), Expr::number(2), Expr::number(3)])
         )));
+    }
+
+    #[test]
+    fn try_catch_finally() {
+        insta::assert_snapshot!(emit(&Program {
+            body: vec![Stmt::try_catch(
+                Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::member(Expr::ident("console"), "log"),
+                    vec![Expr::string("trying")]
+                ))]),
+                Some("e".into()),
+                Some(Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::member(Expr::ident("console"), "error"),
+                    vec![Expr::ident("e")]
+                ))])),
+                Some(Stmt::block(vec![Stmt::expr(Expr::call(
+                    Expr::ident("cleanup"),
+                    vec![]
+                ))]))
+            )]
+        }));
     }
 }

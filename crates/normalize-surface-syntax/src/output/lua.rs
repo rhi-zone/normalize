@@ -184,6 +184,37 @@ impl LuaWriter {
                     .push_str("-- continue (not supported in Lua 5.1)");
             }
 
+            Stmt::TryCatch {
+                body,
+                catch_param,
+                catch_body,
+                finally_body,
+            } => {
+                // Lua uses pcall/xpcall for error handling
+                let param = catch_param.as_deref().unwrap_or("_err");
+                self.output.push_str("local _ok, ");
+                self.output.push_str(param);
+                self.output.push_str(" = pcall(function()\n");
+                self.indent += 1;
+                self.write_stmt_body(body);
+                self.indent -= 1;
+                self.write_indent();
+                self.output.push_str("end)\n");
+                if let Some(cb) = catch_body {
+                    self.write_indent();
+                    self.output.push_str("if not _ok then\n");
+                    self.indent += 1;
+                    self.write_stmt_body(cb);
+                    self.indent -= 1;
+                    self.write_indent();
+                    self.output.push_str("end");
+                }
+                if let Some(fb) = finally_body {
+                    self.output.push('\n');
+                    self.write_stmt_body(fb);
+                }
+            }
+
             Stmt::Function(f) => {
                 self.write_function(f);
             }

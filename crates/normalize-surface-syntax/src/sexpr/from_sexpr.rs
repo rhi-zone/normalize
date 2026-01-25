@@ -128,6 +128,39 @@ fn parse_opcode(opcode: &str, args: &[Value]) -> Result<Stmt, SExprError> {
         "std.break" => Ok(Stmt::break_stmt()),
         "std.continue" => Ok(Stmt::continue_stmt()),
 
+        "std.try" => {
+            if args.is_empty() {
+                return Err(SExprError::WrongArity {
+                    opcode: opcode.into(),
+                    expected: 1,
+                    got: 0,
+                });
+            }
+            let body = value_to_stmt(&args[0])?;
+            let mut catch_param = None;
+            let mut catch_body = None;
+            let mut finally_body = None;
+
+            for arg in &args[1..] {
+                if let Value::Array(arr) = arg {
+                    if let Some(tag) = arr.first().and_then(|v| v.as_str()) {
+                        match tag {
+                            "catch" if arr.len() >= 3 => {
+                                catch_param = arr[1].as_str().map(String::from);
+                                catch_body = Some(value_to_stmt(&arr[2])?);
+                            }
+                            "finally" if arr.len() >= 2 => {
+                                finally_body = Some(value_to_stmt(&arr[1])?);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            Ok(Stmt::try_catch(body, catch_param, catch_body, finally_body))
+        }
+
         "std.fn" => {
             ensure_arity(opcode, args, 3)?;
             let name = args[0]

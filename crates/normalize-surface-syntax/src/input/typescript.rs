@@ -87,6 +87,7 @@ impl<'a> ReadContext<'a> {
             "for_statement" => self.read_for_statement(node).map(Some),
             "for_in_statement" => self.read_for_in_statement(node).map(Some),
             "switch_statement" => self.read_switch_statement(node).map(Some),
+            "try_statement" => self.read_try_statement(node).map(Some),
             "break_statement" => Ok(Some(Stmt::break_stmt())),
             "continue_statement" => Ok(Some(Stmt::continue_stmt())),
             "return_statement" => self.read_return_statement(node).map(Some),
@@ -926,6 +927,40 @@ impl<'a> ReadContext<'a> {
                 });
 
         Ok(result)
+    }
+
+    fn read_try_statement(&self, node: Node) -> Result<Stmt, ReadError> {
+        let body = node
+            .child_by_field_name("body")
+            .ok_or_else(|| ReadError::Parse("try_statement missing body".into()))?;
+
+        let body_stmt = self.read_block(body)?;
+
+        let handler = node.child_by_field_name("handler");
+        let (catch_param, catch_body) = if let Some(h) = handler {
+            let param = h
+                .child_by_field_name("parameter")
+                .map(|p| self.node_text(p).to_string());
+            let catch_body_node = h
+                .child_by_field_name("body")
+                .ok_or_else(|| ReadError::Parse("catch_clause missing body".into()))?;
+            (param, Some(self.read_block(catch_body_node)?))
+        } else {
+            (None, None)
+        };
+
+        let finalizer = node.child_by_field_name("finalizer");
+        let finally_body = finalizer
+            .and_then(|f| f.child_by_field_name("body"))
+            .map(|f| self.read_block(f))
+            .transpose()?;
+
+        Ok(Stmt::try_catch(
+            body_stmt,
+            catch_param,
+            catch_body,
+            finally_body,
+        ))
     }
 
     fn read_return_statement(&self, node: Node) -> Result<Stmt, ReadError> {
