@@ -2,13 +2,9 @@
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
-## Docs Build Fixes
-
-- Fix dead link `./script` in `docs/cli/README.md` (script.md doesn't exist)
-- Fix dead link `/guide/rules` in `docs/cli/rules.md` (guide/ directory doesn't exist)
-
 ## Next Up
 
+- Add rule writing guide (`docs/rules.md`) and link from `docs/cli/rules.md`
 - [x] Rule sharing/import: `normalize rules add/update/list/remove` (Phase 1 complete)
 - [x] Auto-fix support: `normalize analyze rules --fix` with fix templates
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)

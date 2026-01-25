@@ -35,11 +35,6 @@ Moss provides a unified CLI for code intelligence. Three core primitives: **view
 |---------|---------|
 | [package](package.md) | Package info, dependency trees, outdated checks |
 
-### Scripting
-| Command | Purpose |
-|---------|---------|
-| [script](script.md) | Run Lua scripts |
-
 ### Utilities
 | Command | Purpose |
 |---------|---------|
