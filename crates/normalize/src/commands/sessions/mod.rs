@@ -214,8 +214,33 @@ pub enum SessionsCommand {
     },
 }
 
+/// Print JSON schema for the sessions subcommand's output type.
+fn print_sessions_schema(command: &Option<SessionsCommand>) -> i32 {
+    use crate::sessions::SessionAnalysis;
+    match command {
+        Some(SessionsCommand::List { .. }) | None => {
+            crate::output::print_output_schema::<list::SessionListReport>();
+        }
+        Some(SessionsCommand::Show { .. }) | Some(SessionsCommand::Stats { .. }) => {
+            crate::output::print_output_schema::<SessionAnalysis>();
+        }
+        Some(SessionsCommand::Plans { .. }) => {
+            crate::output::print_output_schema::<plans::PlansListReport>();
+        }
+        #[cfg(feature = "sessions-web")]
+        Some(SessionsCommand::Serve { .. }) => {
+            eprintln!("Serve subcommand does not have a structured output schema");
+            return 1;
+        }
+    }
+    0
+}
+
 /// Run the sessions command
-pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
+pub fn run(args: SessionsArgs, json: bool, pretty: bool, output_schema: bool) -> i32 {
+    if output_schema {
+        return print_sessions_schema(&args.command);
+    }
     match args.command {
         Some(SessionsCommand::List {
             grep,

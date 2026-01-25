@@ -71,7 +71,35 @@ pub enum TestSubAction {
     List,
 }
 
-pub fn run(action: ToolsAction, root: Option<&Path>, format: OutputFormat, json: bool) -> i32 {
+/// Print JSON schema for the tools subcommand's output type.
+fn print_tools_schema(action: &ToolsAction) -> i32 {
+    match action {
+        ToolsAction::Lint { action: sub, .. } => {
+            if matches!(sub, Some(LintSubAction::List)) {
+                crate::output::print_output_schema::<lint::LintListResult>();
+                0
+            } else {
+                eprintln!("Lint run subcommand does not have a structured output schema");
+                1
+            }
+        }
+        ToolsAction::Test { .. } => {
+            eprintln!("Test subcommand does not have a structured output schema");
+            1
+        }
+    }
+}
+
+pub fn run(
+    action: ToolsAction,
+    root: Option<&Path>,
+    format: OutputFormat,
+    json: bool,
+    output_schema: bool,
+) -> i32 {
+    if output_schema {
+        return print_tools_schema(&action);
+    }
     match action {
         ToolsAction::Lint {
             action: sub_action,

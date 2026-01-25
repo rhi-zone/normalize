@@ -78,7 +78,22 @@ pub enum GrammarAction {
 }
 
 /// Run the grammars command
-pub fn cmd_grammars(action: GrammarAction, json: bool) -> i32 {
+pub fn cmd_grammars(action: GrammarAction, json: bool, output_schema: bool) -> i32 {
+    if output_schema {
+        match action {
+            GrammarAction::List => {
+                crate::output::print_output_schema::<GrammarListReport>();
+            }
+            GrammarAction::Paths => {
+                crate::output::print_output_schema::<GrammarPathsReport>();
+            }
+            GrammarAction::Install { .. } => {
+                eprintln!("Install subcommand does not have a structured output schema");
+                return 1;
+            }
+        }
+        return 0;
+    }
     match action {
         GrammarAction::List => cmd_list(json),
         GrammarAction::Install { version, force } => cmd_install(version, force, json),

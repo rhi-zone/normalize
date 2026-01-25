@@ -16,7 +16,7 @@ struct SessionListItem {
 
 /// Session list report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct SessionListReport {
+pub struct SessionListReport {
     sessions: Vec<SessionListItem>,
 }
 

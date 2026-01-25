@@ -16,7 +16,7 @@ struct PlanListItem {
 
 /// Plans list report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct PlansListReport {
+pub struct PlansListReport {
     plans: Vec<PlanListItem>,
 }
 

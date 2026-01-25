@@ -260,7 +260,9 @@ fn main() {
         Commands::Init(args) => commands::init::run(args),
         Commands::Daemon { action } => commands::daemon::cmd_daemon(action, cli.json),
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
-        Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
+        Commands::Grammars { action } => {
+            commands::grammars::cmd_grammars(action, cli.json, cli.output_schema)
+        }
         Commands::Analyze(args) => commands::analyze::run(args, format, cli.output_schema),
         Commands::Aliases(args) => {
             if cli.input_schema {
@@ -283,14 +285,16 @@ fn main() {
         }
         Commands::Context(args) => commands::context::run(args, format),
         Commands::TextSearch(args) => commands::text_search::run(args, format, cli.output_schema),
-        Commands::Sessions(args) => commands::sessions::run(args, cli.json, cli.pretty),
+        Commands::Sessions(args) => {
+            commands::sessions::run(args, cli.json, cli.pretty, cli.output_schema)
+        }
         Commands::Package {
             action,
             ecosystem,
             root,
         } => commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), format),
         Commands::Tools { action, root } => {
-            commands::tools::run(action, root.as_deref(), format, cli.json)
+            commands::tools::run(action, root.as_deref(), format, cli.json, cli.output_schema)
         }
         Commands::Serve(args) => serve::run(args, cli.json),
         Commands::Generate(args) => commands::generate::run(args),
