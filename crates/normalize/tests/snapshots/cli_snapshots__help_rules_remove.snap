@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 433
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rules\", \"remove\"])"
 ---
 Remove an imported rule
 
-Usage: moss rules remove [OPTIONS] <RULE_ID>
+Usage: normalize rules remove [OPTIONS] <RULE_ID>
 
 Arguments:
   <RULE_ID>  Rule ID to remove

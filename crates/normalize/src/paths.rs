@@ -39,14 +39,16 @@ pub fn get_moss_dir(root: &Path) -> PathBuf {
 mod tests {
     use super::*;
     use std::env;
+    use std::sync::Mutex;
 
-    // SAFETY: These tests run single-threaded via `cargo test -- --test-threads=1`
-    // or are independent enough that env var conflicts are unlikely in practice.
+    // Mutex to serialize tests that modify environment variables.
     // set_var/remove_var are unsafe in edition 2024 due to potential data races
     // when other threads read the environment concurrently.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_default_moss_dir() {
+        let _guard = ENV_LOCK.lock().unwrap();
         unsafe { env::remove_var("MOSS_INDEX_DIR") };
         let root = PathBuf::from("/project");
         assert_eq!(get_moss_dir(&root), PathBuf::from("/project/.normalize"));
@@ -54,6 +56,7 @@ mod tests {
 
     #[test]
     fn test_absolute_moss_index_dir() {
+        let _guard = ENV_LOCK.lock().unwrap();
         unsafe { env::set_var("MOSS_INDEX_DIR", "/custom/path") };
         let root = PathBuf::from("/project");
         assert_eq!(get_moss_dir(&root), PathBuf::from("/custom/path"));
@@ -62,6 +65,7 @@ mod tests {
 
     #[test]
     fn test_relative_moss_index_dir() {
+        let _guard = ENV_LOCK.lock().unwrap();
         unsafe { env::set_var("MOSS_INDEX_DIR", "myproject") };
         unsafe { env::set_var("XDG_DATA_HOME", "/home/user/.data") };
         let root = PathBuf::from("/project");

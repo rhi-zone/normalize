@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 232
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"complexity\"])"
 ---
 Run complexity analysis
 
-Usage: moss analyze complexity [OPTIONS] [TARGET]
+Usage: normalize analyze complexity [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target file or directory
@@ -15,7 +14,7 @@ Options:
   -l, --limit <LIMIT>          Maximum number of functions to show (0 = no limit) [default: 10]
       --kind <KIND>            Filter by symbol kind: function, method
       --sarif                  Output in SARIF format for IDE integration
-      --allow <SYMBOL>         Add function to .moss/complexity-allow
+      --allow <SYMBOL>         Add function to .normalize/complexity-allow
       --reason <REASON>        Reason for allowing
       --json                   Output as JSON
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)

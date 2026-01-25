@@ -5,18 +5,18 @@
 
 use assert_cmd::Command;
 
-fn moss() -> Command {
-    Command::cargo_bin("moss").unwrap()
+fn normalize() -> Command {
+    Command::cargo_bin("normalize").unwrap()
 }
 
 fn snapshot_help(args: &[&str]) -> String {
-    let mut cmd = moss();
+    let mut cmd = normalize();
     for arg in args {
         cmd.arg(arg);
     }
     cmd.arg("--help");
 
-    let output = cmd.output().expect("failed to execute moss");
+    let output = cmd.output().expect("failed to execute normalize");
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
@@ -315,6 +315,11 @@ fn test_help_analyze_query() {
 #[test]
 fn test_help_analyze_rules() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "rules"]));
+}
+
+#[test]
+fn test_help_analyze_test_gaps() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "test-gaps"]));
 }
 
 // sessions subcommands

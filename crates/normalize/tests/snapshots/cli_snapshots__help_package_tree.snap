@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 354
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\", \"tree\"])"
 ---
 Show dependency tree from lockfile
 
-Usage: moss package tree [OPTIONS]
+Usage: normalize package tree [OPTIONS]
 
 Options:
   -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)

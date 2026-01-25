@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 138
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\", \"insert\"])"
 ---
 Insert content relative to target
 
-Usage: moss edit insert [OPTIONS] --at <AT> <CONTENT>
+Usage: normalize edit insert [OPTIONS] --at <AT> <CONTENT>
 
 Arguments:
   <CONTENT>

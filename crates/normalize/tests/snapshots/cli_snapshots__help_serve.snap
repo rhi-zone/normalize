@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 107
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"serve\"])"
 ---
 Start a moss server (MCP, HTTP, LSP)
 
-Usage: moss serve [OPTIONS] <COMMAND>
+Usage: normalize serve [OPTIONS] <COMMAND>
 
 Commands:
   mcp   Start MCP server for LLM integration (stdio transport)

@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 190
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"daemon\", \"run\"])"
 ---
 Run the daemon in foreground (for debugging)
 
-Usage: moss daemon run [OPTIONS]
+Usage: normalize daemon run [OPTIONS]
 
 Options:
       --json       Output as JSON

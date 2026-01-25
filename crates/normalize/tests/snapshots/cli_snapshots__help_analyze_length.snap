@@ -1,18 +1,17 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 237
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"length\"])"
 ---
 Run function length analysis
 
-Usage: moss analyze length [OPTIONS] [TARGET]
+Usage: normalize analyze length [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target file or directory
 
 Options:
       --sarif              Output in SARIF format for IDE integration
-      --allow <SYMBOL>     Add function to .moss/length-allow
+      --allow <SYMBOL>     Add function to .normalize/length-allow
       --reason <REASON>    Reason for allowing
       --json               Output as JSON
       --jq <EXPR>          Filter JSON output with jq expression (implies --json)

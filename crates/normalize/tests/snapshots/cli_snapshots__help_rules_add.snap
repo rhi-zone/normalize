@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 418
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rules\", \"add\"])"
 ---
 Add a rule from a URL
 
-Usage: moss rules add [OPTIONS] <URL>
+Usage: normalize rules add [OPTIONS] <URL>
 
 Arguments:
   <URL>  URL to download the rule from

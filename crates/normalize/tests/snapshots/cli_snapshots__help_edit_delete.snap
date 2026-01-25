@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 123
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\", \"delete\"])"
 ---
 Delete the target symbol
 
-Usage: moss edit delete [OPTIONS]
+Usage: normalize edit delete [OPTIONS]
 
 Options:
   -r, --root <ROOT>        Root directory (defaults to current directory)

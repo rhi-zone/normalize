@@ -1,16 +1,21 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"analyze\", \"callees\"])"
+expression: "snapshot_help(&[\"analyze\", \"test-gaps\"])"
 ---
-Show what functions a symbol calls
+Find public functions with no direct test caller
 
-Usage: normalize analyze callees [OPTIONS] <SYMBOL>
+Usage: normalize analyze test-gaps [OPTIONS] [TARGET]
 
 Arguments:
-  <SYMBOL>  Symbol to find callees for
+  [TARGET]  Target file or directory
 
 Options:
-  -i, --case-insensitive   Case-insensitive symbol matching
+      --all                Show all functions (including tested), sorted by test calls ascending
+      --min-risk <N>       Only show functions above this risk threshold
+  -l, --limit <LIMIT>      Maximum number of functions to show (0 = no limit) [default: 20]
+      --sarif              Output in SARIF format for IDE integration
+      --allow <SYMBOL>     Add function to .normalize/test-gaps-allow
+      --reason <REASON>    Reason for allowing
       --json               Output as JSON
       --jq <EXPR>          Filter JSON output with jq expression (implies --json)
   -r, --root <ROOT>        Root directory (defaults to current directory)

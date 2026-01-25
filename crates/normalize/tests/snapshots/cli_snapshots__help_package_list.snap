@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 349
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\", \"list\"])"
 ---
 List declared dependencies from manifest
 
-Usage: moss package list [OPTIONS]
+Usage: normalize package list [OPTIONS]
 
 Options:
   -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)

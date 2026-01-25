@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 227
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"health\"])"
 ---
 Run health analysis (file counts, complexity stats, large file warnings)
 
-Usage: moss analyze health [OPTIONS] [TARGET]
+Usage: normalize analyze health [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target file or directory

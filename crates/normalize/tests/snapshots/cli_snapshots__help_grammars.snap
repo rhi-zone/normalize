@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 67
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"grammars\"])"
 ---
 Manage tree-sitter grammars for parsing
 
-Usage: moss grammars [OPTIONS] <COMMAND>
+Usage: normalize grammars [OPTIONS] <COMMAND>
 
 Commands:
   list     List installed grammars

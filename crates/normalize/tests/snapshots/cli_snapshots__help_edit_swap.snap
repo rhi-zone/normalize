@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 133
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\", \"swap\"])"
 ---
 Swap target with another symbol
 
-Usage: moss edit swap [OPTIONS] <OTHER>
+Usage: normalize edit swap [OPTIONS] <OTHER>
 
 Arguments:
   <OTHER>  Symbol to swap with

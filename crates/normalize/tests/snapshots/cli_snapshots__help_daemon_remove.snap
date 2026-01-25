@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 200
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"daemon\", \"remove\"])"
 ---
 Remove a root from watching
 
-Usage: moss daemon remove [OPTIONS] [PATH]
+Usage: normalize daemon remove [OPTIONS] [PATH]
 
 Arguments:
   [PATH]  Path to the project root [default: .]

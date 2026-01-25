@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 282
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"stale-docs\"])"
 ---
 Find documentation with stale code references
 
-Usage: moss analyze stale-docs [OPTIONS]
+Usage: normalize analyze stale-docs [OPTIONS]
 
 Options:
       --json               Output as JSON

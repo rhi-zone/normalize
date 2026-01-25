@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 102
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"tools\"])"
 ---
 External ecosystem tools (linters, formatters, test runners)
 
-Usage: moss tools [OPTIONS] <COMMAND>
+Usage: normalize tools [OPTIONS] <COMMAND>
 
 Commands:
   lint  Run linters, formatters, and type checkers

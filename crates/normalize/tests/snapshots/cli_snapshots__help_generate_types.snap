@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 407
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"generate\", \"types\"])"
 ---
 Generate types from JSON Schema (legacy)
 
-Usage: moss generate types [OPTIONS] --lang <LANG> <SCHEMA>
+Usage: normalize generate types [OPTIONS] --lang <LANG> <SCHEMA>
 
 Arguments:
   <SCHEMA>  JSON Schema file

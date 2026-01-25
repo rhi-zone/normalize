@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 344
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\", \"info\"])"
 ---
 Query package info from registry
 
-Usage: moss package info [OPTIONS] <PACKAGE>
+Usage: normalize package info [OPTIONS] <PACKAGE>
 
 Arguments:
   <PACKAGE>  Package name to query (optionally with @version)

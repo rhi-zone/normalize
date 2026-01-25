@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 386
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"serve\", \"mcp\"])"
 ---
 Start MCP server for LLM integration (stdio transport)
 
-Usage: moss serve mcp [OPTIONS]
+Usage: normalize serve mcp [OPTIONS]
 
 Options:
   -r, --root <ROOT>  Root directory (defaults to current directory)

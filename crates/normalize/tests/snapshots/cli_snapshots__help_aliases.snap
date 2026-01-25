@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 77
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"aliases\"])"
 ---
 List filter aliases (used by --exclude/--only)
 
-Usage: moss aliases [OPTIONS]
+Usage: normalize aliases [OPTIONS]
 
 Options:
   -r, --root <ROOT>  Root directory (defaults to current directory)

@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 180
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"daemon\", \"stop\"])"
 ---
 Stop the daemon
 
-Usage: moss daemon stop [OPTIONS]
+Usage: normalize daemon stop [OPTIONS]
 
 Options:
       --json       Output as JSON

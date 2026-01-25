@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 87
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"text-search\"])"
 ---
 Search for text patterns in files (fast ripgrep-based search)
 
-Usage: moss text-search [OPTIONS] <PATTERN>
+Usage: normalize text-search [OPTIONS] <PATTERN>
 
 Arguments:
   <PATTERN>  Regex pattern to search for

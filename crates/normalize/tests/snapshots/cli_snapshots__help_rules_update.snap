@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 428
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rules\", \"update\"])"
 ---
 Update imported rules from their sources
 
-Usage: moss rules update [OPTIONS] [RULE_ID]
+Usage: normalize rules update [OPTIONS] [RULE_ID]
 
 Arguments:
   [RULE_ID]  Specific rule ID to update (updates all if omitted)

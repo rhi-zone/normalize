@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 52
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"init\"])"
 ---
 Initialize moss in current directory
 
-Usage: moss init [OPTIONS]
+Usage: normalize init [OPTIONS]
 
 Options:
       --index      Index the codebase after initialization

@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 287
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"check-examples\"])"
 ---
 Check example references in documentation
 
-Usage: moss analyze check-examples [OPTIONS]
+Usage: normalize analyze check-examples [OPTIONS]
 
 Options:
       --json               Output as JSON

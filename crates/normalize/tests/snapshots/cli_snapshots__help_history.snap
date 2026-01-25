@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 42
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"history\"])"
 ---
 View shadow git edit history
 
-Usage: moss history [OPTIONS] [FILE]
+Usage: normalize history [OPTIONS] [FILE]
 
 Arguments:
   [FILE]  Filter history to specific file

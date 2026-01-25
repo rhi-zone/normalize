@@ -2,6 +2,11 @@
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
+## Docs Build Fixes
+
+- Fix dead link `./script` in `docs/cli/README.md` (script.md doesn't exist)
+- Fix dead link `/guide/rules` in `docs/cli/rules.md` (guide/ directory doesn't exist)
+
 ## Next Up
 
 - [x] Rule sharing/import: `normalize rules add/update/list/remove` (Phase 1 complete)
@@ -429,7 +434,7 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
 - [x] Chained if-let: edition 2024 allows `if let Ok(x) = foo() && let Some(y) = bar(x)`. Audit complete.
 - PR/diff analysis: `normalize analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
-- Test gap analysis: `normalize analyze test-gaps` - find public functions with no direct test caller. See `docs/design/test-gaps.md`
+- [x] Test gap analysis: `normalize analyze test-gaps` - find public functions with no direct test caller. See `docs/design/test-gaps.md`
 - [x] Validate node kinds against grammars: `validate_unused_kinds_audit()` in 99 language files, runs as test
 - [x] Directory context: `normalize context`, `view --dir-context`
 - Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)

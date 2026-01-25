@@ -1,18 +1,17 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 297
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"duplicate-types\"])"
 ---
 Detect duplicate type definitions
 
-Usage: moss analyze duplicate-types [OPTIONS] [TARGET]
+Usage: normalize analyze duplicate-types [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target directory to scan
 
 Options:
       --min-overlap <MIN_OVERLAP>  Minimum field overlap percentage (default: 70) [default: 70]
-      --allow <TYPE1> <TYPE2>      Allow a duplicate type pair (add to .moss/duplicate-types-allow)
+      --allow <TYPE1> <TYPE2>      Allow a duplicate type pair (add to .normalize/duplicate-types-allow)
       --reason <REASON>            Reason for allowing
       --json                       Output as JSON
       --jq <EXPR>                  Filter JSON output with jq expression (implies --json)

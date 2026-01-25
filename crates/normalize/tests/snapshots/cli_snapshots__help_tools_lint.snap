@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 375
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"tools\", \"lint\"])"
 ---
 Run linters, formatters, and type checkers
 
-Usage: moss tools lint [OPTIONS] [TARGET] [COMMAND]
+Usage: normalize tools lint [OPTIONS] [TARGET] [COMMAND]
 
 Commands:
   run   Run linters (default)

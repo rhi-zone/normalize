@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 359
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\", \"why\"])"
 ---
 Show why a dependency is in the tree
 
-Usage: moss package why [OPTIONS] <PACKAGE>
+Usage: normalize package why [OPTIONS] <PACKAGE>
 
 Arguments:
   <PACKAGE>  Package name to trace

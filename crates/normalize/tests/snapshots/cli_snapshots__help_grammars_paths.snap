@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 221
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"grammars\", \"paths\"])"
 ---
 Show grammar search paths
 
-Usage: moss grammars paths [OPTIONS]
+Usage: normalize grammars paths [OPTIONS]
 
 Options:
       --json       Output as JSON

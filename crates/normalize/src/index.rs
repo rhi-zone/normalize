@@ -1014,6 +1014,51 @@ impl FileIndex {
         })
     }
 
+    /// Load all call edges from the calls table.
+    /// Returns Vec<(caller_file, caller_symbol, callee_name)>.
+    /// Used by test-gaps analysis for bulk caller lookup.
+    pub async fn all_call_edges(&self) -> Result<Vec<(String, String, String)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT caller_file, caller_symbol, callee_name FROM calls",
+                (),
+            )
+            .await?;
+        let mut edges = Vec::new();
+        while let Some(row) = rows.next().await? {
+            edges.push((row.get(0)?, row.get(1)?, row.get(2)?));
+        }
+        Ok(edges)
+    }
+
+    /// Load all symbols from the symbols table with full details.
+    /// Returns Vec<(file, name, kind, start_line, end_line, parent)>.
+    /// Used by test-gaps analysis to classify test context.
+    pub async fn all_symbols_with_details(
+        &self,
+    ) -> Result<Vec<(String, String, String, usize, usize, Option<String>)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, name, kind, start_line, end_line, parent FROM symbols",
+                (),
+            )
+            .await?;
+        let mut symbols = Vec::new();
+        while let Some(row) = rows.next().await? {
+            symbols.push((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get::<i64>(3)? as usize,
+                row.get::<i64>(4)? as usize,
+                row.get(5).ok(),
+            ));
+        }
+        Ok(symbols)
+    }
+
     /// Convert a module name to possible file paths using the language's trait method.
     /// Returns only paths that exist in the index.
     async fn module_to_files(&self, module: &str, source_file: &str) -> Vec<String> {

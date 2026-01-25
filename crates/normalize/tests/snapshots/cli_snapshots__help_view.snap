@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 32
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"view\"])"
 ---
 View a node in the codebase tree (directory, file, or symbol)
 
-Usage: moss view [OPTIONS] [TARGET]
+Usage: normalize view [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target: path, path/Symbol, Parent/method, file:line, or SymbolName

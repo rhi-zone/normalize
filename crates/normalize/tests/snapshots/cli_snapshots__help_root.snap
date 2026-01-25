@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 26
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[])"
 ---
 Fast code intelligence CLI
 
-Usage: moss [OPTIONS] <COMMAND>
+Usage: normalize [OPTIONS] <COMMAND>
 
 Commands:
   view         View a node in the codebase tree (directory, file, or symbol)
@@ -26,6 +25,7 @@ Commands:
   serve        Start a moss server (MCP, HTTP, LSP)
   generate     Generate code from API spec
   rules        Manage custom analysis rules
+  translate    Translate code between programming languages
   help         Print this message or the help of the given subcommand(s)
 
 Options:

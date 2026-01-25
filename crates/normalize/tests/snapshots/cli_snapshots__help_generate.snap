@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 112
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"generate\"])"
 ---
 Generate code from API spec
 
-Usage: moss generate [OPTIONS] <COMMAND>
+Usage: normalize generate [OPTIONS] <COMMAND>
 
 Commands:
   client        Generate API client from OpenAPI spec (legacy)

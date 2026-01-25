@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 57
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"daemon\"])"
 ---
 Manage the global moss daemon
 
-Usage: moss daemon [OPTIONS] <COMMAND>
+Usage: normalize daemon [OPTIONS] <COMMAND>
 
 Commands:
   status  Show daemon status

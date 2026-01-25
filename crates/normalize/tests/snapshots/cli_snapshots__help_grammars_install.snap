@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 216
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"grammars\", \"install\"])"
 ---
 Install grammars from GitHub release
 
-Usage: moss grammars install [OPTIONS]
+Usage: normalize grammars install [OPTIONS]
 
 Options:
       --version <VERSION>  Specific version to install (default: latest)

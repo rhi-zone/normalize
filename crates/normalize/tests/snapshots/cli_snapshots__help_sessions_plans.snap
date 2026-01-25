@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 338
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\", \"plans\"])"
 ---
 List and view agent plans (from ~/.claude/plans/, etc.)
 
-Usage: moss sessions plans [OPTIONS] [NAME]
+Usage: normalize sessions plans [OPTIONS] [NAME]
 
 Arguments:
   [NAME]  Plan name to view (omit to list all plans)

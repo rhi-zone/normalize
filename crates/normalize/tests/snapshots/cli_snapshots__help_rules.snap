@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 117
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rules\"])"
 ---
 Manage custom analysis rules
 
-Usage: moss rules [OPTIONS] <COMMAND>
+Usage: normalize rules [OPTIONS] <COMMAND>
 
 Commands:
   add     Add a rule from a URL

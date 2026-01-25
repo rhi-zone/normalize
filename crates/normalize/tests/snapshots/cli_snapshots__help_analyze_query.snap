@@ -1,13 +1,12 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 312
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"query\"])"
 ---
 Test a tree-sitter query against files
 
 Supports two pattern syntaxes (auto-detected): - Tree-sitter S-expression: (call_expression function: (identifier) @fn) - ast-grep pattern: $FN($ARGS)
 
-Usage: moss analyze query [OPTIONS] <PATTERN> [PATH]
+Usage: normalize analyze query [OPTIONS] <PATTERN> [PATH]
 
 Arguments:
   <PATTERN>

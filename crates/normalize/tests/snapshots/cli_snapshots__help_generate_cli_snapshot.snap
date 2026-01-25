@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 412
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"generate\", \"cli-snapshot\"])"
 ---
 Generate CLI snapshot tests for a binary
 
-Usage: moss generate cli-snapshot [OPTIONS] <BINARY>
+Usage: normalize generate cli-snapshot [OPTIONS] <BINARY>
 
 Arguments:
   <BINARY>  Path to the CLI binary

@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 185
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"daemon\", \"start\"])"
 ---
 Start the daemon (background)
 
-Usage: moss daemon start [OPTIONS]
+Usage: normalize daemon start [OPTIONS]
 
 Options:
       --json       Output as JSON

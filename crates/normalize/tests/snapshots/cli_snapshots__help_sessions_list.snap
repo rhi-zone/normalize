@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 323
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\", \"list\"])"
 ---
 List sessions
 
-Usage: moss sessions list [OPTIONS]
+Usage: normalize sessions list [OPTIONS]
 
 Options:
       --grep <GREP>        Filter sessions by grep pattern (searches prompt/commands)

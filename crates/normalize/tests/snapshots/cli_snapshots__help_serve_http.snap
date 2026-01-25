@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 391
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"serve\", \"http\"])"
 ---
 Start HTTP server (REST API)
 
-Usage: moss serve http [OPTIONS]
+Usage: normalize serve http [OPTIONS]
 
 Options:
   -p, --port <PORT>  Port to listen on [default: 8080]

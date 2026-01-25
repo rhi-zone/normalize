@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 364
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\", \"outdated\"])"
 ---
 Show outdated packages (installed vs latest)
 
-Usage: moss package outdated [OPTIONS]
+Usage: normalize package outdated [OPTIONS]
 
 Options:
   -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)

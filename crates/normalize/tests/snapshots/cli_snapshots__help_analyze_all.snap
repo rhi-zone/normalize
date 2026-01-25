@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 302
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"all\"])"
 ---
 Run all analysis passes
 
-Usage: moss analyze all [OPTIONS] [TARGET]
+Usage: normalize analyze all [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target file or directory

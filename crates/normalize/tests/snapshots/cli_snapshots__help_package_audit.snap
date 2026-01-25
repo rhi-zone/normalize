@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 369
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\", \"audit\"])"
 ---
 Check for security vulnerabilities
 
-Usage: moss package audit [OPTIONS]
+Usage: normalize package audit [OPTIONS]
 
 Options:
   -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)

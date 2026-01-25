@@ -2,6 +2,7 @@
 
 pub mod complexity;
 pub mod function_length;
+pub mod test_gaps;
 
 use serde::Serialize;
 

@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 62
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"update\"])"
 ---
 Check for and install updates
 
-Usage: moss update [OPTIONS]
+Usage: normalize update [OPTIONS]
 
 Options:
   -c, --check      Check for updates without installing

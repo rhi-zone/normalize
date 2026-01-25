@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 92
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\"])"
 ---
 Analyze Claude Code and other agent session logs
 
-Usage: moss sessions [OPTIONS] [COMMAND]
+Usage: normalize sessions [OPTIONS] [COMMAND]
 
 Commands:
   list   List sessions

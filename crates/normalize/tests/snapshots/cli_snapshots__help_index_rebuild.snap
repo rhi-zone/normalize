@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 154
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"index\", \"rebuild\"])"
 ---
 Rebuild the file index
 
-Usage: moss index rebuild [OPTIONS]
+Usage: normalize index rebuild [OPTIONS]
 
 Options:
       --include <INCLUDE>

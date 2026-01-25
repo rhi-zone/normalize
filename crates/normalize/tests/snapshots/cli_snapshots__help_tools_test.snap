@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 380
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"tools\", \"test\"])"
 ---
 Run native test runners (cargo test, go test, bun test, etc.)
 
-Usage: moss tools test [OPTIONS] [ARGS]... [COMMAND]
+Usage: normalize tools test [OPTIONS] [ARGS]... [COMMAND]
 
 Commands:
   run   Run tests (default)

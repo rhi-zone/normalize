@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 307
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"ast\"])"
 ---
 Show AST for a file (for authoring syntax rules)
 
-Usage: moss analyze ast [OPTIONS] <FILE>
+Usage: normalize analyze ast [OPTIONS] <FILE>
 
 Arguments:
   <FILE>  File to parse

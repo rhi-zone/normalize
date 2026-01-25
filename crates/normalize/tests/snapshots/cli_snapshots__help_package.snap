@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 97
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\"])"
 ---
 Package management: info, list, tree, outdated
 
-Usage: moss package [OPTIONS] <COMMAND>
+Usage: normalize package [OPTIONS] <COMMAND>
 
 Commands:
   info      Query package info from registry

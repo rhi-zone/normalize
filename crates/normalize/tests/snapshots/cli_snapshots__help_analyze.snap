@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 72
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
 
-Usage: moss analyze [OPTIONS] [COMMAND]
+Usage: normalize analyze [OPTIONS] [COMMAND]
 
 Commands:
   health               Run health analysis (file counts, complexity stats, large file warnings)
@@ -23,10 +22,11 @@ Commands:
   check-examples       Check example references in documentation
   duplicate-functions  Detect duplicate functions (code clones)
   duplicate-types      Detect duplicate type definitions
+  test-gaps            Find public functions with no direct test caller
   all                  Run all analysis passes
   ast                  Show AST for a file (for authoring syntax rules)
   query                Test a tree-sitter query against files
-  rules                Run syntax rules from .moss/rules/*.scm
+  rules                Run syntax rules from .normalize/rules/*.scm
   help                 Print this message or the help of the given subcommand(s)
 
 Options:

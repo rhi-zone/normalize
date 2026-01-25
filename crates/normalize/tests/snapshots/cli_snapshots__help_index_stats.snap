@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 159
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"index\", \"stats\"])"
 ---
 Show index statistics (DB size vs codebase size)
 
-Usage: moss index stats [OPTIONS]
+Usage: normalize index stats [OPTIONS]
 
 Options:
       --storage      Show storage usage for index and caches

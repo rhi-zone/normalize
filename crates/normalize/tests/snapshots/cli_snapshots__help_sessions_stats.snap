@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 333
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\", \"stats\"])"
 ---
 Show aggregate statistics across sessions
 
-Usage: moss sessions stats [OPTIONS]
+Usage: normalize sessions stats [OPTIONS]
 
 Options:
       --grep <GREP>        Filter sessions by grep pattern
@@ -16,6 +15,7 @@ Options:
   -r, --root <ROOT>        Root directory (defaults to current directory)
       --all-projects       Show sessions from all projects (not just current)
       --format <FORMAT>    Force specific format: claude, codex, gemini, moss
+      --by-repo            Group statistics by repository
   -l, --limit <LIMIT>      Limit number of sessions [default: 20]
       --json               Output as JSON
       --jq <EXPR>          Filter JSON output with jq expression (implies --json)

@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 242
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"security\"])"
 ---
 Run security analysis
 
-Usage: moss analyze security [OPTIONS] [TARGET]
+Usage: normalize analyze security [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target file or directory

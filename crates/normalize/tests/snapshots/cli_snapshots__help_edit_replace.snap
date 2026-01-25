@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 128
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\", \"replace\"])"
 ---
 Replace target with new content
 
-Usage: moss edit replace [OPTIONS] <CONTENT>
+Usage: normalize edit replace [OPTIONS] <CONTENT>
 
 Arguments:
   <CONTENT>  New content to replace with

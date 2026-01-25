@@ -1,15 +1,14 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 252
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"files\"])"
 ---
 Show longest files in codebase
 
-Usage: moss analyze files [OPTIONS]
+Usage: normalize analyze files [OPTIONS]
 
 Options:
   -l, --limit <LIMIT>      Number of files to show [default: 20]
-      --allow <PATTERN>    Add pattern to .moss/large-files-allow
+      --allow <PATTERN>    Add pattern to .normalize/large-files-allow
       --reason <REASON>    Reason for allowing
       --json               Output as JSON
       --jq <EXPR>          Filter JSON output with jq expression (implies --json)

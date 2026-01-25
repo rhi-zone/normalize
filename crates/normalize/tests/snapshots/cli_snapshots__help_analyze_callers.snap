@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 262
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"callers\"])"
 ---
 Show what functions call a symbol
 
-Usage: moss analyze callers [OPTIONS] <SYMBOL>
+Usage: normalize analyze callers [OPTIONS] <SYMBOL>
 
 Arguments:
   <SYMBOL>  Symbol to find callers for

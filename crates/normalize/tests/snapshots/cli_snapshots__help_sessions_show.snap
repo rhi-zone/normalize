@@ -1,22 +1,26 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 328
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\", \"show\"])"
 ---
 Show a specific session
 
-Usage: moss sessions show [OPTIONS] <SESSION>
+Usage: normalize sessions show [OPTIONS] <SESSION>
 
 Arguments:
   <SESSION>  Session ID or path
 
 Options:
-      --jq <JQ>          Apply jq filter to each JSONL line
-  -a, --analyze          Run full analysis instead of dumping raw log
-  -r, --root <ROOT>      Root directory (defaults to current directory)
-      --format <FORMAT>  Force specific format: claude, codex, gemini, moss
-  -l, --limit <LIMIT>    Limit number of sessions [default: 20]
-      --json             Output as JSON
-      --pretty           Human-friendly output with colors and formatting
-      --compact          Compact output without colors (overrides TTY detection)
-  -h, --help             Print help
+      --jq <JQ>           Apply jq filter to each JSONL line
+  -a, --analyze           Run full analysis instead of dumping raw log
+      --filter <FILTER>   Filter messages by role/type: user, assistant, system, tool_use, tool_result, thinking
+      --grep <GREP>       Search for pattern in filtered messages (requires --filter or shows all matching)
+      --errors-only       Show only error tool results (implies --filter tool_result)
+  -r, --root <ROOT>       Root directory (defaults to current directory)
+      --format <FORMAT>   Force specific format: claude, codex, gemini, moss
+      --ngrams <NGRAMS>   Extract common word sequences (ngrams) of length N (2-4)
+      --case-insensitive  Case-insensitive ngram matching
+  -l, --limit <LIMIT>     Limit number of sessions [default: 20]
+      --json              Output as JSON
+      --pretty            Human-friendly output with colors and formatting
+      --compact           Compact output without colors (overrides TTY detection)
+  -h, --help              Print help

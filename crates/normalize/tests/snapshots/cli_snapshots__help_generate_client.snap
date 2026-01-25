@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 402
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"generate\", \"client\"])"
 ---
 Generate API client from OpenAPI spec (legacy)
 
-Usage: moss generate client [OPTIONS] --lang <LANG> <SPEC>
+Usage: normalize generate client [OPTIONS] --lang <LANG> <SPEC>
 
 Arguments:
   <SPEC>  OpenAPI spec JSON file

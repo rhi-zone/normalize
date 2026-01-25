@@ -1,18 +1,17 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 292
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"duplicate-functions\"])"
 ---
 Detect duplicate functions (code clones)
 
-Usage: moss analyze duplicate-functions [OPTIONS]
+Usage: normalize analyze duplicate-functions [OPTIONS]
 
 Options:
       --elide-identifiers      Elide identifier names when comparing (default: true)
       --elide-literals         Elide literal values when comparing
       --show-source            Show source code for detected duplicates
       --min-lines <MIN_LINES>  Minimum lines for a function to be considered [default: 1]
-      --allow <LOCATION>       Allow a duplicate function group (add to .moss/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
+      --allow <LOCATION>       Allow a duplicate function group (add to .normalize/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
       --reason <REASON>        Reason for allowing
       --json                   Output as JSON
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)

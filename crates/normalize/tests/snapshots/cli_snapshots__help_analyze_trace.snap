@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 257
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"trace\"])"
 ---
 Trace value provenance for a symbol
 
-Usage: moss analyze trace [OPTIONS] <SYMBOL>
+Usage: normalize analyze trace [OPTIONS] <SYMBOL>
 
 Arguments:
   <SYMBOL>  Symbol to trace (format: symbol or file:line or file/symbol)

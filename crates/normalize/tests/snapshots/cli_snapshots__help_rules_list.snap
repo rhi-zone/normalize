@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 423
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rules\", \"list\"])"
 ---
 List installed rules
 
-Usage: moss rules list [OPTIONS]
+Usage: normalize rules list [OPTIONS]
 
 Options:
       --sources    Show source URLs for imported rules

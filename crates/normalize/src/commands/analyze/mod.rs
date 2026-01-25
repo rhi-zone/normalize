@@ -17,6 +17,7 @@ pub mod rules_cmd;
 mod sarif;
 pub mod security;
 pub mod stale_docs;
+pub mod test_gaps;
 pub mod trace;
 
 use crate::commands::aliases::detect_project_languages;
@@ -566,6 +567,48 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                     .unwrap_or_else(|| effective_root.clone());
                 duplicates::cmd_duplicate_types(&scan_root, &effective_root, min_overlap, json)
             }
+        }
+
+        Some(AnalyzeCommand::TestGaps {
+            target,
+            all,
+            min_risk,
+            limit,
+            sarif,
+            allow,
+            reason,
+        }) => {
+            if let Some(pattern) = &allow {
+                return append_to_allow_file(
+                    &effective_root,
+                    "test-gaps-allow",
+                    pattern,
+                    reason.as_deref(),
+                );
+            }
+
+            if sarif {
+                eprintln!("SARIF output for test-gaps not yet implemented");
+                return 1;
+            }
+
+            let allowlist = load_allow_file(&effective_root, "test-gaps-allow");
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+
+            let report = test_gaps::analyze_test_gaps(
+                &effective_root,
+                target.as_deref(),
+                all,
+                min_risk,
+                effective_limit,
+                filter.as_ref(),
+                &allowlist,
+            );
+
+            let format =
+                crate::output::OutputFormat::from_cli(json, None, pretty, false, &config.pretty);
+            report.print(&format);
+            0
         }
 
         Some(AnalyzeCommand::All { target }) => {

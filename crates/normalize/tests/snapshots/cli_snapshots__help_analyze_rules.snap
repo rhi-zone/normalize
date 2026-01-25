@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 317
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"rules\"])"
 ---
-Run syntax rules from .moss/rules/*.scm
+Run syntax rules from .normalize/rules/*.scm
 
-Usage: moss analyze rules [OPTIONS] [TARGET]
+Usage: normalize analyze rules [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target directory to scan

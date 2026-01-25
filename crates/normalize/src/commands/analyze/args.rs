@@ -219,6 +219,36 @@ pub enum AnalyzeCommand {
         reason: Option<String>,
     },
 
+    /// Find public functions with no direct test caller
+    TestGaps {
+        /// Target file or directory
+        target: Option<String>,
+
+        /// Show all functions (including tested), sorted by test calls ascending
+        #[arg(long)]
+        all: bool,
+
+        /// Only show functions above this risk threshold
+        #[arg(long, value_name = "N")]
+        min_risk: Option<f64>,
+
+        /// Maximum number of functions to show (0 = no limit)
+        #[arg(short = 'l', long, default_value = "20")]
+        limit: usize,
+
+        /// Output in SARIF format for IDE integration
+        #[arg(long)]
+        sarif: bool,
+
+        /// Add function to .normalize/test-gaps-allow
+        #[arg(long, value_name = "SYMBOL")]
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
+    },
+
     /// Run all analysis passes
     All {
         /// Target file or directory

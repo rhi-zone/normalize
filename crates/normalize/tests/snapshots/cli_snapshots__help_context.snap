@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 82
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"context\"])"
 ---
 Show directory context (hierarchical .context.md files)
 
-Usage: moss context [OPTIONS] [TARGET]
+Usage: normalize context [OPTIONS] [TARGET]
 
 Arguments:
   [TARGET]  Target path to collect context for [default: .]

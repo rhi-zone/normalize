@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 47
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"index\"])"
 ---
 Manage file index
 
-Usage: moss index [OPTIONS] <COMMAND>
+Usage: normalize index [OPTIONS] <COMMAND>
 
 Commands:
   rebuild   Rebuild the file index

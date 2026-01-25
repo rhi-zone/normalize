@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 195
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"daemon\", \"add\"])"
 ---
 Add a root to watch
 
-Usage: moss daemon add [OPTIONS] [PATH]
+Usage: normalize daemon add [OPTIONS] [PATH]
 
 Arguments:
   [PATH]  Path to the project root [default: .]

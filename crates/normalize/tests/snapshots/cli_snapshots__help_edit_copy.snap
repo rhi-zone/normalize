@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 148
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\", \"copy\"])"
 ---
 Copy target to a new location
 
-Usage: moss edit copy [OPTIONS] --at <AT> <DESTINATION>
+Usage: normalize edit copy [OPTIONS] --at <AT> <DESTINATION>
 
 Arguments:
   <DESTINATION>

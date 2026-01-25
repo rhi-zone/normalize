@@ -1,11 +1,10 @@
 ---
-source: crates/moss/tests/cli_snapshots.rs
-assertion_line: 169
+source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"index\", \"packages\"])"
 ---
 Index external packages (stdlib, site-packages) into global cache
 
-Usage: moss index packages [OPTIONS]
+Usage: normalize index packages [OPTIONS]
 
 Options:
       --only <ONLY>  Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available
