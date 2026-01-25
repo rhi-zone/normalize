@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum RulesAction {
     /// Add a rule from a URL
     Add {
@@ -14,6 +14,7 @@ pub enum RulesAction {
 
         /// Install to global rules (~/.config/moss/rules/) instead of project
         #[arg(long)]
+        #[serde(default)]
         global: bool,
     },
 
@@ -21,6 +22,7 @@ pub enum RulesAction {
     List {
         /// Show source URLs for imported rules
         #[arg(long)]
+        #[serde(default)]
         sources: bool,
     },
 

@@ -26,7 +26,12 @@ where
     }
 }
 
-#[derive(Subcommand)]
+/// Helper for default path
+fn default_path() -> PathBuf {
+    PathBuf::from(".")
+}
+
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum DaemonAction {
     /// Show daemon status
     Status,
@@ -44,6 +49,7 @@ pub enum DaemonAction {
     Add {
         /// Path to the project root
         #[arg(default_value = ".")]
+        #[serde(default = "default_path")]
         path: PathBuf,
     },
 
@@ -51,6 +57,7 @@ pub enum DaemonAction {
     Remove {
         /// Path to the project root
         #[arg(default_value = ".")]
+        #[serde(default = "default_path")]
         path: PathBuf,
     },
 

@@ -57,7 +57,7 @@ impl OutputFormatter for GrammarPathsReport {
     }
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum GrammarAction {
     /// List installed grammars
     List,
@@ -70,6 +70,7 @@ pub enum GrammarAction {
 
         /// Force reinstall even if grammars exist
         #[arg(long)]
+        #[serde(default)]
         force: bool,
     },
 

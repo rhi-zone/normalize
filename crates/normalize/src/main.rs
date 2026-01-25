@@ -263,7 +263,9 @@ fn main() {
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)
         }
-        Commands::Init(args) => commands::init::run(args),
+        Commands::Init(args) => {
+            commands::init::run(args, cli.input_schema, cli.params_json.as_deref())
+        }
         Commands::Daemon { action } => commands::daemon::cmd_daemon(action, cli.json),
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
         Commands::Grammars { action } => {

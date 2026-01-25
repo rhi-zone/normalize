@@ -8,7 +8,10 @@ use normalize_languages::external_packages;
 use std::path::{Path, PathBuf};
 
 /// What to extract during indexing (files are always indexed).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum IndexContent {
     /// Skip content extraction (files only)
     None,
@@ -31,12 +34,27 @@ impl std::fmt::Display for IndexContent {
     }
 }
 
-#[derive(Subcommand)]
+/// Helper for default include contents
+fn default_include() -> Vec<IndexContent> {
+    vec![
+        IndexContent::Symbols,
+        IndexContent::Calls,
+        IndexContent::Imports,
+    ]
+}
+
+/// Helper for default limit
+fn default_limit() -> usize {
+    100
+}
+
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum IndexAction {
     /// Rebuild the file index
     Rebuild {
         /// What to extract: symbols, calls, imports (default: all)
         #[arg(long, value_delimiter = ',', default_values_t = vec![IndexContent::Symbols, IndexContent::Calls, IndexContent::Imports])]
+        #[serde(default = "default_include")]
         include: Vec<IndexContent>,
     },
 
@@ -44,6 +62,7 @@ pub enum IndexAction {
     Stats {
         /// Show storage usage for index and caches
         #[arg(long)]
+        #[serde(default)]
         storage: bool,
     },
 
@@ -54,6 +73,7 @@ pub enum IndexAction {
 
         /// Maximum number of files to show
         #[arg(short, long, default_value = "100")]
+        #[serde(default = "default_limit")]
         limit: usize,
     },
 
@@ -61,10 +81,12 @@ pub enum IndexAction {
     Packages {
         /// Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available.
         #[arg(long, value_delimiter = ',')]
+        #[serde(default)]
         only: Vec<String>,
 
         /// Clear existing index before re-indexing
         #[arg(long)]
+        #[serde(default)]
         clear: bool,
     },
 }
