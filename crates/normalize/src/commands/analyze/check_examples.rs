@@ -14,7 +14,7 @@ struct MissingExample {
 
 /// Example references check report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct CheckExamplesReport {
+pub struct CheckExamplesReport {
     defined_examples: usize,
     references_found: usize,
     missing: Vec<MissingExample>,

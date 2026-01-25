@@ -20,7 +20,7 @@ struct FileHotspot {
 
 /// Hotspots analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct HotspotsReport {
+pub struct HotspotsReport {
     hotspots: Vec<FileHotspot>,
 }
 

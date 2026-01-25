@@ -261,7 +261,7 @@ fn main() {
         Commands::Daemon { action } => commands::daemon::cmd_daemon(action, cli.json),
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
-        Commands::Analyze(args) => commands::analyze::run(args, format),
+        Commands::Analyze(args) => commands::analyze::run(args, format, cli.output_schema),
         Commands::Aliases(args) => {
             if cli.input_schema {
                 commands::aliases::print_input_schema();

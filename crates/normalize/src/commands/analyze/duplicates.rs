@@ -37,7 +37,7 @@ struct DuplicateFunctionLocation {
 
 /// Duplicate functions analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct DuplicateFunctionsReport {
+pub struct DuplicateFunctionsReport {
     files_scanned: usize,
     functions_hashed: usize,
     #[serde(skip)]
@@ -129,7 +129,7 @@ struct DuplicatePair {
 
 /// Duplicate types analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct DuplicateTypesReport {
+pub struct DuplicateTypesReport {
     files_scanned: usize,
     types_analyzed: usize,
     min_overlap_percent: usize,

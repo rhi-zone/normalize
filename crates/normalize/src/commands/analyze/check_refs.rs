@@ -16,7 +16,7 @@ struct BrokenRef {
 
 /// Documentation reference check report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct CheckRefsReport {
+pub struct CheckRefsReport {
     broken_refs: Vec<BrokenRef>,
     files_checked: usize,
     symbols_indexed: usize,

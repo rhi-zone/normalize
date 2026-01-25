@@ -203,8 +203,75 @@ fn append_to_allow_file(root: &Path, filename: &str, pattern: &str, reason: Opti
     0
 }
 
+/// Print JSON schema for the subcommand's output type.
+fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
+    use crate::analyze::complexity::ComplexityReport;
+    use crate::analyze::function_length::LengthReport;
+    use crate::analyze::test_gaps::TestGapsReport;
+    match command {
+        Some(AnalyzeCommand::Health { .. }) | None => {
+            crate::output::print_output_schema::<report::AnalyzeReport>();
+        }
+        Some(AnalyzeCommand::Complexity { .. }) => {
+            crate::output::print_output_schema::<ComplexityReport>();
+        }
+        Some(AnalyzeCommand::Length { .. }) => {
+            crate::output::print_output_schema::<LengthReport>();
+        }
+        Some(AnalyzeCommand::Security { .. }) => {
+            crate::output::print_output_schema::<report::SecurityReport>();
+        }
+        Some(AnalyzeCommand::Docs { .. }) => {
+            crate::output::print_output_schema::<docs::DocCoverageReport>();
+        }
+        Some(AnalyzeCommand::Files { .. }) => {
+            crate::output::print_output_schema::<files::FileLengthReport>();
+        }
+        Some(AnalyzeCommand::Hotspots { .. }) => {
+            crate::output::print_output_schema::<hotspots::HotspotsReport>();
+        }
+        Some(AnalyzeCommand::CheckRefs { .. }) => {
+            crate::output::print_output_schema::<check_refs::CheckRefsReport>();
+        }
+        Some(AnalyzeCommand::StaleDocs { .. }) => {
+            crate::output::print_output_schema::<stale_docs::StaleDocsReport>();
+        }
+        Some(AnalyzeCommand::CheckExamples { .. }) => {
+            crate::output::print_output_schema::<check_examples::CheckExamplesReport>();
+        }
+        Some(AnalyzeCommand::DuplicateFunctions { .. }) => {
+            crate::output::print_output_schema::<duplicates::DuplicateFunctionsReport>();
+        }
+        Some(AnalyzeCommand::DuplicateTypes { .. }) => {
+            crate::output::print_output_schema::<duplicates::DuplicateTypesReport>();
+        }
+        Some(AnalyzeCommand::TestGaps { .. }) => {
+            crate::output::print_output_schema::<TestGapsReport>();
+        }
+        Some(AnalyzeCommand::All { .. }) => {
+            crate::output::print_output_schema::<report::AnalyzeReport>();
+        }
+        // These don't have structured output
+        Some(AnalyzeCommand::Trace { .. })
+        | Some(AnalyzeCommand::Callers { .. })
+        | Some(AnalyzeCommand::Callees { .. })
+        | Some(AnalyzeCommand::Ast { .. })
+        | Some(AnalyzeCommand::Query { .. })
+        | Some(AnalyzeCommand::Rules { .. }) => {
+            eprintln!("This subcommand does not have a JSON schema");
+            return 1;
+        }
+    }
+    0
+}
+
 /// Run analyze command with args.
-pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
+pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat, output_schema: bool) -> i32 {
+    // Handle --output-schema early based on subcommand
+    if output_schema {
+        return print_subcommand_schema(&args.command);
+    }
+
     let effective_root = args
         .root
         .clone()

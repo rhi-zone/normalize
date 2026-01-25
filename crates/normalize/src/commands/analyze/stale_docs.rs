@@ -22,7 +22,7 @@ struct StaleCover {
 
 /// Stale docs analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct StaleDocsReport {
+pub struct StaleDocsReport {
     stale_docs: Vec<StaleDoc>,
     files_checked: usize,
     files_with_covers: usize,
