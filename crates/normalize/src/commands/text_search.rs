@@ -34,7 +34,7 @@ impl TextSearchConfig {
 }
 
 /// Text search command arguments.
-#[derive(Args, Debug)]
+#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct TextSearchArgs {
     /// Regex pattern to search for
     pub pattern: String,
@@ -49,23 +49,56 @@ pub struct TextSearchArgs {
 
     /// Case-insensitive search
     #[arg(short = 'i', long)]
+    #[serde(default)]
     pub ignore_case: bool,
 
     /// Exclude files matching patterns or aliases
     #[arg(long, value_delimiter = ',')]
+    #[serde(default)]
     pub exclude: Vec<String>,
 
     /// Only include files matching patterns or aliases
     #[arg(long, value_delimiter = ',')]
+    #[serde(default)]
     pub only: Vec<String>,
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(TextSearchArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run text-search command with args.
-pub fn run(args: TextSearchArgs, format: crate::output::OutputFormat, output_schema: bool) -> i32 {
+pub fn run(
+    args: TextSearchArgs,
+    format: crate::output::OutputFormat,
+    output_schema: bool,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
     if output_schema {
         crate::output::print_output_schema::<text_search::GrepResult>();
         return 0;
     }
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     let effective_root = args
         .root
         .clone()

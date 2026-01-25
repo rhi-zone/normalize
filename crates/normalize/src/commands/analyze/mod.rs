@@ -203,6 +203,15 @@ fn append_to_allow_file(root: &Path, filename: &str, pattern: &str, reason: Opti
     0
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(AnalyzeArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Print JSON schema for the subcommand's output type.
 fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
     use crate::analyze::complexity::ComplexityReport;
@@ -266,11 +275,32 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
 }
 
 /// Run analyze command with args.
-pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat, output_schema: bool) -> i32 {
+pub fn run(
+    args: AnalyzeArgs,
+    format: crate::output::OutputFormat,
+    output_schema: bool,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
     // Handle --output-schema early based on subcommand
     if output_schema {
         return print_subcommand_schema(&args.command);
     }
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
 
     let effective_root = args
         .root

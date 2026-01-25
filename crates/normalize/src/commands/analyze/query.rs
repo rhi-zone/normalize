@@ -500,7 +500,7 @@ pub fn cmd_query(
             })
             .collect();
 
-        let json_value = serde_json::Value::Array(results);
+        let json_value = serde_json::Value::Array(results.clone());
 
         match format {
             OutputFormat::Jq(filter) => match crate::output::apply_jq(&json_value, filter) {
@@ -514,6 +514,38 @@ pub fn cmd_query(
                     return 1;
                 }
             },
+            OutputFormat::JqJsonLines(filter) => match crate::output::apply_jq(&json_value, filter)
+            {
+                Ok(lines) => {
+                    for line in lines {
+                        // Parse each result and emit as JSONL
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
+                            if let serde_json::Value::Array(arr) = val {
+                                for item in arr {
+                                    println!(
+                                        "{}",
+                                        serde_json::to_string(&item).unwrap_or_default()
+                                    );
+                                }
+                            } else {
+                                println!("{}", serde_json::to_string(&val).unwrap_or_default());
+                            }
+                        } else {
+                            println!("{}", line);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("jq error: {}", e);
+                    return 1;
+                }
+            },
+            OutputFormat::JsonLines => {
+                // Emit each result on its own line
+                for item in results {
+                    println!("{}", serde_json::to_string(&item).unwrap_or_default());
+                }
+            }
             _ => {
                 println!("{}", serde_json::to_string_pretty(&json_value).unwrap());
             }

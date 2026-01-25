@@ -4,7 +4,7 @@ use clap::{Args, ValueEnum};
 use std::path::PathBuf;
 
 /// Translate command arguments
-#[derive(Args)]
+#[derive(Args, serde::Deserialize, schemars::JsonSchema)]
 pub struct TranslateArgs {
     /// Input source file, use - for stdin
     pub input: PathBuf,
@@ -22,7 +22,8 @@ pub struct TranslateArgs {
     pub output: Option<PathBuf>,
 }
 
-#[derive(Clone, Copy, ValueEnum)]
+#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum SourceLanguage {
     /// TypeScript/JavaScript
     Typescript,
@@ -32,7 +33,8 @@ pub enum SourceLanguage {
     Python,
 }
 
-#[derive(Clone, Copy, ValueEnum)]
+#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum TargetLanguage {
     /// TypeScript
     Typescript,
@@ -62,8 +64,32 @@ impl TargetLanguage {
     }
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(TranslateArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run the translate command
-pub fn run(args: TranslateArgs) -> i32 {
+pub fn run(args: TranslateArgs, input_schema: bool, params_json: Option<&str>) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     let is_stdin = args.input.as_os_str() == "-";
 
     // Read input (file or stdin)

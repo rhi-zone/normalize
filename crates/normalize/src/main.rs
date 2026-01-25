@@ -251,9 +251,15 @@ fn main() {
     );
 
     let exit_code = match cli.command {
-        Commands::View(args) => commands::view::run(args, format),
-        Commands::Edit(args) => commands::edit::run(args, cli.json),
-        Commands::History(args) => commands::history::run(args, format),
+        Commands::View(args) => {
+            commands::view::run(args, format, cli.input_schema, cli.params_json.as_deref())
+        }
+        Commands::Edit(args) => {
+            commands::edit::run(args, cli.json, cli.input_schema, cli.params_json.as_deref())
+        }
+        Commands::History(args) => {
+            commands::history::run(args, format, cli.input_schema, cli.params_json.as_deref())
+        }
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)
         }
@@ -263,31 +269,38 @@ fn main() {
         Commands::Grammars { action } => {
             commands::grammars::cmd_grammars(action, cli.json, cli.output_schema)
         }
-        Commands::Analyze(args) => commands::analyze::run(args, format, cli.output_schema),
-        Commands::Aliases(args) => {
-            if cli.input_schema {
-                commands::aliases::print_input_schema();
-                0
-            } else {
-                // Override args with --params-json if provided
-                let args = match cli.params_json.as_ref() {
-                    Some(json) => match serde_json::from_str(json) {
-                        Ok(parsed) => parsed,
-                        Err(e) => {
-                            eprintln!("error: invalid --params-json: {}", e);
-                            std::process::exit(1);
-                        }
-                    },
-                    None => args,
-                };
-                commands::aliases::run(args, format, cli.output_schema)
-            }
+        Commands::Analyze(args) => commands::analyze::run(
+            args,
+            format,
+            cli.output_schema,
+            cli.input_schema,
+            cli.params_json.as_deref(),
+        ),
+        Commands::Aliases(args) => commands::aliases::run(
+            args,
+            format,
+            cli.output_schema,
+            cli.input_schema,
+            cli.params_json.as_deref(),
+        ),
+        Commands::Context(args) => {
+            commands::context::run(args, format, cli.input_schema, cli.params_json.as_deref())
         }
-        Commands::Context(args) => commands::context::run(args, format),
-        Commands::TextSearch(args) => commands::text_search::run(args, format, cli.output_schema),
-        Commands::Sessions(args) => {
-            commands::sessions::run(args, cli.json, cli.pretty, cli.output_schema)
-        }
+        Commands::TextSearch(args) => commands::text_search::run(
+            args,
+            format,
+            cli.output_schema,
+            cli.input_schema,
+            cli.params_json.as_deref(),
+        ),
+        Commands::Sessions(args) => commands::sessions::run(
+            args,
+            cli.json,
+            cli.pretty,
+            cli.output_schema,
+            cli.input_schema,
+            cli.params_json.as_deref(),
+        ),
         Commands::Package {
             action,
             ecosystem,
@@ -297,9 +310,13 @@ fn main() {
             commands::tools::run(action, root.as_deref(), format, cli.json, cli.output_schema)
         }
         Commands::Serve(args) => serve::run(args, cli.json),
-        Commands::Generate(args) => commands::generate::run(args),
+        Commands::Generate(args) => {
+            commands::generate::run(args, cli.input_schema, cli.params_json.as_deref())
+        }
         Commands::Rules { action } => commands::rules::cmd_rules(action, cli.json),
-        Commands::Translate(args) => commands::translate::run(args),
+        Commands::Translate(args) => {
+            commands::translate::run(args, cli.input_schema, cli.params_json.as_deref())
+        }
     };
 
     std::process::exit(exit_code);

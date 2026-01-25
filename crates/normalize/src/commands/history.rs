@@ -5,7 +5,7 @@ use clap::Args;
 use std::path::PathBuf;
 
 /// History command arguments.
-#[derive(Args, Debug)]
+#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct HistoryArgs {
     /// Filter history to specific file
     pub file: Option<String>,
@@ -16,10 +16,12 @@ pub struct HistoryArgs {
 
     /// Show full tree structure (all branches)
     #[arg(long)]
+    #[serde(default)]
     pub all: bool,
 
     /// Show uncommitted shadow edits since last git commit
     #[arg(long)]
+    #[serde(default)]
     pub status: bool,
 
     /// Show diff for a specific commit
@@ -28,6 +30,7 @@ pub struct HistoryArgs {
 
     /// Maximum number of entries to show
     #[arg(short = 'n', long, default_value = "20")]
+    #[serde(default = "default_limit")]
     pub limit: usize,
 
     /// Prune shadow history, keeping only the last N commits
@@ -35,8 +38,42 @@ pub struct HistoryArgs {
     pub prune: Option<usize>,
 }
 
+/// Helper for serde default limit
+fn default_limit() -> usize {
+    20
+}
+
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(HistoryArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run history command.
-pub fn run(args: HistoryArgs, format: crate::output::OutputFormat) -> i32 {
+pub fn run(
+    args: HistoryArgs,
+    format: crate::output::OutputFormat,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     let root = args
         .root
         .unwrap_or_else(|| std::env::current_dir().unwrap());

@@ -3,8 +3,13 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
+/// Helper for serde default = true
+fn default_true() -> bool {
+    true
+}
+
 /// Analyze command arguments.
-#[derive(Args, Debug)]
+#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct AnalyzeArgs {
     #[command(subcommand)]
     pub command: Option<AnalyzeCommand>,
@@ -15,10 +20,12 @@ pub struct AnalyzeArgs {
 
     /// Exclude paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN", value_delimiter = ',', global = true)]
+    #[serde(default)]
     pub exclude: Vec<String>,
 
     /// Include only paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN", value_delimiter = ',', global = true)]
+    #[serde(default)]
     pub only: Vec<String>,
 
     /// Analyze only files changed since base ref (e.g., main, HEAD~1)
@@ -27,7 +34,7 @@ pub struct AnalyzeArgs {
     pub diff: Option<String>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, serde::Deserialize, schemars::JsonSchema)]
 pub enum AnalyzeCommand {
     /// Run health analysis (file counts, complexity stats, large file warnings)
     Health {
@@ -54,6 +61,7 @@ pub enum AnalyzeCommand {
 
         /// Output in SARIF format for IDE integration
         #[arg(long)]
+        #[serde(default)]
         sarif: bool,
 
         /// Add function to .normalize/complexity-allow
@@ -72,6 +80,7 @@ pub enum AnalyzeCommand {
 
         /// Output in SARIF format for IDE integration
         #[arg(long)]
+        #[serde(default)]
         sarif: bool,
 
         /// Add function to .normalize/length-allow
@@ -126,10 +135,12 @@ pub enum AnalyzeCommand {
 
         /// Trace into called functions (show what they return)
         #[arg(long)]
+        #[serde(default)]
         recursive: bool,
 
         /// Case-insensitive symbol matching
         #[arg(short = 'i', long)]
+        #[serde(default)]
         case_insensitive: bool,
     },
 
@@ -140,6 +151,7 @@ pub enum AnalyzeCommand {
 
         /// Case-insensitive symbol matching
         #[arg(short = 'i', long)]
+        #[serde(default)]
         case_insensitive: bool,
     },
 
@@ -150,6 +162,7 @@ pub enum AnalyzeCommand {
 
         /// Case-insensitive symbol matching
         #[arg(short = 'i', long)]
+        #[serde(default)]
         case_insensitive: bool,
     },
 
@@ -177,14 +190,17 @@ pub enum AnalyzeCommand {
     DuplicateFunctions {
         /// Elide identifier names when comparing (default: true)
         #[arg(long, default_value = "true")]
+        #[serde(default = "default_true")]
         elide_identifiers: bool,
 
         /// Elide literal values when comparing
         #[arg(long)]
+        #[serde(default)]
         elide_literals: bool,
 
         /// Show source code for detected duplicates
         #[arg(long)]
+        #[serde(default)]
         show_source: bool,
 
         /// Minimum lines for a function to be considered
@@ -226,6 +242,7 @@ pub enum AnalyzeCommand {
 
         /// Show all functions (including tested), sorted by test calls ascending
         #[arg(long)]
+        #[serde(default)]
         all: bool,
 
         /// Only show functions above this risk threshold
@@ -238,6 +255,7 @@ pub enum AnalyzeCommand {
 
         /// Output in SARIF format for IDE integration
         #[arg(long)]
+        #[serde(default)]
         sarif: bool,
 
         /// Add function to .normalize/test-gaps-allow
@@ -266,6 +284,7 @@ pub enum AnalyzeCommand {
 
         /// Output as S-expression (default: tree format)
         #[arg(long)]
+        #[serde(default)]
         sexp: bool,
     },
 
@@ -283,6 +302,7 @@ pub enum AnalyzeCommand {
 
         /// Show full matched source code
         #[arg(long)]
+        #[serde(default)]
         show_source: bool,
 
         /// Lines of context to show in preview
@@ -298,14 +318,17 @@ pub enum AnalyzeCommand {
 
         /// List available rules without running them
         #[arg(long)]
+        #[serde(default)]
         list: bool,
 
         /// Auto-fix issues that have fixes available
         #[arg(long)]
+        #[serde(default)]
         fix: bool,
 
         /// Output in SARIF format for IDE integration
         #[arg(long)]
+        #[serde(default)]
         sarif: bool,
 
         /// Target directory to scan
@@ -313,6 +336,7 @@ pub enum AnalyzeCommand {
 
         /// Enable debug output (comma-delimited: timing, all)
         #[arg(long, value_delimiter = ',')]
+        #[serde(default)]
         debug: Vec<String>,
     },
 }

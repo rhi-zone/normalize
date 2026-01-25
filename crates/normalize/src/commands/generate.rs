@@ -3,14 +3,24 @@
 use clap::{Args, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+/// Helper for serde default = true
+fn default_true() -> bool {
+    true
+}
+
+/// Helper for default package name
+fn default_package() -> String {
+    "types".to_string()
+}
+
 /// Generate command arguments
-#[derive(Args)]
+#[derive(Args, serde::Deserialize, schemars::JsonSchema)]
 pub struct GenerateArgs {
     #[command(subcommand)]
     pub target: GenerateTarget,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum GenerateTarget {
     /// Generate API client from OpenAPI spec
     Client {
@@ -44,18 +54,22 @@ pub enum GenerateTarget {
 
         /// Export all types (add 'export' keyword)
         #[arg(long, default_value = "true")]
+        #[serde(default = "default_true")]
         export: bool,
 
         /// Generate type inference (for Zod/Valibot)
         #[arg(long)]
+        #[serde(default)]
         infer_types: bool,
 
         /// Make types readonly/frozen
         #[arg(long)]
+        #[serde(default)]
         readonly: bool,
 
         /// Package name (for Go)
         #[arg(long, default_value = "types")]
+        #[serde(default = "default_package")]
         package: String,
     },
     /// Generate CLI snapshot tests for a binary
@@ -74,7 +88,8 @@ pub enum GenerateTarget {
     },
 }
 
-#[derive(Clone, Copy, ValueEnum)]
+#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum InputFormat {
     /// Auto-detect from file content
     Auto,
@@ -86,7 +101,8 @@ pub enum InputFormat {
     Typescript,
 }
 
-#[derive(Clone, Copy, ValueEnum)]
+#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Backend {
     /// TypeScript interfaces/types
     Typescript,
@@ -104,8 +120,32 @@ pub enum Backend {
     Rust,
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(GenerateArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run the generate command
-pub fn run(args: GenerateArgs) -> i32 {
+pub fn run(args: GenerateArgs, input_schema: bool, params_json: Option<&str>) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     match args.target {
         GenerateTarget::Client { spec, lang, output } => run_client(spec, lang, output),
         GenerateTarget::Types {

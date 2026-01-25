@@ -87,11 +87,32 @@ pub fn print_input_schema() {
 }
 
 /// Run the aliases command
-pub fn run(args: AliasesArgs, format: crate::output::OutputFormat, output_schema: bool) -> i32 {
+pub fn run(
+    args: AliasesArgs,
+    format: crate::output::OutputFormat,
+    output_schema: bool,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
     if output_schema {
         crate::output::print_output_schema::<AliasesReport>();
         return 0;
     }
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     let root = args
         .root
         .unwrap_or_else(|| std::env::current_dir().unwrap());

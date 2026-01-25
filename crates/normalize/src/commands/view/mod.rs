@@ -59,7 +59,7 @@ impl ViewConfig {
 /// | `file:123` | Symbol containing line 123 |
 /// | `file:10-20` | Lines 10-20 (raw) |
 /// | `SymbolName` | Symbol search across codebase |
-#[derive(Args, Debug)]
+#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct ViewArgs {
     /// Target: path, path/Symbol, Parent/method, file:line, or SymbolName
     pub target: Option<String>,
@@ -74,10 +74,12 @@ pub struct ViewArgs {
 
     /// Show line numbers
     #[arg(short = 'n', long)]
+    #[serde(default)]
     pub line_numbers: bool,
 
     /// Show dependencies (imports/exports)
     #[arg(long)]
+    #[serde(default)]
     pub deps: bool,
 
     /// Filter by symbol kind: class, function, method
@@ -86,14 +88,17 @@ pub struct ViewArgs {
 
     /// Show only type definitions (class, struct, enum, interface, type alias)
     #[arg(long = "types-only")]
+    #[serde(default)]
     pub types_only: bool,
 
     /// Include test functions and test modules (hidden by default)
     #[arg(long)]
+    #[serde(default)]
     pub tests: bool,
 
     /// Disable smart display (no collapsing single-child dirs)
     #[arg(long)]
+    #[serde(default)]
     pub raw: bool,
 
     /// Focus view: show target at high detail, imports at signature level
@@ -102,38 +107,47 @@ pub struct ViewArgs {
 
     /// Resolve imports: inline signatures of specific imported symbols
     #[arg(long)]
+    #[serde(default)]
     pub resolve_imports: bool,
 
     /// Show full source code
     #[arg(long)]
+    #[serde(default)]
     pub full: bool,
 
     /// Show full docstrings
     #[arg(long)]
+    #[serde(default)]
     pub docs: bool,
 
     /// Hide parent/ancestor context (shown by default for nested symbols)
     #[arg(long)]
+    #[serde(default)]
     pub no_parent: bool,
 
     /// Context view: skeleton + imports combined
     #[arg(long)]
+    #[serde(default)]
     pub context: bool,
 
     /// Prepend directory context (.context.md files from hierarchy)
     #[arg(long)]
+    #[serde(default)]
     pub dir_context: bool,
 
     /// Exclude paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN", value_delimiter = ',')]
+    #[serde(default)]
     pub exclude: Vec<String>,
 
     /// Include only paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN", value_delimiter = ',')]
+    #[serde(default)]
     pub only: Vec<String>,
 
     /// Case-insensitive symbol matching
     #[arg(short = 'i', long)]
+    #[serde(default)]
     pub case_insensitive: bool,
 
     /// Show git history for symbol (last N changes)
@@ -141,8 +155,37 @@ pub struct ViewArgs {
     pub history: Option<usize>,
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(ViewArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run view command with args.
-pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
+pub fn run(
+    args: ViewArgs,
+    format: crate::output::OutputFormat,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     let effective_root = args
         .root
         .clone()

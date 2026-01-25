@@ -86,8 +86,13 @@ pub(crate) fn resolve_session_paths(
     Vec::new()
 }
 
+/// Helper for default limit
+fn default_limit() -> usize {
+    20
+}
+
 /// Sessions command arguments
-#[derive(Args)]
+#[derive(Args, serde::Deserialize, schemars::JsonSchema)]
 pub struct SessionsArgs {
     #[command(subcommand)]
     pub command: Option<SessionsCommand>,
@@ -102,10 +107,11 @@ pub struct SessionsArgs {
 
     /// Limit number of sessions
     #[arg(short, long, default_value = "20", global = true)]
+    #[serde(default = "default_limit")]
     pub limit: usize,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum SessionsCommand {
     /// List sessions
     List {
@@ -131,6 +137,7 @@ pub enum SessionsCommand {
 
         /// Show sessions from all projects (not just current)
         #[arg(long)]
+        #[serde(default)]
         all_projects: bool,
     },
 
@@ -145,6 +152,7 @@ pub enum SessionsCommand {
 
         /// Run full analysis instead of dumping raw log
         #[arg(short, long)]
+        #[serde(default)]
         analyze: bool,
 
         /// Filter messages by role/type: user, assistant, system, tool_use, tool_result, thinking
@@ -157,6 +165,7 @@ pub enum SessionsCommand {
 
         /// Show only error tool results (implies --filter tool_result)
         #[arg(long)]
+        #[serde(default)]
         errors_only: bool,
 
         /// Extract common word sequences (ngrams) of length N (2-4)
@@ -165,6 +174,7 @@ pub enum SessionsCommand {
 
         /// Case-insensitive ngram matching
         #[arg(long)]
+        #[serde(default)]
         case_insensitive: bool,
     },
 
@@ -192,10 +202,12 @@ pub enum SessionsCommand {
 
         /// Show sessions from all projects (not just current)
         #[arg(long)]
+        #[serde(default)]
         all_projects: bool,
 
         /// Group statistics by repository
         #[arg(long)]
+        #[serde(default)]
         by_repo: bool,
     },
 
@@ -236,11 +248,42 @@ fn print_sessions_schema(command: &Option<SessionsCommand>) -> i32 {
     0
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(SessionsArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run the sessions command
-pub fn run(args: SessionsArgs, json: bool, pretty: bool, output_schema: bool) -> i32 {
+pub fn run(
+    args: SessionsArgs,
+    json: bool,
+    pretty: bool,
+    output_schema: bool,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
     if output_schema {
         return print_sessions_schema(&args.command);
     }
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json_str) => match serde_json::from_str(json_str) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     match args.command {
         Some(SessionsCommand::List {
             grep,

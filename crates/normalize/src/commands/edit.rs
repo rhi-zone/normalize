@@ -10,7 +10,7 @@ use crate::shadow::{EditInfo, Shadow};
 use crate::{daemon, edit, path_resolve};
 
 /// Edit command arguments
-#[derive(Args)]
+#[derive(Args, serde::Deserialize, schemars::JsonSchema)]
 pub struct EditArgs {
     /// Target to edit (path like src/main.py/Foo/bar)
     pub target: Option<String>,
@@ -25,18 +25,22 @@ pub struct EditArgs {
 
     /// Dry run - show what would be changed without applying
     #[arg(long, global = true)]
+    #[serde(default)]
     pub dry_run: bool,
 
     /// Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
     #[arg(long, value_delimiter = ',', global = true)]
+    #[serde(default)]
     pub exclude: Vec<String>,
 
     /// Only include files matching patterns or aliases
     #[arg(long, value_delimiter = ',', global = true)]
+    #[serde(default)]
     pub only: Vec<String>,
 
     /// Allow glob patterns to match multiple symbols
     #[arg(long, global = true)]
+    #[serde(default)]
     pub multiple: bool,
 
     /// Message describing the edit (for shadow git history)
@@ -49,10 +53,12 @@ pub struct EditArgs {
 
     /// Redo the last undone edit
     #[arg(long)]
+    #[serde(default)]
     pub redo: bool,
 
     /// Force undo even if files were modified externally
     #[arg(long)]
+    #[serde(default)]
     pub force: bool,
 
     /// Jump to a specific shadow commit (restores file state from that point)
@@ -65,14 +71,17 @@ pub struct EditArgs {
 
     /// Allow undo to cross git commit boundaries (checkpoints)
     #[arg(long)]
+    #[serde(default)]
     pub cross_checkpoint: bool,
 
     /// Confirm destructive operations (delete) without prompting
     #[arg(short = 'y', long)]
+    #[serde(default)]
     pub yes: bool,
 
     /// Case-insensitive symbol matching
     #[arg(short = 'i', long)]
+    #[serde(default)]
     pub case_insensitive: bool,
 
     /// Apply batch edits from JSON file (or - for stdin)
@@ -80,8 +89,32 @@ pub struct EditArgs {
     pub batch: Option<String>,
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(EditArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run the edit command
-pub fn run(args: EditArgs, json: bool) -> i32 {
+pub fn run(args: EditArgs, json: bool, input_schema: bool, params_json: Option<&str>) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json_str) => match serde_json::from_str(json_str) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     // Handle undo/redo/goto operations
     if args.undo.is_some() || args.redo || args.goto.is_some() {
         cmd_undo_redo(
@@ -126,7 +159,8 @@ pub fn run(args: EditArgs, json: bool) -> i32 {
 }
 
 /// Position for insert/move/copy operations
-#[derive(Clone, Copy, clap::ValueEnum)]
+#[derive(Clone, Copy, clap::ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Position {
     /// Before the destination (sibling)
     Before,
@@ -172,7 +206,7 @@ impl std::fmt::Display for Operation {
 }
 
 /// Edit action to perform (CLI)
-#[derive(clap::Subcommand)]
+#[derive(clap::Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum EditAction {
     /// Delete the target symbol
     Delete,

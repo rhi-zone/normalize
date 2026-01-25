@@ -12,10 +12,11 @@ use crate::output::OutputFormat;
 /// Context file names to look for (in priority order).
 const CONTEXT_FILES: &[&str] = &[".context.md", "CONTEXT.md"];
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct ContextArgs {
     /// Target path to collect context for
     #[arg(default_value = ".")]
+    #[serde(default = "default_target")]
     pub target: String,
 
     /// Root directory (defaults to current directory)
@@ -24,11 +25,46 @@ pub struct ContextArgs {
 
     /// Show only file paths, not content
     #[arg(long)]
+    #[serde(default)]
     pub list: bool,
 }
 
+/// Helper for serde default target
+fn default_target() -> String {
+    ".".to_string()
+}
+
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(ContextArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run context command.
-pub fn run(args: ContextArgs, format: OutputFormat) -> i32 {
+pub fn run(
+    args: ContextArgs,
+    format: OutputFormat,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override args with --params-json if provided
+    let args = match params_json {
+        Some(json) => match serde_json::from_str(json) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => args,
+    };
     let root = args
         .root
         .unwrap_or_else(|| std::env::current_dir().unwrap());
