@@ -36,7 +36,7 @@ dirs = "5"
 normalize-core = { path = "../normalize-core" }
 normalize-derive = { path = "../normalize-derive" }
 normalize-languages = { path = "../normalize-languages" }
-normalize-typegen = { path = "../normalize-typegen" }
+normalize-typegen = { path = "../normalize-typegen", features = ["input-typescript"] }
 normalize-jsonschema = { path = "../normalize-jsonschema" }
 normalize-rules = { path = "../normalize-rules" }
 normalize-openapi = { path = "../normalize-openapi" }

@@ -3450,10 +3450,12 @@ dependencies = [
 name = "normalize-typegen"
 version = "0.1.0"
 dependencies = [
+ "arborium-typescript",
  "insta",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tree-sitter",
 ]
 
 [[package]]

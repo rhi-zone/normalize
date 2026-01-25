@@ -100,6 +100,8 @@ pub enum InputFormat {
     JsonSchema,
     /// OpenAPI 3.x
     OpenApi,
+    /// TypeScript source (extract type definitions)
+    Typescript,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -277,42 +279,66 @@ fn run_typegen(
         }
     };
 
-    let json: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(j) => j,
-        Err(e) => {
-            eprintln!("Failed to parse JSON: {}", e);
-            return 1;
-        }
-    };
-
     // Detect format if auto
     let detected_format = match format {
         InputFormat::Auto => {
-            if json.get("openapi").is_some() {
-                InputFormat::OpenApi
-            } else {
-                InputFormat::JsonSchema
+            let ext = input.extension().and_then(|e| e.to_str());
+            match ext {
+                Some("ts") | Some("tsx") | Some("d.ts") => InputFormat::Typescript,
+                _ => {
+                    // Try to parse as JSON and auto-detect
+                    InputFormat::Auto
+                }
             }
         }
         f => f,
     };
 
     // Parse to IR
-    let schema: Schema = match detected_format {
-        InputFormat::JsonSchema | InputFormat::Auto => match parse_json_schema(&json) {
+    let schema: Schema = if matches!(detected_format, InputFormat::Typescript) {
+        match normalize_typegen::parse_typescript_types(&content) {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Failed to parse JSON Schema: {}", e);
+                eprintln!("Failed to parse TypeScript: {}", e);
                 return 1;
             }
-        },
-        InputFormat::OpenApi => match parse_openapi(&json) {
-            Ok(s) => s,
+        }
+    } else {
+        let json: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(j) => j,
             Err(e) => {
-                eprintln!("Failed to parse OpenAPI: {}", e);
+                eprintln!("Failed to parse JSON: {}", e);
                 return 1;
             }
-        },
+        };
+
+        let json_format = match detected_format {
+            InputFormat::Auto => {
+                if json.get("openapi").is_some() {
+                    InputFormat::OpenApi
+                } else {
+                    InputFormat::JsonSchema
+                }
+            }
+            f => f,
+        };
+
+        match json_format {
+            InputFormat::OpenApi => match parse_openapi(&json) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Failed to parse OpenAPI: {}", e);
+                    return 1;
+                }
+            },
+            _ => match parse_json_schema(&json) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Failed to parse JSON Schema: {}", e);
+                    return 1;
+                }
+            },
+        }
     };
 
     // Generate code

@@ -80,6 +80,8 @@ pub mod registry;
 pub mod traits;
 
 // Re-export commonly used items
+#[cfg(feature = "input-typescript")]
+pub use input::parse_typescript_types;
 pub use input::{ParseError, parse_json_schema, parse_openapi};
 
 // Re-export traits
