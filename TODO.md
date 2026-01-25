@@ -429,6 +429,7 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
 - [x] Chained if-let: edition 2024 allows `if let Ok(x) = foo() && let Some(y) = bar(x)`. Audit complete.
 - PR/diff analysis: `normalize analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
+- Test gap analysis: `normalize analyze test-gaps` - find public functions with no direct test caller. See `docs/design/test-gaps.md`
 - [x] Validate node kinds against grammars: `validate_unused_kinds_audit()` in 99 language files, runs as test
 - [x] Directory context: `normalize context`, `view --dir-context`
 - Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
@@ -594,7 +595,7 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 Core agency features complete (shadow editing, validation, risk gates, retry, auto-commit).
 
 **Remaining**:
-- [ ] Test selection: run only tests affected by changes (use call graph)
+- [ ] Test selection: run only tests affected by changes (use call graph). Related: `analyze test-gaps` (see `docs/design/test-gaps.md`) shares the test-context classification
 - [ ] Task decomposition: break large tasks into validated subtasks
 - [ ] Cross-file refactoring: rename symbol across codebase
 - [ ] Partial success: apply working edits, report failures
