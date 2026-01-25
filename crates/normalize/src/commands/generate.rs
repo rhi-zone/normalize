@@ -12,7 +12,7 @@ pub struct GenerateArgs {
 
 #[derive(Subcommand)]
 pub enum GenerateTarget {
-    /// Generate API client from OpenAPI spec (legacy)
+    /// Generate API client from OpenAPI spec
     Client {
         /// OpenAPI spec JSON file
         spec: PathBuf,
@@ -25,40 +25,8 @@ pub enum GenerateTarget {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
-    /// Generate types from JSON Schema (legacy)
+    /// Generate types/validators from schema
     Types {
-        /// JSON Schema file
-        schema: PathBuf,
-
-        /// Root type name
-        #[arg(short, long, default_value = "Root")]
-        name: String,
-
-        /// Target language: typescript, python, rust
-        #[arg(short, long)]
-        lang: String,
-
-        /// Output file (stdout if not specified)
-        #[arg(short, long)]
-        output: Option<PathBuf>,
-    },
-    /// Generate CLI snapshot tests for a binary
-    #[command(name = "cli-snapshot")]
-    CliSnapshot {
-        /// Path to the CLI binary
-        binary: PathBuf,
-
-        /// Output file for the test (stdout if not specified)
-        #[arg(short, long)]
-        output: Option<PathBuf>,
-
-        /// Binary name to use in test (defaults to file stem)
-        #[arg(long)]
-        name: Option<String>,
-    },
-    /// Generate types/validators from schema (new IR-based)
-    #[command(name = "typegen")]
-    Typegen {
         /// Input schema file (JSON Schema or OpenAPI), use - for stdin
         input: PathBuf,
 
@@ -89,6 +57,20 @@ pub enum GenerateTarget {
         /// Package name (for Go)
         #[arg(long, default_value = "types")]
         package: String,
+    },
+    /// Generate CLI snapshot tests for a binary
+    #[command(name = "cli-snapshot")]
+    CliSnapshot {
+        /// Path to the CLI binary
+        binary: PathBuf,
+
+        /// Output file for the test (stdout if not specified)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Binary name to use in test (defaults to file stem)
+        #[arg(long)]
+        name: Option<String>,
     },
 }
 
@@ -125,19 +107,8 @@ pub enum Backend {
 /// Run the generate command
 pub fn run(args: GenerateArgs) -> i32 {
     match args.target {
-        GenerateTarget::Client { spec, lang, output } => run_legacy_client(spec, lang, output),
+        GenerateTarget::Client { spec, lang, output } => run_client(spec, lang, output),
         GenerateTarget::Types {
-            schema,
-            name,
-            lang,
-            output,
-        } => run_legacy_types(schema, name, lang, output),
-        GenerateTarget::CliSnapshot {
-            binary,
-            output,
-            name,
-        } => run_cli_snapshot(binary, output, name),
-        GenerateTarget::Typegen {
             input,
             format,
             backend,
@@ -146,7 +117,7 @@ pub fn run(args: GenerateArgs) -> i32 {
             infer_types,
             readonly,
             package,
-        } => run_typegen(
+        } => run_types(
             input,
             format,
             backend,
@@ -156,10 +127,15 @@ pub fn run(args: GenerateArgs) -> i32 {
             readonly,
             package,
         ),
+        GenerateTarget::CliSnapshot {
+            binary,
+            output,
+            name,
+        } => run_cli_snapshot(binary, output, name),
     }
 }
 
-fn run_legacy_client(spec: PathBuf, lang: String, output: Option<PathBuf>) -> i32 {
+fn run_client(spec: PathBuf, lang: String, output: Option<PathBuf>) -> i32 {
     let Some(generator) = normalize_openapi::find_generator(&lang) else {
         eprintln!("Unknown language: {}. Available:", lang);
         for (lang, variant) in normalize_openapi::list_generators() {
@@ -197,46 +173,8 @@ fn run_legacy_client(spec: PathBuf, lang: String, output: Option<PathBuf>) -> i3
     0
 }
 
-fn run_legacy_types(schema: PathBuf, name: String, lang: String, output: Option<PathBuf>) -> i32 {
-    let Some(generator) = normalize_jsonschema::find_generator(&lang) else {
-        eprintln!("Unknown language: {}. Available:", lang);
-        for l in normalize_jsonschema::list_generators() {
-            eprintln!("  {}", l);
-        }
-        return 1;
-    };
-
-    let content = match std::fs::read_to_string(&schema) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Failed to read {}: {}", schema.display(), e);
-            return 1;
-        }
-    };
-    let schema_json: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(j) => j,
-        Err(e) => {
-            eprintln!("Failed to parse JSON: {}", e);
-            return 1;
-        }
-    };
-
-    let code = generator.generate(&schema_json, &name);
-
-    if let Some(path) = output {
-        if let Err(e) = std::fs::write(&path, &code) {
-            eprintln!("Failed to write {}: {}", path.display(), e);
-            return 1;
-        }
-        eprintln!("Generated {}", path.display());
-    } else {
-        print!("{}", code);
-    }
-    0
-}
-
 #[allow(clippy::too_many_arguments)]
-fn run_typegen(
+fn run_types(
     input: PathBuf,
     format: InputFormat,
     backend: Backend,

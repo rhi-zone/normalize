@@ -1,17 +1,12 @@
-//! Package registry queries for multiple ecosystems.
+//! Project dependency management for multiple package ecosystems.
 //!
-//! This crate provides two main features:
+//! Provides the [`Ecosystem`] trait for detecting and querying package
+//! ecosystems (cargo, npm, pip, etc.) in project directories.
 //!
-//! - **`ecosystem`** (default): Project dependency management via the [`Ecosystem`] trait.
-//!   Detect ecosystems from manifest files, query package info, list dependencies, audit.
-//!
-//! - **`index`** (default): Package index ingestion via the [`PackageIndex`] trait.
-//!   Fetch metadata from package manager indices (apt, brew, crates.io, etc.).
-//!
-//! # Example (ecosystem feature)
+//! # Example
 //!
 //! ```ignore
-//! use normalize_packages::{detect_ecosystem, PackageInfo};
+//! use normalize_ecosystems::{detect_ecosystem, PackageInfo};
 //! use std::path::Path;
 //!
 //! if let Some(ecosystem) = detect_ecosystem(Path::new(".")) {
@@ -20,35 +15,16 @@
 //!     }
 //! }
 //! ```
-//!
-//! # Example (index feature)
-//!
-//! ```ignore
-//! use normalize_packages::index::{get_index, PackageMeta};
-//!
-//! if let Some(brew) = get_index("brew") {
-//!     if let Ok(pkg) = brew.fetch("ripgrep") {
-//!         println!("{}: {} - {:?}", pkg.name, pkg.version, pkg.repository);
-//!     }
-//! }
-//! ```
 
-#[cfg(feature = "ecosystem")]
 mod cache;
-#[cfg(feature = "ecosystem")]
 pub mod ecosystems;
-#[cfg(feature = "ecosystem")]
 mod http;
 
-#[cfg(feature = "index")]
-pub mod index;
-
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ecosystem")]
 use std::path::Path;
 
 // ============================================================================
-// Shared types (available with either feature)
+// Types
 // ============================================================================
 
 /// Parsed package query (name with optional version).
@@ -197,11 +173,10 @@ impl std::fmt::Display for PackageError {
 impl std::error::Error for PackageError {}
 
 // ============================================================================
-// Ecosystem feature: project dependency management
+// Ecosystem trait
 // ============================================================================
 
 /// A lockfile pattern and its associated package manager.
-#[cfg(feature = "ecosystem")]
 pub struct LockfileManager {
     pub filename: &'static str,
     pub manager: &'static str,
@@ -212,7 +187,6 @@ pub struct LockfileManager {
 /// Each ecosystem (cargo, npm, pip, etc.) implements this trait to provide:
 /// - Detection via manifest files and lockfiles
 /// - Package info queries via available tools
-#[cfg(feature = "ecosystem")]
 pub trait Ecosystem: Send + Sync {
     /// Display name for this ecosystem (e.g., "cargo", "npm", "pip")
     fn name(&self) -> &'static str;
@@ -315,7 +289,6 @@ pub trait Ecosystem: Send + Sync {
 }
 
 /// Check if a command exists in PATH.
-#[cfg(feature = "ecosystem")]
 fn which(cmd: &str) -> bool {
     std::env::var_os("PATH")
         .map(|paths| {
@@ -327,7 +300,7 @@ fn which(cmd: &str) -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(all(feature = "ecosystem", unix))]
+#[cfg(unix)]
 fn is_executable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     path.metadata()
@@ -335,13 +308,12 @@ fn is_executable(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(all(feature = "ecosystem", not(unix)))]
+#[cfg(not(unix))]
 fn is_executable(path: &Path) -> bool {
     path.is_file()
 }
 
 // Re-export ecosystem detection functions
-#[cfg(feature = "ecosystem")]
 pub use ecosystems::{
     all_ecosystems, detect_all_ecosystems, detect_ecosystem, get_ecosystem, list_ecosystems,
     register as register_ecosystem,

@@ -1,0 +1,41 @@
+[package]
+name = "normalize-ecosystems"
+version = "0.1.0"
+edition = "2024"
+description = "Project dependency management for multiple package ecosystems"
+
+[features]
+default = ["all"]
+
+# All ecosystems
+all = [
+    "cargo", "npm", "deno", "python",
+    "go", "hex", "gem", "composer",
+    "maven", "nuget", "nix", "conan",
+]
+
+# Individual ecosystems
+cargo = []     # Rust (Cargo.toml)
+npm = []       # JavaScript/TypeScript (package.json)
+deno = []      # Deno (deno.json)
+python = []    # Python (pyproject.toml, requirements.txt, etc.)
+go = []        # Go (go.mod)
+hex = []       # Elixir/Erlang (mix.exs)
+gem = []       # Ruby (Gemfile)
+composer = []  # PHP (composer.json)
+maven = []     # Java (pom.xml)
+nuget = []     # .NET (*.csproj)
+nix = []       # Nix (flake.nix)
+conan = []     # C++ (conanfile.txt)
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_json_lenient = "0.2"
+serde_yaml = "0.9"
+toml = "0.8"
+ureq = { version = "2", features = ["json", "gzip"] }
+urlencoding = "2"
+
+[dev-dependencies]
+base64 = "0.22"

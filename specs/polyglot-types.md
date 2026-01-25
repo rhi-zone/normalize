@@ -127,7 +127,6 @@ May or may not reuse existing crates depending on fit:
 
 | Crate | Might Provide |
 |-------|---------------|
-| `normalize-jsonschema` | JSON Schema parsing (if it exists/fits) |
 | `normalize-openapi` | OpenAPI parsing (if it exists/fits) |
 | `normalize-languages` | Language metadata (extensions, conventions) |
 

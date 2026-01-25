@@ -5,7 +5,7 @@
 //! Users can register custom ecosystems via [`register()`]:
 //!
 //! ```ignore
-//! use normalize_packages::{Ecosystem, LockfileManager, register_ecosystem};
+//! use normalize_ecosystems::{Ecosystem, LockfileManager, register_ecosystem};
 //! use std::path::Path;
 //!
 //! struct MyEcosystem;
@@ -22,58 +22,58 @@
 //! register_ecosystem(&MyEcosystem);
 //! ```
 
-#[cfg(feature = "ecosystem-cargo")]
+#[cfg(feature = "cargo")]
 mod cargo;
-#[cfg(feature = "ecosystem-composer")]
+#[cfg(feature = "composer")]
 mod composer;
-#[cfg(feature = "ecosystem-conan")]
+#[cfg(feature = "conan")]
 mod conan;
-#[cfg(feature = "ecosystem-deno")]
+#[cfg(feature = "deno")]
 mod deno;
-#[cfg(feature = "ecosystem-gem")]
+#[cfg(feature = "gem")]
 mod gem;
-#[cfg(feature = "ecosystem-go")]
+#[cfg(feature = "go")]
 mod go;
-#[cfg(feature = "ecosystem-hex")]
+#[cfg(feature = "hex")]
 mod hex;
-#[cfg(feature = "ecosystem-maven")]
+#[cfg(feature = "maven")]
 mod maven;
-#[cfg(feature = "ecosystem-nix")]
+#[cfg(feature = "nix")]
 mod nix;
-#[cfg(feature = "ecosystem-npm")]
+#[cfg(feature = "npm")]
 mod npm;
-#[cfg(feature = "ecosystem-nuget")]
+#[cfg(feature = "nuget")]
 mod nuget;
-#[cfg(feature = "ecosystem-python")]
+#[cfg(feature = "python")]
 mod python;
 
 use crate::Ecosystem;
 use std::path::Path;
 use std::sync::{OnceLock, RwLock};
 
-#[cfg(feature = "ecosystem-cargo")]
+#[cfg(feature = "cargo")]
 pub use cargo::Cargo;
-#[cfg(feature = "ecosystem-composer")]
+#[cfg(feature = "composer")]
 pub use composer::Composer;
-#[cfg(feature = "ecosystem-conan")]
+#[cfg(feature = "conan")]
 pub use conan::Conan;
-#[cfg(feature = "ecosystem-deno")]
+#[cfg(feature = "deno")]
 pub use deno::Deno;
-#[cfg(feature = "ecosystem-gem")]
+#[cfg(feature = "gem")]
 pub use gem::Gem;
-#[cfg(feature = "ecosystem-go")]
+#[cfg(feature = "go")]
 pub use go::Go;
-#[cfg(feature = "ecosystem-hex")]
+#[cfg(feature = "hex")]
 pub use hex::Hex;
-#[cfg(feature = "ecosystem-maven")]
+#[cfg(feature = "maven")]
 pub use maven::Maven;
-#[cfg(feature = "ecosystem-nix")]
+#[cfg(feature = "nix")]
 pub use nix::Nix;
-#[cfg(feature = "ecosystem-npm")]
+#[cfg(feature = "npm")]
 pub use npm::Npm;
-#[cfg(feature = "ecosystem-nuget")]
+#[cfg(feature = "nuget")]
 pub use nuget::Nuget;
-#[cfg(feature = "ecosystem-python")]
+#[cfg(feature = "python")]
 pub use python::Python;
 
 /// Global registry of ecosystem plugins.
@@ -92,29 +92,29 @@ pub fn register(ecosystem: &'static dyn Ecosystem) {
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
         let mut ecosystems = ECOSYSTEMS.write().unwrap();
-        #[cfg(feature = "ecosystem-cargo")]
+        #[cfg(feature = "cargo")]
         ecosystems.push(&Cargo);
-        #[cfg(feature = "ecosystem-npm")]
+        #[cfg(feature = "npm")]
         ecosystems.push(&Npm);
-        #[cfg(feature = "ecosystem-deno")]
+        #[cfg(feature = "deno")]
         ecosystems.push(&Deno);
-        #[cfg(feature = "ecosystem-python")]
+        #[cfg(feature = "python")]
         ecosystems.push(&Python);
-        #[cfg(feature = "ecosystem-go")]
+        #[cfg(feature = "go")]
         ecosystems.push(&Go);
-        #[cfg(feature = "ecosystem-hex")]
+        #[cfg(feature = "hex")]
         ecosystems.push(&Hex);
-        #[cfg(feature = "ecosystem-gem")]
+        #[cfg(feature = "gem")]
         ecosystems.push(&Gem);
-        #[cfg(feature = "ecosystem-composer")]
+        #[cfg(feature = "composer")]
         ecosystems.push(&Composer);
-        #[cfg(feature = "ecosystem-maven")]
+        #[cfg(feature = "maven")]
         ecosystems.push(&Maven);
-        #[cfg(feature = "ecosystem-nuget")]
+        #[cfg(feature = "nuget")]
         ecosystems.push(&Nuget);
-        #[cfg(feature = "ecosystem-nix")]
+        #[cfg(feature = "nix")]
         ecosystems.push(&Nix);
-        #[cfg(feature = "ecosystem-conan")]
+        #[cfg(feature = "conan")]
         ecosystems.push(&Conan);
     });
 }

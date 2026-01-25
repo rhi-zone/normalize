@@ -35,11 +35,11 @@ All trait-based crates follow the normalize-languages pattern for extensibility:
 Crates with registries:
 - [x] normalize-languages: `Language` trait, `register()` in registry.rs
 - [x] normalize-cli-parser: `CliFormat` trait, `register()` in formats/mod.rs
-- [x] normalize-sessions: `LogFormat` trait, `register()` in formats/mod.rs
+- [x] normalize-chat-sessions: `LogFormat` trait, `register()` in formats/mod.rs
 - [x] normalize-tools: `Tool` trait (`register_tool()`), `TestRunner` trait (`register()`)
-- [x] normalize-packages: `Ecosystem` trait, `register_ecosystem()` in ecosystems/mod.rs
-- [x] normalize-jsonschema: `JsonSchemaGenerator` trait, `register()` in lib.rs
+- [x] normalize-ecosystems: `Ecosystem` trait, `register_ecosystem()` in ecosystems/mod.rs
 - [x] normalize-openapi: `OpenApiClientGenerator` trait, `register()` in lib.rs
+- [x] normalize-typegen: `Backend` trait, `register_backend()` in registry.rs
 
 Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. normalize CLI can add Lua bindings at application layer for scripting.
 
@@ -58,6 +58,11 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--allow` semantics: reviewed - intentional (different analysis types need different allowlist formats: patterns for files/hotspots, locations for duplicate-functions, pairs for duplicate-types; help text documents each)
 - [x] `--type` vs `--kind`: standardized to `--kind` (view now uses `--kind` like analyze complexity)
 
+**Future:**
+- `--output-schema`: output JSON schema for command's `--json` return type (enables tooling, validation)
+- `--input-schema`: output JSON schema for CLI flags (alternative input via JSON for programmatic use)
+- `--jsonl`: add to applicable commands (where output is naturally a stream of records)
+
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
 - [x] Rename `normalize filter aliases` to `normalize aliases`: removes unnecessary namespace layer
@@ -68,11 +73,35 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] Remove `normalize @` and `normalize workflow` references from docs - spore handles workflow running now
   - Archived: script.md, agent*.md, lua-cli.md, agent-state-machine.md, workflow-format.md, agent-commands.md, lua-api.md, agent-dogfooding.md
   - Updated: shadow-git.md, log-analysis.md, workflows/README.md, security-audit.md, dogfooding.md, langgraph-evaluation.md, prior-art.md
-  - Kept: normalize-sessions parser (format still valid for reading old logs)
+  - Kept: normalize-chat-sessions parser (format still valid for reading old logs)
 
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration
+
+### Crate Rename Audit
+
+**Clear names (no change):**
+- `normalize-core`, `normalize-derive`, `normalize-grammars` - foundational
+- `normalize-languages` - Language trait implementations
+- `normalize-typegen`, `normalize-openapi` - code generators
+- `normalize-surface-syntax` - syntax translation
+- `normalize-tools` - external tool interface
+- `normalize-cli-parser` - CLI help output parsing
+
+**Renames for clarity:**
+- [ ] `normalize-chat-sessions` → `normalize-chat-sessions`
+  - "Sessions" too generic (web sessions? user sessions?)
+  - Content: AI agent chat session log parsing (Claude Code, Gemini CLI, etc.)
+- [ ] `normalize-syntax-rules` → `normalize-syntax-rules`
+  - "Rules" too generic (business rules? validation?)
+  - Content: tree-sitter syntax-based linting rules
+
+**Structural split:**
+- [x] `normalize-ecosystems` → split into two crates:
+  - `normalize-ecosystems` - Ecosystem trait: project dependency management (cargo, npm, pip)
+  - `normalize-package-index` - PackageIndex trait: distro/registry index ingestion (apt, brew, etc.)
+  - Each has its own cache.rs with domain-specific caching
 - Edit routing: workflow engine with LLM decision points
 - Session/checkpoint: workflow state persistence
 - PR/diff analysis: `normalize analyze --pr` or similar
@@ -100,7 +129,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [ ] Protobuf output - emit IR as .proto definitions
 
 **CLI Enhancements:**
-- [x] Support stdin input (`normalize generate typegen -`)
+- [x] Support stdin input (`normalize generate types -`)
 - [ ] Multiple output files (`--split` to emit one file per type)
 - [ ] Dry-run mode (`--dry-run` to preview without writing)
 
@@ -183,8 +212,8 @@ Audit found fragmentation across commands. Fix for consistent UX:
 Add feature flags to crates so consumers can opt out of implementations they don't need.
 Use consistent prefixes within each crate:
 - [x] normalize-languages: `lang-*` (e.g., `lang-typescript`, `lang-rust`) and groups `langs-*` (e.g., `langs-core`, `langs-functional`)
-- [x] normalize-packages: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-python`)
-- [x] normalize-sessions: `format-*` (e.g., `format-claude`, `format-codex`, `format-gemini`, `format-normalize`)
+- [x] normalize-ecosystems: `ecosystem-*` (e.g., `ecosystem-npm`, `ecosystem-cargo`, `ecosystem-python`)
+- [x] normalize-chat-sessions: `format-*` (e.g., `format-claude`, `format-codex`, `format-gemini`, `format-normalize`)
 - [x] normalize-tools: `tool-*` individual (e.g., `tool-ruff`, `tool-clippy`) + `tools-*` language groups (e.g., `tools-python`, `tools-rust`)
 
 ### Workflow Engine
@@ -245,7 +274,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - Very low priority - needs concrete use case showing value beyond direct tool usage
   - Possible value-adds: install across all ecosystems, auto-audit after install, config-driven installs
 
-### Package Index Fetchers (normalize-packages)
+### Package Index Fetchers (normalize-ecosystems)
 
 **Full coverage tracking**: See `docs/repository-coverage.md` for complete repository list.
 
@@ -380,11 +409,11 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] `cmd_edit` (67→51): extracted insert_single_at_destination
 - [x] `cmd_daemon` (66→54): extracted handle_response
 - [x] `cmd_view_symbol` (65→47): extracted print_smart_imports
-- [ ] `crates/normalize-rules/src/runner.rs:evaluate_predicates` (53)
+- [ ] `crates/normalize-syntax-rules/src/runner.rs:evaluate_predicates` (53)
 - [ ] `crates/normalize/src/commands/analyze/mod.rs:run` (53)
 - [ ] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (49)
 - [ ] `crates/normalize/src/tree.rs:collect_highlight_spans` (48)
-- [ ] `crates/normalize-rules/src/runner.rs:run_rules` (44)
+- [ ] `crates/normalize-syntax-rules/src/runner.rs:run_rules` (44)
 - [ ] `crates/normalize/src/commands/analyze/report.rs:analyze` (44)
 
 ### Package Index Backlog (simplest → complex)
@@ -671,7 +700,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 
 ### Session Analysis
 
-**normalize-sessions refactor** - see `docs/design/sessions-refactor.md`
+**normalize-chat-sessions refactor** - see `docs/design/sessions-refactor.md`
 - [x] Split parsing from analysis: `LogFormat::parse()` → unified `Session` type
 - [x] Move analysis to consumers (normalize CLI uses `parse()` + local `analyze_session()`)
 - [x] Remove `analyze()` from LogFormat trait (analysis now in `crates/normalize/src/sessions/analysis.rs`)

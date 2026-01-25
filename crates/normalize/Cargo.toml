@@ -37,11 +37,10 @@ normalize-core = { path = "../normalize-core" }
 normalize-derive = { path = "../normalize-derive" }
 normalize-languages = { path = "../normalize-languages" }
 normalize-typegen = { path = "../normalize-typegen", features = ["input-typescript"] }
-normalize-jsonschema = { path = "../normalize-jsonschema" }
-normalize-rules = { path = "../normalize-rules" }
+normalize-syntax-rules = { path = "../normalize-syntax-rules" }
 normalize-openapi = { path = "../normalize-openapi" }
-normalize-packages = { path = "../normalize-packages" }
-normalize-sessions = { path = "../normalize-sessions" }
+normalize-ecosystems = { path = "../normalize-ecosystems" }
+normalize-chat-sessions = { path = "../normalize-chat-sessions" }
 normalize-tools = { path = "../normalize-tools" }
 normalize-cli-parser = { path = "../normalize-cli-parser" }
 normalize-surface-syntax = { path = "../normalize-surface-syntax", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }

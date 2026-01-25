@@ -1,0 +1,26 @@
+[package]
+name = "normalize-package-index"
+version = "0.1.0"
+edition = "2024"
+description = "Package index ingestion from distro and language registries"
+
+[features]
+default = ["all"]
+all = []
+test-network = []  # Enable tests that hit real APIs (disabled in CI)
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_json_lenient = "0.2"
+ureq = { version = "2", features = ["json", "gzip"] }
+urlencoding = "2"
+flate2 = "1"
+xz2 = "0.1"
+tar = "0.4"
+zstd = "0.13"
+rayon = { workspace = true }
+quick-xml = { version = "0.37", features = ["serialize"] }
+
+[dev-dependencies]
+base64 = "0.22"

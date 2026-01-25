@@ -32,12 +32,12 @@ Key architectural decisions and their rationale.
 
 ```
 crates/
-├── moss/                    # Core library + CLI
+├── moss/                         # Core library + CLI
 ├── normalize-languages/          # 98 language definitions
-├── normalize-packages/           # Package ecosystem support
+├── normalize-ecosystems/         # Project dependency management (Ecosystem trait)
+├── normalize-package-index/      # Distro/registry index ingestion (PackageIndex trait)
 ├── normalize-tools/              # MCP tool generation
 ├── normalize-derive/             # Proc macros (must be separate)
-├── normalize-jsonschema/         # Schema generation
 ├── normalize-openapi/            # OpenAPI generation
 ├── normalize-typegen/            # Type codegen (single crate, multiple backends)
 └── normalize-surface-syntax/     # Syntax translation (single crate, multiple readers/writers)
@@ -183,10 +183,11 @@ pub fn get(name: &str) -> Option<&'static dyn MyTrait> {
 |-------|-------|---------|
 | normalize-languages | `Language` | Language support (98 built-in) |
 | normalize-cli-parser | `CliFormat` | CLI help parsing |
-| normalize-sessions | `LogFormat` | Agent session log parsing |
+| normalize-chat-sessions | `LogFormat` | Agent session log parsing |
 | normalize-tools | `Tool`, `TestRunner` | Tool/runner adapters |
-| normalize-packages | `Ecosystem` | Package manager support |
-| normalize-jsonschema | `JsonSchemaGenerator` | Type generation |
+| normalize-ecosystems | `Ecosystem` | Project dependency management |
+| normalize-package-index | `PackageIndex` | Distro/registry index ingestion |
+| normalize-typegen | `Backend` | Type/validator codegen |
 | normalize-openapi | `OpenApiClientGenerator` | API client generation |
 
 ### When to Use Compile-Time Dispatch (Feature Flags)
@@ -209,7 +210,7 @@ backend-rust = []
 | Crate | Features | Rationale |
 |-------|----------|-----------|
 | normalize-typegen | Backend selection (ts, rust, python, etc.) | Backends known at compile time, no runtime extensibility needed |
-| normalize-rules | Optional linting backends | Heavy optional dependencies |
+| normalize-syntax-rules | Optional linting backends | Heavy optional dependencies |
 
 ### Hybrid: Traits + Feature Flags
 

@@ -90,7 +90,7 @@ See `docs/` for design docs and `README.md` for usage.
   - JSON output with `--json`
   - Shows file count in header: "src/**/*.rs (18 files)"
   - Language sources: `typescript.*` (tsconfig.json), `python.*` (pyproject.toml), `go.*` (go.mod)
-  - Extracted to `normalize-rules` crate (library code separate from CLI)
+  - Extracted to `normalize-syntax-rules` crate (library code separate from CLI)
 - `-i/--case-insensitive` flag for trace, callers, callees subcommands
   - Matches symbol names case-insensitively
   - Consistent with view and edit command flags
@@ -506,12 +506,11 @@ Added `session-summary` workflow for end-of-session stats:
 
 ### JSON Schema Type Codegen
 
-New `normalize-jsonschema` crate for generating type definitions from JSON Schema:
+`normalize generate types` command for generating type definitions from JSON Schema (uses `normalize-typegen`):
 - `normalize generate types <schema.json> -l typescript` - TypeScript interfaces
 - `normalize generate types <schema.json> -l python` - Python dataclasses
 - `normalize generate types <schema.json> -l rust` - Rust structs with serde derives
 - Handles: object, array, enum, allOf, oneOf, $ref, const, nullable types
-- Trait-based design (`JsonSchemaGenerator`) for extensibility
 
 ### Context View Mode
 
@@ -642,7 +641,7 @@ Watch mode (`normalize lint --watch`):
 
 New `normalize package` command queries package registries without web search:
 - **Subcommands**: `info`, `list`, `tree`, `outdated`
-- **normalize-packages crate**: Ecosystem trait with implementations for 11 ecosystems
+- **normalize-ecosystems crate**: Ecosystem trait with implementations for 11 ecosystems
 - **Ecosystems**: cargo, npm, python, go, hex, gem, composer, maven, nuget, nix, conan
 - Auto-detection from manifest files (Cargo.toml → cargo, package.json → npm, etc.)
 - **Multi-ecosystem projects**: `list` and `tree` show all ecosystems when multiple detected

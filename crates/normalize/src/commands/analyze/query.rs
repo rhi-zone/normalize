@@ -10,7 +10,7 @@ use crate::parsers::grammar_loader;
 use crate::tree::highlight_source;
 use normalize_languages::ast_grep::DynLang;
 use normalize_languages::support_for_path;
-use normalize_rules::evaluate_predicates;
+use normalize_syntax_rules::evaluate_predicates;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;

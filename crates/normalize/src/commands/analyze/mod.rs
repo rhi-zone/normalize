@@ -27,7 +27,7 @@ use crate::filter::Filter;
 use crate::output::OutputFormatter;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
 use normalize_derive::Merge;
-pub use normalize_rules::{RuleOverride, RulesConfig};
+pub use normalize_syntax_rules::{RuleOverride, RulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -654,7 +654,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 .as_ref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| effective_root.clone());
-            let debug_flags = normalize_rules::DebugFlags::from_args(&debug);
+            let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
             rules_cmd::cmd_rules(
                 &target_root,
                 rule.as_deref(),

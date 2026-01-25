@@ -3184,16 +3184,15 @@ dependencies = [
  "jaq-std",
  "libc",
  "libsql",
+ "normalize-chat-sessions",
  "normalize-cli-parser",
  "normalize-core",
  "normalize-derive",
- "normalize-jsonschema",
+ "normalize-ecosystems",
  "normalize-languages",
  "normalize-openapi",
- "normalize-packages",
- "normalize-rules",
- "normalize-sessions",
  "normalize-surface-syntax",
+ "normalize-syntax-rules",
  "normalize-tools",
  "normalize-typegen",
  "notify",
@@ -3219,6 +3218,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-chat-sessions"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "normalize-cli-parser"
 version = "0.1.0"
 dependencies = [
@@ -3239,6 +3247,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "normalize-ecosystems"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+ "serde_json",
+ "serde_json_lenient",
+ "serde_yaml",
+ "toml",
+ "ureq",
+ "urlencoding",
 ]
 
 [[package]]
@@ -3346,13 +3368,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "normalize-jsonschema"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
 name = "normalize-languages"
 version = "0.1.0"
 dependencies = [
@@ -3374,7 +3389,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "normalize-packages"
+name = "normalize-package-index"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
@@ -3384,40 +3399,11 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_json_lenient",
- "serde_yaml",
  "tar",
- "toml",
  "ureq",
  "urlencoding",
  "xz2",
  "zstd",
-]
-
-[[package]]
-name = "normalize-rules"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "glob",
- "ignore",
- "normalize-core",
- "normalize-derive",
- "normalize-languages",
- "regex",
- "schemars",
- "serde",
- "streaming-iterator",
- "toml",
- "tree-sitter",
-]
-
-[[package]]
-name = "normalize-sessions"
-version = "0.1.0"
-dependencies = [
- "regex",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -3431,6 +3417,24 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tree-sitter",
+]
+
+[[package]]
+name = "normalize-syntax-rules"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "glob",
+ "ignore",
+ "normalize-core",
+ "normalize-derive",
+ "normalize-languages",
+ "regex",
+ "schemars",
+ "serde",
+ "streaming-iterator",
+ "toml",
  "tree-sitter",
 ]
 
