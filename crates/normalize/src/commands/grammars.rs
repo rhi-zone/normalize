@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 /// Grammar list report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct GrammarListReport {
+pub struct GrammarListReport {
     grammars: Vec<String>,
 }
 
@@ -42,7 +42,7 @@ struct GrammarPath {
 
 /// Grammar paths report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct GrammarPathsReport {
+pub struct GrammarPathsReport {
     paths: Vec<GrammarPath>,
 }
 

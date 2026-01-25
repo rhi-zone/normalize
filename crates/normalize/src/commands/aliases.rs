@@ -18,7 +18,7 @@ struct AliasItem {
 
 /// Aliases report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct AliasesReport {
+pub struct AliasesReport {
     aliases: Vec<AliasItem>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     detected_languages: Vec<String>,
