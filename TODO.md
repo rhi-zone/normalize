@@ -64,8 +64,9 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--input-schema`: output JSON schema for command's input arguments
 - [x] `--params-json`: pass command arguments as JSON (overrides CLI flags)
 - [x] Core infrastructure: `OutputFormatter` requires `JsonSchema`, all output types derive it
-- [ ] Wire up `--output-schema` for remaining commands (currently: aliases, text-search)
-- [ ] Wire up `--input-schema` + `--params-json` for remaining commands (currently: aliases)
+- [x] `--output-schema` wired up for: aliases, text-search, analyze (all subcommands)
+- [ ] Wire up `--output-schema` for: grammars, sessions, tools, context, history, view
+- [ ] Wire up `--input-schema` + `--params-json` for remaining commands (currently: aliases only)
 - [ ] Support `--jsonl` + `--jq` combination (apply jq filter, then emit results as jsonl)
 
 ### CLI Cleanup
