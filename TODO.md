@@ -91,7 +91,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] OpenAPI parser (`parse_openapi`)
 - [ ] Protobuf parser - read .proto files to IR
 - [ ] GraphQL schema parser - read GraphQL SDL to IR
-- [ ] TypeScript type parser - extract type definitions from .ts files
+- [x] TypeScript type parser - extract type definitions from .ts files
 
 **Output Backends:**
 - [ ] JSON Schema output - emit IR back to JSON Schema (for validation/documentation)
@@ -99,7 +99,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [ ] Protobuf output - emit IR as .proto definitions
 
 **CLI Enhancements:**
-- [ ] Support stdin input (`normalize generate typegen -` or `--stdin`)
+- [x] Support stdin input (`normalize generate typegen -`)
 - [ ] Multiple output files (`--split` to emit one file per type)
 - [ ] Dry-run mode (`--dry-run` to preview without writing)
 
@@ -123,8 +123,8 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - [x] Functions (declarations, arrow functions)
   - [x] Arrays, objects
   - [ ] Classes, interfaces, type annotations
-  - [ ] Try/catch/finally
-  - [ ] Switch statements
+  - [x] Try/catch/finally
+  - [x] Switch statements (→ nested if/else in IR)
   - [ ] Spread operator, destructuring
   - [ ] Template literals
   - [ ] Async/await
@@ -134,11 +134,11 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - [x] Functions (declarations, anonymous)
   - [x] Tables (array-like, record-like)
   - [ ] Metatables, metamethods
-  - [ ] Varargs (`...`)
-  - [ ] Repeat-until loops
-  - [ ] Multiple return values, multiple assignment
+  - [x] Varargs (`...`) - params and expression context
+  - [x] Repeat-until loops (→ while(true) + break)
+  - [x] Multiple return values (→ array expression)
   - [ ] String methods (`:method()` syntax)
-- [ ] Python reader
+- [x] Python reader (tree-sitter based)
 - [ ] JavaScript reader (or reuse TypeScript reader with flag?)
 
 **Writers:**
@@ -155,18 +155,18 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - [ ] Type annotations (when available in IR)
   - [ ] Verify semicolon placement
   - [ ] Template literal output for complex strings
-- [ ] Python writer
+- [x] Python writer
 - [ ] JavaScript writer (or reuse TypeScript writer?)
 
 **Testing:**
 - [x] Basic roundtrip tests in registry.rs
-- [ ] Roundtrip tests with `structure_eq`: TS → IR₁ → Lua → IR₂ → assert `ir1.structure_eq(&ir2)`
+- [x] Roundtrip tests with `structure_eq`: TS → IR₁ → Lua → IR₂ → assert `ir1.structure_eq(&ir2)`
   - IR is "reasonable middle ground", not strict LCD
   - Core fields: must match (names, expressions, control flow structure)
   - Hint fields: normalized in comparison (`mutable`, `computed` on string-literal member access)
   - `structure_eq(&self, &other) -> bool`: in-place comparison, no cloning
-- [ ] Snapshot tests for reader outputs (verify parsed IR is correct)
-- [ ] Snapshot tests for writer outputs (verify emitted code is correct)
+- [x] Snapshot tests for reader outputs (verify parsed IR is correct)
+- [x] Snapshot tests for writer outputs (verify emitted code is correct)
 - [ ] Edge case tests: nested expressions, complex control flow, Unicode strings
 
 **IR Improvements:**
@@ -176,7 +176,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [ ] Class definitions, method definitions
 - [ ] Type annotations (optional, for typed languages)
 - [ ] Pattern matching / destructuring
-- [ ] Exception handling (try/catch)
+- [x] Exception handling (try/catch/finally)
 
 ### Feature flags for customizability
 Add feature flags to crates so consumers can opt out of implementations they don't need.
