@@ -89,10 +89,8 @@ pub enum OutputFormat {
     Json,
     /// JSON Lines output (one JSON object per line, arrays emit each element).
     JsonLines,
-    /// JSON filtered through jq expression.
-    Jq(String),
-    /// JSON filtered through jq, output as JSON Lines (each result on separate line).
-    JqJsonLines(String),
+    /// JSON filtered through jq expression. If jsonl is true, emit results as JSON Lines.
+    Jq { filter: String, jsonl: bool },
 }
 
 impl OutputFormat {
@@ -107,11 +105,10 @@ impl OutputFormat {
     ) -> Self {
         // JSON modes take precedence
         if let Some(filter) = jq {
-            // --jsonl + --jq: apply jq filter, output as JSONL
-            if jsonl {
-                return OutputFormat::JqJsonLines(filter.to_string());
-            }
-            return OutputFormat::Jq(filter.to_string());
+            return OutputFormat::Jq {
+                filter: filter.to_string(),
+                jsonl,
+            };
         }
         if jsonl {
             return OutputFormat::JsonLines;
@@ -151,10 +148,7 @@ impl OutputFormat {
     pub fn is_json(&self) -> bool {
         matches!(
             self,
-            OutputFormat::Json
-                | OutputFormat::JsonLines
-                | OutputFormat::Jq(_)
-                | OutputFormat::JqJsonLines(_)
+            OutputFormat::Json | OutputFormat::JsonLines | OutputFormat::Jq { .. }
         )
     }
 
@@ -196,28 +190,19 @@ pub trait OutputFormatter: Serialize + schemars::JsonSchema {
                 let json = serde_json::to_value(self).unwrap_or_default();
                 print_jsonl(&json);
             }
-            OutputFormat::Jq(filter) => {
+            OutputFormat::Jq { filter, jsonl } => {
                 let json = serde_json::to_value(self).unwrap_or_default();
                 match apply_jq(&json, filter) {
                     Ok(results) => {
                         for result in results {
-                            println!("{}", result);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("jq error: {}", e);
-                    }
-                }
-            }
-            OutputFormat::JqJsonLines(filter) => {
-                let json = serde_json::to_value(self).unwrap_or_default();
-                match apply_jq(&json, filter) {
-                    Ok(results) => {
-                        for result in results {
-                            // Try to parse and re-emit as JSON for proper JSONL format
-                            // (apply_jq returns stringified values)
-                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&result) {
-                                print_jsonl(&val);
+                            if *jsonl {
+                                // Parse and emit as JSONL (arrays get expanded)
+                                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&result)
+                                {
+                                    print_jsonl(&val);
+                                } else {
+                                    println!("{}", result);
+                                }
                             } else {
                                 println!("{}", result);
                             }
@@ -327,22 +312,31 @@ mod tests {
         );
         assert_eq!(
             OutputFormat::from_cli(false, false, Some(".name"), false, false, &config),
-            OutputFormat::Jq(".name".to_string())
+            OutputFormat::Jq {
+                filter: ".name".to_string(),
+                jsonl: false
+            }
         );
-        // jq + jsonl = JqJsonLines
+        // jq + jsonl
         assert_eq!(
             OutputFormat::from_cli(true, true, Some(".name"), false, false, &config),
-            OutputFormat::JqJsonLines(".name".to_string())
+            OutputFormat::Jq {
+                filter: ".name".to_string(),
+                jsonl: true
+            }
         );
-        // jsonl takes precedence over json
+        // jsonl takes precedence over json (when no jq)
         assert_eq!(
             OutputFormat::from_cli(true, true, None, false, false, &config),
             OutputFormat::JsonLines
         );
-        // jq alone
+        // jq without jsonl
         assert_eq!(
-            OutputFormat::from_cli(false, false, Some(".name"), false, false, &config),
-            OutputFormat::Jq(".name".to_string())
+            OutputFormat::from_cli(true, false, Some(".name"), false, false, &config),
+            OutputFormat::Jq {
+                filter: ".name".to_string(),
+                jsonl: false
+            }
         );
     }
 

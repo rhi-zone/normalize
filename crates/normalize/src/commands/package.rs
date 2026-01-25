@@ -609,27 +609,24 @@ fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
                 println!("{}", serde_json::to_string(value).unwrap_or_default());
             }
         }
-        OutputFormat::Jq(filter) => match crate::output::apply_jq(value, filter) {
+        OutputFormat::Jq { filter, jsonl } => match crate::output::apply_jq(value, filter) {
             Ok(results) => {
                 for result in results {
-                    println!("{}", result);
-                }
-            }
-            Err(e) => {
-                eprintln!("jq error: {}", e);
-            }
-        },
-        OutputFormat::JqJsonLines(filter) => match crate::output::apply_jq(value, filter) {
-            Ok(results) => {
-                for result in results {
-                    // Parse each result and emit as JSONL
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&result) {
-                        if let serde_json::Value::Array(arr) = val {
-                            for item in arr {
-                                println!("{}", serde_json::to_string(&item).unwrap_or_default());
+                    if *jsonl {
+                        // Parse each result and emit as JSONL
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&result) {
+                            if let serde_json::Value::Array(arr) = val {
+                                for item in arr {
+                                    println!(
+                                        "{}",
+                                        serde_json::to_string(&item).unwrap_or_default()
+                                    );
+                                }
+                            } else {
+                                println!("{}", serde_json::to_string(&val).unwrap_or_default());
                             }
                         } else {
-                            println!("{}", serde_json::to_string(&val).unwrap_or_default());
+                            println!("{}", result);
                         }
                     } else {
                         println!("{}", result);
@@ -647,10 +644,7 @@ fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
 fn print_package_info(info: &PackageInfo, ecosystem: &str, format: &OutputFormat) {
     match format {
         OutputFormat::Compact | OutputFormat::Pretty { .. } => print_human(info, ecosystem),
-        OutputFormat::Json
-        | OutputFormat::JsonLines
-        | OutputFormat::Jq(_)
-        | OutputFormat::JqJsonLines(_) => {
+        OutputFormat::Json | OutputFormat::JsonLines | OutputFormat::Jq { .. } => {
             let value = serde_json::to_value(info).unwrap_or_default();
             print_json_value(&value, format);
         }
