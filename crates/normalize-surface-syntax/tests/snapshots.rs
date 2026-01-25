@@ -190,6 +190,26 @@ mod lua_reader {
     fn anonymous_function() {
         insta::assert_json_snapshot!(parse("local add = function(a, b) return a + b end"));
     }
+
+    #[test]
+    fn varargs_function() {
+        insta::assert_json_snapshot!(parse("function foo(...) return ... end"));
+    }
+
+    #[test]
+    fn multiple_return() {
+        insta::assert_json_snapshot!(parse("function swap(a, b) return b, a end"));
+    }
+
+    #[test]
+    fn repeat_until() {
+        insta::assert_json_snapshot!(parse("repeat x = x + 1 until x > 10"));
+    }
+
+    #[test]
+    fn generic_for() {
+        insta::assert_json_snapshot!(parse("for k, v in pairs(t) do print(k, v) end"));
+    }
 }
 
 // ============================================================================

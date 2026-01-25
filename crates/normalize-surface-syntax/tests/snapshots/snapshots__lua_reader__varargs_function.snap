@@ -1,0 +1,23 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "parse(\"function foo(...) return ... end\")"
+---
+{
+  "body": [
+    {
+      "Function": {
+        "name": "foo",
+        "params": [
+          "..."
+        ],
+        "body": [
+          {
+            "Return": {
+              "Ident": "..."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "parse(\"for k, v in pairs(t) do print(k, v) end\")"
+---
+{
+  "body": [
+    {
+      "ForIn": {
+        "variable": "k",
+        "iterable": {
+          "Call": {
+            "callee": {
+              "Ident": "pairs"
+            },
+            "args": [
+              {
+                "Ident": "t"
+              }
+            ]
+          }
+        },
+        "body": {
+          "Block": [
+            {
+              "Expr": {
+                "Call": {
+                  "callee": {
+                    "Ident": "print"
+                  },
+                  "args": [
+                    {
+                      "Ident": "k"
+                    },
+                    {
+                      "Ident": "v"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

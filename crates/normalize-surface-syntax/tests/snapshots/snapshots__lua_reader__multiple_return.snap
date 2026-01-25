@@ -1,0 +1,31 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "parse(\"function swap(a, b) return b, a end\")"
+---
+{
+  "body": [
+    {
+      "Function": {
+        "name": "swap",
+        "params": [
+          "a",
+          "b"
+        ],
+        "body": [
+          {
+            "Return": {
+              "Array": [
+                {
+                  "Ident": "b"
+                },
+                {
+                  "Ident": "a"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

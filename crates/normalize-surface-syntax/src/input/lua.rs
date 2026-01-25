@@ -75,8 +75,8 @@ impl<'a> ReadContext<'a> {
 
     fn read_stmt(&self, node: Node) -> Result<Option<Stmt>, ReadError> {
         match node.kind() {
-            // Comments
-            "comment" => Ok(None),
+            // Skip comments and goto/labels (no IR equivalent)
+            "comment" | "goto_statement" | "label_statement" => Ok(None),
 
             // Variable declarations (Lua grammar: variable_declaration contains local + assignment)
             "variable_declaration" => self.read_local_variable_declaration(node).map(Some),
@@ -137,6 +137,9 @@ impl<'a> ReadContext<'a> {
 
             // Method calls (obj:method(args))
             "method_index_expression" => self.read_method_index(node),
+
+            // Varargs expression
+            "vararg_expression" => Ok(Expr::ident("...")),
 
             kind => Err(ReadError::Unsupported(format!(
                 "expression type '{}': {}",
@@ -783,14 +786,18 @@ impl<'a> ReadContext<'a> {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             if child.kind() == "expression_list" {
+                let mut values = Vec::new();
                 let mut inner_cursor = child.walk();
                 for expr_node in child.children(&mut inner_cursor) {
                     if expr_node.is_named() {
-                        // Return first value (multiple return values not directly supported in IR)
-                        let value = self.read_expr(expr_node)?;
-                        return Ok(Stmt::return_stmt(Some(value)));
+                        values.push(self.read_expr(expr_node)?);
                     }
                 }
+                return match values.len() {
+                    0 => Ok(Stmt::return_stmt(None)),
+                    1 => Ok(Stmt::return_stmt(Some(values.remove(0)))),
+                    _ => Ok(Stmt::return_stmt(Some(Expr::array(values)))),
+                };
             } else if child.is_named() && child.kind() != "return" {
                 let value = self.read_expr(child)?;
                 return Ok(Stmt::return_stmt(Some(value)));
@@ -930,6 +937,66 @@ mod tests {
                 assert_eq!(pairs.len(), 2);
             }
             _ => panic!("expected Object"),
+        }
+    }
+
+    #[test]
+    fn test_varargs_expression() {
+        let program = read_lua("function foo(...) return ... end").unwrap();
+        match &program.body[0] {
+            Stmt::Function(f) => {
+                assert_eq!(f.params, vec!["..."]);
+                match &f.body[0] {
+                    Stmt::Return(Some(Expr::Ident(name))) => {
+                        assert_eq!(name, "...");
+                    }
+                    _ => panic!("expected Return with vararg ident"),
+                }
+            }
+            _ => panic!("expected Function"),
+        }
+    }
+
+    #[test]
+    fn test_multiple_return() {
+        let program = read_lua("function swap(a, b) return b, a end").unwrap();
+        match &program.body[0] {
+            Stmt::Function(f) => match &f.body[0] {
+                Stmt::Return(Some(Expr::Array(items))) => {
+                    assert_eq!(items.len(), 2);
+                }
+                _ => panic!("expected Return with array"),
+            },
+            _ => panic!("expected Function"),
+        }
+    }
+
+    #[test]
+    fn test_repeat_until() {
+        let program = read_lua("repeat x = x + 1 until x > 10").unwrap();
+        match &program.body[0] {
+            Stmt::While { test, body } => {
+                // repeat-until becomes while(true) { body; if(cond) break }
+                assert!(matches!(test, Expr::Literal(Literal::Bool(true))));
+                match body.as_ref() {
+                    Stmt::Block(stmts) => {
+                        assert!(stmts.len() >= 2); // body + break-if
+                    }
+                    _ => panic!("expected Block body"),
+                }
+            }
+            _ => panic!("expected While"),
+        }
+    }
+
+    #[test]
+    fn test_goto_label_skipped() {
+        let program = read_lua("::start::\nprint('hello')\ngoto start").unwrap();
+        // goto and labels are skipped, only the print call remains
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Expr(Expr::Call { .. }) => {}
+            _ => panic!("expected Call"),
         }
     }
 }

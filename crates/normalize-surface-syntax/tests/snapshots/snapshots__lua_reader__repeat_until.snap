@@ -1,0 +1,62 @@
+---
+source: crates/normalize-surface-syntax/tests/snapshots.rs
+expression: "parse(\"repeat x = x + 1 until x > 10\")"
+---
+{
+  "body": [
+    {
+      "While": {
+        "test": {
+          "Literal": {
+            "Bool": true
+          }
+        },
+        "body": {
+          "Block": [
+            {
+              "Expr": {
+                "Assign": {
+                  "target": {
+                    "Ident": "x"
+                  },
+                  "value": {
+                    "Binary": {
+                      "left": {
+                        "Ident": "x"
+                      },
+                      "op": "Add",
+                      "right": {
+                        "Literal": {
+                          "Number": 1.0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "If": {
+                "test": {
+                  "Binary": {
+                    "left": {
+                      "Ident": "x"
+                    },
+                    "op": "Gt",
+                    "right": {
+                      "Literal": {
+                        "Number": 10.0
+                      }
+                    }
+                  }
+                },
+                "consequent": "Break",
+                "alternate": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
