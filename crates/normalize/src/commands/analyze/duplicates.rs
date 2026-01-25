@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 /// A group of duplicate functions
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct DuplicateFunctionGroup {
     #[serde(serialize_with = "serialize_hash")]
     hash: u64,
@@ -27,7 +27,7 @@ where
 }
 
 /// Location of a duplicate function instance
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct DuplicateFunctionLocation {
     file: String,
     symbol: String,
@@ -36,7 +36,7 @@ struct DuplicateFunctionLocation {
 }
 
 /// Duplicate functions analysis report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct DuplicateFunctionsReport {
     files_scanned: usize,
     functions_hashed: usize,
@@ -110,7 +110,7 @@ impl OutputFormatter for DuplicateFunctionsReport {
 }
 
 /// Type information
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 struct TypeInfo {
     file: String,
     name: String,
@@ -119,7 +119,7 @@ struct TypeInfo {
 }
 
 /// A pair of duplicate types
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct DuplicatePair {
     type1: TypeInfo,
     type2: TypeInfo,
@@ -128,7 +128,7 @@ struct DuplicatePair {
 }
 
 /// Duplicate types analysis report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct DuplicateTypesReport {
     files_scanned: usize,
     types_analyzed: usize,
@@ -591,7 +591,8 @@ pub fn cmd_duplicate_functions_with_count(
     };
 
     let config = crate::config::NormalizeConfig::load(root);
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     let exit_code = if group_count == 0 { 0 } else { 1 };
@@ -774,7 +775,8 @@ pub fn cmd_duplicate_types(
     };
 
     let config = crate::config::NormalizeConfig::load(root);
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     if report.duplicates.is_empty() { 0 } else { 1 }

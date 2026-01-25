@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Plan item for serialization
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct PlanListItem {
     name: String,
     title: String,
@@ -15,7 +15,7 @@ struct PlanListItem {
 }
 
 /// Plans list report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct PlansListReport {
     plans: Vec<PlanListItem>,
 }
@@ -260,7 +260,7 @@ pub fn cmd_plans(name: Option<&str>, limit: usize, json: bool) -> i32 {
         let report = PlansListReport { plans: items };
         let config = crate::config::NormalizeConfig::default();
         let format =
-            crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+            crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
         report.print(&format);
         0
     }

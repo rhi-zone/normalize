@@ -13,7 +13,7 @@ use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 
 /// Tool info for lint list output
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ToolListItem {
     pub name: String,
     pub category: String,
@@ -24,7 +24,7 @@ pub struct ToolListItem {
 }
 
 /// Result of lint list command
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct LintListResult {
     pub tools: Vec<ToolListItem>,
 }

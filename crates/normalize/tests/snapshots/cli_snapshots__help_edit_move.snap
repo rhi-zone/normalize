@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 143
 expression: "snapshot_help(&[\"edit\", \"move\"])"
 ---
 Move target to a new location
@@ -43,6 +44,9 @@ Options:
       --json
           Output as JSON
 
+      --jsonl
+          Output as JSON Lines (one object per line)
+
       --jq <EXPR>
           Filter JSON output with jq expression (implies --json)
 
@@ -51,6 +55,15 @@ Options:
 
       --compact
           Compact output without colors (overrides TTY detection)
+
+      --output-schema
+          Output JSON schema for the command's return type
+
+      --input-schema
+          Output JSON schema for the command's input arguments
+
+      --params-json <JSON>
+          Pass command arguments as JSON (overrides CLI args)
 
   -h, --help
           Print help (see a summary with '-h')

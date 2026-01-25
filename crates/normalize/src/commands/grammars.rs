@@ -8,7 +8,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 /// Grammar list report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct GrammarListReport {
     grammars: Vec<String>,
 }
@@ -33,7 +33,7 @@ impl OutputFormatter for GrammarListReport {
 }
 
 /// Grammar path item
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct GrammarPath {
     source: String,
     path: String,
@@ -41,7 +41,7 @@ struct GrammarPath {
 }
 
 /// Grammar paths report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct GrammarPathsReport {
     paths: Vec<GrammarPath>,
 }
@@ -91,7 +91,8 @@ fn cmd_list(json: bool) -> i32 {
 
     let report = GrammarListReport { grammars };
     let config = crate::config::NormalizeConfig::default();
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     0
@@ -125,7 +126,8 @@ fn cmd_paths(json: bool) -> i32 {
 
     let report = GrammarPathsReport { paths };
     let config = crate::config::NormalizeConfig::default();
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     0

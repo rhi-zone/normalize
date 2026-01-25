@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 433
 expression: "snapshot_help(&[\"rules\", \"list\"])"
 ---
 List installed rules
@@ -7,9 +8,13 @@ List installed rules
 Usage: normalize rules list [OPTIONS]
 
 Options:
-      --sources    Show source URLs for imported rules
-      --json       Output as JSON
-      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
-      --pretty     Human-friendly output with colors and formatting
-      --compact    Compact output without colors (overrides TTY detection)
-  -h, --help       Print help
+      --sources             Show source URLs for imported rules
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

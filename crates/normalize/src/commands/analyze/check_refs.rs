@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::path::Path;
 
 /// A broken reference found in documentation
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 struct BrokenRef {
     file: String,
     line: usize,
@@ -15,7 +15,7 @@ struct BrokenRef {
 }
 
 /// Documentation reference check report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct CheckRefsReport {
     broken_refs: Vec<BrokenRef>,
     files_checked: usize,
@@ -96,7 +96,7 @@ async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
         };
         let config = crate::config::NormalizeConfig::load(root);
         let format =
-            crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+            crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
         report.print(&format);
         return 0;
     }
@@ -157,7 +157,8 @@ async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
         symbols_indexed: all_symbols.len(),
     };
     let config = crate::config::NormalizeConfig::load(root);
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     if broken_refs.is_empty() { 0 } else { 1 }

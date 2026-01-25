@@ -28,6 +28,10 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
 
+    /// Output as JSON Lines (one object per line)
+    #[arg(long, global = true)]
+    jsonl: bool,
+
     /// Filter JSON output with jq expression (implies --json)
     #[arg(long, global = true, value_name = "EXPR")]
     jq: Option<String>,
@@ -39,6 +43,18 @@ struct Cli {
     /// Compact output without colors (overrides TTY detection)
     #[arg(long, global = true, conflicts_with = "pretty")]
     compact: bool,
+
+    /// Output JSON schema for the command's return type
+    #[arg(long, global = true)]
+    output_schema: bool,
+
+    /// Output JSON schema for the command's input arguments
+    #[arg(long, global = true)]
+    input_schema: bool,
+
+    /// Pass command arguments as JSON (overrides CLI args)
+    #[arg(long, global = true, value_name = "JSON")]
+    params_json: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -227,6 +243,7 @@ fn main() {
     let config = normalize::config::NormalizeConfig::load(Path::new("."));
     let format = normalize::output::OutputFormat::from_cli(
         cli.json,
+        cli.jsonl,
         cli.jq.as_deref(),
         cli.pretty,
         cli.compact,
@@ -245,9 +262,27 @@ fn main() {
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
         Commands::Analyze(args) => commands::analyze::run(args, format),
-        Commands::Aliases(args) => commands::aliases::run(args, cli.json),
+        Commands::Aliases(args) => {
+            if cli.input_schema {
+                commands::aliases::print_input_schema();
+                0
+            } else {
+                // Override args with --params-json if provided
+                let args = match cli.params_json.as_ref() {
+                    Some(json) => match serde_json::from_str(json) {
+                        Ok(parsed) => parsed,
+                        Err(e) => {
+                            eprintln!("error: invalid --params-json: {}", e);
+                            std::process::exit(1);
+                        }
+                    },
+                    None => args,
+                };
+                commands::aliases::run(args, format, cli.output_schema)
+            }
+        }
         Commands::Context(args) => commands::context::run(args, format),
-        Commands::TextSearch(args) => commands::text_search::run(args, format),
+        Commands::TextSearch(args) => commands::text_search::run(args, format, cli.output_schema),
         Commands::Sessions(args) => commands::sessions::run(args, cli.json, cli.pretty),
         Commands::Package {
             action,

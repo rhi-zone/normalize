@@ -58,10 +58,15 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--allow` semantics: reviewed - intentional (different analysis types need different allowlist formats: patterns for files/hotspots, locations for duplicate-functions, pairs for duplicate-types; help text documents each)
 - [x] `--type` vs `--kind`: standardized to `--kind` (view now uses `--kind` like analyze complexity)
 
-**Future:**
-- `--output-schema`: output JSON schema for command's `--json` return type (enables tooling, validation)
-- `--input-schema`: output JSON schema for CLI flags (alternative input via JSON for programmatic use)
-- `--jsonl`: add to applicable commands (where output is naturally a stream of records)
+**Programmatic CLI Interface (in progress):**
+- [x] `--jsonl`: JSON Lines output (arrays emit one object per line, scalars emit single line)
+- [x] `--output-schema`: output JSON schema for command's return type
+- [x] `--input-schema`: output JSON schema for command's input arguments
+- [x] `--params-json`: pass command arguments as JSON (overrides CLI flags)
+- [x] Core infrastructure: `OutputFormatter` requires `JsonSchema`, all output types derive it
+- [ ] Wire up `--output-schema` for remaining commands (currently: aliases, text-search)
+- [ ] Wire up `--input-schema` + `--params-json` for remaining commands (currently: aliases)
+- [ ] Support `--jsonl` + `--jq` combination (apply jq filter, then emit results as jsonl)
 
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions

@@ -11,7 +11,7 @@ use std::path::Path;
 use tree_sitter;
 
 /// Risk classification based on McCabe cyclomatic complexity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub enum RiskLevel {
     /// 1-5: Simple, easy to test
     Low,
@@ -44,7 +44,7 @@ impl RiskLevel {
 }
 
 /// Complexity data for a function
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FunctionComplexity {
     pub name: String,
     pub complexity: usize,

@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 164
 expression: "snapshot_help(&[\"index\", \"files\"])"
 ---
 List indexed files (with optional prefix filter)
@@ -10,10 +11,14 @@ Arguments:
   [PREFIX]  Filter files by prefix
 
 Options:
-  -l, --limit <LIMIT>  Maximum number of files to show [default: 100]
-  -r, --root <ROOT>    Root directory (defaults to current directory)
-      --json           Output as JSON
-      --jq <EXPR>      Filter JSON output with jq expression (implies --json)
-      --pretty         Human-friendly output with colors and formatting
-      --compact        Compact output without colors (overrides TTY detection)
-  -h, --help           Print help
+  -l, --limit <LIMIT>       Maximum number of files to show [default: 100]
+  -r, --root <ROOT>         Root directory (defaults to current directory)
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

@@ -1,20 +1,80 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 412
 expression: "snapshot_help(&[\"generate\", \"types\"])"
 ---
-Generate types from JSON Schema (legacy)
+Generate types/validators from schema
 
-Usage: normalize generate types [OPTIONS] --lang <LANG> <SCHEMA>
+Usage: normalize generate types [OPTIONS] --backend <BACKEND> <INPUT>
 
 Arguments:
-  <SCHEMA>  JSON Schema file
+  <INPUT>
+          Input schema file (JSON Schema or OpenAPI), use - for stdin
 
 Options:
-  -n, --name <NAME>      Root type name [default: Root]
-  -l, --lang <LANG>      Target language: typescript, python, rust
-  -o, --output <OUTPUT>  Output file (stdout if not specified)
-      --json             Output as JSON
-      --jq <EXPR>        Filter JSON output with jq expression (implies --json)
-      --pretty           Human-friendly output with colors and formatting
-      --compact          Compact output without colors (overrides TTY detection)
-  -h, --help             Print help
+  -f, --format <FORMAT>
+          Input format
+
+          Possible values:
+          - auto:        Auto-detect from file content
+          - json-schema: JSON Schema
+          - open-api:    OpenAPI 3.x
+          - typescript:  TypeScript source (extract type definitions)
+          
+          [default: auto]
+
+  -b, --backend <BACKEND>
+          Output backend
+
+          Possible values:
+          - typescript: TypeScript interfaces/types
+          - zod:        Zod schemas (TypeScript)
+          - valibot:    Valibot schemas (TypeScript)
+          - python:     Python dataclasses
+          - pydantic:   Pydantic models
+          - go:         Go structs
+          - rust:       Rust structs with serde
+
+  -o, --output <OUTPUT>
+          Output file (stdout if not specified)
+
+      --export
+          Export all types (add 'export' keyword)
+
+      --infer-types
+          Generate type inference (for Zod/Valibot)
+
+      --readonly
+          Make types readonly/frozen
+
+      --package <PACKAGE>
+          Package name (for Go)
+          
+          [default: types]
+
+      --json
+          Output as JSON
+
+      --jsonl
+          Output as JSON Lines (one object per line)
+
+      --jq <EXPR>
+          Filter JSON output with jq expression (implies --json)
+
+      --pretty
+          Human-friendly output with colors and formatting
+
+      --compact
+          Compact output without colors (overrides TTY detection)
+
+      --output-schema
+          Output JSON schema for the command's return type
+
+      --input-schema
+          Output JSON schema for the command's input arguments
+
+      --params-json <JSON>
+          Pass command arguments as JSON (overrides CLI args)
+
+  -h, --help
+          Print help (see a summary with '-h')

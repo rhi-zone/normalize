@@ -30,7 +30,7 @@ pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool, prett
 
     let config = crate::config::NormalizeConfig::default();
     let output_format =
-        crate::output::OutputFormat::from_cli(json, None, false, pretty, &config.pretty);
+        crate::output::OutputFormat::from_cli(json, false, None, false, pretty, &config.pretty);
     analysis.print(&output_format);
     0
 }
@@ -122,7 +122,7 @@ pub fn cmd_sessions_analyze_multi(
 
     let config = crate::config::NormalizeConfig::default();
     let output_format =
-        crate::output::OutputFormat::from_cli(json, None, false, pretty, &config.pretty);
+        crate::output::OutputFormat::from_cli(json, false, None, false, pretty, &config.pretty);
     aggregate.print(&output_format);
 
     0

@@ -8,7 +8,7 @@ use crate::output::OutputFormatter;
 use serde::Serialize;
 
 /// A public function analyzed for test coverage gaps.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FunctionTestGap {
     /// Function name
     pub name: String,
@@ -67,7 +67,7 @@ pub fn compute_risk(complexity: usize, caller_count: usize, loc: usize) -> f64 {
 }
 
 /// De-prioritization categories for lower-risk untested functions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub enum DePriorityReason {
     /// new, default, from, from_str, try_from
     Constructor,
@@ -116,7 +116,7 @@ pub fn check_de_priority(
 }
 
 /// Full report for test gaps analysis.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct TestGapsReport {
     /// Functions analyzed (sorted by risk desc for untested, then test count asc)
     pub functions: Vec<FunctionTestGap>,

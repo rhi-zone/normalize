@@ -11,8 +11,8 @@ pub use complexity::FunctionComplexity;
 pub use function_length::FunctionLength;
 
 /// Generic report for file-level analysis (shared by complexity and length).
-#[derive(Debug, Serialize)]
-pub struct FileReport<T: Serialize> {
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct FileReport<T: Serialize + schemars::JsonSchema> {
     pub functions: Vec<T>,
     pub file_path: String,
     /// Stats computed before limit was applied (for accurate reporting when limited).
@@ -21,7 +21,7 @@ pub struct FileReport<T: Serialize> {
 }
 
 /// Statistics computed on the full result set before limiting.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FullStats {
     pub total_count: usize,
     pub total_avg: f64,

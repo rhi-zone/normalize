@@ -87,6 +87,8 @@ pub enum OutputFormat {
     Pretty { colors: bool },
     /// JSON output.
     Json,
+    /// JSON Lines output (one JSON object per line, arrays emit each element).
+    JsonLines,
     /// JSON filtered through jq expression.
     Jq(String),
 }
@@ -95,6 +97,7 @@ impl OutputFormat {
     /// Create from CLI flags and config (fully resolved).
     pub fn from_cli(
         json: bool,
+        jsonl: bool,
         jq: Option<&str>,
         pretty: bool,
         compact: bool,
@@ -103,6 +106,9 @@ impl OutputFormat {
         // JSON modes take precedence
         if let Some(filter) = jq {
             return OutputFormat::Jq(filter.to_string());
+        }
+        if jsonl {
+            return OutputFormat::JsonLines;
         }
         if json {
             return OutputFormat::Json;
@@ -137,7 +143,10 @@ impl OutputFormat {
 
     /// Is this a JSON-based format?
     pub fn is_json(&self) -> bool {
-        matches!(self, OutputFormat::Json | OutputFormat::Jq(_))
+        matches!(
+            self,
+            OutputFormat::Json | OutputFormat::JsonLines | OutputFormat::Jq(_)
+        )
     }
 
     /// Is this pretty mode?
@@ -155,7 +164,8 @@ impl OutputFormat {
 ///
 /// Types implementing this trait can be printed as either JSON or text.
 /// JSON serialization uses serde, while text formatting is custom.
-pub trait OutputFormatter: Serialize {
+/// Schema generation uses schemars for `--output-schema` support.
+pub trait OutputFormatter: Serialize + schemars::JsonSchema {
     /// Format as minimal text (LLM-optimized, default).
     fn format_text(&self) -> String;
 
@@ -173,6 +183,10 @@ pub trait OutputFormatter: Serialize {
             OutputFormat::Json => {
                 println!("{}", serde_json::to_string(self).unwrap_or_default())
             }
+            OutputFormat::JsonLines => {
+                let json = serde_json::to_value(self).unwrap_or_default();
+                print_jsonl(&json);
+            }
             OutputFormat::Jq(filter) => {
                 let json = serde_json::to_value(self).unwrap_or_default();
                 match apply_jq(&json, filter) {
@@ -188,6 +202,28 @@ pub trait OutputFormatter: Serialize {
             }
         }
     }
+}
+
+/// Print JSON value as JSON Lines (one object per line).
+/// Arrays emit each element as a separate line, other values emit as single line.
+fn print_jsonl(value: &serde_json::Value) {
+    if let serde_json::Value::Array(arr) = value {
+        for item in arr {
+            println!("{}", serde_json::to_string(item).unwrap_or_default());
+        }
+    } else {
+        println!("{}", serde_json::to_string(value).unwrap_or_default());
+    }
+}
+
+/// Print JSON schema for a type implementing OutputFormatter.
+/// Use this for `--output-schema` flag handling.
+pub fn print_output_schema<T: OutputFormatter>() {
+    let schema = schemars::schema_for!(T);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
 }
 
 /// Apply a jq filter to a JSON value.
@@ -232,7 +268,7 @@ pub fn apply_jq(value: &serde_json::Value, filter: &str) -> Result<Vec<String>, 
 mod tests {
     use super::*;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     #[allow(dead_code)]
     struct TestOutput {
         name: String,
@@ -250,21 +286,30 @@ mod tests {
         let config = PrettyConfig::default();
         // compact=true overrides auto
         assert_eq!(
-            OutputFormat::from_cli(false, None, false, true, &config),
+            OutputFormat::from_cli(false, false, None, false, true, &config),
             OutputFormat::Compact
         );
         assert_eq!(
-            OutputFormat::from_cli(true, None, false, false, &config),
+            OutputFormat::from_cli(true, false, None, false, false, &config),
             OutputFormat::Json
         );
         assert_eq!(
-            OutputFormat::from_cli(false, Some(".name"), false, false, &config),
+            OutputFormat::from_cli(false, true, None, false, false, &config),
+            OutputFormat::JsonLines
+        );
+        assert_eq!(
+            OutputFormat::from_cli(false, false, Some(".name"), false, false, &config),
             OutputFormat::Jq(".name".to_string())
         );
-        // jq takes precedence over json
+        // jq takes precedence over json and jsonl
         assert_eq!(
-            OutputFormat::from_cli(true, Some(".name"), false, false, &config),
+            OutputFormat::from_cli(true, true, Some(".name"), false, false, &config),
             OutputFormat::Jq(".name".to_string())
+        );
+        // jsonl takes precedence over json
+        assert_eq!(
+            OutputFormat::from_cli(true, true, None, false, false, &config),
+            OutputFormat::JsonLines
         );
     }
 

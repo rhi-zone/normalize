@@ -7,7 +7,7 @@ use normalize_languages::{Language, support_for_path};
 use serde::Serialize;
 use std::path::Path;
 /// Length classification for functions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub enum LengthCategory {
     /// 1-20 lines: concise
     Short,
@@ -37,7 +37,7 @@ impl LengthCategory {
     }
 }
 /// Function length data.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FunctionLength {
     pub name: String,
     pub lines: usize,

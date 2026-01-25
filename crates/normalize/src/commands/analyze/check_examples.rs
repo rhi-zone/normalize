@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::path::Path;
 
 /// A missing example reference
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct MissingExample {
     doc_file: String,
     line: usize,
@@ -13,7 +13,7 @@ struct MissingExample {
 }
 
 /// Example references check report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct CheckExamplesReport {
     defined_examples: usize,
     references_found: usize,
@@ -173,7 +173,8 @@ pub fn cmd_check_examples(root: &Path, json: bool) -> i32 {
         missing,
     };
     let config = crate::config::NormalizeConfig::load(root);
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     if report.missing.is_empty() { 0 } else { 1 }

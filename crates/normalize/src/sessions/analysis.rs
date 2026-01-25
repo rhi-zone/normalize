@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Statistics for a single tool.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct ToolStats {
     pub name: String,
     pub calls: usize,
@@ -37,7 +37,7 @@ impl ToolStats {
 }
 
 /// Token usage statistics.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct TokenStats {
     pub total_input: u64,
     pub total_output: u64,
@@ -111,7 +111,7 @@ impl ModelPricing {
 }
 
 /// Cost breakdown for a session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct CostBreakdown {
     pub model: &'static str,
     pub input_cost: f64,
@@ -142,7 +142,7 @@ impl TokenStats {
 }
 
 /// A recurring error pattern.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct ErrorPattern {
     pub category: String,
     pub count: usize,
@@ -160,7 +160,7 @@ impl ErrorPattern {
 }
 
 /// A sequence of consecutive single-tool calls (potential parallelization).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct ToolChain {
     pub tools: Vec<String>,
     pub turn_range: (usize, usize),
@@ -192,7 +192,7 @@ impl ToolChain {
 }
 
 /// Type of correction made by the assistant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CorrectionType {
     Apology,
@@ -213,7 +213,7 @@ impl CorrectionType {
 }
 
 /// An assistant correction or apology.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct Correction {
     pub turn: usize,
     pub text: String,
@@ -221,7 +221,7 @@ pub struct Correction {
 }
 
 /// File operation statistics.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct FileOperation {
     pub path: String,
     pub reads: usize,
@@ -236,7 +236,7 @@ impl FileOperation {
 }
 
 /// A common tool pattern across sessions.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct ToolPattern {
     pub tools: Vec<String>,
     pub occurrences: usize,
@@ -249,7 +249,7 @@ impl ToolPattern {
 }
 
 /// Complete analysis of a session.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct SessionAnalysis {
     pub session_path: PathBuf,
     pub format: String,

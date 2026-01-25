@@ -9,7 +9,7 @@ use crate::filter::{AliasStatus, list_aliases};
 use crate::output::OutputFormatter;
 
 /// Alias for serialization
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct AliasItem {
     name: String,
     patterns: Vec<String>,
@@ -17,7 +17,7 @@ struct AliasItem {
 }
 
 /// Aliases report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct AliasesReport {
     aliases: Vec<AliasItem>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -70,23 +70,36 @@ impl OutputFormatter for AliasesReport {
 }
 
 /// Aliases command arguments
-#[derive(Args)]
+#[derive(Args, serde::Deserialize, schemars::JsonSchema)]
 pub struct AliasesArgs {
     /// Root directory (defaults to current directory)
     #[arg(short, long)]
     pub root: Option<PathBuf>,
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(AliasesArgs);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run the aliases command
-pub fn run(args: AliasesArgs, json: bool) -> i32 {
+pub fn run(args: AliasesArgs, format: crate::output::OutputFormat, output_schema: bool) -> i32 {
+    if output_schema {
+        crate::output::print_output_schema::<AliasesReport>();
+        return 0;
+    }
     let root = args
         .root
         .unwrap_or_else(|| std::env::current_dir().unwrap());
-    cmd_aliases(&root, json)
+    cmd_aliases(&root, format)
 }
 
 /// List available filter aliases.
-fn cmd_aliases(root: &Path, json: bool) -> i32 {
+fn cmd_aliases(root: &Path, format: crate::output::OutputFormat) -> i32 {
     let config = NormalizeConfig::load(root);
 
     // Detect languages in the project
@@ -115,7 +128,6 @@ fn cmd_aliases(root: &Path, json: bool) -> i32 {
         detected_languages: languages,
     };
 
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
     report.print(&format);
 
     0

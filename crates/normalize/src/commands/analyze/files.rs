@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// File length info
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FileLength {
     pub path: String,
     pub lines: usize,
@@ -17,7 +17,7 @@ pub struct FileLength {
 }
 
 /// File length report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct FileLengthReport {
     pub files: Vec<FileLength>,
     pub total_lines: usize,
@@ -65,7 +65,7 @@ pub fn cmd_files(root: &Path, limit: usize, exclude: &[String], json: bool) -> i
     let config = crate::config::NormalizeConfig::load(root);
     let report = analyze_files(root, limit, exclude);
 
-    let format = OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format = OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     0

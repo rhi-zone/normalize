@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 112
 expression: "snapshot_help(&[\"generate\"])"
 ---
 Generate code from API spec
@@ -7,15 +8,18 @@ Generate code from API spec
 Usage: normalize generate [OPTIONS] <COMMAND>
 
 Commands:
-  client        Generate API client from OpenAPI spec (legacy)
-  types         Generate types from JSON Schema (legacy)
+  client        Generate API client from OpenAPI spec
+  types         Generate types/validators from schema
   cli-snapshot  Generate CLI snapshot tests for a binary
-  typegen       Generate types/validators from schema (new IR-based)
   help          Print this message or the help of the given subcommand(s)
 
 Options:
-      --json       Output as JSON
-      --jq <EXPR>  Filter JSON output with jq expression (implies --json)
-      --pretty     Human-friendly output with colors and formatting
-      --compact    Compact output without colors (overrides TTY detection)
-  -h, --help       Print help
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

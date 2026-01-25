@@ -346,6 +346,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
                 let format = crate::output::OutputFormat::from_cli(
                     json,
+                    false,
                     None,
                     pretty,
                     false,
@@ -401,6 +402,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
                 let format = crate::output::OutputFormat::from_cli(
                     json,
+                    false,
                     None,
                     pretty,
                     false,
@@ -605,8 +607,14 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 &allowlist,
             );
 
-            let format =
-                crate::output::OutputFormat::from_cli(json, None, pretty, false, &config.pretty);
+            let format = crate::output::OutputFormat::from_cli(
+                json,
+                false,
+                None,
+                pretty,
+                false,
+                &config.pretty,
+            );
             report.print(&format);
             0
         }
@@ -850,7 +858,7 @@ fn print_report(report: &report::AnalyzeReport, json: bool, pretty: bool) -> i32
     use crate::output::OutputFormat;
 
     let config = crate::config::NormalizeConfig::load(std::env::current_dir().unwrap().as_path());
-    let format = OutputFormat::from_cli(json, None, pretty, false, &config.pretty);
+    let format = OutputFormat::from_cli(json, false, None, pretty, false, &config.pretty);
     report.print(&format);
     0
 }
@@ -887,7 +895,8 @@ fn run_all_passes(
     }
 
     let config = crate::config::NormalizeConfig::load(root);
-    let format = crate::output::OutputFormat::from_cli(json, None, pretty, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, pretty, false, &config.pretty);
     report.print(&format);
 
     // 2. Duplicate functions

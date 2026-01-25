@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 364
 expression: "snapshot_help(&[\"package\", \"why\"])"
 ---
 Show why a dependency is in the tree
@@ -13,7 +14,11 @@ Options:
   -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)
   -r, --root <ROOT>            Root directory (defaults to current directory)
       --json                   Output as JSON
+      --jsonl                  Output as JSON Lines (one object per line)
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)
       --pretty                 Human-friendly output with colors and formatting
       --compact                Compact output without colors (overrides TTY detection)
+      --output-schema          Output JSON schema for the command's return type
+      --input-schema           Output JSON schema for the command's input arguments
+      --params-json <JSON>     Pass command arguments as JSON (overrides CLI args)
   -h, --help                   Print help

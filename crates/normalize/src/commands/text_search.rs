@@ -61,7 +61,11 @@ pub struct TextSearchArgs {
 }
 
 /// Run text-search command with args.
-pub fn run(args: TextSearchArgs, format: crate::output::OutputFormat) -> i32 {
+pub fn run(args: TextSearchArgs, format: crate::output::OutputFormat, output_schema: bool) -> i32 {
+    if output_schema {
+        crate::output::print_output_schema::<text_search::GrepResult>();
+        return 0;
+    }
     let effective_root = args
         .root
         .clone()

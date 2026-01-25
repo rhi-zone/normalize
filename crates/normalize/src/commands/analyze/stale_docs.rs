@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::path::Path;
 
 /// A doc file with stale code coverage
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct StaleDoc {
     doc_path: String,
     doc_modified: u64,
@@ -13,7 +13,7 @@ struct StaleDoc {
 }
 
 /// A stale coverage declaration
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct StaleCover {
     pattern: String,
     code_modified: u64,
@@ -21,7 +21,7 @@ struct StaleCover {
 }
 
 /// Stale docs analysis report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct StaleDocsReport {
     stale_docs: Vec<StaleDoc>,
     files_checked: usize,
@@ -88,7 +88,7 @@ pub fn cmd_stale_docs(root: &Path, json: bool) -> i32 {
         };
         let config = crate::config::NormalizeConfig::load(root);
         let format =
-            crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+            crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
         report.print(&format);
         return 0;
     }
@@ -179,7 +179,8 @@ pub fn cmd_stale_docs(root: &Path, json: bool) -> i32 {
         files_with_covers,
     };
     let config = crate::config::NormalizeConfig::load(root);
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     if report.stale_docs.is_empty() { 0 } else { 1 }

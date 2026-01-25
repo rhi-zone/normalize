@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 /// A session in the list
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct SessionListItem {
     id: String,
     path: PathBuf,
@@ -15,7 +15,7 @@ struct SessionListItem {
 }
 
 /// Session list report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct SessionListReport {
     sessions: Vec<SessionListItem>,
 }
@@ -96,7 +96,8 @@ pub fn cmd_sessions_list(
 
     let report = SessionListReport { sessions: items };
     let config = crate::config::NormalizeConfig::default();
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     0

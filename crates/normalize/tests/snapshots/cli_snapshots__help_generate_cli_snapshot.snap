@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 417
 expression: "snapshot_help(&[\"generate\", \"cli-snapshot\"])"
 ---
 Generate CLI snapshot tests for a binary
@@ -10,10 +11,14 @@ Arguments:
   <BINARY>  Path to the CLI binary
 
 Options:
-  -o, --output <OUTPUT>  Output file for the test (stdout if not specified)
-      --name <NAME>      Binary name to use in test (defaults to file stem)
-      --json             Output as JSON
-      --jq <EXPR>        Filter JSON output with jq expression (implies --json)
-      --pretty           Human-friendly output with colors and formatting
-      --compact          Compact output without colors (overrides TTY detection)
-  -h, --help             Print help
+  -o, --output <OUTPUT>     Output file for the test (stdout if not specified)
+      --name <NAME>         Binary name to use in test (defaults to file stem)
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

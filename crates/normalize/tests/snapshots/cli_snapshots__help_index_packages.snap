@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 169
 expression: "snapshot_help(&[\"index\", \"packages\"])"
 ---
 Index external packages (stdlib, site-packages) into global cache
@@ -7,11 +8,15 @@ Index external packages (stdlib, site-packages) into global cache
 Usage: normalize index packages [OPTIONS]
 
 Options:
-      --only <ONLY>  Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available
-      --clear        Clear existing index before re-indexing
-  -r, --root <ROOT>  Root directory (defaults to current directory)
-      --json         Output as JSON
-      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
-      --pretty       Human-friendly output with colors and formatting
-      --compact      Compact output without colors (overrides TTY detection)
-  -h, --help         Print help
+      --only <ONLY>         Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available
+      --clear               Clear existing index before re-indexing
+  -r, --root <ROOT>         Root directory (defaults to current directory)
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

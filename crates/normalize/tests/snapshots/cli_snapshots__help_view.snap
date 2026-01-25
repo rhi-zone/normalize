@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 32
 expression: "snapshot_help(&[\"view\"])"
 ---
 View a node in the codebase tree (directory, file, or symbol)
@@ -10,27 +11,31 @@ Arguments:
   [TARGET]  Target: path, path/Symbol, Parent/method, file:line, or SymbolName
 
 Options:
-  -r, --root <ROOT>        Root directory (defaults to current directory)
-  -d, --depth <DEPTH>      Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
-  -n, --line-numbers       Show line numbers
-      --deps               Show dependencies (imports/exports)
-  -k, --kind <KIND>        Filter by symbol kind: class, function, method
-      --types-only         Show only type definitions (class, struct, enum, interface, type alias)
-      --tests              Include test functions and test modules (hidden by default)
-      --raw                Disable smart display (no collapsing single-child dirs)
-      --focus[=<MODULE>]   Focus view: show target at high detail, imports at signature level
-      --resolve-imports    Resolve imports: inline signatures of specific imported symbols
-      --full               Show full source code
-      --docs               Show full docstrings
-      --no-parent          Hide parent/ancestor context (shown by default for nested symbols)
-      --context            Context view: skeleton + imports combined
-      --dir-context        Prepend directory context (.context.md files from hierarchy)
-      --exclude <PATTERN>  Exclude paths matching pattern or @alias
-      --only <PATTERN>     Include only paths matching pattern or @alias
-  -i, --case-insensitive   Case-insensitive symbol matching
-      --history [<N>]      Show git history for symbol (last N changes)
-      --json               Output as JSON
-      --jq <EXPR>          Filter JSON output with jq expression (implies --json)
-      --pretty             Human-friendly output with colors and formatting
-      --compact            Compact output without colors (overrides TTY detection)
-  -h, --help               Print help
+  -r, --root <ROOT>         Root directory (defaults to current directory)
+  -d, --depth <DEPTH>       Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
+  -n, --line-numbers        Show line numbers
+      --deps                Show dependencies (imports/exports)
+  -k, --kind <KIND>         Filter by symbol kind: class, function, method
+      --types-only          Show only type definitions (class, struct, enum, interface, type alias)
+      --tests               Include test functions and test modules (hidden by default)
+      --raw                 Disable smart display (no collapsing single-child dirs)
+      --focus[=<MODULE>]    Focus view: show target at high detail, imports at signature level
+      --resolve-imports     Resolve imports: inline signatures of specific imported symbols
+      --full                Show full source code
+      --docs                Show full docstrings
+      --no-parent           Hide parent/ancestor context (shown by default for nested symbols)
+      --context             Context view: skeleton + imports combined
+      --dir-context         Prepend directory context (.context.md files from hierarchy)
+      --exclude <PATTERN>   Exclude paths matching pattern or @alias
+      --only <PATTERN>      Include only paths matching pattern or @alias
+  -i, --case-insensitive    Case-insensitive symbol matching
+      --history [<N>]       Show git history for symbol (last N changes)
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// Doc coverage info for a single file
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FileDocCoverage {
     pub file_path: String,
     pub documented: usize,
@@ -31,7 +31,7 @@ impl FileDocCoverage {
 }
 
 /// Documentation coverage report
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub struct DocCoverageReport {
     pub total_callables: usize,
     pub documented: usize,
@@ -109,7 +109,7 @@ pub fn cmd_docs(root: &Path, limit: usize, json: bool, filter: Option<&Filter>) 
     let exclude_interface_impls = config.analyze.exclude_interface_impls();
     let report = analyze_docs(root, limit, exclude_interface_impls, filter);
 
-    let format = OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format = OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
 
     0

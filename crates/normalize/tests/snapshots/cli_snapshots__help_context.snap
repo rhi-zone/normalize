@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 82
 expression: "snapshot_help(&[\"context\"])"
 ---
 Show directory context (hierarchical .context.md files)
@@ -10,10 +11,14 @@ Arguments:
   [TARGET]  Target path to collect context for [default: .]
 
 Options:
-  -r, --root <ROOT>  Root directory (defaults to current directory)
-      --list         Show only file paths, not content
-      --json         Output as JSON
-      --jq <EXPR>    Filter JSON output with jq expression (implies --json)
-      --pretty       Human-friendly output with colors and formatting
-      --compact      Compact output without colors (overrides TTY detection)
-  -h, --help         Print help
+  -r, --root <ROOT>         Root directory (defaults to current directory)
+      --list                Show only file paths, not content
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

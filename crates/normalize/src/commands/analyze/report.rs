@@ -26,7 +26,7 @@ pub struct Grade {
 }
 
 /// Severity levels for security findings
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Low,
@@ -56,7 +56,7 @@ impl Severity {
 }
 
 /// A security finding from analysis tools
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct SecurityFinding {
     pub file: String,
     pub line: usize,
@@ -67,7 +67,7 @@ pub struct SecurityFinding {
 }
 
 /// Security analysis results
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Serialize, schemars::JsonSchema)]
 pub struct SecurityReport {
     pub findings: Vec<SecurityFinding>,
     pub tools_run: Vec<String>,
@@ -154,7 +154,7 @@ impl OutputFormatter for SecurityReport {
 }
 
 /// Combined analysis report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct AnalyzeReport {
     pub health: Option<HealthReport>,
     pub complexity: Option<ComplexityReport>,

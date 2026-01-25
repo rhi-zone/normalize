@@ -18,7 +18,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A single match result
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, schemars::JsonSchema)]
 pub struct GrepMatch {
     pub file: String,
     pub line: usize,
@@ -37,7 +37,7 @@ pub struct GrepMatch {
 }
 
 /// Result of a grep search
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 pub struct GrepResult {
     pub matches: Vec<GrepMatch>,
     pub total_matches: usize,

@@ -599,6 +599,16 @@ fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
             unreachable!("print_json_value called with non-JSON format")
         }
         OutputFormat::Json => println!("{}", value),
+        OutputFormat::JsonLines => {
+            // For arrays, emit each element per line; otherwise single line
+            if let serde_json::Value::Array(arr) = value {
+                for item in arr {
+                    println!("{}", serde_json::to_string(item).unwrap_or_default());
+                }
+            } else {
+                println!("{}", serde_json::to_string(value).unwrap_or_default());
+            }
+        }
         OutputFormat::Jq(filter) => match crate::output::apply_jq(value, filter) {
             Ok(results) => {
                 for result in results {
@@ -616,7 +626,7 @@ fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
 fn print_package_info(info: &PackageInfo, ecosystem: &str, format: &OutputFormat) {
     match format {
         OutputFormat::Compact | OutputFormat::Pretty { .. } => print_human(info, ecosystem),
-        OutputFormat::Json | OutputFormat::Jq(_) => {
+        OutputFormat::Json | OutputFormat::JsonLines | OutputFormat::Jq(_) => {
             let value = serde_json::to_value(info).unwrap_or_default();
             print_json_value(&value, format);
         }

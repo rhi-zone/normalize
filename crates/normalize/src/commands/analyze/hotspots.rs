@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::path::Path;
 
 /// Hotspot data for a file
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct FileHotspot {
     path: String,
     commits: usize,
@@ -19,7 +19,7 @@ struct FileHotspot {
 }
 
 /// Hotspots analysis report
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 struct HotspotsReport {
     hotspots: Vec<FileHotspot>,
 }
@@ -146,8 +146,14 @@ pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], json: bool) -> i32
 
             let report = HotspotsReport { hotspots };
             let config = crate::config::NormalizeConfig::load(root);
-            let format =
-                crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+            let format = crate::output::OutputFormat::from_cli(
+                json,
+                false,
+                None,
+                false,
+                false,
+                &config.pretty,
+            );
             report.print(&format);
             return 0;
         }
@@ -185,7 +191,8 @@ pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], json: bool) -> i32
 
     let report = HotspotsReport { hotspots };
     let config = crate::config::NormalizeConfig::load(root);
-    let format = crate::output::OutputFormat::from_cli(json, None, false, false, &config.pretty);
+    let format =
+        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
     0
 }

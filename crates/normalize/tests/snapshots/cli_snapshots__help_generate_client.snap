@@ -1,8 +1,9 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 407
 expression: "snapshot_help(&[\"generate\", \"client\"])"
 ---
-Generate API client from OpenAPI spec (legacy)
+Generate API client from OpenAPI spec
 
 Usage: normalize generate client [OPTIONS] --lang <LANG> <SPEC>
 
@@ -10,10 +11,14 @@ Arguments:
   <SPEC>  OpenAPI spec JSON file
 
 Options:
-  -l, --lang <LANG>      Target language: typescript, python, rust
-  -o, --output <OUTPUT>  Output file (stdout if not specified)
-      --json             Output as JSON
-      --jq <EXPR>        Filter JSON output with jq expression (implies --json)
-      --pretty           Human-friendly output with colors and formatting
-      --compact          Compact output without colors (overrides TTY detection)
-  -h, --help             Print help
+  -l, --lang <LANG>         Target language: typescript, python, rust
+  -o, --output <OUTPUT>     Output file (stdout if not specified)
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help
