@@ -150,7 +150,7 @@ pub fn cmd_view_file(
     show_tests: bool,
     focus: Option<&str>,
     resolve_imports: bool,
-    show_docs: bool,
+    docstring_mode: DocstringDisplay,
     context: bool,
     json: bool,
     pretty: bool,
@@ -260,10 +260,8 @@ pub fn cmd_view_file(
             let format_options = FormatOptions {
                 docstrings: if context {
                     DocstringDisplay::None
-                } else if show_docs {
-                    DocstringDisplay::Full
                 } else {
-                    DocstringDisplay::Summary
+                    docstring_mode
                 },
                 line_numbers: true,
                 skip_root: true,

@@ -23,6 +23,7 @@ Options:
       --resolve-imports     Resolve imports: inline signatures of specific imported symbols
       --full                Show full source code
       --docs                Show full docstrings
+      --no-docs             Hide all docstrings (overrides --docs)
       --no-parent           Hide parent/ancestor context (shown by default for nested symbols)
       --context             Context view: skeleton + imports combined
       --dir-context         Prepend directory context (.context.md files from hierarchy)

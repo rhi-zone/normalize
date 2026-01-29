@@ -1,5 +1,6 @@
 //! Line range viewing for view command.
 
+use crate::tree::DocstringDisplay;
 use crate::{parsers, path_resolve, tree};
 use normalize_languages::support_for_path;
 use std::collections::HashSet;
@@ -35,7 +36,7 @@ pub fn cmd_view_line_range(
     start: usize,
     end: usize,
     root: &Path,
-    show_docs: bool,
+    docstring_mode: DocstringDisplay,
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -87,7 +88,7 @@ pub fn cmd_view_line_range(
     let range_end = actual_end.min(lines.len());
 
     let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
-    let source: String = if !show_docs {
+    let source: String = if docstring_mode != DocstringDisplay::Full {
         if let Some(ref g) = grammar {
             let doc_lines = find_doc_comment_lines(&content, g, actual_start, actual_end);
             lines[range_start..range_end]

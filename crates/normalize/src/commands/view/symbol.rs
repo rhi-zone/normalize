@@ -16,7 +16,7 @@ pub fn cmd_view_symbol_direct(
     root: &Path,
     depth: i32,
     full: bool,
-    show_docs: bool,
+    docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
     json: bool,
@@ -34,7 +34,7 @@ pub fn cmd_view_symbol_direct(
         root,
         depth,
         full,
-        show_docs,
+        docstring_mode,
         show_parent,
         context,
         json,
@@ -51,7 +51,7 @@ pub fn cmd_view_symbol_at_line(
     line: usize,
     root: &Path,
     depth: i32,
-    show_docs: bool,
+    docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
     json: bool,
@@ -154,11 +154,7 @@ pub fn cmd_view_symbol_at_line(
         }
 
         let format_options = FormatOptions {
-            docstrings: if show_docs {
-                DocstringDisplay::Full
-            } else {
-                DocstringDisplay::Summary
-            },
+            docstrings: docstring_mode,
             line_numbers: true,
             skip_root: false,
             max_depth: None,
@@ -388,7 +384,7 @@ pub fn cmd_view_symbol(
     root: &Path,
     depth: i32,
     _full: bool,
-    show_docs: bool,
+    docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
     json: bool,
@@ -609,11 +605,7 @@ pub fn cmd_view_symbol(
                     sym.end_line
                 );
                 let format_options = FormatOptions {
-                    docstrings: if show_docs {
-                        DocstringDisplay::Full
-                    } else {
-                        DocstringDisplay::Summary
-                    },
+                    docstrings: docstring_mode,
                     line_numbers: true,
                     skip_root: false,
                     max_depth: None,
@@ -895,7 +887,7 @@ pub fn cmd_view_symbol_glob(
     root: &Path,
     _depth: i32,
     _full: bool,
-    _show_docs: bool,
+    _docstring_mode: DocstringDisplay,
     json: bool,
     _pretty: bool,
     _use_colors: bool,

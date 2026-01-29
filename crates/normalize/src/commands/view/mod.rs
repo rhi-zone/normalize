@@ -10,6 +10,7 @@ pub mod tree;
 use crate::commands::aliases::detect_project_languages;
 use crate::config::NormalizeConfig;
 use crate::filter::Filter;
+use crate::tree::DocstringDisplay;
 use crate::{daemon, path_resolve};
 use clap::Args;
 use normalize_derive::Merge;
@@ -120,6 +121,11 @@ pub struct ViewArgs {
     #[serde(default)]
     pub docs: bool,
 
+    /// Hide all docstrings (overrides --docs)
+    #[arg(long)]
+    #[serde(default)]
+    pub no_docs: bool,
+
     /// Hide parent/ancestor context (shown by default for nested symbols)
     #[arg(long)]
     #[serde(default)]
@@ -218,6 +224,14 @@ pub fn run(
         }
     }
 
+    let docstring_mode = if args.no_docs {
+        DocstringDisplay::None
+    } else if args.docs || config.view.show_docs() {
+        DocstringDisplay::Full
+    } else {
+        DocstringDisplay::Summary
+    };
+
     cmd_view(
         args.target.as_deref(),
         args.root.as_deref(),
@@ -231,7 +245,7 @@ pub fn run(
         args.focus.as_deref(),
         args.resolve_imports,
         args.full,
-        args.docs || config.view.show_docs(),
+        docstring_mode,
         args.context,
         !args.no_parent,
         format.is_json(),
@@ -258,7 +272,7 @@ pub fn cmd_view(
     focus: Option<&str>,
     resolve_imports: bool,
     full: bool,
-    show_docs: bool,
+    docstring_mode: DocstringDisplay,
     context: bool,
     show_parent: bool,
     json: bool,
@@ -329,7 +343,14 @@ pub fn cmd_view(
     if let Some((file_path, line, end_opt)) = lines::parse_line_target(target) {
         if let Some(end) = end_opt {
             return lines::cmd_view_line_range(
-                &file_path, line, end, &root, show_docs, json, pretty, use_colors,
+                &file_path,
+                line,
+                end,
+                &root,
+                docstring_mode,
+                json,
+                pretty,
+                use_colors,
             );
         } else {
             return symbol::cmd_view_symbol_at_line(
@@ -337,7 +358,7 @@ pub fn cmd_view(
                 line,
                 &root,
                 depth,
-                show_docs,
+                docstring_mode,
                 show_parent,
                 context,
                 json,
@@ -395,7 +416,7 @@ pub fn cmd_view(
                 &root,
                 depth,
                 full,
-                show_docs,
+                docstring_mode,
                 show_parent,
                 context,
                 json,
@@ -479,7 +500,7 @@ pub fn cmd_view(
             show_tests,
             focus,
             resolve_imports,
-            show_docs,
+            docstring_mode,
             context,
             json,
             pretty,
@@ -495,7 +516,7 @@ pub fn cmd_view(
                 &root,
                 depth,
                 full,
-                show_docs,
+                docstring_mode,
                 json,
                 pretty,
                 use_colors,
@@ -509,7 +530,7 @@ pub fn cmd_view(
             &root,
             depth,
             full,
-            show_docs,
+            docstring_mode,
             show_parent,
             context,
             json,
