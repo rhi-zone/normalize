@@ -253,16 +253,22 @@ impl SessionShowReport {
 
 use normalize_chat_sessions::Turn;
 
+/// A self-describing action extracted from a tool call.
+enum Action {
+    /// `read path` / `edit path` / `write path`
+    FileOp { verb: &'static str, path: String },
+    /// bare command string
+    Bash { command: String },
+}
+
 /// Extracted high-value content from a single turn.
 struct TurnSummary {
     user_prompt: Option<String>,
     assistant_text: Option<String>,
-    /// Collapsed tool calls: (name, count)
-    tool_counts: Vec<(String, usize)>,
-    /// Files mutated (Edit/Write) this turn
-    mutations: Vec<String>,
-    /// Bash commands run this turn
-    bash_commands: Vec<String>,
+    /// Self-describing action lines (file ops, bash commands) in call order
+    actions: Vec<Action>,
+    /// Tools not represented by actions: (name, count)
+    other_tools: Vec<(String, usize)>,
     /// Errors from tool results
     errors: Vec<String>,
 }
@@ -271,9 +277,8 @@ impl TurnSummary {
     fn extract(turn: &Turn) -> Self {
         let mut user_prompt = None;
         let mut assistant_text = None;
-        let mut tool_map: HashMap<String, usize> = HashMap::new();
-        let mut mutations = Vec::new();
-        let mut bash_commands = Vec::new();
+        let mut actions = Vec::new();
+        let mut other_map: HashMap<String, usize> = HashMap::new();
         let mut errors = Vec::new();
 
         for msg in &turn.messages {
@@ -299,28 +304,38 @@ impl TurnSummary {
                                     assistant_text = Some(text.clone());
                                 }
                             }
-                            ContentBlock::ToolUse { name, input, .. } => {
-                                *tool_map.entry(name.clone()).or_insert(0) += 1;
-
-                                // Track mutations
-                                match name.as_str() {
-                                    "Edit" | "Write" => {
-                                        if let Some(path) =
-                                            input.get("file_path").and_then(|v| v.as_str())
-                                        {
-                                            mutations.push(normalize_path(path));
-                                        }
+                            ContentBlock::ToolUse { name, input, .. } => match name.as_str() {
+                                "Read" | "Edit" | "Write" => {
+                                    let verb = match name.as_str() {
+                                        "Read" => "read",
+                                        "Edit" => "edit",
+                                        _ => "write",
+                                    };
+                                    if let Some(path) =
+                                        input.get("file_path").and_then(|v| v.as_str())
+                                    {
+                                        actions.push(Action::FileOp {
+                                            verb,
+                                            path: normalize_path(path),
+                                        });
+                                    } else {
+                                        *other_map.entry(name.clone()).or_insert(0) += 1;
                                     }
-                                    "Bash" => {
-                                        if let Some(cmd) =
-                                            input.get("command").and_then(|v| v.as_str())
-                                        {
-                                            bash_commands.push(collapse_newlines(cmd));
-                                        }
-                                    }
-                                    _ => {}
                                 }
-                            }
+                                "Bash" => {
+                                    if let Some(cmd) = input.get("command").and_then(|v| v.as_str())
+                                    {
+                                        actions.push(Action::Bash {
+                                            command: collapse_newlines(cmd),
+                                        });
+                                    } else {
+                                        *other_map.entry(name.clone()).or_insert(0) += 1;
+                                    }
+                                }
+                                _ => {
+                                    *other_map.entry(name.clone()).or_insert(0) += 1;
+                                }
+                            },
                             ContentBlock::ToolResult {
                                 is_error: true,
                                 content,
@@ -336,32 +351,33 @@ impl TurnSummary {
             }
         }
 
-        // Sort tool counts by frequency descending
-        let mut tool_counts: Vec<_> = tool_map.into_iter().collect();
-        tool_counts.sort_by(|a, b| b.1.cmp(&a.1));
-
-        // Deduplicate mutations (same file edited multiple times)
-        mutations.sort();
-        mutations.dedup();
+        // Sort other tools by frequency descending
+        let mut other_tools: Vec<_> = other_map.into_iter().collect();
+        other_tools.sort_by(|a, b| b.1.cmp(&a.1));
 
         Self {
             user_prompt,
             assistant_text,
-            tool_counts,
-            mutations,
-            bash_commands,
+            actions,
+            other_tools,
             errors,
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.user_prompt.is_none() && self.assistant_text.is_none() && self.tool_counts.is_empty()
+        self.user_prompt.is_none()
+            && self.assistant_text.is_none()
+            && self.actions.is_empty()
+            && self.other_tools.is_empty()
+    }
+
+    fn has_tools(&self) -> bool {
+        !self.actions.is_empty() || !self.other_tools.is_empty()
     }
 
     /// True if this turn has only tool calls with no user prompt or assistant text.
-    /// These are continuation turns (agent working) that should be collapsed.
     fn is_tool_only(&self) -> bool {
-        self.user_prompt.is_none() && self.assistant_text.is_none() && !self.tool_counts.is_empty()
+        self.user_prompt.is_none() && self.assistant_text.is_none() && self.has_tools()
     }
 
     fn format_text(&self, out: &mut String, turn_idx: usize) {
@@ -380,30 +396,32 @@ impl TurnSummary {
             let _ = writeln!(out);
         }
 
-        // Tool summary line
-        if !self.tool_counts.is_empty() {
-            let tools_str = format_tool_counts(&self.tool_counts);
-            if self.is_tool_only() {
-                // Continuation turn — single compact line
+        // Collapsed other-tools line (only tools without detail lines)
+        if !self.other_tools.is_empty() {
+            let tools_str = format_tool_counts(&self.other_tools);
+            if self.is_tool_only() && self.actions.is_empty() {
                 let _ = writeln!(out, "  [{} ...]", tools_str);
             } else {
                 let _ = writeln!(out, "[{}]", tools_str);
             }
         }
 
-        // Mutations
-        for path in &self.mutations {
-            let _ = writeln!(out, "  -> {}", path);
-        }
-
-        // Bash commands
-        for cmd in &self.bash_commands {
-            let _ = writeln!(out, "  {}", cmd);
+        // Action lines
+        let indent = if self.is_tool_only() { "  " } else { "  " };
+        for action in &self.actions {
+            match action {
+                Action::FileOp { verb, path } => {
+                    let _ = writeln!(out, "{}{} {}", indent, verb, path);
+                }
+                Action::Bash { command } => {
+                    let _ = writeln!(out, "{}$ {}", indent, command);
+                }
+            }
         }
 
         // Errors
         for err in &self.errors {
-            let _ = writeln!(out, "  ERROR: {}", collapse_newlines(err));
+            let _ = writeln!(out, "{}ERROR: {}", indent, collapse_newlines(err));
         }
 
         // Blank line between turns (only if we printed something substantive)
@@ -438,36 +456,40 @@ impl TurnSummary {
             let _ = writeln!(out);
         }
 
-        // Tool summary line
-        if !self.tool_counts.is_empty() {
-            let tools_str = format_tool_counts(&self.tool_counts);
-            if self.is_tool_only() {
+        // Collapsed other-tools line
+        if !self.other_tools.is_empty() {
+            let tools_str = format_tool_counts(&self.other_tools);
+            if self.is_tool_only() && self.actions.is_empty() {
                 let _ = writeln!(out, "  {}", Cyan.paint(format!("[{} ...]", tools_str)));
             } else {
                 let _ = writeln!(out, "{}", Cyan.paint(format!("[{}]", tools_str)));
             }
         }
 
-        // Mutations
-        for path in &self.mutations {
-            let _ = writeln!(
-                out,
-                "  {} {}",
-                Green.paint("->"),
-                Yellow.paint(path.as_str())
-            );
-        }
-
-        // Bash commands
-        for cmd in &self.bash_commands {
-            let _ = writeln!(out, "  {}", cmd);
+        // Action lines
+        let indent = if self.is_tool_only() { "  " } else { "  " };
+        for action in &self.actions {
+            match action {
+                Action::FileOp { verb, path } => {
+                    let _ = writeln!(
+                        out,
+                        "{}{}",
+                        indent,
+                        Yellow.paint(format!("{} {}", verb, path))
+                    );
+                }
+                Action::Bash { command } => {
+                    let _ = writeln!(out, "{}{} {}", indent, Green.paint("$"), command);
+                }
+            }
         }
 
         // Errors
         for err in &self.errors {
             let _ = writeln!(
                 out,
-                "  {} {}",
+                "{}{} {}",
+                indent,
                 Red.bold().paint("ERROR:"),
                 collapse_newlines(err)
             );
@@ -479,7 +501,7 @@ impl TurnSummary {
     }
 }
 
-/// Format tool counts as a compact string: "Read x3, Edit x2, Bash"
+/// Format tool counts as a compact string: "Grep x3, Glob x2, Task"
 fn format_tool_counts(counts: &[(String, usize)]) -> String {
     counts
         .iter()
