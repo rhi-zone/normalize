@@ -50,6 +50,16 @@ Patterns from `docs/log-analysis.md` correction analysis:
 
 When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exact line content needed by Edit.
 
+## Workflow
+
+**Batch cargo commands** to minimize round-trips:
+```bash
+cargo clippy --all-targets --all-features -- -D warnings && cargo test
+```
+After editing multiple files, run the full check once — not after each edit. Formatting is handled automatically by the pre-commit hook (`cargo fmt`).
+
+**When making the same change across multiple crates**, edit all files first, then build once.
+
 ## Commit Convention
 
 Use conventional commits: `type(scope): message`

@@ -100,6 +100,50 @@ pub fn cmd_sessions_analyze_multi(
 
                 // Collect tool chains for pattern analysis
                 all_chains.extend(a.tool_chains);
+
+                // Aggregate command stats by category
+                for cs in a.command_stats {
+                    if let Some(existing) = aggregate
+                        .command_stats
+                        .iter_mut()
+                        .find(|s| s.category == cs.category)
+                    {
+                        existing.total_calls += cs.total_calls;
+                        existing.total_errors += cs.total_errors;
+                        existing.output_tokens += cs.output_tokens;
+                        // Merge command details
+                        for detail in cs.commands {
+                            if let Some(ed) = existing
+                                .commands
+                                .iter_mut()
+                                .find(|d| d.pattern == detail.pattern)
+                            {
+                                ed.calls += detail.calls;
+                                ed.errors += detail.errors;
+                            } else {
+                                existing.commands.push(detail);
+                            }
+                        }
+                    } else {
+                        aggregate.command_stats.push(cs);
+                    }
+                }
+
+                // Aggregate retry hotspots by pattern
+                for rh in a.retry_hotspots {
+                    if let Some(existing) = aggregate
+                        .retry_hotspots
+                        .iter_mut()
+                        .find(|h| h.pattern == rh.pattern)
+                    {
+                        existing.attempts += rh.attempts;
+                        existing.failures += rh.failures;
+                        existing.output_tokens += rh.output_tokens;
+                        existing.turn_indices.extend(rh.turn_indices);
+                    } else {
+                        aggregate.retry_hotspots.push(rh);
+                    }
+                }
             }
             Err(e) => {
                 eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
@@ -111,6 +155,17 @@ pub fn cmd_sessions_analyze_multi(
         eprintln!("No sessions could be analyzed");
         return 1;
     }
+
+    // Sort aggregated command stats and details
+    aggregate
+        .command_stats
+        .sort_by(|a, b| b.total_calls.cmp(&a.total_calls));
+    for cs in &mut aggregate.command_stats {
+        cs.commands.sort_by(|a, b| b.calls.cmp(&a.calls));
+    }
+    aggregate
+        .retry_hotspots
+        .sort_by(|a, b| b.failures.cmp(&a.failures));
 
     // Extract common tool patterns from all chains
     use crate::sessions::extract_tool_patterns;

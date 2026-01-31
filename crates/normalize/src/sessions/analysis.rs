@@ -235,6 +235,35 @@ impl FileOperation {
     }
 }
 
+/// Statistics for a command category (e.g., "build", "test", "git").
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
+pub struct CommandStats {
+    pub category: String,
+    pub commands: Vec<CommandDetail>,
+    pub total_calls: usize,
+    pub total_errors: usize,
+    /// Sum of output tokens for turns containing this category.
+    pub output_tokens: u64,
+}
+
+/// Detail for a specific command pattern within a category.
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
+pub struct CommandDetail {
+    pub pattern: String,
+    pub calls: usize,
+    pub errors: usize,
+}
+
+/// A command pattern that failed and was retried.
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
+pub struct RetryHotspot {
+    pub pattern: String,
+    pub attempts: usize,
+    pub failures: usize,
+    pub output_tokens: u64,
+    pub turn_indices: Vec<usize>,
+}
+
 /// A common tool pattern across sessions.
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct ToolPattern {
@@ -272,6 +301,10 @@ pub struct SessionAnalysis {
     pub file_operations: HashMap<String, FileOperation>,
     /// Common tool patterns (multi-session aggregate only)
     pub tool_patterns: Vec<ToolPattern>,
+    /// Bash command statistics by category
+    pub command_stats: Vec<CommandStats>,
+    /// Commands that failed and were retried
+    pub retry_hotspots: Vec<RetryHotspot>,
 }
 
 impl SessionAnalysis {
@@ -462,6 +495,62 @@ impl SessionAnalysis {
                 }
                 lines.push(String::new());
             }
+        }
+
+        // Command breakdown
+        if !self.command_stats.is_empty() {
+            lines.push("## Command Breakdown".to_string());
+            lines.push(String::new());
+            lines.push("| Category | Calls | Errors | ~Output Tokens |".to_string());
+            lines.push("|----------|-------|--------|----------------|".to_string());
+            for stat in &self.command_stats {
+                lines.push(format!(
+                    "| {} | {} | {} | {} |",
+                    stat.category,
+                    stat.total_calls,
+                    stat.total_errors,
+                    format_tokens(stat.output_tokens)
+                ));
+            }
+            lines.push(String::new());
+
+            // Top commands across all categories
+            let mut all_commands: Vec<&CommandDetail> = self
+                .command_stats
+                .iter()
+                .flat_map(|s| &s.commands)
+                .collect();
+            all_commands.sort_by(|a, b| b.calls.cmp(&a.calls));
+            if !all_commands.is_empty() {
+                lines.push("Top commands:".to_string());
+                for cmd in all_commands.iter().take(10) {
+                    if cmd.errors > 0 {
+                        lines.push(format!(
+                            "- {}: {} calls ({} errors)",
+                            cmd.pattern, cmd.calls, cmd.errors
+                        ));
+                    } else {
+                        lines.push(format!("- {}: {} calls", cmd.pattern, cmd.calls));
+                    }
+                }
+                lines.push(String::new());
+            }
+        }
+
+        // Retry hotspots
+        if !self.retry_hotspots.is_empty() {
+            lines.push("## Retry Hotspots".to_string());
+            lines.push(String::new());
+            for hotspot in &self.retry_hotspots {
+                lines.push(format!(
+                    "- **{}** — {} failures / {} attempts, ~{} output tokens",
+                    hotspot.pattern,
+                    hotspot.failures,
+                    hotspot.attempts,
+                    format_tokens(hotspot.output_tokens)
+                ));
+            }
+            lines.push(String::new());
         }
 
         // Token hotspots
@@ -754,6 +843,70 @@ impl SessionAnalysis {
                 }
                 writeln!(out).unwrap();
             }
+        }
+
+        // Command breakdown with bar charts
+        if !self.command_stats.is_empty() {
+            writeln!(out, "\x1b[1;36m━━━ Command Breakdown ━━━\x1b[0m").unwrap();
+
+            let max_calls = self
+                .command_stats
+                .first()
+                .map(|s| s.total_calls)
+                .unwrap_or(1);
+            let max_cat_len = self
+                .command_stats
+                .iter()
+                .map(|s| s.category.len())
+                .max()
+                .unwrap_or(8);
+
+            for stat in &self.command_stats {
+                let bar_width = 20;
+                let filled =
+                    (stat.total_calls as f64 / max_calls as f64 * bar_width as f64) as usize;
+                let bar: String = "█".repeat(filled) + &"░".repeat(bar_width - filled);
+
+                let error_str = if stat.total_errors > 0 {
+                    format!(
+                        " (\x1b[31m{} error{}\x1b[0m)",
+                        stat.total_errors,
+                        if stat.total_errors == 1 { "" } else { "s" }
+                    )
+                } else {
+                    String::new()
+                };
+
+                writeln!(
+                    out,
+                    "{:>width$}  {} {:>3} calls{} ~{}",
+                    stat.category,
+                    bar,
+                    stat.total_calls,
+                    error_str,
+                    format_tokens(stat.output_tokens),
+                    width = max_cat_len
+                )
+                .unwrap();
+            }
+            writeln!(out).unwrap();
+        }
+
+        // Retry hotspots
+        if !self.retry_hotspots.is_empty() {
+            writeln!(out, "\x1b[1;36m━━━ Retry Hotspots ━━━\x1b[0m").unwrap();
+            for hotspot in &self.retry_hotspots {
+                writeln!(
+                    out,
+                    "\x1b[33m⚠\x1b[0m {} — {}/{} failed, ~{} output tokens burned",
+                    hotspot.pattern,
+                    hotspot.failures,
+                    hotspot.attempts,
+                    format_tokens(hotspot.output_tokens)
+                )
+                .unwrap();
+            }
+            writeln!(out).unwrap();
         }
 
         // File operations heatmap
@@ -1120,6 +1273,241 @@ pub fn normalize_path(path: &str) -> String {
     path.to_string()
 }
 
+/// Split a shell command line on `&&`, `;`, and `||` into individual commands.
+fn split_command_chain(cmd: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0;
+    let bytes = cmd.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if bytes[i] == b';' {
+            let part = cmd[start..i].trim();
+            if !part.is_empty() {
+                parts.push(part);
+            }
+            start = i + 1;
+        } else if i + 1 < len && bytes[i] == b'&' && bytes[i + 1] == b'&' {
+            let part = cmd[start..i].trim();
+            if !part.is_empty() {
+                parts.push(part);
+            }
+            start = i + 2;
+            i += 1; // skip extra char
+        } else if i + 1 < len && bytes[i] == b'|' && bytes[i + 1] == b'|' {
+            let part = cmd[start..i].trim();
+            if !part.is_empty() {
+                parts.push(part);
+            }
+            start = i + 2;
+            i += 1;
+        }
+        i += 1;
+    }
+    let part = cmd[start..].trim();
+    if !part.is_empty() {
+        parts.push(part);
+    }
+    // Filter out comments and empty-ish entries
+    parts.into_iter().filter(|p| !p.starts_with('#')).collect()
+}
+
+/// Categorize a single shell command and return (category, normalized_pattern).
+///
+/// The normalized pattern is the base command + subcommand (e.g. "cargo test", "npm run build").
+pub fn categorize_command(cmd: &str) -> (&'static str, String) {
+    // Strip leading env vars (KEY=val cmd ...) and cd prefixes
+    let cmd = cmd.trim();
+    // Skip env var assignments at the start
+    let effective = cmd
+        .split_whitespace()
+        .skip_while(|w| w.contains('=') && !w.starts_with('-'))
+        .collect::<Vec<_>>();
+    if effective.is_empty() {
+        return ("other", cmd.to_string());
+    }
+
+    let base = effective[0];
+    let sub = effective.get(1).copied().unwrap_or("");
+
+    // Extract the binary name from any path (e.g. ./target/debug/cargo -> cargo)
+    let base_name = base.rsplit('/').next().unwrap_or(base);
+
+    match base_name {
+        // Build tools
+        "cargo" if sub == "build" || sub == "b" => ("build", "cargo build".to_string()),
+        "make" | "cmake" | "ninja" => ("build", base_name.to_string()),
+        "tsc" => ("build", "tsc".to_string()),
+        "webpack" | "vite" | "esbuild" | "rollup" | "parcel" => ("build", base_name.to_string()),
+        "npm" | "npx" | "yarn" | "pnpm" if sub == "run" => {
+            let script = effective.get(2).copied().unwrap_or("?");
+            match script {
+                s if s.contains("build") => ("build", format!("{} run build", base_name)),
+                s if s.contains("test") => ("test", format!("{} run test", base_name)),
+                s if s.contains("lint") => ("lint", format!("{} run lint", base_name)),
+                s if s.contains("format") || s.contains("fmt") => {
+                    ("lint", format!("{} run {}", base_name, s))
+                }
+                _ => ("other", format!("{} run {}", base_name, script)),
+            }
+        }
+        "npm" | "npx" | "yarn" | "pnpm" if sub == "build" => {
+            ("build", format!("{} build", base_name))
+        }
+
+        // Test tools
+        "cargo" if sub == "test" || sub == "t" || sub == "nextest" => {
+            ("test", "cargo test".to_string())
+        }
+        "npm" | "npx" | "yarn" | "pnpm" if sub == "test" => ("test", format!("{} test", base_name)),
+        "pytest" | "jest" | "vitest" | "mocha" => ("test", base_name.to_string()),
+        "go" if sub == "test" => ("test", "go test".to_string()),
+        "ruby" if sub == "-e" || sub == "test" => ("test", "ruby test".to_string()),
+        "rspec" | "phpunit" => ("test", base_name.to_string()),
+
+        // Lint/format tools
+        "cargo" if sub == "clippy" => ("lint", "cargo clippy".to_string()),
+        "cargo" if sub == "fmt" => ("lint", "cargo fmt".to_string()),
+        "eslint" | "prettier" | "ruff" | "black" | "flake8" | "mypy" | "pylint" | "rubocop"
+        | "biome" | "oxlint" => ("lint", base_name.to_string()),
+
+        // Git
+        "git" | "gh" => {
+            let git_sub = if sub.is_empty() { "git" } else { sub };
+            ("git", format!("{} {}", base_name, git_sub))
+        }
+
+        // Install/dependency
+        "cargo" if sub == "add" || sub == "install" => ("install", format!("cargo {}", sub)),
+        "npm" | "npx" | "yarn" | "pnpm"
+            if sub == "install" || sub == "i" || sub == "add" || sub == "ci" =>
+        {
+            ("install", format!("{} install", base_name))
+        }
+        "pip" | "pip3" if sub == "install" => ("install", "pip install".to_string()),
+        "apt" | "apt-get" | "brew" | "dnf" | "pacman" | "nix" => {
+            ("install", format!("{} {}", base_name, sub))
+        }
+
+        // Search/read tools
+        "find" | "grep" | "rg" | "ag" | "fd" => ("search", base_name.to_string()),
+        "ls" | "cat" | "head" | "tail" | "wc" | "file" | "stat" | "tree" | "less" => {
+            ("search", base_name.to_string())
+        }
+
+        // Cargo other
+        "cargo" => ("build", format!("cargo {}", sub)),
+
+        _ => ("other", base_name.to_string()),
+    }
+}
+
+/// Detect retry hotspots from a sequence of command invocations.
+///
+/// Takes `(turn_idx, normalized_pattern, was_error)` triples and groups
+/// them by pattern. A hotspot = pattern with >= 2 failures out of >= 3 attempts.
+fn detect_retry_hotspots(
+    invocations: &[(usize, String, bool)],
+    output_tokens_per_turn: &[u64],
+) -> Vec<RetryHotspot> {
+    // Group by normalized pattern
+    let mut by_pattern: HashMap<String, Vec<(usize, bool)>> = HashMap::new();
+    for (turn_idx, pattern, was_error) in invocations {
+        by_pattern
+            .entry(pattern.clone())
+            .or_default()
+            .push((*turn_idx, *was_error));
+    }
+
+    let mut hotspots = Vec::new();
+    for (pattern, entries) in &by_pattern {
+        let attempts = entries.len();
+        let failures = entries.iter().filter(|(_, err)| *err).count();
+        if failures >= 2 && attempts >= 3 {
+            let turn_indices: Vec<usize> = entries.iter().map(|(idx, _)| *idx).collect();
+            let output_tokens: u64 = turn_indices
+                .iter()
+                .filter_map(|&idx| output_tokens_per_turn.get(idx))
+                .sum();
+            hotspots.push(RetryHotspot {
+                pattern: pattern.clone(),
+                attempts,
+                failures,
+                output_tokens,
+                turn_indices,
+            });
+        }
+    }
+
+    // Sort by failures descending, then by output_tokens descending
+    hotspots.sort_by(|a, b| {
+        b.failures
+            .cmp(&a.failures)
+            .then(b.output_tokens.cmp(&a.output_tokens))
+    });
+
+    hotspots
+}
+
+/// Build command stats from invocation data.
+fn build_command_stats(
+    invocations: &[(usize, String, bool, &'static str)],
+    output_tokens_per_turn: &[u64],
+) -> Vec<CommandStats> {
+    // Group by category
+    let mut by_category: HashMap<&str, HashMap<String, (usize, usize)>> = HashMap::new();
+    let mut category_turns: HashMap<&str, Vec<usize>> = HashMap::new();
+
+    for (turn_idx, pattern, was_error, category) in invocations {
+        let commands = by_category.entry(category).or_default();
+        let entry = commands.entry(pattern.clone()).or_insert((0, 0));
+        entry.0 += 1;
+        if *was_error {
+            entry.1 += 1;
+        }
+        category_turns.entry(category).or_default().push(*turn_idx);
+    }
+
+    let mut stats: Vec<CommandStats> = by_category
+        .into_iter()
+        .map(|(category, commands)| {
+            let total_calls: usize = commands.values().map(|(c, _)| c).sum();
+            let total_errors: usize = commands.values().map(|(_, e)| e).sum();
+
+            // Deduplicate turn indices and sum output tokens
+            let mut turns: Vec<usize> = category_turns.get(category).cloned().unwrap_or_default();
+            turns.sort_unstable();
+            turns.dedup();
+            let output_tokens: u64 = turns
+                .iter()
+                .filter_map(|&idx| output_tokens_per_turn.get(idx))
+                .sum();
+
+            let mut details: Vec<CommandDetail> = commands
+                .into_iter()
+                .map(|(pattern, (calls, errors))| CommandDetail {
+                    pattern,
+                    calls,
+                    errors,
+                })
+                .collect();
+            details.sort_by(|a, b| b.calls.cmp(&a.calls));
+
+            CommandStats {
+                category: category.to_string(),
+                commands: details,
+                total_calls,
+                total_errors,
+                output_tokens,
+            }
+        })
+        .collect();
+
+    // Sort by total_calls descending
+    stats.sort_by(|a, b| b.total_calls.cmp(&a.total_calls));
+    stats
+}
+
 /// Extract all subsequences of length 2-5 from tool chains.
 pub fn extract_tool_patterns(chains: &[ToolChain]) -> Vec<ToolPattern> {
     let mut pattern_counts: HashMap<Vec<String>, usize> = HashMap::new();
@@ -1164,12 +1552,24 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
         }
     }
 
-    // Analyze tool usage and detect tool chains
+    // Analyze tool usage, detect tool chains, and collect command data
     let mut current_chain: Option<Vec<(usize, String)>> = None;
+
+    // For command analysis: (turn_idx, pattern, was_error, category)
+    let mut command_invocations: Vec<(usize, String, bool, &'static str)> = Vec::new();
+    // For retry detection: (turn_idx, pattern, was_error)
+    let mut retry_candidates: Vec<(usize, String, bool)> = Vec::new();
+    // Output tokens per turn index (populated in the token usage pass below)
+    let mut output_tokens_per_turn: Vec<u64> = Vec::new();
 
     for (turn_idx, turn) in session.turns.iter().enumerate() {
         let mut tool_uses_in_turn = 0;
         let mut tool_name_in_turn: Option<String> = None;
+
+        // Collect Bash tool_use IDs and their commands for this turn
+        let mut bash_commands: HashMap<String, Vec<(String, &'static str)>> = HashMap::new();
+        // Track which tool_use IDs had errors
+        let mut tool_errors: HashMap<String, bool> = HashMap::new();
 
         for msg in &turn.messages {
             // Detect corrections in assistant messages
@@ -1189,7 +1589,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
 
             for block in &msg.content {
                 match block {
-                    ContentBlock::ToolUse { name, input, .. } => {
+                    ContentBlock::ToolUse { id, name, input } => {
                         let stat = analysis
                             .tool_stats
                             .entry(name.clone())
@@ -1214,13 +1614,43 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
                                 _ => {}
                             }
                         }
+
+                        // Collect Bash commands for categorization
+                        if name == "Bash"
+                            && let Some(cmd) = input.get("command").and_then(|v| v.as_str())
+                        {
+                            let subcmds = split_command_chain(cmd);
+                            let mut entries = Vec::new();
+                            for subcmd in subcmds {
+                                let (cat, pattern) = categorize_command(subcmd);
+                                entries.push((pattern, cat));
+                            }
+                            bash_commands.insert(id.clone(), entries);
+                        }
                     }
                     ContentBlock::ToolResult {
-                        is_error, content, ..
+                        tool_use_id,
+                        is_error,
+                        content,
+                        ..
                     } => {
+                        // Track error status for Bash tool matching
+                        tool_errors.insert(tool_use_id.clone(), *is_error);
+
                         if *is_error {
-                            // Try to attribute error to most recent tool
-                            // For now, just track in error patterns
+                            // Attribute error to tool stat
+                            // Find which tool this result belongs to by scanning the turn
+                            for m in &turn.messages {
+                                for b in &m.content {
+                                    if let ContentBlock::ToolUse { id, name, .. } = b
+                                        && id == tool_use_id
+                                        && let Some(stat) = analysis.tool_stats.get_mut(name)
+                                    {
+                                        stat.errors += 1;
+                                    }
+                                }
+                            }
+
                             let category = categorize_error(content);
                             let pattern = analysis
                                 .error_patterns
@@ -1242,6 +1672,15 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
                     }
                     _ => {}
                 }
+            }
+        }
+
+        // Process collected bash commands for this turn
+        for (tool_id, entries) in &bash_commands {
+            let was_error = tool_errors.get(tool_id).copied().unwrap_or(false);
+            for (pattern, category) in entries {
+                command_invocations.push((turn_idx, pattern.clone(), was_error, category));
+                retry_candidates.push((turn_idx, pattern.clone(), was_error));
             }
         }
 
@@ -1281,7 +1720,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
         }
     }
 
-    // Analyze token usage
+    // Analyze token usage and build output_tokens_per_turn
     analysis.total_turns = session.turns.len();
     for turn in &session.turns {
         if let Some(usage) = &turn.token_usage {
@@ -1298,11 +1737,16 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
             let context = usage.input + usage.cache_read.unwrap_or(0);
             analysis.token_stats.update_context(context);
             analysis.context_per_turn.push(context);
+            output_tokens_per_turn.push(usage.output);
         } else {
-            // No token usage for this turn (user message)
             analysis.context_per_turn.push(0);
+            output_tokens_per_turn.push(0);
         }
     }
+
+    // Build command stats and retry hotspots
+    analysis.command_stats = build_command_stats(&command_invocations, &output_tokens_per_turn);
+    analysis.retry_hotspots = detect_retry_hotspots(&retry_candidates, &output_tokens_per_turn);
 
     // Sort error patterns by count
     analysis

@@ -14,6 +14,7 @@ pub use normalize_chat_sessions::{
 
 // Export analysis types from this crate
 pub use analysis::{
-    ErrorPattern, SessionAnalysis, TokenStats, ToolStats, analyze_session, categorize_error,
-    extract_tool_patterns, normalize_path,
+    CommandDetail, CommandStats, ErrorPattern, RetryHotspot, SessionAnalysis, TokenStats,
+    ToolStats, analyze_session, categorize_command, categorize_error, extract_tool_patterns,
+    normalize_path,
 };
