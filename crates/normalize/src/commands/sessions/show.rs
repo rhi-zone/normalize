@@ -257,8 +257,10 @@ use normalize_chat_sessions::Turn;
 enum Action {
     /// `read path` / `edit path` / `write path`
     FileOp { verb: &'static str, path: String },
-    /// bare command string
+    /// `$ command`
     Bash { command: String },
+    /// `verb arg` for other known tools (grep, glob, search, etc.)
+    Tool { verb: &'static str, arg: String },
 }
 
 /// Extracted high-value content from a single turn.
@@ -333,7 +335,11 @@ impl TurnSummary {
                                     }
                                 }
                                 _ => {
-                                    *other_map.entry(name.clone()).or_insert(0) += 1;
+                                    if let Some(action) = extract_tool_action(name, input) {
+                                        actions.push(action);
+                                    } else {
+                                        *other_map.entry(name.clone()).or_insert(0) += 1;
+                                    }
                                 }
                             },
                             ContentBlock::ToolResult {
@@ -392,7 +398,7 @@ impl TurnSummary {
 
         // Assistant response
         if let Some(text) = &self.assistant_text {
-            let _ = writeln!(out, "{}", collapse_newlines(text));
+            let _ = writeln!(out, "{}", text.trim());
             let _ = writeln!(out);
         }
 
@@ -415,6 +421,9 @@ impl TurnSummary {
                 }
                 Action::Bash { command } => {
                     let _ = writeln!(out, "{}$ {}", indent, command);
+                }
+                Action::Tool { verb, arg } => {
+                    let _ = writeln!(out, "{}{} {}", indent, verb, arg);
                 }
             }
         }
@@ -452,7 +461,7 @@ impl TurnSummary {
 
         // Assistant response
         if let Some(text) = &self.assistant_text {
-            let _ = writeln!(out, "{}", collapse_newlines(text));
+            let _ = writeln!(out, "{}", text.trim());
             let _ = writeln!(out);
         }
 
@@ -480,6 +489,14 @@ impl TurnSummary {
                 }
                 Action::Bash { command } => {
                     let _ = writeln!(out, "{}{} {}", indent, Green.paint("$"), command);
+                }
+                Action::Tool { verb, arg } => {
+                    let _ = writeln!(
+                        out,
+                        "{}{}",
+                        indent,
+                        Yellow.paint(format!("{} {}", verb, arg))
+                    );
                 }
             }
         }
@@ -544,7 +561,39 @@ fn format_tokens(tokens: u64) -> String {
     }
 }
 
-/// Truncate a string to max chars, adding "..." if truncated. Collapses newlines.
+/// Extract a self-describing action for known tool types.
+fn extract_tool_action(name: &str, input: &serde_json::Value) -> Option<Action> {
+    let str_field = |field: &str| input.get(field).and_then(|v| v.as_str()).map(String::from);
+
+    match name {
+        "Grep" => str_field("pattern").map(|p| Action::Tool {
+            verb: "grep",
+            arg: p,
+        }),
+        "Glob" => str_field("pattern").map(|p| Action::Tool {
+            verb: "glob",
+            arg: p,
+        }),
+        "WebSearch" => str_field("query").map(|q| Action::Tool {
+            verb: "search",
+            arg: q,
+        }),
+        "WebFetch" => str_field("url").map(|u| Action::Tool {
+            verb: "fetch",
+            arg: u,
+        }),
+        "Task" => str_field("description").map(|d| Action::Tool {
+            verb: "task",
+            arg: d,
+        }),
+        "NotebookEdit" => str_field("notebook_path").map(|p| Action::Tool {
+            verb: "notebook",
+            arg: normalize_path(&p),
+        }),
+        _ => None,
+    }
+}
+
 /// Collapse newlines into spaces, trim.
 fn collapse_newlines(s: &str) -> String {
     let collapsed: String = s

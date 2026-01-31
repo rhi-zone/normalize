@@ -219,11 +219,17 @@ impl LogFormat for ClaudeCodeFormat {
 fn parse_message(entry: &Value, role: Role) -> Message {
     let mut content_blocks = Vec::new();
 
-    if let Some(content) = entry
-        .get("message")
-        .and_then(|m| m.get("content"))
-        .and_then(|c| c.as_array())
-    {
+    // Content can be a bare string (human-typed prompts) or an array of content blocks
+    // (tool results, assistant text blocks, etc.)
+    let content_value = entry.get("message").and_then(|m| m.get("content"));
+
+    if let Some(text) = content_value.and_then(|c| c.as_str()) {
+        if !text.is_empty() {
+            content_blocks.push(ContentBlock::Text {
+                text: text.to_string(),
+            });
+        }
+    } else if let Some(content) = content_value.and_then(|c| c.as_array()) {
         for block in content {
             let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
