@@ -297,8 +297,7 @@ fn main() {
         ),
         Commands::Sessions(args) => commands::sessions::run(
             args,
-            cli.json,
-            cli.pretty,
+            &format,
             cli.output_schema,
             cli.input_schema,
             cli.params_json.as_deref(),

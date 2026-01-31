@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 /// A parsed session in unified format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Session {
     /// Path to the original session file.
     pub path: PathBuf,
@@ -22,6 +23,7 @@ pub struct Session {
 
 /// Session metadata extracted from the log.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionMetadata {
     /// Session identifier (format-specific).
     pub session_id: Option<String>,
@@ -37,6 +39,7 @@ pub struct SessionMetadata {
 
 /// A single turn in the conversation (typically one user message + assistant response).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Turn {
     /// Messages in this turn.
     pub messages: Vec<Message>,
@@ -46,6 +49,7 @@ pub struct Turn {
 
 /// A message from a participant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Message {
     /// Who sent this message.
     pub role: Role,
@@ -57,6 +61,7 @@ pub struct Message {
 
 /// Message sender role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     User,
@@ -66,6 +71,7 @@ pub enum Role {
 
 /// A content block within a message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
     /// Plain text content.
@@ -88,6 +94,7 @@ pub enum ContentBlock {
 
 /// Token usage for an API call.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TokenUsage {
     /// Input tokens (prompt).
     pub input: u64,

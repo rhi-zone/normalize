@@ -11,7 +11,7 @@ pub mod stats;
 pub use list::cmd_sessions_list;
 #[cfg(feature = "sessions-web")]
 pub use serve::cmd_sessions_serve;
-pub use show::cmd_sessions_show;
+pub use show::{SessionShowReport, cmd_sessions_show};
 pub use stats::cmd_sessions_stats;
 
 use clap::{Args, Subcommand};
@@ -216,10 +216,15 @@ pub enum SessionsCommand {
         #[arg(long)]
         jq: Option<String>,
 
-        /// Run full analysis instead of dumping raw log
+        /// Run full analysis instead of summary
         #[arg(short, long)]
         #[serde(default)]
         analyze: bool,
+
+        /// Show full conversation log (default is summary)
+        #[arg(long)]
+        #[serde(default)]
+        full: bool,
 
         /// Filter messages by role/type: user, assistant, system, tool_use, tool_result, thinking
         #[arg(long)]
@@ -299,8 +304,11 @@ fn print_sessions_schema(command: &Option<SessionsCommand>) -> i32 {
         Some(SessionsCommand::List { .. }) | None => {
             crate::output::print_output_schema::<list::SessionListReport>();
         }
-        Some(SessionsCommand::Show { .. }) | Some(SessionsCommand::Stats { .. }) => {
+        Some(SessionsCommand::Show { analyze: true, .. }) | Some(SessionsCommand::Stats { .. }) => {
             crate::output::print_output_schema::<SessionAnalysis>();
+        }
+        Some(SessionsCommand::Show { .. }) => {
+            crate::output::print_output_schema::<show::SessionShowReport>();
         }
         Some(SessionsCommand::Plans { .. }) => {
             crate::output::print_output_schema::<plans::PlansListReport>();
@@ -326,12 +334,12 @@ pub fn print_input_schema() {
 /// Run the sessions command
 pub fn run(
     args: SessionsArgs,
-    json: bool,
-    pretty: bool,
+    output_format: &crate::output::OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
 ) -> i32 {
+    let json = output_format.is_json();
     if output_schema {
         return print_sessions_schema(&args.command);
     }
@@ -376,6 +384,7 @@ pub fn run(
             exact,
             jq,
             analyze,
+            full,
             filter,
             grep,
             errors_only,
@@ -387,8 +396,8 @@ pub fn run(
             jq.as_deref(),
             args.format.as_deref(),
             analyze,
-            json,
-            pretty,
+            full,
+            output_format,
             filter.as_deref(),
             grep.as_deref(),
             errors_only,
@@ -417,7 +426,7 @@ pub fn run(
             all_projects,
             by_repo,
             json,
-            pretty,
+            output_format.is_pretty(),
         ),
 
         #[cfg(feature = "sessions-web")]

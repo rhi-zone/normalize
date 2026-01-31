@@ -1,6 +1,7 @@
 //! Aggregate statistics across sessions.
 
 use super::{analyze::cmd_sessions_analyze_multi, session_matches_grep};
+use crate::output::OutputFormat;
 use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
@@ -60,6 +61,8 @@ pub fn cmd_sessions_stats(
     json: bool,
     pretty: bool,
 ) -> i32 {
+    let config = crate::config::NormalizeConfig::default();
+    let output_format = OutputFormat::from_cli(json, false, None, pretty, false, &config.pretty);
     let registry = FormatRegistry::new();
 
     // Get format (default to claude for backwards compatibility)
@@ -184,12 +187,12 @@ pub fn cmd_sessions_stats(
 
     // Group by repo if requested
     if by_repo {
-        return cmd_sessions_stats_by_repo(&sessions, format_name, json, pretty);
+        return cmd_sessions_stats_by_repo(&sessions, format_name, json, &output_format);
     }
 
     // Collect paths and analyze
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
-    cmd_sessions_analyze_multi(&paths, format_name, json, pretty)
+    cmd_sessions_analyze_multi(&paths, format_name, &output_format)
 }
 
 /// List sessions from all projects in ~/.claude/projects/
@@ -269,7 +272,7 @@ fn cmd_sessions_stats_by_repo(
     sessions: &[SessionFile],
     format_name: Option<&str>,
     json: bool,
-    pretty: bool,
+    output_format: &OutputFormat,
 ) -> i32 {
     use std::collections::HashMap;
 
@@ -298,7 +301,7 @@ fn cmd_sessions_stats_by_repo(
     for (repo_name, paths) in repos {
         println!("=== {} ({} sessions) ===\n", repo_name, paths.len());
 
-        let result = cmd_sessions_analyze_multi(&paths, format_name, false, pretty);
+        let result = cmd_sessions_analyze_multi(&paths, format_name, output_format);
         if result != 0 {
             eprintln!("Failed to analyze sessions for {}", repo_name);
             return result;

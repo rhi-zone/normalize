@@ -375,6 +375,7 @@ mod tests {
         use crate::commands::aliases::AliasesReport;
         use crate::commands::analyze::report::AnalyzeReport;
         use crate::commands::grammars::{GrammarListReport, GrammarPathsReport};
+        use crate::commands::sessions::SessionShowReport;
         use crate::commands::sessions::list::SessionListReport;
         use crate::commands::sessions::plans::PlansListReport;
         use crate::commands::tools::lint::LintListResult;
@@ -389,6 +390,7 @@ mod tests {
         assert_output_formatter::<AnalyzeReport>();
         assert_output_formatter::<GrammarListReport>();
         assert_output_formatter::<GrammarPathsReport>();
+        assert_output_formatter::<SessionShowReport>();
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<PlansListReport>();
         assert_output_formatter::<SessionAnalysis>();

@@ -16,7 +16,11 @@ format-codex = []   # OpenAI Codex CLI sessions
 format-gemini = []  # Gemini CLI sessions
 format-normalize = []    # normalize agent sessions
 
+# JSON Schema support (schemars derives on session types)
+schema = ["dep:schemars"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1"
+schemars = { version = "1", optional = true }

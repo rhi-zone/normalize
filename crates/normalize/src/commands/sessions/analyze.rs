@@ -1,6 +1,6 @@
 //! Session analysis functions.
 
-use crate::output::OutputFormatter;
+use crate::output::{OutputFormat, OutputFormatter};
 use crate::sessions::{
     SessionAnalysis, ToolStats, analyze_session, parse_session, parse_session_with_format,
 };
@@ -9,7 +9,11 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 /// Analyze a session and output statistics.
-pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool, pretty: bool) -> i32 {
+pub fn cmd_sessions_analyze(
+    path: &Path,
+    format: Option<&str>,
+    output_format: &OutputFormat,
+) -> i32 {
     // Parse the session
     let session = if let Some(fmt) = format {
         parse_session_with_format(path, fmt)
@@ -27,11 +31,7 @@ pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool, prett
 
     // Analyze the parsed session
     let analysis = analyze_session(&session);
-
-    let config = crate::config::NormalizeConfig::default();
-    let output_format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, pretty, &config.pretty);
-    analysis.print(&output_format);
+    analysis.print(output_format);
     0
 }
 
@@ -39,8 +39,7 @@ pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>, json: bool, prett
 pub fn cmd_sessions_analyze_multi(
     paths: &[PathBuf],
     format: Option<&str>,
-    json: bool,
-    pretty: bool,
+    output_format: &OutputFormat,
 ) -> i32 {
     let mut aggregate = SessionAnalysis::new(PathBuf::from("."), "aggregate");
     let mut session_count = 0;
@@ -120,10 +119,7 @@ pub fn cmd_sessions_analyze_multi(
     // Update format to show aggregate info
     aggregate.format = format!("aggregate ({} sessions)", session_count);
 
-    let config = crate::config::NormalizeConfig::default();
-    let output_format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, pretty, &config.pretty);
-    aggregate.print(&output_format);
+    aggregate.print(output_format);
 
     0
 }
