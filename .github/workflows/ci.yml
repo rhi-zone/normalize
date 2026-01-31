@@ -136,7 +136,7 @@ jobs:
           NORMALIZE_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
       - name: Build normalize
-        run: cargo build --release -p rhi-normalize
+        run: cargo build --release -p normalize
 
       - name: Check for code clones
         run: |
@@ -190,7 +190,7 @@ jobs:
           workspaces: "crates -> target"
 
       - name: Build release
-        run: cargo build --release -p rhi-normalize
+        run: cargo build --release -p normalize
 
       - name: Run benchmarks
         run: |
@@ -278,4 +278,4 @@ jobs:
           # Compare public API between PR branch and base
           cargo public-api diff ${{ github.event.pull_request.base.sha }}..${{ github.sha }} \
             --deny changed --deny removed \
-            -p rhi-normalize
+            -p normalize

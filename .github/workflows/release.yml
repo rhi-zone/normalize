@@ -74,7 +74,7 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build CLI
-        run: cargo build --release --target ${{ matrix.target }} -p rhi-normalize --features sessions-web
+        run: cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
