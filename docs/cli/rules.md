@@ -107,4 +107,4 @@ moss rules update
 ## See Also
 
 - [analyze](analyze.md) - Run analysis with rules
-- [Rule Writing Guide](../rules.md) - Create custom rules
+- Rule Writing Guide - Create custom rules (planned)
