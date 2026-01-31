@@ -71,14 +71,8 @@ impl SessionShowReport {
             let _ = writeln!(out, "project: {}", project);
         }
 
-        // Stats line
         let tokens = s.total_tokens();
-        let _ = write!(
-            out,
-            "{} turns, {} messages",
-            s.turns.len(),
-            s.message_count()
-        );
+        let _ = write!(out, "{} turns", s.turns.len());
         if tokens.input > 0 || tokens.output > 0 {
             let _ = write!(
                 out,
@@ -90,81 +84,23 @@ impl SessionShowReport {
         let _ = writeln!(out);
         let _ = writeln!(out);
 
-        // User prompts
-        let prompts = extract_user_prompts(s);
-        if !prompts.is_empty() {
-            let _ = writeln!(out, "## Prompts");
-            let _ = writeln!(out);
-            for (turn_idx, text) in &prompts {
-                let _ = writeln!(out, "Turn {}: {}", turn_idx, truncate(text, 120));
+        // Per-turn narrative
+        for (turn_idx, turn) in s.turns.iter().enumerate() {
+            let summary = TurnSummary::extract(turn);
+            if summary.is_empty() {
+                continue;
             }
-            let _ = writeln!(out);
-        }
-
-        // Tool usage
-        let tool_counts = count_tools(s);
-        if !tool_counts.is_empty() {
-            let _ = writeln!(out, "## Tools");
-            let _ = writeln!(out);
-            let mut tools: Vec<_> = tool_counts.iter().collect();
-            tools.sort_by(|a, b| b.1.cmp(a.1));
-            for (name, count) in &tools {
-                let _ = writeln!(out, "  {} {}", count, name);
-            }
-            let _ = writeln!(out);
-        }
-
-        // Errors
-        let errors = collect_errors(s);
-        if !errors.is_empty() {
-            let _ = writeln!(out, "## Errors ({})", errors.len());
-            let _ = writeln!(out);
-            for (turn_idx, text) in errors.iter().take(5) {
-                let _ = writeln!(out, "Turn {}: {}", turn_idx, truncate(text, 100));
-            }
-            if errors.len() > 5 {
-                let _ = writeln!(out, "  ... and {} more", errors.len() - 5);
-            }
-            let _ = writeln!(out);
-        }
-
-        // Files touched
-        let files = collect_file_ops(s);
-        if !files.is_empty() {
-            let _ = writeln!(out, "## Files");
-            let _ = writeln!(out);
-            let mut files: Vec<_> = files.iter().collect();
-            files.sort_by(|a, b| {
-                let a_total = a.1.0 + a.1.1 + a.1.2;
-                let b_total = b.1.0 + b.1.1 + b.1.2;
-                b_total.cmp(&a_total)
-            });
-            for (path, (reads, edits, writes)) in files.iter().take(15) {
-                let mut parts = Vec::new();
-                if *reads > 0 {
-                    parts.push(format!("{}r", reads));
-                }
-                if *edits > 0 {
-                    parts.push(format!("{}e", edits));
-                }
-                if *writes > 0 {
-                    parts.push(format!("{}w", writes));
-                }
-                let _ = writeln!(out, "  {} {}", parts.join("/"), path);
-            }
-            if files.len() > 15 {
-                let _ = writeln!(out, "  ... and {} more files", files.len() - 15);
-            }
+            summary.format_text(&mut out, turn_idx);
         }
 
         out
     }
 
     fn format_summary_pretty(&self) -> String {
-        use nu_ansi_term::Color::{Blue, Cyan, Green, Red, Yellow};
-
         let mut out = String::new();
         let s = &self.session;
+
+        use nu_ansi_term::Color::{Cyan, Green};
 
         // Metadata header
         if let Some(id) = &s.metadata.session_id {
@@ -180,17 +116,8 @@ impl SessionShowReport {
             let _ = writeln!(out, "{} {}", Cyan.paint("project:"), project);
         }
 
-        // Stats line
         let tokens = s.total_tokens();
-        let _ = write!(
-            out,
-            "{}",
-            Cyan.paint(format!(
-                "{} turns, {} messages",
-                s.turns.len(),
-                s.message_count()
-            ))
-        );
+        let _ = write!(out, "{}", Cyan.paint(format!("{} turns", s.turns.len())));
         if tokens.input > 0 || tokens.output > 0 {
             let _ = write!(
                 out,
@@ -205,98 +132,13 @@ impl SessionShowReport {
         let _ = writeln!(out);
         let _ = writeln!(out);
 
-        // User prompts
-        let prompts = extract_user_prompts(s);
-        if !prompts.is_empty() {
-            let _ = writeln!(out, "{}", Blue.bold().paint("## Prompts"));
-            let _ = writeln!(out);
-            for (turn_idx, text) in &prompts {
-                let _ = writeln!(
-                    out,
-                    "{} {}",
-                    Cyan.paint(format!("Turn {}:", turn_idx)),
-                    truncate(text, 120)
-                );
+        // Per-turn narrative
+        for (turn_idx, turn) in s.turns.iter().enumerate() {
+            let summary = TurnSummary::extract(turn);
+            if summary.is_empty() {
+                continue;
             }
-            let _ = writeln!(out);
-        }
-
-        // Tool usage
-        let tool_counts = count_tools(s);
-        if !tool_counts.is_empty() {
-            let _ = writeln!(out, "{}", Green.bold().paint("## Tools"));
-            let _ = writeln!(out);
-            let mut tools: Vec<_> = tool_counts.iter().collect();
-            tools.sort_by(|a, b| b.1.cmp(a.1));
-            for (name, count) in &tools {
-                let _ = writeln!(out, "  {} {}", Yellow.paint(format!("{:>3}", count)), name);
-            }
-            let _ = writeln!(out);
-        }
-
-        // Errors
-        let errors = collect_errors(s);
-        if !errors.is_empty() {
-            let _ = writeln!(
-                out,
-                "{}",
-                Red.bold().paint(format!("## Errors ({})", errors.len()))
-            );
-            let _ = writeln!(out);
-            for (turn_idx, text) in errors.iter().take(5) {
-                let _ = writeln!(
-                    out,
-                    "  {} {}",
-                    Red.paint(format!("Turn {}:", turn_idx)),
-                    truncate(text, 100)
-                );
-            }
-            if errors.len() > 5 {
-                let _ = writeln!(
-                    out,
-                    "  {}",
-                    Red.paint(format!("... and {} more", errors.len() - 5))
-                );
-            }
-            let _ = writeln!(out);
-        }
-
-        // Files touched
-        let files = collect_file_ops(s);
-        if !files.is_empty() {
-            let _ = writeln!(out, "{}", Cyan.bold().paint("## Files"));
-            let _ = writeln!(out);
-            let mut files: Vec<_> = files.iter().collect();
-            files.sort_by(|a, b| {
-                let a_total = a.1.0 + a.1.1 + a.1.2;
-                let b_total = b.1.0 + b.1.1 + b.1.2;
-                b_total.cmp(&a_total)
-            });
-            for (path, (reads, edits, writes)) in files.iter().take(15) {
-                let mut parts = Vec::new();
-                if *reads > 0 {
-                    parts.push(format!("{}r", reads));
-                }
-                if *edits > 0 {
-                    parts.push(format!("{}e", edits));
-                }
-                if *writes > 0 {
-                    parts.push(format!("{}w", writes));
-                }
-                let _ = writeln!(
-                    out,
-                    "  {} {}",
-                    Yellow.paint(format!("{:>8}", parts.join("/"))),
-                    path
-                );
-            }
-            if files.len() > 15 {
-                let _ = writeln!(
-                    out,
-                    "  {}",
-                    Cyan.paint(format!("... and {} more files", files.len() - 15))
-                );
-            }
+            summary.format_pretty(&mut out, turn_idx);
         }
 
         out
@@ -407,91 +249,253 @@ impl SessionShowReport {
     }
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────
+// ── Per-turn summary extraction ─────────────────────────────────────────
 
-/// Extract the first text block from each user message, with turn index.
-fn extract_user_prompts(session: &Session) -> Vec<(usize, String)> {
-    let mut prompts = Vec::new();
-    for (turn_idx, turn) in session.turns.iter().enumerate() {
+use normalize_chat_sessions::Turn;
+
+/// Extracted high-value content from a single turn.
+struct TurnSummary {
+    user_prompt: Option<String>,
+    assistant_text: Option<String>,
+    /// Collapsed tool calls: (name, count)
+    tool_counts: Vec<(String, usize)>,
+    /// Files mutated (Edit/Write) this turn
+    mutations: Vec<String>,
+    /// Bash commands run this turn
+    bash_commands: Vec<String>,
+    /// Errors from tool results
+    errors: Vec<String>,
+}
+
+impl TurnSummary {
+    fn extract(turn: &Turn) -> Self {
+        let mut user_prompt = None;
+        let mut assistant_text = None;
+        let mut tool_map: HashMap<String, usize> = HashMap::new();
+        let mut mutations = Vec::new();
+        let mut bash_commands = Vec::new();
+        let mut errors = Vec::new();
+
         for msg in &turn.messages {
-            if msg.role != Role::User {
-                continue;
-            }
-            for block in &msg.content {
-                if let ContentBlock::Text { text } = block {
-                    if !text.trim().is_empty() {
-                        prompts.push((turn_idx, text.clone()));
-                        break;
+            match msg.role {
+                Role::User => {
+                    if user_prompt.is_none() {
+                        for block in &msg.content {
+                            if let ContentBlock::Text { text } = block {
+                                if !text.trim().is_empty() {
+                                    user_prompt = Some(text.clone());
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
-            }
-        }
-    }
-    prompts
-}
+                Role::Assistant => {
+                    for block in &msg.content {
+                        match block {
+                            ContentBlock::Text { text } if assistant_text.is_none() => {
+                                let trimmed = text.trim();
+                                if !trimmed.is_empty() && trimmed != "(no content)" {
+                                    assistant_text = Some(text.clone());
+                                }
+                            }
+                            ContentBlock::ToolUse { name, input, .. } => {
+                                *tool_map.entry(name.clone()).or_insert(0) += 1;
 
-/// Count tool calls by name.
-fn count_tools(session: &Session) -> HashMap<String, usize> {
-    let mut counts = HashMap::new();
-    for turn in &session.turns {
-        for msg in &turn.messages {
-            for block in &msg.content {
-                if let ContentBlock::ToolUse { name, .. } = block {
-                    *counts.entry(name.clone()).or_insert(0) += 1;
-                }
-            }
-        }
-    }
-    counts
-}
-
-/// Collect error tool results with turn index.
-fn collect_errors(session: &Session) -> Vec<(usize, String)> {
-    let mut errors = Vec::new();
-    for (turn_idx, turn) in session.turns.iter().enumerate() {
-        for msg in &turn.messages {
-            for block in &msg.content {
-                if let ContentBlock::ToolResult {
-                    is_error: true,
-                    content,
-                    ..
-                } = block
-                {
-                    errors.push((turn_idx, content.clone()));
-                }
-            }
-        }
-    }
-    errors
-}
-
-/// Collect file operations: path -> (reads, edits, writes).
-fn collect_file_ops(session: &Session) -> HashMap<String, (usize, usize, usize)> {
-    let mut ops: HashMap<String, (usize, usize, usize)> = HashMap::new();
-    for turn in &session.turns {
-        for msg in &turn.messages {
-            for block in &msg.content {
-                if let ContentBlock::ToolUse { name, input, .. } = block {
-                    let path = match name.as_str() {
-                        "Read" | "Write" | "Edit" => {
-                            input.get("file_path").and_then(|v| v.as_str())
-                        }
-                        _ => None,
-                    };
-                    if let Some(path) = path {
-                        let entry = ops.entry(normalize_path(path)).or_default();
-                        match name.as_str() {
-                            "Read" => entry.0 += 1,
-                            "Edit" => entry.1 += 1,
-                            "Write" => entry.2 += 1,
+                                // Track mutations
+                                match name.as_str() {
+                                    "Edit" | "Write" => {
+                                        if let Some(path) =
+                                            input.get("file_path").and_then(|v| v.as_str())
+                                        {
+                                            mutations.push(normalize_path(path));
+                                        }
+                                    }
+                                    "Bash" => {
+                                        if let Some(cmd) =
+                                            input.get("command").and_then(|v| v.as_str())
+                                        {
+                                            bash_commands.push(truncate(cmd, 80));
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            ContentBlock::ToolResult {
+                                is_error: true,
+                                content,
+                                ..
+                            } => {
+                                errors.push(content.clone());
+                            }
                             _ => {}
                         }
                     }
                 }
+                Role::System => {}
             }
         }
+
+        // Sort tool counts by frequency descending
+        let mut tool_counts: Vec<_> = tool_map.into_iter().collect();
+        tool_counts.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Deduplicate mutations (same file edited multiple times)
+        mutations.sort();
+        mutations.dedup();
+
+        Self {
+            user_prompt,
+            assistant_text,
+            tool_counts,
+            mutations,
+            bash_commands,
+            errors,
+        }
     }
-    ops
+
+    fn is_empty(&self) -> bool {
+        self.user_prompt.is_none() && self.assistant_text.is_none() && self.tool_counts.is_empty()
+    }
+
+    /// True if this turn has only tool calls with no user prompt or assistant text.
+    /// These are continuation turns (agent working) that should be collapsed.
+    fn is_tool_only(&self) -> bool {
+        self.user_prompt.is_none() && self.assistant_text.is_none() && !self.tool_counts.is_empty()
+    }
+
+    fn format_text(&self, out: &mut String, turn_idx: usize) {
+        // User prompt
+        if let Some(prompt) = &self.user_prompt {
+            let _ = writeln!(out, "## Turn {}", turn_idx);
+            let _ = writeln!(out, "> {}", truncate(prompt, 200));
+            let _ = writeln!(out);
+        } else if !self.is_tool_only() && self.assistant_text.is_some() {
+            let _ = writeln!(out, "## Turn {}", turn_idx);
+        }
+
+        // Assistant response (truncated)
+        if let Some(text) = &self.assistant_text {
+            let _ = writeln!(out, "{}", truncate(text, 200));
+            let _ = writeln!(out);
+        }
+
+        // Tool summary line
+        if !self.tool_counts.is_empty() {
+            let tools_str = format_tool_counts(&self.tool_counts);
+            if self.is_tool_only() {
+                // Continuation turn — single compact line
+                let _ = writeln!(out, "  [{} ...]", tools_str);
+            } else {
+                let _ = writeln!(out, "[{}]", tools_str);
+            }
+        }
+
+        // Mutations
+        if !self.mutations.is_empty() {
+            for path in &self.mutations {
+                let _ = writeln!(out, "  -> {}", path);
+            }
+        }
+
+        // Bash commands
+        for cmd in &self.bash_commands {
+            let _ = writeln!(out, "  $ {}", cmd);
+        }
+
+        // Errors
+        for err in &self.errors {
+            let _ = writeln!(out, "  ERROR: {}", truncate(err, 120));
+        }
+
+        // Blank line between turns (only if we printed something substantive)
+        if self.user_prompt.is_some() || self.assistant_text.is_some() || !self.errors.is_empty() {
+            let _ = writeln!(out);
+        }
+    }
+
+    fn format_pretty(&self, out: &mut String, turn_idx: usize) {
+        use nu_ansi_term::Color::{Blue, Cyan, Green, Red, Yellow};
+
+        // User prompt
+        if let Some(prompt) = &self.user_prompt {
+            let _ = writeln!(
+                out,
+                "{}",
+                Blue.bold().paint(format!("## Turn {}", turn_idx))
+            );
+            let _ = writeln!(out, "{} {}", Blue.paint(">"), truncate(prompt, 200));
+            let _ = writeln!(out);
+        } else if !self.is_tool_only() && self.assistant_text.is_some() {
+            let _ = writeln!(
+                out,
+                "{}",
+                Cyan.bold().paint(format!("## Turn {}", turn_idx))
+            );
+        }
+
+        // Assistant response (truncated)
+        if let Some(text) = &self.assistant_text {
+            let _ = writeln!(out, "{}", truncate(text, 200));
+            let _ = writeln!(out);
+        }
+
+        // Tool summary line
+        if !self.tool_counts.is_empty() {
+            let tools_str = format_tool_counts(&self.tool_counts);
+            if self.is_tool_only() {
+                let _ = writeln!(out, "  {}", Cyan.paint(format!("[{} ...]", tools_str)));
+            } else {
+                let _ = writeln!(out, "{}", Cyan.paint(format!("[{}]", tools_str)));
+            }
+        }
+
+        // Mutations
+        if !self.mutations.is_empty() {
+            for path in &self.mutations {
+                let _ = writeln!(
+                    out,
+                    "  {} {}",
+                    Green.paint("->"),
+                    Yellow.paint(path.as_str())
+                );
+            }
+        }
+
+        // Bash commands
+        for cmd in &self.bash_commands {
+            let _ = writeln!(out, "  {} {}", Green.paint("$"), cmd);
+        }
+
+        // Errors
+        for err in &self.errors {
+            let _ = writeln!(
+                out,
+                "  {} {}",
+                Red.bold().paint("ERROR:"),
+                truncate(err, 120)
+            );
+        }
+
+        if self.user_prompt.is_some() || self.assistant_text.is_some() || !self.errors.is_empty() {
+            let _ = writeln!(out);
+        }
+    }
+}
+
+/// Format tool counts as a compact string: "Read x3, Edit x2, Bash"
+fn format_tool_counts(counts: &[(String, usize)]) -> String {
+    counts
+        .iter()
+        .map(|(name, count)| {
+            if *count == 1 {
+                name.clone()
+            } else {
+                format!("{} x{}", name, count)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Normalize a file path for display (strip common prefixes).
