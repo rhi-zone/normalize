@@ -161,18 +161,12 @@ export default withMermaid(
           ]
         },
         {
-          text: 'Experiments',
-          collapsed: true,
-          items: [
-            { text: 'Agent Prompts', link: '/experiments/agent-prompts' },
-          ]
-        },
-        {
           text: 'Archive',
           collapsed: true,
           items: [
             { text: 'Agent', link: '/archive/agent' },
             { text: 'Agent Architecture', link: '/archive/agent-architecture' },
+            { text: 'Agent Prompts', link: '/archive/agent-prompts' },
             { text: 'Agent Commands', link: '/archive/agent-commands' },
             { text: 'Agent Dogfooding', link: '/archive/agent-dogfooding' },
             { text: 'Agent State Machine', link: '/archive/agent-state-machine' },
