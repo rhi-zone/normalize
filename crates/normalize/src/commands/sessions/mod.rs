@@ -20,6 +20,8 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::sessions::{FormatRegistry, LogFormat};
+use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
+use nucleo_matcher::{Config, Matcher};
 
 /// Format an age in seconds to a human-readable string.
 pub(crate) fn format_age(secs: u64) -> String {
@@ -35,8 +37,29 @@ pub(crate) fn format_age(secs: u64) -> String {
 }
 
 /// Resolve a session identifier to one or more file paths.
-/// Supports: full path, session ID, glob pattern.
+/// Tries literal (exact/prefix) matching first, then falls back to fuzzy matching.
 pub(crate) fn resolve_session_paths(
+    session_id: &str,
+    project: Option<&Path>,
+    format_name: Option<&str>,
+) -> Vec<PathBuf> {
+    let literal = resolve_session_paths_literal(session_id, project, format_name);
+    if !literal.is_empty() {
+        return literal;
+    }
+
+    // Fuzzy fallback
+    if let Some((path, matched_stem)) = resolve_session_fuzzy(session_id, project, format_name) {
+        eprintln!("fuzzy match: {}", matched_stem);
+        return vec![path];
+    }
+
+    Vec::new()
+}
+
+/// Resolve a session identifier using exact match or prefix only.
+/// Supports: full path, session ID prefix, glob pattern.
+pub(crate) fn resolve_session_paths_literal(
     session_id: &str,
     project: Option<&Path>,
     format_name: Option<&str>,
@@ -84,6 +107,44 @@ pub(crate) fn resolve_session_paths(
 
     // No match
     Vec::new()
+}
+
+/// Fuzzy-match a session identifier against all session file stems.
+/// Returns the best match (highest score) along with the matched stem.
+fn resolve_session_fuzzy(
+    session_id: &str,
+    project: Option<&Path>,
+    format_name: Option<&str>,
+) -> Option<(PathBuf, String)> {
+    let registry = FormatRegistry::new();
+    let format: &dyn LogFormat = match format_name {
+        Some(name) => registry.get(name)?,
+        None => registry.get("claude").unwrap(),
+    };
+
+    let sessions = format.list_sessions(project);
+    let mut matcher = Matcher::new(Config::DEFAULT);
+    let pattern = Pattern::parse(session_id, CaseMatching::Ignore, Normalization::Smart);
+
+    let mut best: Option<(PathBuf, String, u32)> = None;
+
+    for s in &sessions {
+        if let Some(stem) = s.path.file_stem().and_then(|os| os.to_str()) {
+            let mut buf = Vec::new();
+            if let Some(score) =
+                pattern.score(nucleo_matcher::Utf32Str::new(stem, &mut buf), &mut matcher)
+            {
+                if best
+                    .as_ref()
+                    .is_none_or(|(_, _, best_score)| score > *best_score)
+                {
+                    best = Some((s.path.clone(), stem.to_string(), score));
+                }
+            }
+        }
+    }
+
+    best.map(|(path, stem, _)| (path, stem))
 }
 
 /// Helper for default limit
@@ -145,6 +206,11 @@ pub enum SessionsCommand {
     Show {
         /// Session ID or path
         session: String,
+
+        /// Require exact/prefix match (disable fuzzy fallback)
+        #[arg(long)]
+        #[serde(default)]
+        exact: bool,
 
         /// Apply jq filter to each JSONL line
         #[arg(long)]
@@ -307,6 +373,7 @@ pub fn run(
 
         Some(SessionsCommand::Show {
             session,
+            exact,
             jq,
             analyze,
             filter,
@@ -327,6 +394,7 @@ pub fn run(
             errors_only,
             ngrams,
             case_insensitive,
+            exact,
         ),
 
         Some(SessionsCommand::Stats {

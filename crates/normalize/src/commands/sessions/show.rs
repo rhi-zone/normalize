@@ -1,7 +1,7 @@
 //! Show/analyze a specific session.
 
 use super::analyze::{cmd_sessions_analyze, cmd_sessions_analyze_multi, cmd_sessions_jq};
-use super::resolve_session_paths;
+use super::{resolve_session_paths, resolve_session_paths_literal};
 use normalize_chat_sessions::{ContentBlock, Role, Session};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
@@ -22,9 +22,14 @@ pub fn cmd_sessions_show(
     errors_only: bool,
     ngrams: Option<usize>,
     case_insensitive: bool,
+    exact: bool,
 ) -> i32 {
     // Find matching session files
-    let paths = resolve_session_paths(session_id, project, format);
+    let paths = if exact {
+        resolve_session_paths_literal(session_id, project, format)
+    } else {
+        resolve_session_paths(session_id, project, format)
+    };
 
     if paths.is_empty() {
         eprintln!("No sessions found matching: {}", session_id);
