@@ -315,7 +315,7 @@ impl TurnSummary {
                                         if let Some(cmd) =
                                             input.get("command").and_then(|v| v.as_str())
                                         {
-                                            bash_commands.push(truncate(cmd, 80));
+                                            bash_commands.push(collapse_newlines(cmd));
                                         }
                                     }
                                     _ => {}
@@ -368,15 +368,15 @@ impl TurnSummary {
         // User prompt
         if let Some(prompt) = &self.user_prompt {
             let _ = writeln!(out, "## Turn {}", turn_idx);
-            let _ = writeln!(out, "> {}", truncate(prompt, 200));
+            let _ = writeln!(out, "> {}", collapse_newlines(prompt));
             let _ = writeln!(out);
         } else if !self.is_tool_only() && self.assistant_text.is_some() {
             let _ = writeln!(out, "## Turn {}", turn_idx);
         }
 
-        // Assistant response (truncated)
+        // Assistant response
         if let Some(text) = &self.assistant_text {
-            let _ = writeln!(out, "{}", truncate(text, 200));
+            let _ = writeln!(out, "{}", collapse_newlines(text));
             let _ = writeln!(out);
         }
 
@@ -392,20 +392,18 @@ impl TurnSummary {
         }
 
         // Mutations
-        if !self.mutations.is_empty() {
-            for path in &self.mutations {
-                let _ = writeln!(out, "  -> {}", path);
-            }
+        for path in &self.mutations {
+            let _ = writeln!(out, "  -> {}", path);
         }
 
         // Bash commands
         for cmd in &self.bash_commands {
-            let _ = writeln!(out, "  $ {}", cmd);
+            let _ = writeln!(out, "  {}", cmd);
         }
 
         // Errors
         for err in &self.errors {
-            let _ = writeln!(out, "  ERROR: {}", truncate(err, 120));
+            let _ = writeln!(out, "  ERROR: {}", collapse_newlines(err));
         }
 
         // Blank line between turns (only if we printed something substantive)
@@ -424,7 +422,7 @@ impl TurnSummary {
                 "{}",
                 Blue.bold().paint(format!("## Turn {}", turn_idx))
             );
-            let _ = writeln!(out, "{} {}", Blue.paint(">"), truncate(prompt, 200));
+            let _ = writeln!(out, "{} {}", Blue.paint(">"), collapse_newlines(prompt));
             let _ = writeln!(out);
         } else if !self.is_tool_only() && self.assistant_text.is_some() {
             let _ = writeln!(
@@ -434,9 +432,9 @@ impl TurnSummary {
             );
         }
 
-        // Assistant response (truncated)
+        // Assistant response
         if let Some(text) = &self.assistant_text {
-            let _ = writeln!(out, "{}", truncate(text, 200));
+            let _ = writeln!(out, "{}", collapse_newlines(text));
             let _ = writeln!(out);
         }
 
@@ -451,20 +449,18 @@ impl TurnSummary {
         }
 
         // Mutations
-        if !self.mutations.is_empty() {
-            for path in &self.mutations {
-                let _ = writeln!(
-                    out,
-                    "  {} {}",
-                    Green.paint("->"),
-                    Yellow.paint(path.as_str())
-                );
-            }
+        for path in &self.mutations {
+            let _ = writeln!(
+                out,
+                "  {} {}",
+                Green.paint("->"),
+                Yellow.paint(path.as_str())
+            );
         }
 
         // Bash commands
         for cmd in &self.bash_commands {
-            let _ = writeln!(out, "  {} {}", Green.paint("$"), cmd);
+            let _ = writeln!(out, "  {}", cmd);
         }
 
         // Errors
@@ -473,7 +469,7 @@ impl TurnSummary {
                 out,
                 "  {} {}",
                 Red.bold().paint("ERROR:"),
-                truncate(err, 120)
+                collapse_newlines(err)
             );
         }
 
@@ -527,17 +523,13 @@ fn format_tokens(tokens: u64) -> String {
 }
 
 /// Truncate a string to max chars, adding "..." if truncated. Collapses newlines.
-fn truncate(s: &str, max: usize) -> String {
+/// Collapse newlines into spaces, trim.
+fn collapse_newlines(s: &str) -> String {
     let collapsed: String = s
         .chars()
         .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
         .collect();
-    let trimmed = collapsed.trim();
-    if trimmed.len() <= max {
-        trimmed.to_string()
-    } else {
-        format!("{}...", &trimmed[..max])
-    }
+    collapsed.trim().to_string()
 }
 
 /// Format a content block as plain text.
