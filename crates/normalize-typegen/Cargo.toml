@@ -3,6 +3,7 @@ name = "normalize-typegen"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Polyglot type and validator generation from schemas"
 
 [features]

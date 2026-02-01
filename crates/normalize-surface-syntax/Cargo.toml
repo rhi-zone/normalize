@@ -3,6 +3,7 @@ name = "normalize-surface-syntax"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Surface-level syntax translation between languages via a common IR"
 
 [features]

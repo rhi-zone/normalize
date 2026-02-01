@@ -3,6 +3,7 @@ name = "normalize-syntax-rules"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Syntax-based linting rules with tree-sitter queries"
 
 [dependencies]
@@ -21,11 +22,11 @@ tree-sitter = "0.26"
 streaming-iterator = "0.1"
 
 # Language support
-normalize-languages = { path = "../normalize-languages" }
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
 
 # Schema generation
 schemars = "1"
 
 # Core traits
-normalize-core = { path = "../normalize-core" }
-normalize-derive = { path = "../normalize-derive" }
+normalize-core = { path = "../normalize-core", version = "0.1.0" }
+normalize-derive = { path = "../normalize-derive", version = "0.1.0" }

@@ -1,8 +1,9 @@
 [package]
 name = "normalize"
 version.workspace = true
-edition = "2024"
+edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Fast code intelligence CLI and library"
 
 [lib]
@@ -33,17 +34,17 @@ libsql.workspace = true
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 dirs = "5"
-normalize-core = { path = "../normalize-core" }
-normalize-derive = { path = "../normalize-derive" }
-normalize-languages = { path = "../normalize-languages" }
-normalize-typegen = { path = "../normalize-typegen", features = ["input-typescript"] }
-normalize-syntax-rules = { path = "../normalize-syntax-rules" }
-normalize-openapi = { path = "../normalize-openapi" }
-normalize-ecosystems = { path = "../normalize-ecosystems" }
-normalize-chat-sessions = { path = "../normalize-chat-sessions", features = ["schema"] }
-normalize-tools = { path = "../normalize-tools" }
-normalize-cli-parser = { path = "../normalize-cli-parser" }
-normalize-surface-syntax = { path = "../normalize-surface-syntax", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }
+normalize-core = { path = "../normalize-core", version = "0.1.0" }
+normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+normalize-typegen = { path = "../normalize-typegen", version = "0.1.0", features = ["input-typescript"] }
+normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.1.0" }
+normalize-openapi = { path = "../normalize-openapi", version = "0.1.0" }
+normalize-ecosystems = { path = "../normalize-ecosystems", version = "0.1.0" }
+normalize-chat-sessions = { path = "../normalize-chat-sessions", version = "0.1.0", features = ["schema"] }
+normalize-tools = { path = "../normalize-tools", version = "0.1.0" }
+normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }
+normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.1.0", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true

@@ -1,8 +1,10 @@
 [package]
 name = "normalize-derive"
-version = "0.1.0"
-edition = "2024"
-description = "Normalize"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Derive macros for normalize"
 
 [lib]
 proc-macro = true

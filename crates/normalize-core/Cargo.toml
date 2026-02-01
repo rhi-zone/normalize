@@ -3,6 +3,7 @@ name = "normalize-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Normalize"
+repository.workspace = true
+description = "Core traits and types for the normalize code intelligence system"
 
 [dependencies]
