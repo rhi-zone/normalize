@@ -4,6 +4,10 @@ Behavioral rules for Claude Code in this repository.
 
 **References:** `docs/philosophy.md` (design tenets), `docs/architecture-decisions.md` (technical choices), `docs/session-modes.md` (working conventions).
 
+## Publishing
+
+**Published on [crates.io](https://crates.io/crates/normalize)** as 13 crates. All at v0.1.0 (early, in active development). `normalize-grammars` is `publish = false` (build-time grammar data).
+
 ## Architecture
 
 **Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. All commands work without index (graceful degradation).
