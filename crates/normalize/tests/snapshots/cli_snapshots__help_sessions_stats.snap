@@ -13,10 +13,10 @@ Options:
       --since <SINCE>       Filter sessions since date (YYYY-MM-DD)
       --until <UNTIL>       Filter sessions until date (YYYY-MM-DD)
       --project <PROJECT>   Filter by specific project path
-      --all-projects        Show sessions from all projects (not just current)
   -r, --root <ROOT>         Root directory (defaults to current directory)
-      --by-repo             Group statistics by repository
+      --all-projects        Show sessions from all projects (not just current)
       --format <FORMAT>     Force specific format: claude, codex, gemini, moss
+      --by-repo             Group statistics by repository
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
