@@ -108,17 +108,17 @@ impl Filter {
     /// Returns true if the path passes the filter.
     pub fn matches(&self, path: &Path) -> bool {
         // If only matcher exists, path must match it
-        if let Some(ref only) = self.only_matcher {
-            if !only.matched(path, false).is_ignore() {
-                return false;
-            }
+        if let Some(ref only) = self.only_matcher
+            && !only.matched(path, false).is_ignore()
+        {
+            return false;
         }
 
         // If exclude matcher exists, path must not match it
-        if let Some(ref exclude) = self.exclude_matcher {
-            if exclude.matched(path, false).is_ignore() {
-                return false;
-            }
+        if let Some(ref exclude) = self.exclude_matcher
+            && exclude.matched(path, false).is_ignore()
+        {
+            return false;
         }
 
         true
@@ -164,10 +164,10 @@ fn resolve_patterns(
 /// Resolve a single alias name to patterns.
 fn resolve_alias(name: &str, config: &AliasConfig, languages: &[&str]) -> ResolveResult {
     // Check if explicitly disabled
-    if let Some(patterns) = config.entries.get(name) {
-        if patterns.is_empty() {
-            return ResolveResult::DisabledAlias(name.to_string());
-        }
+    if let Some(patterns) = config.entries.get(name)
+        && patterns.is_empty()
+    {
+        return ResolveResult::DisabledAlias(name.to_string());
     }
 
     // Use unified alias lookup

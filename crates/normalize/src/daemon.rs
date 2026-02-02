@@ -279,21 +279,19 @@ impl DaemonServer {
             let debounce = Duration::from_millis(500);
             let mut last_event = Instant::now();
 
-            for res in notify_rx {
-                if let Ok(event) = res {
-                    // Skip .normalize directory
-                    if event
-                        .paths
-                        .iter()
-                        .all(|p| p.to_string_lossy().contains(".normalize"))
-                    {
-                        continue;
-                    }
+            for event in notify_rx.into_iter().flatten() {
+                // Skip .normalize directory
+                if event
+                    .paths
+                    .iter()
+                    .all(|p| p.to_string_lossy().contains(".normalize"))
+                {
+                    continue;
+                }
 
-                    if last_event.elapsed() >= debounce {
-                        let _ = tx.send(root_clone.clone());
-                        last_event = Instant::now();
-                    }
+                if last_event.elapsed() >= debounce {
+                    let _ = tx.send(root_clone.clone());
+                    last_event = Instant::now();
                 }
             }
         });

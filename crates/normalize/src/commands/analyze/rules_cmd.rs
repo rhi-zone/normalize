@@ -9,6 +9,7 @@ use normalize_syntax_rules::{
 use std::path::Path;
 
 /// Run the rules command.
+#[allow(clippy::too_many_arguments)]
 pub fn cmd_rules(
     root: &Path,
     filter_rule: Option<&str>,

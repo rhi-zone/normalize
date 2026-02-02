@@ -165,17 +165,17 @@ impl GrammarLoader {
 
         for search_path in &self.search_paths {
             let scm_path = search_path.join(&scm_name);
-            if scm_path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&scm_path) {
-                    let query = Arc::new(content);
+            if scm_path.exists()
+                && let Ok(content) = std::fs::read_to_string(&scm_path)
+            {
+                let query = Arc::new(content);
 
-                    // Cache it
-                    if let Ok(mut c) = cache.write() {
-                        c.insert(name.to_string(), Arc::clone(&query));
-                    }
-
-                    return Some(query);
+                // Cache it
+                if let Ok(mut c) = cache.write() {
+                    c.insert(name.to_string(), Arc::clone(&query));
                 }
+
+                return Some(query);
             }
         }
 
@@ -188,10 +188,10 @@ impl GrammarLoader {
 
         for search_path in &self.search_paths {
             let lib_path = search_path.join(&lib_name);
-            if lib_path.exists() {
-                if let Some(lang) = self.load_from_path(name, &lib_path) {
-                    return Some(lang);
-                }
+            if lib_path.exists()
+                && let Some(lang) = self.load_from_path(name, &lib_path)
+            {
+                return Some(lang);
             }
         }
 

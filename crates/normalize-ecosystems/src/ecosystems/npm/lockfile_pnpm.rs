@@ -214,7 +214,7 @@ fn build_tree(
     if let Some(importers) = parsed.get("importers").and_then(|i| i.as_mapping())
         && let Some(root_importer) = importers
             .get(".")
-            .or_else(|| importers.get(&serde_yaml::Value::String(".".to_string())))
+            .or_else(|| importers.get(serde_yaml::Value::String(".".to_string())))
     {
         for dep_type in ["dependencies", "devDependencies"] {
             if let Some(deps) = root_importer.get(dep_type).and_then(|d| d.as_mapping()) {

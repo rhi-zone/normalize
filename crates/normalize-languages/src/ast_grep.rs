@@ -45,7 +45,7 @@ impl AstGrepLanguage for DynLang {
 
 impl LanguageExt for DynLang {
     fn get_ts_language(&self) -> TSLanguage {
-        self.0.clone().into()
+        self.0.clone()
     }
 }
 

@@ -51,8 +51,7 @@ fn line_has_allow_comment(line: &str, rule_id: &str) -> bool {
         let after = &line[pos + 11..]; // len("moss-allow:")
         let after = after.trim_start();
         // Check if rule_id matches (might be followed by space, dash, or end of comment)
-        if after.starts_with(rule_id) {
-            let rest = &after[rule_id.len()..];
+        if let Some(rest) = after.strip_prefix(rule_id) {
             // Valid if followed by nothing, whitespace, dash (reason), or end of comment
             return rest.is_empty()
                 || rest.starts_with(char::is_whitespace)
@@ -70,19 +69,18 @@ fn is_allowed_by_comment(content: &str, start_line: usize, rule_id: &str) -> boo
     let line_idx = start_line.saturating_sub(1); // 0-indexed
 
     // Check the line itself
-    if let Some(line) = lines.get(line_idx) {
-        if line_has_allow_comment(line, rule_id) {
-            return true;
-        }
+    if let Some(line) = lines.get(line_idx)
+        && line_has_allow_comment(line, rule_id)
+    {
+        return true;
     }
 
     // Check the line before (for standalone comment)
-    if line_idx > 0 {
-        if let Some(line) = lines.get(line_idx - 1) {
-            if line_has_allow_comment(line, rule_id) {
-                return true;
-            }
-        }
+    if line_idx > 0
+        && let Some(line) = lines.get(line_idx - 1)
+        && line_has_allow_comment(line, rule_id)
+    {
+        return true;
     }
 
     false
@@ -108,9 +106,9 @@ fn check_requires(rule: &Rule, registry: &SourceRegistry, ctx: &SourceContext) -
 
         // Parse operator prefix
         let matches = if let Some(rest) = expected.strip_prefix(">=") {
-            actual >= rest.to_string()
+            *actual >= *rest
         } else if let Some(rest) = expected.strip_prefix("<=") {
-            actual <= rest.to_string()
+            *actual <= *rest
         } else if let Some(rest) = expected.strip_prefix('!') {
             actual != rest
         } else {
@@ -149,7 +147,7 @@ pub fn run_rules(
     // Filter rules first
     let active_rules: Vec<&Rule> = rules
         .iter()
-        .filter(|r| filter_rule.map_or(true, |f| r.id == f))
+        .filter(|r| filter_rule.is_none_or(|f| r.id == f))
         .collect();
 
     if active_rules.is_empty() {
@@ -187,10 +185,10 @@ pub fn run_rules(
 
         // Pass 1: Language-specific rules - compile directly (trust the author)
         for rule in &specific_rules {
-            if rule.languages.iter().any(|l| l == grammar_name) {
-                if let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str) {
-                    compiled_rules.push((rule, q));
-                }
+            if rule.languages.iter().any(|l| l == grammar_name)
+                && let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str)
+            {
+                compiled_rules.push((rule, q));
             }
         }
 

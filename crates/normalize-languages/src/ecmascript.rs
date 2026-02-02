@@ -142,24 +142,21 @@ pub fn extract_container(node: &Node, content: &str, name: &str) -> Symbol {
     let mut implements = Vec::new();
     // Find class_heritage child node (not a field)
     for i in 0..node.child_count() as u32 {
-        if let Some(heritage) = node.child(i) {
-            if heritage.kind() == "class_heritage" {
-                // heritage can contain extends_clause and/or implements_clause
-                for j in 0..heritage.child_count() as u32 {
-                    if let Some(clause) = heritage.child(j) {
-                        if clause.kind() == "extends_clause" || clause.kind() == "implements_clause"
+        if let Some(heritage) = node.child(i)
+            && heritage.kind() == "class_heritage"
+        {
+            // heritage can contain extends_clause and/or implements_clause
+            for j in 0..heritage.child_count() as u32 {
+                if let Some(clause) = heritage.child(j)
+                    && (clause.kind() == "extends_clause" || clause.kind() == "implements_clause")
+                {
+                    // Each clause contains type identifiers
+                    for k in 0..clause.child_count() as u32 {
+                        if let Some(type_node) = clause.child(k)
+                            && (type_node.kind() == "type_identifier"
+                                || type_node.kind() == "identifier")
                         {
-                            // Each clause contains type identifiers
-                            for k in 0..clause.child_count() as u32 {
-                                if let Some(type_node) = clause.child(k) {
-                                    if type_node.kind() == "type_identifier"
-                                        || type_node.kind() == "identifier"
-                                    {
-                                        implements
-                                            .push(content[type_node.byte_range()].to_string());
-                                    }
-                                }
-                            }
+                            implements.push(content[type_node.byte_range()].to_string());
                         }
                     }
                 }
@@ -282,10 +279,10 @@ fn collect_import_names(import_clause: &Node, content: &str, names: &mut Vec<Str
                 // { foo, bar }
                 let mut inner_cursor = child.walk();
                 for inner in child.children(&mut inner_cursor) {
-                    if inner.kind() == "import_specifier" {
-                        if let Some(name_node) = inner.child_by_field_name("name") {
-                            names.push(content[name_node.byte_range()].to_string());
-                        }
+                    if inner.kind() == "import_specifier"
+                        && let Some(name_node) = inner.child_by_field_name("name")
+                    {
+                        names.push(content[name_node.byte_range()].to_string());
                     }
                 }
             }
@@ -334,14 +331,14 @@ pub fn extract_public_symbols(node: &Node, content: &str) -> Vec<Export> {
                 // export const foo = ...
                 let mut decl_cursor = child.walk();
                 for decl_child in child.children(&mut decl_cursor) {
-                    if decl_child.kind() == "variable_declarator" {
-                        if let Some(name_node) = decl_child.child_by_field_name("name") {
-                            exports.push(Export {
-                                name: content[name_node.byte_range()].to_string(),
-                                kind: SymbolKind::Variable,
-                                line,
-                            });
-                        }
+                    if decl_child.kind() == "variable_declarator"
+                        && let Some(name_node) = decl_child.child_by_field_name("name")
+                    {
+                        exports.push(Export {
+                            name: content[name_node.byte_range()].to_string(),
+                            kind: SymbolKind::Variable,
+                            line,
+                        });
                     }
                 }
             }

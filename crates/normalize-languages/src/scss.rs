@@ -192,8 +192,8 @@ impl Language for Scss {
 
         // Handle @import, @use, @forward
         for keyword in &["@import ", "@use ", "@forward "] {
-            if text.starts_with(keyword) {
-                let rest = text[keyword.len()..].trim();
+            if let Some(stripped) = text.strip_prefix(keyword) {
+                let rest = stripped.trim();
                 // Extract quoted path
                 if let Some(start) = rest.find('"').or_else(|| rest.find('\'')) {
                     let quote = rest.chars().nth(start).unwrap();

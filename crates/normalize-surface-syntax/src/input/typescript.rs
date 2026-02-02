@@ -63,10 +63,10 @@ impl<'a> ReadContext<'a> {
         let mut cursor = root.walk();
 
         for child in root.children(&mut cursor) {
-            if child.is_named() {
-                if let Some(stmt) = self.read_stmt(child)? {
-                    statements.push(stmt);
-                }
+            if child.is_named()
+                && let Some(stmt) = self.read_stmt(child)?
+            {
+                statements.push(stmt);
             }
         }
 
@@ -523,10 +523,10 @@ impl<'a> ReadContext<'a> {
             self.collect_params(params, &mut param_names);
         }
         // Try "parameter" field (for single unparenthesized param: x => ...)
-        if let Some(param) = node.child_by_field_name("parameter") {
-            if param.kind() == "identifier" {
-                param_names.push(self.node_text(param).to_string());
-            }
+        if let Some(param) = node.child_by_field_name("parameter")
+            && param.kind() == "identifier"
+        {
+            param_names.push(self.node_text(param).to_string());
         }
 
         // Get body
@@ -594,10 +594,10 @@ impl<'a> ReadContext<'a> {
                 for child in params.children(&mut cursor) {
                     if child.kind() == "identifier" {
                         param_names.push(self.node_text(child).to_string());
-                    } else if child.kind() == "required_parameter" {
-                        if let Some(pattern) = child.child_by_field_name("pattern") {
-                            param_names.push(self.node_text(pattern).to_string());
-                        }
+                    } else if child.kind() == "required_parameter"
+                        && let Some(pattern) = child.child_by_field_name("pattern")
+                    {
+                        param_names.push(self.node_text(pattern).to_string());
                     }
                 }
             }
@@ -820,10 +820,10 @@ impl<'a> ReadContext<'a> {
             "lexical_declaration" => {
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
-                    if child.kind() == "variable_declarator" {
-                        if let Some(name) = child.child_by_field_name("name") {
-                            return Ok(self.node_text(name).to_string());
-                        }
+                    if child.kind() == "variable_declarator"
+                        && let Some(name) = child.child_by_field_name("name")
+                    {
+                        return Ok(self.node_text(name).to_string());
                     }
                 }
                 Err(ReadError::Parse(
@@ -866,12 +866,12 @@ impl<'a> ReadContext<'a> {
                                 past_colon = true;
                                 continue;
                             }
-                            if past_colon && inner_child.is_named() {
-                                if inner_child.kind() != "break_statement" {
-                                    if let Some(stmt) = self.read_stmt(inner_child)? {
-                                        body_stmts.push(stmt);
-                                    }
-                                }
+                            if past_colon
+                                && inner_child.is_named()
+                                && inner_child.kind() != "break_statement"
+                                && let Some(stmt) = self.read_stmt(inner_child)?
+                            {
+                                body_stmts.push(stmt);
                             }
                         }
 
@@ -886,12 +886,12 @@ impl<'a> ReadContext<'a> {
                             past_colon = true;
                             continue;
                         }
-                        if past_colon && inner_child.is_named() {
-                            if inner_child.kind() != "break_statement" {
-                                if let Some(stmt) = self.read_stmt(inner_child)? {
-                                    default_body.push(stmt);
-                                }
-                            }
+                        if past_colon
+                            && inner_child.is_named()
+                            && inner_child.kind() != "break_statement"
+                            && let Some(stmt) = self.read_stmt(inner_child)?
+                        {
+                            default_body.push(stmt);
                         }
                     }
                 }
@@ -984,10 +984,10 @@ impl<'a> ReadContext<'a> {
         let mut cursor = node.walk();
 
         for child in node.children(&mut cursor) {
-            if child.is_named() {
-                if let Some(stmt) = self.read_stmt(child)? {
-                    statements.push(stmt);
-                }
+            if child.is_named()
+                && let Some(stmt) = self.read_stmt(child)?
+            {
+                statements.push(stmt);
             }
         }
 

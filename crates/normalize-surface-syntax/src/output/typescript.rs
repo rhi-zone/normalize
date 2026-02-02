@@ -388,11 +388,11 @@ impl TypeScriptWriter {
                     self.output.push_str(") => ");
 
                     // Single return statement can be expression body
-                    if f.body.len() == 1 {
-                        if let Stmt::Return(Some(expr)) = &f.body[0] {
-                            self.write_expr(expr);
-                            return;
-                        }
+                    if f.body.len() == 1
+                        && let Stmt::Return(Some(expr)) = &f.body[0]
+                    {
+                        self.write_expr(expr);
+                        return;
                     }
 
                     self.output.push_str("{\n");

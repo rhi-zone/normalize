@@ -176,20 +176,20 @@ impl Language for Hcl {
         // Look for source attribute in the block
         let text = &content[node.byte_range()];
         for line in text.lines() {
-            if line.trim().starts_with("source") {
-                if let Some(start) = line.find('"') {
-                    let rest = &line[start + 1..];
-                    if let Some(end) = rest.find('"') {
-                        let module = rest[..end].to_string();
-                        return vec![Import {
-                            module,
-                            names: Vec::new(),
-                            alias: None,
-                            is_wildcard: false,
-                            is_relative: !rest.starts_with("registry") && !rest.starts_with("git"),
-                            line: node.start_position().row + 1,
-                        }];
-                    }
+            if line.trim().starts_with("source")
+                && let Some(start) = line.find('"')
+            {
+                let rest = &line[start + 1..];
+                if let Some(end) = rest.find('"') {
+                    let module = rest[..end].to_string();
+                    return vec![Import {
+                        module,
+                        names: Vec::new(),
+                        alias: None,
+                        is_wildcard: false,
+                        is_relative: !rest.starts_with("registry") && !rest.starts_with("git"),
+                        line: node.start_position().row + 1,
+                    }];
                 }
             }
         }

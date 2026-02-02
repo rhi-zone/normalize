@@ -633,7 +633,7 @@ fn test_highlight_markdown_code() {
     let code = "# Heading\n\n`inline code`";
     let spans = get_spans(code, "markdown");
     // Just verify we got some spans (grammar loaded successfully)
-    assert!(!spans.is_empty() || code.len() > 0); // Always passes, grammar check
+    assert!(!spans.is_empty() || !code.is_empty()); // Always passes, grammar check
 }
 
 // ==================== CSS ====================
@@ -834,7 +834,7 @@ fn test_highlight_elixir_keywords() {
     let code = "def hello do :ok end";
     let _spans = get_spans(code, "elixir");
     // Just verify grammar loads - most tokens are anonymous in this grammar
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -850,7 +850,7 @@ fn test_highlight_elixir_atoms() {
     let code = ":ok";
     let _spans = get_spans(code, "elixir");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Erlang ====================
@@ -861,7 +861,7 @@ fn test_highlight_erlang_atoms() {
     let code = "hello() -> ok.";
     let _spans = get_spans(code, "erlang");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -879,7 +879,7 @@ fn test_highlight_clojure_numbers() {
     let code = "(+ 1 2)";
     let _spans = get_spans(code, "clojure");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -888,7 +888,7 @@ fn test_highlight_clojure_strings() {
     let code = "(println \"hello\")";
     let _spans = get_spans(code, "clojure");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -897,7 +897,7 @@ fn test_highlight_clojure_comments() {
     let code = "; comment\n(+ 1 2)";
     let _spans = get_spans(code, "clojure");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Scheme ====================
@@ -908,7 +908,7 @@ fn test_highlight_scheme_numbers() {
     let code = "(+ 1 2)";
     let _spans = get_spans(code, "scheme");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -925,7 +925,7 @@ fn test_highlight_scheme_comments() {
     let code = "; comment\n(+ 1 2)";
     let _spans = get_spans(code, "scheme");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Zig ====================
@@ -936,7 +936,7 @@ fn test_highlight_zig_keywords() {
     let code = "const x: i32 = 42;";
     let _spans = get_spans(code, "zig");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -954,7 +954,7 @@ fn test_highlight_d_keywords() {
     let code = "int x = 42;";
     let _spans = get_spans(code, "d");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -963,7 +963,7 @@ fn test_highlight_d_comments() {
     let code = "int x = 1; // comment";
     let _spans = get_spans(code, "d");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Ada ====================
@@ -974,7 +974,7 @@ fn test_highlight_ada_keywords() {
     let code = "X : Integer := 42;";
     let _spans = get_spans(code, "ada");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -992,7 +992,7 @@ fn test_highlight_verilog_keywords() {
     let code = "wire x = 1;";
     let _spans = get_spans(code, "verilog");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -1009,7 +1009,7 @@ fn test_highlight_vhdl_keywords() {
     let code = "signal x : integer := 42;";
     let _spans = get_spans(code, "vhdl");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -1027,7 +1027,7 @@ fn test_highlight_asm_instructions() {
     let code = "mov eax, 42";
     let _spans = get_spans(code, "asm");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -1044,7 +1044,7 @@ fn test_highlight_x86asm_instructions() {
     let code = "mov eax, 42";
     let _spans = get_spans(code, "x86asm");
     // Grammar loads successfully
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Batch 4: JVM + Apple ====================
@@ -1053,14 +1053,14 @@ fn test_highlight_x86asm_instructions() {
 fn test_highlight_scala() {
     let code = "val x = 42";
     let _spans = get_spans(code, "scala");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_kotlin() {
     let code = "val x = 42";
     let _spans = get_spans(code, "kotlin");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -1075,14 +1075,14 @@ fn test_highlight_groovy() {
 fn test_highlight_swift() {
     let code = "let x = 42";
     let _spans = get_spans(code, "swift");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_objc() {
     let code = "int x = 42;";
     let _spans = get_spans(code, "objc");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Batch 5: Scripting ====================
@@ -1091,42 +1091,42 @@ fn test_highlight_objc() {
 fn test_highlight_perl() {
     let code = "my $x = 42;";
     let _spans = get_spans(code, "perl");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_php() {
     let code = "<?php $x = 42; ?>";
     let _spans = get_spans(code, "php");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_awk() {
     let code = "{ print $1 }";
     let _spans = get_spans(code, "awk");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_fish() {
     let code = "set x 42";
     let _spans = get_spans(code, "fish");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_zsh() {
     let code = "x=42";
     let _spans = get_spans(code, "zsh");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_powershell() {
     let code = "$x = 42";
     let _spans = get_spans(code, "powershell");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Batch 6: Data/Query ====================
@@ -1136,28 +1136,28 @@ fn test_highlight_sql() {
     // NOTE: SQL grammar uses anonymous nodes for keywords (keyword_select*)
     let code = "SELECT * FROM users WHERE id = 1;";
     let _spans = get_spans(code, "sql");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_graphql() {
     let code = "query { user { name } }";
     let _spans = get_spans(code, "graphql");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_sparql() {
     let code = "SELECT ?name WHERE { ?s ?p ?o }";
     let _spans = get_spans(code, "sparql");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_jq() {
     let code = ".foo | .bar";
     let _spans = get_spans(code, "jq");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Batch 7: Config ====================
@@ -1166,49 +1166,49 @@ fn test_highlight_jq() {
 fn test_highlight_ini() {
     let code = "[section]\nkey = value";
     let _spans = get_spans(code, "ini");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_hcl() {
     let code = "resource \"aws_instance\" \"example\" { }";
     let _spans = get_spans(code, "hcl");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_nix() {
     let code = "{ pkgs ? import <nixpkgs> {} }: pkgs.hello";
     let _spans = get_spans(code, "nix");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_dockerfile() {
     let code = "FROM ubuntu:latest\nRUN apt-get update";
     let _spans = get_spans(code, "dockerfile");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_nginx() {
     let code = "server { listen 80; }";
     let _spans = get_spans(code, "nginx");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_cmake() {
     let code = "cmake_minimum_required(VERSION 3.10)";
     let _spans = get_spans(code, "cmake");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_meson() {
     let code = "project('hello', 'c')";
     let _spans = get_spans(code, "meson");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Batch 8: Scientific ====================
@@ -1217,28 +1217,28 @@ fn test_highlight_meson() {
 fn test_highlight_julia() {
     let code = "x = 42";
     let _spans = get_spans(code, "julia");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_r() {
     let code = "x <- 42";
     let _spans = get_spans(code, "r");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_matlab() {
     let code = "x = 42;";
     let _spans = get_spans(code, "matlab");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_prolog() {
     let code = "hello :- write('Hello').";
     let _spans = get_spans(code, "prolog");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 // ==================== Batch 9: Misc ====================
@@ -1247,21 +1247,21 @@ fn test_highlight_prolog() {
 fn test_highlight_dart() {
     let code = "var x = 42;";
     let _spans = get_spans(code, "dart");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_vim() {
     let code = "let g:var = 42";
     let _spans = get_spans(code, "vim");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_elisp() {
     let code = "(setq x 42)";
     let _spans = get_spans(code, "elisp");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
@@ -1287,19 +1287,19 @@ fn test_highlight_xml_attributes() {
 fn test_highlight_gleam() {
     let code = "let x = 42";
     let _spans = get_spans(code, "gleam");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_elm() {
     let code = "x = 42";
     let _spans = get_spans(code, "elm");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }
 
 #[test]
 fn test_highlight_ron() {
     let code = "(x: 42)";
     let _spans = get_spans(code, "ron");
-    assert!(code.len() > 0);
+    assert!(!code.is_empty());
 }

@@ -1,0 +1,29 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 338
+expression: "snapshot_help(&[\"sessions\", \"stats\"])"
+---
+Show aggregate statistics across sessions
+
+Usage: normalize sessions stats [OPTIONS]
+
+Options:
+      --grep <GREP>         Filter sessions by grep pattern
+      --days <DAYS>         Filter sessions from the last N days
+      --since <SINCE>       Filter sessions since date (YYYY-MM-DD)
+      --until <UNTIL>       Filter sessions until date (YYYY-MM-DD)
+      --project <PROJECT>   Filter by specific project path
+  -r, --root <ROOT>         Root directory (defaults to current directory)
+      --all-projects        Show sessions from all projects (not just current)
+      --format <FORMAT>     Force specific format: claude, codex, gemini, moss
+      --by-repo             Group statistics by repository
+  -l, --limit <LIMIT>       Limit number of sessions [default: 20]
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

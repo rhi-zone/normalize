@@ -303,17 +303,15 @@ pub fn cmd_view_file(
                     continue;
                 }
 
-                if let Some(resolved_path) = resolve_import(&imp.module, &full_path, root) {
-                    if let Ok(import_content) = std::fs::read_to_string(&resolved_path) {
-                        let import_extractor = skeleton::SkeletonExtractor::new();
-                        let import_skeleton =
-                            import_extractor.extract(&resolved_path, &import_content);
+                if let Some(resolved_path) = resolve_import(&imp.module, &full_path, root)
+                    && let Ok(import_content) = std::fs::read_to_string(&resolved_path)
+                {
+                    let import_extractor = skeleton::SkeletonExtractor::new();
+                    let import_skeleton = import_extractor.extract(&resolved_path, &import_content);
 
-                        for name in &imp.names {
-                            if let Some(sig) = find_symbol_signature(&import_skeleton.symbols, name)
-                            {
-                                resolved_symbols.push((imp.module.clone(), name.clone(), sig));
-                            }
+                    for name in &imp.names {
+                        if let Some(sig) = find_symbol_signature(&import_skeleton.symbols, name) {
+                            resolved_symbols.push((imp.module.clone(), name.clone(), sig));
                         }
                     }
                 }

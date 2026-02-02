@@ -180,15 +180,15 @@ impl LogFormat for NormalizeAgentFormat {
         for line in peek_lines(path, 3) {
             if let Ok(entry) = serde_json::from_str::<Value>(&line) {
                 // Moss agent logs have "event" field
-                if let Some(event) = entry.get("event").and_then(|v| v.as_str()) {
-                    if matches!(event, "session_start" | "task" | "turn_start") {
-                        // Check for moss-specific fields
-                        if entry.get("moss_root").is_some()
-                            || entry.get("user_prompt").is_some()
-                            || entry.get("working_memory_count").is_some()
-                        {
-                            return 1.0;
-                        }
+                if let Some(event) = entry.get("event").and_then(|v| v.as_str())
+                    && matches!(event, "session_start" | "task" | "turn_start")
+                {
+                    // Check for moss-specific fields
+                    if entry.get("moss_root").is_some()
+                        || entry.get("user_prompt").is_some()
+                        || entry.get("working_memory_count").is_some()
+                    {
+                        return 1.0;
                     }
                 }
             }

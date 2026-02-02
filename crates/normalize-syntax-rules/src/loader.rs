@@ -63,10 +63,10 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
     // 4. Apply config overrides
     for (rule_id, override_cfg) in &config.0 {
         if let Some(rule) = rules_by_id.get_mut(rule_id) {
-            if let Some(ref severity_str) = override_cfg.severity {
-                if let Ok(severity) = severity_str.parse() {
-                    rule.severity = severity;
-                }
+            if let Some(ref severity_str) = override_cfg.severity
+                && let Ok(severity) = severity_str.parse()
+            {
+                rule.severity = severity;
             }
             if let Some(enabled) = override_cfg.enabled {
                 rule.enabled = enabled;
@@ -99,10 +99,10 @@ fn load_rules_from_dir(rules_dir: &Path) -> Vec<Rule> {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().map(|e| e == "scm").unwrap_or(false) {
-            if let Some(rule) = parse_rule_file(&path) {
-                rules.push(rule);
-            }
+        if path.extension().is_some_and(|e| e == "scm")
+            && let Some(rule) = parse_rule_file(&path)
+        {
+            rules.push(rule);
         }
     }
 
@@ -133,20 +133,16 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
     for line in &lines {
         let trimmed = line.trim();
         if trimmed == "# ---" {
-            if in_frontmatter {
-                in_frontmatter = false;
-            } else {
-                in_frontmatter = true;
-            }
+            in_frontmatter = !in_frontmatter;
             continue;
         }
 
         if in_frontmatter {
             let fm_line = line.strip_prefix('#').unwrap_or(line).trim_start();
             frontmatter_lines.push(fm_line);
-        } else if !in_frontmatter && !frontmatter_lines.is_empty() {
-            query_lines.push(*line);
-        } else if frontmatter_lines.is_empty() && !trimmed.is_empty() && !trimmed.starts_with('#') {
+        } else if !frontmatter_lines.is_empty()
+            || (frontmatter_lines.is_empty() && !trimmed.is_empty() && !trimmed.starts_with('#'))
+        {
             query_lines.push(*line);
         }
     }

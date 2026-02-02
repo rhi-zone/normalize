@@ -372,14 +372,14 @@ impl PythonWriter {
 
             Expr::Function(func) => {
                 // Lambda if single return statement, otherwise can't express
-                if func.body.len() == 1 {
-                    if let Stmt::Return(Some(ret_expr)) = &func.body[0] {
-                        self.output.push_str("lambda ");
-                        self.output.push_str(&func.params.join(", "));
-                        self.output.push_str(": ");
-                        self.write_expr(ret_expr);
-                        return;
-                    }
+                if func.body.len() == 1
+                    && let Stmt::Return(Some(ret_expr)) = &func.body[0]
+                {
+                    self.output.push_str("lambda ");
+                    self.output.push_str(&func.params.join(", "));
+                    self.output.push_str(": ");
+                    self.write_expr(ret_expr);
+                    return;
                 }
                 // Can't express multi-statement function as expression in Python
                 // Output as a comment or placeholder

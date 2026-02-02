@@ -58,7 +58,7 @@ fn run_bandit(root: &Path) -> Result<Vec<SecurityFinding>, String> {
             findings.push(SecurityFinding {
                 file,
                 line,
-                severity: Severity::from_str(severity_str),
+                severity: Severity::parse(severity_str),
                 rule_id,
                 message,
                 tool: "bandit".to_string(),

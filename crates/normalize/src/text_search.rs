@@ -95,10 +95,10 @@ pub fn grep(
 
             // Apply filter if provided
             let rel_path = path.strip_prefix(root).unwrap_or(path);
-            if let Some(f) = filter {
-                if !f.matches(rel_path) {
-                    return ignore::WalkState::Continue;
-                }
+            if let Some(f) = filter
+                && !f.matches(rel_path)
+            {
+                return ignore::WalkState::Continue;
             }
 
             files_searched.fetch_add(1, Ordering::Relaxed);

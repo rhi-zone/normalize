@@ -138,12 +138,11 @@ pub fn list_jsonl_sessions(dir: &Path) -> Vec<SessionFile> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                if let Ok(meta) = path.metadata() {
-                    if let Ok(mtime) = meta.modified() {
-                        sessions.push(SessionFile { path, mtime });
-                    }
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("jsonl")
+                && let Ok(meta) = path.metadata()
+                && let Ok(mtime) = meta.modified()
+            {
+                sessions.push(SessionFile { path, mtime });
             }
         }
     }
@@ -168,6 +167,7 @@ impl Default for FormatRegistry {
 
 impl FormatRegistry {
     /// Create a new registry with all built-in formats.
+    #[allow(clippy::vec_init_then_push)] // cfg-gated pushes can't use vec![]
     pub fn new() -> Self {
         let mut formats: Vec<Box<dyn LogFormat>> = Vec::new();
         #[cfg(feature = "format-claude")]
@@ -196,10 +196,8 @@ impl FormatRegistry {
         let mut best: Option<(&dyn LogFormat, f64)> = None;
         for fmt in &self.formats {
             let score = fmt.detect(path);
-            if score > 0.0 {
-                if best.is_none() || score > best.unwrap().1 {
-                    best = Some((fmt.as_ref(), score));
-                }
+            if score > 0.0 && (best.is_none() || score > best.unwrap().1) {
+                best = Some((fmt.as_ref(), score));
             }
         }
         best.map(|(fmt, _)| fmt)

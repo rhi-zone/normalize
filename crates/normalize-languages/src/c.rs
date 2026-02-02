@@ -90,7 +90,7 @@ impl Language for C {
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let declarator = node.child_by_field_name("declarator")?;
-        let name = self.find_identifier(&declarator, content)?;
+        let name = Self::find_identifier(&declarator, content)?;
 
         Some(Symbol {
             name: name.to_string(),
@@ -230,20 +230,20 @@ impl Language for C {
         }
         // For functions, look in the declarator
         if let Some(declarator) = node.child_by_field_name("declarator") {
-            return self.find_identifier(&declarator, content);
+            return Self::find_identifier(&declarator, content);
         }
         None
     }
 }
 
 impl C {
-    fn find_identifier<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+    fn find_identifier<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
         if node.kind() == "identifier" {
             return Some(&content[node.byte_range()]);
         }
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if let Some(id) = self.find_identifier(&child, content) {
+            if let Some(id) = Self::find_identifier(&child, content) {
                 return Some(id);
             }
         }

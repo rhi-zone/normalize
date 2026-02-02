@@ -136,19 +136,19 @@ pub fn cmd_lint_run(
         }
 
         let result = if fix && tool.can_fix() {
-            tool.fix(&paths.iter().copied().collect::<Vec<_>>(), root)
+            tool.fix(&paths.to_vec(), root)
         } else {
-            tool.run(&paths.iter().copied().collect::<Vec<_>>(), root)
+            tool.run(&paths.to_vec(), root)
         };
 
         match result {
             Ok(result) => {
                 if !result.success {
                     had_errors = true;
-                    if let Some(err) = &result.error {
-                        if !json {
-                            eprintln!("{}: {}", info.name, err);
-                        }
+                    if let Some(err) = &result.error
+                        && !json
+                    {
+                        eprintln!("{}: {}", info.name, err);
                     }
                 } else if result.error_count() > 0 {
                     had_errors = true;
@@ -330,35 +330,33 @@ pub fn cmd_lint_watch(
         .flat_map(|t| t.info().extensions.iter().copied())
         .collect();
 
-    for res in rx {
-        if let Ok(event) = res {
-            // Skip hidden files and directories
-            let dominated_by_hidden = event.paths.iter().all(|p| {
-                p.components()
-                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
-            });
-            if dominated_by_hidden {
-                continue;
-            }
+    for event in rx.into_iter().flatten() {
+        // Skip hidden files and directories
+        let dominated_by_hidden = event.paths.iter().all(|p| {
+            p.components()
+                .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        });
+        if dominated_by_hidden {
+            continue;
+        }
 
-            // Only trigger on files with relevant extensions
-            let has_relevant_file = event.paths.iter().any(|p| {
-                p.extension()
-                    .and_then(|e| e.to_str())
-                    .map(|e| watch_extensions.contains(e))
-                    .unwrap_or(false)
-            });
-            if !has_relevant_file {
-                continue;
-            }
+        // Only trigger on files with relevant extensions
+        let has_relevant_file = event.paths.iter().any(|p| {
+            p.extension()
+                .and_then(|e| e.to_str())
+                .map(|e| watch_extensions.contains(e))
+                .unwrap_or(false)
+        });
+        if !has_relevant_file {
+            continue;
+        }
 
-            // Debounce: only run if enough time has passed
-            if last_run.elapsed() >= debounce {
-                eprintln!();
-                eprintln!("File changed, re-running lint...");
-                let _ = run_lint_once(target, root, fix, tools, category, json);
-                last_run = Instant::now();
-            }
+        // Debounce: only run if enough time has passed
+        if last_run.elapsed() >= debounce {
+            eprintln!();
+            eprintln!("File changed, re-running lint...");
+            let _ = run_lint_once(target, root, fix, tools, category, json);
+            last_run = Instant::now();
         }
     }
 
@@ -441,19 +439,19 @@ fn run_lint_once(
         }
 
         let result = if fix && tool.can_fix() {
-            tool.fix(&paths.iter().copied().collect::<Vec<_>>(), root)
+            tool.fix(&paths.to_vec(), root)
         } else {
-            tool.run(&paths.iter().copied().collect::<Vec<_>>(), root)
+            tool.run(&paths.to_vec(), root)
         };
 
         match result {
             Ok(result) => {
                 if !result.success {
                     had_errors = true;
-                    if let Some(err) = &result.error {
-                        if !json {
-                            eprintln!("{}: {}", info.name, err);
-                        }
+                    if let Some(err) = &result.error
+                        && !json
+                    {
+                        eprintln!("{}: {}", info.name, err);
                     }
                 } else if result.error_count() > 0 {
                     had_errors = true;

@@ -68,7 +68,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &TypeScriptOptions
 
                 for (i, variant) in variants.iter().enumerate() {
                     if i > 0 {
-                        out.push_str("\n");
+                        out.push('\n');
                     }
                     out.push_str("  | \"");
                     out.push_str(&variant.value);
@@ -84,7 +84,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &TypeScriptOptions
 
                 for (i, variant) in variants.iter().enumerate() {
                     if i > 0 {
-                        out.push_str("\n");
+                        out.push('\n');
                     }
                     out.push_str("  | ");
                     out.push_str(&variant.value.to_string());
@@ -99,7 +99,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &TypeScriptOptions
 
                 for (i, variant) in tagged.variants.iter().enumerate() {
                     if i > 0 {
-                        out.push_str("\n");
+                        out.push('\n');
                     }
                     out.push_str("  | {\n");
                     out.push_str("      ");
@@ -155,10 +155,10 @@ fn generate_field(out: &mut String, field: &Field, options: &TypeScriptOptions) 
     let ty_str = type_to_ts(&field.ty);
     out.push_str(&ty_str);
 
-    if !field.required {
-        if let OptionalStyle::Union = options.optional_style {
-            out.push_str(" | undefined");
-        }
+    if !field.required
+        && let OptionalStyle::Union = options.optional_style
+    {
+        out.push_str(" | undefined");
     }
 
     out.push_str(";\n");
@@ -180,10 +180,10 @@ fn generate_field_inline(out: &mut String, field: &Field, options: &TypeScriptOp
     out.push_str(": ");
     out.push_str(&type_to_ts(&field.ty));
 
-    if !field.required {
-        if let OptionalStyle::Union = options.optional_style {
-            out.push_str(" | undefined");
-        }
+    if !field.required
+        && let OptionalStyle::Union = options.optional_style
+    {
+        out.push_str(" | undefined");
     }
 
     out.push(';');

@@ -3,10 +3,10 @@
 //! These tests ensure CLI breaking changes are detected during review.
 //! Run `cargo insta review` to update snapshots after intentional changes.
 
-use assert_cmd::Command;
+use assert_cmd::{Command, cargo_bin_cmd};
 
 fn normalize() -> Command {
-    Command::cargo_bin("normalize").unwrap()
+    cargo_bin_cmd!("normalize")
 }
 
 fn snapshot_help(args: &[&str]) -> String {

@@ -275,22 +275,24 @@ pub fn cmd_edit(
     let shadow_enabled = config.shadow.enabled();
 
     // Check for delete confirmation if warn_on_delete is enabled
-    if matches!(action, EditAction::Delete) && !yes && !dry_run {
-        if config.shadow.warn_on_delete.unwrap_or(true) {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "error": "Delete requires confirmation",
-                        "hint": "Use --yes or -y to confirm deletion, or set [shadow] warn_on_delete = false"
-                    })
-                );
-            } else {
-                eprintln!("Delete requires confirmation. Use --yes or -y to confirm.");
-                eprintln!("To disable this warning: set [shadow] warn_on_delete = false in config");
-            }
-            return 1;
+    if matches!(action, EditAction::Delete)
+        && !yes
+        && !dry_run
+        && config.shadow.warn_on_delete.unwrap_or(true)
+    {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "error": "Delete requires confirmation",
+                    "hint": "Use --yes or -y to confirm deletion, or set [shadow] warn_on_delete = false"
+                })
+            );
+        } else {
+            eprintln!("Delete requires confirmation. Use --yes or -y to confirm.");
+            eprintln!("To disable this warning: set [shadow] warn_on_delete = false in config");
         }
+        return 1;
     }
 
     // Ensure daemon is running if configured (will pick up edits)
@@ -664,6 +666,7 @@ fn output_result(
 /// Insert content at a destination symbol or container.
 /// Used by both Move and Copy operations to avoid duplication.
 /// Returns Ok(new_content) on success, Err(error_message) on failure.
+#[allow(clippy::too_many_arguments)]
 fn insert_at_destination(
     editor: &edit::Editor,
     file_path: &Path,
@@ -998,6 +1001,7 @@ fn handle_glob_edit(
 }
 
 /// Handle undo/redo/goto operations on shadow git history.
+#[allow(clippy::too_many_arguments)]
 pub fn cmd_undo_redo(
     root: Option<&Path>,
     undo: Option<usize>,

@@ -30,7 +30,7 @@ pub fn cmd_view_directory(
         Some(depth as usize)
     };
 
-    let include_symbols = depth > 1 || depth < 0;
+    let include_symbols = !(0..=1).contains(&depth);
 
     let view_node = tree::generate_view_tree(
         dir,
@@ -165,10 +165,10 @@ pub fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i3
         let syms = parser.parse_file(&file_path, &content);
         for sym in syms {
             let sym_kind = sym.kind.as_str();
-            if let Some(filter) = kind_filter {
-                if sym_kind != filter {
-                    continue;
-                }
+            if let Some(filter) = kind_filter
+                && sym_kind != filter
+            {
+                continue;
             }
             all_symbols.push((
                 rel_path.clone(),

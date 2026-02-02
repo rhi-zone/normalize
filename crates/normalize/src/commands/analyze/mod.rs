@@ -239,13 +239,13 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         Some(AnalyzeCommand::Hotspots { .. }) => {
             crate::output::print_output_schema::<hotspots::HotspotsReport>();
         }
-        Some(AnalyzeCommand::CheckRefs { .. }) => {
+        Some(AnalyzeCommand::CheckRefs) => {
             crate::output::print_output_schema::<check_refs::CheckRefsReport>();
         }
-        Some(AnalyzeCommand::StaleDocs { .. }) => {
+        Some(AnalyzeCommand::StaleDocs) => {
             crate::output::print_output_schema::<stale_docs::StaleDocsReport>();
         }
-        Some(AnalyzeCommand::CheckExamples { .. }) => {
+        Some(AnalyzeCommand::CheckExamples) => {
             crate::output::print_output_schema::<check_examples::CheckExamplesReport>();
         }
         Some(AnalyzeCommand::DuplicateFunctions { .. }) => {

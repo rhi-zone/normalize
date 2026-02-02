@@ -445,33 +445,33 @@ fn detect_branch_context(node: &tree_sitter::Node, source: &[u8]) -> Option<Stri
     }
 
     // If this is a block, check if parent is if_expression (then branch) or else_clause (else branch)
-    if kind == "block" {
-        if let Some(parent) = node.parent() {
-            let parent_kind = parent.kind();
-            if parent_kind == "if_expression" || parent_kind == "if_statement" {
-                // Check if we're the consequence (then) or part of else
-                // If the block's previous sibling is "else", we're in else branch
-                if let Some(prev) = node.prev_sibling() {
-                    if prev.kind() == "else" {
-                        return Some("else".to_string());
-                    }
-                }
-                return Some("if".to_string());
-            }
-            if parent_kind == "else_clause" {
+    if kind == "block"
+        && let Some(parent) = node.parent()
+    {
+        let parent_kind = parent.kind();
+        if parent_kind == "if_expression" || parent_kind == "if_statement" {
+            // Check if we're the consequence (then) or part of else
+            // If the block's previous sibling is "else", we're in else branch
+            if let Some(prev) = node.prev_sibling()
+                && prev.kind() == "else"
+            {
                 return Some("else".to_string());
             }
+            return Some("if".to_string());
+        }
+        if parent_kind == "else_clause" {
+            return Some("else".to_string());
         }
     }
 
     // Match/switch arms
     if kind == "match_arm" || kind == "case_clause" || kind == "switch_case" {
         // Try to get the pattern text
-        if let Some(pattern) = node.child_by_field_name("pattern") {
-            if let Ok(text) = pattern.utf8_text(source) {
-                let preview: String = text.chars().take(20).collect();
-                return Some(format!("match {}", preview));
-            }
+        if let Some(pattern) = node.child_by_field_name("pattern")
+            && let Ok(text) = pattern.utf8_text(source)
+        {
+            let preview: String = text.chars().take(20).collect();
+            return Some(format!("match {}", preview));
         }
         return Some("match arm".to_string());
     }
@@ -500,19 +500,17 @@ fn trace_node(
         let child_context_ref = child_context.as_deref();
 
         // Only process nodes within our range
-        if line >= start_line && line <= end_line {
+        if line >= start_line && line <= end_line
             // Look for assignment-like nodes
-            if kind == "assignment_expression"
+            && (kind == "assignment_expression"
                 || kind == "assignment"
                 || kind == "let_declaration"
                 || kind == "variable_declarator"
-                || kind == "short_var_declaration"
-            {
-                if let Some(mut entry) = extract_assignment(&node, source, line, signature_map) {
-                    entry.branch_context = branch_context.map(|s| s.to_string());
-                    entries.push(entry);
-                }
-            }
+                || kind == "short_var_declaration")
+            && let Some(mut entry) = extract_assignment(&node, source, line, signature_map)
+        {
+            entry.branch_context = branch_context.map(|s| s.to_string());
+            entries.push(entry);
         }
 
         if cursor.goto_first_child() {
@@ -640,7 +638,7 @@ fn extract_calls_from_node(
 
                 if let Some(name) = func_name {
                     // Try to look up signature and location
-                    let simple_name = name.split(&['.', ':'][..]).last().unwrap_or(&name);
+                    let simple_name = name.split(&['.', ':'][..]).next_back().unwrap_or(&name);
                     let info = signature_map.get(simple_name);
                     calls.push(CallInfo {
                         name,
@@ -676,17 +674,16 @@ fn extract_identifiers_from_node(node: &tree_sitter::Node, source: &[u8]) -> Vec
             let node = cursor.node();
             let kind = node.kind();
 
-            if kind == "identifier" || kind == "field_identifier" || kind.ends_with("_identifier") {
-                if let Ok(text) = node.utf8_text(source) {
-                    // Skip keywords and common non-identifier patterns
-                    if ![
-                        "let", "mut", "const", "var", "true", "false", "nil", "null", "self",
-                        "this",
-                    ]
-                    .contains(&text)
-                    {
-                        ids.push(text.to_string());
-                    }
+            if (kind == "identifier" || kind == "field_identifier" || kind.ends_with("_identifier"))
+                && let Ok(text) = node.utf8_text(source)
+            {
+                // Skip keywords and common non-identifier patterns
+                if ![
+                    "let", "mut", "const", "var", "true", "false", "nil", "null", "self", "this",
+                ]
+                .contains(&text)
+                {
+                    ids.push(text.to_string());
                 }
             }
 
@@ -804,7 +801,10 @@ async fn trace_cross_file_returns_async(
     root: &std::path::Path,
 ) -> Option<CrossFileReturns> {
     // Extract simple function name (last segment of method chain)
-    let simple_name = call_name.split(&['.', ':'][..]).last().unwrap_or(call_name);
+    let simple_name = call_name
+        .split(&['.', ':'][..])
+        .next_back()
+        .unwrap_or(call_name);
 
     // Look up in index
     let mut idx = index::FileIndex::open_if_enabled(root).await?;

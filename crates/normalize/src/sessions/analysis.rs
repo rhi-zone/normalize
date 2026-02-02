@@ -572,7 +572,7 @@ impl SessionAnalysis {
             lines.push("## File Operations".to_string());
             lines.push(String::new());
             let mut ops: Vec<_> = self.file_operations.values().collect();
-            ops.sort_by(|a, b| b.total().cmp(&a.total()));
+            ops.sort_by_key(|b| std::cmp::Reverse(b.total()));
             lines.push("| File | Reads | Edits | Writes | Total |".to_string());
             lines.push("|------|-------|-------|--------|-------|".to_string());
             for op in ops.iter().take(20) {
@@ -591,7 +591,7 @@ impl SessionAnalysis {
         // Parallelization hints
         if !self.tool_chains.is_empty() {
             let mut sorted_chains = self.tool_chains.clone();
-            sorted_chains.sort_by(|a, b| b.potential_savings().cmp(&a.potential_savings()));
+            sorted_chains.sort_by_key(|b| std::cmp::Reverse(b.potential_savings()));
 
             let top_opportunities: Vec<_> = sorted_chains
                 .iter()
@@ -913,7 +913,7 @@ impl SessionAnalysis {
         if !self.file_operations.is_empty() {
             writeln!(out, "\x1b[1;36m━━━ File Operations ━━━\x1b[0m").unwrap();
             let mut ops: Vec<_> = self.file_operations.values().collect();
-            ops.sort_by(|a, b| b.total().cmp(&a.total()));
+            ops.sort_by_key(|b| std::cmp::Reverse(b.total()));
 
             for op in ops.iter().take(15) {
                 let bar_width = 20;
@@ -984,7 +984,7 @@ impl SessionAnalysis {
         // Parallelization opportunities
         if !self.tool_chains.is_empty() {
             let mut sorted_chains = self.tool_chains.clone();
-            sorted_chains.sort_by(|a, b| b.potential_savings().cmp(&a.potential_savings()));
+            sorted_chains.sort_by_key(|b| std::cmp::Reverse(b.potential_savings()));
 
             let top_opportunities: Vec<_> = sorted_chains
                 .iter()
@@ -1516,8 +1516,7 @@ pub fn extract_tool_patterns(chains: &[ToolChain]) -> Vec<ToolPattern> {
         // Extract all subsequences of length 2-5
         for len in 2..=5.min(chain.tools.len()) {
             for start in 0..=chain.tools.len().saturating_sub(len) {
-                let subsequence: Vec<String> =
-                    chain.tools[start..start + len].iter().cloned().collect();
+                let subsequence: Vec<String> = chain.tools[start..start + len].to_vec();
                 *pattern_counts.entry(subsequence).or_insert(0) += 1;
             }
         }
@@ -1575,14 +1574,14 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
             // Detect corrections in assistant messages
             if msg.role == normalize_chat_sessions::Role::Assistant {
                 for block in &msg.content {
-                    if let ContentBlock::Text { text } = block {
-                        if let Some((category, excerpt)) = detect_correction(text) {
-                            analysis.corrections.push(Correction {
-                                turn: turn_idx,
-                                text: excerpt,
-                                category,
-                            });
-                        }
+                    if let ContentBlock::Text { text } = block
+                        && let Some((category, excerpt)) = detect_correction(text)
+                    {
+                        analysis.corrections.push(Correction {
+                            turn: turn_idx,
+                            text: excerpt,
+                            category,
+                        });
                     }
                 }
             }
@@ -1701,23 +1700,23 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
             }
         } else {
             // Chain broken - save if length >= 3
-            if let Some(chain) = current_chain.take() {
-                if chain.len() >= 3 {
-                    let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
-                    let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
-                    analysis.tool_chains.push(ToolChain { tools, turn_range });
-                }
+            if let Some(chain) = current_chain.take()
+                && chain.len() >= 3
+            {
+                let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
+                let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
+                analysis.tool_chains.push(ToolChain { tools, turn_range });
             }
         }
     }
 
     // Handle final chain
-    if let Some(chain) = current_chain {
-        if chain.len() >= 3 {
-            let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
-            let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
-            analysis.tool_chains.push(ToolChain { tools, turn_range });
-        }
+    if let Some(chain) = current_chain
+        && chain.len() >= 3
+    {
+        let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
+        let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
+        analysis.tool_chains.push(ToolChain { tools, turn_range });
     }
 
     // Analyze token usage and build output_tokens_per_turn

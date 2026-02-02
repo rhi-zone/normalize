@@ -29,15 +29,14 @@ impl LogFormat for GeminiCliFormat {
                     continue;
                 }
                 let logs_path = subdir.join("logs.json");
-                if logs_path.exists() {
-                    if let Ok(meta) = logs_path.metadata() {
-                        if let Ok(mtime) = meta.modified() {
-                            sessions.push(SessionFile {
-                                path: logs_path,
-                                mtime,
-                            });
-                        }
-                    }
+                if logs_path.exists()
+                    && let Ok(meta) = logs_path.metadata()
+                    && let Ok(mtime) = meta.modified()
+                {
+                    sessions.push(SessionFile {
+                        path: logs_path,
+                        mtime,
+                    });
                 }
             }
         }

@@ -191,10 +191,10 @@ fn strip_jsonc_comments(content: &str) -> String {
             result.push(c);
             if c == '"' {
                 in_string = false;
-            } else if c == '\\' {
-                if let Some(escaped) = chars.next() {
-                    result.push(escaped);
-                }
+            } else if c == '\\'
+                && let Some(escaped) = chars.next()
+            {
+                result.push(escaped);
             }
             continue;
         }
@@ -221,23 +221,14 @@ fn strip_jsonc_comments(content: &str) -> String {
 }
 
 fn extract_version_from_specifier(spec: &str) -> Option<String> {
-    // Handle jsr:@scope/pkg@version
-    if spec.starts_with("jsr:") {
-        let rest = &spec[4..];
-        if let Some(at_pos) = rest.rfind('@') {
-            if at_pos > 0 {
-                return Some(rest[at_pos + 1..].to_string());
-            }
-        }
-    }
-    // Handle npm:pkg@version
-    else if spec.starts_with("npm:") {
-        let rest = &spec[4..];
-        if let Some(at_pos) = rest.rfind('@') {
-            if at_pos > 0 {
-                return Some(rest[at_pos + 1..].to_string());
-            }
-        }
+    // Handle jsr:@scope/pkg@version or npm:pkg@version
+    let rest = spec
+        .strip_prefix("jsr:")
+        .or_else(|| spec.strip_prefix("npm:"))?;
+    if let Some(at_pos) = rest.rfind('@')
+        && at_pos > 0
+    {
+        return Some(rest[at_pos + 1..].to_string());
     }
     None
 }
@@ -333,8 +324,7 @@ fn build_tree(
 fn parse_deno_url(url: &str) -> Option<(String, String)> {
     // https://deno.land/std@0.177.0/...
     // https://deno.land/x/oak@v12.0.0/...
-    if url.starts_with("https://deno.land/") {
-        let path = &url[18..]; // strip https://deno.land/
+    if let Some(path) = url.strip_prefix("https://deno.land/") {
         let parts: Vec<&str> = path.split('/').collect();
         if !parts.is_empty() {
             let first = parts[0];

@@ -45,7 +45,7 @@ impl Severity {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "critical" | "error" => Severity::Critical,
             "high" | "warning" => Severity::High,
@@ -416,6 +416,7 @@ fn expand_glob(pattern: &str, root: &Path) -> Vec<PathBuf> {
 }
 
 /// Analyze files matching a glob pattern
+#[allow(clippy::too_many_arguments)]
 fn analyze_glob(
     pattern: &str,
     root: &Path,
@@ -565,6 +566,7 @@ fn analyze_glob(
 }
 
 /// Run unified analysis on a path
+#[allow(clippy::too_many_arguments)]
 pub fn analyze(
     target: Option<&str>,
     root: &Path,
@@ -586,19 +588,19 @@ pub fn analyze(
     });
 
     // Check for glob patterns in target
-    if let Some(t) = target {
-        if is_glob_pattern(t) {
-            return analyze_glob(
-                t,
-                root,
-                run_complexity,
-                run_length,
-                run_security,
-                complexity_threshold,
-                kind.as_deref(),
-                filter,
-            );
-        }
+    if let Some(t) = target
+        && is_glob_pattern(t)
+    {
+        return analyze_glob(
+            t,
+            root,
+            run_complexity,
+            run_length,
+            run_security,
+            complexity_threshold,
+            kind,
+            filter,
+        );
     }
 
     // Use unified path resolution to handle file/symbol paths
@@ -665,28 +667,28 @@ pub fn analyze(
             let mut report = complexity::analyze_file_complexity(&full_path);
 
             // Apply symbol filter if targeting a specific symbol
-            if let Some(ref mut r) = report {
-                if has_symbol_target {
-                    let target_name = symbol_path.last().unwrap();
-                    let target_parent = if symbol_path.len() > 1 {
-                        Some(symbol_path[symbol_path.len() - 2].as_str())
-                    } else {
-                        None
-                    };
+            if let Some(ref mut r) = report
+                && has_symbol_target
+            {
+                let target_name = symbol_path.last().unwrap();
+                let target_parent = if symbol_path.len() > 1 {
+                    Some(symbol_path[symbol_path.len() - 2].as_str())
+                } else {
+                    None
+                };
 
-                    r.functions.retain(|f| {
-                        // Match by name
-                        if f.name != *target_name {
-                            return false;
-                        }
-                        // If parent specified in path, match that too
-                        if let Some(tp) = target_parent {
-                            f.parent.as_ref().map(|p| p == tp).unwrap_or(false)
-                        } else {
-                            true
-                        }
-                    });
-                }
+                r.functions.retain(|f| {
+                    // Match by name
+                    if f.name != *target_name {
+                        return false;
+                    }
+                    // If parent specified in path, match that too
+                    if let Some(tp) = target_parent {
+                        f.parent.as_ref().map(|p| p == tp).unwrap_or(false)
+                    } else {
+                        true
+                    }
+                });
             }
 
             // Apply threshold filter

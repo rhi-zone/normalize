@@ -205,10 +205,10 @@ impl Language for Go {
                     // Grouped imports
                     let mut list_cursor = child.walk();
                     for spec in child.children(&mut list_cursor) {
-                        if spec.kind() == "import_spec" {
-                            if let Some(imp) = Self::parse_import_spec(&spec, content, line) {
-                                imports.push(imp);
-                            }
+                        if spec.kind() == "import_spec"
+                            && let Some(imp) = Self::parse_import_spec(&spec, content, line)
+                        {
+                            imports.push(imp);
                         }
                     }
                 }

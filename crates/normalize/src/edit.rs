@@ -44,6 +44,12 @@ fn line_to_byte(content: &str, line: usize) -> usize {
 /// Editor for structural code modifications
 pub struct Editor {}
 
+impl Default for Editor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Editor {
     pub fn new() -> Self {
         Self {}

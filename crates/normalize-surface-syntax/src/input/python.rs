@@ -63,10 +63,10 @@ impl<'a> ReadContext<'a> {
         let mut cursor = root.walk();
 
         for child in root.children(&mut cursor) {
-            if child.is_named() {
-                if let Some(stmt) = self.read_stmt(child)? {
-                    statements.push(stmt);
-                }
+            if child.is_named()
+                && let Some(stmt) = self.read_stmt(child)?
+            {
+                statements.push(stmt);
             }
         }
 
@@ -341,10 +341,10 @@ impl<'a> ReadContext<'a> {
                 }
                 "typed_parameter" | "typed_default_parameter" => {
                     // Get just the name, ignore type annotation
-                    if let Some(name) = child.child(0) {
-                        if name.kind() == "identifier" {
-                            params.push(self.node_text(name).to_string());
-                        }
+                    if let Some(name) = child.child(0)
+                        && name.kind() == "identifier"
+                    {
+                        params.push(self.node_text(name).to_string());
                     }
                 }
                 _ => {}
@@ -363,10 +363,10 @@ impl<'a> ReadContext<'a> {
         let mut cursor = node.walk();
 
         for child in node.children(&mut cursor) {
-            if child.is_named() {
-                if let Some(stmt) = self.read_stmt(child)? {
-                    stmts.push(stmt);
-                }
+            if child.is_named()
+                && let Some(stmt) = self.read_stmt(child)?
+            {
+                stmts.push(stmt);
             }
         }
 
@@ -386,12 +386,12 @@ impl<'a> ReadContext<'a> {
                 let text = self.node_text(node);
                 // Remove quotes
                 let inner = text
-                    .trim_start_matches(|c| c == '"' || c == '\'')
+                    .trim_start_matches(['"', '\''])
                     .trim_start_matches("f\"")
                     .trim_start_matches("f'")
                     .trim_start_matches("r\"")
                     .trim_start_matches("r'")
-                    .trim_end_matches(|c| c == '"' || c == '\'');
+                    .trim_end_matches(['"', '\'']);
                 Ok(Expr::string(inner))
             }
 

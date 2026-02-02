@@ -197,7 +197,7 @@ pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String>
     }
 
     // Render children
-    let prefix = if options.skip_root { "" } else { "" };
+    let prefix = "";
     format_children(
         &node.children,
         prefix,
@@ -350,10 +350,10 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
     };
 
     // Add line info for symbols if requested
-    if options.line_numbers {
-        if let Some((start, end)) = node.line_range {
-            return format!("{} L{}-{}", base, start, end);
-        }
+    if options.line_numbers
+        && let Some((start, end)) = node.line_range
+    {
+        return format!("{} L{}-{}", base, start, end);
     }
 
     base
@@ -417,14 +417,14 @@ fn strip_suffix_with_ansi(highlighted: &str, suffix: &str) -> String {
                 continue;
             }
             // Check for trailing ANSI escape: must end with 'm' preceded by digits/semicolons after ESC[
-            if result.ends_with('m') {
-                if let Some(esc_pos) = result.rfind("\x1b[") {
-                    // Verify everything between ESC[ and m is digits/semicolons
-                    let params = &result[esc_pos + 2..result.len() - 1];
-                    if params.chars().all(|c| c.is_ascii_digit() || c == ';') {
-                        result.truncate(esc_pos);
-                        continue;
-                    }
+            if result.ends_with('m')
+                && let Some(esc_pos) = result.rfind("\x1b[")
+            {
+                // Verify everything between ESC[ and m is digits/semicolons
+                let params = &result[esc_pos + 2..result.len() - 1];
+                if params.chars().all(|c| c.is_ascii_digit() || c == ';') {
+                    result.truncate(esc_pos);
+                    continue;
                 }
             }
             break;
@@ -495,7 +495,7 @@ pub fn highlight_source(source: &str, grammar: &str, use_colors: bool) -> String
             &injection_query,
             tree.root_node(),
             source,
-            &*grammar_loader(),
+            &grammar_loader(),
         );
         // Injection spans take precedence - remove base spans that overlap
         spans = merge_injection_spans(spans, injection_spans);
@@ -547,10 +547,10 @@ fn collect_injection_spans(
         // Check for #set! injection.language directive in properties
         if lang_name.is_none() {
             for prop in query.property_settings(match_.pattern_index) {
-                if &*prop.key == "injection.language" {
-                    if let Some(val) = &prop.value {
-                        lang_name = Some(val.to_string());
-                    }
+                if &*prop.key == "injection.language"
+                    && let Some(val) = &prop.value
+                {
+                    lang_name = Some(val.to_string());
                 }
             }
         }
@@ -605,7 +605,7 @@ fn collect_inner_spans(content: &str, grammar: &str, offset: usize) -> Vec<Highl
     // Recursively process injections in the injected content
     if let Some(injection_query) = get_injection_query(grammar, &language) {
         let nested_spans =
-            collect_injection_spans(&injection_query, tree.root_node(), content, &*loader);
+            collect_injection_spans(&injection_query, tree.root_node(), content, &loader);
         // Adjust nested span offsets
         let adjusted: Vec<_> = nested_spans
             .into_iter()
@@ -860,126 +860,127 @@ pub fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<Highligh
     }
 
     // Check for function/method names and calls
-    if node.child_count() == 0 {
-        if let Some(parent) = node.parent() {
-            let parent_kind = parent.kind();
+    if node.child_count() == 0
+        && let Some(parent) = node.parent()
+    {
+        let parent_kind = parent.kind();
 
-            // Function/method definitions
-            if kind == "identifier"
-                && matches!(
-                    parent_kind,
-                    "function_item"
-                        | "function_signature_item"
-                        | "function_definition"
-                        | "method_definition"
-                        | "function_declaration"
-                )
-            {
-                spans.push(HighlightSpan {
-                    start: node.start_byte(),
-                    end: node.end_byte(),
-                    kind: HighlightKind::FunctionName,
-                });
-            }
-
-            // Function/macro calls: foo() - Rust: call_expression/macro_invocation, JS: call_expression, Python: call, Lua: function_call
-            if kind == "identifier"
-                && matches!(
-                    parent_kind,
-                    "call_expression" | "call" | "macro_invocation" | "function_call"
-                )
-            {
-                spans.push(HighlightSpan {
-                    start: node.start_byte(),
-                    end: node.end_byte(),
-                    kind: HighlightKind::FunctionName,
-                });
-            }
-
-            // Scoped function calls: serde_json::to_value()
-            // identifier → scoped_identifier → call_expression
-            // Only highlight the last identifier (the function name, not module path)
-            if kind == "identifier" && parent_kind == "scoped_identifier" {
-                if let Some(grandparent) = parent.parent() {
-                    if matches!(grandparent.kind(), "call_expression" | "call") {
-                        // Check this is the last identifier (no :: after it)
-                        let is_last = node.next_sibling().map_or(true, |s| s.kind() != "::");
-                        if is_last {
-                            spans.push(HighlightSpan {
-                                start: node.start_byte(),
-                                end: node.end_byte(),
-                                kind: HighlightKind::FunctionName,
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Method calls: bar.baz()
-            // - Rust: field_identifier → field_expression → call_expression
-            // - JS/TS: property_identifier → member_expression → call_expression
-            // - Python: identifier → attribute → call
-            // - Lua: identifier → dot_index_expression/method_index_expression → function_call
-            //   For Lua, only the second identifier (after . or :) is the method name
-            let is_method_id = matches!(kind, "field_identifier" | "property_identifier")
-                || (kind == "identifier" && parent_kind == "attribute");
-            let is_lua_method = kind == "identifier"
-                && matches!(
-                    parent_kind,
-                    "dot_index_expression" | "method_index_expression"
-                )
-                && node
-                    .prev_sibling()
-                    .map_or(false, |s| matches!(s.kind(), "." | ":"));
-            let is_method_parent = matches!(
+        // Function/method definitions
+        if kind == "identifier"
+            && matches!(
                 parent_kind,
-                "field_expression"
-                    | "member_expression"
-                    | "attribute"
-                    | "dot_index_expression"
-                    | "method_index_expression"
-            );
-            if (is_method_id || is_lua_method) && is_method_parent {
-                if let Some(grandparent) = parent.parent() {
-                    if matches!(
-                        grandparent.kind(),
-                        "call_expression" | "call" | "function_call"
-                    ) {
-                        spans.push(HighlightSpan {
-                            start: node.start_byte(),
-                            end: node.end_byte(),
-                            kind: HighlightKind::FunctionName,
-                        });
-                    }
-                }
-            }
+                "function_item"
+                    | "function_signature_item"
+                    | "function_definition"
+                    | "method_definition"
+                    | "function_declaration"
+            )
+        {
+            spans.push(HighlightSpan {
+                start: node.start_byte(),
+                end: node.end_byte(),
+                kind: HighlightKind::FunctionName,
+            });
+        }
 
-            // Inside macro token_tree: heuristic for function/method calls
-            // Pattern: identifier followed by token_tree starting with (
-            // Or: identifier preceded by . (method call)
-            if kind == "identifier" && parent_kind == "token_tree" {
-                if let Some(next) = node.next_sibling() {
-                    // Check if next sibling is () or token_tree starting with (
-                    let next_kind = next.kind();
-                    if next_kind == "token_tree" || next_kind == "(" {
-                        spans.push(HighlightSpan {
-                            start: node.start_byte(),
-                            end: node.end_byte(),
-                            kind: HighlightKind::FunctionName,
-                        });
-                    }
-                }
-            }
+        // Function/macro calls: foo() - Rust: call_expression/macro_invocation, JS: call_expression, Python: call, Lua: function_call
+        if kind == "identifier"
+            && matches!(
+                parent_kind,
+                "call_expression" | "call" | "macro_invocation" | "function_call"
+            )
+        {
+            spans.push(HighlightSpan {
+                start: node.start_byte(),
+                end: node.end_byte(),
+                kind: HighlightKind::FunctionName,
+            });
+        }
 
-            // XML: Anonymous Name nodes in tag/attribute context
-            // STag > Name (tag name), ETag > Name (closing tag), Attribute > Name (attr name)
-            if kind == "Name" && matches!(parent_kind, "STag" | "ETag" | "Attribute") {
+        // Scoped function calls: serde_json::to_value()
+        // identifier → scoped_identifier → call_expression
+        // Only highlight the last identifier (the function name, not module path)
+        if kind == "identifier"
+            && parent_kind == "scoped_identifier"
+            && let Some(grandparent) = parent.parent()
+            && matches!(grandparent.kind(), "call_expression" | "call")
+        {
+            // Check this is the last identifier (no :: after it)
+            let is_last = node.next_sibling().is_none_or(|s| s.kind() != "::");
+            if is_last {
                 spans.push(HighlightSpan {
                     start: node.start_byte(),
                     end: node.end_byte(),
-                    kind: HighlightKind::Keyword,
+                    kind: HighlightKind::FunctionName,
                 });
             }
+        }
+
+        // Method calls: bar.baz()
+        // - Rust: field_identifier → field_expression → call_expression
+        // - JS/TS: property_identifier → member_expression → call_expression
+        // - Python: identifier → attribute → call
+        // - Lua: identifier → dot_index_expression/method_index_expression → function_call
+        //   For Lua, only the second identifier (after . or :) is the method name
+        let is_method_id = matches!(kind, "field_identifier" | "property_identifier")
+            || (kind == "identifier" && parent_kind == "attribute");
+        let is_lua_method = kind == "identifier"
+            && matches!(
+                parent_kind,
+                "dot_index_expression" | "method_index_expression"
+            )
+            && node
+                .prev_sibling()
+                .is_some_and(|s| matches!(s.kind(), "." | ":"));
+        let is_method_parent = matches!(
+            parent_kind,
+            "field_expression"
+                | "member_expression"
+                | "attribute"
+                | "dot_index_expression"
+                | "method_index_expression"
+        );
+        if (is_method_id || is_lua_method)
+            && is_method_parent
+            && let Some(grandparent) = parent.parent()
+            && matches!(
+                grandparent.kind(),
+                "call_expression" | "call" | "function_call"
+            )
+        {
+            spans.push(HighlightSpan {
+                start: node.start_byte(),
+                end: node.end_byte(),
+                kind: HighlightKind::FunctionName,
+            });
+        }
+
+        // Inside macro token_tree: heuristic for function/method calls
+        // Pattern: identifier followed by token_tree starting with (
+        // Or: identifier preceded by . (method call)
+        if kind == "identifier"
+            && parent_kind == "token_tree"
+            && let Some(next) = node.next_sibling()
+        {
+            // Check if next sibling is () or token_tree starting with (
+            let next_kind = next.kind();
+            if next_kind == "token_tree" || next_kind == "(" {
+                spans.push(HighlightSpan {
+                    start: node.start_byte(),
+                    end: node.end_byte(),
+                    kind: HighlightKind::FunctionName,
+                });
+            }
+        }
+
+        // XML: Anonymous Name nodes in tag/attribute context
+        // STag > Name (tag name), ETag > Name (closing tag), Attribute > Name (attr name)
+        if kind == "Name" && matches!(parent_kind, "STag" | "ETag" | "Attribute") {
+            spans.push(HighlightSpan {
+                start: node.start_byte(),
+                end: node.end_byte(),
+                kind: HighlightKind::Keyword,
+            });
         }
     }
 
@@ -1123,10 +1124,10 @@ fn format_children(
     grammar: Option<&str>,
 ) {
     // Check depth limit
-    if let Some(max) = options.max_depth {
-        if depth >= max {
-            return;
-        }
+    if let Some(max) = options.max_depth
+        && depth >= max
+    {
+        return;
     }
 
     let count = children.len();
@@ -1268,8 +1269,10 @@ pub fn generate_view_tree(root: &Path, options: &TreeOptions) -> ViewNode {
         .git_exclude(true)
         .build();
 
-    let mut tree = InternalTreeNode::default();
-    tree.is_dir = true;
+    let mut tree = InternalTreeNode {
+        is_dir: true,
+        ..Default::default()
+    };
 
     for entry in walker.flatten() {
         let path = entry.path();

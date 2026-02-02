@@ -84,11 +84,7 @@ impl SkeletonResult {
         fn filter_symbol(sym: &Symbol) -> Option<Symbol> {
             if is_type_kind(sym.kind) {
                 // For types, keep only nested types (not methods)
-                let type_children: Vec<_> = sym
-                    .children
-                    .iter()
-                    .filter_map(|c| filter_symbol(c))
-                    .collect();
+                let type_children: Vec<_> = sym.children.iter().filter_map(filter_symbol).collect();
                 Some(Symbol {
                     name: sym.name.clone(),
                     kind: sym.kind,
@@ -107,11 +103,7 @@ impl SkeletonResult {
             }
         }
 
-        let filtered_symbols: Vec<_> = self
-            .symbols
-            .iter()
-            .filter_map(|s| filter_symbol(s))
-            .collect();
+        let filtered_symbols: Vec<_> = self.symbols.iter().filter_map(filter_symbol).collect();
 
         SkeletonResult {
             symbols: filtered_symbols,
@@ -174,6 +166,12 @@ pub struct SkeletonExtractor {
     extractor: Extractor,
 }
 
+impl Default for SkeletonExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SkeletonExtractor {
     pub fn new() -> Self {
         Self {
@@ -212,9 +210,7 @@ impl SkeletonExtractor {
         if result.symbols.is_empty() {
             // Check if this is a supported file type that just has no symbols
             use normalize_languages::support_for_path;
-            if support_for_path(path).is_none() {
-                return None;
-            }
+            support_for_path(path)?;
         }
         Some(SkeletonResult {
             symbols: result.symbols,
@@ -297,14 +293,14 @@ def greet(name: str) -> str:
         let view_node = result.to_view_node(Some("python"));
 
         assert_eq!(view_node.name, "test.py");
-        assert!(view_node.children.len() >= 1);
+        assert!(!view_node.children.is_empty());
         let greet = &view_node.children[0];
         assert_eq!(greet.name, "greet");
         assert!(
             greet
                 .signature
                 .as_ref()
-                .map_or(false, |s| s.contains("def greet"))
+                .is_some_and(|s| s.contains("def greet"))
         );
     }
 

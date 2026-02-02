@@ -171,13 +171,10 @@ impl Language for Vim {
         let line = node.start_position().row + 1;
 
         // source file.vim, runtime path/to/file.vim
-        let module = if let Some(rest) = text.strip_prefix("source ") {
-            Some(rest.trim().to_string())
-        } else if let Some(rest) = text.strip_prefix("runtime ") {
-            Some(rest.trim().to_string())
-        } else {
-            None
-        };
+        let module = text
+            .strip_prefix("source ")
+            .or_else(|| text.strip_prefix("runtime "))
+            .map(|rest| rest.trim().to_string());
 
         if let Some(module) = module {
             return vec![Import {
@@ -204,7 +201,7 @@ impl Language for Vim {
 
     fn is_public(&self, node: &Node, content: &str) -> bool {
         self.node_name(node, content)
-            .map_or(true, |n| !n.starts_with("s:"))
+            .is_none_or(|n| !n.starts_with("s:"))
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {

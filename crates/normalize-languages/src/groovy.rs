@@ -160,16 +160,14 @@ impl Language for Groovy {
         let mut prev = node.prev_sibling();
         while let Some(sibling) = prev {
             let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" {
-                if text.starts_with("/**") {
-                    let inner = text.trim_start_matches("/**").trim_end_matches("*/").trim();
-                    if !inner.is_empty() {
-                        // Get first non-empty line, strip leading *
-                        for line in inner.lines() {
-                            let line = line.trim().trim_start_matches('*').trim();
-                            if !line.is_empty() && !line.starts_with('@') {
-                                return Some(line.to_string());
-                            }
+            if sibling.kind() == "comment" && text.starts_with("/**") {
+                let inner = text.trim_start_matches("/**").trim_end_matches("*/").trim();
+                if !inner.is_empty() {
+                    // Get first non-empty line, strip leading *
+                    for line in inner.lines() {
+                        let line = line.trim().trim_start_matches('*').trim();
+                        if !line.is_empty() && !line.starts_with('@') {
+                            return Some(line.to_string());
                         }
                     }
                 }

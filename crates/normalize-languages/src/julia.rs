@@ -208,7 +208,7 @@ impl Language for Julia {
 
         let rest = text.strip_prefix(keyword).unwrap_or("");
         let module = rest
-            .split(|c| c == ':' || c == ',')
+            .split([':', ','])
             .next()
             .map(|s| s.trim().to_string())
             .unwrap_or_default();

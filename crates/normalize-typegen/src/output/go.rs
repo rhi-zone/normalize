@@ -59,7 +59,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &GoOptions) {
     if let Some(docs) = &def.docs {
         out.push_str("// ");
         out.push_str(&def.name);
-        out.push_str(" ");
+        out.push(' ');
         out.push_str(docs);
         out.push('\n');
     }
@@ -86,9 +86,9 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &GoOptions) {
                 out.push_str("const (\n");
                 for variant in variants {
                     let const_name = format!("{}{}", def.name, to_pascal_case(&variant.value));
-                    out.push_str("\t");
+                    out.push('\t');
                     out.push_str(&const_name);
-                    out.push_str(" ");
+                    out.push(' ');
                     out.push_str(&def.name);
                     out.push_str(" = \"");
                     out.push_str(&variant.value);
@@ -107,9 +107,9 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &GoOptions) {
                         .name
                         .clone()
                         .unwrap_or_else(|| format!("{}_{}", def.name, i));
-                    out.push_str("\t");
+                    out.push('\t');
                     out.push_str(&const_name);
-                    out.push_str(" ");
+                    out.push(' ');
                     out.push_str(&def.name);
                     out.push_str(" = ");
                     out.push_str(&variant.value.to_string());
@@ -134,7 +134,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &GoOptions) {
                     if let Some(docs) = &variant.docs {
                         out.push_str("// ");
                         out.push_str(&variant_name);
-                        out.push_str(" ");
+                        out.push(' ');
                         out.push_str(docs);
                         out.push('\n');
                     }
@@ -144,7 +144,7 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &GoOptions) {
                     out.push_str(" struct {\n");
 
                     // Discriminator field
-                    out.push_str("\t");
+                    out.push('\t');
                     out.push_str(&to_pascal_case(&tagged.discriminator));
                     out.push_str(" string");
                     if options.json_tags {
@@ -188,7 +188,7 @@ fn generate_field(out: &mut String, field: &Field, options: &GoOptions) {
         out.push('\n');
     }
 
-    out.push_str("\t");
+    out.push('\t');
     out.push_str(&to_pascal_case(&field.name));
     out.push(' ');
 

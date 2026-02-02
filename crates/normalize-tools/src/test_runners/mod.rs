@@ -157,6 +157,7 @@ pub fn all_runners() -> Vec<&'static dyn TestRunner> {
 }
 
 /// Get all available test runners (returns boxed runners for backwards compatibility).
+#[allow(clippy::vec_init_then_push)]
 pub fn all_test_runners() -> Vec<Box<dyn TestRunner>> {
     let mut runners: Vec<Box<dyn TestRunner>> = Vec::new();
     #[cfg(feature = "tool-cargo")]
@@ -185,10 +186,8 @@ pub fn detect_test_runner(root: &Path) -> Option<&'static dyn TestRunner> {
         }
 
         let score = runner.detect(root);
-        if score > 0.0 {
-            if best.is_none() || score > best.unwrap().1 {
-                best = Some((*runner, score));
-            }
+        if score > 0.0 && (best.is_none() || score > best.unwrap().1) {
+            best = Some((*runner, score));
         }
     }
 

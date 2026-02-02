@@ -51,8 +51,8 @@ impl Language for Diff {
         let text = &content[node.byte_range()];
         // Extract filename from diff header
         for prefix in &["--- ", "+++ ", "diff --git "] {
-            if text.starts_with(prefix) {
-                let name = text[prefix.len()..]
+            if let Some(rest) = text.strip_prefix(prefix) {
+                let name = rest
                     .split_whitespace()
                     .next()
                     .map(|s| s.trim_start_matches("a/").trim_start_matches("b/"))

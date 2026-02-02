@@ -47,14 +47,14 @@ impl Language for Lua {
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Non-local functions are public
-        if node.kind() == "function_declaration" {
-            if let Some(name) = self.node_name(node, content) {
-                return vec![Export {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    line: node.start_position().row + 1,
-                }];
-            }
+        if node.kind() == "function_declaration"
+            && let Some(name) = self.node_name(node, content)
+        {
+            return vec![Export {
+                name: name.to_string(),
+                kind: SymbolKind::Function,
+                line: node.start_position().row + 1,
+            }];
         }
         Vec::new()
     }

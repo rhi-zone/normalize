@@ -49,10 +49,10 @@ impl TestRunner for Pytest {
             return 1.0;
         }
         if root.join("pyproject.toml").exists() {
-            if let Ok(content) = std::fs::read_to_string(root.join("pyproject.toml")) {
-                if content.contains("[tool.pytest") {
-                    return 1.0;
-                }
+            if let Ok(content) = std::fs::read_to_string(root.join("pyproject.toml"))
+                && content.contains("[tool.pytest")
+            {
+                return 1.0;
             }
             return 0.8;
         }

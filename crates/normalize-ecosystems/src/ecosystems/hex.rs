@@ -60,12 +60,12 @@ impl Ecosystem for Hex {
         // Simple pattern extraction: {:dep_name, "~> 1.0"} or {:dep_name, ">= 1.0"}
         for line in content.lines() {
             let line = line.trim();
-            if line.starts_with("{:") {
+            if let Some(stripped) = line.strip_prefix("{:") {
                 // Extract atom name after {:
-                if let Some(end) = line[2..].find(|c: char| c == ',' || c == '}') {
-                    let name = line[2..2 + end].to_string();
+                if let Some(end) = stripped.find([',', '}']) {
+                    let name = stripped[..end].to_string();
                     // Try to find version string
-                    let rest = &line[2 + end..];
+                    let rest = &stripped[end..];
                     let version_req = if let Some(start) = rest.find('"') {
                         let ver_str = &rest[start + 1..];
                         ver_str.find('"').map(|end| ver_str[..end].to_string())

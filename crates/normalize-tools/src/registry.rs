@@ -263,9 +263,9 @@ impl ToolRegistry {
         let detected = self.detect(root);
         detected
             .into_iter()
-            .filter_map(|(tool, _)| match tool.run(paths, root) {
-                Ok(result) => Some(result),
-                Err(e) => Some(ToolResult::failure(tool.info().name, e)),
+            .map(|(tool, _)| match tool.run(paths, root) {
+                Ok(result) => result,
+                Err(e) => ToolResult::failure(tool.info().name, e),
             })
             .collect()
     }
@@ -275,9 +275,9 @@ impl ToolRegistry {
         self.tools
             .iter()
             .filter(|t| names.contains(&t.info().name))
-            .filter_map(|tool| match tool.run(paths, root) {
-                Ok(result) => Some(result),
-                Err(e) => Some(ToolResult::failure(tool.info().name, e)),
+            .map(|tool| match tool.run(paths, root) {
+                Ok(result) => result,
+                Err(e) => ToolResult::failure(tool.info().name, e),
             })
             .collect()
     }

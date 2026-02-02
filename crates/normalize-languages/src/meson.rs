@@ -46,14 +46,14 @@ impl Language for Meson {
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() == "expression_statement" {
-            if let Some(name) = self.node_name(node, content) {
-                return vec![Export {
-                    name: name.to_string(),
-                    kind: SymbolKind::Variable,
-                    line: node.start_position().row + 1,
-                }];
-            }
+        if node.kind() == "expression_statement"
+            && let Some(name) = self.node_name(node, content)
+        {
+            return vec![Export {
+                name: name.to_string(),
+                kind: SymbolKind::Variable,
+                line: node.start_position().row + 1,
+            }];
         }
         Vec::new()
     }

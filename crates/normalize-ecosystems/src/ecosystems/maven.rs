@@ -224,9 +224,8 @@ fn parse_gradle_dependencies(content: &str) -> Result<Vec<Dependency>, PackageEr
             "runtimeOnly",
             "testImplementation",
         ] {
-            if line.starts_with(prefix) {
+            if let Some(after) = line.strip_prefix(prefix) {
                 // Extract the dependency string from quotes
-                let after = &line[prefix.len()..];
                 let dep_str = if let Some(start) = after.find('"') {
                     let rest = &after[start + 1..];
                     rest.find('"').map(|end| &rest[..end])

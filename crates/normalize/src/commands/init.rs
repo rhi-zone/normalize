@@ -161,7 +161,7 @@ fn detect_todo_files(root: &Path) -> Vec<String> {
 /// Entries we want in .gitignore
 /// - .normalize/* ignores root .normalize/ contents (patterns with / only match at root)
 /// - !.normalize/... un-ignores specific files (works because /* ignores contents, not the dir)
-/// NOTE: We omit **/.normalize/ because it would block un-ignore patterns entirely.
+///   NOTE: We omit **/.normalize/ because it would block un-ignore patterns entirely.
 const GITIGNORE_ENTRIES: &[&str] = &[
     ".normalize/*",
     "!.normalize/config.toml",
@@ -219,7 +219,7 @@ fn update_gitignore(path: &Path) -> Vec<String> {
         }
     } else {
         // Append at end with header
-        if !new_lines.is_empty() && !new_lines.last().map_or(true, |l| l.is_empty()) {
+        if !new_lines.is_empty() && !new_lines.last().is_none_or(|l| l.is_empty()) {
             new_lines.push(String::new());
         }
         new_lines.push("# Moss".to_string());

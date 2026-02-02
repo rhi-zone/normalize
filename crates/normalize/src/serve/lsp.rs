@@ -239,10 +239,10 @@ impl LanguageServer for MossBackend {
         // Find symbol at position (1-indexed line)
         let line = position.line as usize + 1;
 
-        fn find_symbol_at_line<'a>(
-            symbols: &'a [crate::skeleton::SkeletonSymbol],
+        fn find_symbol_at_line(
+            symbols: &[crate::skeleton::SkeletonSymbol],
             line: usize,
-        ) -> Option<&'a crate::skeleton::SkeletonSymbol> {
+        ) -> Option<&crate::skeleton::SkeletonSymbol> {
             for sym in symbols {
                 if line >= sym.start_line && line <= sym.end_line {
                     // Check children first for more specific match
@@ -403,25 +403,25 @@ impl LanguageServer for MossBackend {
         let mut locations = Vec::new();
 
         // Include definition if requested
-        if params.context.include_declaration {
-            if let Ok(defs) = index.find_symbol(&word).await {
-                for (file, _kind, start_line, _end_line) in defs {
-                    let target_path = root.join(&file);
-                    if let Ok(target_uri) = Url::from_file_path(&target_path) {
-                        locations.push(Location {
-                            uri: target_uri,
-                            range: Range {
-                                start: Position {
-                                    line: start_line.saturating_sub(1) as u32,
-                                    character: 0,
-                                },
-                                end: Position {
-                                    line: start_line.saturating_sub(1) as u32,
-                                    character: 0,
-                                },
+        if params.context.include_declaration
+            && let Ok(defs) = index.find_symbol(&word).await
+        {
+            for (file, _kind, start_line, _end_line) in defs {
+                let target_path = root.join(&file);
+                if let Ok(target_uri) = Url::from_file_path(&target_path) {
+                    locations.push(Location {
+                        uri: target_uri,
+                        range: Range {
+                            start: Position {
+                                line: start_line.saturating_sub(1) as u32,
+                                character: 0,
                             },
-                        });
-                    }
+                            end: Position {
+                                line: start_line.saturating_sub(1) as u32,
+                                character: 0,
+                            },
+                        },
+                    });
                 }
             }
         }

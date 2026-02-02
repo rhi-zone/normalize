@@ -186,47 +186,47 @@ fn cmd_list(sources: bool, json: bool) -> i32 {
         .unwrap_or_default();
 
     // List project rules
-    if let Some(dir) = rules_dir(false) {
-        if dir.exists() {
-            for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-                if entry
+    if let Some(dir) = rules_dir(false)
+        && dir.exists()
+    {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            if entry
+                .path()
+                .extension()
+                .map(|e| e == "scm")
+                .unwrap_or(false)
+            {
+                let id = entry
                     .path()
-                    .extension()
-                    .map(|e| e == "scm")
-                    .unwrap_or(false)
-                {
-                    let id = entry
-                        .path()
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-                    let source = project_lock.rules.get(&id).map(|e| e.source.clone());
-                    all_rules.push(("project", id, source));
-                }
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let source = project_lock.rules.get(&id).map(|e| e.source.clone());
+                all_rules.push(("project", id, source));
             }
         }
     }
 
     // List global rules
-    if let Some(dir) = rules_dir(true) {
-        if dir.exists() {
-            for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-                if entry
+    if let Some(dir) = rules_dir(true)
+        && dir.exists()
+    {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            if entry
+                .path()
+                .extension()
+                .map(|e| e == "scm")
+                .unwrap_or(false)
+            {
+                let id = entry
                     .path()
-                    .extension()
-                    .map(|e| e == "scm")
-                    .unwrap_or(false)
-                {
-                    let id = entry
-                        .path()
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-                    let source = global_lock.rules.get(&id).map(|e| e.source.clone());
-                    all_rules.push(("global", id, source));
-                }
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let source = global_lock.rules.get(&id).map(|e| e.source.clone());
+                all_rules.push(("global", id, source));
             }
         }
     }
@@ -324,16 +324,14 @@ fn cmd_update(rule_id: Option<&str>, json: bool) -> i32 {
                 "errors": errors
             })
         );
+    } else if updated.is_empty() && errors.is_empty() {
+        println!("No imported rules to update.");
     } else {
-        if updated.is_empty() && errors.is_empty() {
-            println!("No imported rules to update.");
-        } else {
-            for id in &updated {
-                println!("Updated: {}", id);
-            }
-            for (id, err) in &errors {
-                eprintln!("Failed to update {}: {}", id, err);
-            }
+        for id in &updated {
+            println!("Updated: {}", id);
+        }
+        for (id, err) in &errors {
+            eprintln!("Failed to update {}: {}", id, err);
         }
     }
 
@@ -355,15 +353,14 @@ fn cmd_remove(rule_id: &str, json: bool) -> i32 {
     }
 
     // Try global if not found in project
-    if !removed {
-        if let (Some(lock_path), Some(rules_dir)) = (lock_file_path(true), rules_dir(true)) {
-            let mut lock = RulesLock::load(&lock_path);
-            if lock.rules.remove(rule_id).is_some() {
-                let _ = lock.save(&lock_path);
-                let rule_path = rules_dir.join(format!("{}.scm", rule_id));
-                let _ = std::fs::remove_file(&rule_path);
-                removed = true;
-            }
+    if !removed && let (Some(lock_path), Some(rules_dir)) = (lock_file_path(true), rules_dir(true))
+    {
+        let mut lock = RulesLock::load(&lock_path);
+        if lock.rules.remove(rule_id).is_some() {
+            let _ = lock.save(&lock_path);
+            let rule_path = rules_dir.join(format!("{}.scm", rule_id));
+            let _ = std::fs::remove_file(&rule_path);
+            removed = true;
         }
     }
 

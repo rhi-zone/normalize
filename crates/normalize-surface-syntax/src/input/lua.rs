@@ -63,10 +63,10 @@ impl<'a> ReadContext<'a> {
         let mut cursor = root.walk();
 
         for child in root.children(&mut cursor) {
-            if child.is_named() {
-                if let Some(stmt) = self.read_stmt(child)? {
-                    statements.push(stmt);
-                }
+            if child.is_named()
+                && let Some(stmt) = self.read_stmt(child)?
+            {
+                statements.push(stmt);
             }
         }
 
@@ -837,10 +837,10 @@ impl<'a> ReadContext<'a> {
         let mut cursor = node.walk();
 
         for child in node.children(&mut cursor) {
-            if child.is_named() {
-                if let Some(stmt) = self.read_stmt(child)? {
-                    statements.push(stmt);
-                }
+            if child.is_named()
+                && let Some(stmt) = self.read_stmt(child)?
+            {
+                statements.push(stmt);
             }
         }
 

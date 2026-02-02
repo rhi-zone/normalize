@@ -438,14 +438,14 @@ impl<'a> ExtractContext<'a> {
             .ok_or_else(|| ParseError::Unsupported("type alias missing value".into()))?;
 
         // Check if this is a union of string literals (→ StringLiteral enum)
-        if value.kind() == "union_type" {
-            if let Some(enum_def) = self.try_extract_string_literal_enum(value) {
-                return Ok(TypeDef {
-                    name: name_str,
-                    docs: None,
-                    kind: TypeDefKind::Enum(enum_def),
-                });
-            }
+        if value.kind() == "union_type"
+            && let Some(enum_def) = self.try_extract_string_literal_enum(value)
+        {
+            return Ok(TypeDef {
+                name: name_str,
+                docs: None,
+                kind: TypeDefKind::Enum(enum_def),
+            });
         }
 
         let ty = self.extract_type(value)?;

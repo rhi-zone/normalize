@@ -35,7 +35,7 @@ fn cache_dir() -> Option<PathBuf> {
 fn cache_path(ecosystem: &str, package: &str) -> Option<PathBuf> {
     let dir = cache_dir()?;
     // Sanitize package name for filesystem
-    let safe_name = package.replace('/', "_").replace(':', "_");
+    let safe_name = package.replace(['/', ':'], "_");
     Some(dir.join(ecosystem).join(format!("{}.json", safe_name)))
 }
 

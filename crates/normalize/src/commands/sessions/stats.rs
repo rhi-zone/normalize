@@ -78,7 +78,7 @@ pub fn cmd_sessions_stats(
     };
 
     // Compile grep pattern if provided
-    let grep_re = grep.map(|p| regex::Regex::new(p).ok()).flatten();
+    let grep_re = grep.and_then(|p| regex::Regex::new(p).ok());
     if grep.is_some() && grep_re.is_none() {
         eprintln!("Invalid grep pattern: {}", grep.unwrap());
         return 1;
@@ -220,14 +220,13 @@ pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFi
             if let Ok(files) = std::fs::read_dir(&proj_dir) {
                 for file in files.filter_map(|f| f.ok()) {
                     let path = file.path();
-                    if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                        if let Ok(meta) = path.metadata() {
-                            if let Ok(mtime) = meta.modified() {
-                                // Use format's detect to verify it's the right format
-                                if format.detect(&path) > 0.5 {
-                                    all_sessions.push(SessionFile { path, mtime });
-                                }
-                            }
+                    if path.extension().and_then(|e| e.to_str()) == Some("jsonl")
+                        && let Ok(meta) = path.metadata()
+                        && let Ok(mtime) = meta.modified()
+                    {
+                        // Use format's detect to verify it's the right format
+                        if format.detect(&path) > 0.5 {
+                            all_sessions.push(SessionFile { path, mtime });
                         }
                     }
                 }
@@ -280,10 +279,7 @@ fn cmd_sessions_stats_by_repo(
     let mut by_repo: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for session in sessions {
         let repo = extract_repo_name(&session.path);
-        by_repo
-            .entry(repo)
-            .or_insert_with(Vec::new)
-            .push(session.path.clone());
+        by_repo.entry(repo).or_default().push(session.path.clone());
     }
 
     // Sort repos by name for consistent output

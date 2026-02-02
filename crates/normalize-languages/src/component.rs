@@ -10,12 +10,8 @@ use crate::EmbeddedBlock;
 /// Find the raw_text child of a script/style element.
 pub fn find_raw_text_child<'a>(node: &'a Node<'a>) -> Option<Node<'a>> {
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if child.kind() == "raw_text" {
-            return Some(child);
-        }
-    }
-    None
+    node.children(&mut cursor)
+        .find(|&child| child.kind() == "raw_text")
 }
 
 /// Detect script language from the lang attribute (e.g., `<script lang="ts">`).

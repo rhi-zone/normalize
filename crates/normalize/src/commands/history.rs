@@ -280,17 +280,15 @@ fn cmd_prune(shadow: &Shadow, keep: usize, json: bool) -> i32 {
                         "kept": keep
                     })
                 );
+            } else if pruned_count > 0 {
+                println!(
+                    "Pruned {} commit{}, keeping last {}",
+                    pruned_count,
+                    if pruned_count == 1 { "" } else { "s" },
+                    keep
+                );
             } else {
-                if pruned_count > 0 {
-                    println!(
-                        "Pruned {} commit{}, keeping last {}",
-                        pruned_count,
-                        if pruned_count == 1 { "" } else { "s" },
-                        keep
-                    );
-                } else {
-                    println!("Nothing to prune (only {} commits in history)", keep);
-                }
+                println!("Nothing to prune (only {} commits in history)", keep);
             }
             0
         }

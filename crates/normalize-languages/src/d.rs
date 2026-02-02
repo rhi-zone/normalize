@@ -72,25 +72,25 @@ impl Language for D {
                 }
             }
             "class_declaration" | "struct_declaration" | "interface_declaration" => {
-                if self.is_public(node, content) {
-                    if let Some(name) = self.node_name(node, content) {
-                        return vec![Export {
-                            name: name.to_string(),
-                            kind: SymbolKind::Class,
-                            line: node.start_position().row + 1,
-                        }];
-                    }
+                if self.is_public(node, content)
+                    && let Some(name) = self.node_name(node, content)
+                {
+                    return vec![Export {
+                        name: name.to_string(),
+                        kind: SymbolKind::Class,
+                        line: node.start_position().row + 1,
+                    }];
                 }
             }
             "auto_declaration" | "function_literal" => {
-                if self.is_public(node, content) {
-                    if let Some(name) = self.node_name(node, content) {
-                        return vec![Export {
-                            name: name.to_string(),
-                            kind: SymbolKind::Function,
-                            line: node.start_position().row + 1,
-                        }];
-                    }
+                if self.is_public(node, content)
+                    && let Some(name) = self.node_name(node, content)
+                {
+                    return vec![Export {
+                        name: name.to_string(),
+                        kind: SymbolKind::Function,
+                        line: node.start_position().row + 1,
+                    }];
                 }
             }
             _ => {}

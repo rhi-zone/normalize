@@ -141,7 +141,7 @@ fn fetch_nix_info(package: &str) -> Result<PackageInfo, PackageError> {
                 .or_else(|| obj.iter().next())
                 .ok_or_else(|| PackageError::NotFound(package.to_string()))?;
 
-            let name = attr.split('.').last().unwrap_or(package).to_string();
+            let name = attr.split('.').next_back().unwrap_or(package).to_string();
 
             let version = info
                 .get("version")

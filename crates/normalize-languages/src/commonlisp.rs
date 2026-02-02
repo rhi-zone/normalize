@@ -55,26 +55,26 @@ impl Language for CommonLisp {
 
         // (defun name ...), (defmacro name ...), etc.
         for prefix in &["(defun ", "(defmacro ", "(defgeneric ", "(defmethod "] {
-            if text.starts_with(prefix) {
-                if let Some(name) = text[prefix.len()..].split_whitespace().next() {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        line,
-                    }];
-                }
+            if let Some(rest) = text.strip_prefix(prefix)
+                && let Some(name) = rest.split_whitespace().next()
+            {
+                return vec![Export {
+                    name: name.to_string(),
+                    kind: SymbolKind::Function,
+                    line,
+                }];
             }
         }
 
         for prefix in &["(defclass ", "(defstruct "] {
-            if text.starts_with(prefix) {
-                if let Some(name) = text[prefix.len()..].split_whitespace().next() {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Class,
-                        line,
-                    }];
-                }
+            if let Some(rest) = text.strip_prefix(prefix)
+                && let Some(name) = rest.split_whitespace().next()
+            {
+                return vec![Export {
+                    name: name.to_string(),
+                    kind: SymbolKind::Class,
+                    line,
+                }];
             }
         }
 
@@ -110,22 +110,22 @@ impl Language for CommonLisp {
         let first_line = text.lines().next().unwrap_or(text);
 
         for prefix in &["(defun ", "(defmacro ", "(defgeneric ", "(defmethod "] {
-            if text.starts_with(prefix) {
-                if let Some(name) = text[prefix.len()..].split_whitespace().next() {
-                    return Some(Symbol {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        signature: first_line.trim().to_string(),
-                        docstring: self.extract_docstring(node, content),
-                        attributes: Vec::new(),
-                        start_line: node.start_position().row + 1,
-                        end_line: node.end_position().row + 1,
-                        visibility: Visibility::Public,
-                        children: Vec::new(),
-                        is_interface_impl: false,
-                        implements: Vec::new(),
-                    });
-                }
+            if let Some(rest) = text.strip_prefix(prefix)
+                && let Some(name) = rest.split_whitespace().next()
+            {
+                return Some(Symbol {
+                    name: name.to_string(),
+                    kind: SymbolKind::Function,
+                    signature: first_line.trim().to_string(),
+                    docstring: self.extract_docstring(node, content),
+                    attributes: Vec::new(),
+                    start_line: node.start_position().row + 1,
+                    end_line: node.end_position().row + 1,
+                    visibility: Visibility::Public,
+                    children: Vec::new(),
+                    is_interface_impl: false,
+                    implements: Vec::new(),
+                });
             }
         }
 
@@ -139,8 +139,8 @@ impl Language for CommonLisp {
 
         let text = &content[node.byte_range()];
 
-        if text.starts_with("(defpackage ") {
-            let name = text["(defpackage ".len()..].split_whitespace().next()?;
+        if let Some(rest) = text.strip_prefix("(defpackage ") {
+            let name = rest.split_whitespace().next()?;
             return Some(Symbol {
                 name: name.to_string(),
                 kind: SymbolKind::Module,
@@ -157,8 +157,8 @@ impl Language for CommonLisp {
         }
 
         for prefix in &["(defclass ", "(defstruct "] {
-            if text.starts_with(prefix) {
-                let name = text[prefix.len()..].split_whitespace().next()?;
+            if let Some(rest) = text.strip_prefix(prefix) {
+                let name = rest.split_whitespace().next()?;
                 return Some(Symbol {
                     name: name.to_string(),
                     kind: SymbolKind::Class,
@@ -207,8 +207,8 @@ impl Language for CommonLisp {
         let line = node.start_position().row + 1;
 
         for prefix in &["(require ", "(use-package ", "(ql:quickload "] {
-            if text.starts_with(prefix) {
-                let module = text[prefix.len()..]
+            if let Some(rest) = text.strip_prefix(prefix) {
+                let module = rest
                     .split(|c: char| c.is_whitespace() || c == ')')
                     .next()
                     .map(|s| s.trim_matches(|c| c == '\'' || c == ':' || c == '"'))

@@ -100,23 +100,23 @@ fn normalize_separators(query: &str) -> String {
 /// 3. If exact path doesn't exist, try fuzzy matching for the file portion
 pub fn resolve_unified(query: &str, root: &Path) -> Option<UnifiedPath> {
     // Handle sigil expansion (@todo, @config, etc.)
-    if query.starts_with('@') {
-        if let Some(expansion) = expand_sigil(query, root) {
-            // Try each target path until one exists
-            for target in &expansion.paths {
-                let full_query = if expansion.suffix.is_empty() {
-                    target.clone()
-                } else {
-                    format!("{}/{}", target, expansion.suffix)
-                };
-                if let Some(result) = resolve_unified(&full_query, root) {
-                    return Some(result);
-                }
+    if query.starts_with('@')
+        && let Some(expansion) = expand_sigil(query, root)
+    {
+        // Try each target path until one exists
+        for target in &expansion.paths {
+            let full_query = if expansion.suffix.is_empty() {
+                target.clone()
+            } else {
+                format!("{}/{}", target, expansion.suffix)
+            };
+            if let Some(result) = resolve_unified(&full_query, root) {
+                return Some(result);
             }
-            return None;
         }
-        // Unknown sigil - fall through to normal resolution (will likely fail)
+        return None;
     }
+    // Unknown sigil - fall through to normal resolution (will likely fail)
 
     let normalized = normalize_separators(query);
 
@@ -221,20 +221,19 @@ pub fn resolve_unified(query: &str, root: &Path) -> Option<UnifiedPath> {
 /// or multiple elements if query matches multiple files.
 pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
     // Handle sigil expansion (@todo, @config, etc.)
-    if query.starts_with('@') {
-        if let Some(expansion) = expand_sigil(query, root) {
-            let mut results = Vec::new();
-            for target in &expansion.paths {
-                let full_query = if expansion.suffix.is_empty() {
-                    target.clone()
-                } else {
-                    format!("{}/{}", target, expansion.suffix)
-                };
-                results.extend(resolve_unified_all(&full_query, root));
-            }
-            return results;
+    if query.starts_with('@')
+        && let Some(expansion) = expand_sigil(query, root)
+    {
+        let mut results = Vec::new();
+        for target in &expansion.paths {
+            let full_query = if expansion.suffix.is_empty() {
+                target.clone()
+            } else {
+                format!("{}/{}", target, expansion.suffix)
+            };
+            results.extend(resolve_unified_all(&full_query, root));
         }
-        // Unknown sigil - fall through
+        return results;
     }
 
     let normalized = normalize_separators(query);
@@ -399,14 +398,14 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
                     let path = entry.path();
                     if path.is_file() {
                         let path_str = path.to_string_lossy();
-                        if path_str.ends_with(ext) {
-                            if let Ok(rel) = path.strip_prefix(root) {
-                                return Some(PathMatch {
-                                    path: rel.to_string_lossy().to_string(),
-                                    kind: "file".to_string(),
-                                    score: u32::MAX,
-                                });
-                            }
+                        if path_str.ends_with(ext)
+                            && let Ok(rel) = path.strip_prefix(root)
+                        {
+                            return Some(PathMatch {
+                                path: rel.to_string_lossy().to_string(),
+                                kind: "file".to_string(),
+                                score: u32::MAX,
+                            });
                         }
                     }
                     None
@@ -427,12 +426,11 @@ fn get_paths_for_query(root: &Path, query: &str) -> Vec<(String, bool)> {
     if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
         let _ = rt.block_on(index.incremental_refresh());
         // Try LIKE first for faster queries
-        if !query.is_empty() {
-            if let Ok(files) = rt.block_on(index.find_like(query)) {
-                if !files.is_empty() {
-                    return files.into_iter().map(|f| (f.path, f.is_dir)).collect();
-                }
-            }
+        if !query.is_empty()
+            && let Ok(files) = rt.block_on(index.find_like(query))
+            && !files.is_empty()
+        {
+            return files.into_iter().map(|f| (f.path, f.is_dir)).collect();
         }
         // Fall back to all files for empty query or no LIKE matches
         if let Ok(files) = rt.block_on(index.all_files()) {

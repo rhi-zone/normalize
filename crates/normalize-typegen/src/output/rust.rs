@@ -88,12 +88,12 @@ fn generate_typedef(out: &mut String, def: &TypeDef, options: &RustOptions) {
                 out.push_str(&derives.join(", "));
                 out.push_str(")]\n");
             }
-            if options.serde {
-                if let Some(rename) = &options.rename_all {
-                    out.push_str("#[serde(rename_all = \"");
-                    out.push_str(rename);
-                    out.push_str("\")]\n");
-                }
+            if options.serde
+                && let Some(rename) = &options.rename_all
+            {
+                out.push_str("#[serde(rename_all = \"");
+                out.push_str(rename);
+                out.push_str("\")]\n");
             }
 
             out.push_str(vis);

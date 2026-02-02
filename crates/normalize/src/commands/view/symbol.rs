@@ -167,24 +167,22 @@ pub fn cmd_view_symbol_at_line(
         }
 
         // Show referenced type definitions when --context is used
-        if context {
-            if let Some(ref g) = grammar {
-                // Extract source for the symbol
-                let file_lines: Vec<&str> = content.lines().collect();
-                let start = sym.start_line.saturating_sub(1);
-                let end = sym.end_line.min(file_lines.len());
-                let source = file_lines[start..end].join("\n");
+        if context && let Some(ref g) = grammar {
+            // Extract source for the symbol
+            let file_lines: Vec<&str> = content.lines().collect();
+            let start = sym.start_line.saturating_sub(1);
+            let end = sym.end_line.min(file_lines.len());
+            let source = file_lines[start..end].join("\n");
 
-                display_referenced_types(
-                    &source,
-                    g,
-                    &skeleton_result.symbols,
-                    &sym.name,
-                    use_colors,
-                    root,
-                    &resolved.file_path,
-                );
-            }
+            display_referenced_types(
+                &source,
+                g,
+                &skeleton_result.symbols,
+                &sym.name,
+                use_colors,
+                root,
+                &resolved.file_path,
+            );
         }
     }
     0
@@ -351,12 +349,12 @@ fn print_smart_imports(
         let import_text = if used_names.len() == import.names.len() || import.names.is_empty() {
             if import.line > 0 && import.line <= lines.len() {
                 lines[import.line - 1].trim().to_string()
-            } else if let Some(ref l) = lang {
+            } else if let Some(l) = lang {
                 l.format_import(import, None)
             } else {
                 import.format_summary()
             }
-        } else if let Some(ref l) = lang {
+        } else if let Some(l) = lang {
             l.format_import(import, Some(&used_names))
         } else {
             import.format_summary()
@@ -449,10 +447,10 @@ pub fn cmd_view_symbol(
             }
 
             // Smart Header: show only imports used by this symbol
-            if !deps_result.imports.is_empty() {
-                if let Some(ref g) = grammar {
-                    print_smart_imports(&source, g, &full_path, &content, &deps_result.imports);
-                }
+            if !deps_result.imports.is_empty()
+                && let Some(ref g) = grammar
+            {
+                print_smart_imports(&source, g, &full_path, &content, &deps_result.imports);
             }
 
             // Show ancestor context (extract skeleton if needed for parent or context)
@@ -493,26 +491,24 @@ pub fn cmd_view_symbol(
             };
             println!("{}", highlighted);
 
-            if let Some((_, sibling_count)) = ancestors.last() {
-                if *sibling_count > 0 {
-                    println!();
-                    println!("    /* {} other members */", sibling_count);
-                }
+            if let Some((_, sibling_count)) = ancestors.last()
+                && *sibling_count > 0
+            {
+                println!();
+                println!("    /* {} other members */", sibling_count);
             }
 
             // Show referenced type definitions when --context is used
-            if context {
-                if let (Some(sr), Some(g)) = (&skeleton_result, &grammar) {
-                    display_referenced_types(
-                        &source,
-                        g,
-                        &sr.symbols,
-                        symbol_name,
-                        use_colors,
-                        root,
-                        file_path,
-                    );
-                }
+            if context && let (Some(sr), Some(g)) = (&skeleton_result, &grammar) {
+                display_referenced_types(
+                    &source,
+                    g,
+                    &sr.symbols,
+                    symbol_name,
+                    use_colors,
+                    root,
+                    file_path,
+                );
             }
         }
         0
@@ -557,14 +553,15 @@ pub fn cmd_view_symbol(
                         );
                     }
 
-                    if show_parent && symbol_path.len() > 1 {
-                        if let Some(parent_sym) = find_symbol_ci(
+                    if show_parent
+                        && symbol_path.len() > 1
+                        && let Some(parent_sym) = find_symbol_ci(
                             &skeleton_result.symbols,
                             &symbol_path[0],
                             case_insensitive,
-                        ) {
-                            println!("\n{}\n", parent_sym.signature);
-                        }
+                        )
+                    {
+                        println!("\n{}\n", parent_sym.signature);
                     }
 
                     let highlighted = if let Some(ref g) = grammar {
@@ -575,18 +572,16 @@ pub fn cmd_view_symbol(
                     println!("{}", highlighted);
 
                     // Show referenced type definitions when --context is used
-                    if context {
-                        if let Some(ref g) = grammar {
-                            display_referenced_types(
-                                &source,
-                                g,
-                                &skeleton_result.symbols,
-                                symbol_name,
-                                use_colors,
-                                root,
-                                file_path,
-                            );
-                        }
+                    if context && let Some(ref g) = grammar {
+                        display_referenced_types(
+                            &source,
+                            g,
+                            &skeleton_result.symbols,
+                            symbol_name,
+                            use_colors,
+                            root,
+                            file_path,
+                        );
                     }
                 }
                 return 0;
@@ -663,23 +658,21 @@ fn collect_identifiers(
         let node = cursor.node();
         let kind = node.kind();
 
-        if kind == "identifier"
+        if (kind == "identifier"
             || kind == "type_identifier"
             || kind == "field_identifier"
             || kind == "property_identifier"
-            || kind.ends_with("_identifier")
+            || kind.ends_with("_identifier"))
+            && let Ok(text) = node.utf8_text(source)
         {
-            if let Ok(text) = node.utf8_text(source) {
-                identifiers.insert(text.to_string());
-            }
+            identifiers.insert(text.to_string());
         }
 
-        if kind == "scoped_identifier" || kind == "scoped_type_identifier" {
-            if let Some(last_child) = node.child(node.child_count().saturating_sub(1) as u32) {
-                if let Ok(text) = last_child.utf8_text(source) {
-                    identifiers.insert(text.to_string());
-                }
-            }
+        if (kind == "scoped_identifier" || kind == "scoped_type_identifier")
+            && let Some(last_child) = node.child(node.child_count().saturating_sub(1) as u32)
+            && let Ok(text) = last_child.utf8_text(source)
+        {
+            identifiers.insert(text.to_string());
         }
 
         if cursor.goto_first_child() {
@@ -717,29 +710,27 @@ fn collect_type_identifiers(
         let kind = node.kind();
 
         // Collect type identifier nodes
-        if kind == "type_identifier" {
-            if let Ok(text) = node.utf8_text(source) {
-                types.insert(text.to_string());
-            }
+        if kind == "type_identifier"
+            && let Ok(text) = node.utf8_text(source)
+        {
+            types.insert(text.to_string());
         }
 
         // For scoped types like std::Vec, extract the last component
-        if kind == "scoped_type_identifier" {
-            if let Some(last_child) = node.child(node.child_count().saturating_sub(1) as u32) {
-                if let Ok(text) = last_child.utf8_text(source) {
-                    types.insert(text.to_string());
-                }
-            }
+        if kind == "scoped_type_identifier"
+            && let Some(last_child) = node.child(node.child_count().saturating_sub(1) as u32)
+            && let Ok(text) = last_child.utf8_text(source)
+        {
+            types.insert(text.to_string());
         }
 
         // Generic type arguments (e.g., T in Vec<T>)
-        if kind == "generic_type" {
+        if kind == "generic_type"
             // First child is usually the type name
-            if let Some(first_child) = node.child(0) {
-                if let Ok(text) = first_child.utf8_text(source) {
-                    types.insert(text.to_string());
-                }
-            }
+            && let Some(first_child) = node.child(0)
+            && let Ok(text) = first_child.utf8_text(source)
+        {
+            types.insert(text.to_string());
         }
 
         if cursor.goto_first_child() {

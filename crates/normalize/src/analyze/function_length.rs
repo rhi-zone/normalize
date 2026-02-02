@@ -318,11 +318,10 @@ impl LengthAnalyzer {
         let mut functions = Vec::new();
         let root = tree.root_node();
         let mut cursor = root.walk();
-        self.collect_functions(&mut cursor, content, support, &mut functions, None);
+        Self::collect_functions(&mut cursor, content, support, &mut functions, None);
         functions
     }
     fn collect_functions(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         support: &dyn Language,
@@ -333,20 +332,20 @@ impl LengthAnalyzer {
             let node = cursor.node();
             let kind = node.kind();
             // Check if this is a function
-            if support.function_kinds().contains(&kind) {
-                if let Some(name) = support.node_name(&node, content) {
-                    let start_line = node.start_position().row + 1;
-                    let end_line = node.end_position().row + 1;
-                    let lines = end_line.saturating_sub(start_line) + 1;
-                    functions.push(FunctionLength {
-                        name: name.to_string(),
-                        lines,
-                        start_line,
-                        end_line,
-                        parent: parent.map(String::from),
-                        file_path: None,
-                    });
-                }
+            if support.function_kinds().contains(&kind)
+                && let Some(name) = support.node_name(&node, content)
+            {
+                let start_line = node.start_position().row + 1;
+                let end_line = node.end_position().row + 1;
+                let lines = end_line.saturating_sub(start_line) + 1;
+                functions.push(FunctionLength {
+                    name: name.to_string(),
+                    lines,
+                    start_line,
+                    end_line,
+                    parent: parent.map(String::from),
+                    file_path: None,
+                });
             }
             // Check for container (class, impl, module) holding methods
             let new_parent = if support.container_kinds().contains(&kind) {
@@ -356,7 +355,7 @@ impl LengthAnalyzer {
             };
             // Recurse into children
             if cursor.goto_first_child() {
-                self.collect_functions(cursor, content, support, functions, new_parent.as_deref());
+                Self::collect_functions(cursor, content, support, functions, new_parent.as_deref());
                 cursor.goto_parent();
             }
             if !cursor.goto_next_sibling() {

@@ -48,14 +48,14 @@ impl Language for Erlang {
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Functions are only public if listed in -export
         // For now, return all functions as we'd need module-level analysis
-        if node.kind() == "function_clause" {
-            if let Some(name) = self.node_name(node, content) {
-                return vec![Export {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    line: node.start_position().row + 1,
-                }];
-            }
+        if node.kind() == "function_clause"
+            && let Some(name) = self.node_name(node, content)
+        {
+            return vec![Export {
+                name: name.to_string(),
+                kind: SymbolKind::Function,
+                line: node.start_position().row + 1,
+            }];
         }
         Vec::new()
     }
@@ -226,38 +226,38 @@ impl Language for Erlang {
         let line = node.start_position().row + 1;
 
         // Handle -import(module, [...]).
-        if text.starts_with("-import(") {
-            if let Some(start) = text.find('(') {
-                let rest = &text[start + 1..];
-                if let Some(comma) = rest.find(',') {
-                    let module = rest[..comma].trim().to_string();
-                    return vec![Import {
-                        module,
-                        names: Vec::new(),
-                        alias: None,
-                        is_wildcard: false,
-                        is_relative: false,
-                        line,
-                    }];
-                }
+        if text.starts_with("-import(")
+            && let Some(start) = text.find('(')
+        {
+            let rest = &text[start + 1..];
+            if let Some(comma) = rest.find(',') {
+                let module = rest[..comma].trim().to_string();
+                return vec![Import {
+                    module,
+                    names: Vec::new(),
+                    alias: None,
+                    is_wildcard: false,
+                    is_relative: false,
+                    line,
+                }];
             }
         }
 
         // Handle -include("file.hrl"). or -include_lib("app/include/file.hrl").
-        if text.starts_with("-include") {
-            if let Some(start) = text.find('"') {
-                let rest = &text[start + 1..];
-                if let Some(end) = rest.find('"') {
-                    let module = rest[..end].to_string();
-                    return vec![Import {
-                        module,
-                        names: Vec::new(),
-                        alias: None,
-                        is_wildcard: false,
-                        is_relative: text.starts_with("-include("),
-                        line,
-                    }];
-                }
+        if text.starts_with("-include")
+            && let Some(start) = text.find('"')
+        {
+            let rest = &text[start + 1..];
+            if let Some(end) = rest.find('"') {
+                let module = rest[..end].to_string();
+                return vec![Import {
+                    module,
+                    names: Vec::new(),
+                    alias: None,
+                    is_wildcard: false,
+                    is_relative: text.starts_with("-include("),
+                    line,
+                }];
             }
         }
 

@@ -396,12 +396,13 @@ fn extract_cargo_crate_name(content: &str) -> Option<String> {
             in_package = false;
             continue;
         }
-        if in_package && trimmed.starts_with("name") {
-            if let Some(eq_pos) = trimmed.find('=') {
-                let value = trimmed[eq_pos + 1..].trim();
-                let value = value.trim_matches('"').trim_matches('\'');
-                return Some(value.to_string());
-            }
+        if in_package
+            && trimmed.starts_with("name")
+            && let Some(eq_pos) = trimmed.find('=')
+        {
+            let value = trimmed[eq_pos + 1..].trim();
+            let value = value.trim_matches('"').trim_matches('\'');
+            return Some(value.to_string());
         }
     }
     None

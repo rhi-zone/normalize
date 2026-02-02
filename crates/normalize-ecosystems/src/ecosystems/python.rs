@@ -125,7 +125,7 @@ impl Ecosystem for Python {
                 && let Some(dependencies) = project.get("dependencies").and_then(|d| d.as_array())
             {
                 for dep in dependencies {
-                    if let Some(req) = dep.as_str().and_then(|s| parse_requirement(s)) {
+                    if let Some(req) = dep.as_str().and_then(parse_requirement) {
                         deps.push(req);
                     }
                 }
@@ -139,9 +139,7 @@ impl Ecosystem for Python {
                     for (_group, group_deps) in optional {
                         if let Some(arr) = group_deps.as_array() {
                             for dep in arr {
-                                if let Some(mut req) =
-                                    dep.as_str().and_then(|s| parse_requirement(s))
-                                {
+                                if let Some(mut req) = dep.as_str().and_then(parse_requirement) {
                                     req.optional = true;
                                     deps.push(req);
                                 }
@@ -387,10 +385,10 @@ fn build_python_tree(
         for pkg in pkgs {
             let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
             let normalized = name.to_lowercase().replace(['-', '.'], "_");
-            if !visited.contains(&normalized) {
-                if let Some(node) = build_node(name, &packages, &mut visited) {
-                    root_deps.push(node);
-                }
+            if !visited.contains(&normalized)
+                && let Some(node) = build_node(name, &packages, &mut visited)
+            {
+                root_deps.push(node);
             }
         }
     }
@@ -532,9 +530,7 @@ fn parse_requirement(req: &str) -> Option<Dependency> {
     }
 
     // Extract version requirement (only from the part before the marker)
-    let version_req = if let Some(start) =
-        req_part.find(|c: char| c == '<' || c == '>' || c == '=' || c == '!')
-    {
+    let version_req = if let Some(start) = req_part.find(['<', '>', '=', '!']) {
         let version_part = req_part[start..].trim();
         if version_part.is_empty() {
             None

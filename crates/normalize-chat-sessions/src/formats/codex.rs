@@ -49,12 +49,10 @@ impl LogFormat for CodexFormat {
                                         let path = file.path();
                                         if path.extension().and_then(|e| e.to_str())
                                             == Some("jsonl")
+                                            && let Ok(meta) = path.metadata()
+                                            && let Ok(mtime) = meta.modified()
                                         {
-                                            if let Ok(meta) = path.metadata() {
-                                                if let Ok(mtime) = meta.modified() {
-                                                    sessions.push(SessionFile { path, mtime });
-                                                }
-                                            }
+                                            sessions.push(SessionFile { path, mtime });
                                         }
                                     }
                                 }
@@ -78,18 +76,17 @@ impl LogFormat for CodexFormat {
         for line in peek_lines(path, 5) {
             if let Ok(entry) = serde_json::from_str::<Value>(&line) {
                 // Codex has type field with session_meta, response_item, event_msg
-                if let Some(t) = entry.get("type").and_then(|v| v.as_str()) {
-                    if t == "session_meta" {
-                        // Check for codex-specific originator
-                        if let Some(originator) = entry
-                            .get("payload")
-                            .and_then(|p| p.get("originator"))
-                            .and_then(|v| v.as_str())
-                        {
-                            if originator.contains("codex") {
-                                return 1.0;
-                            }
-                        }
+                if let Some(t) = entry.get("type").and_then(|v| v.as_str())
+                    && t == "session_meta"
+                {
+                    // Check for codex-specific originator
+                    if let Some(originator) = entry
+                        .get("payload")
+                        .and_then(|p| p.get("originator"))
+                        .and_then(|v| v.as_str())
+                        && originator.contains("codex")
+                    {
+                        return 1.0;
                     }
                 }
             }
@@ -118,20 +115,20 @@ impl LogFormat for CodexFormat {
             let entry_type = entry.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
             // Extract metadata from session_meta
-            if entry_type == "session_meta" {
-                if let Some(payload) = entry.get("payload") {
-                    if session.metadata.session_id.is_none() {
-                        session.metadata.session_id = payload
-                            .get("session_id")
-                            .and_then(|v| v.as_str())
-                            .map(String::from);
-                    }
-                    if session.metadata.model.is_none() {
-                        session.metadata.model = payload
-                            .get("model")
-                            .and_then(|v| v.as_str())
-                            .map(String::from);
-                    }
+            if entry_type == "session_meta"
+                && let Some(payload) = entry.get("payload")
+            {
+                if session.metadata.session_id.is_none() {
+                    session.metadata.session_id = payload
+                        .get("session_id")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
+                }
+                if session.metadata.model.is_none() {
+                    session.metadata.model = payload
+                        .get("model")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
                 }
             }
 
@@ -246,27 +243,25 @@ impl LogFormat for CodexFormat {
                 }
                 "token_count" => {
                     // Extract final token usage
-                    if let Some(info) = payload.get("info") {
-                        if let Some(total) = info.get("total_token_usage") {
-                            current_turn.token_usage = Some(TokenUsage {
-                                input: total
-                                    .get("input_tokens")
+                    if let Some(info) = payload.get("info")
+                        && let Some(total) = info.get("total_token_usage")
+                    {
+                        current_turn.token_usage = Some(TokenUsage {
+                            input: total
+                                .get("input_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0),
+                            output: total
+                                .get("output_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0)
+                                + total
+                                    .get("reasoning_output_tokens")
                                     .and_then(|v| v.as_u64())
                                     .unwrap_or(0),
-                                output: total
-                                    .get("output_tokens")
-                                    .and_then(|v| v.as_u64())
-                                    .unwrap_or(0)
-                                    + total
-                                        .get("reasoning_output_tokens")
-                                        .and_then(|v| v.as_u64())
-                                        .unwrap_or(0),
-                                cache_read: total
-                                    .get("cached_input_tokens")
-                                    .and_then(|v| v.as_u64()),
-                                cache_create: None,
-                            });
-                        }
+                            cache_read: total.get("cached_input_tokens").and_then(|v| v.as_u64()),
+                            cache_create: None,
+                        });
                     }
                 }
                 _ => {}

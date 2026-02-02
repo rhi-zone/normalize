@@ -53,36 +53,38 @@ impl Language for Elixir {
         let text = &content[node.byte_range()];
 
         // Check for def (not defp)
-        if text.starts_with("def ") && !text.starts_with("defp") {
-            if let Some(name) = self.extract_def_name(node, content) {
-                return vec![Export {
-                    name,
-                    kind: SymbolKind::Function,
-                    line: node.start_position().row + 1,
-                }];
-            }
+        if text.starts_with("def ")
+            && !text.starts_with("defp")
+            && let Some(name) = self.extract_def_name(node, content)
+        {
+            return vec![Export {
+                name,
+                kind: SymbolKind::Function,
+                line: node.start_position().row + 1,
+            }];
         }
 
         // Check for defmacro (not defmacrop)
-        if text.starts_with("defmacro ") && !text.starts_with("defmacrop") {
-            if let Some(name) = self.extract_def_name(node, content) {
-                return vec![Export {
-                    name,
-                    kind: SymbolKind::Function,
-                    line: node.start_position().row + 1,
-                }];
-            }
+        if text.starts_with("defmacro ")
+            && !text.starts_with("defmacrop")
+            && let Some(name) = self.extract_def_name(node, content)
+        {
+            return vec![Export {
+                name,
+                kind: SymbolKind::Function,
+                line: node.start_position().row + 1,
+            }];
         }
 
         // Check for defmodule
-        if text.starts_with("defmodule ") {
-            if let Some(name) = self.extract_module_name(node, content) {
-                return vec![Export {
-                    name,
-                    kind: SymbolKind::Module,
-                    line: node.start_position().row + 1,
-                }];
-            }
+        if text.starts_with("defmodule ")
+            && let Some(name) = self.extract_module_name(node, content)
+        {
+            return vec![Export {
+                name,
+                kind: SymbolKind::Module,
+                line: node.start_position().row + 1,
+            }];
         }
 
         Vec::new()
@@ -217,8 +219,8 @@ impl Language for Elixir {
 
         // Handle import, alias, require, use
         for keyword in &["import ", "alias ", "require ", "use "] {
-            if text.starts_with(keyword) {
-                let rest = text[keyword.len()..].trim();
+            if let Some(stripped) = text.strip_prefix(keyword) {
+                let rest = stripped.trim();
                 let module = rest
                     .split(|c: char| c.is_whitespace() || c == ',')
                     .next()
@@ -291,12 +293,8 @@ impl Language for Elixir {
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // Look for do_block child
         let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "do_block" {
-                return Some(child);
-            }
-        }
-        None
+        node.children(&mut cursor)
+            .find(|&child| child.kind() == "do_block")
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {

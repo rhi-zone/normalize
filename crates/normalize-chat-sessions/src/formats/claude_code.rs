@@ -44,12 +44,9 @@ impl LogFormat for ClaudeCodeFormat {
         if let Ok(output) = std::process::Command::new("git")
             .args(["rev-parse", "--show-toplevel"])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                return path_to_claude_dir(Path::new(
-                    String::from_utf8_lossy(&output.stdout).trim(),
-                ));
-            }
+            return path_to_claude_dir(Path::new(String::from_utf8_lossy(&output.stdout).trim()));
         }
 
         if let Ok(cwd) = std::env::current_dir() {
@@ -74,13 +71,13 @@ impl LogFormat for ClaudeCodeFormat {
         for line in peek_lines(path, 5) {
             if let Ok(entry) = serde_json::from_str::<Value>(&line) {
                 // Claude Code has type field with specific values
-                if let Some(t) = entry.get("type").and_then(|v| v.as_str()) {
-                    if matches!(
+                if let Some(t) = entry.get("type").and_then(|v| v.as_str())
+                    && matches!(
                         t,
                         "user" | "assistant" | "summary" | "file-history-snapshot"
-                    ) {
-                        return 1.0;
-                    }
+                    )
+                {
+                    return 1.0;
                 }
             }
         }
@@ -115,10 +112,10 @@ impl LogFormat for ClaudeCodeFormat {
                     // Flush previous turn if we have messages
                     if !current_turn.messages.is_empty() {
                         // Attach token usage from the last request
-                        if let Some(req_id) = &last_request_id {
-                            if let Some(usage) = request_tokens.remove(req_id) {
-                                current_turn.token_usage = Some(usage);
-                            }
+                        if let Some(req_id) = &last_request_id
+                            && let Some(usage) = request_tokens.remove(req_id)
+                        {
+                            current_turn.token_usage = Some(usage);
                         }
                         session.turns.push(std::mem::take(&mut current_turn));
                     }
@@ -200,10 +197,10 @@ impl LogFormat for ClaudeCodeFormat {
 
         // Flush final turn
         if !current_turn.messages.is_empty() {
-            if let Some(req_id) = &last_request_id {
-                if let Some(usage) = request_tokens.remove(req_id) {
-                    current_turn.token_usage = Some(usage);
-                }
+            if let Some(req_id) = &last_request_id
+                && let Some(usage) = request_tokens.remove(req_id)
+            {
+                current_turn.token_usage = Some(usage);
             }
             session.turns.push(current_turn);
         }

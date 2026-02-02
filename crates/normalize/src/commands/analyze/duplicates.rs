@@ -405,7 +405,7 @@ pub fn cmd_allow_duplicate_function(
         }
     } else {
         // Append at end with reason as comment
-        if !new_lines.is_empty() && !new_lines.last().map_or(true, |l| l.is_empty()) {
+        if !new_lines.is_empty() && !new_lines.last().is_none_or(|l| l.is_empty()) {
             new_lines.push(String::new());
         }
         if let Some(r) = reason {
@@ -620,7 +620,7 @@ pub fn cmd_duplicate_types(
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
         .filter_map(|l| {
-            let parts: Vec<&str> = l.trim().split_whitespace().collect();
+            let parts: Vec<&str> = l.split_whitespace().collect();
             if parts.len() == 2 {
                 // Store in sorted order for consistent matching
                 let (a, b) = if parts[0] < parts[1] {
@@ -804,7 +804,7 @@ pub fn cmd_allow_duplicate_type(
 
     // Check if already exists
     for line in &existing_lines {
-        let parts: Vec<&str> = line.trim().split_whitespace().collect();
+        let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() == 2 {
             let (a, b) = if parts[0] < parts[1] {
                 (parts[0], parts[1])
@@ -826,7 +826,7 @@ pub fn cmd_allow_duplicate_type(
 
     // Build new content
     let mut new_lines: Vec<String> = existing_lines.iter().map(|s| s.to_string()).collect();
-    if !new_lines.is_empty() && !new_lines.last().map_or(true, |l| l.is_empty()) {
+    if !new_lines.is_empty() && !new_lines.last().is_none_or(|l| l.is_empty()) {
         new_lines.push(String::new());
     }
     if let Some(r) = reason {
@@ -836,11 +836,11 @@ pub fn cmd_allow_duplicate_type(
 
     // Ensure .normalize directory exists
     let moss_dir = root.join(".normalize");
-    if !moss_dir.exists() {
-        if let Err(e) = std::fs::create_dir_all(&moss_dir) {
-            eprintln!("Failed to create .normalize directory: {}", e);
-            return 1;
-        }
+    if !moss_dir.exists()
+        && let Err(e) = std::fs::create_dir_all(&moss_dir)
+    {
+        eprintln!("Failed to create .normalize directory: {}", e);
+        return 1;
     }
 
     // Write back

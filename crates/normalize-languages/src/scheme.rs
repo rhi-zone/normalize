@@ -54,11 +54,10 @@ impl Language for Scheme {
         let line = node.start_position().row + 1;
 
         // (define name ...) or (define (name args) ...)
-        if text.starts_with("(define ") {
-            let rest = &text["(define ".len()..];
-            let name = if rest.starts_with('(') {
+        if let Some(rest) = text.strip_prefix("(define ") {
+            let name = if let Some(inner) = rest.strip_prefix('(') {
                 // (define (name args) ...)
-                rest[1..].split_whitespace().next()
+                inner.split_whitespace().next()
             } else {
                 // (define name ...)
                 rest.split_whitespace().next()
@@ -79,14 +78,14 @@ impl Language for Scheme {
             }
         }
 
-        if text.starts_with("(define-syntax ") {
-            if let Some(name) = text["(define-syntax ".len()..].split_whitespace().next() {
-                return vec![Export {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    line,
-                }];
-            }
+        if let Some(rest) = text.strip_prefix("(define-syntax ")
+            && let Some(name) = rest.split_whitespace().next()
+        {
+            return vec![Export {
+                name: name.to_string(),
+                kind: SymbolKind::Function,
+                line,
+            }];
         }
 
         Vec::new()
@@ -120,13 +119,11 @@ impl Language for Scheme {
         let text = &content[node.byte_range()];
         let first_line = text.lines().next().unwrap_or(text);
 
-        if text.starts_with("(define ") {
-            let rest = &text["(define ".len()..];
-
+        if let Some(rest) = text.strip_prefix("(define ") {
             // Only extract function definitions
             if rest.starts_with('(') || rest.contains("(lambda") {
-                let name = if rest.starts_with('(') {
-                    rest[1..].split_whitespace().next()
+                let name = if let Some(inner) = rest.strip_prefix('(') {
+                    inner.split_whitespace().next()
                 } else {
                     rest.split_whitespace().next()
                 }?;
@@ -147,8 +144,8 @@ impl Language for Scheme {
             }
         }
 
-        if text.starts_with("(define-syntax ") {
-            let name = text["(define-syntax ".len()..].split_whitespace().next()?;
+        if let Some(rest) = text.strip_prefix("(define-syntax ") {
+            let name = rest.split_whitespace().next()?;
             return Some(Symbol {
                 name: name.to_string(),
                 kind: SymbolKind::Function,

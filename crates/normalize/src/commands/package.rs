@@ -459,32 +459,30 @@ fn cmd_outdated(
             "errors": errors.iter().map(|(n, e)| serde_json::json!({"name": n, "error": e})).collect::<Vec<_>>()
         });
         print_json_value(&value, format);
+    } else if outdated.is_empty() && errors.is_empty() {
+        println!("All packages are up to date");
     } else {
-        if outdated.is_empty() && errors.is_empty() {
-            println!("All packages are up to date");
-        } else {
-            if !outdated.is_empty() {
-                println!("Outdated packages ({}):", outdated.len());
-                println!();
-                for pkg in &outdated {
-                    let installed = pkg.installed.as_deref().unwrap_or("(not installed)");
-                    let (installed_display, latest_display) = if use_colors {
-                        (
-                            Yellow.paint(installed).to_string(),
-                            Yellow.paint(&pkg.latest).to_string(),
-                        )
-                    } else {
-                        (installed.to_string(), pkg.latest.clone())
-                    };
-                    println!("  {} {} → {}", pkg.name, installed_display, latest_display);
-                }
+        if !outdated.is_empty() {
+            println!("Outdated packages ({}):", outdated.len());
+            println!();
+            for pkg in &outdated {
+                let installed = pkg.installed.as_deref().unwrap_or("(not installed)");
+                let (installed_display, latest_display) = if use_colors {
+                    (
+                        Yellow.paint(installed).to_string(),
+                        Yellow.paint(&pkg.latest).to_string(),
+                    )
+                } else {
+                    (installed.to_string(), pkg.latest.clone())
+                };
+                println!("  {} {} → {}", pkg.name, installed_display, latest_display);
             }
-            if !errors.is_empty() {
-                println!();
-                println!("Errors ({}):", errors.len());
-                for (name, err) in &errors {
-                    println!("  {}: {}", name, err);
-                }
+        }
+        if !errors.is_empty() {
+            println!();
+            println!("Errors ({}):", errors.len());
+            for (name, err) in &errors {
+                println!("  {}: {}", name, err);
             }
         }
     }

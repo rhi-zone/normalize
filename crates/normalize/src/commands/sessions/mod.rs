@@ -72,15 +72,15 @@ pub(crate) fn resolve_session_paths_literal(
     }
 
     // If it looks like a glob pattern, expand it
-    if session_id.contains('*') || session_id.contains('?') {
-        if let Ok(entries) = glob::glob(session_id) {
-            let paths: Vec<_> = entries
-                .filter_map(|e| e.ok())
-                .filter(|p| p.is_file())
-                .collect();
-            if !paths.is_empty() {
-                return paths;
-            }
+    if (session_id.contains('*') || session_id.contains('?'))
+        && let Ok(entries) = glob::glob(session_id)
+    {
+        let paths: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|p| p.is_file())
+            .collect();
+        if !paths.is_empty() {
+            return paths;
         }
     }
 
@@ -98,10 +98,10 @@ pub(crate) fn resolve_session_paths_literal(
 
     // Match by session ID prefix (file stem)
     for s in &sessions {
-        if let Some(stem) = s.path.file_stem().and_then(|s| s.to_str()) {
-            if stem == session_id || stem.starts_with(session_id) {
-                return vec![s.path.clone()];
-            }
+        if let Some(stem) = s.path.file_stem().and_then(|s| s.to_str())
+            && (stem == session_id || stem.starts_with(session_id))
+        {
+            return vec![s.path.clone()];
         }
     }
 
@@ -133,13 +133,11 @@ fn resolve_session_fuzzy(
             let mut buf = Vec::new();
             if let Some(score) =
                 pattern.score(nucleo_matcher::Utf32Str::new(stem, &mut buf), &mut matcher)
-            {
-                if best
+                && best
                     .as_ref()
                     .is_none_or(|(_, _, best_score)| score > *best_score)
-                {
-                    best = Some((s.path.clone(), stem.to_string(), score));
-                }
+            {
+                best = Some((s.path.clone(), stem.to_string(), score));
             }
         }
     }
@@ -451,6 +449,7 @@ pub fn run(
 }
 
 /// List sessions with filtering support
+#[allow(clippy::too_many_arguments)]
 fn cmd_sessions_list_filtered(
     root: Option<&Path>,
     limit: usize,
@@ -481,7 +480,7 @@ fn cmd_sessions_list_filtered(
     };
 
     // Compile grep pattern
-    let grep_re = grep.map(|p| regex::Regex::new(p).ok()).flatten();
+    let grep_re = grep.and_then(|p| regex::Regex::new(p).ok());
     if grep.is_some() && grep_re.is_none() {
         eprintln!("Invalid grep pattern: {}", grep.unwrap());
         return 1;
@@ -501,16 +500,16 @@ fn cmd_sessions_list_filtered(
         let since_time = now - Duration::from_secs(d as u64 * 86400);
         sessions.retain(|s| s.mtime >= since_time);
     }
-    if let Some(s) = since {
-        if let Some(since_time) = stats::parse_date(s) {
-            sessions.retain(|s| s.mtime >= since_time);
-        }
+    if let Some(s) = since
+        && let Some(since_time) = stats::parse_date(s)
+    {
+        sessions.retain(|s| s.mtime >= since_time);
     }
-    if let Some(u) = until {
-        if let Some(until_time) = stats::parse_date(u) {
-            let until_time = until_time + Duration::from_secs(86400);
-            sessions.retain(|s| s.mtime <= until_time);
-        }
+    if let Some(u) = until
+        && let Some(until_time) = stats::parse_date(u)
+    {
+        let until_time = until_time + Duration::from_secs(86400);
+        sessions.retain(|s| s.mtime <= until_time);
     }
 
     // Grep filtering

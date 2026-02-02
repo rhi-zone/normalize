@@ -124,10 +124,7 @@ async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
                 let reference = &cap[1];
 
                 // Extract symbol name (last part after :: or .)
-                let symbol_name = reference
-                    .rsplit(|c| c == ':' || c == '.')
-                    .next()
-                    .unwrap_or(reference);
+                let symbol_name = reference.rsplit([':', '.']).next().unwrap_or(reference);
 
                 // Skip common non-symbol patterns
                 if is_common_non_symbol(symbol_name) {

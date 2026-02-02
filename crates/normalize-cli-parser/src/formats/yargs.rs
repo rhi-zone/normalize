@@ -143,10 +143,10 @@ fn parse_command_line(line: &str, prog_name: Option<&str>) -> Option<CliCommand>
         let description = caps.get(3).map(|m| m.as_str().to_string());
 
         // Verify prefix matches program name
-        if let Some(name) = prog_name {
-            if prefix != name {
-                return None;
-            }
+        if let Some(name) = prog_name
+            && prefix != name
+        {
+            return None;
         }
 
         Some(CliCommand {
@@ -200,13 +200,11 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
 
             // Extract type and default from bracketed parts
             let brackets = &rest[bracket_start..];
-            if brackets.contains("[default:") {
-                if let Some(start) = brackets.find("[default:") {
-                    if let Some(end) = brackets[start..].find(']') {
-                        let default = brackets[start + 9..start + end].trim().to_string();
-                        opt.default = Some(default);
-                    }
-                }
+            if let Some(start) = brackets.find("[default:")
+                && let Some(end) = brackets[start..].find(']')
+            {
+                let default = brackets[start + 9..start + end].trim().to_string();
+                opt.default = Some(default);
             }
 
             // Infer value type from annotations

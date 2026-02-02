@@ -89,10 +89,10 @@ pub fn dependency_tree(project_root: &Path) -> Option<Result<DependencyTree, Pac
     }
 
     // Fall back to binary format
-    if let Some(lockfile) = find_binary_lockfile(project_root) {
-        if lockfile.exists() {
-            return Some(build_tree_binary(project_root));
-        }
+    if let Some(lockfile) = find_binary_lockfile(project_root)
+        && lockfile.exists()
+    {
+        return Some(build_tree_binary(project_root));
     }
 
     None
@@ -622,7 +622,6 @@ impl<'a> BunLockb<'a> {
 
     /// Recursively build a TreeNode using logical dependencies
     fn build_node(
-        &self,
         name: &str,
         deps_map: &HashMap<String, (String, Vec<String>)>,
         visited: &mut HashSet<String>,
@@ -645,7 +644,7 @@ impl<'a> BunLockb<'a> {
 
         let children = if let Some((_, deps)) = deps_map.get(name) {
             deps.iter()
-                .map(|dep| self.build_node(dep, deps_map, visited, max_depth - 1))
+                .map(|dep| Self::build_node(dep, deps_map, visited, max_depth - 1))
                 .collect()
         } else {
             Vec::new()
@@ -674,7 +673,7 @@ impl<'a> BunLockb<'a> {
             if let Some((_, direct_deps)) = deps_map.get(&root_pkg.name) {
                 direct_deps
                     .iter()
-                    .map(|dep| self.build_node(dep, &deps_map, &mut visited, MAX_DEPTH))
+                    .map(|dep| Self::build_node(dep, &deps_map, &mut visited, MAX_DEPTH))
                     .collect()
             } else {
                 Vec::new()

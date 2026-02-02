@@ -187,10 +187,11 @@ impl Language for Perl {
 
         // use Module::Name;
         // require Module::Name;
-        let module = if let Some(rest) = text.strip_prefix("use ") {
-            rest.split(|c| c == ';' || c == ' ').next()
-        } else if let Some(rest) = text.strip_prefix("require ") {
-            rest.split(|c| c == ';' || c == ' ').next()
+        let module = if let Some(rest) = text
+            .strip_prefix("use ")
+            .or_else(|| text.strip_prefix("require "))
+        {
+            rest.split([';', ' ']).next()
         } else {
             None
         };
@@ -224,7 +225,7 @@ impl Language for Perl {
 
     fn is_public(&self, node: &Node, content: &str) -> bool {
         self.node_name(node, content)
-            .map_or(true, |n| !n.starts_with('_'))
+            .is_none_or(|n| !n.starts_with('_'))
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {

@@ -155,13 +155,10 @@ impl Language for Zsh {
         let line = node.start_position().row + 1;
 
         // source file or . file
-        let module = if let Some(rest) = text.strip_prefix("source ") {
-            Some(rest.trim().to_string())
-        } else if let Some(rest) = text.strip_prefix(". ") {
-            Some(rest.trim().to_string())
-        } else {
-            None
-        };
+        let module = text
+            .strip_prefix("source ")
+            .or_else(|| text.strip_prefix(". "))
+            .map(|rest| rest.trim().to_string());
 
         if let Some(module) = module {
             return vec![Import {

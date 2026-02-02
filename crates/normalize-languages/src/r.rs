@@ -65,7 +65,7 @@ impl Language for R {
 
         // Check if RHS is a function
         let rhs = node.child(2);
-        let is_function = rhs.map_or(false, |n| n.kind() == "function_definition");
+        let is_function = rhs.is_some_and(|n| n.kind() == "function_definition");
 
         if !is_function {
             return Vec::new();
@@ -223,7 +223,7 @@ impl Language for R {
 
     fn is_public(&self, node: &Node, content: &str) -> bool {
         node.child(0)
-            .map_or(true, |n| !content[n.byte_range()].starts_with('.'))
+            .is_none_or(|n| !content[n.byte_range()].starts_with('.'))
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {

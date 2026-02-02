@@ -82,7 +82,7 @@ impl CliFormat for ClapFormat {
                 if potential_version
                     .chars()
                     .next()
-                    .map_or(false, |c| c.is_ascii_digit())
+                    .is_some_and(|c| c.is_ascii_digit())
                     || potential_version.starts_with('v')
                 {
                     spec.name = Some(parts[0].to_string());
@@ -232,18 +232,18 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
 
         // Check for default value in description
         if let Some(ref desc) = opt.description {
-            if let Some(start) = desc.find("[default:") {
-                if let Some(end) = desc[start..].find(']') {
-                    let default = desc[start + 9..start + end].trim().to_string();
-                    opt.default = Some(default);
-                }
+            if let Some(start) = desc.find("[default:")
+                && let Some(end) = desc[start..].find(']')
+            {
+                let default = desc[start + 9..start + end].trim().to_string();
+                opt.default = Some(default);
             }
             // Check for env var
-            if let Some(start) = desc.find("[env:") {
-                if let Some(end) = desc[start..].find(']') {
-                    let env = desc[start + 5..start + end].trim().to_string();
-                    opt.env = Some(env);
-                }
+            if let Some(start) = desc.find("[env:")
+                && let Some(end) = desc[start..].find(']')
+            {
+                let env = desc[start + 5..start + end].trim().to_string();
+                opt.env = Some(env);
             }
         }
 

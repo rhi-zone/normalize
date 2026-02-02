@@ -87,10 +87,10 @@ impl SourceRegistry {
         let (ns, field) = key.split_once('.')?;
 
         for source in &self.sources {
-            if source.namespace() == ns {
-                if let Some(values) = source.evaluate(ctx) {
-                    return values.get(field).cloned();
-                }
+            if source.namespace() == ns
+                && let Some(values) = source.evaluate(ctx)
+            {
+                return values.get(field).cloned();
             }
         }
         None
@@ -163,11 +163,10 @@ impl RuleSource for GitSource {
             .args(["rev-parse", "--abbrev-ref", "HEAD"])
             .current_dir(ctx.project_root)
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                result.insert("branch".to_string(), branch);
-            }
+            let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            result.insert("branch".to_string(), branch);
         }
 
         // Check if file is staged
@@ -175,12 +174,11 @@ impl RuleSource for GitSource {
             .args(["diff", "--cached", "--name-only"])
             .current_dir(ctx.project_root)
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let staged = String::from_utf8_lossy(&output.stdout);
-                let is_staged = staged.lines().any(|l| l == ctx.rel_path);
-                result.insert("staged".to_string(), is_staged.to_string());
-            }
+            let staged = String::from_utf8_lossy(&output.stdout);
+            let is_staged = staged.lines().any(|l| l == ctx.rel_path);
+            result.insert("staged".to_string(), is_staged.to_string());
         }
 
         // Check if repo is dirty
@@ -188,11 +186,10 @@ impl RuleSource for GitSource {
             .args(["status", "--porcelain"])
             .current_dir(ctx.project_root)
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let dirty = !output.stdout.is_empty();
-                result.insert("dirty".to_string(), dirty.to_string());
-            }
+            let dirty = !output.stdout.is_empty();
+            result.insert("dirty".to_string(), dirty.to_string());
         }
 
         Some(result)
@@ -224,14 +221,12 @@ impl RustSource {
         let mut current = start.parent()?;
         loop {
             let cargo_toml = current.join("Cargo.toml");
-            if cargo_toml.exists() {
-                if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
-                    if let Ok(parsed) = content.parse::<toml::Table>() {
-                        if parsed.contains_key("workspace") {
-                            return Some(cargo_toml);
-                        }
-                    }
-                }
+            if cargo_toml.exists()
+                && let Ok(content) = std::fs::read_to_string(&cargo_toml)
+                && let Ok(parsed) = content.parse::<toml::Table>()
+                && parsed.contains_key("workspace")
+            {
+                return Some(cargo_toml);
             }
             current = current.parent()?;
         }
@@ -267,37 +262,36 @@ impl RustSource {
         for key in keys {
             if let Some(value) = package.get(key) {
                 // Check for workspace inheritance: { workspace = true }
-                if let Some(table) = value.as_table() {
-                    if table.get("workspace").and_then(|v| v.as_bool()) == Some(true) {
-                        // Lazily load workspace Cargo.toml
-                        if workspace_package.is_none() {
-                            if let Some(ws_path) = Self::find_workspace_root(cargo_toml_path) {
-                                if let Ok(ws_content) = std::fs::read_to_string(&ws_path) {
-                                    if let Ok(ws_parsed) = ws_content.parse::<toml::Table>() {
-                                        workspace_parsed = Some(ws_parsed);
-                                    }
-                                }
-                            }
-                            workspace_package = workspace_parsed
-                                .as_ref()
-                                .and_then(|ws| ws.get("workspace"))
-                                .and_then(|w| w.as_table())
-                                .and_then(|w| w.get("package"))
-                                .and_then(|p| p.as_table());
+                if let Some(table) = value.as_table()
+                    && table.get("workspace").and_then(|v| v.as_bool()) == Some(true)
+                {
+                    // Lazily load workspace Cargo.toml
+                    if workspace_package.is_none() {
+                        if let Some(ws_path) = Self::find_workspace_root(cargo_toml_path)
+                            && let Ok(ws_content) = std::fs::read_to_string(&ws_path)
+                            && let Ok(ws_parsed) = ws_content.parse::<toml::Table>()
+                        {
+                            workspace_parsed = Some(ws_parsed);
                         }
-
-                        // Get value from workspace
-                        if let Some(ws_pkg) = workspace_package {
-                            if let Some(ws_value) = ws_pkg.get(key) {
-                                if let Some(s) = ws_value.as_str() {
-                                    result.insert(key.to_string(), s.to_string());
-                                } else if let Some(i) = ws_value.as_integer() {
-                                    result.insert(key.to_string(), i.to_string());
-                                }
-                            }
-                        }
-                        continue;
+                        workspace_package = workspace_parsed
+                            .as_ref()
+                            .and_then(|ws| ws.get("workspace"))
+                            .and_then(|w| w.as_table())
+                            .and_then(|w| w.get("package"))
+                            .and_then(|p| p.as_table());
                     }
+
+                    // Get value from workspace
+                    if let Some(ws_pkg) = workspace_package
+                        && let Some(ws_value) = ws_pkg.get(key)
+                    {
+                        if let Some(s) = ws_value.as_str() {
+                            result.insert(key.to_string(), s.to_string());
+                        } else if let Some(i) = ws_value.as_integer() {
+                            result.insert(key.to_string(), i.to_string());
+                        }
+                    }
+                    continue;
                 }
 
                 // Direct value
@@ -326,13 +320,12 @@ impl RustSource {
         }
 
         // Filename patterns
-        if let Some(filename) = ctx.file_path.file_name().and_then(|n| n.to_str()) {
-            if filename.ends_with("_test.rs")
+        if let Some(filename) = ctx.file_path.file_name().and_then(|n| n.to_str())
+            && (filename.ends_with("_test.rs")
                 || filename.ends_with("_tests.rs")
-                || filename.starts_with("test_")
-            {
-                return true;
-            }
+                || filename.starts_with("test_"))
+        {
+            return true;
         }
 
         // Check file content for top-level #[cfg(test)]
@@ -457,15 +450,15 @@ impl TypeScriptSource {
             }
 
             // Also get name and version
-            if let Some(value) = Self::extract_json_string(line, "name") {
-                if !result.contains_key("name") {
-                    result.insert("name".to_string(), value);
-                }
+            if let Some(value) = Self::extract_json_string(line, "name")
+                && !result.contains_key("name")
+            {
+                result.insert("name".to_string(), value);
             }
-            if let Some(value) = Self::extract_json_string(line, "version") {
-                if !result.contains_key("version") {
-                    result.insert("version".to_string(), value);
-                }
+            if let Some(value) = Self::extract_json_string(line, "version")
+                && !result.contains_key("version")
+            {
+                result.insert("version".to_string(), value);
             }
         }
 
@@ -508,17 +501,17 @@ impl RuleSource for TypeScriptSource {
         let mut result = HashMap::new();
 
         // Parse tsconfig.json if present
-        if let Some(tsconfig) = Self::find_tsconfig(ctx.file_path) {
-            if let Ok(content) = std::fs::read_to_string(&tsconfig) {
-                result.extend(Self::parse_tsconfig(&content));
-            }
+        if let Some(tsconfig) = Self::find_tsconfig(ctx.file_path)
+            && let Ok(content) = std::fs::read_to_string(&tsconfig)
+        {
+            result.extend(Self::parse_tsconfig(&content));
         }
 
         // Parse package.json if present
-        if let Some(pkg_json) = Self::find_package_json(ctx.file_path) {
-            if let Ok(content) = std::fs::read_to_string(&pkg_json) {
-                result.extend(Self::parse_package_json(&content));
-            }
+        if let Some(pkg_json) = Self::find_package_json(ctx.file_path)
+            && let Ok(content) = std::fs::read_to_string(&pkg_json)
+        {
+            result.extend(Self::parse_package_json(&content));
         }
 
         if result.is_empty() {
@@ -556,25 +549,25 @@ impl PythonSource {
         for line in content.lines() {
             let line = line.trim();
 
-            if let Some(rest) = line.strip_prefix("requires-python") {
-                if let Some(value) = parse_toml_value(rest) {
-                    // Strip comparison operators for the version
-                    let version = value
-                        .trim_start_matches(">=")
-                        .trim_start_matches("<=")
-                        .trim_start_matches("==")
-                        .trim_start_matches('^')
-                        .trim_start_matches('~');
-                    result.insert("requires_python".to_string(), version.to_string());
-                }
-            } else if let Some(rest) = line.strip_prefix("name") {
-                if let Some(value) = parse_toml_value(rest) {
-                    result.insert("name".to_string(), value);
-                }
-            } else if let Some(rest) = line.strip_prefix("version") {
-                if let Some(value) = parse_toml_value(rest) {
-                    result.insert("version".to_string(), value);
-                }
+            if let Some(rest) = line.strip_prefix("requires-python")
+                && let Some(value) = parse_toml_value(rest)
+            {
+                // Strip comparison operators for the version
+                let version = value
+                    .trim_start_matches(">=")
+                    .trim_start_matches("<=")
+                    .trim_start_matches("==")
+                    .trim_start_matches('^')
+                    .trim_start_matches('~');
+                result.insert("requires_python".to_string(), version.to_string());
+            } else if let Some(rest) = line.strip_prefix("name")
+                && let Some(value) = parse_toml_value(rest)
+            {
+                result.insert("name".to_string(), value);
+            } else if let Some(rest) = line.strip_prefix("version")
+                && let Some(value) = parse_toml_value(rest)
+            {
+                result.insert("version".to_string(), value);
             }
         }
 

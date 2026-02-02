@@ -54,18 +54,18 @@ impl Language for Elisp {
         let line = node.start_position().row + 1;
 
         for prefix in &["(defun ", "(defmacro ", "(defsubst ", "(cl-defun "] {
-            if text.starts_with(prefix) {
-                if let Some(name) = text[prefix.len()..].split_whitespace().next() {
-                    // Skip internal functions (double dash convention)
-                    if name.contains("--") {
-                        return Vec::new();
-                    }
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        line,
-                    }];
+            if let Some(rest) = text.strip_prefix(prefix)
+                && let Some(name) = rest.split_whitespace().next()
+            {
+                // Skip internal functions (double dash convention)
+                if name.contains("--") {
+                    return Vec::new();
                 }
+                return vec![Export {
+                    name: name.to_string(),
+                    kind: SymbolKind::Function,
+                    line,
+                }];
             }
         }
 
@@ -80,14 +80,14 @@ impl Language for Elisp {
             } else {
                 11
             };
-            if let Some(name) = text[prefix_len..].split_whitespace().next() {
-                if !name.contains("--") {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Variable,
-                        line,
-                    }];
-                }
+            if let Some(name) = text[prefix_len..].split_whitespace().next()
+                && !name.contains("--")
+            {
+                return vec![Export {
+                    name: name.to_string(),
+                    kind: SymbolKind::Variable,
+                    line,
+                }];
             }
         }
 
@@ -123,27 +123,27 @@ impl Language for Elisp {
         let first_line = text.lines().next().unwrap_or(text);
 
         for prefix in &["(defun ", "(defmacro ", "(defsubst ", "(cl-defun "] {
-            if text.starts_with(prefix) {
-                if let Some(name) = text[prefix.len()..].split_whitespace().next() {
-                    let is_private = name.contains("--");
-                    return Some(Symbol {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        signature: first_line.trim().to_string(),
-                        docstring: self.extract_docstring(node, content),
-                        attributes: Vec::new(),
-                        start_line: node.start_position().row + 1,
-                        end_line: node.end_position().row + 1,
-                        visibility: if is_private {
-                            Visibility::Private
-                        } else {
-                            Visibility::Public
-                        },
-                        children: Vec::new(),
-                        is_interface_impl: false,
-                        implements: Vec::new(),
-                    });
-                }
+            if let Some(rest) = text.strip_prefix(prefix)
+                && let Some(name) = rest.split_whitespace().next()
+            {
+                let is_private = name.contains("--");
+                return Some(Symbol {
+                    name: name.to_string(),
+                    kind: SymbolKind::Function,
+                    signature: first_line.trim().to_string(),
+                    docstring: self.extract_docstring(node, content),
+                    attributes: Vec::new(),
+                    start_line: node.start_position().row + 1,
+                    end_line: node.end_position().row + 1,
+                    visibility: if is_private {
+                        Visibility::Private
+                    } else {
+                        Visibility::Public
+                    },
+                    children: Vec::new(),
+                    is_interface_impl: false,
+                    implements: Vec::new(),
+                });
             }
         }
 
@@ -157,8 +157,8 @@ impl Language for Elisp {
 
         let text = &content[node.byte_range()];
 
-        if text.starts_with("(defgroup ") {
-            let name = text["(defgroup ".len()..].split_whitespace().next()?;
+        if let Some(rest) = text.strip_prefix("(defgroup ") {
+            let name = rest.split_whitespace().next()?;
             return Some(Symbol {
                 name: name.to_string(),
                 kind: SymbolKind::Module,
@@ -208,8 +208,8 @@ impl Language for Elisp {
         let text = &content[node.byte_range()];
         let line = node.start_position().row + 1;
 
-        if text.starts_with("(require ") {
-            let module = text["(require ".len()..]
+        if let Some(rest) = text.strip_prefix("(require ") {
+            let module = rest
                 .split(|c: char| c.is_whitespace() || c == ')')
                 .next()
                 .map(|s| s.trim_matches('\''))

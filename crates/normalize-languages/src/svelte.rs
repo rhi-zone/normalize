@@ -50,20 +50,20 @@ impl Language for Svelte {
         // Look for export let/const/function
         let text = &content[node.byte_range()];
 
-        if node.kind() == "export_statement" || text.contains("export ") {
-            if let Some(name) = self.node_name(node, content) {
-                let kind = if text.contains("function") {
-                    SymbolKind::Function
-                } else {
-                    SymbolKind::Variable
-                };
+        if (node.kind() == "export_statement" || text.contains("export "))
+            && let Some(name) = self.node_name(node, content)
+        {
+            let kind = if text.contains("function") {
+                SymbolKind::Function
+            } else {
+                SymbolKind::Variable
+            };
 
-                return vec![Export {
-                    name: name.to_string(),
-                    kind,
-                    line: node.start_position().row + 1,
-                }];
-            }
+            return vec![Export {
+                name: name.to_string(),
+                kind,
+                line: node.start_position().row + 1,
+            }];
         }
 
         Vec::new()
@@ -271,12 +271,8 @@ impl Language for Svelte {
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // Find the content of script/style elements
         let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "raw_text" {
-                return Some(child);
-            }
-        }
-        None
+        node.children(&mut cursor)
+            .find(|&child| child.kind() == "raw_text")
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {

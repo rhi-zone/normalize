@@ -288,11 +288,11 @@ impl TurnSummary {
                 Role::User => {
                     if user_prompt.is_none() {
                         for block in &msg.content {
-                            if let ContentBlock::Text { text } = block {
-                                if !text.trim().is_empty() {
-                                    user_prompt = Some(text.clone());
-                                    break;
-                                }
+                            if let ContentBlock::Text { text } = block
+                                && !text.trim().is_empty()
+                            {
+                                user_prompt = Some(text.clone());
+                                break;
                             }
                         }
                     }
@@ -413,7 +413,7 @@ impl TurnSummary {
         }
 
         // Action lines
-        let indent = if self.is_tool_only() { "  " } else { "  " };
+        let indent = "  ";
         for action in &self.actions {
             match action {
                 Action::FileOp { verb, path } => {
@@ -476,7 +476,7 @@ impl TurnSummary {
         }
 
         // Action lines
-        let indent = if self.is_tool_only() { "  " } else { "  " };
+        let indent = "  ";
         for action in &self.actions {
             match action {
                 Action::FileOp { verb, path } => {
@@ -810,10 +810,10 @@ fn cmd_sessions_filter(
                 };
 
                 // Apply filter
-                if let Some(f) = filter {
-                    if f != block_type {
-                        continue;
-                    }
+                if let Some(f) = filter
+                    && f != block_type
+                {
+                    continue;
                 }
 
                 // Apply errors_only filter
@@ -837,10 +837,10 @@ fn cmd_sessions_filter(
                 };
 
                 // Apply grep filter
-                if let Some(pattern) = grep_pattern {
-                    if !text.to_lowercase().contains(&pattern.to_lowercase()) {
-                        continue;
-                    }
+                if let Some(pattern) = grep_pattern
+                    && !text.to_lowercase().contains(&pattern.to_lowercase())
+                {
+                    continue;
                 }
 
                 // Display the matching content
@@ -908,7 +908,7 @@ fn format_role_and_type(role: &Role, block: &ContentBlock) -> String {
 /// Extract and display common n-grams (word sequences) from session messages.
 fn cmd_sessions_ngrams(session: &Session, n: usize, case_insensitive: bool) -> i32 {
     // Validate n is in reasonable range
-    if n < 2 || n > 4 {
+    if !(2..=4).contains(&n) {
         eprintln!("N-gram length must be 2-4");
         return 1;
     }

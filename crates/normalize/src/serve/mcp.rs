@@ -67,7 +67,7 @@ mod implementation {
             let content = if result.exit_code == 0 {
                 Content::text(&result.output)
             } else {
-                Content::text(&format!(
+                Content::text(format!(
                     "Error (exit {}): {}",
                     result.exit_code, result.output
                 ))

@@ -34,6 +34,12 @@ pub struct SymbolParser {
     // Keep for import parsing and call graph analysis
 }
 
+impl Default for SymbolParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SymbolParser {
     pub fn new() -> Self {
         Self {
@@ -54,18 +60,13 @@ impl SymbolParser {
         // Flatten nested symbols
         let mut symbols = Vec::new();
         for sym in &result.symbols {
-            self.flatten_symbol(sym, None, &mut symbols);
+            Self::flatten_symbol(sym, None, &mut symbols);
         }
         symbols
     }
 
     /// Flatten a nested symbol into the flat list with parent references
-    fn flatten_symbol(
-        &self,
-        sym: &LangSymbol,
-        parent: Option<&str>,
-        symbols: &mut Vec<FlatSymbol>,
-    ) {
+    fn flatten_symbol(sym: &LangSymbol, parent: Option<&str>, symbols: &mut Vec<FlatSymbol>) {
         symbols.push(FlatSymbol {
             name: sym.name.clone(),
             kind: sym.kind,
@@ -76,7 +77,7 @@ impl SymbolParser {
 
         // Recurse into children with current symbol as parent
         for child in &sym.children {
-            self.flatten_symbol(child, Some(&sym.name), symbols);
+            Self::flatten_symbol(child, Some(&sym.name), symbols);
         }
     }
 
@@ -101,12 +102,11 @@ impl SymbolParser {
         let mut imports = Vec::new();
         let root = tree.root_node();
         let mut cursor = root.walk();
-        self.collect_imports_with_trait(&mut cursor, content, support, &mut imports);
+        Self::collect_imports_with_trait(&mut cursor, content, support, &mut imports);
         imports
     }
 
     fn collect_imports_with_trait(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         support: &dyn Language,
@@ -125,7 +125,7 @@ impl SymbolParser {
                 let mut sub_imports = Vec::new();
                 let sub_root = sub_tree.root_node();
                 let mut sub_cursor = sub_root.walk();
-                self.collect_imports_with_trait(
+                Self::collect_imports_with_trait(
                     &mut sub_cursor,
                     &embedded.content,
                     sub_lang,
@@ -180,7 +180,7 @@ impl SymbolParser {
 
             // Recurse into children
             if cursor.goto_first_child() {
-                self.collect_imports_with_trait(cursor, content, support, imports);
+                Self::collect_imports_with_trait(cursor, content, support, imports);
                 cursor.goto_parent();
             }
 
@@ -240,7 +240,7 @@ impl SymbolParser {
 
         let mut calls = std::collections::HashSet::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_python_calls(&mut cursor, source, &mut calls);
+        Self::collect_python_calls(&mut cursor, source, &mut calls);
 
         let mut result: Vec<_> = calls.into_iter().collect();
         result.sort();
@@ -248,7 +248,6 @@ impl SymbolParser {
     }
 
     fn collect_python_calls(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         calls: &mut std::collections::HashSet<String>,
@@ -261,13 +260,13 @@ impl SymbolParser {
                 if let Some(func_node) = node.child_by_field_name("function") {
                     let func_text = &content[func_node.byte_range()];
                     // Extract just the function name (last part if dotted)
-                    let name = func_text.split('.').last().unwrap_or(func_text);
+                    let name = func_text.split('.').next_back().unwrap_or(func_text);
                     calls.insert(name.to_string());
                 }
             }
 
             if cursor.goto_first_child() {
-                self.collect_python_calls(cursor, content, calls);
+                Self::collect_python_calls(cursor, content, calls);
                 cursor.goto_parent();
             }
 
@@ -336,12 +335,11 @@ impl SymbolParser {
 
         let mut calls = Vec::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_python_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        Self::collect_python_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
     }
 
     fn collect_python_calls_with_lines(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         base_line: usize,
@@ -350,24 +348,24 @@ impl SymbolParser {
         loop {
             let node = cursor.node();
 
-            if node.kind() == "call" {
-                if let Some(func_node) = node.child_by_field_name("function") {
-                    let func_text = &content[func_node.byte_range()];
-                    let line = node.start_position().row + base_line;
+            if node.kind() == "call"
+                && let Some(func_node) = node.child_by_field_name("function")
+            {
+                let func_text = &content[func_node.byte_range()];
+                let line = node.start_position().row + base_line;
 
-                    // Parse qualifier.name or just name
-                    if let Some(dot_pos) = func_text.rfind('.') {
-                        let qualifier = &func_text[..dot_pos];
-                        let name = &func_text[dot_pos + 1..];
-                        calls.push((name.to_string(), line, Some(qualifier.to_string())));
-                    } else {
-                        calls.push((func_text.to_string(), line, None));
-                    }
+                // Parse qualifier.name or just name
+                if let Some(dot_pos) = func_text.rfind('.') {
+                    let qualifier = &func_text[..dot_pos];
+                    let name = &func_text[dot_pos + 1..];
+                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
+                } else {
+                    calls.push((func_text.to_string(), line, None));
                 }
             }
 
             if cursor.goto_first_child() {
-                self.collect_python_calls_with_lines(cursor, content, base_line, calls);
+                Self::collect_python_calls_with_lines(cursor, content, base_line, calls);
                 cursor.goto_parent();
             }
 
@@ -389,12 +387,11 @@ impl SymbolParser {
 
         let mut calls = Vec::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_rust_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        Self::collect_rust_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
     }
 
     fn collect_rust_calls_with_lines(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         base_line: usize,
@@ -403,30 +400,30 @@ impl SymbolParser {
         loop {
             let node = cursor.node();
 
-            if node.kind() == "call_expression" {
-                if let Some(func_node) = node.child_by_field_name("function") {
-                    let func_text = &content[func_node.byte_range()];
-                    let line = node.start_position().row + base_line;
+            if node.kind() == "call_expression"
+                && let Some(func_node) = node.child_by_field_name("function")
+            {
+                let func_text = &content[func_node.byte_range()];
+                let line = node.start_position().row + base_line;
 
-                    // Parse qualifier::name, qualifier.name, or just name
-                    // For Rust: foo::bar() or foo.bar() or bar()
-                    if let Some(sep_pos) = func_text.rfind("::").or_else(|| func_text.rfind('.')) {
-                        let sep_len = if func_text[sep_pos..].starts_with("::") {
-                            2
-                        } else {
-                            1
-                        };
-                        let qualifier = &func_text[..sep_pos];
-                        let name = &func_text[sep_pos + sep_len..];
-                        calls.push((name.to_string(), line, Some(qualifier.to_string())));
+                // Parse qualifier::name, qualifier.name, or just name
+                // For Rust: foo::bar() or foo.bar() or bar()
+                if let Some(sep_pos) = func_text.rfind("::").or_else(|| func_text.rfind('.')) {
+                    let sep_len = if func_text[sep_pos..].starts_with("::") {
+                        2
                     } else {
-                        calls.push((func_text.to_string(), line, None));
-                    }
+                        1
+                    };
+                    let qualifier = &func_text[..sep_pos];
+                    let name = &func_text[sep_pos + sep_len..];
+                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
+                } else {
+                    calls.push((func_text.to_string(), line, None));
                 }
             }
 
             if cursor.goto_first_child() {
-                self.collect_rust_calls_with_lines(cursor, content, base_line, calls);
+                Self::collect_rust_calls_with_lines(cursor, content, base_line, calls);
                 cursor.goto_parent();
             }
 
@@ -450,7 +447,7 @@ impl SymbolParser {
 
         let mut calls = Vec::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        Self::collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
     }
 
@@ -466,13 +463,12 @@ impl SymbolParser {
 
         let mut calls = Vec::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        Self::collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
     }
 
     /// Shared implementation for JavaScript and TypeScript call extraction
     fn collect_js_ts_calls_with_lines(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         base_line: usize,
@@ -481,24 +477,24 @@ impl SymbolParser {
         loop {
             let node = cursor.node();
 
-            if node.kind() == "call_expression" {
-                if let Some(func_node) = node.child_by_field_name("function") {
-                    let func_text = &content[func_node.byte_range()];
-                    let line = node.start_position().row + base_line;
+            if node.kind() == "call_expression"
+                && let Some(func_node) = node.child_by_field_name("function")
+            {
+                let func_text = &content[func_node.byte_range()];
+                let line = node.start_position().row + base_line;
 
-                    // Parse qualifier.name or just name (e.g., obj.method(), func())
-                    if let Some(dot_pos) = func_text.rfind('.') {
-                        let qualifier = &func_text[..dot_pos];
-                        let name = &func_text[dot_pos + 1..];
-                        calls.push((name.to_string(), line, Some(qualifier.to_string())));
-                    } else {
-                        calls.push((func_text.to_string(), line, None));
-                    }
+                // Parse qualifier.name or just name (e.g., obj.method(), func())
+                if let Some(dot_pos) = func_text.rfind('.') {
+                    let qualifier = &func_text[..dot_pos];
+                    let name = &func_text[dot_pos + 1..];
+                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
+                } else {
+                    calls.push((func_text.to_string(), line, None));
                 }
             }
 
             if cursor.goto_first_child() {
-                self.collect_js_ts_calls_with_lines(cursor, content, base_line, calls);
+                Self::collect_js_ts_calls_with_lines(cursor, content, base_line, calls);
                 cursor.goto_parent();
             }
 
@@ -520,12 +516,11 @@ impl SymbolParser {
 
         let mut calls = Vec::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_java_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        Self::collect_java_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
     }
 
     fn collect_java_calls_with_lines(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         base_line: usize,
@@ -535,22 +530,22 @@ impl SymbolParser {
             let node = cursor.node();
 
             // Java uses "method_invocation" for method calls
-            if node.kind() == "method_invocation" {
-                if let Some(name_node) = node.child_by_field_name("name") {
-                    let name = &content[name_node.byte_range()];
-                    let line = node.start_position().row + base_line;
+            if node.kind() == "method_invocation"
+                && let Some(name_node) = node.child_by_field_name("name")
+            {
+                let name = &content[name_node.byte_range()];
+                let line = node.start_position().row + base_line;
 
-                    // Get the object/qualifier if present
-                    let qualifier = node
-                        .child_by_field_name("object")
-                        .map(|obj| content[obj.byte_range()].to_string());
+                // Get the object/qualifier if present
+                let qualifier = node
+                    .child_by_field_name("object")
+                    .map(|obj| content[obj.byte_range()].to_string());
 
-                    calls.push((name.to_string(), line, qualifier));
-                }
+                calls.push((name.to_string(), line, qualifier));
             }
 
             if cursor.goto_first_child() {
-                self.collect_java_calls_with_lines(cursor, content, base_line, calls);
+                Self::collect_java_calls_with_lines(cursor, content, base_line, calls);
                 cursor.goto_parent();
             }
 
@@ -572,12 +567,11 @@ impl SymbolParser {
 
         let mut calls = Vec::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_go_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        Self::collect_go_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
     }
 
     fn collect_go_calls_with_lines(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         base_line: usize,
@@ -586,24 +580,24 @@ impl SymbolParser {
         loop {
             let node = cursor.node();
 
-            if node.kind() == "call_expression" {
-                if let Some(func_node) = node.child_by_field_name("function") {
-                    let func_text = &content[func_node.byte_range()];
-                    let line = node.start_position().row + base_line;
+            if node.kind() == "call_expression"
+                && let Some(func_node) = node.child_by_field_name("function")
+            {
+                let func_text = &content[func_node.byte_range()];
+                let line = node.start_position().row + base_line;
 
-                    // Go uses . for method calls and package access: pkg.Func(), obj.Method()
-                    if let Some(dot_pos) = func_text.rfind('.') {
-                        let qualifier = &func_text[..dot_pos];
-                        let name = &func_text[dot_pos + 1..];
-                        calls.push((name.to_string(), line, Some(qualifier.to_string())));
-                    } else {
-                        calls.push((func_text.to_string(), line, None));
-                    }
+                // Go uses . for method calls and package access: pkg.Func(), obj.Method()
+                if let Some(dot_pos) = func_text.rfind('.') {
+                    let qualifier = &func_text[..dot_pos];
+                    let name = &func_text[dot_pos + 1..];
+                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
+                } else {
+                    calls.push((func_text.to_string(), line, None));
                 }
             }
 
             if cursor.goto_first_child() {
-                self.collect_go_calls_with_lines(cursor, content, base_line, calls);
+                Self::collect_go_calls_with_lines(cursor, content, base_line, calls);
                 cursor.goto_parent();
             }
 
@@ -621,7 +615,7 @@ impl SymbolParser {
 
         let mut calls = std::collections::HashSet::new();
         let mut cursor = tree.root_node().walk();
-        self.collect_rust_calls(&mut cursor, source, &mut calls);
+        Self::collect_rust_calls(&mut cursor, source, &mut calls);
 
         let mut result: Vec<_> = calls.into_iter().collect();
         result.sort();
@@ -629,7 +623,6 @@ impl SymbolParser {
     }
 
     fn collect_rust_calls(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         calls: &mut std::collections::HashSet<String>,
@@ -647,14 +640,14 @@ impl SymbolParser {
                         .last()
                         .unwrap_or(func_text)
                         .split('.')
-                        .last()
+                        .next_back()
                         .unwrap_or(func_text);
                     calls.insert(name.to_string());
                 }
             }
 
             if cursor.goto_first_child() {
-                self.collect_rust_calls(cursor, content, calls);
+                Self::collect_rust_calls(cursor, content, calls);
                 cursor.goto_parent();
             }
 

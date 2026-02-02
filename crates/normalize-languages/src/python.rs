@@ -261,21 +261,21 @@ impl Language for Python {
                             is_relative: false,
                             line,
                         });
-                    } else if child.kind() == "aliased_import" {
-                        if let Some(name) = child.child_by_field_name("name") {
-                            let module = content[name.byte_range()].to_string();
-                            let alias = child
-                                .child_by_field_name("alias")
-                                .map(|a| content[a.byte_range()].to_string());
-                            imports.push(Import {
-                                module,
-                                names: Vec::new(),
-                                alias,
-                                is_wildcard: false,
-                                is_relative: false,
-                                line,
-                            });
-                        }
+                    } else if child.kind() == "aliased_import"
+                        && let Some(name) = child.child_by_field_name("name")
+                    {
+                        let module = content[name.byte_range()].to_string();
+                        let alias = child
+                            .child_by_field_name("alias")
+                            .map(|a| content[a.byte_range()].to_string());
+                        imports.push(Import {
+                            module,
+                            names: Vec::new(),
+                            alias,
+                            is_wildcard: false,
+                            is_relative: false,
+                            line,
+                        });
                     }
                 }
                 imports
@@ -355,26 +355,26 @@ impl Language for Python {
 
         match node.kind() {
             "function_definition" => {
-                if let Some(name) = self.node_name(node, content) {
-                    if !name.starts_with('_') {
-                        return vec![Export {
-                            name: name.to_string(),
-                            kind: SymbolKind::Function,
-                            line,
-                        }];
-                    }
+                if let Some(name) = self.node_name(node, content)
+                    && !name.starts_with('_')
+                {
+                    return vec![Export {
+                        name: name.to_string(),
+                        kind: SymbolKind::Function,
+                        line,
+                    }];
                 }
                 Vec::new()
             }
             "class_definition" => {
-                if let Some(name) = self.node_name(node, content) {
-                    if !name.starts_with('_') {
-                        return vec![Export {
-                            name: name.to_string(),
-                            kind: SymbolKind::Class,
-                            line,
-                        }];
-                    }
+                if let Some(name) = self.node_name(node, content)
+                    && !name.starts_with('_')
+                {
+                    return vec![Export {
+                        name: name.to_string(),
+                        kind: SymbolKind::Class,
+                        line,
+                    }];
                 }
                 Vec::new()
             }

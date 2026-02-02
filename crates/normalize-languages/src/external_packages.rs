@@ -104,10 +104,10 @@ impl Version {
         if *self < min {
             return false;
         }
-        if let Some(max) = max {
-            if *self > max {
-                return false;
-            }
+        if let Some(max) = max
+            && *self > max
+        {
+            return false;
         }
         true
     }

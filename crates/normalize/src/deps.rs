@@ -95,6 +95,12 @@ impl DepsResult {
 
 pub struct DepsExtractor {}
 
+impl Default for DepsExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DepsExtractor {
     pub fn new() -> Self {
         Self {}
@@ -146,7 +152,7 @@ impl DepsExtractor {
         let root = tree.root_node();
         let mut cursor = root.walk();
 
-        self.collect_with_trait(&mut cursor, content, support, &mut imports, &mut exports);
+        Self::collect_with_trait(&mut cursor, content, support, &mut imports, &mut exports);
         ExtractedDeps {
             imports,
             exports,
@@ -155,7 +161,6 @@ impl DepsExtractor {
     }
 
     fn collect_with_trait(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         support: &dyn Language,
@@ -176,7 +181,7 @@ impl DepsExtractor {
                 let mut sub_exports = Vec::new();
                 let sub_root = sub_tree.root_node();
                 let mut sub_cursor = sub_root.walk();
-                self.collect_with_trait(
+                Self::collect_with_trait(
                     &mut sub_cursor,
                     &embedded.content,
                     sub_lang,
@@ -214,7 +219,7 @@ impl DepsExtractor {
 
             // Recurse into children
             if cursor.goto_first_child() {
-                self.collect_with_trait(cursor, content, support, imports, exports);
+                Self::collect_with_trait(cursor, content, support, imports, exports);
                 cursor.goto_parent();
             }
 
@@ -274,7 +279,7 @@ impl DepsExtractor {
         let root = tree.root_node();
         let mut cursor = root.walk();
 
-        self.collect_js_ts_deps(
+        Self::collect_js_ts_deps(
             &mut cursor,
             content,
             &mut imports,
@@ -289,7 +294,6 @@ impl DepsExtractor {
     }
 
     fn collect_js_ts_deps(
-        &self,
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         imports: &mut Vec<Import>,
@@ -319,7 +323,7 @@ impl DepsExtractor {
                                 }
                                 "import_clause" => {
                                     // Extract imported names
-                                    self.collect_import_names(child, content, &mut names);
+                                    Self::collect_import_names(child, content, &mut names);
                                 }
                                 _ => {}
                             }
@@ -370,7 +374,7 @@ impl DepsExtractor {
                                 }
                                 "export_clause" => {
                                     // export { foo, bar } from './module'
-                                    self.collect_export_clause_names(
+                                    Self::collect_export_clause_names(
                                         child,
                                         content,
                                         &mut named_exports,
@@ -396,7 +400,7 @@ impl DepsExtractor {
                                 }
                                 "lexical_declaration" => {
                                     // export const foo = ..., bar = ...
-                                    self.collect_variable_names(
+                                    Self::collect_variable_names(
                                         child,
                                         content,
                                         exports,
@@ -448,7 +452,7 @@ impl DepsExtractor {
 
             // Recurse into children
             if cursor.goto_first_child() {
-                self.collect_js_ts_deps(cursor, content, imports, exports, reexports);
+                Self::collect_js_ts_deps(cursor, content, imports, exports, reexports);
                 cursor.goto_parent();
             }
 
@@ -460,7 +464,6 @@ impl DepsExtractor {
 
     /// Collect names from export clause: export { foo, bar } from ...
     fn collect_export_clause_names(
-        &self,
         node: tree_sitter::Node,
         content: &str,
         names: &mut Vec<String>,
@@ -477,30 +480,25 @@ impl DepsExtractor {
                         } else {
                             // Find first identifier child
                             for j in 0..child.child_count() as u32 {
-                                if let Some(id) = child.child(j) {
-                                    if id.kind() == "identifier" {
-                                        names.push(content[id.byte_range()].to_string());
-                                        break;
-                                    }
+                                if let Some(id) = child.child(j)
+                                    && id.kind() == "identifier"
+                                {
+                                    names.push(content[id.byte_range()].to_string());
+                                    break;
                                 }
                             }
                         }
                     }
                     _ => {
                         // Recurse into other nodes
-                        self.collect_export_clause_names(child, content, names);
+                        Self::collect_export_clause_names(child, content, names);
                     }
                 }
             }
         }
     }
 
-    fn collect_import_names(
-        &self,
-        node: tree_sitter::Node,
-        content: &str,
-        names: &mut Vec<String>,
-    ) {
+    fn collect_import_names(node: tree_sitter::Node, content: &str, names: &mut Vec<String>) {
         let mut cursor = node.walk();
         loop {
             let child = cursor.node();
@@ -517,10 +515,10 @@ impl DepsExtractor {
                 "namespace_import" => {
                     // import * as foo - we want "foo"
                     for i in 0..child.child_count() as u32 {
-                        if let Some(id) = child.child(i) {
-                            if id.kind() == "identifier" {
-                                names.push(content[id.byte_range()].to_string());
-                            }
+                        if let Some(id) = child.child(i)
+                            && id.kind() == "identifier"
+                        {
+                            names.push(content[id.byte_range()].to_string());
                         }
                     }
                 }
@@ -528,7 +526,7 @@ impl DepsExtractor {
             }
 
             if cursor.goto_first_child() {
-                self.collect_import_names(cursor.node(), content, names);
+                Self::collect_import_names(cursor.node(), content, names);
                 cursor.goto_parent();
             }
 
@@ -539,7 +537,6 @@ impl DepsExtractor {
     }
 
     fn collect_variable_names(
-        &self,
         node: tree_sitter::Node,
         content: &str,
         exports: &mut Vec<Export>,
@@ -548,20 +545,19 @@ impl DepsExtractor {
         let mut cursor = node.walk();
         loop {
             let child = cursor.node();
-            if child.kind() == "variable_declarator" {
-                if let Some(name_node) = child.child_by_field_name("name") {
-                    if name_node.kind() == "identifier" {
-                        exports.push(Export {
-                            name: content[name_node.byte_range()].to_string(),
-                            kind: SymbolKind::Variable,
-                            line,
-                        });
-                    }
-                }
+            if child.kind() == "variable_declarator"
+                && let Some(name_node) = child.child_by_field_name("name")
+                && name_node.kind() == "identifier"
+            {
+                exports.push(Export {
+                    name: content[name_node.byte_range()].to_string(),
+                    kind: SymbolKind::Variable,
+                    line,
+                });
             }
 
             if cursor.goto_first_child() {
-                self.collect_variable_names(cursor.node(), content, exports, line);
+                Self::collect_variable_names(cursor.node(), content, exports, line);
                 cursor.goto_parent();
             }
 

@@ -207,13 +207,12 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
         opt.description = caps.get(4).map(|m| m.as_str().to_string());
 
         // Check for default value in description: "(default: X)"
-        if let Some(ref desc) = opt.description {
-            if let Some(start) = desc.find("(default:") {
-                if let Some(end) = desc[start..].find(')') {
-                    let default = desc[start + 9..start + end].trim().to_string();
-                    opt.default = Some(default);
-                }
-            }
+        if let Some(ref desc) = opt.description
+            && let Some(start) = desc.find("(default:")
+            && let Some(end) = desc[start..].find(')')
+        {
+            let default = desc[start + 9..start + end].trim().to_string();
+            opt.default = Some(default);
         }
 
         // Skip help as it's meta

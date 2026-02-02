@@ -251,10 +251,11 @@ fn structural_preview(text: &str, grammar: &str) -> (String, usize) {
     }
 
     // Always include the closing brace if present
-    if let Some(last) = lines.last() {
-        if last.trim() == "}" && !preview_lines.contains(last) {
-            preview_lines.push(*last);
-        }
+    if let Some(last) = lines.last()
+        && last.trim() == "}"
+        && !preview_lines.contains(last)
+    {
+        preview_lines.push(*last);
     }
 
     let hidden = lines.len().saturating_sub(preview_lines.len());

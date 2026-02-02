@@ -223,22 +223,15 @@ pub trait Ecosystem: Send + Sync {
 
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {
-        for tool in self.tools() {
-            if which(tool) {
-                return Some(tool);
-            }
-        }
-        None
+        self.tools().iter().copied().find(|tool| which(tool))
     }
 
     /// Detect preferred tool from lockfiles, falling back to first available.
     fn detect_tool(&self, project_root: &Path) -> Option<&'static str> {
         // Check lockfiles first
         for lock in self.lockfiles() {
-            if project_root.join(lock.filename).exists() {
-                if which(lock.manager) {
-                    return Some(lock.manager);
-                }
+            if project_root.join(lock.filename).exists() && which(lock.manager) {
+                return Some(lock.manager);
             }
         }
         // Fall back to first available tool

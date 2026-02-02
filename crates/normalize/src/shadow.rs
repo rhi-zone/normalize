@@ -642,7 +642,7 @@ impl Shadow {
 
             if dry_run {
                 // Also report conflicts in dry-run mode
-                let conflicts = self.detect_conflicts(&[entry.clone()]);
+                let conflicts = self.detect_conflicts(std::slice::from_ref(entry));
                 results.push(UndoResult {
                     files: files_to_undo.iter().map(PathBuf::from).collect(),
                     undone_commit: entry.hash.clone(),
@@ -743,10 +743,10 @@ impl Shadow {
                     Ok(output) if output.status.success() => {
                         // File exists in shadow - compare with actual
                         if actual_file.exists() {
-                            if let Ok(actual_content) = std::fs::read(&actual_file) {
-                                if actual_content != output.stdout {
-                                    conflicts.push(file_path.clone());
-                                }
+                            if let Ok(actual_content) = std::fs::read(&actual_file)
+                                && actual_content != output.stdout
+                            {
+                                conflicts.push(file_path.clone());
                             }
                         } else {
                             // File was deleted externally

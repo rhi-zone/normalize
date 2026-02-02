@@ -162,29 +162,30 @@ fn cmd_install(version: Option<String>, force: bool, json: bool) -> i32 {
     };
 
     // Check if grammars already exist
-    if install_dir.exists() && !force {
-        if let Ok(entries) = std::fs::read_dir(&install_dir) {
-            let count = entries.filter(|e| e.is_ok()).count();
-            if count > 0 {
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "status": "already_installed",
-                            "path": install_dir.display().to_string(),
-                            "count": count
-                        })
-                    );
-                } else {
-                    println!(
-                        "Grammars already installed at {} ({} files)",
-                        install_dir.display(),
-                        count
-                    );
-                    println!("Use --force to reinstall");
-                }
-                return 0;
+    if install_dir.exists()
+        && !force
+        && let Ok(entries) = std::fs::read_dir(&install_dir)
+    {
+        let count = entries.filter(|e| e.is_ok()).count();
+        if count > 0 {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "status": "already_installed",
+                        "path": install_dir.display().to_string(),
+                        "count": count
+                    })
+                );
+            } else {
+                println!(
+                    "Grammars already installed at {} ({} files)",
+                    install_dir.display(),
+                    count
+                );
+                println!("Use --force to reinstall");
             }
+            return 0;
         }
     }
 
@@ -247,10 +248,10 @@ fn cmd_install(version: Option<String>, force: bool, json: bool) -> i32 {
             eprintln!("Available assets:");
             if let Some(arr) = assets {
                 for a in arr {
-                    if let Some(name) = a["name"].as_str() {
-                        if name.contains("grammars") {
-                            eprintln!("  - {}", name);
-                        }
+                    if let Some(name) = a["name"].as_str()
+                        && name.contains("grammars")
+                    {
+                        eprintln!("  - {}", name);
                     }
                 }
             }

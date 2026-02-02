@@ -130,9 +130,9 @@ impl Language for Nginx {
         }
 
         let text = &content[node.byte_range()];
-        if text.starts_with("include ") {
+        if let Some(rest) = text.strip_prefix("include ") {
             return vec![Import {
-                module: text[8..].trim_end_matches(';').trim().to_string(),
+                module: rest.trim_end_matches(';').trim().to_string(),
                 names: Vec::new(),
                 alias: None,
                 is_wildcard: text.contains('*'),

@@ -74,10 +74,10 @@ impl InterfaceResolver for IndexedResolver<'_> {
         // Also check if the type is defined in any indexed file
         if let Ok(files) = rt.block_on(self.index.find_type_definitions(name)) {
             for file in files {
-                if let Ok(methods) = rt.block_on(self.index.get_type_methods(&file, name)) {
-                    if !methods.is_empty() {
-                        return Some(methods);
-                    }
+                if let Ok(methods) = rt.block_on(self.index.get_type_methods(&file, name))
+                    && !methods.is_empty()
+                {
+                    return Some(methods);
                 }
             }
         }
@@ -172,6 +172,12 @@ impl InterfaceResolver for OnDemandResolver<'_> {
 /// Shared symbol extractor using the Language trait.
 pub struct Extractor {
     options: ExtractOptions,
+}
+
+impl Default for Extractor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Extractor {
@@ -285,37 +291,37 @@ impl Extractor {
 
             // Check if this is a function
             if support.function_kinds().contains(&kind) {
-                if let Some(sym) = support.extract_function(&node, content, in_container) {
-                    if self.should_include(&sym) {
-                        symbols.push(sym);
-                    }
+                if let Some(sym) = support.extract_function(&node, content, in_container)
+                    && self.should_include(&sym)
+                {
+                    symbols.push(sym);
                 }
             }
             // Check if this is a container (class, impl, module)
             else if support.container_kinds().contains(&kind) {
-                if let Some(mut sym) = support.extract_container(&node, content) {
-                    if self.should_include(&sym) {
-                        // Recurse into container body
-                        if let Some(body) = support.container_body(&node) {
-                            let mut body_cursor = body.walk();
-                            if body_cursor.goto_first_child() {
-                                self.collect_symbols(
-                                    &mut body_cursor,
-                                    content,
-                                    support,
-                                    &mut sym.children,
-                                    true,
-                                );
-                            }
+                if let Some(mut sym) = support.extract_container(&node, content)
+                    && self.should_include(&sym)
+                {
+                    // Recurse into container body
+                    if let Some(body) = support.container_body(&node) {
+                        let mut body_cursor = body.walk();
+                        if body_cursor.goto_first_child() {
+                            self.collect_symbols(
+                                &mut body_cursor,
+                                content,
+                                support,
+                                &mut sym.children,
+                                true,
+                            );
                         }
-
-                        // Propagate is_interface_impl to all children
-                        if sym.is_interface_impl {
-                            propagate_interface_impl(&mut sym.children);
-                        }
-
-                        symbols.push(sym);
                     }
+
+                    // Propagate is_interface_impl to all children
+                    if sym.is_interface_impl {
+                        propagate_interface_impl(&mut sym.children);
+                    }
+
+                    symbols.push(sym);
                 }
                 // Don't descend further after processing container
                 if cursor.goto_next_sibling() {
@@ -326,12 +332,10 @@ impl Extractor {
             // Check if this is a standalone type (struct, enum, etc.)
             else if support.type_kinds().contains(&kind)
                 && !support.container_kinds().contains(&kind)
+                && let Some(sym) = support.extract_type(&node, content)
+                && self.should_include(&sym)
             {
-                if let Some(sym) = support.extract_type(&node, content) {
-                    if self.should_include(&sym) {
-                        symbols.push(sym);
-                    }
-                }
+                symbols.push(sym);
             }
 
             // Descend into children for other nodes
@@ -374,10 +378,9 @@ impl Extractor {
             if matches!(
                 sym.kind,
                 normalize_languages::SymbolKind::Struct | normalize_languages::SymbolKind::Enum
-            ) {
-                if let Some(methods) = impl_methods.remove(&sym.name) {
-                    sym.children.extend(methods);
-                }
+            ) && let Some(methods) = impl_methods.remove(&sym.name)
+            {
+                sym.children.extend(methods);
             }
         }
 
@@ -408,7 +411,7 @@ impl Extractor {
     /// If a resolver is provided, it will be used to look up interface methods
     /// from other files when not found locally.
     fn mark_interface_implementations(
-        symbols: &mut Vec<Symbol>,
+        symbols: &mut [Symbol],
         resolver: Option<&dyn InterfaceResolver>,
         current_file: &str,
     ) {

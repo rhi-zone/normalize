@@ -69,8 +69,7 @@ impl Ecosystem for Gem {
             }
 
             // gem 'name' or gem 'name', 'version' or gem "name", "~> 1.0"
-            if line.starts_with("gem ") {
-                let rest = &line[4..];
+            if let Some(rest) = line.strip_prefix("gem ") {
                 // Extract gem name from quotes
                 let quote = rest.chars().next();
                 if quote == Some('\'') || quote == Some('"') {

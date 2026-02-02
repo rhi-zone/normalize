@@ -340,6 +340,12 @@ impl OutputFormatter for ComplexityReport {
 
 pub struct ComplexityAnalyzer {}
 
+impl Default for ComplexityAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ComplexityAnalyzer {
     pub fn new() -> Self {
         Self {}
@@ -402,24 +408,24 @@ impl ComplexityAnalyzer {
                 }
             }
             // Check if this is a container (class, impl, module)
-            else if support.container_kinds().contains(&kind) {
-                if let Some(name) = support.node_name(&node, content) {
-                    // Recurse into container with the container name as parent
-                    if cursor.goto_first_child() {
-                        self.collect_functions_with_trait(
-                            cursor,
-                            content,
-                            support,
-                            functions,
-                            Some(name),
-                        );
-                        cursor.goto_parent();
-                    }
-                    if cursor.goto_next_sibling() {
-                        continue;
-                    }
-                    break;
+            else if support.container_kinds().contains(&kind)
+                && let Some(name) = support.node_name(&node, content)
+            {
+                // Recurse into container with the container name as parent
+                if cursor.goto_first_child() {
+                    self.collect_functions_with_trait(
+                        cursor,
+                        content,
+                        support,
+                        functions,
+                        Some(name),
+                    );
+                    cursor.goto_parent();
                 }
+                if cursor.goto_next_sibling() {
+                    continue;
+                }
+                break;
             }
 
             // Recurse into other nodes

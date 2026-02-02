@@ -12,12 +12,12 @@ pub fn parse_json_schema(input: &Value) -> Result<Schema, ParseError> {
     let mut parser = Parser::new();
 
     // Handle $defs / definitions
-    if let Some(defs) = input.get("$defs").or_else(|| input.get("definitions")) {
-        if let Some(obj) = defs.as_object() {
-            for (name, def) in obj {
-                if let Some(type_def) = parser.parse_definition(name, def)? {
-                    schema.add(type_def);
-                }
+    if let Some(defs) = input.get("$defs").or_else(|| input.get("definitions"))
+        && let Some(obj) = defs.as_object()
+    {
+        for (name, def) in obj {
+            if let Some(type_def) = parser.parse_definition(name, def)? {
+                schema.add(type_def);
             }
         }
     }
@@ -67,10 +67,10 @@ impl Parser {
         }
 
         // Check for oneOf with discriminator (tagged union)
-        if let Some(one_of) = schema.get("oneOf") {
-            if let Some(disc) = schema.get("discriminator") {
-                return Ok(Some(self.parse_tagged_union(name, one_of, disc, docs)?));
-            }
+        if let Some(one_of) = schema.get("oneOf")
+            && let Some(disc) = schema.get("discriminator")
+        {
+            return Ok(Some(self.parse_tagged_union(name, one_of, disc, docs)?));
         }
 
         // Check for object type
@@ -297,28 +297,27 @@ impl Parser {
         }
 
         // Handle anyOf / oneOf without discriminator
-        if let Some(any_of) = schema.get("anyOf").or_else(|| schema.get("oneOf")) {
-            if let Some(arr) = any_of.as_array() {
-                let types: Vec<Type> = arr
-                    .iter()
-                    .filter_map(|s| self.parse_type(s).ok().flatten())
-                    .collect();
-                if types.len() == 1 {
-                    return Ok(Some(types.into_iter().next().unwrap()));
-                }
-                if !types.is_empty() {
-                    return Ok(Some(Type::Union(types)));
-                }
+        if let Some(any_of) = schema.get("anyOf").or_else(|| schema.get("oneOf"))
+            && let Some(arr) = any_of.as_array()
+        {
+            let types: Vec<Type> = arr
+                .iter()
+                .filter_map(|s| self.parse_type(s).ok().flatten())
+                .collect();
+            if types.len() == 1 {
+                return Ok(Some(types.into_iter().next().unwrap()));
+            }
+            if !types.is_empty() {
+                return Ok(Some(Type::Union(types)));
             }
         }
 
         // Handle allOf (intersection - flatten into first type for now)
-        if let Some(all_of) = schema.get("allOf") {
-            if let Some(arr) = all_of.as_array() {
-                if let Some(first) = arr.first() {
-                    return self.parse_type(first);
-                }
-            }
+        if let Some(all_of) = schema.get("allOf")
+            && let Some(arr) = all_of.as_array()
+            && let Some(first) = arr.first()
+        {
+            return self.parse_type(first);
         }
 
         Ok(None)

@@ -76,6 +76,7 @@ pub use tsgo::Tsgo;
 use crate::Tool;
 
 /// Create a registry with all built-in adapters.
+#[allow(clippy::vec_init_then_push)]
 pub fn all_adapters() -> Vec<Box<dyn Tool>> {
     let mut adapters: Vec<Box<dyn Tool>> = Vec::new();
 

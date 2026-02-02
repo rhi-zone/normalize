@@ -372,7 +372,6 @@ impl OpenApiClientGenerator for PythonUrllib {
                         }
                     }
 
-                    let url_template = path.replace('{', "{");
                     let params_dict = if query_params.is_empty() {
                         String::new()
                     } else {
@@ -391,7 +390,7 @@ impl OpenApiClientGenerator for PythonUrllib {
                     ));
                     out.push_str(&format!(
                         "        data = self._request(f'{}'{})\n",
-                        url_template, params_dict
+                        path, params_dict
                     ));
                     out.push_str(&format!("        return {}(**data)\n\n", resp_type));
                 }
@@ -581,7 +580,7 @@ fn json_schema_to_rust(schema: &Value) -> String {
     if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
         return ref_path
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("serde_json::Value")
             .to_string();
     }
@@ -625,7 +624,11 @@ fn type_str_to_rust(t: &str) -> String {
 
 fn json_schema_to_ts(schema: &Value) -> String {
     if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
-        return ref_path.split('/').last().unwrap_or("unknown").to_string();
+        return ref_path
+            .split('/')
+            .next_back()
+            .unwrap_or("unknown")
+            .to_string();
     }
 
     let type_val = schema.get("type");
@@ -664,7 +667,7 @@ fn type_str_to_ts(t: &str) -> String {
 
 fn json_schema_to_py(schema: &Value) -> String {
     if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
-        return ref_path.split('/').last().unwrap_or("Any").to_string();
+        return ref_path.split('/').next_back().unwrap_or("Any").to_string();
     }
 
     let type_val = schema.get("type");
