@@ -1068,8 +1068,14 @@ impl FileIndex {
             None => return vec![],
         };
 
-        // Get candidate paths from the language trait
-        let candidates = lang.module_name_to_paths(module);
+        // Get local deps implementation for this language
+        let deps = match normalize_local_deps::registry::deps_for_language(lang.name()) {
+            Some(d) => d,
+            None => return vec![],
+        };
+
+        // Get candidate paths from the local deps trait
+        let candidates = deps.module_name_to_paths(module);
 
         // Filter to files that exist in index
         let mut result = Vec::new();

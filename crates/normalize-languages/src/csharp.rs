@@ -1,8 +1,6 @@
 //! C# language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// C# language support.
@@ -367,30 +365,6 @@ impl Language for CSharp {
             .map(|n| &content[n.byte_range()])
     }
 
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        if path.extension()?.to_str()? != "cs" {
-            return None;
-        }
-        // C#: typically namespace matches folder structure
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        // C# namespaces don't directly map to paths, but we can try
-        let path = module.replace('.', "/");
-        vec![format!("{}.cs", path), format!("src/{}.cs", path)]
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        import_name.starts_with("System") || import_name.starts_with("Microsoft")
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        // .NET runtime assemblies are not easily indexable
-        None
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -412,124 +386,6 @@ impl Language for CSharp {
         }
         // C# default visibility depends on context, but for skeleton purposes treat as public
         Visibility::Public
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "csharp"
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        _current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        // Try to find a file matching the namespace
-        let path_part = import.replace('.', "/");
-
-        {
-            let ext = &"cs";
-            let source_path = project_root.join(format!("{}.{}", path_part, ext));
-            if source_path.is_file() {
-                return Some(source_path);
-            }
-
-            // Try src/ prefix
-            let source_path = project_root
-                .join("src")
-                .join(format!("{}.{}", path_part, ext));
-            if source_path.is_file() {
-                return Some(source_path);
-            }
-        }
-
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        // NuGet package resolution would go here
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        // Try to find .NET version from global.json or .csproj
-        let global_json = project_root.join("global.json");
-        if global_json.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&global_json) {
-                // Quick parse for "version": "X.Y.Z"
-                if let Some(idx) = content.find("\"version\"") {
-                    let rest = &content[idx..];
-                    if let Some(start) = rest.find(':') {
-                        let after_colon = rest[start + 1..].trim();
-                        if let Some(ver_start) = after_colon.find('"') {
-                            let ver_rest = &after_colon[ver_start + 1..];
-                            if let Some(ver_end) = ver_rest.find('"') {
-                                return Some(ver_rest[..ver_end].to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        // NuGet cache location
-        if let Ok(home) = std::env::var("HOME") {
-            let cache = PathBuf::from(home).join(".nuget").join("packages");
-            if cache.is_dir() {
-                return Some(cache);
-            }
-        }
-        if let Ok(home) = std::env::var("USERPROFILE") {
-            let cache = PathBuf::from(home).join(".nuget").join("packages");
-            if cache.is_dir() {
-                return Some(cache);
-            }
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["cs"]
-    }
-
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new() // NuGet sources would go here
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && (name == "bin" || name == "obj" || name == "packages") {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new() // NuGet package discovery would go here
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".cs")
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            return Some(path.to_path_buf());
-        }
-        None
     }
 }
 

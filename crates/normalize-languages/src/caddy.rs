@@ -1,8 +1,6 @@
 //! Caddyfile configuration support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Caddy language support.
@@ -175,71 +173,6 @@ impl Language for Caddy {
             return Some(&content[first_child.byte_range()]);
         }
         None
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let name = path.file_name()?.to_str()?;
-        if name.to_lowercase().contains("caddy") {
-            return Some(name.to_string());
-        }
-        None
-    }
-
-    fn module_name_to_paths(&self, _module: &str) -> Vec<String> {
-        vec!["Caddyfile".to_string()]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "caddy"
-    }
-
-    fn is_stdlib_import(&self, _: &str, _: &Path) -> bool {
-        false
-    }
-    fn find_stdlib(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_local_import(&self, _: &str, _: &Path, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
-        None
-    }
-    fn get_version(&self, _: &Path) -> Option<String> {
-        None
-    }
-    fn find_package_cache(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::skip_dotfiles;
-        if skip_dotfiles(name) {
-            return true;
-        }
-        !is_dir && !name.to_lowercase().contains("caddy")
-    }
-
-    fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name.to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
     }
 }
 

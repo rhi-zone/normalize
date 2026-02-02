@@ -1,8 +1,6 @@
 //! Perl language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Perl language support.
@@ -261,108 +259,6 @@ impl Language for Perl {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if !["pl", "pm"].contains(&ext) {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        let path = module.replace("::", "/");
-        vec![format!("{}.pm", path), format!("{}.pl", path)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "perl"
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        // Core Perl modules
-        import_name == "strict"
-            || import_name == "warnings"
-            || import_name.starts_with("File::")
-            || import_name.starts_with("IO::")
-            || import_name.starts_with("Data::")
-            || import_name.starts_with("Carp")
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        _current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        let path = import.replace("::", "/");
-        let full = project_root.join("lib").join(format!("{}.pm", path));
-        if full.is_file() { Some(full) } else { None }
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        if project_root.join("cpanfile").is_file() {
-            return Some("cpan".to_string());
-        }
-        if project_root.join("Makefile.PL").is_file() {
-            return Some("ExtUtils::MakeMaker".to_string());
-        }
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["pl", "pm"]
-    }
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && name == "blib" {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".pm")
-            .or_else(|| entry_name.strip_suffix(".pl"))
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
     }
 }
 

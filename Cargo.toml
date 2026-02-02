@@ -17,6 +17,7 @@ members = [
     "crates/normalize-syntax-rules",
     "crates/normalize-chat-sessions",
     "crates/normalize-tools",
+    "crates/normalize-local-deps",
     "xtask",
 ]
 

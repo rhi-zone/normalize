@@ -3190,6 +3190,7 @@ dependencies = [
  "normalize-derive",
  "normalize-ecosystems",
  "normalize-languages",
+ "normalize-local-deps",
  "normalize-openapi",
  "normalize-surface-syntax",
  "normalize-syntax-rules",
@@ -3380,6 +3381,13 @@ dependencies = [
  "tokio",
  "tree-sitter",
  "tree-sitter-language",
+]
+
+[[package]]
+name = "normalize-local-deps"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

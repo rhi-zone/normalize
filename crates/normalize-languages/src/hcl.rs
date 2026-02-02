@@ -1,8 +1,6 @@
 //! HCL (HashiCorp Configuration Language) support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// HCL language support (Terraform, Packer, etc.).
@@ -232,130 +230,6 @@ impl Language for Hcl {
         false
     }
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
-        None
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if ext != "tf" && ext != "tfvars" && ext != "hcl" {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        vec![format!("{}.tf", module), format!("{}/main.tf", module)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "hcl"
-    }
-
-    fn is_stdlib_import(&self, _import_name: &str, _project_root: &Path) -> bool {
-        false
-    }
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        _current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        if import.starts_with("./") || import.starts_with("../") {
-            let full = project_root.join(import);
-            if full.is_dir() {
-                let main_tf = full.join("main.tf");
-                if main_tf.is_file() {
-                    return Some(main_tf);
-                }
-            }
-        }
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        // Terraform registry resolution would go here
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        // Check versions.tf or terraform block for version
-        let versions = project_root.join("versions.tf");
-        if versions.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&versions) {
-                for line in content.lines() {
-                    if line.contains("required_version") {
-                        if let Some(start) = line.find('"') {
-                            let rest = &line[start + 1..];
-                            if let Some(end) = rest.find('"') {
-                                return Some(rest[..end].to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        // Terraform modules cache
-        if let Some(home) = std::env::var_os("HOME") {
-            let cache = PathBuf::from(home).join(".terraform.d/plugin-cache");
-            if cache.is_dir() {
-                return Some(cache);
-            }
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["tf"]
-    }
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && name == ".terraform" {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".tf")
-            .or_else(|| entry_name.strip_suffix(".tfvars"))
-            .or_else(|| entry_name.strip_suffix(".hcl"))
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            return Some(path.to_path_buf());
-        }
-        let main = path.join("main.tf");
-        if main.is_file() {
-            return Some(main);
-        }
         None
     }
 }

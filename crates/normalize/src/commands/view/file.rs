@@ -129,12 +129,13 @@ fn print_fisheye_imports(
 /// Resolve an import to a local file path based on the source file's language.
 fn resolve_import(module: &str, current_file: &Path, root: &Path) -> Option<PathBuf> {
     let lang = normalize_languages::support_for_path(current_file)?;
+    let deps = normalize_local_deps::registry::deps_for_language(lang.name())?;
 
-    if let Some(path) = lang.resolve_local_import(module, current_file, root) {
+    if let Some(path) = deps.resolve_local_import(module, current_file, root) {
         return Some(path);
     }
 
-    lang.resolve_external_import(module, root)
+    deps.resolve_external_import(module, root)
         .map(|pkg| pkg.path)
 }
 

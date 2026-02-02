@@ -6,13 +6,19 @@ Behavioral rules for Claude Code in this repository.
 
 ## Publishing
 
-**Published on [crates.io](https://crates.io/crates/normalize)** as 13 crates. All at v0.1.0 (early, in active development). `normalize-grammars` is `publish = false` (build-time grammar data).
+**Published on [crates.io](https://crates.io/crates/normalize)** as 14 crates. All at v0.1.0 (early, in active development). `normalize-grammars` is `publish = false` (build-time grammar data).
 
 ## Architecture
 
 **Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. All commands work without index (graceful degradation).
 
 **Balance agent vs tooling:** Both should progress in parallel. After significant agent work, pivot to tooling; after tooling sprint, check if agent could benefit.
+
+**Language vs LocalDeps traits:** Two separate traits, two separate crates, no cross-dependency.
+- `Language` (`normalize-languages`): Syntax/AST extraction — symbols, imports, exports, complexity. Implemented by ~98 languages. All methods are required (no defaults). Adding a language = implement this trait.
+- `LocalDeps` (`normalize-local-deps`): Filesystem/package discovery — resolve imports, find installed packages, index external deps. Implemented by ~10 ecosystems. All methods have defaults (opt-in overrides). Adding package support = implement this trait.
+- Assembly at top level: `deps_for_language(lang.name())` bridges syntax and deps lookups.
+- When a trait grows beyond its domain, extract a new crate rather than expanding. Watch for: methods that only ~10% of impls override, methods that need filesystem access in a syntax trait, methods that need new dependencies.
 
 ## Core Rule
 
@@ -91,7 +97,7 @@ Do not:
 - Do half measures - migrate ALL callers when adding abstraction
 - Ask permission when philosophy is clear - just do it
 - Return tuples - use structs with named fields
-- Use trait default implementations - explicit impl required
+- Use trait defaults in `Language` - explicit impl required (but `LocalDeps` uses defaults by design)
 - String-match AST properties - use tree-sitter structure
 - Replace content when editing lists - extend, don't replace
 - Cut corners with fallbacks - implement properly for each case

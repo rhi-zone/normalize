@@ -1,8 +1,6 @@
 //! Dockerfile language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Dockerfile language support.
@@ -180,78 +178,6 @@ impl Language for Dockerfile {
         false
     }
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
-        None
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let name = path.file_name()?.to_str()?;
-        if name.to_lowercase() == "dockerfile" || name.ends_with(".dockerfile") {
-            Some(name.to_string())
-        } else {
-            None
-        }
-    }
-
-    fn module_name_to_paths(&self, _module: &str) -> Vec<String> {
-        vec!["Dockerfile".to_string()]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "dockerfile"
-    }
-
-    fn is_stdlib_import(&self, _import_name: &str, _project_root: &Path) -> bool {
-        false
-    }
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(
-        &self,
-        _import: &str,
-        _current_file: &Path,
-        _project_root: &Path,
-    ) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        // Could resolve Docker Hub images here
-        None
-    }
-
-    fn get_version(&self, _project_root: &Path) -> Option<String> {
-        None
-    }
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, _is_dir: bool) -> bool {
-        use crate::traits::skip_dotfiles;
-        skip_dotfiles(name)
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name.to_string()
-    }
-
-    fn find_package_entry(&self, _path: &Path) -> Option<PathBuf> {
         None
     }
 }

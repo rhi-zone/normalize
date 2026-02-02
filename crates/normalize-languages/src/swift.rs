@@ -1,8 +1,6 @@
 //! Swift language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Swift language support.
@@ -329,44 +327,6 @@ impl Language for Swift {
             .map(|n| &content[n.byte_range()])
     }
 
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        if path.extension()?.to_str()? != "swift" {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        vec![
-            format!("{}.swift", module),
-            format!("Sources/{}.swift", module),
-            format!("Sources/{}/{}.swift", module, module),
-        ]
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        matches!(
-            import_name,
-            "Foundation"
-                | "UIKit"
-                | "AppKit"
-                | "SwiftUI"
-                | "Combine"
-                | "CoreData"
-                | "CoreGraphics"
-                | "CoreFoundation"
-                | "Darwin"
-                | "Dispatch"
-                | "ObjectiveC"
-                | "Swift"
-        )
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -397,104 +357,6 @@ impl Language for Swift {
     }
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "swift"
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        _current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        // Swift Package Manager structure
-        let paths = [
-            format!("Sources/{}/{}.swift", import, import),
-            format!("Sources/{}.swift", import),
-            format!("{}.swift", import),
-        ];
-
-        for path in &paths {
-            let full_path = project_root.join(path);
-            if full_path.is_file() {
-                return Some(full_path);
-            }
-        }
-
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        // Swift Package Manager resolution would go here
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        // Check Package.swift for swift-tools-version
-        let package_swift = project_root.join("Package.swift");
-        if package_swift.is_file()
-            && let Ok(content) = std::fs::read_to_string(&package_swift)
-            && let Some(line) = content.lines().next()
-            && line.contains("swift-tools-version:")
-        {
-            let version = line.split(':').nth(1)?.trim();
-            return Some(version.to_string());
-        }
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        // Swift Package Manager cache
-        if let Ok(home) = std::env::var("HOME") {
-            let cache = PathBuf::from(home).join("Library/Caches/org.swift.swiftpm");
-            if cache.is_dir() {
-                return Some(cache);
-            }
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["swift"]
-    }
-
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && (name == "build" || name == ".build" || name == "Pods") {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".swift")
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            return Some(path.to_path_buf());
-        }
         None
     }
 }

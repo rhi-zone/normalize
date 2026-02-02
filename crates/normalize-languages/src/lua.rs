@@ -1,8 +1,6 @@
 //! Lua language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Lua language support.
@@ -268,130 +266,6 @@ impl Language for Lua {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if ext != "lua" {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        let path = module.replace('.', "/");
-        vec![format!("{}.lua", path), format!("{}/init.lua", path)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "lua"
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        // Lua stdlib modules
-        matches!(
-            import_name,
-            "string"
-                | "table"
-                | "math"
-                | "io"
-                | "os"
-                | "debug"
-                | "coroutine"
-                | "package"
-                | "utf8"
-                | "bit32"
-        )
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        let path_part = import.replace('.', "/");
-        let paths = [
-            format!("{}.lua", path_part),
-            format!("{}/init.lua", path_part),
-        ];
-
-        // Check relative to current file
-        if let Some(dir) = current_file.parent() {
-            for p in &paths {
-                let full = dir.join(p);
-                if full.is_file() {
-                    return Some(full);
-                }
-            }
-        }
-
-        // Check relative to project root
-        for p in &paths {
-            let full = project_root.join(p);
-            if full.is_file() {
-                return Some(full);
-            }
-        }
-
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        // LuaRocks package resolution would go here
-        None
-    }
-
-    fn get_version(&self, _project_root: &Path) -> Option<String> {
-        None
-    }
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["lua"]
-    }
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".lua")
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            return Some(path.to_path_buf());
-        }
-        let init = path.join("init.lua");
-        if init.is_file() {
-            return Some(init);
-        }
-        None
     }
 }
 

@@ -1,8 +1,6 @@
 //! D language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// D language support.
@@ -317,81 +315,6 @@ impl Language for D {
             if child.kind() == "identifier" {
                 return Some(&content[child.byte_range()]);
             }
-        }
-        None
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if !["d", "di"].contains(&ext) {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        let path = module.replace('.', "/");
-        vec![format!("{}.d", path), format!("{}/package.d", path)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "d"
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        import_name.starts_with("std.") || import_name.starts_with("core.")
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_local_import(&self, _: &str, _: &Path, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
-        None
-    }
-    fn get_version(&self, _: &Path) -> Option<String> {
-        None
-    }
-    fn find_package_cache(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["d", "di"]
-    }
-    fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".d")
-            .or_else(|| entry_name.strip_suffix(".di"))
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            return Some(path.to_path_buf());
-        }
-        let package_d = path.join("package.d");
-        if package_d.is_file() {
-            return Some(package_d);
         }
         None
     }

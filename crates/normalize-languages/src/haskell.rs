@@ -1,11 +1,9 @@
 //! Haskell language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{
     Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
     simple_function_symbol,
 };
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Haskell language support.
@@ -242,137 +240,6 @@ impl Language for Haskell {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if ext != "hs" && ext != "lhs" {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        let path = module.replace('.', "/");
-        vec![format!("{}.hs", path), format!("{}.lhs", path)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "haskell"
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        // Common base libraries
-        import_name.starts_with("Prelude")
-            || import_name.starts_with("Data.")
-            || import_name.starts_with("Control.")
-            || import_name.starts_with("System.")
-            || import_name.starts_with("GHC.")
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        _current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        let path = import.replace('.', "/");
-        for ext in &["hs", "lhs"] {
-            let candidates = [
-                project_root.join("src").join(format!("{}.{}", path, ext)),
-                project_root.join("lib").join(format!("{}.{}", path, ext)),
-                project_root.join(format!("{}.{}", path, ext)),
-            ];
-            for c in &candidates {
-                if c.is_file() {
-                    return Some(c.clone());
-                }
-            }
-        }
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        // Check cabal or package.yaml
-        let cabal_files: Vec<_> = std::fs::read_dir(project_root)
-            .ok()?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "cabal"))
-            .collect();
-
-        if !cabal_files.is_empty() {
-            return Some("cabal".to_string());
-        }
-
-        if project_root.join("package.yaml").is_file() {
-            return Some("stack".to_string());
-        }
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        if let Some(home) = std::env::var_os("HOME") {
-            let cabal = PathBuf::from(&home).join(".cabal/store");
-            if cabal.is_dir() {
-                return Some(cabal);
-            }
-            let stack = PathBuf::from(&home).join(".stack");
-            if stack.is_dir() {
-                return Some(stack);
-            }
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["hs", "lhs"]
-    }
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && (name == "dist" || name == "dist-newstyle" || name == ".stack-work") {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".hs")
-            .or_else(|| entry_name.strip_suffix(".lhs"))
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
     }
 }
 

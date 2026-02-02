@@ -1,11 +1,9 @@
 //! Zsh language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{
     Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
     simple_function_symbol,
 };
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Zsh language support.
@@ -215,95 +213,6 @@ impl Language for Zsh {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let name = path.file_name()?.to_str()?;
-        if name.ends_with(".zsh") || name.starts_with(".zsh") || name == "zshrc" {
-            let stem = path.file_stem()?.to_str()?;
-            return Some(stem.to_string());
-        }
-        None
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        vec![format!("{}.zsh", module), format!("functions/{}", module)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "zsh"
-    }
-
-    fn is_stdlib_import(&self, _import_name: &str, _project_root: &Path) -> bool {
-        false
-    }
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(&self, import: &str, current_file: &Path, _: &Path) -> Option<PathBuf> {
-        let dir = current_file.parent()?;
-        let full = dir.join(import);
-        if full.is_file() { Some(full) } else { None }
-    }
-
-    fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
-        None
-    }
-    fn get_version(&self, _: &Path) -> Option<String> {
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        if let Some(home) = std::env::var_os("HOME") {
-            let oh_my_zsh = PathBuf::from(&home).join(".oh-my-zsh");
-            if oh_my_zsh.is_dir() {
-                return Some(oh_my_zsh);
-            }
-            let zdotdir = PathBuf::from(&home).join(".zsh");
-            if zdotdir.is_dir() {
-                return Some(zdotdir);
-            }
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["zsh"]
-    }
-    fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::skip_dotfiles;
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir {
-            return false;
-        }
-        // Zsh files often don't have extensions
-        !name.ends_with(".zsh") && !name.contains("zsh")
-    }
-
-    fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".zsh")
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
     }
 }
 

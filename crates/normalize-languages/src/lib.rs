@@ -35,7 +35,6 @@
 //! ```
 
 pub mod ast_grep;
-pub mod c_cpp;
 mod component;
 pub mod ecmascript;
 pub mod external_packages;
@@ -247,9 +246,8 @@ pub use registry::{
     validate_unused_kinds_audit,
 };
 pub use traits::{
-    EmbeddedBlock, Export, Import, Language, PackageSource, PackageSourceKind, Symbol, SymbolKind,
-    Visibility, VisibilityMechanism, has_extension, simple_function_symbol, simple_symbol,
-    skip_dotfiles,
+    EmbeddedBlock, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+    simple_function_symbol, simple_symbol,
 };
 
 // Re-export language structs (feature-gated)

@@ -1,0 +1,28 @@
+[package]
+name = "normalize-local-deps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Local dependency discovery for programming language ecosystems"
+
+[features]
+default = ["langs-all"]
+
+langs-all = [
+    "lang-python", "lang-javascript", "lang-typescript", "lang-rust", "lang-go",
+    "lang-java", "lang-kotlin", "lang-c", "lang-cpp",
+]
+
+lang-python = []
+lang-javascript = []
+lang-typescript = []
+lang-rust = []
+lang-go = []
+lang-java = []
+lang-kotlin = ["lang-java"]
+lang-c = []
+lang-cpp = []
+
+[dependencies]
+serde_json = { workspace = true }

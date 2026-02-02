@@ -6,7 +6,7 @@
 //! - Rust: rust.rs
 //! - JavaScript/TypeScript/Deno: ecmascript.rs
 //! - Java: java.rs
-//! - C/C++: c_cpp.rs
+//! - C/C++: moved to normalize-local-deps
 //!
 //! This module contains:
 //! - ResolvedPackage: Common result type for package resolution

@@ -398,9 +398,10 @@ async fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: b
     let mut results: std::collections::HashMap<&str, IndexedCounts> =
         std::collections::HashMap::new();
 
-    let available: Vec<&str> = normalize_languages::supported_languages()
+    let all_deps = normalize_local_deps::registry::all_local_deps();
+    let available: Vec<&str> = all_deps
         .iter()
-        .map(|l| l.lang_key())
+        .map(|d| d.ecosystem_key())
         .filter(|k| !k.is_empty())
         .collect();
 
@@ -423,16 +424,16 @@ async fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: b
         }
     }
 
-    for lang in normalize_languages::supported_languages() {
-        let lang_key = lang.lang_key();
-        if lang_key.is_empty() || !ecosystems.contains(&lang_key) {
+    for deps in &all_deps {
+        let eco_key = deps.ecosystem_key();
+        if eco_key.is_empty() || !ecosystems.contains(&eco_key) {
             continue;
         }
-        if results.contains_key(lang_key) {
+        if results.contains_key(eco_key) {
             continue;
         }
-        let counts = index_language_packages(lang, &pkg_index, &root, json).await;
-        results.insert(lang_key, counts);
+        let counts = index_language_packages(*deps, &pkg_index, &root, json).await;
+        results.insert(eco_key, counts);
     }
 
     if json {
@@ -484,17 +485,17 @@ async fn count_and_insert_symbols(
 }
 
 async fn index_language_packages(
-    lang: &dyn normalize_languages::Language,
+    deps: &dyn normalize_local_deps::LocalDeps,
     pkg_index: &external_packages::PackageIndex,
     project_root: &Path,
     json: bool,
 ) -> IndexedCounts {
-    let version = lang
+    let version = deps
         .get_version(project_root)
         .and_then(|v| external_packages::Version::parse(&v));
 
-    let lang_key = lang.lang_key();
-    if lang_key.is_empty() {
+    let eco_key = deps.ecosystem_key();
+    if eco_key.is_empty() {
         return IndexedCounts {
             packages: 0,
             symbols: 0,
@@ -504,12 +505,12 @@ async fn index_language_packages(
     if !json {
         println!(
             "Indexing {} packages (version {:?})...",
-            lang.name(),
+            deps.language_name(),
             version
         );
     }
 
-    let sources = lang.package_sources(project_root);
+    let sources = deps.dep_sources(project_root);
     if sources.is_empty() {
         if !json {
             println!("  No package sources found");
@@ -535,16 +536,16 @@ async fn index_language_packages(
         } else {
             None
         };
-        let discovered = lang.discover_packages(&source);
+        let discovered = deps.discover_packages(&source);
 
         for (pkg_name, pkg_path) in discovered {
-            if let Ok(true) = pkg_index.is_indexed(lang_key, &pkg_name).await {
+            if let Ok(true) = pkg_index.is_indexed(eco_key, &pkg_name).await {
                 continue;
             }
 
             let pkg_id = match pkg_index
                 .insert_package(
-                    lang_key,
+                    eco_key,
                     &pkg_name,
                     &pkg_path.to_string_lossy(),
                     min_version,
@@ -558,7 +559,7 @@ async fn index_language_packages(
 
             total_packages += 1;
             total_symbols +=
-                index_package_symbols(lang, pkg_index, &mut extractor, pkg_id, &pkg_path).await;
+                index_package_symbols(deps, pkg_index, &mut extractor, pkg_id, &pkg_path).await;
         }
     }
 
@@ -569,13 +570,13 @@ async fn index_language_packages(
 }
 
 async fn index_package_symbols(
-    lang: &dyn normalize_languages::Language,
+    deps: &dyn normalize_local_deps::LocalDeps,
     pkg_index: &external_packages::PackageIndex,
     extractor: &mut skeleton::SkeletonExtractor,
     pkg_id: i64,
     path: &Path,
 ) -> usize {
-    let entry = match lang.find_package_entry(path) {
+    let entry = match deps.find_package_entry(path) {
         Some(e) => e,
         None => return 0,
     };

@@ -1,8 +1,6 @@
 //! SSH config file support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// SSH config language support.
@@ -120,68 +118,6 @@ impl Language for SshConfig {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let name = path.file_name()?.to_str()?;
-        if name == "config" || name == "ssh_config" || name.ends_with("_config") {
-            return Some(name.to_string());
-        }
-        None
-    }
-
-    fn module_name_to_paths(&self, _module: &str) -> Vec<String> {
-        vec!["config".to_string(), "ssh_config".to_string()]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "ssh-config"
-    }
-
-    fn is_stdlib_import(&self, _: &str, _: &Path) -> bool {
-        false
-    }
-    fn find_stdlib(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_local_import(&self, _: &str, _: &Path, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
-        None
-    }
-    fn get_version(&self, _: &Path) -> Option<String> {
-        None
-    }
-    fn find_package_cache(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, _is_dir: bool) -> bool {
-        use crate::traits::skip_dotfiles;
-        skip_dotfiles(name)
-    }
-
-    fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name.to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
     }
 }
 

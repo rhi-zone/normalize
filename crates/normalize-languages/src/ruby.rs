@@ -1,8 +1,6 @@
 //! Ruby language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Ruby language support.
@@ -206,65 +204,6 @@ impl Language for Ruby {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         let name_node = node.child_by_field_name("name")?;
         Some(&content[name_node.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        if path.extension()?.to_str()? != "rb" {
-            return None;
-        }
-        Some(path.to_string_lossy().to_string())
-    }
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        vec![format!("{}.rb", module)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "ruby"
-    }
-    fn resolve_local_import(&self, _: &str, _: &Path, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
-        None
-    }
-    fn is_stdlib_import(&self, _: &str, _: &Path) -> bool {
-        false
-    }
-    fn get_version(&self, _: &Path) -> Option<String> {
-        None
-    }
-    fn find_package_cache(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["rb"]
-    }
-    fn find_stdlib(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn package_module_name(&self, name: &str) -> String {
-        name.strip_suffix(".rb").unwrap_or(name).to_string()
-    }
-    fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-    fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
     }
 }
 

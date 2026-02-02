@@ -1,8 +1,6 @@
 //! Clojure language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Clojure language support.
@@ -261,123 +259,6 @@ impl Language for Clojure {
     }
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if !["clj", "cljs", "cljc"].contains(&ext) {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.replace('_', "-"))
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        let path = module.replace('-', "_").replace('.', "/");
-        vec![
-            format!("{}.clj", path),
-            format!("{}.cljs", path),
-            format!("{}.cljc", path),
-        ]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "clojure"
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        import_name.starts_with("clojure.") || import_name.starts_with("cljs.")
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        current_file: &Path,
-        _project_root: &Path,
-    ) -> Option<PathBuf> {
-        let dir = current_file.parent()?;
-        let path = import.replace('-', "_").replace('.', "/");
-        for ext in &["clj", "cljs", "cljc"] {
-            let full = dir.join(format!("{}.{}", path, ext));
-            if full.is_file() {
-                return Some(full);
-            }
-        }
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        // Check project.clj or deps.edn
-        let project_clj = project_root.join("project.clj");
-        if project_clj.is_file() {
-            return Some("leiningen".to_string());
-        }
-        let deps_edn = project_root.join("deps.edn");
-        if deps_edn.is_file() {
-            return Some("deps.edn".to_string());
-        }
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        if let Some(home) = std::env::var_os("HOME") {
-            let m2 = PathBuf::from(home).join(".m2/repository");
-            if m2.is_dir() {
-                return Some(m2);
-            }
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["clj", "cljs", "cljc"]
-    }
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && name == "target" {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".clj")
-            .or_else(|| entry_name.strip_suffix(".cljs"))
-            .or_else(|| entry_name.strip_suffix(".cljc"))
-            .unwrap_or(entry_name)
-            .replace('_', "-")
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
     }
 }
 

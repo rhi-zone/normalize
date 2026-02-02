@@ -1,11 +1,9 @@
 //! Julia language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{
     Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
     simple_function_symbol,
 };
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Julia language support.
@@ -272,128 +270,6 @@ impl Language for Julia {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if ext != "jl" {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        vec![format!("{}.jl", module), format!("src/{}.jl", module)]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "julia"
-    }
-
-    fn is_stdlib_import(&self, import_name: &str, _project_root: &Path) -> bool {
-        matches!(
-            import_name,
-            "Base"
-                | "Core"
-                | "Main"
-                | "LinearAlgebra"
-                | "Statistics"
-                | "Random"
-                | "Dates"
-                | "Printf"
-                | "Test"
-                | "Pkg"
-        )
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        _current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        let candidates = [
-            project_root.join("src").join(format!("{}.jl", import)),
-            project_root.join(format!("{}.jl", import)),
-        ];
-        for c in &candidates {
-            if c.is_file() {
-                return Some(c.clone());
-            }
-        }
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        if project_root.join("Project.toml").is_file() {
-            return Some("Project.toml".to_string());
-        }
-        None
-    }
-
-    fn find_package_cache(&self, _project_root: &Path) -> Option<PathBuf> {
-        if let Some(home) = std::env::var_os("HOME") {
-            let depot = PathBuf::from(home).join(".julia/packages");
-            if depot.is_dir() {
-                return Some(depot);
-            }
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["jl"]
-    }
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && (name == "test" || name == "docs" || name == "benchmark") {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".jl")
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            return Some(path.to_path_buf());
-        }
-        let src = path
-            .join("src")
-            .join(format!("{}.jl", path.file_name()?.to_str()?));
-        if src.is_file() {
-            return Some(src);
-        }
-        None
     }
 }
 

@@ -1,8 +1,6 @@
 //! PHP language support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// PHP language support.
@@ -320,33 +318,6 @@ impl Language for Php {
             .map(|n| &content[n.byte_range()])
     }
 
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if ext != "php" && ext != "phtml" {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        let path = module.replace('\\', "/");
-        vec![
-            format!("{}.php", path),
-            format!("src/{}.php", path),
-            format!("app/{}.php", path),
-        ]
-    }
-
-    fn is_stdlib_import(&self, _import_name: &str, _project_root: &Path) -> bool {
-        // PHP doesn't have namespaced stdlib in the same way
-        false
-    }
-
-    fn find_stdlib(&self, _project_root: &Path) -> Option<PathBuf> {
-        None
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -365,114 +336,6 @@ impl Language for Php {
         }
         // PHP default visibility for methods/properties in classes is public
         Visibility::Public
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "php"
-    }
-
-    fn resolve_local_import(
-        &self,
-        import: &str,
-        _current_file: &Path,
-        project_root: &Path,
-    ) -> Option<PathBuf> {
-        // PSR-4 style: namespace maps to directory structure
-        let path_part = import.replace('\\', "/");
-
-        let paths = [
-            format!("{}.php", path_part),
-            format!("src/{}.php", path_part),
-            format!("app/{}.php", path_part),
-            format!("lib/{}.php", path_part),
-        ];
-
-        for path in &paths {
-            let full_path = project_root.join(path);
-            if full_path.is_file() {
-                return Some(full_path);
-            }
-        }
-
-        None
-    }
-
-    fn resolve_external_import(
-        &self,
-        _import_name: &str,
-        _project_root: &Path,
-    ) -> Option<ResolvedPackage> {
-        // Composer package resolution would go here
-        None
-    }
-
-    fn get_version(&self, project_root: &Path) -> Option<String> {
-        // Check composer.json for PHP version requirement
-        let composer = project_root.join("composer.json");
-        if composer.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&composer) {
-                // Quick parse for "php": "^8.1" or similar
-                if let Some(idx) = content.find("\"php\"") {
-                    let rest = &content[idx..];
-                    if let Some(start) = rest.find(':') {
-                        let after_colon = rest[start + 1..].trim();
-                        if let Some(ver_start) = after_colon.find('"') {
-                            let ver_rest = &after_colon[ver_start + 1..];
-                            if let Some(ver_end) = ver_rest.find('"') {
-                                return Some(ver_rest[..ver_end].to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    fn find_package_cache(&self, project_root: &Path) -> Option<PathBuf> {
-        // Composer vendor directory
-        let vendor = project_root.join("vendor");
-        if vendor.is_dir() {
-            return Some(vendor);
-        }
-        None
-    }
-
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["php"]
-    }
-
-    fn package_sources(&self, _project_root: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        if is_dir && (name == "vendor" || name == "cache" || name == "tests") {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _source: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".php")
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            return Some(path.to_path_buf());
-        }
-        None
     }
 }
 

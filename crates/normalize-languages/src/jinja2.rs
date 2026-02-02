@@ -1,8 +1,6 @@
 //! Jinja2 template support.
 
-use crate::external_packages::ResolvedPackage;
 use crate::{Export, Import, Language, Symbol, Visibility, VisibilityMechanism};
-use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Jinja2 language support.
@@ -134,81 +132,6 @@ impl Language for Jinja2 {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
-    }
-
-    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        if !["j2", "jinja", "jinja2"].contains(&ext) {
-            return None;
-        }
-        let stem = path.file_stem()?.to_str()?;
-        Some(stem.to_string())
-    }
-
-    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
-        vec![
-            format!("{}.j2", module),
-            format!("{}.jinja2", module),
-            format!("{}.jinja", module),
-        ]
-    }
-
-    fn lang_key(&self) -> &'static str {
-        "jinja2"
-    }
-
-    fn is_stdlib_import(&self, _: &str, _: &Path) -> bool {
-        false
-    }
-    fn find_stdlib(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_local_import(&self, _: &str, _: &Path, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
-        None
-    }
-    fn get_version(&self, _: &Path) -> Option<String> {
-        None
-    }
-    fn find_package_cache(&self, _: &Path) -> Option<PathBuf> {
-        None
-    }
-    fn indexable_extensions(&self) -> &'static [&'static str] {
-        &["j2", "jinja", "jinja2"]
-    }
-    fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> {
-        Vec::new()
-    }
-
-    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{has_extension, skip_dotfiles};
-        if skip_dotfiles(name) {
-            return true;
-        }
-        !is_dir && !has_extension(name, self.indexable_extensions())
-    }
-
-    fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> {
-        Vec::new()
-    }
-
-    fn package_module_name(&self, entry_name: &str) -> String {
-        entry_name
-            .strip_suffix(".j2")
-            .or_else(|| entry_name.strip_suffix(".jinja2"))
-            .or_else(|| entry_name.strip_suffix(".jinja"))
-            .unwrap_or(entry_name)
-            .to_string()
-    }
-
-    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
     }
 }
 
