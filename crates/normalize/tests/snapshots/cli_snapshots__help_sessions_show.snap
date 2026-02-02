@@ -16,10 +16,10 @@ Options:
   -a, --analyze             Run full analysis instead of summary
       --full                Show full conversation log (default is summary)
       --filter <FILTER>     Filter messages by role/type: user, assistant, system, tool_use, tool_result, thinking
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-      --format <FORMAT>     Force specific format: claude, codex, gemini, moss
       --grep <GREP>         Search for pattern in filtered messages (requires --filter or shows all matching)
+  -r, --root <ROOT>         Root directory (defaults to current directory)
       --errors-only         Show only error tool results (implies --filter tool_result)
+      --format <FORMAT>     Force specific format: claude, codex, gemini, moss
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
       --ngrams <NGRAMS>     Extract common word sequences (ngrams) of length N (2-4)
       --case-insensitive    Case-insensitive ngram matching

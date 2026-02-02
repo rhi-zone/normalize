@@ -13,8 +13,8 @@ Options:
       --since <SINCE>       Filter sessions since date (YYYY-MM-DD)
       --until <UNTIL>       Filter sessions until date (YYYY-MM-DD)
       --project <PROJECT>   Filter by specific project path
-  -r, --root <ROOT>         Root directory (defaults to current directory)
       --all-projects        Show sessions from all projects (not just current)
+  -r, --root <ROOT>         Root directory (defaults to current directory)
       --format <FORMAT>     Force specific format: claude, codex, gemini, moss
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
       --json                Output as JSON
