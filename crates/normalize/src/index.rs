@@ -1061,7 +1061,7 @@ impl FileIndex {
 
     /// Convert a module name to possible file paths using the language's trait method.
     /// Returns only paths that exist in the index.
-    async fn module_to_files(&self, module: &str, source_file: &str) -> Vec<String> {
+    pub async fn module_to_files(&self, module: &str, source_file: &str) -> Vec<String> {
         // Get language from the source file extension
         let lang = match support_for_path(Path::new(source_file)) {
             Some(l) => l,

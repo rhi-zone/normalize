@@ -68,6 +68,7 @@ pub struct ArchitectureReport {
     pub total_modules: usize,
     pub total_symbols: usize,
     pub total_imports: usize,
+    pub resolved_imports: usize,
 }
 
 impl OutputFormatter for ArchitectureReport {
@@ -156,10 +157,25 @@ impl OutputFormatter for ArchitectureReport {
         lines.push("## Summary".to_string());
         lines.push(format!("  Modules: {}", self.total_modules));
         lines.push(format!("  Symbols: {}", self.total_symbols));
-        lines.push(format!("  Import relationships: {}", self.total_imports));
+        lines.push(format!(
+            "  Imports: {} total, {} resolved to local files",
+            self.total_imports, self.resolved_imports
+        ));
         lines.push(format!("  Circular dependencies: {}", self.cycles.len()));
         lines.push(format!("  Cross-imports: {}", self.cross_imports.len()));
         lines.push(format!("  Orphan modules: {}", self.orphan_modules.len()));
+
+        // Note about resolution
+        if self.total_imports > 0 && self.resolved_imports == 0 {
+            lines.push(String::new());
+            lines.push(
+                "Note: No imports resolved to local files. Coupling metrics require local import resolution.".to_string(),
+            );
+            lines.push(
+                "      External deps (std, third-party crates) don't contribute to coupling analysis."
+                    .to_string(),
+            );
+        }
 
         lines.join("\n")
     }
@@ -201,9 +217,12 @@ pub fn cmd_architecture(root: &Path, json: bool) -> i32 {
 }
 
 async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, libsql::Error> {
-    // Build import graph: file -> set of imported modules
+    // Build import graph
+    // For local imports (./foo, ../bar, crate::, super::), try to resolve to files
+    // External imports are counted but not resolved
     let mut imports_by_file: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut importers_by_module: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut importers_by_file: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut unresolved_imports: usize = 0;
 
     // Query all imports
     let conn = idx.connection();
@@ -212,16 +231,43 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         .await?;
     let mut rows = stmt.query(()).await?;
 
+    // Collect raw imports first
+    let mut raw_imports: Vec<(String, String)> = Vec::new();
     while let Some(row) = rows.next().await? {
         let file: String = row.get(0)?;
         let module: String = row.get(1)?;
-
-        imports_by_file
-            .entry(file.clone())
-            .or_default()
-            .insert(module.clone());
-        importers_by_module.entry(module).or_default().insert(file);
+        raw_imports.push((file, module));
     }
+
+    // Resolve module names to file paths
+    for (source_file, module) in &raw_imports {
+        // Try to resolve the module to actual file paths
+        let resolved_files = idx.module_to_files(module, source_file).await;
+
+        if resolved_files.is_empty() {
+            unresolved_imports += 1;
+            continue;
+        }
+
+        for target_file in resolved_files {
+            imports_by_file
+                .entry(source_file.clone())
+                .or_default()
+                .insert(target_file.clone());
+            importers_by_file
+                .entry(target_file)
+                .or_default()
+                .insert(source_file.clone());
+        }
+    }
+
+    // Log resolution stats for debugging
+    let resolved = raw_imports.len() - unresolved_imports;
+    let _resolution_rate = if raw_imports.is_empty() {
+        0.0
+    } else {
+        (resolved as f64 / raw_imports.len() as f64) * 100.0
+    };
 
     // Get all source files (files with symbols indexed, programming languages only)
     let mut all_files: HashSet<String> = HashSet::new();
@@ -238,7 +284,7 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
     let mut coupling: Vec<ModuleCoupling> = Vec::new();
     for file in &all_files {
         let fan_out = imports_by_file.get(file).map(|s| s.len()).unwrap_or(0);
-        let fan_in = importers_by_module.get(file).map(|s| s.len()).unwrap_or(0);
+        let fan_in = importers_by_file.get(file).map(|s| s.len()).unwrap_or(0);
         let total = fan_in + fan_out;
         let instability = if total > 0 {
             fan_out as f64 / total as f64
@@ -265,24 +311,24 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
     let mut seen_pairs: HashSet<(String, String)> = HashSet::new();
 
     for (file_a, imports_a) in &imports_by_file {
-        for module_b in imports_a {
-            // Check if module_b imports file_a
-            if let Some(imports_b) = imports_by_file.get(module_b)
+        for file_b in imports_a {
+            // Check if file_b imports file_a (bidirectional)
+            if let Some(imports_b) = imports_by_file.get(file_b)
                 && imports_b.contains(file_a)
             {
-                let pair = if file_a < module_b {
-                    (file_a.clone(), module_b.clone())
+                let pair = if file_a < file_b {
+                    (file_a.clone(), file_b.clone())
                 } else {
-                    (module_b.clone(), file_a.clone())
+                    (file_b.clone(), file_a.clone())
                 };
                 if !seen_pairs.contains(&pair) {
                     seen_pairs.insert(pair);
                     // Count imports in each direction
-                    let a_to_b = imports_a.iter().filter(|m| *m == module_b).count();
-                    let b_to_a = imports_b.iter().filter(|m| *m == file_a).count();
+                    let a_to_b = imports_a.iter().filter(|f| *f == file_b).count();
+                    let b_to_a = imports_b.iter().filter(|f| *f == file_a).count();
                     cross_imports.push(CrossImport {
                         module_a: file_a.clone(),
-                        module_b: module_b.clone(),
+                        module_b: file_b.clone(),
                         a_to_b,
                         b_to_a,
                     });
@@ -310,7 +356,7 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         }
 
         // Is this file imported by anyone?
-        let is_imported = importers_by_module.contains_key(&file);
+        let is_imported = importers_by_file.contains_key(&file);
 
         // Skip main/entry files and test files
         let is_likely_entry = file.contains("main.")
@@ -413,7 +459,8 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
 
     // Count totals
     let total_modules = all_files.len();
-    let total_imports: usize = imports_by_file.values().map(|s| s.len()).sum();
+    let total_imports = raw_imports.len();
+    let resolved_imports: usize = imports_by_file.values().map(|s| s.len()).sum();
 
     let stmt = conn.prepare("SELECT COUNT(*) FROM symbols").await?;
     let mut rows = stmt.query(()).await?;
@@ -432,6 +479,7 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         total_modules,
         total_symbols: total_symbols as usize,
         total_imports,
+        resolved_imports,
     })
 }
 
