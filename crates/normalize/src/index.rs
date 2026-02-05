@@ -1,13 +1,15 @@
 use crate::config::NormalizeConfig;
 use crate::paths::get_moss_dir;
+use crate::symbols::SymbolParser;
 use ignore::WalkBuilder;
 use libsql::{Connection, Database, params};
+use normalize_facts_core::{FlatImport, FlatSymbol};
+// Re-export IndexedFile for backwards compatibility
+pub use normalize_facts_core::IndexedFile;
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::symbols::{FlatImport, FlatSymbol, SymbolParser};
 
 /// Parsed data for a single file, ready for database insertion
 struct ParsedFileData {
@@ -44,14 +46,6 @@ fn source_extensions_sql_filter() -> String {
         .map(|ext| format!("path LIKE '%.{}'", ext))
         .collect::<Vec<_>>()
         .join(" OR ")
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct IndexedFile {
-    pub path: String,
-    pub is_dir: bool,
-    pub mtime: i64,
-    pub lines: usize,
 }
 
 /// Result from symbol search

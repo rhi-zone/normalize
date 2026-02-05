@@ -3189,6 +3189,7 @@ dependencies = [
  "normalize-core",
  "normalize-derive",
  "normalize-ecosystems",
+ "normalize-facts-core",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-openapi",
@@ -3263,6 +3264,13 @@ dependencies = [
  "toml",
  "ureq",
  "urlencoding",
+]
+
+[[package]]
+name = "normalize-facts-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -3381,6 +3389,7 @@ dependencies = [
  "dirs",
  "libloading",
  "libsql",
+ "normalize-facts-core",
  "normalize-language-meta",
  "serde_json",
  "tokio",

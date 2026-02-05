@@ -177,6 +177,7 @@ dirs = "5"
 libsql = { workspace = true }
 serde_json = { workspace = true }
 ast-grep-core = "0.40.5"
+normalize-facts-core = { path = "../normalize-facts-core" }
 normalize-language-meta = { path = "../normalize-language-meta" }
 
 [dev-dependencies]

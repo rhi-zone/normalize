@@ -311,3 +311,31 @@ This is a third option for "don't lint these files at all" - coarser than inline
 | Cross-location relationship | `.normalize/*-allow` | Duplicate functions |
 | Code pattern (file exclusion) | Config `allow` patterns | Skip tests for unwrap rule |
 | Code pattern (specific instance) | Inline comment | Allow this one unwrap |
+
+## Facts & Rules Naming
+
+**Decision**: Use "facts" terminology instead of "index" for extracted code metadata.
+
+### Why "facts"?
+
+- **Domain-agnostic**: normalize isn't limited to programming languages - could analyze configs, docs, data formats
+- **Datalog alignment**: The rules engine uses Datalog (via Ascent), which operates on "facts" with "rules"
+- **Precision**: "index" is vague (search index? database index?); "facts" describes what we extract - assertions about code/data
+- **Extensible**: As we add type extraction, data flow, etc., they're all just more facts
+
+### Crate naming
+
+```
+normalize-facts-core               # data types only (SymbolKind, Symbol, Import, FlatSymbol, etc.)
+normalize-facts                    # full library: extraction + storage + queries (depends on core)
+├── normalize-facts-rules-api      # stable ABI for rule plugins
+└── normalize-facts-rules-builtins # default analysis rules
+```
+
+### Plugin architecture
+
+All rules (builtin and user) compile to dylibs via `abi_stable`:
+- Uniform infrastructure - no special-casing between builtin vs user rules
+- Builtins ship pre-compiled, users compile theirs with `normalize facts compile`
+- Rule packs can be shared and version-controlled independently
+- Hot-swappable without recompiling the main binary

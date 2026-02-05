@@ -1,0 +1,10 @@
+[package]
+name = "normalize-facts-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core data types for normalize facts (symbols, imports, exports)"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }

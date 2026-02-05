@@ -129,13 +129,14 @@ See `docs/lint-architecture.md` for full design discussion.
 - Safe Datalog: guaranteed termination, right level of expressiveness
 
 **Implementation plan:**
-- [ ] Ascent for compiled rules (builtins) - gets state-of-the-art optimizations
-- [ ] User rules: compile with Ascent on first run, cache dylib
+- [ ] All rules (builtin + user) compile to dylibs via Ascent + `abi_stable`
+- [ ] Same infrastructure for both - builtins ship pre-compiled, users compile theirs
 - [ ] Same syntax for both (rules can graduate from user to builtin)
+- See "Facts & Rules Architecture" section below for full plan
 
 **Rule tiers:**
-1. `syntax-rules` (exists): AST patterns, no index needed
-2. `index-rules` (new): Datalog over symbol/import/call graph
+1. `syntax-rules` (exists): AST patterns, no facts needed
+2. `facts-rules` (new): Datalog over extracted facts (symbols, imports, calls)
 3. `normalize-lint` (new): escape hatch for complex imperative logic
 
 **Differentiation from CodeQL:**
@@ -182,11 +183,39 @@ Rules (custom enforcement, future):
 - [ ] Threshold rules ("fan-out > 20 is error")
 - [ ] Dependency path queries ("what's between A and B?")
 
-**Ascent integration (Datalog for semantic rules):**
-- [ ] Spike: add Ascent dependency, write one rule over index data
-- [ ] Design index→Ascent relation mapping
-- [ ] Proof of concept rules: unused imports, high-complexity hotspots
-- [ ] Dynamic rule loading: compile user .dl files to dylib, load at runtime (avoids requiring recompilation for custom rules)
+**Facts & Rules Architecture:**
+
+Naming decision: "facts" over "index" because:
+- normalize isn't limited to programming languages - facts are domain-agnostic
+- Aligns with Datalog paradigm (facts + rules = analysis)
+- "index" is vague; "facts" describes what we extract (assertions about code/data)
+
+Plugin architecture: all rules (builtin and user) compile to dylibs via `abi_stable`:
+- Same infrastructure for core team and users
+- Builtins update independently of engine
+- Users can share rule packs
+- No special-casing between builtin vs user rules
+
+Crate structure:
+```
+normalize-facts-core               # data types only (SymbolKind, Symbol, Import, FlatSymbol, etc.)
+normalize-facts                    # full library: extraction + storage + queries (depends on core)
+├── normalize-facts-rules-api      # stable ABI for rule plugins (abi_stable)
+└── normalize-facts-rules-builtins # default rules (cycles, coupling, orphans, etc.)
+```
+
+Implementation:
+- [x] Create `normalize-facts-core` with core data types (SymbolKind, Symbol, Import, Export, FlatSymbol, FlatImport, IndexedFile)
+- [x] Update `normalize-languages` to re-export types from `normalize-facts-core`
+- [x] Update `normalize` CLI to use types from `normalize-facts-core`
+- [ ] Create `normalize-facts` crate (extraction + storage, moves FileIndex from normalize)
+- [ ] Rename command `normalize index` → `normalize facts`
+- [ ] Add Ascent dependency to `normalize-facts-rules-api`
+- [ ] Define stable ABI with `abi_stable` (RulePack trait, Relations struct, Diagnostic output)
+- [ ] Map facts to Ascent relations: `symbol(file, name, kind)`, `import(from, to)`, `call(caller, callee)`
+- [ ] Rewrite one builtin rule in Datalog (circular dependencies) as proof of concept
+- [ ] Dylib loading: find/load rule packs from known paths
+- [ ] `normalize facts compile <rules.dl>` command to build custom packs
 
 ### normalize-typegen
 

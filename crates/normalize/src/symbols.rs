@@ -1,33 +1,11 @@
 use crate::extract::{ExtractOptions, Extractor};
 use crate::parsers;
-use normalize_languages::{
-    Language, Symbol as LangSymbol, SymbolKind, support_for_grammar, support_for_path,
-};
+use normalize_languages::{Language, Symbol as LangSymbol, support_for_grammar, support_for_path};
 use std::path::Path;
 use tree_sitter;
 
-/// A flattened symbol for indexing (parent reference instead of nested children)
-#[derive(Debug, Clone)]
-pub struct FlatSymbol {
-    pub name: String,
-    pub kind: SymbolKind,
-    pub start_line: usize,
-    pub end_line: usize,
-    pub parent: Option<String>,
-}
-
-/// A flattened import for indexing (one entry per imported name)
-#[derive(Debug, Clone)]
-pub struct FlatImport {
-    /// The module being imported from (None for "import X")
-    pub module: Option<String>,
-    /// The name being imported
-    pub name: String,
-    /// Alias if present (from X import Y as Z -> alias = Z)
-    pub alias: Option<String>,
-    /// Line number
-    pub line: usize,
-}
+// Re-export for use by other modules in this crate
+pub use normalize_facts_core::{FlatImport, FlatSymbol, SymbolKind};
 
 pub struct SymbolParser {
     extractor: Extractor,
