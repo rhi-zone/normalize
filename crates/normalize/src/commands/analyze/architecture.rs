@@ -57,12 +57,24 @@ pub struct OrphanModule {
     pub symbols: usize,
 }
 
+/// Hub module (high fan-in AND high fan-out)
+/// These are architectural bottlenecks - everything flows through them.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct HubModule {
+    pub path: String,
+    pub fan_in: usize,
+    pub fan_out: usize,
+    /// Product of fan_in * fan_out - higher = more central
+    pub hub_score: usize,
+}
+
 /// Full architecture analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ArchitectureReport {
     pub cycles: Vec<Cycle>,
-    pub coupling_hotspots: Vec<ModuleCoupling>,
     pub cross_imports: Vec<CrossImport>,
+    pub hub_modules: Vec<HubModule>,
+    pub coupling_hotspots: Vec<ModuleCoupling>,
     pub orphan_modules: Vec<OrphanModule>,
     pub symbol_hotspots: Vec<SymbolMetrics>,
     pub total_modules: usize,
@@ -100,6 +112,24 @@ impl OutputFormatter for ArchitectureReport {
             }
         }
         lines.push(String::new());
+
+        // Hub modules
+        if !self.hub_modules.is_empty() {
+            lines.push("## Hub Modules (high fan-in AND fan-out)".to_string());
+            lines.push(format!(
+                "  {:<50} {:>6} {:>7} {:>10}",
+                "Module", "Fan-in", "Fan-out", "Hub Score"
+            ));
+            lines.push(format!("  {}", "-".repeat(76)));
+            for h in &self.hub_modules {
+                let display_path = truncate_path(&h.path, 48);
+                lines.push(format!(
+                    "  {:<50} {:>6} {:>7} {:>10}",
+                    display_path, h.fan_in, h.fan_out, h.hub_score
+                ));
+            }
+            lines.push(String::new());
+        }
 
         // Coupling hotspots
         lines.push("## Coupling Hotspots".to_string());
@@ -332,6 +362,22 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
 
     // Sort by fan_in (most depended on first)
     coupling.sort_by(|a, b| b.fan_in.cmp(&a.fan_in));
+
+    // Find hub modules (high fan-in AND high fan-out)
+    // These are architectural bottlenecks - everything flows through them
+    let mut hub_modules: Vec<HubModule> = coupling
+        .iter()
+        .filter(|m| m.fan_in >= 3 && m.fan_out >= 3)
+        .map(|m| HubModule {
+            path: m.path.clone(),
+            fan_in: m.fan_in,
+            fan_out: m.fan_out,
+            hub_score: m.fan_in * m.fan_out,
+        })
+        .collect();
+    hub_modules.sort_by(|a, b| b.hub_score.cmp(&a.hub_score));
+    hub_modules.truncate(10);
+
     coupling.truncate(15);
 
     // Find cross-imports (A imports B AND B imports A)
@@ -500,8 +546,9 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
 
     Ok(ArchitectureReport {
         cycles,
-        coupling_hotspots: coupling,
         cross_imports,
+        hub_modules,
+        coupling_hotspots: coupling,
         orphan_modules: orphans,
         symbol_hotspots,
         total_modules,
