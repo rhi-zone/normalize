@@ -1074,7 +1074,28 @@ impl FileIndex {
             None => return vec![],
         };
 
-        // Get candidate paths from the local deps trait
+        // First try resolve_local_import which handles crate::, super::, self:: properly
+        let source_path = self.root.join(source_file);
+        if let Some(resolved) = deps.resolve_local_import(module, &source_path, &self.root) {
+            // Convert absolute path back to relative path for index lookup
+            if let Ok(rel_path) = resolved.strip_prefix(&self.root) {
+                let rel_str = rel_path.to_string_lossy().to_string();
+                // Verify it exists in index
+                if let Ok(mut rows) = self
+                    .conn
+                    .query(
+                        "SELECT 1 FROM files WHERE path = ?1",
+                        params![rel_str.clone()],
+                    )
+                    .await
+                    && rows.next().await.ok().flatten().is_some()
+                {
+                    return vec![rel_str];
+                }
+            }
+        }
+
+        // Fall back to module_name_to_paths for simpler lookups
         let candidates = deps.module_name_to_paths(module);
 
         // Filter to files that exist in index

@@ -224,19 +224,47 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
     let mut importers_by_file: HashMap<String, HashSet<String>> = HashMap::new();
     let mut unresolved_imports: usize = 0;
 
-    // Query all imports
+    // Query all imports - need both module and name to build full module paths
     let conn = idx.connection();
     let stmt = conn
-        .prepare("SELECT file, module FROM imports WHERE module IS NOT NULL")
+        .prepare("SELECT file, module, name FROM imports")
         .await?;
     let mut rows = stmt.query(()).await?;
 
-    // Collect raw imports first
+    // Collect raw imports first, extracting full module paths
     let mut raw_imports: Vec<(String, String)> = Vec::new();
     while let Some(row) = rows.next().await? {
         let file: String = row.get(0)?;
-        let module: String = row.get(1)?;
-        raw_imports.push((file, module));
+        let module: Option<String> = row.get(1)?;
+        let name: String = row.get(2)?;
+
+        // Build the full module path
+        let full_module = match module {
+            Some(m) if !m.is_empty() => {
+                if m.contains("::") {
+                    // Already a full path like "crate::traits" or "std::path"
+                    m
+                } else if m == "crate" || m == "super" || m == "self" {
+                    // Bare crate/super/self with symbol name: crate::name or super::name
+                    format!("{}::{}", m, name)
+                } else {
+                    // External crate with no path
+                    m
+                }
+            }
+            _ => {
+                // Module is null/empty, check if name contains the path
+                if let Some(pos) = name.rfind("::") {
+                    // Name is like "crate::foo::Bar" - extract module "crate::foo"
+                    name[..pos].to_string()
+                } else {
+                    // Just a symbol name with no module path - skip
+                    continue;
+                }
+            }
+        };
+
+        raw_imports.push((file, full_module));
     }
 
     // Resolve module names to file paths

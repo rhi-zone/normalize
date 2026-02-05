@@ -144,7 +144,9 @@ See `docs/lint-architecture.md` for full design discussion.
 
 **High priority:**
 - [ ] Add `is_programming_language() -> bool` to `Language` trait (currently hardcoded list in `registry.rs`)
-- [ ] Resolve module names to file paths in architecture analysis for accurate fan-in/cross-import metrics (imports table has module names like "std::collections", not file paths)
+- [x] Module→file resolution for Rust (crate::, super::, self::) - ~10% of imports resolve to local files
+  - Remaining unresolved: external crates (std::, serde::, etc.) - expected behavior
+  - Future: trace re-exports from lib.rs/mod.rs for higher resolution rate
 
 **Backlog - Deep Analysis (CodeQL-style):**
 - [ ] Type extraction for top languages (TS, Python, Rust, Go)
@@ -159,15 +161,16 @@ Philosophy: **insights by default**, no configuration needed. Rules are for enfo
 `normalize analyze architecture` v1 done:
 - [x] Circular dependencies (DFS-based cycle detection)
 - [x] Cross-imports (A↔B bidirectional coupling detection)
-- [x] Coupling metrics: fan-in, fan-out, instability per module (partial - see below)
+- [x] Coupling metrics: fan-in, fan-out, instability per module
+- [x] Module→file resolution via `LocalDeps::resolve_local_import()` for Rust
 - [x] Orphan modules (files with symbols never imported)
 - [x] Symbol hotspots (most-called functions, filters generic methods)
 
 Next iteration:
-- [ ] Module→file resolution for accurate fan-in (index has `module_to_files()`, needs wiring)
 - [ ] Hub modules (high fan-in AND high fan-out - everything flows through)
 - [ ] Deep import chains (A→B→C→D→E - longest dependency paths)
 - [ ] Boundary violations (detect cli/, core/, services/ and check import directions)
+- [ ] Re-export tracing (follow `pub use` to resolve more imports)
 
 Rules (custom enforcement, future):
 - [ ] Module boundary rules ("services/ cannot import cli/")
