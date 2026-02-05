@@ -114,6 +114,62 @@ Audit found fragmentation across commands. Fix for consistent UX:
 
 ## Backlog
 
+### Lint / Analysis Architecture
+
+See `docs/lint-architecture.md` for full design discussion.
+
+**Current state:**
+- `syntax-rules`: tree-sitter AST pattern matching (scm queries), single-file
+- normalize-languages: extracts symbols, imports, calls, complexity for ~98 languages
+
+**Architecture decision: Datalog for semantic queries**
+- Datalog is the standard for code analysis (CodeQL, Semmle, codeQuest)
+- Recursion essential for code queries (transitive deps, call graphs)
+- Safe Datalog: guaranteed termination, right level of expressiveness
+
+**Implementation plan:**
+- [ ] Ascent for compiled rules (builtins) - gets state-of-the-art optimizations
+- [ ] User rules: compile with Ascent on first run, cache dylib
+- [ ] Same syntax for both (rules can graduate from user to builtin)
+
+**Rule tiers:**
+1. `syntax-rules` (exists): AST patterns, no index needed
+2. `index-rules` (new): Datalog over symbol/import/call graph
+3. `normalize-lint` (new): escape hatch for complex imperative logic
+
+**Differentiation from CodeQL:**
+- CodeQL: deep analysis (types, data flow, taint), ~12 languages
+- normalize: structural/architectural analysis, ~98 languages
+- Focus areas: circular deps, unused exports, module boundaries, import graph metrics
+
+**High priority:**
+- [ ] Add `is_programming_language() -> bool` to `Language` trait (currently hardcoded list in `registry.rs`)
+- [ ] Resolve module names to file paths in architecture analysis for accurate fan-in/cross-import metrics (imports table has module names like "std::collections", not file paths)
+
+**Backlog - Deep Analysis (CodeQL-style):**
+- [ ] Type extraction for top languages (TS, Python, Rust, Go)
+- [ ] Data flow analysis
+- [ ] Taint tracking
+- Note: significant per-language effort, but tractable with LLM assistance
+
+**Architectural analysis (near-term focus):**
+
+Philosophy: **insights by default**, no configuration needed. Rules are for enforcement.
+
+`normalize analyze architecture` should show:
+- [ ] Circular dependencies (always surface these)
+- [ ] Coupling metrics: fan-in, fan-out, instability per module
+- [ ] Cross-imports (A↔B bidirectional = tight coupling)
+- [ ] Orphan modules (defined but never imported)
+- [ ] Hub modules (everything flows through them)
+- [ ] Deep import chains (A→B→C→D→E coupling paths)
+- [ ] Boundary violations (if conventional structure detected: cli/, core/, services/)
+
+Rules (custom enforcement):
+- [ ] Module boundary rules ("services/ cannot import cli/")
+- [ ] Threshold rules ("fan-out > 20 is error")
+- [ ] Dependency path queries ("what's between A and B?")
+
 ### normalize-typegen
 
 **Infrastructure (DONE):**

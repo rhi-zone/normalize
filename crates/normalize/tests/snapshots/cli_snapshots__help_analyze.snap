@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 72
 expression: "snapshot_help(&[\"analyze\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -9,6 +8,7 @@ Usage: normalize analyze [OPTIONS] [COMMAND]
 
 Commands:
   health               Run health analysis (file counts, complexity stats, large file warnings)
+  architecture         Analyze codebase architecture: coupling, cycles, dependencies
   complexity           Run complexity analysis
   length               Run function length analysis
   security             Run security analysis
@@ -33,12 +33,12 @@ Commands:
 Options:
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --exclude <PATTERN>   Exclude paths matching pattern or @alias
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --only <PATTERN>      Include only paths matching pattern or @alias
       --pretty              Human-friendly output with colors and formatting
       --compact             Compact output without colors (overrides TTY detection)
+      --only <PATTERN>      Include only paths matching pattern or @alias
       --diff [<BASE>]       Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
       --output-schema       Output JSON schema for the command's return type
       --input-schema        Output JSON schema for the command's input arguments

@@ -283,6 +283,203 @@ pub fn supported_languages() -> Vec<&'static dyn Language> {
     LANGUAGES.read().unwrap().clone()
 }
 
+/// Check if a path is a programming language (not a data/config format).
+///
+/// Returns false for data formats like JSON, YAML, TOML, Markdown, HTML, CSS, etc.
+/// even though normalize-languages can parse them for syntax highlighting.
+///
+/// Useful for architecture analysis where only "code" files are relevant.
+pub fn is_programming_language(path: &Path) -> bool {
+    // Data/config formats that we support but aren't programming languages
+    const DATA_FORMATS: &[&str] = &[
+        "json",
+        "jsonc",
+        "json5",
+        "yaml",
+        "yml",
+        "toml",
+        "xml",
+        "csv",
+        "ini",
+        "md",
+        "markdown",
+        "rst",
+        "txt",
+        "html",
+        "htm",
+        "css",
+        "scss",
+        "sass",
+        "less",
+        "svg",
+        "gitignore",
+        "editorconfig",
+        "env",
+        "lock",
+        "plist",
+        "dockerfile", // Config, not code
+    ];
+
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase());
+
+    match ext {
+        Some(e) if DATA_FORMATS.contains(&e.as_str()) => false,
+        _ => support_for_path(path).is_some(),
+    }
+}
+
+/// Validate that a language's unused node kinds audit is complete and accurate.
+///
+/// This function checks:
+/// 1. All kinds in `documented_unused` actually exist in the grammar
+/// 2. All potentially useful kinds from the grammar are either used or documented
+///
+/// Call this from each language's `unused_node_kinds_audit` test.
+pub fn validate_unused_kinds_audit(
+    lang: &dyn Language,
+    documented_unused: &[&str],
+) -> Result<(), String> {
+    use crate::GrammarLoader;
+    use std::collections::HashSet;
+
+    let loader = GrammarLoader::new();
+    let ts_lang = loader
+        .get(lang.grammar_name())
+        .ok_or_else(|| format!("Grammar '{}' not found", lang.grammar_name()))?;
+
+    // Keywords that suggest a node kind might be useful (same as cross_check_node_kinds)
+    let interesting_patterns = [
+        "statement",
+        "expression",
+        "definition",
+        "declaration",
+        "clause",
+        "block",
+        "body",
+        "import",
+        "export",
+        "function",
+        "method",
+        "class",
+        "struct",
+        "enum",
+        "interface",
+        "trait",
+        "module",
+        "type",
+        "return",
+        "if",
+        "else",
+        "for",
+        "while",
+        "loop",
+        "match",
+        "case",
+        "try",
+        "catch",
+        "except",
+        "throw",
+        "raise",
+        "with",
+        "async",
+        "await",
+        "yield",
+        "lambda",
+        "comprehension",
+        "generator",
+        "operator",
+    ];
+
+    // Collect all kinds used by Language trait methods
+    let mut used_kinds: HashSet<&str> = HashSet::new();
+    for kind in lang.container_kinds() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.function_kinds() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.type_kinds() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.import_kinds() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.public_symbol_kinds() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.scope_creating_kinds() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.control_flow_kinds() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.complexity_nodes() {
+        used_kinds.insert(kind);
+    }
+    for kind in lang.nesting_nodes() {
+        used_kinds.insert(kind);
+    }
+
+    let documented_set: HashSet<&str> = documented_unused.iter().copied().collect();
+
+    // Get all valid named node kinds from grammar
+    let mut grammar_kinds: HashSet<&str> = HashSet::new();
+    let count = ts_lang.node_kind_count();
+    for id in 0..count as u16 {
+        if let Some(kind) = ts_lang.node_kind_for_id(id) {
+            let named = ts_lang.node_kind_is_named(id);
+            if named && !kind.starts_with('_') {
+                grammar_kinds.insert(kind);
+            }
+        }
+    }
+
+    let mut errors: Vec<String> = Vec::new();
+
+    // Check 1: All documented unused kinds must exist in grammar
+    for kind in documented_unused {
+        if !grammar_kinds.contains(*kind) {
+            errors.push(format!(
+                "Documented kind '{}' doesn't exist in grammar",
+                kind
+            ));
+        }
+        // Also check it's not actually being used
+        if used_kinds.contains(*kind) {
+            errors.push(format!(
+                "Documented kind '{}' is actually used in trait methods",
+                kind
+            ));
+        }
+    }
+
+    // Check 2: All potentially useful grammar kinds must be used or documented
+    for kind in &grammar_kinds {
+        let lower = kind.to_lowercase();
+        let is_interesting = interesting_patterns.iter().any(|p| lower.contains(p));
+
+        if is_interesting && !used_kinds.contains(*kind) && !documented_set.contains(*kind) {
+            errors.push(format!(
+                "Potentially useful kind '{}' is neither used nor documented",
+                kind
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} validation errors:\n  - {}",
+            errors.len(),
+            errors.join("\n  - ")
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -496,154 +693,5 @@ mod tests {
                 }
             }
         }
-    }
-}
-
-/// Validate that a language's unused node kinds audit is complete and accurate.
-///
-/// This function checks:
-/// 1. All kinds in `documented_unused` actually exist in the grammar
-/// 2. All potentially useful kinds from the grammar are either used or documented
-///
-/// Call this from each language's `unused_node_kinds_audit` test.
-pub fn validate_unused_kinds_audit(
-    lang: &dyn Language,
-    documented_unused: &[&str],
-) -> Result<(), String> {
-    use crate::GrammarLoader;
-    use std::collections::HashSet;
-
-    let loader = GrammarLoader::new();
-    let ts_lang = loader
-        .get(lang.grammar_name())
-        .ok_or_else(|| format!("Grammar '{}' not found", lang.grammar_name()))?;
-
-    // Keywords that suggest a node kind might be useful (same as cross_check_node_kinds)
-    let interesting_patterns = [
-        "statement",
-        "expression",
-        "definition",
-        "declaration",
-        "clause",
-        "block",
-        "body",
-        "import",
-        "export",
-        "function",
-        "method",
-        "class",
-        "struct",
-        "enum",
-        "interface",
-        "trait",
-        "module",
-        "type",
-        "return",
-        "if",
-        "else",
-        "for",
-        "while",
-        "loop",
-        "match",
-        "case",
-        "try",
-        "catch",
-        "except",
-        "throw",
-        "raise",
-        "with",
-        "async",
-        "await",
-        "yield",
-        "lambda",
-        "comprehension",
-        "generator",
-        "operator",
-    ];
-
-    // Collect all kinds used by Language trait methods
-    let mut used_kinds: HashSet<&str> = HashSet::new();
-    for kind in lang.container_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.function_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.type_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.import_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.public_symbol_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.scope_creating_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.control_flow_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.complexity_nodes() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.nesting_nodes() {
-        used_kinds.insert(kind);
-    }
-
-    let documented_set: HashSet<&str> = documented_unused.iter().copied().collect();
-
-    // Get all valid named node kinds from grammar
-    let mut grammar_kinds: HashSet<&str> = HashSet::new();
-    let count = ts_lang.node_kind_count();
-    for id in 0..count as u16 {
-        if let Some(kind) = ts_lang.node_kind_for_id(id) {
-            let named = ts_lang.node_kind_is_named(id);
-            if named && !kind.starts_with('_') {
-                grammar_kinds.insert(kind);
-            }
-        }
-    }
-
-    let mut errors: Vec<String> = Vec::new();
-
-    // Check 1: All documented unused kinds must exist in grammar
-    for kind in documented_unused {
-        if !grammar_kinds.contains(*kind) {
-            errors.push(format!(
-                "Documented kind '{}' doesn't exist in grammar",
-                kind
-            ));
-        }
-        // Also check it's not actually being used
-        if used_kinds.contains(*kind) {
-            errors.push(format!(
-                "Documented kind '{}' is actually used in trait methods",
-                kind
-            ));
-        }
-    }
-
-    // Check 2: All potentially useful grammar kinds must be used or documented
-    for kind in &grammar_kinds {
-        let lower = kind.to_lowercase();
-        let is_interesting = interesting_patterns.iter().any(|p| lower.contains(p));
-
-        if is_interesting && !used_kinds.contains(*kind) && !documented_set.contains(*kind) {
-            errors.push(format!(
-                "Potentially useful kind '{}' is neither used nor documented",
-                kind
-            ));
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
-            "{} validation errors:\n  - {}",
-            errors.len(),
-            errors.join("\n  - ")
-        ))
     }
 }

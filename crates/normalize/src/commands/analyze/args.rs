@@ -42,6 +42,9 @@ pub enum AnalyzeCommand {
         target: Option<String>,
     },
 
+    /// Analyze codebase architecture: coupling, cycles, dependencies
+    Architecture,
+
     /// Run complexity analysis
     Complexity {
         /// Target file or directory

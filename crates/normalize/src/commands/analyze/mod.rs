@@ -1,5 +1,6 @@
 //! Analyze command - run analysis on target.
 
+pub mod architecture;
 mod args;
 pub mod ast;
 pub mod call_graph;
@@ -239,6 +240,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         Some(AnalyzeCommand::Hotspots { .. }) => {
             crate::output::print_output_schema::<hotspots::HotspotsReport>();
         }
+        Some(AnalyzeCommand::Architecture) => {
+            crate::output::print_output_schema::<architecture::ArchitectureReport>();
+        }
         Some(AnalyzeCommand::CheckRefs) => {
             crate::output::print_output_schema::<check_refs::CheckRefsReport>();
         }
@@ -385,6 +389,8 @@ pub fn run(
             );
             print_report(&report, json, pretty)
         }
+
+        Some(AnalyzeCommand::Architecture) => architecture::cmd_architecture(&effective_root, json),
 
         Some(AnalyzeCommand::Complexity {
             target,
