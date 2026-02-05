@@ -34,6 +34,7 @@ All trait-based crates follow the normalize-languages pattern for extensibility:
 
 Crates with registries:
 - [x] normalize-languages: `Language` trait, `register()` in registry.rs
+- [x] normalize-language-meta: `Capabilities` struct, `register()` for user overrides
 - [x] normalize-cli-parser: `CliFormat` trait, `register()` in formats/mod.rs
 - [x] normalize-chat-sessions: `LogFormat` trait, `register()` in formats/mod.rs
 - [x] normalize-tools: `Tool` trait (`register_tool()`), `TestRunner` trait (`register()`)
@@ -161,18 +162,19 @@ See `docs/lint-architecture.md` for full design discussion.
 
 Philosophy: **insights by default**, no configuration needed. Rules are for enforcement.
 
-`normalize analyze architecture` v1 done:
+`normalize analyze architecture` complete:
 - [x] Circular dependencies (DFS-based cycle detection)
 - [x] Cross-imports (A↔B bidirectional coupling detection)
 - [x] Coupling metrics: fan-in, fan-out, instability per module
 - [x] Module→file resolution via `LocalDeps::resolve_local_import()` for Rust
 - [x] Orphan modules (files with symbols never imported)
 - [x] Symbol hotspots (most-called functions, filters generic methods)
+- [x] Hub modules (high fan-in AND high fan-out - bottleneck detection)
+- [x] Deep import chains (longest dependency paths, DFS with memoization)
+- [x] Layer dependencies (inter-directory import flows, no config needed)
 
 Next iteration:
-- [x] Hub modules (high fan-in AND high fan-out - everything flows through)
-- [x] Deep import chains (longest dependency paths, DFS with memoization)
-- [ ] Boundary violations (detect cli/, core/, services/ and check import directions)
+- [ ] Boundary violation rules (configurable: "services/ cannot import cli/")
 - [ ] Re-export tracing (follow `pub use` to resolve more imports)
 
 Rules (custom enforcement, future):
