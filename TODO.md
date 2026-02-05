@@ -210,7 +210,7 @@ Implementation:
 - [x] Update `normalize` CLI to use types from `normalize-facts-core`
 - [x] Create `normalize-facts` crate with extraction logic (Extractor, parsers)
 - [x] Move ExtractResult filter methods (filter_types, filter_tests) to normalize-facts
-- [ ] Move FileIndex from normalize to normalize-facts (storage layer)
+- [x] Move FileIndex and SymbolParser from normalize to normalize-facts (storage layer)
 - [ ] Rename command `normalize index` → `normalize facts`
 - [ ] Add Ascent dependency to `normalize-facts-rules-api`
 - [ ] Define stable ABI with `abi_stable` (RulePack trait, Relations struct, Diagnostic output)

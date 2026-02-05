@@ -68,10 +68,10 @@ enum Commands {
     /// View shadow git edit history
     History(HistoryArgs),
 
-    /// Manage file index
-    Index {
+    /// Manage code facts (file index, symbols, calls, imports)
+    Facts {
         #[command(subcommand)]
-        action: commands::index::IndexAction,
+        action: commands::facts::FactsAction,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long, global = true)]
@@ -260,8 +260,8 @@ fn main() {
         Commands::History(args) => {
             commands::history::run(args, format, cli.input_schema, cli.params_json.as_deref())
         }
-        Commands::Index { action, root } => {
-            commands::index::cmd_index(action, root.as_deref(), cli.json)
+        Commands::Facts { action, root } => {
+            commands::facts::cmd_facts(action, root.as_deref(), cli.json)
         }
         Commands::Init(args) => {
             commands::init::run(args, cli.input_schema, cli.params_json.as_deref())

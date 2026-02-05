@@ -1,4 +1,4 @@
-//! Index management commands.
+//! Facts management commands (file index, symbols, calls, imports).
 
 use crate::index;
 use crate::paths::get_moss_dir;
@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
     Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "lowercase")]
-pub enum IndexContent {
+pub enum FactsContent {
     /// Skip content extraction (files only)
     None,
     /// Function and type definitions
@@ -23,23 +23,23 @@ pub enum IndexContent {
     Imports,
 }
 
-impl std::fmt::Display for IndexContent {
+impl std::fmt::Display for FactsContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IndexContent::None => write!(f, "none"),
-            IndexContent::Symbols => write!(f, "symbols"),
-            IndexContent::Calls => write!(f, "calls"),
-            IndexContent::Imports => write!(f, "imports"),
+            FactsContent::None => write!(f, "none"),
+            FactsContent::Symbols => write!(f, "symbols"),
+            FactsContent::Calls => write!(f, "calls"),
+            FactsContent::Imports => write!(f, "imports"),
         }
     }
 }
 
 /// Helper for default include contents
-fn default_include() -> Vec<IndexContent> {
+fn default_include() -> Vec<FactsContent> {
     vec![
-        IndexContent::Symbols,
-        IndexContent::Calls,
-        IndexContent::Imports,
+        FactsContent::Symbols,
+        FactsContent::Calls,
+        FactsContent::Imports,
     ]
 }
 
@@ -49,13 +49,13 @@ fn default_limit() -> usize {
 }
 
 #[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
-pub enum IndexAction {
+pub enum FactsAction {
     /// Rebuild the file index
     Rebuild {
         /// What to extract: symbols, calls, imports (default: all)
-        #[arg(long, value_delimiter = ',', default_values_t = vec![IndexContent::Symbols, IndexContent::Calls, IndexContent::Imports])]
+        #[arg(long, value_delimiter = ',', default_values_t = vec![FactsContent::Symbols, FactsContent::Calls, FactsContent::Imports])]
         #[serde(default = "default_include")]
-        include: Vec<IndexContent>,
+        include: Vec<FactsContent>,
     },
 
     /// Show index statistics (DB size vs codebase size)
@@ -92,15 +92,15 @@ pub enum IndexAction {
 }
 
 /// Run an index management action
-pub fn cmd_index(action: IndexAction, root: Option<&Path>, json: bool) -> i32 {
+pub fn cmd_facts(action: FactsAction, root: Option<&Path>, json: bool) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     match action {
-        IndexAction::Rebuild { include } => rt.block_on(cmd_rebuild(root, &include)),
-        IndexAction::Stats { storage } => rt.block_on(cmd_stats(root, json, storage)),
-        IndexAction::Files { prefix, limit } => {
+        FactsAction::Rebuild { include } => rt.block_on(cmd_rebuild(root, &include)),
+        FactsAction::Stats { storage } => rt.block_on(cmd_stats(root, json, storage)),
+        FactsAction::Files { prefix, limit } => {
             rt.block_on(cmd_list_files(prefix.as_deref(), root, limit, json))
         }
-        IndexAction::Packages { only, clear } => {
+        FactsAction::Packages { only, clear } => {
             rt.block_on(cmd_packages(&only, clear, root, json))
         }
     }
@@ -110,7 +110,7 @@ pub fn cmd_index(action: IndexAction, root: Option<&Path>, json: bool) -> i32 {
 // Rebuild
 // =============================================================================
 
-async fn cmd_rebuild(root: Option<&Path>, include: &[IndexContent]) -> i32 {
+async fn cmd_rebuild(root: Option<&Path>, include: &[FactsContent]) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -122,19 +122,19 @@ async fn cmd_rebuild(root: Option<&Path>, include: &[IndexContent]) -> i32 {
 
                 // Any content type requires call graph extraction (parsed together)
                 // "none" means files only - skip call graph
-                if !include.is_empty() && !include.contains(&IndexContent::None) {
+                if !include.is_empty() && !include.contains(&FactsContent::None) {
                     match idx.refresh_call_graph().await {
                         Ok(mut stats) => {
                             // Delete content types that weren't requested
-                            if !include.contains(&IndexContent::Symbols) {
+                            if !include.contains(&FactsContent::Symbols) {
                                 let _ = idx.execute("DELETE FROM symbols").await;
                                 stats.symbols = 0;
                             }
-                            if !include.contains(&IndexContent::Calls) {
+                            if !include.contains(&FactsContent::Calls) {
                                 let _ = idx.execute("DELETE FROM calls").await;
                                 stats.calls = 0;
                             }
-                            if !include.contains(&IndexContent::Imports) {
+                            if !include.contains(&FactsContent::Imports) {
                                 let _ = idx.execute("DELETE FROM imports").await;
                                 stats.imports = 0;
                             }
