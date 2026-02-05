@@ -214,8 +214,8 @@ Implementation:
 - [x] Rename command `normalize index` → `normalize facts`
 - [x] Add Ascent dependency to `normalize-facts-rules-api`
 - [x] Define stable ABI with `abi_stable` (RulePack trait, Relations struct, Diagnostic output)
-- [ ] Map facts to Ascent relations: `symbol(file, name, kind)`, `import(from, to)`, `call(caller, callee)`
-- [ ] Rewrite one builtin rule in Datalog (circular dependencies) as proof of concept
+- [x] Map facts to Ascent relations: `symbol(file, name, kind)`, `import(from, to)`, `call(caller, callee)`
+- [x] Rewrite one builtin rule in Datalog (circular dependencies) as proof of concept
 - [ ] Dylib loading: find/load rule packs from known paths
 - [ ] `normalize facts compile <rules.dl>` command to build custom packs
 

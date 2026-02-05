@@ -12,6 +12,7 @@ members = [
     "crates/normalize-facts",
     "crates/normalize-facts-core",
     "crates/normalize-facts-rules-api",
+    "crates/normalize-facts-rules-builtins",
     "crates/normalize-grammars",
     "crates/normalize-languages",
     "crates/normalize-language-meta",

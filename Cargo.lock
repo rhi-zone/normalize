@@ -3498,6 +3498,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-facts-rules-builtins"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "ascent",
+ "normalize-facts-rules-api",
+]
+
+[[package]]
 name = "normalize-grammars"
 version = "0.1.0"
 dependencies = [

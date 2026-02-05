@@ -31,5 +31,5 @@ pub use abi_stable::{
     StableAbi, export_root_module,
     prefix_type::PrefixTypeTrait,
     sabi_extern_fn, sabi_trait,
-    std_types::{RString, RVec},
+    std_types::{RStr, RString, RVec},
 };
