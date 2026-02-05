@@ -78,6 +78,18 @@ pub struct ImportChain {
     pub depth: usize,
 }
 
+/// Import flow between directory layers.
+/// Shows which directories import from which, helping identify layer violations.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct LayerFlow {
+    /// Source directory/layer
+    pub from_layer: String,
+    /// Target directory/layer
+    pub to_layer: String,
+    /// Number of imports in this direction
+    pub count: usize,
+}
+
 /// Full architecture analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ArchitectureReport {
@@ -85,6 +97,7 @@ pub struct ArchitectureReport {
     pub cross_imports: Vec<CrossImport>,
     pub hub_modules: Vec<HubModule>,
     pub deep_chains: Vec<ImportChain>,
+    pub layer_flows: Vec<LayerFlow>,
     pub coupling_hotspots: Vec<ModuleCoupling>,
     pub orphan_modules: Vec<OrphanModule>,
     pub symbol_hotspots: Vec<SymbolMetrics>,
@@ -152,6 +165,20 @@ impl OutputFormatter for ArchitectureReport {
                     "  [depth {}] {}",
                     chain.depth,
                     short_modules.join(" → ")
+                ));
+            }
+            lines.push(String::new());
+        }
+
+        // Layer flows (inter-directory imports)
+        if !self.layer_flows.is_empty() {
+            lines.push("## Layer Dependencies".to_string());
+            lines.push(format!("  {:<20} → {:<20} {:>8}", "From", "To", "Imports"));
+            lines.push(format!("  {}", "-".repeat(52)));
+            for flow in &self.layer_flows {
+                lines.push(format!(
+                    "  {:<20} → {:<20} {:>8}",
+                    flow.from_layer, flow.to_layer, flow.count
                 ));
             }
             lines.push(String::new());
@@ -443,6 +470,9 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
     // Find longest import chains
     let deep_chains = find_longest_chains(&imports_by_file);
 
+    // Compute layer flows (inter-directory import counts)
+    let layer_flows = compute_layer_flows(&imports_by_file);
+
     // Find orphan modules (files with symbols but never imported)
     let mut orphans: Vec<OrphanModule> = Vec::new();
     let stmt = conn
@@ -578,6 +608,7 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         cross_imports,
         hub_modules,
         deep_chains,
+        layer_flows,
         coupling_hotspots: coupling,
         orphan_modules: orphans,
         symbol_hotspots,
@@ -731,4 +762,55 @@ fn longest_path_from(
     visited.remove(node);
     memo.insert(node.to_string(), longest.clone());
     longest
+}
+
+/// Extract the layer (top-level directory) from a file path.
+/// Returns the first significant directory component.
+fn extract_layer(path: &str) -> String {
+    // Skip common prefixes like "crates/normalize/" to get to meaningful layer
+    let path = path
+        .strip_prefix("crates/normalize/src/")
+        .or_else(|| path.strip_prefix("crates/normalize-"))
+        .or_else(|| path.strip_prefix("src/"))
+        .unwrap_or(path);
+
+    // Get first directory component
+    if let Some(pos) = path.find('/') {
+        path[..pos].to_string()
+    } else {
+        // File in root - use filename without extension as "layer"
+        path.split('.').next().unwrap_or("root").to_string()
+    }
+}
+
+/// Compute import flows between directory layers.
+fn compute_layer_flows(graph: &HashMap<String, HashSet<String>>) -> Vec<LayerFlow> {
+    let mut flow_counts: HashMap<(String, String), usize> = HashMap::new();
+
+    for (from_file, to_files) in graph {
+        let from_layer = extract_layer(from_file);
+        for to_file in to_files {
+            let to_layer = extract_layer(to_file);
+            // Only count cross-layer imports
+            if from_layer != to_layer {
+                *flow_counts
+                    .entry((from_layer.clone(), to_layer.clone()))
+                    .or_insert(0) += 1;
+            }
+        }
+    }
+
+    // Convert to vec and sort by count descending
+    let mut flows: Vec<LayerFlow> = flow_counts
+        .into_iter()
+        .map(|((from, to), count)| LayerFlow {
+            from_layer: from,
+            to_layer: to,
+            count,
+        })
+        .collect();
+
+    flows.sort_by(|a, b| b.count.cmp(&a.count));
+    flows.truncate(15); // Top 15 flows
+    flows
 }
