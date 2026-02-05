@@ -211,9 +211,9 @@ Implementation:
 - [x] Create `normalize-facts` crate with extraction logic (Extractor, parsers)
 - [x] Move ExtractResult filter methods (filter_types, filter_tests) to normalize-facts
 - [x] Move FileIndex and SymbolParser from normalize to normalize-facts (storage layer)
-- [ ] Rename command `normalize index` → `normalize facts`
-- [ ] Add Ascent dependency to `normalize-facts-rules-api`
-- [ ] Define stable ABI with `abi_stable` (RulePack trait, Relations struct, Diagnostic output)
+- [x] Rename command `normalize index` → `normalize facts`
+- [x] Add Ascent dependency to `normalize-facts-rules-api`
+- [x] Define stable ABI with `abi_stable` (RulePack trait, Relations struct, Diagnostic output)
 - [ ] Map facts to Ascent relations: `symbol(file, name, kind)`, `import(from, to)`, `call(caller, callee)`
 - [ ] Rewrite one builtin rule in Datalog (circular dependencies) as proof of concept
 - [ ] Dylib loading: find/load rule packs from known paths
