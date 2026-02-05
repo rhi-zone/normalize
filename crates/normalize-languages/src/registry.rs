@@ -285,50 +285,20 @@ pub fn supported_languages() -> Vec<&'static dyn Language> {
 
 /// Check if a path is a programming language (not a data/config format).
 ///
-/// Returns false for data formats like JSON, YAML, TOML, Markdown, HTML, CSS, etc.
+/// Returns false for data formats like JSON, YAML, TOML, Markdown, etc.
 /// even though normalize-languages can parse them for syntax highlighting.
 ///
 /// Useful for architecture analysis where only "code" files are relevant.
+/// Uses `normalize_language_meta::capabilities_for()` to determine if a
+/// language is executable code.
 pub fn is_programming_language(path: &Path) -> bool {
-    // Data/config formats that we support but aren't programming languages
-    const DATA_FORMATS: &[&str] = &[
-        "json",
-        "jsonc",
-        "json5",
-        "yaml",
-        "yml",
-        "toml",
-        "xml",
-        "csv",
-        "ini",
-        "md",
-        "markdown",
-        "rst",
-        "txt",
-        "html",
-        "htm",
-        "css",
-        "scss",
-        "sass",
-        "less",
-        "svg",
-        "gitignore",
-        "editorconfig",
-        "env",
-        "lock",
-        "plist",
-        "dockerfile", // Config, not code
-    ];
+    let lang = match support_for_path(path) {
+        Some(l) => l,
+        None => return false,
+    };
 
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase());
-
-    match ext {
-        Some(e) if DATA_FORMATS.contains(&e.as_str()) => false,
-        _ => support_for_path(path).is_some(),
-    }
+    let caps = normalize_language_meta::capabilities_for(lang.name());
+    caps.executable
 }
 
 /// Validate that a language's unused node kinds audit is complete and accurate.

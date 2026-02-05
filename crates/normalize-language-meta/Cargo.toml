@@ -1,0 +1,9 @@
+[package]
+name = "normalize-language-meta"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Language metadata and capabilities for normalize"
+
+[dependencies]

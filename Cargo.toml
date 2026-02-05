@@ -11,6 +11,7 @@ members = [
     "crates/normalize-derive",
     "crates/normalize-grammars",
     "crates/normalize-languages",
+    "crates/normalize-language-meta",
     "crates/normalize-openapi",
     "crates/normalize-ecosystems",
     "crates/normalize-package-index",

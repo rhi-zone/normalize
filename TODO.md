@@ -143,7 +143,10 @@ See `docs/lint-architecture.md` for full design discussion.
 - Focus areas: circular deps, unused exports, module boundaries, import graph metrics
 
 **High priority:**
-- [ ] Add `is_programming_language() -> bool` to `Language` trait (currently hardcoded list in `registry.rs`)
+- [x] Language capabilities via `normalize-language-meta` crate (replaces hardcoded `is_programming_language` list)
+  - `Capabilities` struct: `imports`, `callable_symbols`, `complexity`, `executable`
+  - Per-language classification: data formats, markup, query, build DSL, shell, programming
+  - Extensible for future metadata: type system, paradigm, syntax family
 - [x] Module→file resolution for Rust (crate::, super::, self::) - ~10% of imports resolve to local files
   - Remaining unresolved: external crates (std::, serde::, etc.) - expected behavior
   - Future: trace re-exports from lib.rs/mod.rs for higher resolution rate

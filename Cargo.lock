@@ -3370,6 +3370,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-language-meta"
+version = "0.1.0"
+
+[[package]]
 name = "normalize-languages"
 version = "0.1.0"
 dependencies = [
@@ -3377,6 +3381,7 @@ dependencies = [
  "dirs",
  "libloading",
  "libsql",
+ "normalize-language-meta",
  "serde_json",
  "tokio",
  "tree-sitter",
