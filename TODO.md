@@ -156,19 +156,29 @@ See `docs/lint-architecture.md` for full design discussion.
 
 Philosophy: **insights by default**, no configuration needed. Rules are for enforcement.
 
-`normalize analyze architecture` should show:
-- [ ] Circular dependencies (always surface these)
-- [ ] Coupling metrics: fan-in, fan-out, instability per module
-- [ ] Cross-imports (A↔B bidirectional = tight coupling)
-- [ ] Orphan modules (defined but never imported)
-- [ ] Hub modules (everything flows through them)
-- [ ] Deep import chains (A→B→C→D→E coupling paths)
-- [ ] Boundary violations (if conventional structure detected: cli/, core/, services/)
+`normalize analyze architecture` v1 done:
+- [x] Circular dependencies (DFS-based cycle detection)
+- [x] Cross-imports (A↔B bidirectional coupling detection)
+- [x] Coupling metrics: fan-in, fan-out, instability per module (partial - see below)
+- [x] Orphan modules (files with symbols never imported)
+- [x] Symbol hotspots (most-called functions, filters generic methods)
 
-Rules (custom enforcement):
+Next iteration:
+- [ ] Module→file resolution for accurate fan-in (index has `module_to_files()`, needs wiring)
+- [ ] Hub modules (high fan-in AND high fan-out - everything flows through)
+- [ ] Deep import chains (A→B→C→D→E - longest dependency paths)
+- [ ] Boundary violations (detect cli/, core/, services/ and check import directions)
+
+Rules (custom enforcement, future):
 - [ ] Module boundary rules ("services/ cannot import cli/")
 - [ ] Threshold rules ("fan-out > 20 is error")
 - [ ] Dependency path queries ("what's between A and B?")
+
+**Ascent integration (Datalog for semantic rules):**
+- [ ] Spike: add Ascent dependency, write one rule over index data
+- [ ] Design index→Ascent relation mapping
+- [ ] Proof of concept rules: unused imports, high-complexity hotspots
+- [ ] Dynamic rule loading: compile user .dl files to dylib, load at runtime (avoids requiring recompilation for custom rules)
 
 ### normalize-typegen
 
