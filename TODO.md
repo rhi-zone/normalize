@@ -170,8 +170,8 @@ Philosophy: **insights by default**, no configuration needed. Rules are for enfo
 - [x] Symbol hotspots (most-called functions, filters generic methods)
 
 Next iteration:
-- [ ] Hub modules (high fan-in AND high fan-out - everything flows through)
-- [ ] Deep import chains (A→B→C→D→E - longest dependency paths)
+- [x] Hub modules (high fan-in AND high fan-out - everything flows through)
+- [x] Deep import chains (longest dependency paths, DFS with memoization)
 - [ ] Boundary violations (detect cli/, core/, services/ and check import directions)
 - [ ] Re-export tracing (follow `pub use` to resolve more imports)
 
