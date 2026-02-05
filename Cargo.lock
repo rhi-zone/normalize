@@ -3189,6 +3189,7 @@ dependencies = [
  "normalize-core",
  "normalize-derive",
  "normalize-ecosystems",
+ "normalize-facts",
  "normalize-facts-core",
  "normalize-languages",
  "normalize-local-deps",
@@ -3264,6 +3265,21 @@ dependencies = [
  "toml",
  "ureq",
  "urlencoding",
+]
+
+[[package]]
+name = "normalize-facts"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "ignore",
+ "libsql",
+ "normalize-facts-core",
+ "normalize-languages",
+ "rayon",
+ "serde",
+ "tokio",
+ "tree-sitter",
 ]
 
 [[package]]

@@ -1,6 +1,7 @@
 //! File skeleton viewing for view command.
 
 use super::symbol::find_symbol_signature;
+use crate::skeleton::ExtractResultExt;
 use crate::tree::{DocstringDisplay, FormatOptions};
 use crate::{deps, skeleton, tree};
 use normalize_languages::support_for_path;

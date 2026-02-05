@@ -1,0 +1,31 @@
+[package]
+name = "normalize-facts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Code fact extraction and storage library"
+
+[dependencies]
+# Core types
+normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+
+# Parsing
+tree-sitter = "0.26"
+
+# Database
+libsql.workspace = true
+
+# File system
+ignore.workspace = true
+dirs = "5"
+
+# Parallelism
+rayon.workspace = true
+
+# Serialization
+serde.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true }

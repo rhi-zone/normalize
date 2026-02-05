@@ -9,6 +9,7 @@ members = [
     "crates/normalize-typegen",
     "crates/normalize-core",
     "crates/normalize-derive",
+    "crates/normalize-facts",
     "crates/normalize-facts-core",
     "crates/normalize-grammars",
     "crates/normalize-languages",

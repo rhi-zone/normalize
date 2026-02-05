@@ -3,9 +3,9 @@
 //! Extracts function/class signatures with optional docstrings.
 //! Uses the shared Extractor from extract.rs for tree traversal.
 
-use crate::extract::Extractor;
+use crate::extract::{ExtractResult, Extractor};
 use crate::tree::{ViewNode, ViewNodeKind};
-use normalize_languages::{Symbol, SymbolKind};
+use normalize_languages::Symbol;
 use std::path::Path;
 
 /// Re-export Symbol as SkeletonSymbol for backwards compatibility.
@@ -46,11 +46,16 @@ impl SymbolExt for Symbol {
 }
 
 /// Result of skeleton extraction (alias for ExtractResult)
-pub type SkeletonResult = crate::extract::ExtractResult;
+pub type SkeletonResult = ExtractResult;
 
-impl SkeletonResult {
+/// Extension trait for ExtractResult to add view-related methods
+pub trait ExtractResultExt {
+    fn to_view_node(&self, grammar: Option<&str>) -> ViewNode;
+}
+
+impl ExtractResultExt for ExtractResult {
     /// Convert to a ViewNode with file as root and symbols as children.
-    pub fn to_view_node(&self, grammar: Option<&str>) -> ViewNode {
+    fn to_view_node(&self, grammar: Option<&str>) -> ViewNode {
         let file_name = Path::new(&self.file_path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -63,101 +68,6 @@ impl SkeletonResult {
             .collect();
 
         ViewNode::file(&file_name, &self.file_path).with_children(children)
-    }
-
-    /// Filter to only type definitions (class, struct, enum, trait, interface)
-    /// Returns a new SkeletonResult with only type-like symbols, and strips methods from classes
-    pub fn filter_types(&self) -> SkeletonResult {
-        fn is_type_kind(kind: SymbolKind) -> bool {
-            matches!(
-                kind,
-                SymbolKind::Class
-                    | SymbolKind::Struct
-                    | SymbolKind::Enum
-                    | SymbolKind::Trait
-                    | SymbolKind::Interface
-                    | SymbolKind::Type
-                    | SymbolKind::Module
-            )
-        }
-
-        fn filter_symbol(sym: &Symbol) -> Option<Symbol> {
-            if is_type_kind(sym.kind) {
-                // For types, keep only nested types (not methods)
-                let type_children: Vec<_> = sym.children.iter().filter_map(filter_symbol).collect();
-                Some(Symbol {
-                    name: sym.name.clone(),
-                    kind: sym.kind,
-                    signature: sym.signature.clone(),
-                    docstring: sym.docstring.clone(),
-                    attributes: Vec::new(),
-                    start_line: sym.start_line,
-                    end_line: sym.end_line,
-                    visibility: sym.visibility,
-                    children: type_children,
-                    is_interface_impl: sym.is_interface_impl,
-                    implements: sym.implements.clone(),
-                })
-            } else {
-                None
-            }
-        }
-
-        let filtered_symbols: Vec<_> = self.symbols.iter().filter_map(filter_symbol).collect();
-
-        SkeletonResult {
-            symbols: filtered_symbols,
-            file_path: self.file_path.clone(),
-        }
-    }
-
-    /// Filter out test functions and test modules.
-    /// Uses Language::is_test_symbol() for language-specific detection.
-    pub fn filter_tests(&self) -> SkeletonResult {
-        use normalize_languages::{Language, support_for_path};
-        use std::path::Path;
-
-        let lang = support_for_path(Path::new(&self.file_path));
-
-        fn filter_symbol(sym: &Symbol, lang: Option<&dyn Language>) -> Option<Symbol> {
-            let is_test = match lang {
-                Some(l) => l.is_test_symbol(sym),
-                None => false, // Unknown language: keep everything
-            };
-            if is_test {
-                return None;
-            }
-            let filtered_children: Vec<_> = sym
-                .children
-                .iter()
-                .filter_map(|c| filter_symbol(c, lang))
-                .collect();
-            Some(Symbol {
-                name: sym.name.clone(),
-                kind: sym.kind,
-                signature: sym.signature.clone(),
-                docstring: sym.docstring.clone(),
-                attributes: sym.attributes.clone(),
-                start_line: sym.start_line,
-                end_line: sym.end_line,
-                visibility: sym.visibility,
-                children: filtered_children,
-                is_interface_impl: sym.is_interface_impl,
-                implements: sym.implements.clone(),
-            })
-        }
-
-        let lang_ref: Option<&dyn Language> = lang.map(|l| l as &dyn Language);
-        let filtered_symbols: Vec<_> = self
-            .symbols
-            .iter()
-            .filter_map(|s| filter_symbol(s, lang_ref))
-            .collect();
-
-        SkeletonResult {
-            symbols: filtered_symbols,
-            file_path: self.file_path.clone(),
-        }
     }
 }
 
@@ -222,6 +132,7 @@ impl SkeletonExtractor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use normalize_facts_core::SymbolKind;
     use std::path::PathBuf;
 
     #[test]

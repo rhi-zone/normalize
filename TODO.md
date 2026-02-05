@@ -208,7 +208,9 @@ Implementation:
 - [x] Create `normalize-facts-core` with core data types (SymbolKind, Symbol, Import, Export, FlatSymbol, FlatImport, IndexedFile)
 - [x] Update `normalize-languages` to re-export types from `normalize-facts-core`
 - [x] Update `normalize` CLI to use types from `normalize-facts-core`
-- [ ] Create `normalize-facts` crate (extraction + storage, moves FileIndex from normalize)
+- [x] Create `normalize-facts` crate with extraction logic (Extractor, parsers)
+- [x] Move ExtractResult filter methods (filter_types, filter_tests) to normalize-facts
+- [ ] Move FileIndex from normalize to normalize-facts (storage layer)
 - [ ] Rename command `normalize index` → `normalize facts`
 - [ ] Add Ascent dependency to `normalize-facts-rules-api`
 - [ ] Define stable ABI with `abi_stable` (RulePack trait, Relations struct, Diagnostic output)
