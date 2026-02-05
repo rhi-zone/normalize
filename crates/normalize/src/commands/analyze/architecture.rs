@@ -275,7 +275,7 @@ fn truncate_path(path: &str, max_len: usize) -> String {
 /// Run architecture analysis
 pub fn cmd_architecture(root: &Path, json: bool) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let idx = match rt.block_on(FileIndex::open_if_enabled(root)) {
+    let idx = match rt.block_on(crate::index::open_if_enabled(root)) {
         Some(i) => i,
         None => {
             eprintln!("Index not available. Run `normalize index` first.");

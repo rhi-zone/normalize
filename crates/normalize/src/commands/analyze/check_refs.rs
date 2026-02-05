@@ -58,7 +58,7 @@ async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
     use regex::Regex;
 
     // Open index to get known symbols
-    let idx = match index::FileIndex::open_if_enabled(root).await {
+    let idx = match index::open_if_enabled(root).await {
         Some(i) => i,
         None => {
             eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");

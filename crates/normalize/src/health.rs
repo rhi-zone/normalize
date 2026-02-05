@@ -298,7 +298,7 @@ pub fn analyze_health(root: &Path) -> HealthReport {
 
     // Try index first for file/line stats, fall back to filesystem walk
     let rt = tokio::runtime::Runtime::new().unwrap();
-    if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
+    if let Some(mut index) = rt.block_on(crate::index::open_if_enabled(root)) {
         return rt.block_on(analyze_health_indexed(
             root,
             &mut index,

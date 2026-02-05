@@ -786,8 +786,6 @@ fn display_referenced_types(
     root: &Path,
     current_file: &str,
 ) {
-    use crate::index::FileIndex;
-
     let type_refs = extract_type_references(source, grammar);
 
     // Exclude the symbol itself from type references
@@ -809,7 +807,7 @@ fn display_referenced_types(
 
     if !remaining.is_empty() {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        if let Some(idx) = rt.block_on(FileIndex::open_if_enabled(root)) {
+        if let Some(idx) = rt.block_on(crate::index::open_if_enabled(root)) {
             for type_name in &remaining {
                 if let Ok(matches) = rt.block_on(idx.find_symbol(type_name)) {
                     // Find first match that's a type definition (not from current file)

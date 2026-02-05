@@ -40,7 +40,7 @@ async fn cmd_call_graph_async(
     };
 
     // Try index first
-    let idx = match index::FileIndex::open_if_enabled(root).await {
+    let idx = match index::open_if_enabled(root).await {
         Some(i) => i,
         None => {
             eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");

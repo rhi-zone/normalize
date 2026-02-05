@@ -7,7 +7,6 @@ use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::analyze::test_gaps::{FunctionTestGap, TestGapsReport, check_de_priority, compute_risk};
 use crate::extract::Extractor;
 use crate::filter::Filter;
-use crate::index::FileIndex;
 use crate::path_resolve;
 use normalize_languages::{SymbolKind, Visibility, support_for_path};
 use rayon::prelude::*;
@@ -46,7 +45,7 @@ pub fn analyze_test_gaps(
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
 
     // Step 1: Open index for call graph data
-    let index = rt.block_on(FileIndex::open(root)).ok();
+    let index = rt.block_on(crate::index::open(root)).ok();
 
     // Step 2: Load all call edges into HashMap<callee_name, Vec<(caller_file, caller_symbol)>>
     let callee_to_callers: HashMap<String, Vec<(String, String)>> = if let Some(ref idx) = index {

@@ -118,7 +118,7 @@ pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], json: bool) -> i32
 
     // Get complexity from index
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let idx = match rt.block_on(index::FileIndex::open_if_enabled(root)) {
+    let idx = match rt.block_on(index::open_if_enabled(root)) {
         Some(i) => i,
         None => {
             // No index, just use churn data

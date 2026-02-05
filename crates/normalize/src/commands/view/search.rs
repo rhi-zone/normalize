@@ -29,7 +29,7 @@ async fn search_symbols_async(query: &str, root: &Path) -> Vec<index::SymbolMatc
     let parsed = parse_symbol_query(query);
 
     // Try index first - if enabled, use it (or build it if empty)
-    if let Some(mut idx) = index::FileIndex::open_if_enabled(root).await {
+    if let Some(mut idx) = index::open_if_enabled(root).await {
         let stats = idx.call_graph_stats().await.unwrap_or_default();
         if stats.symbols == 0 {
             eprintln!("Building symbol index...");

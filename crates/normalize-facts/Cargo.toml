@@ -10,6 +10,7 @@ description = "Code fact extraction and storage library"
 # Core types
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
 normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+normalize-local-deps = { path = "../normalize-local-deps", version = "0.1.0" }
 
 # Parsing
 tree-sitter = "0.26"
@@ -28,4 +29,5 @@ rayon.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
+tempfile = "3"
 tokio = { workspace = true }

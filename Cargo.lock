@@ -3276,8 +3276,10 @@ dependencies = [
  "libsql",
  "normalize-facts-core",
  "normalize-languages",
+ "normalize-local-deps",
  "rayon",
  "serde",
+ "tempfile",
  "tokio",
  "tree-sitter",
 ]

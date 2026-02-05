@@ -115,7 +115,7 @@ async fn cmd_rebuild(root: Option<&Path>, include: &[IndexContent]) -> i32 {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    match index::FileIndex::open(&root).await {
+    match index::open(&root).await {
         Ok(mut idx) => match idx.refresh().await {
             Ok(count) => {
                 println!("Indexed {} files", count);
@@ -208,7 +208,7 @@ async fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
 
     let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
 
-    let idx = match index::FileIndex::open(&root).await {
+    let idx = match index::open(&root).await {
         Ok(idx) => idx,
         Err(e) => {
             eprintln!("Failed to open index: {}", e);
@@ -327,7 +327,7 @@ async fn cmd_list_files(
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    let idx = match index::FileIndex::open(&root).await {
+    let idx = match index::open(&root).await {
         Ok(idx) => idx,
         Err(e) => {
             eprintln!("Failed to open index: {}", e);

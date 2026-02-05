@@ -58,7 +58,7 @@ async fn cmd_trace_async(
     };
 
     // Find the symbol - try index first, fall back to file parsing
-    let symbol_matches = if let Some(mut idx) = index::FileIndex::open_if_enabled(root).await {
+    let symbol_matches = if let Some(mut idx) = index::open_if_enabled(root).await {
         let _ = idx.incremental_refresh().await;
         match idx.find_symbols(&symbol_name, None, false, 10).await {
             Ok(matches) if !matches.is_empty() => matches,
@@ -807,7 +807,7 @@ async fn trace_cross_file_returns_async(
         .unwrap_or(call_name);
 
     // Look up in index
-    let mut idx = index::FileIndex::open_if_enabled(root).await?;
+    let mut idx = index::open_if_enabled(root).await?;
     let _ = idx.incremental_refresh().await;
     let matches = idx
         .find_symbols(simple_name, Some("function"), false, 5)

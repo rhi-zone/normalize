@@ -5,7 +5,6 @@ use nucleo_matcher::{Config, Matcher};
 use std::path::Path;
 
 use crate::config::NormalizeConfig;
-use crate::index::FileIndex;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 
 #[derive(Debug, Clone)]
@@ -373,7 +372,7 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
     // Handle extension patterns (e.g., ".rs", ".py") - return all matches directly
     if query.starts_with('.') && !query.contains('/') {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
+        if let Some(mut index) = rt.block_on(crate::index::open_if_enabled(root)) {
             let _ = rt.block_on(index.incremental_refresh());
             if let Ok(files) = rt.block_on(index.find_like(query)) {
                 return files
@@ -423,7 +422,7 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
 /// Get paths matching query using LIKE, fallback to all files
 fn get_paths_for_query(root: &Path, query: &str) -> Vec<(String, bool)> {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
+    if let Some(mut index) = rt.block_on(crate::index::open_if_enabled(root)) {
         let _ = rt.block_on(index.incremental_refresh());
         // Try LIKE first for faster queries
         if !query.is_empty()

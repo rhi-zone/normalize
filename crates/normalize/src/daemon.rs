@@ -4,7 +4,6 @@
 //! refreshes their indexes. Index queries go directly to SQLite files.
 
 use crate::config::NormalizeConfig;
-use crate::index::FileIndex;
 use normalize_derive::Merge;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -248,7 +247,7 @@ impl DaemonServer {
 
         // Initial index refresh
         let rt = tokio::runtime::Runtime::new().unwrap();
-        match rt.block_on(FileIndex::open(&root)) {
+        match rt.block_on(crate::index::open(&root)) {
             Ok(mut idx) => {
                 if let Err(e) = rt.block_on(idx.refresh()) {
                     return Response::err(&format!("Failed to index: {}", e));
@@ -345,7 +344,7 @@ impl DaemonServer {
         let mut roots = self.roots.lock().unwrap();
         if let Some(watched) = roots.get_mut(root) {
             let rt = tokio::runtime::Runtime::new().unwrap();
-            match rt.block_on(FileIndex::open(root)) {
+            match rt.block_on(crate::index::open(root)) {
                 Ok(mut idx) => {
                     if let Err(e) = rt.block_on(idx.incremental_refresh()) {
                         eprintln!("Refresh error for {:?}: {}", root, e);
