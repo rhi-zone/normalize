@@ -31,6 +31,7 @@ pub mod output;
 pub mod parsers;
 pub mod path_resolve;
 pub mod paths;
+pub mod rules;
 pub mod serve;
 pub mod sessions;
 pub mod shadow;

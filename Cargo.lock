@@ -3361,6 +3361,7 @@ dependencies = [
 name = "normalize"
 version = "0.1.0"
 dependencies = [
+ "abi_stable",
  "assert_cmd",
  "ast-grep-core",
  "axum 0.8.8",
@@ -3388,6 +3389,7 @@ dependencies = [
  "normalize-ecosystems",
  "normalize-facts",
  "normalize-facts-core",
+ "normalize-facts-rules-api",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-openapi",

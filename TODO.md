@@ -216,7 +216,7 @@ Implementation:
 - [x] Define stable ABI with `abi_stable` (RulePack trait, Relations struct, Diagnostic output)
 - [x] Map facts to Ascent relations: `symbol(file, name, kind)`, `import(from, to)`, `call(caller, callee)`
 - [x] Rewrite one builtin rule in Datalog (circular dependencies) as proof of concept
-- [ ] Dylib loading: find/load rule packs from known paths
+- [x] Dylib loading: find/load rule packs from known paths
 - [ ] `normalize facts compile <rules.dl>` command to build custom packs
 
 ### normalize-typegen

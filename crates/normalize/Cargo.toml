@@ -38,6 +38,8 @@ normalize-core = { path = "../normalize-core", version = "0.1.0" }
 normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
 normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
+abi_stable = "0.11"
 normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
 normalize-local-deps = { path = "../normalize-local-deps", version = "0.1.0" }
 normalize-typegen = { path = "../normalize-typegen", version = "0.1.0", features = ["input-typescript"] }

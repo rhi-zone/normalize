@@ -1016,6 +1016,53 @@ impl FileIndex {
         Ok(edges)
     }
 
+    /// Load all imports from the imports table.
+    /// Returns Vec<(file, module, name, line)>.
+    /// Used by rules for building relations.
+    pub async fn all_imports(&self) -> Result<Vec<(String, String, String, u32)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query("SELECT file, module, name, line FROM imports", ())
+            .await?;
+        let mut imports = Vec::new();
+        while let Some(row) = rows.next().await? {
+            // module can be NULL in some cases
+            let module: Option<String> = row.get(1).ok();
+            imports.push((
+                row.get(0)?,
+                module.unwrap_or_default(),
+                row.get(2)?,
+                row.get::<i64>(3)? as u32,
+            ));
+        }
+        Ok(imports)
+    }
+
+    /// Load all calls with line numbers.
+    /// Returns Vec<(caller_file, caller_symbol, callee_name, line)>.
+    /// Used by rules for building relations.
+    pub async fn all_calls_with_lines(
+        &self,
+    ) -> Result<Vec<(String, String, String, u32)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT caller_file, caller_symbol, callee_name, line FROM calls",
+                (),
+            )
+            .await?;
+        let mut calls = Vec::new();
+        while let Some(row) = rows.next().await? {
+            calls.push((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get::<i64>(3)? as u32,
+            ));
+        }
+        Ok(calls)
+    }
+
     /// Load all symbols from the symbols table with full details.
     /// Returns Vec<(file, name, kind, start_line, end_line, parent)>.
     /// Used by test-gaps analysis to classify test context.

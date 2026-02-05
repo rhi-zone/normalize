@@ -2,9 +2,12 @@
 
 use crate::index;
 use crate::paths::get_moss_dir;
+use crate::rules;
 use crate::skeleton;
 use clap::Subcommand;
+use normalize_facts_rules_api::Relations;
 use normalize_languages::external_packages;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 /// What to extract during indexing (files are always indexed).
@@ -89,6 +92,22 @@ pub enum FactsAction {
         #[serde(default)]
         clear: bool,
     },
+
+    /// Run rules against extracted facts
+    Rules {
+        /// Specific rule to run (runs all if not specified)
+        #[arg(long)]
+        rule: Option<String>,
+
+        /// Path to a specific rule pack dylib
+        #[arg(long)]
+        pack: Option<PathBuf>,
+
+        /// List available rules instead of running them
+        #[arg(long)]
+        #[serde(default)]
+        list: bool,
+    },
 }
 
 /// Run an index management action
@@ -103,6 +122,13 @@ pub fn cmd_facts(action: FactsAction, root: Option<&Path>, json: bool) -> i32 {
         FactsAction::Packages { only, clear } => {
             rt.block_on(cmd_packages(&only, clear, root, json))
         }
+        FactsAction::Rules { rule, pack, list } => rt.block_on(cmd_rules(
+            root,
+            rule.as_deref(),
+            pack.as_deref(),
+            list,
+            json,
+        )),
     }
 }
 
@@ -660,6 +686,175 @@ fn cmd_storage(root: &Path, json: bool) -> i32 {
     }
 
     0
+}
+
+// =============================================================================
+// Rules
+// =============================================================================
+
+async fn cmd_rules(
+    root: Option<&Path>,
+    rule: Option<&str>,
+    pack_path: Option<&Path>,
+    list: bool,
+    json: bool,
+) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Load rule pack(s)
+    let packs: Vec<rules::LoadedRulePack> = if let Some(path) = pack_path {
+        // Load specific pack
+        match rules::load_from_path(path) {
+            Ok(pack) => vec![pack],
+            Err(e) => {
+                eprintln!("Error loading rule pack: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        // Discover and load all packs
+        let results = rules::load_all(&root);
+        let mut loaded = Vec::new();
+        for result in results {
+            match result {
+                Ok(pack) => loaded.push(pack),
+                Err(e) => eprintln!("Warning: {}", e),
+            }
+        }
+        loaded
+    };
+
+    if packs.is_empty() {
+        eprintln!("No rule packs found.");
+        eprintln!("Search paths:");
+        for path in rules::search_paths(&root) {
+            eprintln!("  - {}", path.display());
+        }
+        eprintln!("\nTo use the builtins, copy the compiled library to one of the search paths.");
+        return 1;
+    }
+
+    // List mode - just show available rules
+    if list {
+        if json {
+            let all_rules: Vec<_> = packs
+                .iter()
+                .map(|pack| {
+                    let info = pack.info();
+                    serde_json::json!({
+                        "pack_id": info.id.to_string(),
+                        "pack_name": info.name.to_string(),
+                        "version": info.version.to_string(),
+                        "rules": info.rules.iter().map(|r| r.to_string()).collect::<Vec<_>>(),
+                    })
+                })
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&all_rules).unwrap());
+        } else {
+            for pack in &packs {
+                let info = pack.info();
+                println!("{} v{}", info.name, info.version);
+                println!("  ID: {}", info.id);
+                println!("  Path: {}", pack.path.display());
+                println!("  Rules:");
+                for rule_id in info.rules.iter() {
+                    println!("    - {}", rule_id);
+                }
+                println!();
+            }
+        }
+        return 0;
+    }
+
+    // Build relations from index
+    let relations = match build_relations_from_index(&root).await {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error building relations: {}", e);
+            eprintln!("Run `normalize facts rebuild` first to index the codebase.");
+            return 1;
+        }
+    };
+
+    // Run rules
+    let mut all_diagnostics = Vec::new();
+    let use_colors = !json && std::io::stdout().is_terminal();
+
+    for pack in &packs {
+        let diagnostics = if let Some(rule_id) = rule {
+            pack.run_rule(rule_id, &relations)
+        } else {
+            pack.run(&relations)
+        };
+        all_diagnostics.extend(diagnostics);
+    }
+
+    // Output results
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&all_diagnostics).unwrap()
+        );
+    } else if all_diagnostics.is_empty() {
+        println!("No issues found.");
+    } else {
+        for diag in &all_diagnostics {
+            println!("{}", rules::format_diagnostic(diag, use_colors));
+        }
+        println!("\n{} issue(s) found.", all_diagnostics.len());
+    }
+
+    if all_diagnostics
+        .iter()
+        .any(|d| d.level == normalize_facts_rules_api::DiagnosticLevel::Error)
+    {
+        1
+    } else {
+        0
+    }
+}
+
+/// Build Relations from the index
+async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
+    let idx = index::open(root)
+        .await
+        .map_err(|e| format!("Failed to open index: {}", e))?;
+
+    let mut relations = Relations::new();
+
+    // Get symbols (file, name, kind, start_line, end_line, parent)
+    let symbols = idx
+        .all_symbols_with_details()
+        .await
+        .map_err(|e| format!("Failed to get symbols: {}", e))?;
+
+    for (file, name, kind, start_line, _end_line, _parent) in symbols {
+        relations.add_symbol(&file, &name, &kind, start_line as u32);
+    }
+
+    // Get imports (file, module, name, line)
+    let imports = idx
+        .all_imports()
+        .await
+        .map_err(|e| format!("Failed to get imports: {}", e))?;
+
+    for (file, module, name, _line) in imports {
+        relations.add_import(&file, &module, &name);
+    }
+
+    // Get calls (caller_file, caller_symbol, callee_name, line)
+    let calls = idx
+        .all_calls_with_lines()
+        .await
+        .map_err(|e| format!("Failed to get calls: {}", e))?;
+
+    for (file, caller, callee, line) in calls {
+        relations.add_call(&file, &caller, &callee, line);
+    }
+
+    Ok(relations)
 }
 
 fn get_cache_dir() -> Option<PathBuf> {
