@@ -1,0 +1,18 @@
+# ---
+# id = "god-class"
+# message = "Type defines too many methods (>20)"
+# enabled = false
+# ---
+
+relation method_of(String, String, String);
+method_of(file, method, cls) <--
+    parent(file, method, cls),
+    symbol(file, method, kind, _),
+    if kind == "method" || kind == "function";
+
+relation type_method_count(String, String, i32);
+type_method_count(file, cls, c) <--
+    method_of(file, _, cls),
+    agg c = count() in method_of(file, _, cls);
+
+warning("god-class", cls) <-- type_method_count(_, cls, c), if c > 20;

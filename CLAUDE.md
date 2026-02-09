@@ -72,6 +72,8 @@ After editing multiple files, run the full check once — not after each edit. F
 
 **Minimize file churn.** When editing a file, read it once, plan all changes, and apply them in one pass. Avoid read-edit-build-fail-read-fix cycles by thinking through the complete change before starting.
 
+**Always commit completed work.** The final step of any implementation task is `git commit`. After clippy + tests pass, commit immediately — don't wait to be asked. Uncommitted work is lost work.
+
 ## Commit Convention
 
 Use conventional commits: `type(scope): message`
@@ -90,7 +92,7 @@ Scope is optional but recommended for multi-crate repos.
 
 Do not:
 - Announce actions ("I will now...") - just do them
-- Leave work uncommitted
+- Leave work uncommitted — after completing a task and tests pass, commit immediately without asking
 - Create special cases - design to avoid them
 - Create legacy APIs - one API, update all callers
 - Add to the monolith - split by domain into sub-crates

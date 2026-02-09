@@ -220,6 +220,25 @@ Implementation:
 - [x] `normalize facts check <rules.dl>` - interpreted Datalog via ascent-interpreter
 - [ ] `normalize facts compile <rules.dl>` command to build custom packs (sandboxed codegen)
 
+**`implements` relation extraction gaps:**
+
+The `implements` relation is only populated for TypeScript. Many languages have the AST nodes available but don't extract them.
+
+Quick wins (tree-sitter nodes already documented):
+- [ ] **Python** — `superclasses` already parsed into signature, just not into `implements`
+- [ ] **Java** — `superclass` + `super_interfaces` nodes exist
+- [ ] **Scala** — `extends_clause` node exists
+- [ ] **Ruby** — `superclass` node exists
+
+Moderate effort (need AST exploration):
+- [ ] **Rust** — extract trait name from `impl Trait for Type`
+- [ ] **C#** — base class list after `:`
+- [ ] **Kotlin** — inheritance in class declaration
+- [ ] **C++** — base class specifier list
+- [ ] **Haskell** — typeclass instance declarations (`instance Foo Bar`)
+
+And more: Swift protocols, PHP interfaces, Elixir behaviours, etc.
+
 ### normalize-typegen
 
 **Infrastructure (DONE):**

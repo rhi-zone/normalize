@@ -159,6 +159,22 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
         id: "duplicate-symbol",
         content: include_str!("builtin_dl/duplicate_symbol.dl"),
     },
+    BuiltinFactsRule {
+        id: "god-class",
+        content: include_str!("builtin_dl/god_class.dl"),
+    },
+    BuiltinFactsRule {
+        id: "long-function",
+        content: include_str!("builtin_dl/long_function.dl"),
+    },
+    BuiltinFactsRule {
+        id: "dead-api",
+        content: include_str!("builtin_dl/dead_api.dl"),
+    },
+    BuiltinFactsRule {
+        id: "missing-impl",
+        content: include_str!("builtin_dl/missing_impl.dl"),
+    },
 ];
 
 /// Load all rules from all sources, merged by ID.
@@ -1252,6 +1268,138 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         let result = run_rules_source(rules, &relations).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].message.as_str(), "Animal");
+    }
+
+    #[test]
+    fn test_god_class_fires() {
+        let mut relations = Relations::new();
+        // Add a class with 21 methods (threshold is >20)
+        relations.add_symbol("a.py", "BigClass", "class", 1);
+        for i in 0..21 {
+            let method = format!("method_{}", i);
+            relations.add_symbol("a.py", &method, "method", i + 2);
+            relations.add_parent("a.py", &method, "BigClass");
+        }
+        // Add a small class (should not fire)
+        relations.add_symbol("a.py", "SmallClass", "class", 100);
+        relations.add_symbol("a.py", "do_thing", "method", 101);
+        relations.add_parent("a.py", "do_thing", "SmallClass");
+
+        let mut rule = find_builtin("god-class");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "BigClass");
+    }
+
+    #[test]
+    fn test_god_class_no_fire() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "NormalClass", "class", 1);
+        for i in 0..5 {
+            let method = format!("method_{}", i);
+            relations.add_symbol("a.py", &method, "method", i + 2);
+            relations.add_parent("a.py", &method, "NormalClass");
+        }
+
+        let mut rule = find_builtin("god-class");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_long_function_fires() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "huge_func", "function", 1);
+        relations.add_symbol_range("a.py", "huge_func", 1, 150);
+        relations.add_symbol("a.py", "tiny_func", "function", 200);
+        relations.add_symbol_range("a.py", "tiny_func", 200, 210);
+
+        let mut rule = find_builtin("long-function");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "huge_func");
+    }
+
+    #[test]
+    fn test_long_function_no_fire() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "short_func", "function", 1);
+        relations.add_symbol_range("a.py", "short_func", 1, 50);
+
+        let mut rule = find_builtin("long-function");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_dead_api_fires() {
+        let mut relations = Relations::new();
+        // Public function defined in a.py, never called from another file
+        relations.add_symbol("a.py", "unused_pub", "function", 1);
+        relations.add_visibility("a.py", "unused_pub", "public");
+        // Public function defined in b.py, called from a.py (not dead)
+        relations.add_symbol("b.py", "used_pub", "function", 1);
+        relations.add_visibility("b.py", "used_pub", "public");
+        relations.add_call("a.py", "main", "used_pub", 5);
+
+        let mut rule = find_builtin("dead-api");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "unused_pub");
+    }
+
+    #[test]
+    fn test_dead_api_no_fire() {
+        let mut relations = Relations::new();
+        // Public function called from another file
+        relations.add_symbol("a.py", "helper", "function", 1);
+        relations.add_visibility("a.py", "helper", "public");
+        relations.add_call("b.py", "main", "helper", 5);
+
+        let mut rule = find_builtin("dead-api");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_missing_impl_fires() {
+        let mut relations = Relations::new();
+        // Interface with 2 methods
+        relations.add_type_method("iface.ts", "Serializable", "serialize");
+        relations.add_type_method("iface.ts", "Serializable", "deserialize");
+        // Class implements Serializable but only has serialize
+        relations.add_symbol("impl.ts", "MyClass", "class", 1);
+        relations.add_implements("impl.ts", "MyClass", "Serializable");
+        relations.add_parent("impl.ts", "serialize", "MyClass");
+        // Missing: deserialize
+
+        let mut rule = find_builtin("missing-impl");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "MyClass");
+    }
+
+    #[test]
+    fn test_missing_impl_no_fire() {
+        let mut relations = Relations::new();
+        // Interface with 1 method
+        relations.add_type_method("iface.ts", "Runnable", "run");
+        // Class implements Runnable and has the method
+        relations.add_symbol("impl.ts", "Worker", "class", 1);
+        relations.add_implements("impl.ts", "Worker", "Runnable");
+        relations.add_parent("impl.ts", "run", "Worker");
+
+        let mut rule = find_builtin("missing-impl");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
     }
 
     /// Helper to find and parse a builtin rule by ID.

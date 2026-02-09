@@ -1,0 +1,15 @@
+# ---
+# id = "long-function"
+# message = "Function body exceeds 100 lines"
+# enabled = false
+# allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs"]
+# ---
+
+relation func_length(String, String, u32);
+func_length(file, name, len) <--
+    symbol_range(file, name, start, end),
+    symbol(file, name, kind, _),
+    if kind == "function" || kind == "method",
+    let len = end - start;
+
+warning("long-function", name) <-- func_length(_, name, len), if len > 100u32;

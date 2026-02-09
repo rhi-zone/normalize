@@ -1508,6 +1508,8 @@ impl FileIndex {
                         sym.kind,
                         normalize_languages::SymbolKind::Interface
                             | normalize_languages::SymbolKind::Class
+                            | normalize_languages::SymbolKind::Trait
+                            | normalize_languages::SymbolKind::Struct
                     ) {
                         for child in &sym.children {
                             if matches!(

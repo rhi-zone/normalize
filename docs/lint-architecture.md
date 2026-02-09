@@ -193,143 +193,60 @@ For most users and rules, interpreted is sufficient. Compiled is the escape hatc
 symbol(file: String, name: String, kind: String, line: u32)
 import(from_file: String, to_module: String, name: String)
 call(caller_file: String, caller_name: String, callee_name: String, line: u32)
+visibility(file: String, name: String, vis: String)
+attribute(file: String, name: String, attr: String)
+parent(file: String, child_name: String, parent_name: String)
+qualifier(caller_file: String, caller_name: String, callee_name: String, qualifier: String)
+symbol_range(file: String, name: String, start_line: u32, end_line: u32)
+implements(file: String, name: String, interface: String)
+is_impl(file: String, name: String)
+type_method(file: String, type_name: String, method_name: String)
 ```
 
 ### What's extracted but NOT exposed
-
-The `Language` trait extracts rich `Symbol` data that gets **flattened away** before reaching Datalog:
 
 | Field | In Symbol | In SQLite | In Datalog Relations |
 |-------|-----------|-----------|---------------------|
 | `name` | yes | yes | yes |
 | `kind` | yes | yes | yes |
 | `start_line` | yes | yes | yes (as `line`) |
-| `end_line` | yes | yes | **no** |
-| `parent` | yes (via `children`) | yes | **no** |
-| `visibility` | yes | **no** | **no** |
-| `attributes` | yes | **no** | **no** |
+| `end_line` | yes | yes | yes (via `symbol_range`) |
+| `parent` | yes (via `children`) | yes | yes |
+| `visibility` | yes | yes | yes |
+| `attributes` | yes | yes | yes |
 | `signature` | yes | **no** | **no** |
-| `implements` | yes | **no** | **no** |
-| `is_interface_impl` | yes | **no** | **no** |
+| `implements` | yes | yes | yes |
+| `is_interface_impl` | yes | yes | yes (via `is_impl`) |
 | `docstring` | yes | **no** | **no** |
-
-Additionally, SQLite has data not exposed to Datalog:
-- `calls.callee_qualifier` — `self`, module aliases (stored but never loaded)
-- `files.lines` — total line count per file
-- `type_methods` table — interface method signatures
-
-### Honest assessment
-
-With only 3 relations, most expressible rules are glorified `GROUP BY ... HAVING COUNT(*) > N`.
-Only `circular-deps` uses Datalog's actual strength (transitive closure). The interpreter
-infrastructure is sound, but the fact set is too impoverished for it to justify itself.
 
 ## Fact Enrichment Roadmap
 
 The path to making fact rules genuinely useful. Ordered by impact and implementation effort.
 
-### Phase 1: Expose what we already extract
+### Phase 1: Expose what we already extract (DONE)
 
-These fields already exist in `Symbol` — we just need to persist them to SQLite and
-wire them into Relations. No new tree-sitter work needed.
+All four relations wired into Relations and available in Datalog.
 
-#### `visibility(file, name, vis)`
+- `visibility(file, name, vis)` — Public/Private/Protected/Internal for all 98 languages
+- `attribute(file, name, attr)` — decorators, annotations, macros
+- `parent(file, child_name, parent_name)` — symbol nesting hierarchy
+- `qualifier(caller_file, caller_name, callee_name, qualifier)` — call qualifiers (self, module, etc.)
 
-The `Language` trait already extracts `Visibility` (Public/Private/Protected/Internal)
-for all 98 languages.
+### Phase 2: Persist currently-discarded Symbol fields (DONE)
 
-**Unlocks:**
-```dl
-# Dead public API: public function never called from outside its file
-relation public_func(String, String);
-public_func(file, name) <-- symbol(file, name, kind, _), visibility(file, name, vis),
-    if kind == "function", if vis == "public";
+- `symbol_range(file, name, start_line, end_line)` — symbol span for line-count rules
+- `implements(file, name, interface)` — interface/trait implementation
+- `is_impl(file, name)` — symbol is a trait/interface implementation
+- `type_method(file, type_name, method_name)` — method signatures on types
 
-relation external_call(String);
-external_call(name) <-- call(file, _, name, _), public_func(other_file, name),
-    if file != other_file;
+### Builtin rules using Phase 1+2 relations (DONE)
 
-warning("dead-api", name) <-- public_func(_, name), !external_call(name);
-```
+Four new builtin `.dl` rules exercise these relations (all `enabled = false` by default):
 
-#### `attribute(file, name, attr)`
-
-Already extracted as `Symbol.attributes: Vec<String>` — decorators, annotations, macros.
-
-**Unlocks:**
-```dl
-# Test-only code: functions only called from test-attributed functions
-relation is_test(String, String);
-is_test(file, name) <-- attribute(file, name, attr),
-    if attr == "test" || attr == "Test" || attr == "pytest.mark";
-
-# Skip test files in other rules (replaces fragile glob patterns)
-```
-
-#### `parent(file, child_name, parent_name)`
-
-Already in SQLite as `symbols.parent` — just not loaded into Relations.
-
-**Unlocks:**
-```dl
-# God class (not just god file): type with >N methods
-relation method_of(String, String, String);
-method_of(file, method, parent) <-- symbol(file, method, kind, _),
-    parent(file, method, parent), if kind == "method";
-
-relation type_method_count(String, String, i32);
-type_method_count(file, type_name, c) <--
-    method_of(file, _, type_name),
-    agg c = count() in method_of(file, _, type_name);
-
-warning("god-class", type_name) <-- type_method_count(_, type_name, c), if c > 20;
-```
-
-#### `qualifier(caller_file, caller_name, callee_name, qualifier)`
-
-Already in SQLite as `calls.callee_qualifier` — just never loaded.
-
-**Unlocks:**
-```dl
-# Distinguish self.method() from external.method()
-# Enables accurate fan-out (only count external calls)
-relation external_call_count(String, String, i32);
-external_call_count(file, caller, c) <--
-    call(file, caller, _, _),
-    qualifier(file, caller, _, q),
-    if q != "self" && q != "Self",
-    agg c = count() in (call(file, caller, _, _), qualifier(file, caller, _, q), if q != "self");
-```
-
-### Phase 2: Persist currently-discarded Symbol fields
-
-These require adding columns to the SQLite schema and updating the flattening logic.
-
-#### `end_line` → `symbol_range(file, name, start_line, end_line)`
-
-Already in SQLite, just not in Relations. Enables line-count-based complexity.
-
-#### `implements(file, name, interface)` + `is_impl(file, name)`
-
-`Symbol.implements: Vec<String>` and `Symbol.is_interface_impl: bool` are extracted
-but discarded during flattening.
-
-**Unlocks:**
-```dl
-# Incomplete interface implementation
-# (class says it implements Foo but doesn't define all of Foo's methods)
-relation interface_method(String, String);
-interface_method(iface, method) <-- type_method(_, iface, method);
-
-relation impl_method(String, String, String);
-impl_method(file, type_name, method) <--
-    implements(file, type_name, iface), parent(file, method, type_name);
-
-warning("missing-impl", type_name) <--
-    implements(_, type_name, iface),
-    interface_method(iface, method),
-    !impl_method(_, type_name, method);
-```
+- **god-class** — Type with >20 methods. Uses `parent` + `symbol`.
+- **long-function** — Function body >100 lines. Uses `symbol_range`.
+- **dead-api** — Public function never called from another file. Uses `visibility` + `call`.
+- **missing-impl** — Class implements interface but missing required methods. Uses `implements` + `type_method` + `parent`.
 
 ### Phase 3: New extraction (requires tree-sitter work)
 

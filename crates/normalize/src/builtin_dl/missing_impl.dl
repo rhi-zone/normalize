@@ -1,0 +1,18 @@
+# ---
+# id = "missing-impl"
+# message = "Class implements interface but is missing required methods"
+# enabled = false
+# ---
+
+relation interface_method(String, String);
+interface_method(iface, method) <-- type_method(_, iface, method);
+
+relation impl_has_method(String, String);
+impl_has_method(cls, method) <--
+    implements(_, cls, _),
+    parent(_, method, cls);
+
+warning("missing-impl", cls) <--
+    implements(_, cls, iface),
+    interface_method(iface, method),
+    !impl_has_method(cls, method);

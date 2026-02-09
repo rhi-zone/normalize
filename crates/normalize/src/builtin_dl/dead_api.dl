@@ -1,0 +1,21 @@
+# ---
+# id = "dead-api"
+# message = "Public function never called from another file"
+# enabled = false
+# allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs", "**/main.rs", "**/main.py", "**/main.go", "**/main.ts", "**/main.js"]
+# ---
+
+relation public_func(String, String);
+public_func(file, name) <--
+    symbol(file, name, kind, _),
+    visibility(file, name, vis),
+    if kind == "function" || kind == "method",
+    if vis == "public";
+
+relation external_call(String);
+external_call(name) <--
+    call(caller_file, _, name, _),
+    public_func(def_file, name),
+    if caller_file != def_file;
+
+warning("dead-api", name) <-- public_func(_, name), !external_call(name);
