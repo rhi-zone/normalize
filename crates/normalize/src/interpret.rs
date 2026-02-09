@@ -33,6 +33,7 @@
 use ascent_eval::{Engine, Value};
 use ascent_ir::Program;
 use ascent_syntax::AscentProgram;
+use glob::Pattern;
 use normalize_facts_rules_api::{Diagnostic, Relations};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -61,6 +62,8 @@ pub struct FactsRule {
     pub source: String,
     /// Description for display when listing rules.
     pub message: String,
+    /// Glob patterns for diagnostic messages to suppress.
+    pub allow: Vec<Pattern>,
     /// Whether this rule is enabled.
     pub enabled: bool,
     /// Whether this is a builtin rule.
@@ -182,6 +185,7 @@ fn parse_rule_file(path: &Path) -> Option<FactsRule> {
 /// # ---
 /// # id = "rule-id"
 /// # message = "What this rule checks for"
+/// # allow = ["**/tests/**"]
 /// # enabled = true
 /// # ---
 /// ```
@@ -239,6 +243,17 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         .unwrap_or("Datalog rule")
         .to_string();
 
+    let allow: Vec<Pattern> = frontmatter
+        .get("allow")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .filter_map(|s| Pattern::new(s).ok())
+                .collect()
+        })
+        .unwrap_or_default();
+
     let enabled = frontmatter
         .get("enabled")
         .and_then(|v| v.as_bool())
@@ -248,6 +263,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         id,
         source: source_str.trim().to_string(),
         message,
+        allow,
         enabled,
         builtin: is_builtin,
         source_path: PathBuf::new(),
@@ -289,11 +305,16 @@ pub fn run_rules_file(
 }
 
 /// Run a FactsRule against the given relations.
+/// Diagnostics whose message matches any `allow` pattern are filtered out.
 pub fn run_rule(
     rule: &FactsRule,
     relations: &Relations,
 ) -> Result<Vec<Diagnostic>, InterpretError> {
-    run_rules_source(&rule.source, relations)
+    let mut diagnostics = run_rules_source(&rule.source, relations)?;
+    if !rule.allow.is_empty() {
+        diagnostics.retain(|d| !rule.allow.iter().any(|p| p.matches(d.message.as_str())));
+    }
+    Ok(diagnostics)
 }
 
 /// Run rules from a source string against the given relations.
@@ -489,6 +510,32 @@ warning("x", "y") <-- symbol(_, _, _, _);
             assert!(rule.builtin);
             assert!(!rule.source.is_empty());
         }
+    }
+
+    #[test]
+    fn test_allow_patterns() {
+        let content = r#"
+# ---
+# id = "test-allow"
+# allow = ["**/tests/**", "**/*_test.py"]
+# ---
+
+warning("test-allow", file) <-- symbol(file, _, _, _);
+"#;
+
+        let mut relations = Relations::new();
+        relations.add_symbol("src/main.py", "foo", "function", 1);
+        relations.add_symbol("tests/test_foo.py", "test_foo", "function", 1);
+        relations.add_symbol("src/foo_test.py", "bar", "function", 1);
+
+        let rule = parse_rule_content(content, "test-allow", false).unwrap();
+        assert_eq!(rule.allow.len(), 2);
+
+        let result = run_rule(&rule, &relations).unwrap();
+        // tests/test_foo.py matches **/tests/**, foo_test.py matches **/*_test.py
+        // Only src/main.py should remain
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "src/main.py");
     }
 
     #[test]
