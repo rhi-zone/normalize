@@ -78,8 +78,38 @@ pub enum GrammarAction {
     Paths,
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(GrammarAction);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 /// Run the grammars command
-pub fn cmd_grammars(action: GrammarAction, json: bool, output_schema: bool) -> i32 {
+pub fn cmd_grammars(
+    action: GrammarAction,
+    json: bool,
+    output_schema: bool,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override action with --params-json if provided
+    let action = match params_json {
+        Some(json_str) => match serde_json::from_str(json_str) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => action,
+    };
     if output_schema {
         match action {
             GrammarAction::List => {

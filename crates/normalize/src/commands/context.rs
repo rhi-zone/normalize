@@ -4,10 +4,11 @@
 //! hierarchy, from project root to target path.
 
 use clap::Args;
+use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::output::OutputFormat;
+use crate::output::{OutputFormat, OutputFormatter};
 
 /// Context file names to look for (in priority order).
 const CONTEXT_FILES: &[&str] = &[".context.md", "CONTEXT.md"];
@@ -34,6 +35,53 @@ fn default_target() -> String {
     ".".to_string()
 }
 
+/// Context file list report (--list mode).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ContextListReport {
+    paths: Vec<String>,
+}
+
+impl OutputFormatter for ContextListReport {
+    fn format_text(&self) -> String {
+        if self.paths.is_empty() {
+            "No context files found.".to_string()
+        } else {
+            self.paths.join("\n")
+        }
+    }
+}
+
+/// A single context file entry.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+struct ContextEntry {
+    path: String,
+    content: String,
+}
+
+/// Context report (default mode).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ContextReport {
+    entries: Vec<ContextEntry>,
+}
+
+impl OutputFormatter for ContextReport {
+    fn format_text(&self) -> String {
+        if self.entries.is_empty() {
+            return "No context files found.".to_string();
+        }
+        let mut lines = Vec::new();
+        for (i, entry) in self.entries.iter().enumerate() {
+            if i > 0 {
+                lines.push(String::new());
+            }
+            lines.push(format!("# {}", entry.path));
+            lines.push(String::new());
+            lines.push(entry.content.clone());
+        }
+        lines.join("\n")
+    }
+}
+
 /// Print JSON schema for the command's input arguments.
 pub fn print_input_schema() {
     let schema = schemars::schema_for!(ContextArgs);
@@ -47,9 +95,19 @@ pub fn print_input_schema() {
 pub fn run(
     args: ContextArgs,
     format: OutputFormat,
+    output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
 ) -> i32 {
+    if output_schema {
+        // Schema depends on --list flag
+        if args.list {
+            crate::output::print_output_schema::<ContextListReport>();
+        } else {
+            crate::output::print_output_schema::<ContextReport>();
+        }
+        return 0;
+    }
     if input_schema {
         print_input_schema();
         return 0;
@@ -96,53 +154,29 @@ pub fn run(
     // Collect context files from root to target
     let files = collect_context_files(&root, &target_dir);
 
-    if files.is_empty() {
-        if format.is_json() {
-            println!("[]");
-        } else {
-            println!("No context files found.");
-        }
-        return 0;
-    }
-
     if args.list {
-        if format.is_json() {
-            let paths: Vec<&str> = files.iter().map(|f| f.to_str().unwrap_or("")).collect();
-            println!("{}", serde_json::to_string_pretty(&paths).unwrap());
-        } else {
-            for file in &files {
-                println!("{}", file.display());
-            }
-        }
+        let paths: Vec<String> = files
+            .iter()
+            .map(|f| f.to_str().unwrap_or("").to_string())
+            .collect();
+        let report = ContextListReport { paths };
+        report.print(&format);
         return 0;
     }
 
-    // Read and output content
-    if format.is_json() {
-        let mut entries = Vec::new();
-        for file in &files {
-            let content = fs::read_to_string(file).unwrap_or_default();
-            entries.push(serde_json::json!({
-                "path": file.to_str().unwrap_or(""),
-                "content": content,
-            }));
-        }
-        println!("{}", serde_json::to_string_pretty(&entries).unwrap());
-    } else {
-        for (i, file) in files.iter().enumerate() {
-            if i > 0 {
-                println!();
-            }
-            // Show relative path from root
+    let entries: Vec<ContextEntry> = files
+        .iter()
+        .map(|file| {
             let rel_path = file.strip_prefix(&root).unwrap_or(file);
-            println!("# {}", rel_path.display());
-            println!();
-            match fs::read_to_string(file) {
-                Ok(content) => print!("{}", content),
-                Err(e) => eprintln!("Failed to read {}: {}", file.display(), e),
+            let content = fs::read_to_string(file).unwrap_or_default();
+            ContextEntry {
+                path: rel_path.display().to_string(),
+                content,
             }
-        }
-    }
+        })
+        .collect();
+    let report = ContextReport { entries };
+    report.print(&format);
 
     0
 }

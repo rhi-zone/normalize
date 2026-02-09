@@ -8,7 +8,7 @@ use crate::output::OutputFormat;
 pub mod lint;
 pub mod test;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum ToolsAction {
     /// Run linters, formatters, and type checkers
     Lint {
@@ -21,6 +21,7 @@ pub enum ToolsAction {
 
         /// Fix issues automatically where possible
         #[arg(short, long, global = true)]
+        #[serde(default)]
         fix: bool,
 
         /// Specific tools to run (comma-separated, e.g., "ruff,oxlint")
@@ -33,10 +34,12 @@ pub enum ToolsAction {
 
         /// Output in SARIF format
         #[arg(long, global = true)]
+        #[serde(default)]
         sarif: bool,
 
         /// Watch for file changes and re-run on save
         #[arg(short, long, global = true)]
+        #[serde(default)]
         watch: bool,
     },
 
@@ -51,11 +54,12 @@ pub enum ToolsAction {
 
         /// Additional arguments to pass to the test runner
         #[arg(trailing_var_arg = true)]
+        #[serde(default)]
         args: Vec<String>,
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum LintSubAction {
     /// Run linters (default)
     Run,
@@ -63,7 +67,7 @@ pub enum LintSubAction {
     List,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum TestSubAction {
     /// Run tests (default)
     Run,
@@ -90,13 +94,39 @@ fn print_tools_schema(action: &ToolsAction) -> i32 {
     }
 }
 
+/// Print JSON schema for the command's input arguments.
+pub fn print_input_schema() {
+    let schema = schemars::schema_for!(ToolsAction);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&schema).unwrap_or_default()
+    );
+}
+
 pub fn run(
     action: ToolsAction,
     root: Option<&Path>,
     format: OutputFormat,
     json: bool,
     output_schema: bool,
+    input_schema: bool,
+    params_json: Option<&str>,
 ) -> i32 {
+    if input_schema {
+        print_input_schema();
+        return 0;
+    }
+    // Override action with --params-json if provided
+    let action = match params_json {
+        Some(json_str) => match serde_json::from_str(json_str) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("error: invalid --params-json: {}", e);
+                return 1;
+            }
+        },
+        None => action,
+    };
     if output_schema {
         return print_tools_schema(&action);
     }

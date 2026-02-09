@@ -1,7 +1,9 @@
 //! History command - view shadow git edit history.
 
-use crate::shadow::Shadow;
+use crate::output::OutputFormatter;
+use crate::shadow::{HistoryEntry, Shadow};
 use clap::Args;
+use serde::Serialize;
 use std::path::PathBuf;
 
 /// History command arguments.
@@ -43,6 +45,113 @@ fn default_limit() -> usize {
     20
 }
 
+/// History listing report (default mode).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct HistoryListReport {
+    head: Option<usize>,
+    checkpoint: Option<String>,
+    edits: Vec<HistoryEntry>,
+}
+
+impl OutputFormatter for HistoryListReport {
+    fn format_text(&self) -> String {
+        if self.edits.is_empty() {
+            return "No edits in history".to_string();
+        }
+        let mut lines = Vec::new();
+        for entry in &self.edits {
+            let msg_suffix = entry
+                .message
+                .as_ref()
+                .map(|m| format!(" \"{}\"", m))
+                .unwrap_or_default();
+            let head_marker = if Some(entry.id) == self.head {
+                " [HEAD]"
+            } else {
+                ""
+            };
+            lines.push(format!(
+                "  {}.{} {}: {} in {}{}",
+                entry.id,
+                head_marker,
+                entry.operation,
+                entry.target,
+                entry.files.join(", "),
+                msg_suffix
+            ));
+        }
+        lines.join("\n")
+    }
+}
+
+/// Diff report (--diff mode).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct HistoryDiffReport {
+    #[serde(rename = "ref")]
+    commit_ref: String,
+    diff: String,
+}
+
+impl OutputFormatter for HistoryDiffReport {
+    fn format_text(&self) -> String {
+        self.diff.clone()
+    }
+}
+
+/// Status report (--status mode).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct HistoryStatusReport {
+    edits_since_checkpoint: usize,
+    checkpoint: Option<String>,
+}
+
+impl OutputFormatter for HistoryStatusReport {
+    fn format_text(&self) -> String {
+        let mut lines = vec![format!(
+            "Shadow edits since last commit: {}",
+            self.edits_since_checkpoint
+        )];
+        if let Some(ref cp) = self.checkpoint {
+            lines.push(format!("Last checkpoint: {}", cp));
+        }
+        lines.join("\n")
+    }
+}
+
+/// Tree report (--all mode).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct HistoryTreeReport {
+    tree: Vec<String>,
+}
+
+impl OutputFormatter for HistoryTreeReport {
+    fn format_text(&self) -> String {
+        self.tree.join("\n")
+    }
+}
+
+/// Prune report (--prune mode).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct HistoryPruneReport {
+    pruned: usize,
+    kept: usize,
+}
+
+impl OutputFormatter for HistoryPruneReport {
+    fn format_text(&self) -> String {
+        if self.pruned > 0 {
+            format!(
+                "Pruned {} commit{}, keeping last {}",
+                self.pruned,
+                if self.pruned == 1 { "" } else { "s" },
+                self.kept
+            )
+        } else {
+            format!("Nothing to prune (only {} commits in history)", self.kept)
+        }
+    }
+}
+
 /// Print JSON schema for the command's input arguments.
 pub fn print_input_schema() {
     let schema = schemars::schema_for!(HistoryArgs);
@@ -52,10 +161,26 @@ pub fn print_input_schema() {
     );
 }
 
+/// Determine which output schema to print based on the args mode.
+fn print_history_output_schema(args: &HistoryArgs) {
+    if args.diff.is_some() {
+        crate::output::print_output_schema::<HistoryDiffReport>();
+    } else if args.status {
+        crate::output::print_output_schema::<HistoryStatusReport>();
+    } else if args.all {
+        crate::output::print_output_schema::<HistoryTreeReport>();
+    } else if args.prune.is_some() {
+        crate::output::print_output_schema::<HistoryPruneReport>();
+    } else {
+        crate::output::print_output_schema::<HistoryListReport>();
+    }
+}
+
 /// Run history command.
 pub fn run(
     args: HistoryArgs,
     format: crate::output::OutputFormat,
+    output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
 ) -> i32 {
@@ -74,6 +199,10 @@ pub fn run(
         },
         None => args,
     };
+    if output_schema {
+        print_history_output_schema(&args);
+        return 0;
+    }
     let root = args
         .root
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -81,122 +210,59 @@ pub fn run(
     let shadow = Shadow::new(&root);
 
     if !shadow.exists() {
-        if format.is_json() {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "head": null,
-                    "checkpoint": null,
-                    "edits": []
-                })
-            );
-        } else {
-            println!("No shadow history (no edits tracked yet)");
-        }
+        let report = HistoryListReport {
+            head: None,
+            checkpoint: None,
+            edits: vec![],
+        };
+        report.print(&format);
         return 0;
     }
 
     // Handle --diff
     if let Some(ref commit_ref) = args.diff {
-        return cmd_diff(&shadow, commit_ref, format.is_json());
+        return cmd_diff(&shadow, commit_ref, &format);
     }
 
     // Handle --status
     if args.status {
-        return cmd_status(&shadow, format.is_json());
+        return cmd_status(&shadow, &format);
     }
 
     // Handle --all (tree view)
     if args.all {
-        return cmd_tree(&shadow, args.limit, format.is_json());
+        return cmd_tree(&shadow, args.limit, &format);
     }
 
     // Handle --prune
     if let Some(keep) = args.prune {
-        return cmd_prune(&shadow, keep, format.is_json());
+        return cmd_prune(&shadow, keep, &format);
     }
 
     // Regular history listing
     let entries = shadow.history(args.file.as_deref(), args.limit);
+    let checkpoint = shadow.checkpoint();
+    let head = entries.first().map(|e| e.id);
 
-    if format.is_json() {
-        let checkpoint = shadow.checkpoint();
-        let head = entries.first().map(|e| e.id);
-
-        // Build JSON output matching design spec
-        let edits: Vec<serde_json::Value> = entries
-            .iter()
-            .map(|e| {
-                serde_json::json!({
-                    "id": e.id,
-                    "operation": e.operation,
-                    "target": e.target,
-                    "files": e.files,
-                    "message": e.message,
-                    "workflow": e.workflow,
-                    "git_head": e.git_head,
-                    "timestamp": e.timestamp
-                })
-            })
-            .collect();
-
-        println!(
-            "{}",
-            serde_json::json!({
-                "head": head,
-                "checkpoint": checkpoint,
-                "edits": edits
-            })
-        );
-    } else {
-        if entries.is_empty() {
-            println!("No edits in history");
-            return 0;
-        }
-
-        for entry in &entries {
-            let msg_suffix = entry
-                .message
-                .as_ref()
-                .map(|m| format!(" \"{}\"", m))
-                .unwrap_or_default();
-
-            let head_marker = if entry.id == entries.first().map(|e| e.id).unwrap_or(0) {
-                " [HEAD]"
-            } else {
-                ""
-            };
-
-            println!(
-                "  {}.{} {}: {} in {}{}",
-                entry.id,
-                head_marker,
-                entry.operation,
-                entry.target,
-                entry.files.join(", "),
-                msg_suffix
-            );
-        }
-    }
+    let report = HistoryListReport {
+        head,
+        checkpoint,
+        edits: entries,
+    };
+    report.print(&format);
 
     0
 }
 
 /// Show diff for a specific commit.
-fn cmd_diff(shadow: &Shadow, commit_ref: &str, json: bool) -> i32 {
+fn cmd_diff(shadow: &Shadow, commit_ref: &str, format: &crate::output::OutputFormat) -> i32 {
     match shadow.diff(commit_ref) {
         Some(diff) => {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "ref": commit_ref,
-                        "diff": diff
-                    })
-                );
-            } else {
-                print!("{}", diff);
-            }
+            let report = HistoryDiffReport {
+                commit_ref: commit_ref.to_string(),
+                diff,
+            };
+            report.print(format);
             0
         }
         None => {
@@ -207,12 +273,12 @@ fn cmd_diff(shadow: &Shadow, commit_ref: &str, json: bool) -> i32 {
 }
 
 /// Show status of shadow edits since last real git commit.
-fn cmd_status(shadow: &Shadow, json: bool) -> i32 {
+fn cmd_status(shadow: &Shadow, format: &crate::output::OutputFormat) -> i32 {
     let entries = shadow.history(None, 100);
     let checkpoint = shadow.checkpoint();
 
     // Count edits since checkpoint
-    let edits_since_checkpoint: Vec<_> = entries
+    let count = entries
         .iter()
         .take_while(|e| {
             checkpoint
@@ -220,45 +286,24 @@ fn cmd_status(shadow: &Shadow, json: bool) -> i32 {
                 .map(|c| &e.git_head != c)
                 .unwrap_or(true)
         })
-        .collect();
+        .count();
 
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "edits_since_checkpoint": edits_since_checkpoint.len(),
-                "checkpoint": checkpoint
-            })
-        );
-    } else {
-        println!(
-            "Shadow edits since last commit: {}",
-            edits_since_checkpoint.len()
-        );
-        if let Some(cp) = checkpoint {
-            println!("Last checkpoint: {}", cp);
-        }
-    }
+    let report = HistoryStatusReport {
+        edits_since_checkpoint: count,
+        checkpoint,
+    };
+    report.print(format);
 
     0
 }
 
 /// Show full tree structure of shadow history (all branches).
-fn cmd_tree(shadow: &Shadow, limit: usize, json: bool) -> i32 {
+fn cmd_tree(shadow: &Shadow, limit: usize, format: &crate::output::OutputFormat) -> i32 {
     match shadow.tree(limit) {
         Some(tree_output) => {
-            if json {
-                // Parse tree into structured format
-                let lines: Vec<&str> = tree_output.lines().collect();
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "tree": lines
-                    })
-                );
-            } else {
-                print!("{}", tree_output);
-            }
+            let lines: Vec<String> = tree_output.lines().map(|l| l.to_string()).collect();
+            let report = HistoryTreeReport { tree: lines };
+            report.print(format);
             0
         }
         None => {
@@ -269,40 +314,18 @@ fn cmd_tree(shadow: &Shadow, limit: usize, json: bool) -> i32 {
 }
 
 /// Prune shadow history, keeping only the last N commits.
-fn cmd_prune(shadow: &Shadow, keep: usize, json: bool) -> i32 {
+fn cmd_prune(shadow: &Shadow, keep: usize, format: &crate::output::OutputFormat) -> i32 {
     match shadow.prune(keep) {
         Ok(pruned_count) => {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "pruned": pruned_count,
-                        "kept": keep
-                    })
-                );
-            } else if pruned_count > 0 {
-                println!(
-                    "Pruned {} commit{}, keeping last {}",
-                    pruned_count,
-                    if pruned_count == 1 { "" } else { "s" },
-                    keep
-                );
-            } else {
-                println!("Nothing to prune (only {} commits in history)", keep);
-            }
+            let report = HistoryPruneReport {
+                pruned: pruned_count,
+                kept: keep,
+            };
+            report.print(format);
             0
         }
         Err(e) => {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "error": e.to_string()
-                    })
-                );
-            } else {
-                eprintln!("Prune failed: {}", e);
-            }
+            eprintln!("Prune failed: {}", e);
             1
         }
     }

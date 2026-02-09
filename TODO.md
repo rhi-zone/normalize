@@ -65,10 +65,10 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--input-schema`: output JSON schema for command's input arguments
 - [x] `--params-json`: pass command arguments as JSON (overrides CLI flags)
 - [x] Core infrastructure: `OutputFormatter` requires `JsonSchema`, all output types derive it
-- [x] `--output-schema` wired up for: aliases, text-search, analyze (all subcommands)
-- [ ] Wire up `--output-schema` for: grammars, sessions, tools, context, history, view
-- [ ] Wire up `--input-schema` + `--params-json` for remaining commands (currently: aliases only)
-- [ ] Support `--jsonl` + `--jq` combination (apply jq filter, then emit results as jsonl)
+- [x] `--output-schema` wired up for: aliases, text-search, analyze, grammars, sessions, tools, context, history
+- [x] `--input-schema` + `--params-json` wired up for: aliases, text-search, analyze, sessions, view, history, context, edit, init, generate, translate, grammars, tools
+- [x] `--jsonl` + `--jq` combination (apply jq filter, then emit results as jsonl)
+- [ ] Wire up `--output-schema` for: view (10+ implicit modes — needs dedicated refactor pass)
 
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
@@ -97,12 +97,8 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - `normalize-cli-parser` - CLI help output parsing
 
 **Renames for clarity:**
-- [ ] `normalize-chat-sessions` → `normalize-chat-sessions`
-  - "Sessions" too generic (web sessions? user sessions?)
-  - Content: AI agent chat session log parsing (Claude Code, Gemini CLI, etc.)
-- [ ] `normalize-syntax-rules` → `normalize-syntax-rules`
-  - "Rules" too generic (business rules? validation?)
-  - Content: tree-sitter syntax-based linting rules
+- [n/a] `normalize-chat-sessions` — name is fine ("chat sessions" is specific enough)
+- [n/a] `normalize-syntax-rules` — name is fine ("syntax rules" is specific enough)
 
 **Structural split:**
 - [x] `normalize-ecosystems` → split into two crates:
