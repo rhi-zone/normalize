@@ -279,15 +279,23 @@ These can't be inline comments because:
 
 ### Inline Comments
 
-For **single-location code findings** (syntax rules):
+For **single-location code findings**, with namespaced prefixes per rule system:
 
 ```rust
-// normalize-allow: rust/unwrap-in-impl - input validated above
+// normalize-syntax-allow: rust/unwrap-in-impl - input validated above
 let value = result.unwrap();
 ```
 
+```python
+# normalize-facts-allow: god-file - this file is intentionally large
+def one_of_many_functions(): ...
+```
+
+Syntax rules check the finding's line and the line above. Fact rules check the
+first 10 lines of the file (fact diagnostics are file-level, not line-level).
+
 Inline comments make sense here because:
-- The finding is about a specific piece of code
+- The finding is about a specific piece of code (or file, for facts)
 - Comments survive refactoring (move with the code)
 - The reason is visible at the location
 - Familiar pattern (clippy `#[allow()]`, ESLint `// eslint-disable`)
@@ -310,7 +318,8 @@ This is a third option for "don't lint these files at all" - coarser than inline
 | Whole-file property | `.normalize/*-allow` | Large files, hotspots |
 | Cross-location relationship | `.normalize/*-allow` | Duplicate functions |
 | Code pattern (file exclusion) | Config `allow` patterns | Skip tests for unwrap rule |
-| Code pattern (specific instance) | Inline comment | Allow this one unwrap |
+| Syntax finding (specific instance) | `normalize-syntax-allow:` comment | Allow this one unwrap |
+| Fact finding (specific file) | `normalize-facts-allow:` comment | Allow this god-file |
 
 ## Facts & Rules Naming
 

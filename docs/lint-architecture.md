@@ -89,192 +89,290 @@ AST pattern matching via tree-sitter queries. No semantic understanding.
 
 **Value**: Fast, no index needed, works on single files. Good for CI pre-commit hooks.
 
-### Tier 2: Index Queries (index-rules, new)
+### Tier 2: Fact Rules (Datalog over the index)
 
-Pattern matching over semantic data: symbols, imports, calls, complexity.
+Datalog rules over extracted facts: symbols, imports, calls. Uses the ascent-interpreter for zero-compilation user rules, with compiled dylib path for performance-critical packs.
 
 | Rule | What it catches | Why syntax can't |
 |------|-----------------|------------------|
-| Unused imports | `import foo` where `foo` never appears in calls/symbols | Needs cross-reference analysis |
-| Missing exports | Public API references unexported symbol | Needs export + symbol data |
-| High-complexity hotspots | Functions with complexity > N called from > M places | Needs complexity + call graph |
-| Deprecated API usage | Calls to functions marked `@deprecated` | Needs symbol metadata |
-| Import from banned module | `import { x } from "banned-pkg"` | Could be syntax, but semantic is more precise |
-| Orphan symbols | Defined but never called/referenced | Needs full reference analysis |
+| Circular dependencies | A imports B imports C imports A (transitive) | Needs recursive closure |
+| Orphan modules | File never imported by anything | Needs cross-file join |
+| Hub modules | Module imported by >N others | Needs aggregation over imports |
+| God files | File with >N functions | Needs counting over symbols |
+| Dead API surface | Public function unreachable from entry points | Needs visibility + transitive calls |
+| Architecture violations | `domain/` transitively imports `infra/` | Needs recursive closure + path predicates |
 
-**Value**: Same analysis depth across all 98 languages. Gleam gets what TypeScript gets.
-
-### Tier 3: Imperative Analysis (normalize-lint, new)
-
-For checks that can't be expressed as pattern matching:
-
-| Rule | Why it needs imperative logic |
-|------|-------------------------------|
-| Circular dependencies | Requires transitive closure / cycle detection |
-| Layering violations | "module A should never transitively depend on B" |
-| Dead code elimination | Reachability from entry points |
-| API stability | Comparing two index snapshots |
-| Custom project rules | "services/ cannot import from cli/" |
-
-**Value**: Escape hatch for complex analysis. Lua scripting for user-defined rules.
+**Value**: Same analysis depth across all 98 languages. Gleam gets what TypeScript gets. Users write `.dl` files — no Rust toolchain needed for the interpreted path.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     User Rules                          │
-│  .scm files (syntax + index)    .lua files (imperative) │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-┌─────────────────────▼───────────────────────────────────┐
-│                  Query Engine                           │
-│         Unified SCM query executor                      │
-└──────────┬─────────────────────────────┬────────────────┘
-           │                             │
-┌──────────▼──────────┐     ┌────────────▼────────────────┐
-│   syntax-rules      │     │      index-rules            │
+┌──────────────────────────────────────────────────────────┐
+│                     User Rules                           │
+│   .scm files (syntax)              .dl files (facts)     │
+└──────────┬──────────────────────────────┬────────────────┘
+           │                              │
+┌──────────▼──────────┐     ┌─────────────▼───────────────┐
+│   syntax-rules      │     │      fact-rules             │
 │                     │     │                             │
-│  TreeCursor over    │     │  TreeCursor over            │
-│  tree-sitter AST    │     │  IndexNode adapter          │
+│  TreeCursor over    │     │  Datalog engine over        │
+│  tree-sitter AST    │     │  extracted Relations        │
+│                     │     │                             │
+│  Per-file, no index │     │  Two execution paths:       │
+│                     │     │  • Interpreted (ascent-eval) │
+│                     │     │  • Compiled (dylib + ascent) │
 └─────────────────────┘     └─────────────────────────────┘
                                          │
-                            ┌────────────▼────────────────┐
-                            │   Flat Index Storage        │
-                            │  Vec<Symbol>, Vec<Import>,  │
-                            │  Vec<Call>, etc.            │
+                            ┌─────────────▼───────────────┐
+                            │   Facts Index (SQLite)      │
+                            │  symbols, imports, calls,   │
+                            │  files, type_methods        │
                             └─────────────────────────────┘
 ```
-
-## Index Tree Projection
-
-The flat index is queried via a tree-shaped interface:
-
-```
-(index
-  (module path: "src/lib.rs"
-    (symbol name: "Config" kind: "struct" exported: true complexity: 5
-      (symbol name: "new" kind: "function" complexity: 12))
-    (symbol name: "helper" kind: "function" exported: false complexity: 3)
-    (import source: "std::collections"
-      (name "HashMap"))
-    (call target: "helper" line: 45)
-    (call target: "HashMap::new" line: 52)))
-```
-
-Query examples:
-
-```scm
-; High-complexity exported functions
-(module
-  (symbol kind: "function" exported: true @fn)
-  (#gt? @fn.complexity 15))
-
-; Imports from specific module
-(module path: @path
-  (import source: "unsafe_module"))
-
-; Functions that are defined but never called
-; (This is where scm hits limits - need to assert absence)
-```
-
-## The Negation Problem
-
-SCM is pattern matching—it finds what exists, not what's missing. Rules like "unused imports" need to assert absence.
-
-Options:
-1. **Post-process**: Query returns all imports + all references, Rust code computes the diff
-2. **Extended predicates**: `(#not-exists? (call target: @import.name))`
-3. **Hybrid**: Simple presence checks in scm, absence checks in normalize-lint
-
-Recommendation: Start with option 1. Keep scm pure, handle negation in Rust. If patterns emerge, consider option 2.
 
 ## Crate Structure
 
 ```
-normalize-syntax-rules   # Exists. AST patterns via scm.
-normalize-index-rules    # New. Index patterns via scm.
-normalize-lint           # New. Imperative analysis via Lua.
-normalize-lint-engine    # New. Shared query executor, reporting, config.
+normalize-syntax-rules         # AST pattern matching via tree-sitter queries (.scm)
+normalize-facts-core           # Data types (Symbol, SymbolKind, Visibility, Import, etc.)
+normalize-facts                # Extraction + SQLite storage (Extractor, FileIndex)
+normalize-facts-rules-api      # Stable ABI for compiled rule packs (Ascent + abi_stable)
+normalize-facts-rules-builtins # Compiled builtin rules (cdylib)
 ```
 
-## Implementation Decision: Ascent + AOT Compilation
+The main `normalize` crate contains the interpreted Datalog engine (`interpret.rs`) and
+the builtin `.dl` rules (`builtin_dl/`).
 
-After evaluating Rust Datalog options (Datafrog, Crepe, Ascent, DDlog), the decision is:
+## Two Execution Paths for Fact Rules
 
-**Use Ascent for all Datalog rules, with AOT compilation for user rules.**
-
-Why Ascent:
-- State-of-the-art optimizations (index generation, semi-naïve evaluation)
-- Lattice support for future data flow analysis
-- Clean Rust integration (call Rust from rules, call rules from Rust)
-- Not "locked into DSL" - predicates are arbitrary Rust functions
-
-Why not an interpreter:
-- All performant Rust Datalog implementations are compile-time
-- Building an interpreter that matches Ascent's optimizations is months of work
-- AOT with caching gives same developer experience with better performance
-
-### User Rule Workflow
+### Path 1: Interpreted (ascent-interpreter)
 
 ```
-User writes rules (.dl files)
+User writes .dl file with TOML frontmatter
          ↓
-normalize compile-rules  (generates Rust, compiles via rustc)
+normalize facts check  (parses + interprets via ascent-eval)
          ↓
-~/.config/normalize/rules.so  (cached dylib)
-         ↓
-normalize lint  (loads dylib, runs fast)
+Diagnostics (warnings/errors)
 ```
 
-Rules recompile only when changed. First run is slow (compilation), subsequent runs are fast.
+- **No compilation** — rules run immediately
+- Supports: recursion, negation, aggregation, lattices, string predicates
+- Uses ascent-interpreter (pterror's fork): ascent-syntax → ascent-ir → ascent-eval
+- Builtin rules are embedded via `include_str!` and loaded automatically
+- User rules: `~/.config/moss/rules/*.dl` and `.normalize/rules/*.dl`
 
-Tradeoff: users need Rust toolchain. Acceptable for users writing Datalog rules.
+### Path 2: Compiled (dylib via abi_stable)
 
-### Rust Integration
-
-Rules can call Rust and vice versa:
-
-```rust
-ascent! {
-    relation symbol(PathBuf, String, SymbolKind);
-    relation high_complexity(PathBuf, String);
-
-    // Pure Datalog for recursion
-    high_complexity(f, s) <--
-        symbol(f, s, SymbolKind::Function),
-        // Escape to Rust for complex logic
-        complexity_exceeds(&f, &s, 15);
-}
-
-fn complexity_exceeds(file: &Path, sym: &str, threshold: u32) -> bool {
-    // Access index, do arbitrary computation
-}
 ```
+User writes Ascent rules in Rust
+         ↓
+cargo build  (compiles to .so/.dylib)
+         ↓
+normalize facts rules --pack <path>  (loads dylib, runs fast)
+```
+
+- **Full Ascent power** — arbitrary Rust in predicates, type safety, optimizations
+- Useful for: performance-critical rules, rules that need filesystem/network access
+- Stable ABI via `abi_stable` — dylibs work across normalize versions
+
+### When to use which
+
+| | Interpreted | Compiled |
+|---|---|---|
+| Setup | Zero (write .dl, run) | Rust toolchain + cargo build |
+| Performance | Fine for <100k facts | Needed for large codebases |
+| Expressiveness | Pure Datalog only | Datalog + arbitrary Rust |
+| Distribution | Copy .dl file | Share .so/.dylib |
+| Iteration speed | Instant | Compile cycle |
+
+For most users and rules, interpreted is sufficient. Compiled is the escape hatch.
+
+## Current Fact Set (What Datalog Rules See)
+
+```
+symbol(file: String, name: String, kind: String, line: u32)
+import(from_file: String, to_module: String, name: String)
+call(caller_file: String, caller_name: String, callee_name: String, line: u32)
+```
+
+### What's extracted but NOT exposed
+
+The `Language` trait extracts rich `Symbol` data that gets **flattened away** before reaching Datalog:
+
+| Field | In Symbol | In SQLite | In Datalog Relations |
+|-------|-----------|-----------|---------------------|
+| `name` | yes | yes | yes |
+| `kind` | yes | yes | yes |
+| `start_line` | yes | yes | yes (as `line`) |
+| `end_line` | yes | yes | **no** |
+| `parent` | yes (via `children`) | yes | **no** |
+| `visibility` | yes | **no** | **no** |
+| `attributes` | yes | **no** | **no** |
+| `signature` | yes | **no** | **no** |
+| `implements` | yes | **no** | **no** |
+| `is_interface_impl` | yes | **no** | **no** |
+| `docstring` | yes | **no** | **no** |
+
+Additionally, SQLite has data not exposed to Datalog:
+- `calls.callee_qualifier` — `self`, module aliases (stored but never loaded)
+- `files.lines` — total line count per file
+- `type_methods` table — interface method signatures
+
+### Honest assessment
+
+With only 3 relations, most expressible rules are glorified `GROUP BY ... HAVING COUNT(*) > N`.
+Only `circular-deps` uses Datalog's actual strength (transitive closure). The interpreter
+infrastructure is sound, but the fact set is too impoverished for it to justify itself.
+
+## Fact Enrichment Roadmap
+
+The path to making fact rules genuinely useful. Ordered by impact and implementation effort.
+
+### Phase 1: Expose what we already extract
+
+These fields already exist in `Symbol` — we just need to persist them to SQLite and
+wire them into Relations. No new tree-sitter work needed.
+
+#### `visibility(file, name, vis)`
+
+The `Language` trait already extracts `Visibility` (Public/Private/Protected/Internal)
+for all 98 languages.
+
+**Unlocks:**
+```dl
+# Dead public API: public function never called from outside its file
+relation public_func(String, String);
+public_func(file, name) <-- symbol(file, name, kind, _), visibility(file, name, vis),
+    if kind == "function", if vis == "public";
+
+relation external_call(String);
+external_call(name) <-- call(file, _, name, _), public_func(other_file, name),
+    if file != other_file;
+
+warning("dead-api", name) <-- public_func(_, name), !external_call(name);
+```
+
+#### `attribute(file, name, attr)`
+
+Already extracted as `Symbol.attributes: Vec<String>` — decorators, annotations, macros.
+
+**Unlocks:**
+```dl
+# Test-only code: functions only called from test-attributed functions
+relation is_test(String, String);
+is_test(file, name) <-- attribute(file, name, attr),
+    if attr == "test" || attr == "Test" || attr == "pytest.mark";
+
+# Skip test files in other rules (replaces fragile glob patterns)
+```
+
+#### `parent(file, child_name, parent_name)`
+
+Already in SQLite as `symbols.parent` — just not loaded into Relations.
+
+**Unlocks:**
+```dl
+# God class (not just god file): type with >N methods
+relation method_of(String, String, String);
+method_of(file, method, parent) <-- symbol(file, method, kind, _),
+    parent(file, method, parent), if kind == "method";
+
+relation type_method_count(String, String, i32);
+type_method_count(file, type_name, c) <--
+    method_of(file, _, type_name),
+    agg c = count() in method_of(file, _, type_name);
+
+warning("god-class", type_name) <-- type_method_count(_, type_name, c), if c > 20;
+```
+
+#### `qualifier(caller_file, caller_name, callee_name, qualifier)`
+
+Already in SQLite as `calls.callee_qualifier` — just never loaded.
+
+**Unlocks:**
+```dl
+# Distinguish self.method() from external.method()
+# Enables accurate fan-out (only count external calls)
+relation external_call_count(String, String, i32);
+external_call_count(file, caller, c) <--
+    call(file, caller, _, _),
+    qualifier(file, caller, _, q),
+    if q != "self" && q != "Self",
+    agg c = count() in (call(file, caller, _, _), qualifier(file, caller, _, q), if q != "self");
+```
+
+### Phase 2: Persist currently-discarded Symbol fields
+
+These require adding columns to the SQLite schema and updating the flattening logic.
+
+#### `end_line` → `symbol_range(file, name, start_line, end_line)`
+
+Already in SQLite, just not in Relations. Enables line-count-based complexity.
+
+#### `implements(file, name, interface)` + `is_impl(file, name)`
+
+`Symbol.implements: Vec<String>` and `Symbol.is_interface_impl: bool` are extracted
+but discarded during flattening.
+
+**Unlocks:**
+```dl
+# Incomplete interface implementation
+# (class says it implements Foo but doesn't define all of Foo's methods)
+relation interface_method(String, String);
+interface_method(iface, method) <-- type_method(_, iface, method);
+
+relation impl_method(String, String, String);
+impl_method(file, type_name, method) <--
+    implements(file, type_name, iface), parent(file, method, type_name);
+
+warning("missing-impl", type_name) <--
+    implements(_, type_name, iface),
+    interface_method(iface, method),
+    !impl_method(_, type_name, method);
+```
+
+### Phase 3: New extraction (requires tree-sitter work)
+
+These don't exist yet in the `Language` trait.
+
+- **`export(file, name)`** — distinguish exports from definitions (some languages conflate them)
+- **`type_annotation(file, name, type_str)`** — parameter/return types for type-based rules
+- **`data_flow(file, from_sym, to_sym)`** — assignment/parameter flow within a function
+
+Phase 3 is significant per-language work and should be driven by specific rule needs.
 
 ## Differentiation from CodeQL
 
 | | CodeQL | normalize |
 |---|--------|-----------|
-| Extraction | Deep (types, data flow, taint) | Shallow (symbols, imports, calls) |
+| Extraction | Deep (types, data flow, taint) | Broad (symbols, imports, calls across 98 langs) |
 | Languages | ~12 with dedicated extractors | ~98 via tree-sitter |
 | Focus | Security vulnerabilities | Structural/architectural analysis |
 | Queries | "Does user input reach SQL?" | "What depends on what?" |
+| Rule authoring | QL (custom language) | Datalog (.dl) or Rust (dylib) |
+| Setup | GitHub-hosted or heavy local install | Single binary |
 
 normalize is the lightweight, broad, structural analysis tool. CodeQL is the heavy, deep, security tool. Different jobs.
 
-**Future**: Deep analysis (types, data flow, taint) is on the backlog. Per-language effort, but tractable. Start with TS, Python, Rust.
+## Inline Suppression
+
+Two namespaced comment prefixes for per-diagnostic suppression:
+
+```rust
+// normalize-syntax-allow: rust/unwrap-in-impl - validated above
+let value = result.unwrap();
+```
+
+```python
+# normalize-facts-allow: god-file - this file is intentionally large
+```
+
+Syntax rules check the finding's line and the line above it. Fact rules check the first
+10 lines of the file (since fact diagnostics are file-level, not line-level).
 
 ## Open Questions
 
-1. **Rule naming**: How do rules from different tiers compose? Same namespace or prefixed?
-2. **Severity inheritance**: If syntax-rules and index-rules both flag the same line, how to dedupe?
-3. **Incremental**: Can index-rules run incrementally on changed files, or always full index?
-4. **Error messages**: How to provide fix suggestions without language-specific knowledge?
-5. **Dylib loading**: Platform differences (`.so`, `.dylib`, `.dll`), versioning, ABI stability
-
-## Next Steps
-
-1. Add Ascent as dependency, spike a simple rule over current index
-2. Design the index → Ascent relation mapping
-3. Implement 3 proof-of-concept rules: unused imports, circular deps, high-complexity hotspots
-4. Build `normalize compile-rules` command with caching
+1. ~~**Rule naming**: How do rules from different tiers compose?~~ **Resolved**: Separate namespaces — `normalize-syntax-allow:` vs `normalize-facts-allow:`
+2. **Incremental**: Can fact rules run incrementally on changed files, or always full index?
+3. **Error messages**: How to provide fix suggestions without language-specific knowledge?
+4. ~~**Dylib loading**: Platform differences, ABI stability~~ **Resolved**: `abi_stable` crate handles this
