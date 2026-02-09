@@ -141,7 +141,17 @@ pub fn cmd_facts(action: FactsAction, root: Option<&Path>, json: bool) -> i32 {
             json,
         )),
         FactsAction::Check { rules_file, list } => {
-            rt.block_on(cmd_check(root, rules_file.as_deref(), list, json))
+            let effective_root = root
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::env::current_dir().unwrap());
+            let config = crate::config::NormalizeConfig::load(&effective_root);
+            rt.block_on(cmd_check(
+                root,
+                rules_file.as_deref(),
+                list,
+                json,
+                &config.analyze.facts_rules,
+            ))
         }
     }
 }
@@ -834,7 +844,13 @@ async fn cmd_rules(
 // Check (interpreted rules)
 // =============================================================================
 
-async fn cmd_check(root: Option<&Path>, rules_file: Option<&Path>, list: bool, json: bool) -> i32 {
+async fn cmd_check(
+    root: Option<&Path>,
+    rules_file: Option<&Path>,
+    list: bool,
+    json: bool,
+    config: &crate::interpret::FactsRulesConfig,
+) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -844,8 +860,8 @@ async fn cmd_check(root: Option<&Path>, rules_file: Option<&Path>, list: bool, j
         return cmd_check_file(&root, path, json).await;
     }
 
-    // Auto-discover rules
-    let all_rules = crate::interpret::load_all_rules(&root);
+    // Auto-discover rules with config overrides
+    let all_rules = crate::interpret::load_all_rules(&root, config);
 
     if list {
         if json {

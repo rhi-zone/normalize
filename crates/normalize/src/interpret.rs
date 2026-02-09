@@ -34,7 +34,9 @@ use ascent_eval::{Engine, Value};
 use ascent_ir::Program;
 use ascent_syntax::AscentProgram;
 use glob::Pattern;
-use normalize_facts_rules_api::{Diagnostic, Relations};
+use normalize_derive::Merge;
+use normalize_facts_rules_api::{Diagnostic, DiagnosticLevel, Relations};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -48,6 +50,37 @@ relation call(String, String, String, u32);
 relation warning(String, String);
 relation error(String, String);
 "#;
+
+// =============================================================================
+// Configuration
+// =============================================================================
+
+/// Per-rule configuration override from config.toml.
+///
+/// ```toml
+/// [facts-rules."god-file"]
+/// deny = true
+/// allow = ["src/generated/**"]
+///
+/// [facts-rules."fan-out"]
+/// enabled = true
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
+#[serde(default)]
+pub struct FactsRuleOverride {
+    /// Promote all warnings from this rule to errors.
+    pub deny: Option<bool>,
+    /// Enable or disable the rule.
+    pub enabled: Option<bool>,
+    /// Additional patterns to allow (suppress matching diagnostics).
+    #[serde(default)]
+    pub allow: Vec<String>,
+}
+
+/// Configuration for fact rules. Maps rule ID to per-rule overrides.
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct FactsRulesConfig(pub HashMap<String, FactsRuleOverride>);
 
 // =============================================================================
 // Rule types and loading
@@ -64,6 +97,8 @@ pub struct FactsRule {
     pub message: String,
     /// Glob patterns for diagnostic messages to suppress.
     pub allow: Vec<Pattern>,
+    /// Promote warnings to errors (deny mode).
+    pub deny: bool,
     /// Whether this rule is enabled.
     pub enabled: bool,
     /// Whether this is a builtin rule.
@@ -112,7 +147,8 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
 
 /// Load all rules from all sources, merged by ID.
 /// Order: builtins → ~/.config/moss/rules/ → .normalize/rules/
-pub fn load_all_rules(project_root: &Path) -> Vec<FactsRule> {
+/// Then applies config overrides (deny, enabled, allow).
+pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<FactsRule> {
     let mut rules_by_id: HashMap<String, FactsRule> = HashMap::new();
 
     // 1. Load embedded builtins
@@ -134,6 +170,23 @@ pub fn load_all_rules(project_root: &Path) -> Vec<FactsRule> {
     let project_rules_dir = project_root.join(".normalize").join("rules");
     for rule in load_rules_from_dir(&project_rules_dir) {
         rules_by_id.insert(rule.id.clone(), rule);
+    }
+
+    // 4. Apply config overrides
+    for (rule_id, override_cfg) in &config.0 {
+        if let Some(rule) = rules_by_id.get_mut(rule_id) {
+            if let Some(deny) = override_cfg.deny {
+                rule.deny = deny;
+            }
+            if let Some(enabled) = override_cfg.enabled {
+                rule.enabled = enabled;
+            }
+            for pattern_str in &override_cfg.allow {
+                if let Ok(pattern) = Pattern::new(pattern_str) {
+                    rule.allow.push(pattern);
+                }
+            }
+        }
     }
 
     // Filter out disabled rules
@@ -254,6 +307,11 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         })
         .unwrap_or_default();
 
+    let deny = frontmatter
+        .get("deny")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
     let enabled = frontmatter
         .get("enabled")
         .and_then(|v| v.as_bool())
@@ -264,6 +322,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         source: source_str.trim().to_string(),
         message,
         allow,
+        deny,
         enabled,
         builtin: is_builtin,
         source_path: PathBuf::new(),
@@ -305,15 +364,27 @@ pub fn run_rules_file(
 }
 
 /// Run a FactsRule against the given relations.
-/// Diagnostics whose message matches any `allow` pattern are filtered out.
+/// Filters diagnostics through `allow` patterns and applies `deny` promotion.
 pub fn run_rule(
     rule: &FactsRule,
     relations: &Relations,
 ) -> Result<Vec<Diagnostic>, InterpretError> {
     let mut diagnostics = run_rules_source(&rule.source, relations)?;
+
+    // Filter out allowed diagnostics
     if !rule.allow.is_empty() {
         diagnostics.retain(|d| !rule.allow.iter().any(|p| p.matches(d.message.as_str())));
     }
+
+    // Promote warnings to errors in deny mode
+    if rule.deny {
+        for d in &mut diagnostics {
+            if d.level == DiagnosticLevel::Warning {
+                d.level = DiagnosticLevel::Error;
+            }
+        }
+    }
+
     Ok(diagnostics)
 }
 
@@ -727,6 +798,95 @@ warning("test-allow", file) <-- symbol(file, _, _, _);
         let result = run_rule(&rule, &relations).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].message.as_str(), "process");
+    }
+
+    #[test]
+    fn test_deny_promotes_warnings_to_errors() {
+        let content = r#"
+# ---
+# id = "strict-rule"
+# deny = true
+# ---
+
+warning("strict-rule", file) <-- symbol(file, _, _, _);
+"#;
+
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "foo", "function", 1);
+
+        let rule = parse_rule_content(content, "strict-rule", false).unwrap();
+        assert!(rule.deny);
+
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].level, DiagnosticLevel::Error); // promoted from warning
+    }
+
+    #[test]
+    fn test_config_override_deny() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "foo", "function", 1);
+
+        // self-import has deny=false by default
+        let rule = find_builtin("self-import");
+        assert!(!rule.deny);
+
+        // Apply config override
+        let mut config = FactsRulesConfig::default();
+        config.0.insert(
+            "self-import".to_string(),
+            FactsRuleOverride {
+                deny: Some(true),
+                ..Default::default()
+            },
+        );
+
+        // Load with config
+        let rules = load_all_rules(Path::new("/nonexistent"), &config);
+        let self_import = rules.iter().find(|r| r.id == "self-import").unwrap();
+        assert!(self_import.deny);
+    }
+
+    #[test]
+    fn test_config_override_allow() {
+        let mut relations = Relations::new();
+        for i in 0..51 {
+            relations.add_symbol("big.py", &format!("sym_{}", i), "function", i);
+        }
+        for i in 0..51 {
+            relations.add_symbol("generated/big.py", &format!("sym_{}", i), "function", i);
+        }
+
+        // Without config override, both files trigger god-file
+        let mut rule = find_builtin("god-file");
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 2);
+
+        // With config override, suppress generated/ files
+        rule.allow.push(Pattern::new("generated/**").unwrap());
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "big.py");
+    }
+
+    #[test]
+    fn test_config_override_enable() {
+        // fan-out is disabled by default
+        let default_config = FactsRulesConfig::default();
+        let rules = load_all_rules(Path::new("/nonexistent"), &default_config);
+        assert!(rules.iter().all(|r| r.id != "fan-out"));
+
+        // Enable via config
+        let mut config = FactsRulesConfig::default();
+        config.0.insert(
+            "fan-out".to_string(),
+            FactsRuleOverride {
+                enabled: Some(true),
+                ..Default::default()
+            },
+        );
+        let rules = load_all_rules(Path::new("/nonexistent"), &config);
+        assert!(rules.iter().any(|r| r.id == "fan-out"));
     }
 
     /// Helper to find and parse a builtin rule by ID.
