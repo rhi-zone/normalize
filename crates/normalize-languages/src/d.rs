@@ -6,6 +6,22 @@ use tree_sitter::Node;
 /// D language support.
 pub struct D;
 
+impl D {
+    /// Recursively collect type names from a D inheritance clause.
+    /// D nests: base_class_list > super_class_or_interface/interfaces/interface >
+    /// qualified_identifier > identifier(s)
+    fn collect_identifiers(node: &Node, content: &str, out: &mut Vec<String>) {
+        if node.kind() == "qualified_identifier" {
+            out.push(content[node.byte_range()].to_string());
+            return;
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            Self::collect_identifiers(&child, content, out);
+        }
+    }
+}
+
 impl Language for D {
     fn name(&self) -> &'static str {
         "D"
@@ -190,6 +206,16 @@ impl Language for D {
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
 
+                // Extract base classes/interfaces from base_class_list
+                // Structure: base_class_list > super_class_or_interface/interfaces > ... > identifier
+                let mut implements = Vec::new();
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "base_class_list" {
+                        Self::collect_identifiers(&child, content, &mut implements);
+                    }
+                }
+
                 Some(Symbol {
                     name: name.to_string(),
                     kind: SymbolKind::Class,
@@ -201,7 +227,7 @@ impl Language for D {
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
                     is_interface_impl: false,
-                    implements: Vec::new(),
+                    implements,
                 })
             }
             _ => None,

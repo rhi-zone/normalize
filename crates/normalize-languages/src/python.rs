@@ -174,6 +174,17 @@ impl Language for Python {
             format!("class {}{}", name, bases)
         };
 
+        // Extract superclasses from argument_list children
+        let mut implements = Vec::new();
+        if let Some(superclasses) = node.child_by_field_name("superclasses") {
+            let mut cursor = superclasses.walk();
+            for child in superclasses.children(&mut cursor) {
+                if child.kind() == "identifier" {
+                    implements.push(content[child.byte_range()].to_string());
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind: SymbolKind::Class,
@@ -185,7 +196,7 @@ impl Language for Python {
             visibility: self.get_visibility(node, content),
             children: Vec::new(), // Caller fills this in
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

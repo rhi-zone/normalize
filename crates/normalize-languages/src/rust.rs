@@ -152,12 +152,16 @@ impl Language for Rust {
                 // Check if this is a trait impl (impl Trait for Type)
                 let is_trait_impl = node.child_by_field_name("trait").is_some();
 
-                let signature = if let Some(trait_node) = node.child_by_field_name("trait") {
-                    let trait_name = &content[trait_node.byte_range()];
-                    format!("impl {} for {}", trait_name, type_name)
-                } else {
-                    format!("impl {}", type_name)
-                };
+                let (signature, implements) =
+                    if let Some(trait_node) = node.child_by_field_name("trait") {
+                        let trait_name = &content[trait_node.byte_range()];
+                        (
+                            format!("impl {} for {}", trait_name, type_name),
+                            vec![trait_name.to_string()],
+                        )
+                    } else {
+                        (format!("impl {}", type_name), Vec::new())
+                    };
 
                 Some(Symbol {
                     name: type_name.to_string(),
@@ -170,7 +174,7 @@ impl Language for Rust {
                     visibility: Visibility::Public,
                     children: Vec::new(),
                     is_interface_impl: is_trait_impl,
-                    implements: Vec::new(),
+                    implements,
                 })
             }
             "trait_item" => {

@@ -8,6 +8,30 @@ use tree_sitter::Node;
 /// GraphQL language support.
 pub struct GraphQL;
 
+impl GraphQL {
+    /// Recursively collect named_type names from implements_interfaces.
+    /// The node is recursive: implements_interfaces > implements_interfaces > named_type > name
+    fn collect_named_types(node: &Node, out: &mut Vec<String>, content: &str) {
+        if node.kind() == "named_type" {
+            // Get the name child (first named child)
+            for i in 0..node.child_count() {
+                if let Some(child) = node.child(i as u32)
+                    && child.is_named()
+                {
+                    out.push(content[child.byte_range()].to_string());
+                    return;
+                }
+            }
+            return;
+        }
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i as u32) {
+                Self::collect_named_types(&child, out, content);
+            }
+        }
+    }
+}
+
 impl Language for GraphQL {
     fn name(&self) -> &'static str {
         "GraphQL"
@@ -128,6 +152,16 @@ impl Language for GraphQL {
             _ => (SymbolKind::Struct, "type"),
         };
 
+        // Extract implements_interfaces (recursive: implements_interfaces > named_type > name)
+        let mut implements = Vec::new();
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i as u32)
+                && child.kind() == "implements_interfaces"
+            {
+                Self::collect_named_types(&child, &mut implements, content);
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -139,7 +173,7 @@ impl Language for GraphQL {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 
@@ -203,8 +237,18 @@ impl Language for GraphQL {
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        node.child_by_field_name("name")
-            .map(|n| &content[n.byte_range()])
+        if let Some(n) = node.child_by_field_name("name") {
+            return Some(&content[n.byte_range()]);
+        }
+        // Fallback: find first child of kind "name"
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i as u32)
+                && child.kind() == "name"
+            {
+                return Some(&content[child.byte_range()]);
+            }
+        }
+        None
     }
 }
 

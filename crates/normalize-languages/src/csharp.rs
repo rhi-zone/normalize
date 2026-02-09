@@ -222,6 +222,20 @@ impl Language for CSharp {
             _ => (SymbolKind::Class, "class"),
         };
 
+        // Extract base types from base_list
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "base_list" {
+                let mut bl = child.walk();
+                for t in child.children(&mut bl) {
+                    if t.kind() == "identifier" || t.kind() == "generic_name" {
+                        implements.push(content[t.byte_range()].to_string());
+                    }
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -233,7 +247,7 @@ impl Language for CSharp {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

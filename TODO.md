@@ -220,24 +220,21 @@ Implementation:
 - [x] `normalize facts check <rules.dl>` - interpreted Datalog via ascent-interpreter
 - [ ] `normalize facts compile <rules.dl>` command to build custom packs (sandboxed codegen)
 
-**`implements` relation extraction gaps:**
+**`implements` relation extraction — completed for 18 languages:**
 
-The `implements` relation is only populated for TypeScript. Many languages have the AST nodes available but don't extract them.
+- [x] TypeScript, JavaScript (shared ecmascript module)
+- [x] Python, Java, C++, Scala, Ruby, Dart, D (Tier 1)
+- [x] C#, Kotlin, Swift, PHP, Objective-C, MATLAB (Tier 2)
+- [x] GraphQL (Tier 3)
+- [x] Rust (trait impls merged into struct via `merge_rust_impl_blocks`)
 
-Quick wins (tree-sitter nodes already documented):
-- [ ] **Python** — `superclasses` already parsed into signature, just not into `implements`
-- [ ] **Java** — `superclass` + `super_interfaces` nodes exist
-- [ ] **Scala** — `extends_clause` node exists
-- [ ] **Ruby** — `superclass` node exists
+Skipped (grammar limitations or semantic mismatch):
+- HLSL — no class container kind (only structs)
+- VB, F# — tree-sitter grammars don't parse inheritance clauses
+- Haskell — `instance` semantics don't map to OOP implements
+- OCaml — `class_definition` not in container_kinds
 
-Moderate effort (need AST exploration):
-- [ ] **Rust** — extract trait name from `impl Trait for Type`
-- [ ] **C#** — base class list after `:`
-- [ ] **Kotlin** — inheritance in class declaration
-- [ ] **C++** — base class specifier list
-- [ ] **Haskell** — typeclass instance declarations (`instance Foo Bar`)
-
-And more: Swift protocols, PHP interfaces, Elixir behaviours, etc.
+Also fixed `node_name` bugs in Kotlin, Objective-C, and GraphQL that prevented class extraction.
 
 ### normalize-typegen
 

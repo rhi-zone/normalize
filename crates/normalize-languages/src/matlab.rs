@@ -146,6 +146,28 @@ impl Language for Matlab {
         let text = &content[node.byte_range()];
         let first_line = text.lines().next().unwrap_or(text);
 
+        // Extract superclasses from superclasses > property_name > identifier
+        let mut implements = Vec::new();
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i as u32)
+                && child.kind() == "superclasses"
+            {
+                for j in 0..child.child_count() {
+                    if let Some(prop) = child.child(j as u32)
+                        && prop.kind() == "property_name"
+                    {
+                        for k in 0..prop.child_count() {
+                            if let Some(id) = prop.child(k as u32)
+                                && id.kind() == "identifier"
+                            {
+                                implements.push(content[id.byte_range()].to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind: SymbolKind::Class,
@@ -157,7 +179,7 @@ impl Language for Matlab {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

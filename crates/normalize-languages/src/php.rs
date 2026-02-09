@@ -204,6 +204,20 @@ impl Language for Php {
             _ => (SymbolKind::Class, "class"),
         };
 
+        // Extract base_clause (extends) and class_interface_clause (implements)
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "base_clause" || child.kind() == "class_interface_clause" {
+                let mut cl = child.walk();
+                for t in child.children(&mut cl) {
+                    if t.kind() == "name" || t.kind() == "qualified_name" {
+                        implements.push(content[t.byte_range()].to_string());
+                    }
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -215,7 +229,7 @@ impl Language for Php {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

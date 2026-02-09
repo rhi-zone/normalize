@@ -217,6 +217,20 @@ impl Language for Dart {
             keyword.to_string()
         };
 
+        // Extract extends (superclass) and implements (interfaces)
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "superclass" || child.kind() == "interfaces" {
+                let mut ic = child.walk();
+                for t in child.children(&mut ic) {
+                    if t.kind() == "type_identifier" {
+                        implements.push(content[t.byte_range()].to_string());
+                    }
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -228,7 +242,7 @@ impl Language for Dart {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

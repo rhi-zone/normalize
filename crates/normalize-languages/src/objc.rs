@@ -151,6 +151,39 @@ impl Language for ObjC {
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
 
+                // Extract superclass (second identifier after class name) and protocols
+                let mut implements = Vec::new();
+                let mut found_name = false;
+                for i in 0..node.child_count() {
+                    if let Some(child) = node.child(i as u32) {
+                        if child.kind() == "identifier" {
+                            if found_name {
+                                // Second identifier = superclass
+                                implements.push(content[child.byte_range()].to_string());
+                            } else {
+                                found_name = true;
+                            }
+                        } else if child.kind() == "parameterized_arguments"
+                            || child.kind() == "protocol_qualifiers"
+                        {
+                            for j in 0..child.child_count() {
+                                if let Some(proto) = child.child(j as u32)
+                                    && proto.kind() == "type_name"
+                                {
+                                    for k in 0..proto.child_count() {
+                                        if let Some(t) = proto.child(k as u32)
+                                            && t.kind() == "type_identifier"
+                                        {
+                                            implements.push(content[t.byte_range()].to_string());
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Some(Symbol {
                     name: name.to_string(),
                     kind: SymbolKind::Class,
@@ -162,7 +195,7 @@ impl Language for ObjC {
                     visibility: Visibility::Public,
                     children: Vec::new(),
                     is_interface_impl: false,
-                    implements: Vec::new(),
+                    implements,
                 })
             }
             _ => None,
@@ -257,9 +290,21 @@ impl Language for ObjC {
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        node.child_by_field_name("name")
+        if let Some(n) = node
+            .child_by_field_name("name")
             .or_else(|| node.child_by_field_name("declarator"))
-            .map(|n| &content[n.byte_range()])
+        {
+            return Some(&content[n.byte_range()]);
+        }
+        // ObjC class_interface/class_implementation: first identifier child is the name
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i as u32)
+                && child.kind() == "identifier"
+            {
+                return Some(&content[child.byte_range()]);
+            }
+        }
+        None
     }
 }
 

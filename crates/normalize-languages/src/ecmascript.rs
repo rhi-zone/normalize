@@ -145,19 +145,21 @@ pub fn extract_container(node: &Node, content: &str, name: &str) -> Symbol {
         if let Some(heritage) = node.child(i)
             && heritage.kind() == "class_heritage"
         {
-            // heritage can contain extends_clause and/or implements_clause
             for j in 0..heritage.child_count() as u32 {
-                if let Some(clause) = heritage.child(j)
-                    && (clause.kind() == "extends_clause" || clause.kind() == "implements_clause")
-                {
-                    // Each clause contains type identifiers
-                    for k in 0..clause.child_count() as u32 {
-                        if let Some(type_node) = clause.child(k)
-                            && (type_node.kind() == "type_identifier"
-                                || type_node.kind() == "identifier")
-                        {
-                            implements.push(content[type_node.byte_range()].to_string());
+                if let Some(clause) = heritage.child(j) {
+                    if clause.kind() == "extends_clause" || clause.kind() == "implements_clause" {
+                        // TypeScript: heritage > extends_clause/implements_clause > type_identifier
+                        for k in 0..clause.child_count() as u32 {
+                            if let Some(type_node) = clause.child(k)
+                                && (type_node.kind() == "type_identifier"
+                                    || type_node.kind() == "identifier")
+                            {
+                                implements.push(content[type_node.byte_range()].to_string());
+                            }
                         }
+                    } else if clause.kind() == "type_identifier" || clause.kind() == "identifier" {
+                        // JavaScript: heritage > identifier (no clause wrapper)
+                        implements.push(content[clause.byte_range()].to_string());
                     }
                 }
             }

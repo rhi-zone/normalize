@@ -144,6 +144,20 @@ impl Language for Cpp {
             SymbolKind::Struct
         };
 
+        // Extract base classes from base_class_clause
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "base_class_clause" {
+                let mut bc = child.walk();
+                for base in child.children(&mut bc) {
+                    if base.kind() == "type_identifier" {
+                        implements.push(content[base.byte_range()].to_string());
+                    }
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -155,7 +169,7 @@ impl Language for Cpp {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

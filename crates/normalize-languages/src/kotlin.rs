@@ -6,6 +6,24 @@ use tree_sitter::Node;
 /// Kotlin language support.
 pub struct Kotlin;
 
+impl Kotlin {
+    /// Find the first type_identifier in a delegation_specifier subtree.
+    fn find_type_identifier(node: &Node, content: &str, out: &mut Vec<String>) {
+        let before = out.len();
+        if node.kind() == "type_identifier" {
+            out.push(content[node.byte_range()].to_string());
+            return;
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            Self::find_type_identifier(&child, content, out);
+            if out.len() > before {
+                return;
+            }
+        }
+    }
+}
+
 impl Language for Kotlin {
     fn name(&self) -> &'static str {
         "Kotlin"
@@ -179,6 +197,18 @@ impl Language for Kotlin {
             _ => (SymbolKind::Class, "class"),
         };
 
+        // Extract supertypes from delegation_specifier nodes
+        // Structure: delegation_specifier > user_type > type_identifier
+        //   or: delegation_specifier > constructor_invocation > user_type > type_identifier
+        let mut implements = Vec::new();
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i as u32)
+                && child.kind() == "delegation_specifier"
+            {
+                Self::find_type_identifier(&child, content, &mut implements);
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -190,7 +220,7 @@ impl Language for Kotlin {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 
@@ -327,10 +357,11 @@ impl Language for Kotlin {
         if let Some(name_node) = node.child_by_field_name("name") {
             return Some(&content[name_node.byte_range()]);
         }
-        // For type alias, the name might be a simple_identifier
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "simple_identifier" {
+        // Try first type_identifier (class/object declarations) or simple_identifier
+        for i in 0..node.child_count() {
+            if let Some(child) = node.child(i as u32)
+                && (child.kind() == "type_identifier" || child.kind() == "simple_identifier")
+            {
                 return Some(&content[child.byte_range()]);
             }
         }

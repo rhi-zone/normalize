@@ -159,6 +159,20 @@ impl Language for Scala {
             _ => (SymbolKind::Class, "class"),
         };
 
+        // Extract extends/with from extends_clause
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "extends_clause" {
+                let mut ec = child.walk();
+                for t in child.children(&mut ec) {
+                    if t.kind() == "type_identifier" {
+                        implements.push(content[t.byte_range()].to_string());
+                    }
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -170,7 +184,7 @@ impl Language for Scala {
             visibility: Visibility::Public,
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

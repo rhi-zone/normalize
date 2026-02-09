@@ -6,6 +6,24 @@ use tree_sitter::Node;
 /// Swift language support.
 pub struct Swift;
 
+impl Swift {
+    /// Find the first type_identifier in an inheritance_specifier subtree.
+    fn find_type_identifier(node: &Node, content: &str, out: &mut Vec<String>) {
+        let before = out.len();
+        if node.kind() == "type_identifier" {
+            out.push(content[node.byte_range()].to_string());
+            return;
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            Self::find_type_identifier(&child, content, out);
+            if out.len() > before {
+                return;
+            }
+        }
+    }
+}
+
 impl Language for Swift {
     fn name(&self) -> &'static str {
         "Swift"
@@ -194,6 +212,16 @@ impl Language for Swift {
             _ => (SymbolKind::Class, "class"),
         };
 
+        // Extract supertypes from inheritance_specifier nodes
+        // Structure: inheritance_specifier > user_type > type_identifier
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "inheritance_specifier" {
+                Self::find_type_identifier(&child, content, &mut implements);
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -205,7 +233,7 @@ impl Language for Swift {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 

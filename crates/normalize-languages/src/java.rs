@@ -189,6 +189,32 @@ impl Language for Java {
             _ => SymbolKind::Class,
         };
 
+        // Extract extends (superclass) and implements (super_interfaces > type_list)
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "superclass" {
+                let mut sc = child.walk();
+                for t in child.children(&mut sc) {
+                    if t.kind() == "type_identifier" {
+                        implements.push(content[t.byte_range()].to_string());
+                    }
+                }
+            } else if child.kind() == "super_interfaces" {
+                let mut si = child.walk();
+                for list in child.children(&mut si) {
+                    if list.kind() == "type_list" {
+                        let mut tc = list.walk();
+                        for t in list.children(&mut tc) {
+                            if t.kind() == "type_identifier" {
+                                implements.push(content[t.byte_range()].to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Some(Symbol {
             name: name.to_string(),
             kind,
@@ -200,7 +226,7 @@ impl Language for Java {
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
             is_interface_impl: false,
-            implements: Vec::new(),
+            implements,
         })
     }
 
