@@ -99,7 +99,13 @@ pub fn print_input_schema() {
 }
 
 /// Run the edit command
-pub fn run(args: EditArgs, json: bool, input_schema: bool, params_json: Option<&str>) -> i32 {
+pub fn run(
+    args: EditArgs,
+    format: &crate::output::OutputFormat,
+    input_schema: bool,
+    params_json: Option<&str>,
+) -> i32 {
+    let json = format.is_json();
     if input_schema {
         print_input_schema();
         return 0;

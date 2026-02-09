@@ -315,7 +315,6 @@ pub fn run(
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = NormalizeConfig::load(&effective_root);
     let json = format.is_json();
-    let pretty = format.is_pretty();
 
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&effective_root);
@@ -390,7 +389,7 @@ pub fn run(
                 None,
                 filter.as_ref(),
             );
-            print_report(&report, json, pretty)
+            print_report(&report, &format)
         }
 
         Some(AnalyzeCommand::Architecture) => architecture::cmd_architecture(&effective_root, json),
@@ -450,14 +449,6 @@ pub fn run(
                 // Note: kind filter not applicable to complexity (no kind field)
                 let _ = kind;
 
-                let format = crate::output::OutputFormat::from_cli(
-                    json,
-                    false,
-                    None,
-                    pretty,
-                    false,
-                    &config.pretty,
-                );
                 report.print(&format);
                 0
             }
@@ -506,14 +497,6 @@ pub fn run(
                     &allowlist,
                 );
 
-                let format = crate::output::OutputFormat::from_cli(
-                    json,
-                    false,
-                    None,
-                    pretty,
-                    false,
-                    &config.pretty,
-                );
                 report.print(&format);
                 0
             }
@@ -531,11 +514,11 @@ pub fn run(
                 None,
                 filter.as_ref(),
             );
-            print_report(&report, json, pretty)
+            print_report(&report, &format)
         }
 
         Some(AnalyzeCommand::Docs { limit }) => {
-            docs::cmd_docs(&effective_root, limit, json, filter.as_ref())
+            docs::cmd_docs(&effective_root, limit, &format, filter.as_ref())
         }
 
         Some(AnalyzeCommand::Files {
@@ -552,7 +535,7 @@ pub fn run(
                 )
             } else {
                 let excludes = load_allow_file(&effective_root, "large-files-allow");
-                files::cmd_files(&effective_root, limit, &excludes, json)
+                files::cmd_files(&effective_root, limit, &excludes, &format)
             }
         }
 
@@ -569,8 +552,7 @@ pub fn run(
             max_depth,
             recursive,
             case_insensitive,
-            json,
-            pretty,
+            &format,
         ),
 
         Some(AnalyzeCommand::Callers {
@@ -582,7 +564,7 @@ pub fn run(
             true,
             false,
             case_insensitive,
-            json,
+            &format,
         ),
 
         Some(AnalyzeCommand::Callees {
@@ -594,7 +576,7 @@ pub fn run(
             false,
             true,
             case_insensitive,
-            json,
+            &format,
         ),
 
         Some(AnalyzeCommand::Hotspots { allow, reason }) => {
@@ -608,16 +590,16 @@ pub fn run(
             } else {
                 let mut excludes = config.analyze.hotspots_exclude.clone();
                 excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
-                hotspots::cmd_hotspots(&effective_root, &excludes, json)
+                hotspots::cmd_hotspots(&effective_root, &excludes, &format)
             }
         }
 
-        Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, json),
+        Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, &format),
 
-        Some(AnalyzeCommand::StaleDocs) => stale_docs::cmd_stale_docs(&effective_root, json),
+        Some(AnalyzeCommand::StaleDocs) => stale_docs::cmd_stale_docs(&effective_root, &format),
 
         Some(AnalyzeCommand::CheckExamples) => {
-            check_examples::cmd_check_examples(&effective_root, json)
+            check_examples::cmd_check_examples(&effective_root, &format)
         }
 
         Some(AnalyzeCommand::DuplicateFunctions {
@@ -644,7 +626,7 @@ pub fn run(
                     elide_literals,
                     show_source,
                     min_lines,
-                    json,
+                    &format,
                     filter.as_ref(),
                 );
                 result.exit_code
@@ -673,7 +655,7 @@ pub fn run(
                 let scan_root = target
                     .map(PathBuf::from)
                     .unwrap_or_else(|| effective_root.clone());
-                duplicates::cmd_duplicate_types(&scan_root, &effective_root, min_overlap, json)
+                duplicates::cmd_duplicate_types(&scan_root, &effective_root, min_overlap, &format)
             }
         }
 
@@ -713,14 +695,6 @@ pub fn run(
                 &allowlist,
             );
 
-            let format = crate::output::OutputFormat::from_cli(
-                json,
-                false,
-                None,
-                pretty,
-                false,
-                &config.pretty,
-            );
             report.print(&format);
             0
         }
@@ -732,12 +706,11 @@ pub fn run(
                 &effective_root,
                 &weights,
                 filter.as_ref(),
-                json,
-                pretty,
+                &format,
             )
         }
 
-        Some(AnalyzeCommand::Ast { file, at, sexp }) => ast::cmd_ast(&file, at, sexp, json),
+        Some(AnalyzeCommand::Ast { file, at, sexp }) => ast::cmd_ast(&file, at, sexp, &format),
 
         Some(AnalyzeCommand::Query {
             pattern,
@@ -774,7 +747,7 @@ pub fn run(
                 rule.as_deref(),
                 list,
                 fix,
-                json,
+                &format,
                 sarif,
                 &config.analyze.rules,
                 &debug_flags,
@@ -794,7 +767,7 @@ pub fn run(
                 None,
                 filter.as_ref(),
             );
-            print_report(&report, json, pretty)
+            print_report(&report, &format)
         }
     }
 }
@@ -960,12 +933,8 @@ fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<Filt
 }
 
 /// Print analysis report in appropriate format
-fn print_report(report: &report::AnalyzeReport, json: bool, pretty: bool) -> i32 {
-    use crate::output::OutputFormat;
-
-    let config = crate::config::NormalizeConfig::load(std::env::current_dir().unwrap().as_path());
-    let format = OutputFormat::from_cli(json, false, None, pretty, false, &config.pretty);
-    report.print(&format);
+fn print_report(report: &report::AnalyzeReport, format: &crate::output::OutputFormat) -> i32 {
+    report.print(format);
     0
 }
 
@@ -975,9 +944,9 @@ fn run_all_passes(
     root: &Path,
     weights: &AnalyzeWeights,
     filter: Option<&Filter>,
-    json: bool,
-    pretty: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = format.is_json();
     let mut exit_code = 0;
     let mut scores: Vec<(f64, f64)> = Vec::new();
 
@@ -1000,10 +969,7 @@ fn run_all_passes(
         scores.push((security_report.score(), weights.security()));
     }
 
-    let config = crate::config::NormalizeConfig::load(root);
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, pretty, false, &config.pretty);
-    report.print(&format);
+    report.print(format);
 
     // 2. Duplicate functions
     if !json {
@@ -1014,7 +980,7 @@ fn run_all_passes(
         false, // elide_literals
         false, // show_source
         1,     // min_lines
-        json, filter,
+        format, filter,
     );
 
     if dup_result.exit_code != 0 {
@@ -1032,7 +998,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: duplicate-types...");
     }
-    let dup_types_result = duplicates::cmd_duplicate_types(root, root, 70, json);
+    let dup_types_result = duplicates::cmd_duplicate_types(root, root, 70, format);
     if dup_types_result != 0 {
         exit_code = dup_types_result;
     }
@@ -1041,7 +1007,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: docs...");
     }
-    let docs_result = docs::cmd_docs(root, 10, json, filter);
+    let docs_result = docs::cmd_docs(root, 10, format, filter);
     if docs_result != 0 {
         exit_code = docs_result;
     }
@@ -1051,7 +1017,7 @@ fn run_all_passes(
         eprintln!("Running: files...");
     }
     let excludes = load_allow_file(root, "large-files-allow");
-    let files_result = files::cmd_files(root, 20, &excludes, json);
+    let files_result = files::cmd_files(root, 20, &excludes, format);
     if files_result != 0 {
         exit_code = files_result;
     }
@@ -1063,7 +1029,7 @@ fn run_all_passes(
     let config = NormalizeConfig::load(root);
     let mut hotspot_excludes = config.analyze.hotspots_exclude.clone();
     hotspot_excludes.extend(load_allow_file(root, "hotspots-allow"));
-    let hotspots_result = hotspots::cmd_hotspots(root, &hotspot_excludes, json);
+    let hotspots_result = hotspots::cmd_hotspots(root, &hotspot_excludes, format);
     if hotspots_result != 0 {
         exit_code = hotspots_result;
     }
@@ -1072,7 +1038,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: check-refs...");
     }
-    let refs_result = check_refs::cmd_check_refs(root, json);
+    let refs_result = check_refs::cmd_check_refs(root, format);
     if refs_result != 0 {
         exit_code = refs_result;
     }
@@ -1081,7 +1047,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: stale-docs...");
     }
-    let stale_result = stale_docs::cmd_stale_docs(root, json);
+    let stale_result = stale_docs::cmd_stale_docs(root, format);
     if stale_result != 0 {
         exit_code = stale_result;
     }
@@ -1090,7 +1056,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: check-examples...");
     }
-    let examples_result = check_examples::cmd_check_examples(root, json);
+    let examples_result = check_examples::cmd_check_examples(root, format);
     if examples_result != 0 {
         exit_code = examples_result;
     }

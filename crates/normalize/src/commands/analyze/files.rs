@@ -59,14 +59,15 @@ impl OutputFormatter for FileLengthReport {
 }
 
 /// Run file length analysis
-pub fn cmd_files(root: &Path, limit: usize, exclude: &[String], json: bool) -> i32 {
-    use crate::output::OutputFormat;
-
-    let config = crate::config::NormalizeConfig::load(root);
+pub fn cmd_files(
+    root: &Path,
+    limit: usize,
+    exclude: &[String],
+    format: &crate::output::OutputFormat,
+) -> i32 {
     let report = analyze_files(root, limit, exclude);
 
-    let format = OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    report.print(format);
 
     0
 }

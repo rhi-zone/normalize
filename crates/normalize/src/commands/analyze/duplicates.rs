@@ -444,9 +444,10 @@ pub fn cmd_duplicate_functions_with_count(
     elide_literals: bool,
     show_source: bool,
     min_lines: usize,
-    json: bool,
+    format: &crate::output::OutputFormat,
     filter: Option<&Filter>,
 ) -> DuplicateFunctionResult {
+    let json = format.is_json();
     let extractor = Extractor::new();
 
     let allowlist = load_duplicate_functions_allowlist(root);
@@ -607,8 +608,9 @@ pub fn cmd_duplicate_types(
     root: &Path,
     config_root: &Path,
     min_overlap_percent: usize,
-    json: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = format.is_json();
     use regex::Regex;
 
     let extractor = Extractor::new();

@@ -64,14 +64,14 @@ pub enum ServeProtocol {
 }
 
 /// Run the serve command
-pub fn run(args: ServeArgs, json: bool) -> i32 {
+pub fn run(args: ServeArgs, _format: &crate::output::OutputFormat) -> i32 {
     use crate::config::NormalizeConfig;
 
     let root = args.root.clone().unwrap_or_else(|| PathBuf::from("."));
     let config = NormalizeConfig::load(&root);
 
     match args.protocol {
-        ServeProtocol::Mcp => mcp::cmd_serve_mcp(args.root.as_deref(), json),
+        ServeProtocol::Mcp => mcp::cmd_serve_mcp(args.root.as_deref()),
         ServeProtocol::Http { port, openapi } => {
             if openapi {
                 // Output OpenAPI spec and exit

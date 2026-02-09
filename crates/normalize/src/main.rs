@@ -259,7 +259,7 @@ fn main() {
             cli.params_json.as_deref(),
         ),
         Commands::Edit(args) => {
-            commands::edit::run(args, cli.json, cli.input_schema, cli.params_json.as_deref())
+            commands::edit::run(args, &format, cli.input_schema, cli.params_json.as_deref())
         }
         Commands::History(args) => commands::history::run(
             args,
@@ -269,16 +269,16 @@ fn main() {
             cli.params_json.as_deref(),
         ),
         Commands::Facts { action, root } => {
-            commands::facts::cmd_facts(action, root.as_deref(), cli.json)
+            commands::facts::cmd_facts(action, root.as_deref(), &format)
         }
         Commands::Init(args) => {
             commands::init::run(args, cli.input_schema, cli.params_json.as_deref())
         }
-        Commands::Daemon { action } => commands::daemon::cmd_daemon(action, cli.json),
-        Commands::Update { check } => commands::update::cmd_update(check, cli.json),
+        Commands::Daemon { action } => commands::daemon::cmd_daemon(action, &format),
+        Commands::Update { check } => commands::update::cmd_update(check, &format),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(
             action,
-            cli.json,
+            &format,
             cli.output_schema,
             cli.input_schema,
             cli.params_json.as_deref(),
@@ -327,16 +327,15 @@ fn main() {
             action,
             root.as_deref(),
             format,
-            cli.json,
             cli.output_schema,
             cli.input_schema,
             cli.params_json.as_deref(),
         ),
-        Commands::Serve(args) => serve::run(args, cli.json),
+        Commands::Serve(args) => serve::run(args, &format),
         Commands::Generate(args) => {
             commands::generate::run(args, cli.input_schema, cli.params_json.as_deref())
         }
-        Commands::Rules { action } => commands::rules::cmd_rules(action, cli.json),
+        Commands::Rules { action } => commands::rules::cmd_rules(action, &format),
         Commands::Translate(args) => {
             commands::translate::run(args, cli.input_schema, cli.params_json.as_deref())
         }

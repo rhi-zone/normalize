@@ -49,12 +49,13 @@ impl OutputFormatter for CheckRefsReport {
 }
 
 /// Check documentation references for broken links
-pub fn cmd_check_refs(root: &Path, json: bool) -> i32 {
+pub fn cmd_check_refs(root: &Path, format: &crate::output::OutputFormat) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(cmd_check_refs_async(root, json))
+    rt.block_on(cmd_check_refs_async(root, format))
 }
 
-async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
+async fn cmd_check_refs_async(root: &Path, format: &crate::output::OutputFormat) -> i32 {
+    let json = format.is_json();
     use regex::Regex;
 
     // Open index to get known symbols

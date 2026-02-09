@@ -61,7 +61,12 @@ impl OutputFormatter for HotspotsReport {
 }
 
 /// Analyze git history hotspots
-pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], json: bool) -> i32 {
+pub fn cmd_hotspots(
+    root: &Path,
+    exclude_patterns: &[String],
+    format: &crate::output::OutputFormat,
+) -> i32 {
+    let json = format.is_json();
     // Compile exclusion patterns
     let excludes: Vec<Pattern> = exclude_patterns
         .iter()

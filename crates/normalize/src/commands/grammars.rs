@@ -90,11 +90,12 @@ pub fn print_input_schema() {
 /// Run the grammars command
 pub fn cmd_grammars(
     action: GrammarAction,
-    json: bool,
+    format: &crate::output::OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
 ) -> i32 {
+    let json = format.is_json();
     if input_schema {
         print_input_schema();
         return 0;
@@ -126,25 +127,22 @@ pub fn cmd_grammars(
         return 0;
     }
     match action {
-        GrammarAction::List => cmd_list(json),
+        GrammarAction::List => cmd_list(format),
         GrammarAction::Install { version, force } => cmd_install(version, force, json),
-        GrammarAction::Paths => cmd_paths(json),
+        GrammarAction::Paths => cmd_paths(format),
     }
 }
 
-fn cmd_list(json: bool) -> i32 {
+fn cmd_list(format: &crate::output::OutputFormat) -> i32 {
     let grammars = parsers::available_external_grammars();
 
     let report = GrammarListReport { grammars };
-    let config = crate::config::NormalizeConfig::default();
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    report.print(format);
 
     0
 }
 
-fn cmd_paths(json: bool) -> i32 {
+fn cmd_paths(format: &crate::output::OutputFormat) -> i32 {
     let mut raw_paths = Vec::new();
 
     // Environment variable
@@ -171,10 +169,7 @@ fn cmd_paths(json: bool) -> i32 {
         .collect();
 
     let report = GrammarPathsReport { paths };
-    let config = crate::config::NormalizeConfig::default();
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    report.print(format);
 
     0
 }

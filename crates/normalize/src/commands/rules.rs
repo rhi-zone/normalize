@@ -72,7 +72,8 @@ impl RulesLock {
 }
 
 /// Run the rules command
-pub fn cmd_rules(action: RulesAction, json: bool) -> i32 {
+pub fn cmd_rules(action: RulesAction, format: &crate::output::OutputFormat) -> i32 {
+    let json = format.is_json();
     match action {
         RulesAction::Add { url, global } => cmd_add(&url, global, json),
         RulesAction::List { sources } => cmd_list(sources, json),

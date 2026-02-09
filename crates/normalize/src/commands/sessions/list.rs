@@ -37,8 +37,9 @@ pub fn cmd_sessions_list(
     limit: usize,
     format_name: Option<&str>,
     grep: Option<&str>,
-    json: bool,
+    output_format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = output_format.is_json();
     let registry = FormatRegistry::new();
 
     // Get format (default to claude for backwards compatibility)

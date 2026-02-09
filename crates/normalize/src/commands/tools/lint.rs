@@ -293,8 +293,9 @@ pub fn cmd_lint_watch(
     fix: bool,
     tools: Option<&str>,
     category: Option<&str>,
-    json: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = format.is_json();
     let root = root.unwrap_or_else(|| Path::new("."));
 
     // Initial run

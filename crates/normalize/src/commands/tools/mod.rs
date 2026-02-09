@@ -107,7 +107,6 @@ pub fn run(
     action: ToolsAction,
     root: Option<&Path>,
     format: OutputFormat,
-    json: bool,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
@@ -150,7 +149,7 @@ pub fn run(
                     fix,
                     tools.as_deref(),
                     category.as_deref(),
-                    json,
+                    &format,
                 )
             } else {
                 lint::cmd_lint_run(

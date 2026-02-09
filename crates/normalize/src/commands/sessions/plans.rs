@@ -151,7 +151,8 @@ fn format_time(time: std::time::SystemTime) -> String {
 }
 
 /// Main command handler
-pub fn cmd_plans(name: Option<&str>, limit: usize, json: bool) -> i32 {
+pub fn cmd_plans(name: Option<&str>, limit: usize, format: &crate::output::OutputFormat) -> i32 {
+    let json = format.is_json();
     let Some(dir) = plans_dir() else {
         eprintln!("Could not find home directory");
         return 1;

@@ -61,7 +61,8 @@ impl OutputFormatter for StaleDocsReport {
 }
 
 /// Find docs with stale code coverage
-pub fn cmd_stale_docs(root: &Path, json: bool) -> i32 {
+pub fn cmd_stale_docs(root: &Path, format: &crate::output::OutputFormat) -> i32 {
+    let json = format.is_json();
     use regex::Regex;
 
     // Find markdown files with <!-- covers: ... --> declarations

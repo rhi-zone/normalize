@@ -58,11 +58,9 @@ pub fn cmd_sessions_stats(
     project_filter: Option<&Path>,
     all_projects: bool,
     by_repo: bool,
-    json: bool,
-    pretty: bool,
+    output_format: &OutputFormat,
 ) -> i32 {
-    let config = crate::config::NormalizeConfig::default();
-    let output_format = OutputFormat::from_cli(json, false, None, pretty, false, &config.pretty);
+    let json = output_format.is_json();
     let registry = FormatRegistry::new();
 
     // Get format (default to claude for backwards compatibility)
@@ -187,12 +185,12 @@ pub fn cmd_sessions_stats(
 
     // Group by repo if requested
     if by_repo {
-        return cmd_sessions_stats_by_repo(&sessions, format_name, json, &output_format);
+        return cmd_sessions_stats_by_repo(&sessions, format_name, output_format);
     }
 
     // Collect paths and analyze
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
-    cmd_sessions_analyze_multi(&paths, format_name, &output_format)
+    cmd_sessions_analyze_multi(&paths, format_name, output_format)
 }
 
 /// List sessions from all projects in ~/.claude/projects/
@@ -270,9 +268,9 @@ fn extract_repo_name(path: &Path) -> String {
 fn cmd_sessions_stats_by_repo(
     sessions: &[SessionFile],
     format_name: Option<&str>,
-    json: bool,
     output_format: &OutputFormat,
 ) -> i32 {
+    let json = output_format.is_json();
     use std::collections::HashMap;
 
     // Group sessions by repository

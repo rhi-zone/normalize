@@ -3,7 +3,8 @@
 use std::io::Read;
 
 /// Run the update command
-pub fn cmd_update(check_only: bool, json: bool) -> i32 {
+pub fn cmd_update(check_only: bool, format: &crate::output::OutputFormat) -> i32 {
+    let json = format.is_json();
     const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
     const GITHUB_REPO: &str = "rhi-zone/normalize";
 

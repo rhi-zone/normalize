@@ -337,7 +337,6 @@ pub fn run(
     input_schema: bool,
     params_json: Option<&str>,
 ) -> i32 {
-    let json = output_format.is_json();
     if output_schema {
         return print_sessions_schema(&args.command);
     }
@@ -374,7 +373,7 @@ pub fn run(
             until.as_deref(),
             project.as_deref(),
             all_projects,
-            json,
+            output_format,
         ),
 
         Some(SessionsCommand::Show {
@@ -423,8 +422,7 @@ pub fn run(
             project.as_deref(),
             all_projects,
             by_repo,
-            json,
-            output_format.is_pretty(),
+            output_format,
         ),
 
         #[cfg(feature = "sessions-web")]
@@ -434,7 +432,7 @@ pub fn run(
         }
 
         Some(SessionsCommand::Plans { name }) => {
-            plans::cmd_plans(name.as_deref(), args.limit, json)
+            plans::cmd_plans(name.as_deref(), args.limit, output_format)
         }
 
         // Default: list sessions
@@ -443,7 +441,7 @@ pub fn run(
             args.limit,
             args.format.as_deref(),
             None,
-            json,
+            output_format,
         ),
     }
 }
@@ -460,8 +458,9 @@ fn cmd_sessions_list_filtered(
     until: Option<&str>,
     project: Option<&Path>,
     all_projects: bool,
-    json: bool,
+    output_format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = output_format.is_json();
     // For now, delegate to stats module's filtering logic but output as list
     // TODO: Refactor to share filtering between list and stats
     use crate::sessions::{FormatRegistry, LogFormat, SessionFile};

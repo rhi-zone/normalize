@@ -47,7 +47,8 @@ impl OutputFormatter for CheckExamplesReport {
 }
 
 /// Check that all example references have matching markers
-pub fn cmd_check_examples(root: &Path, json: bool) -> i32 {
+pub fn cmd_check_examples(root: &Path, format: &crate::output::OutputFormat) -> i32 {
+    let json = format.is_json();
     use regex::Regex;
     use std::collections::HashSet;
 
