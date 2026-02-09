@@ -220,18 +220,17 @@ Implementation:
 - [x] `normalize facts check <rules.dl>` - interpreted Datalog via ascent-interpreter
 - [ ] `normalize facts compile <rules.dl>` command to build custom packs (sandboxed codegen)
 
-**`implements` relation extraction — completed for 18 languages:**
+**`implements` relation extraction — completed for 19 languages:**
 
 - [x] TypeScript, JavaScript (shared ecmascript module)
 - [x] Python, Java, C++, Scala, Ruby, Dart, D (Tier 1)
 - [x] C#, Kotlin, Swift, PHP, Objective-C, MATLAB (Tier 2)
-- [x] GraphQL (Tier 3)
+- [x] GraphQL, Haskell (Tier 3)
 - [x] Rust (trait impls merged into struct via `merge_rust_impl_blocks`)
 
 Skipped (grammar limitations or semantic mismatch):
 - HLSL — no class container kind (only structs)
-- VB, F# — tree-sitter grammars don't parse inheritance clauses
-- Haskell — `instance` semantics don't map to OOP implements
+- VB, F# — tree-sitter grammars parse `Inherits`/`Implements`/`inherit` as ERROR nodes
 - OCaml — `class_definition` not in container_kinds
 
 Also fixed `node_name` bugs in Kotlin, Objective-C, and GraphQL that prevented class extraction.
