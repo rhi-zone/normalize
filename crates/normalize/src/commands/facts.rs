@@ -1008,14 +1008,28 @@ async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
 
     let mut relations = Relations::new();
 
-    // Get symbols (file, name, kind, start_line, end_line, parent)
+    // Get symbols (file, name, kind, start_line, end_line, parent, visibility)
     let symbols = idx
         .all_symbols_with_details()
         .await
         .map_err(|e| format!("Failed to get symbols: {}", e))?;
 
-    for (file, name, kind, start_line, _end_line, _parent) in symbols {
-        relations.add_symbol(&file, &name, &kind, start_line as u32);
+    for (file, name, kind, start_line, _end_line, parent, visibility) in &symbols {
+        relations.add_symbol(file, name, kind, *start_line as u32);
+        relations.add_visibility(file, name, visibility);
+        if let Some(parent_name) = parent {
+            relations.add_parent(file, name, parent_name);
+        }
+    }
+
+    // Get symbol attributes
+    let attrs = idx
+        .all_symbol_attributes()
+        .await
+        .map_err(|e| format!("Failed to get symbol attributes: {}", e))?;
+
+    for (file, name, attribute) in &attrs {
+        relations.add_attribute(file, name, attribute);
     }
 
     // Get imports (file, module, name, line)
@@ -1028,14 +1042,17 @@ async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
         relations.add_import(&file, &module, &name);
     }
 
-    // Get calls (caller_file, caller_symbol, callee_name, line)
+    // Get calls with qualifiers (caller_file, caller_symbol, callee_name, qualifier, line)
     let calls = idx
-        .all_calls_with_lines()
+        .all_calls_with_qualifiers()
         .await
         .map_err(|e| format!("Failed to get calls: {}", e))?;
 
-    for (file, caller, callee, line) in calls {
-        relations.add_call(&file, &caller, &callee, line);
+    for (file, caller, callee, qualifier, line) in &calls {
+        relations.add_call(file, caller, callee, *line);
+        if let Some(qual) = qualifier {
+            relations.add_qualifier(file, caller, callee, qual);
+        }
     }
 
     Ok(relations)

@@ -25,6 +25,10 @@
 //! - `symbol(file: String, name: String, kind: String, line: u32)`
 //! - `import(from_file: String, to_module: String, name: String)`
 //! - `call(caller_file: String, caller_name: String, callee_name: String, line: u32)`
+//! - `visibility(file: String, name: String, vis: String)` — "public", "private", "protected", "internal"
+//! - `attribute(file: String, name: String, attr: String)` — one row per attribute per symbol
+//! - `parent(file: String, child_name: String, parent_name: String)` — symbol nesting hierarchy
+//! - `qualifier(caller_file: String, caller_name: String, callee_name: String, qual: String)` — call qualifier
 //!
 //! Output relations are read as diagnostics:
 //! - `warning(rule_id: String, message: String)` → produces warnings
@@ -47,6 +51,10 @@ const PREAMBLE: &str = r#"
 relation symbol(String, String, String, u32);
 relation import(String, String, String);
 relation call(String, String, String, u32);
+relation visibility(String, String, String);
+relation attribute(String, String, String);
+relation parent(String, String, String);
+relation qualifier(String, String, String, String);
 relation warning(String, String);
 relation error(String, String);
 "#;
@@ -491,6 +499,51 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) {
                 Value::String(Rc::new(call.caller_name.to_string())),
                 Value::String(Rc::new(call.callee_name.to_string())),
                 Value::U32(call.line),
+            ],
+        );
+    }
+
+    for vis in relations.visibilities.iter() {
+        engine.insert(
+            "visibility",
+            vec![
+                Value::String(Rc::new(vis.file.to_string())),
+                Value::String(Rc::new(vis.name.to_string())),
+                Value::String(Rc::new(vis.visibility.to_string())),
+            ],
+        );
+    }
+
+    for attr in relations.attributes.iter() {
+        engine.insert(
+            "attribute",
+            vec![
+                Value::String(Rc::new(attr.file.to_string())),
+                Value::String(Rc::new(attr.name.to_string())),
+                Value::String(Rc::new(attr.attribute.to_string())),
+            ],
+        );
+    }
+
+    for p in relations.parents.iter() {
+        engine.insert(
+            "parent",
+            vec![
+                Value::String(Rc::new(p.file.to_string())),
+                Value::String(Rc::new(p.child_name.to_string())),
+                Value::String(Rc::new(p.parent_name.to_string())),
+            ],
+        );
+    }
+
+    for q in relations.qualifiers.iter() {
+        engine.insert(
+            "qualifier",
+            vec![
+                Value::String(Rc::new(q.caller_file.to_string())),
+                Value::String(Rc::new(q.caller_name.to_string())),
+                Value::String(Rc::new(q.callee_name.to_string())),
+                Value::String(Rc::new(q.qualifier.to_string())),
             ],
         );
     }
@@ -991,6 +1044,83 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         assert_eq!(diagnostics[1].message.as_str(), "nonexistent.py");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_visibility_relation() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "foo", "function", 1);
+        relations.add_symbol("a.py", "_bar", "function", 5);
+        relations.add_visibility("a.py", "foo", "public");
+        relations.add_visibility("a.py", "_bar", "private");
+
+        let rules = r#"
+            relation priv_func(String, String);
+            priv_func(file, name) <-- visibility(file, name, vis), if vis == "private";
+            warning("private-func", name) <-- priv_func(_, name);
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "_bar");
+    }
+
+    #[test]
+    fn test_attribute_relation() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "foo", "function", 1);
+        relations.add_attribute("a.py", "foo", "@staticmethod");
+        relations.add_attribute("a.py", "foo", "@override");
+
+        let rules = r##"
+            relation static_fn(String, String);
+            static_fn(file, name) <-- attribute(file, name, attr), if attr == "@staticmethod";
+            warning("static-fn", name) <-- static_fn(_, name);
+        "##;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "foo");
+    }
+
+    #[test]
+    fn test_parent_relation() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "MyClass", "class", 1);
+        relations.add_symbol("a.py", "method_a", "method", 2);
+        relations.add_symbol("a.py", "method_b", "method", 5);
+        relations.add_parent("a.py", "method_a", "MyClass");
+        relations.add_parent("a.py", "method_b", "MyClass");
+
+        let rules = r#"
+            relation method_count(String, String, i32);
+            method_count(file, cls, c) <--
+                parent(file, _, cls),
+                agg c = count() in parent(file, _, cls);
+            warning("big-class", cls) <-- method_count(_, cls, c), if c > 1;
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "MyClass");
+    }
+
+    #[test]
+    fn test_qualifier_relation() {
+        let mut relations = Relations::new();
+        relations.add_call("a.py", "method_a", "method_b", 3);
+        relations.add_qualifier("a.py", "method_a", "method_b", "self");
+        relations.add_call("a.py", "main", "helper", 10);
+
+        let rules = r#"
+            relation self_call(String, String, String);
+            self_call(file, caller, callee) <-- qualifier(file, caller, callee, q), if q == "self";
+            warning("self-call", callee) <-- self_call(_, _, callee);
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "method_b");
     }
 
     /// Helper to find and parse a builtin rule by ID.

@@ -50,6 +50,8 @@ impl SymbolParser {
             start_line: sym.start_line,
             end_line: sym.end_line,
             parent: parent.map(String::from),
+            visibility: sym.visibility,
+            attributes: sym.attributes.clone(),
         });
 
         // Recurse into children with current symbol as parent

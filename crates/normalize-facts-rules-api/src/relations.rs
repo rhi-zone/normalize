@@ -6,6 +6,10 @@
 //! - `symbol(file, name, kind, line)` - defined symbols
 //! - `import(from_file, to_module, name)` - import statements
 //! - `call(caller_file, caller_name, callee_name, line)` - function calls
+//! - `visibility(file, name, vis)` - symbol visibility
+//! - `attribute(file, name, attr)` - symbol attributes (one per attribute)
+//! - `parent(file, child_name, parent_name)` - symbol nesting hierarchy
+//! - `qualifier(caller_file, caller_name, callee_name, qual)` - call qualifier
 
 use abi_stable::{
     StableAbi,
@@ -58,6 +62,64 @@ pub struct CallFact {
     pub line: u32,
 }
 
+/// A visibility fact: the visibility of a symbol.
+///
+/// Maps to Datalog: `visibility(file, name, vis)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct VisibilityFact {
+    /// File path relative to project root
+    pub file: RString,
+    /// Symbol name
+    pub name: RString,
+    /// Visibility: "public", "private", "protected", "internal"
+    pub visibility: RString,
+}
+
+/// An attribute fact: one attribute annotation on a symbol.
+///
+/// Maps to Datalog: `attribute(file, name, attr)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct AttributeFact {
+    /// File path relative to project root
+    pub file: RString,
+    /// Symbol name
+    pub name: RString,
+    /// Attribute string (e.g. "#[derive(Debug)]", "@Override")
+    pub attribute: RString,
+}
+
+/// A parent fact: symbol nesting hierarchy.
+///
+/// Maps to Datalog: `parent(file, child_name, parent_name)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct ParentFact {
+    /// File path relative to project root
+    pub file: RString,
+    /// Child symbol name
+    pub child_name: RString,
+    /// Parent symbol name
+    pub parent_name: RString,
+}
+
+/// A qualifier fact: call qualifier (receiver/module).
+///
+/// Maps to Datalog: `qualifier(caller_file, caller_name, callee_name, qual)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct QualifierFact {
+    /// File containing the call
+    pub caller_file: RString,
+    /// Name of the calling function/method
+    pub caller_name: RString,
+    /// Name of the called function/method
+    pub callee_name: RString,
+    /// Qualifier ("self", module name, etc.)
+    pub qualifier: RString,
+}
+
 /// All relations (facts) available to rules.
 ///
 /// This is the complete set of facts extracted from a codebase.
@@ -71,6 +133,14 @@ pub struct Relations {
     pub imports: RVec<ImportFact>,
     /// All function calls in the codebase
     pub calls: RVec<CallFact>,
+    /// Symbol visibility facts
+    pub visibilities: RVec<VisibilityFact>,
+    /// Symbol attribute facts (one per attribute per symbol)
+    pub attributes: RVec<AttributeFact>,
+    /// Symbol parent-child hierarchy
+    pub parents: RVec<ParentFact>,
+    /// Call qualifier facts (receiver/module on calls)
+    pub qualifiers: RVec<QualifierFact>,
 }
 
 impl Relations {
@@ -105,6 +175,49 @@ impl Relations {
             caller_name: caller_name.into(),
             callee_name: callee_name.into(),
             line,
+        });
+    }
+
+    /// Add a visibility fact
+    pub fn add_visibility(&mut self, file: &str, name: &str, visibility: &str) {
+        self.visibilities.push(VisibilityFact {
+            file: file.into(),
+            name: name.into(),
+            visibility: visibility.into(),
+        });
+    }
+
+    /// Add an attribute fact
+    pub fn add_attribute(&mut self, file: &str, name: &str, attribute: &str) {
+        self.attributes.push(AttributeFact {
+            file: file.into(),
+            name: name.into(),
+            attribute: attribute.into(),
+        });
+    }
+
+    /// Add a parent fact
+    pub fn add_parent(&mut self, file: &str, child_name: &str, parent_name: &str) {
+        self.parents.push(ParentFact {
+            file: file.into(),
+            child_name: child_name.into(),
+            parent_name: parent_name.into(),
+        });
+    }
+
+    /// Add a qualifier fact
+    pub fn add_qualifier(
+        &mut self,
+        caller_file: &str,
+        caller_name: &str,
+        callee_name: &str,
+        qualifier: &str,
+    ) {
+        self.qualifiers.push(QualifierFact {
+            caller_file: caller_file.into(),
+            caller_name: caller_name.into(),
+            callee_name: callee_name.into(),
+            qualifier: qualifier.into(),
         });
     }
 }

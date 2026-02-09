@@ -50,6 +50,17 @@ pub enum Visibility {
     Internal,
 }
 
+impl Visibility {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Visibility::Public => "public",
+            Visibility::Private => "private",
+            Visibility::Protected => "protected",
+            Visibility::Internal => "internal",
+        }
+    }
+}
+
 /// How a language determines symbol visibility
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -94,4 +105,6 @@ pub struct FlatSymbol {
     pub start_line: usize,
     pub end_line: usize,
     pub parent: Option<String>,
+    pub visibility: Visibility,
+    pub attributes: Vec<String>,
 }
