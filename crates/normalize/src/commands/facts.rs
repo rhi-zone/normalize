@@ -1014,11 +1014,15 @@ async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
         .await
         .map_err(|e| format!("Failed to get symbols: {}", e))?;
 
-    for (file, name, kind, start_line, _end_line, parent, visibility) in &symbols {
+    for (file, name, kind, start_line, end_line, parent, visibility, is_impl) in &symbols {
         relations.add_symbol(file, name, kind, *start_line as u32);
+        relations.add_symbol_range(file, name, *start_line as u32, *end_line as u32);
         relations.add_visibility(file, name, visibility);
         if let Some(parent_name) = parent {
             relations.add_parent(file, name, parent_name);
+        }
+        if *is_impl {
+            relations.add_is_impl(file, name);
         }
     }
 
@@ -1030,6 +1034,26 @@ async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
 
     for (file, name, attribute) in &attrs {
         relations.add_attribute(file, name, attribute);
+    }
+
+    // Get symbol implements
+    let implements = idx
+        .all_symbol_implements()
+        .await
+        .map_err(|e| format!("Failed to get symbol implements: {}", e))?;
+
+    for (file, name, interface) in &implements {
+        relations.add_implements(file, name, interface);
+    }
+
+    // Get type methods
+    let type_methods = idx
+        .all_type_methods()
+        .await
+        .map_err(|e| format!("Failed to get type methods: {}", e))?;
+
+    for (file, type_name, method_name) in &type_methods {
+        relations.add_type_method(file, type_name, method_name);
     }
 
     // Get imports (file, module, name, line)

@@ -52,6 +52,8 @@ impl SymbolParser {
             parent: parent.map(String::from),
             visibility: sym.visibility,
             attributes: sym.attributes.clone(),
+            is_interface_impl: sym.is_interface_impl,
+            implements: sym.implements.clone(),
         });
 
         // Recurse into children with current symbol as parent

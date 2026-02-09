@@ -29,6 +29,10 @@
 //! - `attribute(file: String, name: String, attr: String)` — one row per attribute per symbol
 //! - `parent(file: String, child_name: String, parent_name: String)` — symbol nesting hierarchy
 //! - `qualifier(caller_file: String, caller_name: String, callee_name: String, qual: String)` — call qualifier
+//! - `symbol_range(file: String, name: String, start_line: u32, end_line: u32)` — symbol span
+//! - `implements(file: String, name: String, interface: String)` — interface/trait implementation
+//! - `is_impl(file: String, name: String)` — symbol is a trait/interface implementation
+//! - `type_method(file: String, type_name: String, method_name: String)` — method signatures on types
 //!
 //! Output relations are read as diagnostics:
 //! - `warning(rule_id: String, message: String)` → produces warnings
@@ -55,6 +59,10 @@ relation visibility(String, String, String);
 relation attribute(String, String, String);
 relation parent(String, String, String);
 relation qualifier(String, String, String, String);
+relation symbol_range(String, String, u32, u32);
+relation implements(String, String, String);
+relation is_impl(String, String);
+relation type_method(String, String, String);
 relation warning(String, String);
 relation error(String, String);
 "#;
@@ -544,6 +552,50 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) {
                 Value::String(Rc::new(q.caller_name.to_string())),
                 Value::String(Rc::new(q.callee_name.to_string())),
                 Value::String(Rc::new(q.qualifier.to_string())),
+            ],
+        );
+    }
+
+    for sr in relations.symbol_ranges.iter() {
+        engine.insert(
+            "symbol_range",
+            vec![
+                Value::String(Rc::new(sr.file.to_string())),
+                Value::String(Rc::new(sr.name.to_string())),
+                Value::U32(sr.start_line),
+                Value::U32(sr.end_line),
+            ],
+        );
+    }
+
+    for imp in relations.implements.iter() {
+        engine.insert(
+            "implements",
+            vec![
+                Value::String(Rc::new(imp.file.to_string())),
+                Value::String(Rc::new(imp.name.to_string())),
+                Value::String(Rc::new(imp.interface.to_string())),
+            ],
+        );
+    }
+
+    for ii in relations.is_impls.iter() {
+        engine.insert(
+            "is_impl",
+            vec![
+                Value::String(Rc::new(ii.file.to_string())),
+                Value::String(Rc::new(ii.name.to_string())),
+            ],
+        );
+    }
+
+    for tm in relations.type_methods.iter() {
+        engine.insert(
+            "type_method",
+            vec![
+                Value::String(Rc::new(tm.file.to_string())),
+                Value::String(Rc::new(tm.type_name.to_string())),
+                Value::String(Rc::new(tm.method_name.to_string())),
             ],
         );
     }
@@ -1121,6 +1173,85 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         let result = run_rules_source(rules, &relations).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].message.as_str(), "method_b");
+    }
+
+    #[test]
+    fn test_symbol_range_relation() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "big_func", "function", 1);
+        relations.add_symbol("a.py", "small_func", "function", 50);
+        relations.add_symbol_range("a.py", "big_func", 1, 100);
+        relations.add_symbol_range("a.py", "small_func", 50, 55);
+
+        let rules = r#"
+            relation long_fn(String, String, u32);
+            long_fn(file, name, len) <--
+                symbol_range(file, name, start, end),
+                let len = end - start,
+                if len > 20u32;
+            warning("long-fn", name) <-- long_fn(_, name, _);
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "big_func");
+    }
+
+    #[test]
+    fn test_implements_relation() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "MyClass", "class", 1);
+        relations.add_implements("a.py", "MyClass", "Serializable");
+        relations.add_implements("a.py", "MyClass", "Comparable");
+        relations.add_symbol("b.py", "OtherClass", "class", 1);
+
+        let rules = r#"
+            relation impl_count(String, String, i32);
+            impl_count(file, name, c) <--
+                implements(file, name, _),
+                agg c = count() in implements(file, name, _);
+            warning("multi-impl", name) <-- impl_count(_, name, c), if c > 1;
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "MyClass");
+    }
+
+    #[test]
+    fn test_is_impl_relation() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.rs", "impl_method", "method", 5);
+        relations.add_symbol("a.rs", "free_func", "function", 20);
+        relations.add_is_impl("a.rs", "impl_method");
+
+        let rules = r#"
+            warning("is-impl", name) <-- is_impl(_, name);
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "impl_method");
+    }
+
+    #[test]
+    fn test_type_method_relation() {
+        let mut relations = Relations::new();
+        relations.add_type_method("a.py", "Animal", "speak");
+        relations.add_type_method("a.py", "Animal", "move");
+        relations.add_type_method("b.py", "Vehicle", "drive");
+
+        let rules = r#"
+            relation method_count(String, String, i32);
+            method_count(file, t, c) <--
+                type_method(file, t, _),
+                agg c = count() in type_method(file, t, _);
+            warning("rich-type", t) <-- method_count(_, t, c), if c > 1;
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "Animal");
     }
 
     /// Helper to find and parse a builtin rule by ID.

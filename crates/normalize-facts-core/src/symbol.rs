@@ -107,4 +107,8 @@ pub struct FlatSymbol {
     pub parent: Option<String>,
     pub visibility: Visibility,
     pub attributes: Vec<String>,
+    /// True if this symbol implements an interface/trait
+    pub is_interface_impl: bool,
+    /// Parent interfaces/classes this symbol extends or implements
+    pub implements: Vec<String>,
 }

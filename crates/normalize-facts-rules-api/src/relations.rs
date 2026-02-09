@@ -10,6 +10,10 @@
 //! - `attribute(file, name, attr)` - symbol attributes (one per attribute)
 //! - `parent(file, child_name, parent_name)` - symbol nesting hierarchy
 //! - `qualifier(caller_file, caller_name, callee_name, qual)` - call qualifier
+//! - `symbol_range(file, name, start_line, end_line)` - symbol span
+//! - `implements(file, name, interface)` - interface/trait implementation
+//! - `is_impl(file, name)` - symbol is a trait/interface implementation
+//! - `type_method(file, type_name, method_name)` - method signatures on types
 
 use abi_stable::{
     StableAbi,
@@ -120,6 +124,62 @@ pub struct QualifierFact {
     pub qualifier: RString,
 }
 
+/// A symbol range fact: start and end lines of a symbol.
+///
+/// Maps to Datalog: `symbol_range(file, name, start_line, end_line)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct SymbolRangeFact {
+    /// File path relative to project root
+    pub file: RString,
+    /// Symbol name
+    pub name: RString,
+    /// Start line number
+    pub start_line: u32,
+    /// End line number
+    pub end_line: u32,
+}
+
+/// An implements fact: a symbol implements an interface/trait.
+///
+/// Maps to Datalog: `implements(file, name, interface)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct ImplementsFact {
+    /// File path relative to project root
+    pub file: RString,
+    /// Symbol name
+    pub name: RString,
+    /// Interface/trait name
+    pub interface: RString,
+}
+
+/// An is_impl fact: symbol is a trait/interface implementation.
+///
+/// Maps to Datalog: `is_impl(file, name)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct IsImplFact {
+    /// File path relative to project root
+    pub file: RString,
+    /// Symbol name
+    pub name: RString,
+}
+
+/// A type method fact: a method signature on a type.
+///
+/// Maps to Datalog: `type_method(file, type_name, method_name)`
+#[repr(C)]
+#[derive(Clone, Debug, StableAbi)]
+pub struct TypeMethodFact {
+    /// File path relative to project root
+    pub file: RString,
+    /// Type (interface/class) name
+    pub type_name: RString,
+    /// Method name
+    pub method_name: RString,
+}
+
 /// All relations (facts) available to rules.
 ///
 /// This is the complete set of facts extracted from a codebase.
@@ -141,6 +201,14 @@ pub struct Relations {
     pub parents: RVec<ParentFact>,
     /// Call qualifier facts (receiver/module on calls)
     pub qualifiers: RVec<QualifierFact>,
+    /// Symbol range facts (start and end lines)
+    pub symbol_ranges: RVec<SymbolRangeFact>,
+    /// Implements facts (symbol implements interface/trait)
+    pub implements: RVec<ImplementsFact>,
+    /// Is-impl facts (symbol is a trait/interface implementation)
+    pub is_impls: RVec<IsImplFact>,
+    /// Type method facts (method signatures on types)
+    pub type_methods: RVec<TypeMethodFact>,
 }
 
 impl Relations {
@@ -218,6 +286,42 @@ impl Relations {
             caller_name: caller_name.into(),
             callee_name: callee_name.into(),
             qualifier: qualifier.into(),
+        });
+    }
+
+    /// Add a symbol range fact
+    pub fn add_symbol_range(&mut self, file: &str, name: &str, start_line: u32, end_line: u32) {
+        self.symbol_ranges.push(SymbolRangeFact {
+            file: file.into(),
+            name: name.into(),
+            start_line,
+            end_line,
+        });
+    }
+
+    /// Add an implements fact
+    pub fn add_implements(&mut self, file: &str, name: &str, interface: &str) {
+        self.implements.push(ImplementsFact {
+            file: file.into(),
+            name: name.into(),
+            interface: interface.into(),
+        });
+    }
+
+    /// Add an is_impl fact
+    pub fn add_is_impl(&mut self, file: &str, name: &str) {
+        self.is_impls.push(IsImplFact {
+            file: file.into(),
+            name: name.into(),
+        });
+    }
+
+    /// Add a type method fact
+    pub fn add_type_method(&mut self, file: &str, type_name: &str, method_name: &str) {
+        self.type_methods.push(TypeMethodFact {
+            file: file.into(),
+            type_name: type_name.into(),
+            method_name: method_name.into(),
         });
     }
 }

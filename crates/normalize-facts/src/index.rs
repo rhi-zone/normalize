@@ -17,6 +17,8 @@ struct ParsedSymbol {
     parent: Option<String>,
     visibility: String,
     attributes: Vec<String>,
+    is_interface_impl: bool,
+    implements: Vec<String>,
 }
 
 /// Parsed data for a single file, ready for database insertion
@@ -32,7 +34,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -213,7 +215,8 @@ impl FileIndex {
                 start_line INTEGER NOT NULL,
                 end_line INTEGER NOT NULL,
                 parent TEXT,
-                visibility TEXT NOT NULL DEFAULT 'public'
+                visibility TEXT NOT NULL DEFAULT 'public',
+                is_impl INTEGER NOT NULL DEFAULT 0
             )",
             (),
         )
@@ -241,6 +244,22 @@ impl FileIndex {
         .await?;
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_symbol_attributes_file_name ON symbol_attributes(file, name)",
+            (),
+        )
+        .await?;
+
+        // Symbol implements (one row per interface/trait per symbol)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS symbol_implements (
+                file TEXT NOT NULL,
+                name TEXT NOT NULL,
+                interface TEXT NOT NULL
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_symbol_implements_file_name ON symbol_implements(file, name)",
             (),
         )
         .await?;
@@ -311,6 +330,7 @@ impl FileIndex {
             conn.execute("DELETE FROM imports", ()).await.ok();
             conn.execute("DELETE FROM type_methods", ()).await.ok();
             conn.execute("DELETE FROM symbol_attributes", ()).await.ok();
+            conn.execute("DELETE FROM symbol_implements", ()).await.ok();
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
@@ -712,14 +732,22 @@ impl FileIndex {
         // Insert symbols
         for sym in symbols {
             self.conn.execute(
-                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![path.to_string(), sym.name.clone(), sym.kind.as_str(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.as_str()],
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![path.to_string(), sym.name.clone(), sym.kind.as_str(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.as_str(), sym.is_interface_impl as i64],
             ).await?;
             for attr in &sym.attributes {
                 self.conn
                     .execute(
                         "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
                         params![path.to_string(), sym.name.clone(), attr.clone()],
+                    )
+                    .await?;
+            }
+            for iface in &sym.implements {
+                self.conn
+                    .execute(
+                        "INSERT INTO symbol_implements (file, name, interface) VALUES (?1, ?2, ?3)",
+                        params![path.to_string(), sym.name.clone(), iface.clone()],
                     )
                     .await?;
             }
@@ -1074,6 +1102,36 @@ impl FileIndex {
         Ok(imports)
     }
 
+    /// Load all symbol implements from the symbol_implements table.
+    /// Returns Vec<(file, name, interface)>.
+    pub async fn all_symbol_implements(
+        &self,
+    ) -> Result<Vec<(String, String, String)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query("SELECT file, name, interface FROM symbol_implements", ())
+            .await?;
+        let mut implements = Vec::new();
+        while let Some(row) = rows.next().await? {
+            implements.push((row.get(0)?, row.get(1)?, row.get(2)?));
+        }
+        Ok(implements)
+    }
+
+    /// Load all type methods from the type_methods table.
+    /// Returns Vec<(file, type_name, method_name)>.
+    pub async fn all_type_methods(&self) -> Result<Vec<(String, String, String)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query("SELECT file, type_name, method_name FROM type_methods", ())
+            .await?;
+        let mut methods = Vec::new();
+        while let Some(row) = rows.next().await? {
+            methods.push((row.get(0)?, row.get(1)?, row.get(2)?));
+        }
+        Ok(methods)
+    }
+
     /// Load all calls with line numbers.
     /// Returns Vec<(caller_file, caller_symbol, callee_name, line)>.
     /// Used by rules for building relations.
@@ -1100,16 +1158,27 @@ impl FileIndex {
     }
 
     /// Load all symbols from the symbols table with full details.
-    /// Returns Vec<(file, name, kind, start_line, end_line, parent, visibility)>.
+    /// Returns Vec<(file, name, kind, start_line, end_line, parent, visibility, is_impl)>.
     /// Used by test-gaps analysis to classify test context.
     pub async fn all_symbols_with_details(
         &self,
-    ) -> Result<Vec<(String, String, String, usize, usize, Option<String>, String)>, libsql::Error>
-    {
+    ) -> Result<
+        Vec<(
+            String,
+            String,
+            String,
+            usize,
+            usize,
+            Option<String>,
+            String,
+            bool,
+        )>,
+        libsql::Error,
+    > {
         let mut rows = self
             .conn
             .query(
-                "SELECT file, name, kind, start_line, end_line, parent, visibility FROM symbols",
+                "SELECT file, name, kind, start_line, end_line, parent, visibility, is_impl FROM symbols",
                 (),
             )
             .await?;
@@ -1124,6 +1193,7 @@ impl FileIndex {
                 row.get(5).ok(),
                 row.get::<String>(6)
                     .unwrap_or_else(|_| "public".to_string()),
+                row.get::<i64>(7).unwrap_or(0) != 0,
             ));
         }
         Ok(symbols)
@@ -1411,6 +1481,8 @@ impl FileIndex {
                         parent: sym.parent.clone(),
                         visibility: sym.visibility.as_str().to_string(),
                         attributes: sym.attributes.clone(),
+                        is_interface_impl: sym.is_interface_impl,
+                        implements: sym.implements.clone(),
                     });
 
                     // Only index calls for functions/methods
@@ -1467,6 +1539,9 @@ impl FileIndex {
         self.conn
             .execute("DELETE FROM symbol_attributes", ())
             .await?;
+        self.conn
+            .execute("DELETE FROM symbol_implements", ())
+            .await?;
 
         let mut symbol_count = 0;
         let mut call_count = 0;
@@ -1475,13 +1550,19 @@ impl FileIndex {
         for data in &parsed_data {
             for sym in &data.symbols {
                 self.conn.execute(
-                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    params![data.file_path.clone(), sym.name.clone(), sym.kind.clone(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.clone()],
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    params![data.file_path.clone(), sym.name.clone(), sym.kind.clone(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.clone(), sym.is_interface_impl as i64],
                 ).await?;
                 for attr in &sym.attributes {
                     self.conn.execute(
                         "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
                         params![data.file_path.clone(), sym.name.clone(), attr.clone()],
+                    ).await?;
+                }
+                for iface in &sym.implements {
+                    self.conn.execute(
+                        "INSERT INTO symbol_implements (file, name, interface) VALUES (?1, ?2, ?3)",
+                        params![data.file_path.clone(), sym.name.clone(), iface.clone()],
                     ).await?;
                 }
                 symbol_count += 1;
@@ -1563,6 +1644,12 @@ impl FileIndex {
                     params![path.clone()],
                 )
                 .await?;
+            self.conn
+                .execute(
+                    "DELETE FROM symbol_implements WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
         }
 
         let mut parser = SymbolParser::new();
@@ -1582,13 +1669,19 @@ impl FileIndex {
 
             for sym in &symbols {
                 self.conn.execute(
-                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    params![file_path.clone(), sym.name.clone(), sym.kind.as_str(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.as_str()],
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    params![file_path.clone(), sym.name.clone(), sym.kind.as_str(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.as_str(), sym.is_interface_impl as i64],
                 ).await?;
                 for attr in &sym.attributes {
                     self.conn.execute(
                         "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
                         params![file_path.clone(), sym.name.clone(), attr.clone()],
+                    ).await?;
+                }
+                for iface in &sym.implements {
+                    self.conn.execute(
+                        "INSERT INTO symbol_implements (file, name, interface) VALUES (?1, ?2, ?3)",
+                        params![file_path.clone(), sym.name.clone(), iface.clone()],
                     ).await?;
                 }
                 symbol_count += 1;
