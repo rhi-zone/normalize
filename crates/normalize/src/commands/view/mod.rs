@@ -3,6 +3,7 @@
 pub mod file;
 pub mod history;
 pub mod lines;
+pub mod report;
 pub mod search;
 pub mod symbol;
 pub mod tree;
@@ -10,6 +11,7 @@ pub mod tree;
 use crate::commands::aliases::detect_project_languages;
 use crate::config::NormalizeConfig;
 use crate::filter::Filter;
+use crate::output::OutputFormatter;
 use crate::tree::DocstringDisplay;
 use crate::{daemon, path_resolve};
 use clap::Args;
@@ -174,11 +176,16 @@ pub fn print_input_schema() {
 pub fn run(
     args: ViewArgs,
     format: crate::output::OutputFormat,
+    output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
 ) -> i32 {
     if input_schema {
         print_input_schema();
+        return 0;
+    }
+    if output_schema {
+        crate::output::print_output_schema::<report::ViewOutput>();
         return 0;
     }
     // Override args with --params-json if provided
@@ -205,7 +212,7 @@ pub fn run(
             &effective_root,
             limit,
             args.case_insensitive,
-            format.is_json(),
+            &format,
         );
     }
 
@@ -248,9 +255,7 @@ pub fn run(
         docstring_mode,
         args.context,
         !args.no_parent,
-        format.is_json(),
-        format.is_pretty(),
-        format.use_colors(),
+        &format,
         &args.exclude,
         &args.only,
         args.case_insensitive,
@@ -275,13 +280,12 @@ pub fn cmd_view(
     docstring_mode: DocstringDisplay,
     context: bool,
     show_parent: bool,
-    json: bool,
-    pretty: bool,
-    use_colors: bool,
+    format: &crate::output::OutputFormat,
     exclude: &[String],
     only: &[String],
     case_insensitive: bool,
 ) -> i32 {
+    let json = format.is_json();
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -314,7 +318,7 @@ pub fn cmd_view(
     // If kind filter is specified without target (or with "."), list matching symbols
     if let Some(kind) = kind_filter {
         let scope = target.unwrap_or(".");
-        return tree::cmd_view_filtered(&root, scope, kind, json);
+        return tree::cmd_view_filtered(&root, scope, kind, format);
     }
 
     // --focus requires a file target
@@ -327,16 +331,7 @@ pub fn cmd_view(
 
     // Handle "." as current directory
     if target == "." {
-        return tree::cmd_view_directory(
-            &root,
-            &root,
-            depth,
-            raw,
-            json,
-            pretty,
-            use_colors,
-            filter.as_ref(),
-        );
+        return tree::cmd_view_directory(&root, &root, depth, raw, format, filter.as_ref());
     }
 
     // Handle line targets: file.rs:30 (symbol at line) or file.rs:30-55 (range)
@@ -348,9 +343,7 @@ pub fn cmd_view(
                 end,
                 &root,
                 docstring_mode,
-                json,
-                pretty,
-                use_colors,
+                format,
             );
         } else {
             return symbol::cmd_view_symbol_at_line(
@@ -361,9 +354,7 @@ pub fn cmd_view(
                 docstring_mode,
                 show_parent,
                 context,
-                json,
-                pretty,
-                use_colors,
+                format,
             );
         }
     }
@@ -419,43 +410,38 @@ pub fn cmd_view(
                 docstring_mode,
                 show_parent,
                 context,
-                json,
-                pretty,
-                use_colors,
+                format,
                 case_insensitive,
             );
         }
         _ => {
             // Multiple matches - list files and symbols
             if json {
-                let file_items: Vec<_> = matches
-                    .iter()
-                    .map(|m| {
-                        serde_json::json!({
-                            "path": m.file_path,
-                            "type": if m.is_directory { "directory" } else { "file" }
-                        })
-                    })
-                    .collect();
-                let symbol_items: Vec<_> = symbol_matches
-                    .iter()
-                    .map(|sym| {
-                        serde_json::json!({
-                            "path": format!("{}:{}", sym.file, sym.start_line),
-                            "type": "symbol",
-                            "name": sym.name,
-                            "kind": sym.kind,
-                            "parent": sym.parent
-                        })
-                    })
-                    .collect();
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "file_matches": file_items,
-                        "symbol_matches": symbol_items
-                    })
-                );
+                let report =
+                    report::ViewOutput::MultipleMatches(report::ViewMultipleMatchesReport {
+                        file_matches: matches
+                            .iter()
+                            .map(|m| report::ViewFileMatch {
+                                path: m.file_path.clone(),
+                                match_type: if m.is_directory {
+                                    "directory".to_string()
+                                } else {
+                                    "file".to_string()
+                                },
+                            })
+                            .collect(),
+                        symbol_matches: symbol_matches
+                            .iter()
+                            .map(|sym| report::ViewSymbolMatchEntry {
+                                path: format!("{}:{}", sym.file, sym.start_line),
+                                match_type: "symbol".to_string(),
+                                name: sym.name.clone(),
+                                kind: sym.kind.clone(),
+                                parent: sym.parent.clone(),
+                            })
+                            .collect(),
+                    });
+                report.print(format);
             } else {
                 eprintln!("Multiple matches for '{}' - be more specific:", target);
                 for m in &matches {
@@ -483,9 +469,7 @@ pub fn cmd_view(
             &root,
             depth,
             raw,
-            json,
-            pretty,
-            use_colors,
+            format,
             filter.as_ref(),
         )
     } else if unified.symbol_path.is_empty() {
@@ -502,9 +486,7 @@ pub fn cmd_view(
             resolve_imports,
             docstring_mode,
             context,
-            json,
-            pretty,
-            use_colors,
+            format,
         )
     } else {
         // Check if symbol path contains glob patterns
@@ -517,9 +499,7 @@ pub fn cmd_view(
                 depth,
                 full,
                 docstring_mode,
-                json,
-                pretty,
-                use_colors,
+                format,
                 case_insensitive,
             );
         }
@@ -533,9 +513,7 @@ pub fn cmd_view(
             docstring_mode,
             show_parent,
             context,
-            json,
-            pretty,
-            use_colors,
+            format,
             case_insensitive,
         )
     }

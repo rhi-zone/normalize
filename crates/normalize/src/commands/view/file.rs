@@ -1,6 +1,8 @@
 //! File skeleton viewing for view command.
 
+use super::report::{ViewFileContentReport, ViewOutput};
 use super::symbol::find_symbol_signature;
+use crate::output::OutputFormatter;
 use crate::skeleton::ExtractResultExt;
 use crate::tree::{DocstringDisplay, FormatOptions};
 use crate::{deps, skeleton, tree};
@@ -154,10 +156,11 @@ pub fn cmd_view_file(
     resolve_imports: bool,
     docstring_mode: DocstringDisplay,
     context: bool,
-    json: bool,
-    pretty: bool,
-    use_colors: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = format.is_json();
+    let pretty = format.is_pretty();
+    let use_colors = format.use_colors();
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
@@ -170,14 +173,11 @@ pub fn cmd_view_file(
     if !(0..=2).contains(&depth) {
         // Full content view
         if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "type": "file",
-                    "path": file_path,
-                    "content": content
-                })
-            );
+            let report = ViewOutput::FileContent(ViewFileContentReport {
+                path: file_path.to_string(),
+                content: content.clone(),
+            });
+            report.print(format);
         } else {
             let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
             let output = if pretty {
@@ -216,7 +216,8 @@ pub fn cmd_view_file(
 
     if json {
         let view_node = skeleton_result.to_view_node(grammar.as_deref());
-        println!("{}", serde_json::to_string(&view_node).unwrap());
+        let report = ViewOutput::File { node: view_node };
+        report.print(format);
     } else {
         println!("# {}", file_path);
         println!("Lines: {}", content.lines().count());

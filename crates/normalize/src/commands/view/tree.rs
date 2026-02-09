@@ -1,7 +1,9 @@
 //! Directory tree viewing for view command.
 
+use super::report::{ViewKindFilterEntry, ViewKindFilterReport, ViewOutput};
 use super::search::has_language_support;
 use crate::filter::Filter;
+use crate::output::OutputFormatter;
 use crate::tree::{FormatOptions, ViewNode, ViewNodeKind};
 use crate::{path_resolve, symbols, tree};
 use std::path::Path;
@@ -19,11 +21,12 @@ pub fn cmd_view_directory(
     _root: &Path,
     depth: i32,
     raw: bool,
-    json: bool,
-    pretty: bool,
-    use_colors: bool,
+    format: &crate::output::OutputFormat,
     filter: Option<&Filter>,
 ) -> i32 {
+    let json = format.is_json();
+    let pretty = format.is_pretty();
+    let use_colors = format.use_colors();
     let effective_depth = if depth < 0 {
         None
     } else {
@@ -68,7 +71,8 @@ pub fn cmd_view_directory(
     let (file_count, dir_count) = (counts.files, counts.dirs);
 
     if json {
-        println!("{}", serde_json::to_string(&view_node).unwrap());
+        let report = ViewOutput::Directory { node: view_node };
+        report.print(format);
     } else {
         let format_options = FormatOptions {
             minimal: !pretty,
@@ -116,7 +120,13 @@ fn filter_view_node(mut node: ViewNode, filter: &Filter) -> ViewNode {
 }
 
 /// List symbols matching a kind filter within a scope
-pub fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i32 {
+pub fn cmd_view_filtered(
+    root: &Path,
+    scope: &str,
+    kind: &str,
+    format: &crate::output::OutputFormat,
+) -> i32 {
+    let json = format.is_json();
     let kind_lower = kind.to_lowercase();
     let kind_filter = match kind_lower.as_str() {
         "class" | "classes" => Some("class"),
@@ -192,19 +202,19 @@ pub fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i3
     all_symbols.sort_by(|a, b| (&a.0, a.3).cmp(&(&b.0, b.3)));
 
     if json {
-        let output: Vec<_> = all_symbols
-            .iter()
-            .map(|(file, name, kind, line, parent)| {
-                serde_json::json!({
-                    "file": file,
-                    "name": name,
-                    "kind": kind,
-                    "line": line,
-                    "parent": parent
+        let report = ViewOutput::KindFilter(ViewKindFilterReport {
+            symbols: all_symbols
+                .iter()
+                .map(|(file, name, kind, line, parent)| ViewKindFilterEntry {
+                    file: file.clone(),
+                    name: name.clone(),
+                    kind: kind.clone(),
+                    line: *line,
+                    parent: parent.clone(),
                 })
-            })
-            .collect();
-        println!("{}", serde_json::to_string(&output).unwrap());
+                .collect(),
+        });
+        report.print(format);
     } else {
         for (file, name, kind, line, parent) in &all_symbols {
             let parent_str = parent

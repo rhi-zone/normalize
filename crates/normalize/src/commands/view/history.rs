@@ -1,11 +1,12 @@
 //! Symbol history via git log.
 
+use super::report::{ViewHistoryCommit, ViewHistoryReport, ViewOutput};
+use super::symbol::find_symbol_ci;
+use crate::output::OutputFormatter;
 use crate::path_resolve;
 use crate::skeleton;
 use std::path::Path;
 use std::process::Command;
-
-use super::symbol::find_symbol_ci;
 
 /// Show git history for a symbol.
 pub fn cmd_history(
@@ -13,7 +14,7 @@ pub fn cmd_history(
     root: &Path,
     limit: usize,
     case_insensitive: bool,
-    json: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
     let Some(target) = target else {
         eprintln!("--history requires a target (file/symbol path)");
@@ -75,7 +76,7 @@ pub fn cmd_history(
     };
 
     // Run git log for changes to these lines
-    show_line_history(root, &file_path, start_line, end_line, limit, json)
+    show_line_history(root, &file_path, start_line, end_line, limit, format)
 }
 
 /// Find symbol by path (parent/child).
@@ -120,8 +121,9 @@ fn show_line_history(
     start_line: usize,
     end_line: usize,
     limit: usize,
-    json: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = format.is_json();
     // Use git log -L to show history for line range
     let line_range = format!("{},{}:{}", start_line, end_line, file_path);
 
@@ -153,33 +155,30 @@ fn show_line_history(
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     if json {
-        let commits: Vec<_> = stdout
+        let commits: Vec<ViewHistoryCommit> = stdout
             .lines()
             .filter(|line| !line.is_empty())
             .filter_map(|line| {
                 let parts: Vec<&str> = line.split('\x1f').collect();
                 if parts.len() >= 4 {
-                    Some(serde_json::json!({
-                        "hash": parts[0],
-                        "author": parts[1],
-                        "date": parts[2],
-                        "message": parts[3]
-                    }))
+                    Some(ViewHistoryCommit {
+                        hash: parts[0].to_string(),
+                        author: parts[1].to_string(),
+                        date: parts[2].to_string(),
+                        message: parts[3].to_string(),
+                    })
                 } else {
                     None
                 }
             })
             .collect();
 
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&serde_json::json!({
-                "file": file_path,
-                "lines": format!("{}-{}", start_line, end_line),
-                "commits": commits
-            }))
-            .unwrap()
-        );
+        let report = ViewOutput::History(ViewHistoryReport {
+            file: file_path.to_string(),
+            lines: format!("{}-{}", start_line, end_line),
+            commits,
+        });
+        report.print(format);
     } else {
         println!("History for {} (L{}-L{}):", file_path, start_line, end_line);
         println!();

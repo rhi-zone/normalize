@@ -1,5 +1,7 @@
 //! Line range viewing for view command.
 
+use super::report::{ViewLineRangeReport, ViewOutput};
+use crate::output::OutputFormatter;
 use crate::tree::DocstringDisplay;
 use crate::{parsers, path_resolve, tree};
 use normalize_languages::support_for_path;
@@ -37,10 +39,11 @@ pub fn cmd_view_line_range(
     end: usize,
     root: &Path,
     docstring_mode: DocstringDisplay,
-    json: bool,
-    pretty: bool,
-    use_colors: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = format.is_json();
+    let pretty = format.is_pretty();
+    let use_colors = format.use_colors();
     let matches = path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => {
@@ -106,15 +109,13 @@ pub fn cmd_view_line_range(
     };
 
     if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "file": display_path,
-                "start": actual_start,
-                "end": actual_end,
-                "content": source
-            })
-        );
+        let report = ViewOutput::LineRange(ViewLineRangeReport {
+            file: display_path.to_string(),
+            start: actual_start,
+            end: actual_end,
+            content: source.clone(),
+        });
+        report.print(format);
         return 0;
     }
 

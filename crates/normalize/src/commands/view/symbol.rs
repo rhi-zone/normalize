@@ -1,5 +1,7 @@
 //! Symbol lookup and rendering for view command.
 
+use super::report::{ViewGlobMatch, ViewGlobReport, ViewOutput, ViewSymbolReport};
+use crate::output::OutputFormatter;
 use crate::skeleton::SymbolExt;
 use crate::tree::{DocstringDisplay, FormatOptions};
 use crate::{deps, parsers, path_resolve, skeleton, symbols, tree};
@@ -19,9 +21,7 @@ pub fn cmd_view_symbol_direct(
     docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
-    json: bool,
-    pretty: bool,
-    use_colors: bool,
+    format: &crate::output::OutputFormat,
     case_insensitive: bool,
 ) -> i32 {
     let symbol_path: Vec<String> = match parent_name {
@@ -37,9 +37,7 @@ pub fn cmd_view_symbol_direct(
         docstring_mode,
         show_parent,
         context,
-        json,
-        pretty,
-        use_colors,
+        format,
         case_insensitive,
     )
 }
@@ -54,10 +52,11 @@ pub fn cmd_view_symbol_at_line(
     docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
-    json: bool,
-    pretty: bool,
-    use_colors: bool,
+    format: &crate::output::OutputFormat,
 ) -> i32 {
+    let json = format.is_json();
+    let pretty = format.is_pretty();
+    let use_colors = format.use_colors();
     let matches = path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => {
@@ -132,7 +131,8 @@ pub fn cmd_view_symbol_at_line(
     let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
 
     if json {
-        println!("{}", serde_json::to_string(&view_node).unwrap());
+        let report = ViewOutput::SymbolAtLine { node: view_node };
+        report.print(format);
     } else {
         if depth >= 0 {
             println!(
@@ -385,11 +385,12 @@ pub fn cmd_view_symbol(
     docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
-    json: bool,
-    pretty: bool,
-    use_colors: bool,
+    format: &crate::output::OutputFormat,
     case_insensitive: bool,
 ) -> i32 {
+    let json = format.is_json();
+    let pretty = format.is_pretty();
+    let use_colors = format.use_colors();
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
@@ -423,17 +424,16 @@ pub fn cmd_view_symbol(
                 .iter()
                 .map(|i| i.format_summary())
                 .collect();
-            println!(
-                "{}",
-                serde_json::json!({
-                    "type": "symbol",
-                    "path": full_symbol_path,
-                    "file": file_path,
-                    "symbol": symbol_name,
-                    "imports": imports,
-                    "source": source
-                })
-            );
+            let report = ViewOutput::Symbol(ViewSymbolReport {
+                path: full_symbol_path.clone(),
+                file: file_path.to_string(),
+                symbol: symbol_name.to_string(),
+                imports: Some(imports),
+                source: Some(source.clone()),
+                start_line: None,
+                end_line: None,
+            });
+            report.print(format);
         } else {
             if depth >= 0 {
                 if let Some(sym) = parser.find_symbol(&full_path, &content, symbol_name) {
@@ -533,18 +533,16 @@ pub fn cmd_view_symbol(
                 let source: String = lines[start..end].join("\n");
 
                 if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "type": "symbol",
-                            "path": full_symbol_path,
-                            "file": file_path,
-                            "symbol": symbol_name,
-                            "source": source,
-                            "start_line": sym.start_line,
-                            "end_line": sym.end_line
-                        })
-                    );
+                    let report = ViewOutput::Symbol(ViewSymbolReport {
+                        path: full_symbol_path.clone(),
+                        file: file_path.to_string(),
+                        symbol: symbol_name.to_string(),
+                        imports: None,
+                        source: Some(source.clone()),
+                        start_line: Some(sym.start_line),
+                        end_line: Some(sym.end_line),
+                    });
+                    report.print(format);
                 } else {
                     if depth >= 0 {
                         println!(
@@ -590,7 +588,8 @@ pub fn cmd_view_symbol(
             // Fallback: show skeleton
             let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
             if json {
-                println!("{}", serde_json::to_string(&view_node).unwrap());
+                let report = ViewOutput::SymbolAtLine { node: view_node };
+                report.print(format);
             } else {
                 println!(
                     "# {} ({}, L{}-{})",
@@ -877,11 +876,10 @@ pub fn cmd_view_symbol_glob(
     _depth: i32,
     _full: bool,
     _docstring_mode: DocstringDisplay,
-    json: bool,
-    _pretty: bool,
-    _use_colors: bool,
+    format: &crate::output::OutputFormat,
     _case_insensitive: bool,
 ) -> i32 {
+    let json = format.is_json();
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
@@ -899,28 +897,22 @@ pub fn cmd_view_symbol_glob(
     }
 
     if json {
-        let items: Vec<_> = matches
-            .iter()
-            .map(|m| {
-                serde_json::json!({
-                    "path": format!("{}/{}", file_path, m.path),
-                    "name": m.symbol.name,
-                    "kind": m.symbol.kind.as_str(),
-                    "start_line": m.symbol.start_line,
-                    "end_line": m.symbol.end_line,
+        let report = ViewOutput::GlobMatches(ViewGlobReport {
+            file: file_path.to_string(),
+            pattern: pattern.to_string(),
+            count: matches.len(),
+            matches: matches
+                .iter()
+                .map(|m| ViewGlobMatch {
+                    path: format!("{}/{}", file_path, m.path),
+                    name: m.symbol.name.clone(),
+                    kind: m.symbol.kind.as_str().to_string(),
+                    start_line: m.symbol.start_line,
+                    end_line: m.symbol.end_line,
                 })
-            })
-            .collect();
-        println!(
-            "{}",
-            serde_json::json!({
-                "type": "glob_matches",
-                "file": file_path,
-                "pattern": pattern,
-                "count": matches.len(),
-                "matches": items
-            })
-        );
+                .collect(),
+        });
+        report.print(format);
         return 0;
     }
 

@@ -251,9 +251,13 @@ fn main() {
     );
 
     let exit_code = match cli.command {
-        Commands::View(args) => {
-            commands::view::run(args, format, cli.input_schema, cli.params_json.as_deref())
-        }
+        Commands::View(args) => commands::view::run(
+            args,
+            format,
+            cli.output_schema,
+            cli.input_schema,
+            cli.params_json.as_deref(),
+        ),
         Commands::Edit(args) => {
             commands::edit::run(args, cli.json, cli.input_schema, cli.params_json.as_deref())
         }

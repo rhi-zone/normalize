@@ -66,7 +66,7 @@ fn get_injection_query(grammar: &str, language: &tree_sitter::Language) -> Optio
 ///
 /// This is the common abstraction for `moss view` - directories contain files,
 /// files contain symbols, symbols can contain nested symbols.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct ViewNode {
     /// Display name (filename, symbol name)
     pub name: String,
@@ -92,7 +92,7 @@ pub struct ViewNode {
 }
 
 /// Type of node in the view tree.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewNodeKind {
     Directory,

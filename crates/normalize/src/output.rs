@@ -379,6 +379,7 @@ mod tests {
         use crate::commands::sessions::list::SessionListReport;
         use crate::commands::sessions::plans::PlansListReport;
         use crate::commands::tools::lint::LintListResult;
+        use crate::commands::view::report::ViewOutput;
         use crate::sessions::SessionAnalysis;
         use crate::text_search::GrepResult;
 
@@ -396,6 +397,7 @@ mod tests {
         assert_output_formatter::<SessionAnalysis>();
         assert_output_formatter::<GrepResult>();
         assert_output_formatter::<LintListResult>();
+        assert_output_formatter::<ViewOutput>();
     }
 
     #[test]
