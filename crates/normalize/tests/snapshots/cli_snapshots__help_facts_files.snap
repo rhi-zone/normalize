@@ -1,11 +1,11 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
 assertion_line: 164
-expression: "snapshot_help(&[\"index\", \"files\"])"
+expression: "snapshot_help(&[\"facts\", \"files\"])"
 ---
 List indexed files (with optional prefix filter)
 
-Usage: normalize index files [OPTIONS] [PREFIX]
+Usage: normalize facts files [OPTIONS] [PREFIX]
 
 Arguments:
   [PREFIX]  Filter files by prefix

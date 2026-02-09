@@ -11,7 +11,7 @@ Commands:
   view         View a node in the codebase tree (directory, file, or symbol)
   edit         Edit a node in the codebase tree (structural code modification)
   history      View shadow git edit history
-  index        Manage file index
+  facts        Manage code facts (file index, symbols, calls, imports)
   init         Initialize moss in current directory
   daemon       Manage the global moss daemon
   update       Check for and install updates

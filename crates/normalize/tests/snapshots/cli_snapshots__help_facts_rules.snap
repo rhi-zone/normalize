@@ -1,14 +1,16 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 159
-expression: "snapshot_help(&[\"index\", \"stats\"])"
+assertion_line: 174
+expression: "snapshot_help(&[\"facts\", \"rules\"])"
 ---
-Show index statistics (DB size vs codebase size)
+Run compiled rule packs (dylibs) against extracted facts
 
-Usage: normalize index stats [OPTIONS]
+Usage: normalize facts rules [OPTIONS]
 
 Options:
-      --storage             Show storage usage for index and caches
+      --rule <RULE>         Specific rule to run (runs all if not specified)
+      --pack <PACK>         Path to a specific rule pack dylib
+      --list                List available rules instead of running them
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)

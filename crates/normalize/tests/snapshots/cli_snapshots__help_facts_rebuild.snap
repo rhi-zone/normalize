@@ -1,11 +1,11 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
 assertion_line: 154
-expression: "snapshot_help(&[\"index\", \"rebuild\"])"
+expression: "snapshot_help(&[\"facts\", \"rebuild\"])"
 ---
 Rebuild the file index
 
-Usage: normalize index rebuild [OPTIONS]
+Usage: normalize facts rebuild [OPTIONS]
 
 Options:
       --include <INCLUDE>

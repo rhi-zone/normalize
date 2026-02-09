@@ -1,0 +1,24 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 179
+expression: "snapshot_help(&[\"facts\", \"check\"])"
+---
+Run Datalog rules (.dl) against extracted facts
+
+Usage: normalize facts check [OPTIONS] [RULES_FILE]
+
+Arguments:
+  [RULES_FILE]  Path to a specific .dl rules file (auto-discovers if omitted)
+
+Options:
+      --list                List available rules instead of running them
+  -r, --root <ROOT>         Root directory (defaults to current directory)
+      --json                Output as JSON
+      --jsonl               Output as JSON Lines (one object per line)
+      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --pretty              Human-friendly output with colors and formatting
+      --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
+      --input-schema        Output JSON schema for the command's input arguments
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+  -h, --help                Print help

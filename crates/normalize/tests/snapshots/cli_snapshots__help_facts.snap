@@ -1,15 +1,22 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 169
-expression: "snapshot_help(&[\"index\", \"packages\"])"
+assertion_line: 47
+expression: "snapshot_help(&[\"facts\"])"
 ---
-Index external packages (stdlib, site-packages) into global cache
+Manage code facts (file index, symbols, calls, imports)
 
-Usage: normalize index packages [OPTIONS]
+Usage: normalize facts [OPTIONS] <COMMAND>
+
+Commands:
+  rebuild   Rebuild the file index
+  stats     Show index statistics (DB size vs codebase size)
+  files     List indexed files (with optional prefix filter)
+  packages  Index external packages (stdlib, site-packages) into global cache
+  rules     Run compiled rule packs (dylibs) against extracted facts
+  check     Run Datalog rules (.dl) against extracted facts
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
-      --only <ONLY>         Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available
-      --clear               Clear existing index before re-indexing
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
