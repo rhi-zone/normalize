@@ -1105,4 +1105,11 @@ class Foo implements IUnknown {
             vec![("Foo".into(), vec!["Bar".into(), "Baz".into()])]
         );
     }
+
+    #[test]
+    fn test_implements_haskell() {
+        let results =
+            extract_implements("test.hs", "instance MyClass Foo where\n  doStuff f = y f\n");
+        assert_eq!(results, vec![("MyClass".into(), vec!["MyClass".into()])]);
+    }
 }
