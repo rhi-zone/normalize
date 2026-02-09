@@ -299,49 +299,44 @@ pub fn cmd_architecture(root: &Path, json: bool) -> i32 {
     0
 }
 
-async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, libsql::Error> {
-    // Build import graph
-    // For local imports (./foo, ../bar, crate::, super::), try to resolve to files
-    // External imports are counted but not resolved
+/// Import graph: maps of who imports whom and who is imported by whom.
+struct ImportGraph {
+    imports_by_file: HashMap<String, HashSet<String>>,
+    importers_by_file: HashMap<String, HashSet<String>>,
+    raw_import_count: usize,
+}
+
+async fn build_import_graph(idx: &FileIndex) -> Result<ImportGraph, libsql::Error> {
     let mut imports_by_file: HashMap<String, HashSet<String>> = HashMap::new();
     let mut importers_by_file: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut unresolved_imports: usize = 0;
+    let mut unresolved = 0usize;
 
-    // Query all imports - need both module and name to build full module paths
     let conn = idx.connection();
     let stmt = conn
         .prepare("SELECT file, module, name FROM imports")
         .await?;
     let mut rows = stmt.query(()).await?;
 
-    // Collect raw imports first, extracting full module paths
     let mut raw_imports: Vec<(String, String)> = Vec::new();
     while let Some(row) = rows.next().await? {
         let file: String = row.get(0)?;
         let module: Option<String> = row.get(1)?;
         let name: String = row.get(2)?;
 
-        // Build the full module path
         let full_module = match module {
             Some(m) if !m.is_empty() => {
                 if m.contains("::") {
-                    // Already a full path like "crate::traits" or "std::path"
                     m
                 } else if m == "crate" || m == "super" || m == "self" {
-                    // Bare crate/super/self with symbol name: crate::name or super::name
                     format!("{}::{}", m, name)
                 } else {
-                    // External crate with no path
                     m
                 }
             }
             _ => {
-                // Module is null/empty, check if name contains the path
                 if let Some(pos) = name.rfind("::") {
-                    // Name is like "crate::foo::Bar" - extract module "crate::foo"
                     name[..pos].to_string()
                 } else {
-                    // Just a symbol name with no module path - skip
                     continue;
                 }
             }
@@ -350,13 +345,11 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         raw_imports.push((file, full_module));
     }
 
-    // Resolve module names to file paths
     for (source_file, module) in &raw_imports {
-        // Try to resolve the module to actual file paths
         let resolved_files = idx.module_to_files(module, source_file).await;
 
         if resolved_files.is_empty() {
-            unresolved_imports += 1;
+            unresolved += 1;
             continue;
         }
 
@@ -372,35 +365,34 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         }
     }
 
-    // Log resolution stats for debugging
-    let resolved = raw_imports.len() - unresolved_imports;
-    let _resolution_rate = if raw_imports.is_empty() {
+    let _ = if raw_imports.is_empty() {
         0.0
     } else {
+        let resolved = raw_imports.len() - unresolved;
         (resolved as f64 / raw_imports.len() as f64) * 100.0
     };
 
-    // Get all source files (files with symbols indexed, programming languages only)
-    let mut all_files: HashSet<String> = HashSet::new();
-    let stmt = conn.prepare("SELECT DISTINCT file FROM symbols").await?;
-    let mut rows = stmt.query(()).await?;
-    while let Some(row) = rows.next().await? {
-        let path: String = row.get(0)?;
-        if is_programming_language(Path::new(&path)) {
-            all_files.insert(path);
-        }
-    }
+    Ok(ImportGraph {
+        imports_by_file,
+        importers_by_file,
+        raw_import_count: raw_imports.len(),
+    })
+}
 
-    // Calculate module coupling
+fn compute_coupling_and_hubs(
+    imports_by_file: &HashMap<String, HashSet<String>>,
+    importers_by_file: &HashMap<String, HashSet<String>>,
+    all_files: &HashSet<String>,
+) -> (Vec<ModuleCoupling>, Vec<HubModule>) {
     let mut coupling: Vec<ModuleCoupling> = Vec::new();
-    for file in &all_files {
+    for file in all_files {
         let fan_out = imports_by_file.get(file).map(|s| s.len()).unwrap_or(0);
         let fan_in = importers_by_file.get(file).map(|s| s.len()).unwrap_or(0);
         let total = fan_in + fan_out;
         let instability = if total > 0 {
             fan_out as f64 / total as f64
         } else {
-            0.5 // No connections = neutral
+            0.5
         };
 
         if fan_in > 0 || fan_out > 0 {
@@ -413,11 +405,8 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         }
     }
 
-    // Sort by fan_in (most depended on first)
     coupling.sort_by(|a, b| b.fan_in.cmp(&a.fan_in));
 
-    // Find hub modules (high fan-in AND high fan-out)
-    // These are architectural bottlenecks - everything flows through them
     let mut hub_modules: Vec<HubModule> = coupling
         .iter()
         .filter(|m| m.fan_in >= 3 && m.fan_out >= 3)
@@ -432,14 +421,15 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
     hub_modules.truncate(10);
 
     coupling.truncate(15);
+    (coupling, hub_modules)
+}
 
-    // Find cross-imports (A imports B AND B imports A)
+fn detect_cross_imports(imports_by_file: &HashMap<String, HashSet<String>>) -> Vec<CrossImport> {
     let mut cross_imports: Vec<CrossImport> = Vec::new();
     let mut seen_pairs: HashSet<(String, String)> = HashSet::new();
 
-    for (file_a, imports_a) in &imports_by_file {
+    for (file_a, imports_a) in imports_by_file {
         for file_b in imports_a {
-            // Check if file_b imports file_a (bidirectional)
             if let Some(imports_b) = imports_by_file.get(file_b)
                 && imports_b.contains(file_a)
             {
@@ -450,7 +440,6 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
                 };
                 if !seen_pairs.contains(&pair) {
                     seen_pairs.insert(pair);
-                    // Count imports in each direction
                     let a_to_b = imports_a.iter().filter(|f| *f == file_b).count();
                     let b_to_a = imports_b.iter().filter(|f| *f == file_a).count();
                     cross_imports.push(CrossImport {
@@ -463,17 +452,13 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
             }
         }
     }
+    cross_imports
+}
 
-    // Detect cycles using DFS
-    let cycles = find_cycles(&imports_by_file);
-
-    // Find longest import chains
-    let deep_chains = find_longest_chains(&imports_by_file);
-
-    // Compute layer flows (inter-directory import counts)
-    let layer_flows = compute_layer_flows(&imports_by_file);
-
-    // Find orphan modules (files with symbols but never imported)
+async fn find_orphan_modules(
+    conn: &libsql::Connection,
+    importers_by_file: &HashMap<String, HashSet<String>>,
+) -> Result<Vec<OrphanModule>, libsql::Error> {
     let mut orphans: Vec<OrphanModule> = Vec::new();
     let stmt = conn
         .prepare("SELECT file, COUNT(*) FROM symbols GROUP BY file")
@@ -483,15 +468,11 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         let file: String = row.get(0)?;
         let symbol_count: i64 = row.get(1)?;
 
-        // Only consider programming languages (not config/data formats)
         if !is_programming_language(Path::new(&file)) {
             continue;
         }
 
-        // Is this file imported by anyone?
         let is_imported = importers_by_file.contains_key(&file);
-
-        // Skip main/entry files and test files
         let is_likely_entry = file.contains("main.")
             || file.contains("mod.rs")
             || file.contains("lib.rs")
@@ -508,50 +489,53 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
         }
     }
     orphans.truncate(10);
+    Ok(orphans)
+}
 
-    // Symbol hotspots (most called functions)
-    // Filter out generic/common methods that aren't interesting
-    let generic_methods: HashSet<&str> = [
-        "new",
-        "default",
-        "from",
-        "into",
-        "clone",
-        "to_string",
-        "as_str",
-        "as_ref",
-        "get",
-        "set",
-        "len",
-        "is_empty",
-        "iter",
-        "next",
-        "unwrap",
-        "expect",
-        "ok",
-        "err",
-        "some",
-        "none",
-        "push",
-        "pop",
-        "insert",
-        "remove",
-        "contains",
-        "map",
-        "filter",
-        "collect",
-        "fmt",
-        "write",
-        "read",
-        "Ok",
-        "Err",
-        "Some",
-        "None",
-    ]
-    .into_iter()
-    .collect();
+const GENERIC_METHODS: &[&str] = &[
+    "new",
+    "default",
+    "from",
+    "into",
+    "clone",
+    "to_string",
+    "as_str",
+    "as_ref",
+    "get",
+    "set",
+    "len",
+    "is_empty",
+    "iter",
+    "next",
+    "unwrap",
+    "expect",
+    "ok",
+    "err",
+    "some",
+    "none",
+    "push",
+    "pop",
+    "insert",
+    "remove",
+    "contains",
+    "map",
+    "filter",
+    "collect",
+    "fmt",
+    "write",
+    "read",
+    "Ok",
+    "Err",
+    "Some",
+    "None",
+];
 
-    let mut symbol_callers: HashMap<String, (String, String, usize)> = HashMap::new();
+async fn find_symbol_hotspots(
+    conn: &libsql::Connection,
+) -> Result<Vec<SymbolMetrics>, libsql::Error> {
+    let generic: HashSet<&str> = GENERIC_METHODS.iter().copied().collect();
+
+    let mut symbol_callers: HashMap<String, usize> = HashMap::new();
     let stmt = conn
         .prepare("SELECT callee_name, COUNT(*) as cnt FROM calls GROUP BY callee_name ORDER BY cnt DESC LIMIT 100")
         .await?;
@@ -559,16 +543,13 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
     while let Some(row) = rows.next().await? {
         let name: String = row.get(0)?;
         let count: i64 = row.get(1)?;
-        // Skip generic methods
-        if !generic_methods.contains(name.as_str()) {
-            symbol_callers.insert(name, (String::new(), String::new(), count as usize));
+        if !generic.contains(name.as_str()) {
+            symbol_callers.insert(name, count as usize);
         }
     }
 
-    // Resolve symbol details
-    let mut symbol_hotspots: Vec<SymbolMetrics> = Vec::new();
-    for (name, (_, _, callers)) in &symbol_callers {
-        // Find the symbol definition
+    let mut hotspots: Vec<SymbolMetrics> = Vec::new();
+    for (name, callers) in &symbol_callers {
         let stmt = conn
             .prepare("SELECT file, kind FROM symbols WHERE name = ? LIMIT 1")
             .await?;
@@ -577,8 +558,7 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
             let file: String = row.get(0)?;
             let kind: String = row.get(1)?;
             if *callers > 3 {
-                // Only show symbols called more than 3 times
-                symbol_hotspots.push(SymbolMetrics {
+                hotspots.push(SymbolMetrics {
                     file,
                     name: name.clone(),
                     kind,
@@ -587,13 +567,38 @@ async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, lib
             }
         }
     }
-    symbol_hotspots.sort_by(|a, b| b.callers.cmp(&a.callers));
-    symbol_hotspots.truncate(10);
+    hotspots.sort_by(|a, b| b.callers.cmp(&a.callers));
+    hotspots.truncate(10);
+    Ok(hotspots)
+}
 
-    // Count totals
+async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, libsql::Error> {
+    let graph = build_import_graph(idx).await?;
+    let conn = idx.connection();
+
+    // Get all source files (programming languages only)
+    let mut all_files: HashSet<String> = HashSet::new();
+    let stmt = conn.prepare("SELECT DISTINCT file FROM symbols").await?;
+    let mut rows = stmt.query(()).await?;
+    while let Some(row) = rows.next().await? {
+        let path: String = row.get(0)?;
+        if is_programming_language(Path::new(&path)) {
+            all_files.insert(path);
+        }
+    }
+
+    let (coupling, hub_modules) =
+        compute_coupling_and_hubs(&graph.imports_by_file, &graph.importers_by_file, &all_files);
+    let cross_imports = detect_cross_imports(&graph.imports_by_file);
+    let cycles = find_cycles(&graph.imports_by_file);
+    let deep_chains = find_longest_chains(&graph.imports_by_file);
+    let layer_flows = compute_layer_flows(&graph.imports_by_file);
+    let orphans = find_orphan_modules(conn, &graph.importers_by_file).await?;
+    let symbol_hotspots = find_symbol_hotspots(conn).await?;
+
     let total_modules = all_files.len();
-    let total_imports = raw_imports.len();
-    let resolved_imports: usize = imports_by_file.values().map(|s| s.len()).sum();
+    let total_imports = graph.raw_import_count;
+    let resolved_imports: usize = graph.imports_by_file.values().map(|s| s.len()).sum();
 
     let stmt = conn.prepare("SELECT COUNT(*) FROM symbols").await?;
     let mut rows = stmt.query(()).await?;

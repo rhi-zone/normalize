@@ -281,6 +281,63 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
     0
 }
 
+/// Resolve --diff files and combine with --exclude/--only into a filter.
+fn resolve_diff_and_filter(
+    effective_root: &Path,
+    args: &AnalyzeArgs,
+) -> Result<Option<Filter>, i32> {
+    let diff_files = if let Some(ref base) = args.diff {
+        let effective_base = if base.is_empty() {
+            match detect_default_branch(effective_root) {
+                Some(branch) => branch,
+                None => {
+                    eprintln!(
+                        "error: Could not detect default branch. Specify explicitly: --diff main"
+                    );
+                    return Err(1);
+                }
+            }
+        } else {
+            base.clone()
+        };
+
+        match get_diff_files(effective_root, &effective_base) {
+            Ok(files) => {
+                if files.is_empty() {
+                    eprintln!("No changed files found relative to {}", effective_base);
+                    return Err(0);
+                }
+                eprintln!(
+                    "Analyzing {} changed files (vs {})",
+                    files.len(),
+                    effective_base
+                );
+                files
+            }
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return Err(1);
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
+    let mut only_patterns = args.only.clone();
+    for file in &diff_files {
+        only_patterns.push(format!("/{}", file));
+    }
+
+    if !args.exclude.is_empty() || !only_patterns.is_empty() {
+        match build_filter(effective_root, &args.exclude, &only_patterns) {
+            Some(f) => Ok(Some(f)),
+            None => Err(1),
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 /// Run analyze command with args.
 pub fn run(
     args: AnalyzeArgs,
@@ -319,60 +376,10 @@ pub fn run(
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&effective_root);
 
-    // Get files from --diff if specified
-    let diff_files = if let Some(ref base) = args.diff {
-        // If base is empty, detect default branch
-        let effective_base = if base.is_empty() {
-            match detect_default_branch(&effective_root) {
-                Some(branch) => branch,
-                None => {
-                    eprintln!(
-                        "error: Could not detect default branch. Specify explicitly: --diff main"
-                    );
-                    return 1;
-                }
-            }
-        } else {
-            base.clone()
-        };
-
-        match get_diff_files(&effective_root, &effective_base) {
-            Ok(files) => {
-                if files.is_empty() {
-                    eprintln!("No changed files found relative to {}", effective_base);
-                    return 0;
-                }
-                eprintln!(
-                    "Analyzing {} changed files (vs {})",
-                    files.len(),
-                    effective_base
-                );
-                files
-            }
-            Err(e) => {
-                eprintln!("error: {}", e);
-                return 1;
-            }
-        }
-    } else {
-        Vec::new()
-    };
-
-    // Merge diff files into only patterns
-    let mut only_patterns = args.only.clone();
-    for file in &diff_files {
-        // Add as exact path pattern (leading / means root-relative)
-        only_patterns.push(format!("/{}", file));
-    }
-
-    // Build filter for --exclude and --only (returns None on error after printing message)
-    let filter = if !args.exclude.is_empty() || !only_patterns.is_empty() {
-        match build_filter(&effective_root, &args.exclude, &only_patterns) {
-            Some(f) => Some(f),
-            None => return 1, // Error already printed
-        }
-    } else {
-        None
+    // Resolve diff files and build filter
+    let filter = match resolve_diff_and_filter(&effective_root, &args) {
+        Ok(f) => f,
+        Err(code) => return code,
     };
 
     // Dispatch based on subcommand

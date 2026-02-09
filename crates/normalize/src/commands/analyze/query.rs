@@ -148,6 +148,72 @@ fn skeleton_preview(text: &str, grammar: &str) -> (String, usize) {
     (result, hidden)
 }
 
+fn is_rust_structural(trimmed: &str) -> bool {
+    trimmed.starts_with("let ")
+        || trimmed.starts_with("if ")
+        || trimmed.starts_with("} else")
+        || trimmed.starts_with("else ")
+        || trimmed.starts_with("match ")
+        || trimmed.starts_with("for ")
+        || trimmed.starts_with("while ")
+        || trimmed.starts_with("loop ")
+        || trimmed.starts_with("return ")
+        || trimmed.starts_with("return;")
+        || trimmed.starts_with("fn ")
+        || trimmed.starts_with("pub fn ")
+        || trimmed.starts_with("async fn ")
+        || trimmed.contains("?;")
+}
+
+fn is_js_structural(trimmed: &str) -> bool {
+    trimmed.starts_with("const ")
+        || trimmed.starts_with("let ")
+        || trimmed.starts_with("var ")
+        || trimmed.starts_with("if ")
+        || trimmed.starts_with("} else")
+        || trimmed.starts_with("else ")
+        || trimmed.starts_with("for ")
+        || trimmed.starts_with("while ")
+        || trimmed.starts_with("switch ")
+        || trimmed.starts_with("return ")
+        || trimmed.starts_with("return;")
+        || trimmed.starts_with("function ")
+        || trimmed.starts_with("async ")
+        || trimmed.starts_with("await ")
+        || trimmed.starts_with("try ")
+        || trimmed.starts_with("} catch")
+}
+
+fn is_python_structural(trimmed: &str) -> bool {
+    trimmed.ends_with(':')
+        || trimmed.starts_with("return ")
+        || trimmed.starts_with("yield ")
+        || trimmed.starts_with("raise ")
+        || trimmed.starts_with("def ")
+        || trimmed.starts_with("async def ")
+}
+
+fn is_go_structural(trimmed: &str) -> bool {
+    trimmed.starts_with("if ")
+        || trimmed.starts_with("} else")
+        || trimmed.starts_with("for ")
+        || trimmed.starts_with("switch ")
+        || trimmed.starts_with("select ")
+        || trimmed.starts_with("return ")
+        || trimmed.starts_with("func ")
+        || trimmed.contains(":= ")
+}
+
+fn is_generic_structural(trimmed: &str) -> bool {
+    trimmed.starts_with("let ")
+        || trimmed.starts_with("const ")
+        || trimmed.starts_with("var ")
+        || trimmed.starts_with("if ")
+        || trimmed.starts_with("for ")
+        || trimmed.starts_with("while ")
+        || trimmed.starts_with("return ")
+}
+
 /// Check if a line represents structural code (control flow, bindings).
 fn is_structural_line(line: &str, grammar: &str) -> bool {
     let trimmed = line.trim();
@@ -163,69 +229,11 @@ fn is_structural_line(line: &str, grammar: &str) -> bool {
     }
 
     match grammar {
-        "rust" => {
-            trimmed.starts_with("let ")
-                || trimmed.starts_with("if ")
-                || trimmed.starts_with("} else")
-                || trimmed.starts_with("else ")
-                || trimmed.starts_with("match ")
-                || trimmed.starts_with("for ")
-                || trimmed.starts_with("while ")
-                || trimmed.starts_with("loop ")
-                || trimmed.starts_with("return ")
-                || trimmed.starts_with("return;")
-                || trimmed.starts_with("fn ")
-                || trimmed.starts_with("pub fn ")
-                || trimmed.starts_with("async fn ")
-                || trimmed.contains("?;") // Early return with ?
-        }
-        "javascript" | "typescript" | "tsx" => {
-            trimmed.starts_with("const ")
-                || trimmed.starts_with("let ")
-                || trimmed.starts_with("var ")
-                || trimmed.starts_with("if ")
-                || trimmed.starts_with("} else")
-                || trimmed.starts_with("else ")
-                || trimmed.starts_with("for ")
-                || trimmed.starts_with("while ")
-                || trimmed.starts_with("switch ")
-                || trimmed.starts_with("return ")
-                || trimmed.starts_with("return;")
-                || trimmed.starts_with("function ")
-                || trimmed.starts_with("async ")
-                || trimmed.starts_with("await ")
-                || trimmed.starts_with("try ")
-                || trimmed.starts_with("} catch")
-        }
-        "python" => {
-            // Python structural elements
-            trimmed.ends_with(':') // if:, for:, def:, class:, etc.
-                || trimmed.starts_with("return ")
-                || trimmed.starts_with("yield ")
-                || trimmed.starts_with("raise ")
-                || trimmed.starts_with("def ")
-                || trimmed.starts_with("async def ")
-        }
-        "go" => {
-            trimmed.starts_with("if ")
-                || trimmed.starts_with("} else")
-                || trimmed.starts_with("for ")
-                || trimmed.starts_with("switch ")
-                || trimmed.starts_with("select ")
-                || trimmed.starts_with("return ")
-                || trimmed.starts_with("func ")
-                || trimmed.contains(":= ")
-        }
-        _ => {
-            // Generic structural patterns
-            trimmed.starts_with("let ")
-                || trimmed.starts_with("const ")
-                || trimmed.starts_with("var ")
-                || trimmed.starts_with("if ")
-                || trimmed.starts_with("for ")
-                || trimmed.starts_with("while ")
-                || trimmed.starts_with("return ")
-        }
+        "rust" => is_rust_structural(trimmed),
+        "javascript" | "typescript" | "tsx" => is_js_structural(trimmed),
+        "python" => is_python_structural(trimmed),
+        "go" => is_go_structural(trimmed),
+        _ => is_generic_structural(trimmed),
     }
 }
 

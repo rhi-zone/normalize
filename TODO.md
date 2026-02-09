@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Add rule writing guide (`docs/rules.md`) and link from `docs/cli/rules.md`
+- [x] Add rule writing guide (`docs/rules.md`) and link from `docs/cli/rules.md`
 - [x] Rule sharing/import: `normalize rules add/update/list/remove` (Phase 1 complete)
 - [x] Auto-fix support: `normalize analyze rules --fix` with fix templates
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
@@ -526,18 +526,22 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 
 All major package managers now have multi-repo support. Remaining unit-struct fetchers are single-source registries where multi-repo doesn't apply (npm, PyPI, crates.io, etc.).
 
-### Complexity Hotspots (reduced - max now 54)
+### Complexity Hotspots (reduced - max now 58)
 - [x] `handle_glob_edit` (76→41): extracted insert_at_destination, position_op_name
 - [x] `cmd_view_file` (69→48): extracted format_skeleton_lines, print_fisheye_imports
 - [x] `cmd_edit` (67→51): extracted insert_single_at_destination
 - [x] `cmd_daemon` (66→54): extracted handle_response
 - [x] `cmd_view_symbol` (65→47): extracted print_smart_imports
+- [x] `categorize_command` (64→26): extracted categorize_cargo, categorize_npm_run, categorize_js_runner
+- [x] `analyze/mod.rs:run` (63→51): extracted resolve_diff_and_filter
+- [x] `analyze_architecture` (62→split): extracted build_import_graph, compute_coupling_and_hubs, detect_cross_imports, find_orphan_modules, find_symbol_hotspots
+- [x] `is_structural_line` (60→14): extracted per-language is_rust/js/python/go/generic_structural
+- [ ] `crates/normalize/src/commands/analyze/query.rs:cmd_query` (58)
+- [ ] `crates/normalize/src/commands/daemon.rs:cmd_daemon` (54)
 - [ ] `crates/normalize-syntax-rules/src/runner.rs:evaluate_predicates` (53)
-- [ ] `crates/normalize/src/commands/analyze/mod.rs:run` (53)
-- [ ] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (49)
-- [ ] `crates/normalize/src/tree.rs:collect_highlight_spans` (48)
-- [ ] `crates/normalize-syntax-rules/src/runner.rs:run_rules` (44)
-- [ ] `crates/normalize/src/commands/analyze/report.rs:analyze` (44)
+- [ ] `crates/normalize/src/commands/analyze/mod.rs:run` (51)
+- [ ] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (48)
+- [ ] `crates/normalize/src/tree.rs:collect_highlight_spans` (46)
 
 ### Package Index Backlog (simplest → complex)
 

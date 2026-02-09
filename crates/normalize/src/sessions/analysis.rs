@@ -1312,6 +1312,44 @@ fn split_command_chain(cmd: &str) -> Vec<&str> {
     parts.into_iter().filter(|p| !p.starts_with('#')).collect()
 }
 
+fn categorize_cargo(sub: &str) -> (&'static str, String) {
+    match sub {
+        "build" | "b" => ("build", "cargo build".to_string()),
+        "test" | "t" | "nextest" => ("test", "cargo test".to_string()),
+        "clippy" => ("lint", "cargo clippy".to_string()),
+        "fmt" => ("lint", "cargo fmt".to_string()),
+        "add" | "install" => ("install", format!("cargo {}", sub)),
+        _ => ("build", format!("cargo {}", sub)),
+    }
+}
+
+fn categorize_npm_run(runner: &str, script: &str) -> (&'static str, String) {
+    if script.contains("build") {
+        ("build", format!("{} run build", runner))
+    } else if script.contains("test") {
+        ("test", format!("{} run test", runner))
+    } else if script.contains("lint") {
+        ("lint", format!("{} run lint", runner))
+    } else if script.contains("format") || script.contains("fmt") {
+        ("lint", format!("{} run {}", runner, script))
+    } else {
+        ("other", format!("{} run {}", runner, script))
+    }
+}
+
+fn categorize_js_runner(base_name: &str, sub: &str, effective: &[&str]) -> (&'static str, String) {
+    match sub {
+        "run" => {
+            let script = effective.get(2).copied().unwrap_or("?");
+            categorize_npm_run(base_name, script)
+        }
+        "build" => ("build", format!("{} build", base_name)),
+        "test" => ("test", format!("{} test", base_name)),
+        "install" | "i" | "add" | "ci" => ("install", format!("{} install", base_name)),
+        _ => ("other", format!("{} {}", base_name, sub)),
+    }
+}
+
 /// Categorize a single shell command and return (category, normalized_pattern).
 ///
 /// The normalized pattern is the base command + subcommand (e.g. "cargo test", "npm run build").
@@ -1334,40 +1372,21 @@ pub fn categorize_command(cmd: &str) -> (&'static str, String) {
     let base_name = base.rsplit('/').next().unwrap_or(base);
 
     match base_name {
+        "cargo" => categorize_cargo(sub),
+        "npm" | "npx" | "yarn" | "pnpm" => categorize_js_runner(base_name, sub, &effective),
+
         // Build tools
-        "cargo" if sub == "build" || sub == "b" => ("build", "cargo build".to_string()),
         "make" | "cmake" | "ninja" => ("build", base_name.to_string()),
         "tsc" => ("build", "tsc".to_string()),
         "webpack" | "vite" | "esbuild" | "rollup" | "parcel" => ("build", base_name.to_string()),
-        "npm" | "npx" | "yarn" | "pnpm" if sub == "run" => {
-            let script = effective.get(2).copied().unwrap_or("?");
-            match script {
-                s if s.contains("build") => ("build", format!("{} run build", base_name)),
-                s if s.contains("test") => ("test", format!("{} run test", base_name)),
-                s if s.contains("lint") => ("lint", format!("{} run lint", base_name)),
-                s if s.contains("format") || s.contains("fmt") => {
-                    ("lint", format!("{} run {}", base_name, s))
-                }
-                _ => ("other", format!("{} run {}", base_name, script)),
-            }
-        }
-        "npm" | "npx" | "yarn" | "pnpm" if sub == "build" => {
-            ("build", format!("{} build", base_name))
-        }
 
         // Test tools
-        "cargo" if sub == "test" || sub == "t" || sub == "nextest" => {
-            ("test", "cargo test".to_string())
-        }
-        "npm" | "npx" | "yarn" | "pnpm" if sub == "test" => ("test", format!("{} test", base_name)),
         "pytest" | "jest" | "vitest" | "mocha" => ("test", base_name.to_string()),
         "go" if sub == "test" => ("test", "go test".to_string()),
         "ruby" if sub == "-e" || sub == "test" => ("test", "ruby test".to_string()),
         "rspec" | "phpunit" => ("test", base_name.to_string()),
 
         // Lint/format tools
-        "cargo" if sub == "clippy" => ("lint", "cargo clippy".to_string()),
-        "cargo" if sub == "fmt" => ("lint", "cargo fmt".to_string()),
         "eslint" | "prettier" | "ruff" | "black" | "flake8" | "mypy" | "pylint" | "rubocop"
         | "biome" | "oxlint" => ("lint", base_name.to_string()),
 
@@ -1378,12 +1397,6 @@ pub fn categorize_command(cmd: &str) -> (&'static str, String) {
         }
 
         // Install/dependency
-        "cargo" if sub == "add" || sub == "install" => ("install", format!("cargo {}", sub)),
-        "npm" | "npx" | "yarn" | "pnpm"
-            if sub == "install" || sub == "i" || sub == "add" || sub == "ci" =>
-        {
-            ("install", format!("{} install", base_name))
-        }
         "pip" | "pip3" if sub == "install" => ("install", "pip install".to_string()),
         "apt" | "apt-get" | "brew" | "dnf" | "pacman" | "nix" => {
             ("install", format!("{} {}", base_name, sub))
@@ -1394,9 +1407,6 @@ pub fn categorize_command(cmd: &str) -> (&'static str, String) {
         "ls" | "cat" | "head" | "tail" | "wc" | "file" | "stat" | "tree" | "less" => {
             ("search", base_name.to_string())
         }
-
-        // Cargo other
-        "cargo" => ("build", format!("cargo {}", sub)),
 
         _ => ("other", base_name.to_string()),
     }
