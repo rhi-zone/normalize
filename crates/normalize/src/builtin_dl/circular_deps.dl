@@ -1,0 +1,13 @@
+# ---
+# id = "circular-deps"
+# message = "Circular dependency detected between modules"
+# ---
+
+relation reaches(String, String);
+relation cycle(String, String);
+
+reaches(from, to) <-- import(from, to, _);
+reaches(from, to) <-- import(from, mid, _), reaches(mid, to);
+cycle(a, b) <-- reaches(a, b), reaches(b, a), if a < b;
+
+warning("circular-deps", a) <-- cycle(a, _);
