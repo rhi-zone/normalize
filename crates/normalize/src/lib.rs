@@ -27,6 +27,7 @@ pub mod extract;
 pub mod filter;
 pub mod health;
 pub mod index;
+pub mod interpret;
 pub mod output;
 pub mod parsers;
 pub mod path_resolve;

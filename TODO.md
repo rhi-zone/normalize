@@ -217,7 +217,8 @@ Implementation:
 - [x] Map facts to Ascent relations: `symbol(file, name, kind)`, `import(from, to)`, `call(caller, callee)`
 - [x] Rewrite one builtin rule in Datalog (circular dependencies) as proof of concept
 - [x] Dylib loading: find/load rule packs from known paths
-- [ ] `normalize facts compile <rules.dl>` command to build custom packs
+- [x] `normalize facts check <rules.dl>` - interpreted Datalog via ascent-interpreter
+- [ ] `normalize facts compile <rules.dl>` command to build custom packs (sandboxed codegen)
 
 ### normalize-typegen
 

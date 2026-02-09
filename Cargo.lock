@@ -1310,6 +1310,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "ascent-eval"
+version = "0.1.0"
+source = "git+https://github.com/pterror/ascent-interpreter#bd0c8236d3fb1cabbec793f317357335b96bd9ff"
+dependencies = [
+ "ascent-ir",
+ "ascent-syntax",
+ "itertools 0.14.0",
+ "petgraph",
+ "rustc-hash 2.1.1",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "ascent-ir"
+version = "0.1.0"
+source = "git+https://github.com/pterror/ascent-interpreter#bd0c8236d3fb1cabbec793f317357335b96bd9ff"
+dependencies = [
+ "ascent-syntax",
+ "itertools 0.14.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "ascent-syntax"
+version = "0.1.0"
+source = "git+https://github.com/pterror/ascent-interpreter#bd0c8236d3fb1cabbec793f317357335b96bd9ff"
+dependencies = [
+ "derive-syn-parse",
+ "itertools 0.14.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
 name = "ascent_base"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2918,6 +2955,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3362,6 +3408,9 @@ name = "normalize"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
+ "ascent-eval",
+ "ascent-ir",
+ "ascent-syntax",
  "assert_cmd",
  "ast-grep-core",
  "axum 0.8.8",
@@ -3407,6 +3456,7 @@ dependencies = [
  "serde",
  "serde_json",
  "streaming-iterator",
+ "syn 2.0.114",
  "tar",
  "tempfile",
  "tokio",

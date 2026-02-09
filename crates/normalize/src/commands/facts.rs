@@ -93,7 +93,7 @@ pub enum FactsAction {
         clear: bool,
     },
 
-    /// Run rules against extracted facts
+    /// Run compiled rule packs (dylibs) against extracted facts
     Rules {
         /// Specific rule to run (runs all if not specified)
         #[arg(long)]
@@ -107,6 +107,12 @@ pub enum FactsAction {
         #[arg(long)]
         #[serde(default)]
         list: bool,
+    },
+
+    /// Run a Datalog rules file (.dl) against extracted facts
+    Check {
+        /// Path to the .dl rules file
+        rules_file: PathBuf,
     },
 }
 
@@ -129,6 +135,7 @@ pub fn cmd_facts(action: FactsAction, root: Option<&Path>, json: bool) -> i32 {
             list,
             json,
         )),
+        FactsAction::Check { rules_file } => rt.block_on(cmd_check(root, &rules_file, json)),
     }
 }
 
@@ -807,6 +814,58 @@ async fn cmd_rules(
     }
 
     if all_diagnostics
+        .iter()
+        .any(|d| d.level == normalize_facts_rules_api::DiagnosticLevel::Error)
+    {
+        1
+    } else {
+        0
+    }
+}
+
+// =============================================================================
+// Check (interpreted rules)
+// =============================================================================
+
+async fn cmd_check(root: Option<&Path>, rules_file: &Path, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Build relations from index
+    let relations = match build_relations_from_index(&root).await {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error building relations: {}", e);
+            eprintln!("Run `normalize facts rebuild` first to index the codebase.");
+            return 1;
+        }
+    };
+
+    // Run interpreted rules
+    let diagnostics = match crate::interpret::run_rules_file(rules_file, &relations) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return 1;
+        }
+    };
+
+    // Output results
+    let use_colors = !json && std::io::stdout().is_terminal();
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&diagnostics).unwrap());
+    } else if diagnostics.is_empty() {
+        println!("No issues found.");
+    } else {
+        for diag in &diagnostics {
+            println!("{}", rules::format_diagnostic(diag, use_colors));
+        }
+        println!("\n{} issue(s) found.", diagnostics.len());
+    }
+
+    if diagnostics
         .iter()
         .any(|d| d.level == normalize_facts_rules_api::DiagnosticLevel::Error)
     {
