@@ -1,0 +1,15 @@
+# ---
+# id = "orphan-file"
+# message = "File is never imported by any other file"
+# enabled = false
+# ---
+
+relation has_symbols(String);
+relation is_imported(String);
+relation orphan(String);
+
+has_symbols(file) <-- symbol(file, _, _, _);
+is_imported(to_module) <-- import(_, to_module, _);
+orphan(file) <-- has_symbols(file), !is_imported(file);
+
+warning("orphan-file", file) <-- orphan(file);

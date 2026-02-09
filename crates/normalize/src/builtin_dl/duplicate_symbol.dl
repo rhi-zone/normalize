@@ -1,0 +1,15 @@
+# ---
+# id = "duplicate-symbol"
+# message = "Same symbol name defined in multiple files"
+# enabled = false
+# ---
+
+relation dup(String, String, String);
+dup(name, file1, file2) <--
+    symbol(file1, name, kind1, _),
+    symbol(file2, name, kind2, _),
+    if file1 < file2,
+    if kind1 == "function",
+    if kind2 == "function";
+
+warning("duplicate-symbol", name) <-- dup(name, _, _);

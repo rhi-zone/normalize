@@ -1,0 +1,12 @@
+# ---
+# id = "god-file"
+# message = "File defines too many functions (>50)"
+# ---
+
+relation func(String, String);
+func(file, name) <-- symbol(file, name, kind, _), if kind == "function";
+
+relation file_func_count(String, i32);
+file_func_count(file, c) <-- func(file, _), agg c = count() in func(file, _);
+
+warning("god-file", file) <-- file_func_count(file, c), if c > 50;

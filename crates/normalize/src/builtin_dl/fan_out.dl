@@ -1,0 +1,12 @@
+# ---
+# id = "fan-out"
+# message = "Function calls too many distinct functions (>50)"
+# enabled = false
+# ---
+
+relation caller_fan_out(String, String, i32);
+caller_fan_out(file, caller, c) <--
+    call(file, caller, _, _),
+    agg c = count() in call(file, caller, _, _);
+
+warning("fan-out", caller) <-- caller_fan_out(_, caller, c), if c > 50;

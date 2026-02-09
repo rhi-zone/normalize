@@ -1,0 +1,12 @@
+# ---
+# id = "hub-file"
+# message = "Module is imported by many files (>30)"
+# enabled = false
+# ---
+
+relation import_count(String, i32);
+import_count(to_module, c) <--
+    import(_, to_module, _),
+    agg c = count() in import(_, to_module, _);
+
+warning("hub-file", to_module) <-- import_count(to_module, c), if c > 30;

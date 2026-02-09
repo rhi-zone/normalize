@@ -76,10 +76,36 @@ pub struct BuiltinFactsRule {
 }
 
 /// All embedded builtin rules.
-const BUILTIN_RULES: &[BuiltinFactsRule] = &[BuiltinFactsRule {
-    id: "circular-deps",
-    content: include_str!("builtin_dl/circular_deps.dl"),
-}];
+const BUILTIN_RULES: &[BuiltinFactsRule] = &[
+    BuiltinFactsRule {
+        id: "circular-deps",
+        content: include_str!("builtin_dl/circular_deps.dl"),
+    },
+    BuiltinFactsRule {
+        id: "orphan-file",
+        content: include_str!("builtin_dl/orphan_file.dl"),
+    },
+    BuiltinFactsRule {
+        id: "self-import",
+        content: include_str!("builtin_dl/self_import.dl"),
+    },
+    BuiltinFactsRule {
+        id: "god-file",
+        content: include_str!("builtin_dl/god_file.dl"),
+    },
+    BuiltinFactsRule {
+        id: "fan-out",
+        content: include_str!("builtin_dl/fan_out.dl"),
+    },
+    BuiltinFactsRule {
+        id: "hub-file",
+        content: include_str!("builtin_dl/hub_file.dl"),
+    },
+    BuiltinFactsRule {
+        id: "duplicate-symbol",
+        content: include_str!("builtin_dl/duplicate_symbol.dl"),
+    },
+];
 
 /// Load all rules from all sources, merged by ID.
 /// Order: builtins → ~/.config/moss/rules/ → .normalize/rules/
@@ -461,9 +487,69 @@ warning("x", "y") <-- symbol(_, _, _, _);
             assert!(rule.is_some(), "Failed to parse builtin: {}", builtin.id);
             let rule = rule.unwrap();
             assert!(rule.builtin);
-            assert!(rule.enabled);
             assert!(!rule.source.is_empty());
         }
+    }
+
+    #[test]
+    fn test_negation() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "foo", "function", 1);
+        relations.add_symbol("b.py", "bar", "function", 1);
+        relations.add_call("a.py", "main", "foo", 5);
+        // bar is never called
+
+        let rules = r#"
+            relation defined(String);
+            relation called(String);
+            relation uncalled(String);
+
+            defined(name) <-- symbol(_, name, _, _);
+            called(name) <-- call(_, _, name, _);
+            uncalled(name) <-- defined(name), !called(name);
+
+            warning("uncalled", name) <-- uncalled(name);
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "bar");
+    }
+
+    #[test]
+    fn test_string_comparison_in_if() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "MyClass", "class", 1);
+        relations.add_symbol("a.py", "my_func", "function", 10);
+
+        let rules = r#"
+            relation func(String, String);
+            func(file, name) <-- symbol(file, name, kind, _), if kind == "function";
+            warning("func-found", name) <-- func(_, name);
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "my_func");
+    }
+
+    #[test]
+    fn test_aggregation_count() {
+        let mut relations = Relations::new();
+        relations.add_symbol("big.py", "a", "function", 1);
+        relations.add_symbol("big.py", "b", "function", 2);
+        relations.add_symbol("big.py", "c", "function", 3);
+        relations.add_symbol("small.py", "x", "function", 1);
+
+        let rules = r#"
+            relation file_count(String, i32);
+            file_count(file, c) <-- symbol(file, _, _, _), agg c = count() in symbol(file, _, _, _);
+            warning("big-file", file) <-- file_count(file, c), if c > 2;
+        "#;
+
+        let result = run_rules_source(rules, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "big.py");
     }
 
     #[test]
@@ -472,10 +558,133 @@ warning("x", "y") <-- symbol(_, _, _, _);
         relations.add_import("a.py", "b.py", "*");
         relations.add_import("b.py", "a.py", "*");
 
-        let builtin = &BUILTIN_RULES[0]; // circular-deps
-        let rule = parse_rule_content(builtin.content, builtin.id, true).unwrap();
+        let rule = find_builtin("circular-deps");
         let result = run_rule(&rule, &relations).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].rule_id.as_str(), "circular-deps");
+    }
+
+    #[test]
+    fn test_orphan_file() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "foo", "function", 1);
+        relations.add_symbol("b.py", "bar", "function", 1);
+        relations.add_symbol("c.py", "baz", "function", 1);
+        relations.add_import("a.py", "b.py", "bar");
+        // c.py is never imported
+
+        // Orphan-file is disabled by default, force-enable for test
+        let mut rule = find_builtin("orphan-file");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        let messages: Vec<&str> = result.iter().map(|d| d.message.as_str()).collect();
+        assert!(messages.contains(&"a.py")); // a.py is also an orphan (not imported)
+        assert!(messages.contains(&"c.py"));
+        assert!(!messages.contains(&"b.py")); // b.py is imported
+    }
+
+    #[test]
+    fn test_self_import() {
+        let mut relations = Relations::new();
+        relations.add_import("a.py", "a.py", "foo");
+        relations.add_import("b.py", "c.py", "bar");
+
+        let rule = find_builtin("self-import");
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "a.py");
+    }
+
+    #[test]
+    fn test_god_file() {
+        let mut relations = Relations::new();
+        // Add 51 symbols to big.py
+        for i in 0..51 {
+            relations.add_symbol("big.py", &format!("sym_{}", i), "function", i);
+        }
+        // Add 5 symbols to small.py
+        for i in 0..5 {
+            relations.add_symbol("small.py", &format!("sym_{}", i), "function", i);
+        }
+
+        let rule = find_builtin("god-file");
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "big.py");
+    }
+
+    #[test]
+    fn test_fan_out() {
+        let mut relations = Relations::new();
+        // Add 51 calls from the same function (threshold is >50)
+        for i in 0..51 {
+            relations.add_call("a.py", "orchestrator", &format!("helper_{}", i), i);
+        }
+        // Add 3 calls from a simple function
+        for i in 0..3 {
+            relations.add_call("b.py", "simple", &format!("util_{}", i), i);
+        }
+
+        // Fan-out is disabled by default, force-enable for test
+        let mut rule = find_builtin("fan-out");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "orchestrator");
+    }
+
+    #[test]
+    fn test_hub_file() {
+        let mut relations = Relations::new();
+        // 31 files import utils.py (threshold is >30)
+        for i in 0..31 {
+            relations.add_import(&format!("file_{}.py", i), "utils.py", "helper");
+        }
+        // Only 2 files import rare.py
+        relations.add_import("a.py", "rare.py", "x");
+        relations.add_import("b.py", "rare.py", "y");
+
+        // Hub-file is disabled by default, force-enable for test
+        let mut rule = find_builtin("hub-file");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "utils.py");
+    }
+
+    #[test]
+    fn test_duplicate_symbol_disabled_by_default() {
+        // duplicate-symbol is disabled by default in frontmatter
+        let builtin = BUILTIN_RULES
+            .iter()
+            .find(|b| b.id == "duplicate-symbol")
+            .unwrap();
+        let rule = parse_rule_content(builtin.content, builtin.id, true).unwrap();
+        assert!(!rule.enabled);
+    }
+
+    #[test]
+    fn test_duplicate_symbol_when_enabled() {
+        let mut relations = Relations::new();
+        relations.add_symbol("a.py", "process", "function", 1);
+        relations.add_symbol("b.py", "process", "function", 5);
+        relations.add_symbol("c.py", "unique", "function", 1);
+
+        // Parse and force-enable
+        let builtin = BUILTIN_RULES
+            .iter()
+            .find(|b| b.id == "duplicate-symbol")
+            .unwrap();
+        let mut rule = parse_rule_content(builtin.content, builtin.id, true).unwrap();
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "process");
+    }
+
+    /// Helper to find and parse a builtin rule by ID.
+    fn find_builtin(id: &str) -> FactsRule {
+        let builtin = BUILTIN_RULES.iter().find(|b| b.id == id).unwrap();
+        parse_rule_content(builtin.content, builtin.id, true).unwrap()
     }
 }

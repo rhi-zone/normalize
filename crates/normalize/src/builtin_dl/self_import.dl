@@ -1,0 +1,6 @@
+# ---
+# id = "self-import"
+# message = "File imports itself"
+# ---
+
+warning("self-import", file) <-- import(file, file, _);
