@@ -927,6 +927,9 @@ async fn cmd_check(
         }
     }
 
+    // Filter inline normalize-facts-allow: comments in source files
+    crate::interpret::filter_inline_allowed(&mut all_diagnostics, &root);
+
     if json {
         println!(
             "{}",

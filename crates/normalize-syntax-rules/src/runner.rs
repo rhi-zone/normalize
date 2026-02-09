@@ -42,13 +42,13 @@ impl DebugFlags {
     }
 }
 
-/// Check if a line contains a moss-allow comment for the given rule.
-/// Supports: `// moss-allow: rule-id` or `/* moss-allow: rule-id */`
+/// Check if a line contains a `normalize-syntax-allow:` comment for the given rule.
+/// Supports: `// normalize-syntax-allow: rule-id` or `/* normalize-syntax-allow: rule-id */`
 fn line_has_allow_comment(line: &str, rule_id: &str) -> bool {
-    // Look for moss-allow: followed by the rule ID
-    // Pattern: moss-allow: rule-id (optionally followed by - reason)
-    if let Some(pos) = line.find("moss-allow:") {
-        let after = &line[pos + 11..]; // len("moss-allow:")
+    // Look for normalize-syntax-allow: followed by the rule ID
+    // Pattern: normalize-syntax-allow: rule-id (optionally followed by - reason)
+    if let Some(pos) = line.find("normalize-syntax-allow:") {
+        let after = &line[pos + 23..]; // len("normalize-syntax-allow:")
         let after = after.trim_start();
         // Check if rule_id matches (might be followed by space, dash, or end of comment)
         if let Some(rest) = after.strip_prefix(rule_id) {

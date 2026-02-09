@@ -388,6 +388,52 @@ pub fn run_rule(
     Ok(diagnostics)
 }
 
+/// Filter out diagnostics suppressed by `normalize-facts-allow: rule-id` comments in source files.
+///
+/// When a diagnostic's message is a file path (relative to `root`), the first 10
+/// lines of that file are checked for `// normalize-facts-allow: rule-id` or
+/// `# normalize-facts-allow: rule-id`. This mirrors the inline suppression mechanism
+/// from syntax-rules.
+pub fn filter_inline_allowed(diagnostics: &mut Vec<Diagnostic>, root: &Path) {
+    diagnostics.retain(|d| {
+        let path = root.join(d.message.as_str());
+        if path.is_file() {
+            !file_has_allow_comment(&path, d.rule_id.as_str())
+        } else {
+            true // not a file path, keep it
+        }
+    });
+}
+
+/// Check if a file's header contains a `normalize-facts-allow: rule-id` comment.
+fn file_has_allow_comment(path: &Path, rule_id: &str) -> bool {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    content
+        .lines()
+        .take(10)
+        .any(|line| line_has_allow_comment(line, rule_id))
+}
+
+/// Check if a line contains a `normalize-facts-allow: rule-id` comment.
+/// Supports `// normalize-facts-allow: rule-id`, `# normalize-facts-allow: rule-id`,
+/// `/* normalize-facts-allow: rule-id */`, with optional `- reason` suffix.
+fn line_has_allow_comment(line: &str, rule_id: &str) -> bool {
+    if let Some(pos) = line.find("normalize-facts-allow:") {
+        let after = &line[pos + 22..]; // len("normalize-facts-allow:")
+        let after = after.trim_start();
+        if let Some(rest) = after.strip_prefix(rule_id) {
+            return rest.is_empty()
+                || rest.starts_with(char::is_whitespace)
+                || rest.starts_with('-')
+                || rest.starts_with("*/");
+        }
+    }
+    false
+}
+
 /// Run rules from a source string against the given relations.
 pub fn run_rules_source(
     source: &str,
@@ -887,6 +933,64 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         );
         let rules = load_all_rules(Path::new("/nonexistent"), &config);
         assert!(rules.iter().any(|r| r.id == "fan-out"));
+    }
+
+    #[test]
+    fn test_line_has_allow_comment() {
+        assert!(line_has_allow_comment(
+            "// normalize-facts-allow: god-file",
+            "god-file"
+        ));
+        assert!(line_has_allow_comment(
+            "# normalize-facts-allow: god-file",
+            "god-file"
+        ));
+        assert!(line_has_allow_comment(
+            "/* normalize-facts-allow: god-file */",
+            "god-file"
+        ));
+        assert!(line_has_allow_comment(
+            "// normalize-facts-allow: god-file - this file is intentionally large",
+            "god-file"
+        ));
+        assert!(!line_has_allow_comment(
+            "// normalize-facts-allow: god-file",
+            "fan-out"
+        ));
+        assert!(!line_has_allow_comment(
+            "// no suppression here",
+            "god-file"
+        ));
+    }
+
+    #[test]
+    fn test_filter_inline_allowed() {
+        let dir = std::env::temp_dir().join("normalize_test_inline_allow");
+        let _ = std::fs::create_dir_all(&dir);
+
+        // File with suppression comment
+        std::fs::write(
+            dir.join("suppressed.py"),
+            "# normalize-facts-allow: test-rule\ndef foo(): pass\n",
+        )
+        .unwrap();
+
+        // File without suppression
+        std::fs::write(dir.join("normal.py"), "def bar(): pass\n").unwrap();
+
+        let mut diagnostics = vec![
+            Diagnostic::warning("test-rule", "suppressed.py"),
+            Diagnostic::warning("test-rule", "normal.py"),
+            Diagnostic::warning("test-rule", "nonexistent.py"), // not a file, kept
+        ];
+
+        filter_inline_allowed(&mut diagnostics, &dir);
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics[0].message.as_str(), "normal.py");
+        assert_eq!(diagnostics[1].message.as_str(), "nonexistent.py");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Helper to find and parse a builtin rule by ID.
