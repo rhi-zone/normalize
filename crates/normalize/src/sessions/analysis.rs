@@ -59,7 +59,7 @@ pub struct ModelPricing {
 }
 
 impl ModelPricing {
-    /// Anthropic Claude pricing (as of Jan 2025).
+    /// Anthropic Claude pricing (as of Feb 2026).
     pub const SONNET_4_5: ModelPricing = ModelPricing {
         name: "Claude Sonnet 4.5",
         input_per_mtok: 3.0,
@@ -69,19 +69,19 @@ impl ModelPricing {
     };
 
     pub const OPUS_4_5: ModelPricing = ModelPricing {
-        name: "Claude Opus 4.5",
-        input_per_mtok: 15.0,
-        output_per_mtok: 75.0,
-        cache_write_per_mtok: 18.75,
-        cache_read_per_mtok: 1.50,
+        name: "Claude Opus 4.6",
+        input_per_mtok: 5.0,
+        output_per_mtok: 25.0,
+        cache_write_per_mtok: 6.25,
+        cache_read_per_mtok: 0.50,
     };
 
     pub const HAIKU_4: ModelPricing = ModelPricing {
-        name: "Claude Haiku 4",
-        input_per_mtok: 0.80,
-        output_per_mtok: 4.0,
-        cache_write_per_mtok: 1.0,
-        cache_read_per_mtok: 0.08,
+        name: "Claude Haiku 4.5",
+        input_per_mtok: 1.0,
+        output_per_mtok: 5.0,
+        cache_write_per_mtok: 1.25,
+        cache_read_per_mtok: 0.10,
     };
 
     /// Calculate cost for given token usage.
