@@ -129,6 +129,13 @@ impl LogFormat for ClaudeCodeFormat {
                         .and_then(|v| v.as_str())
                         .map(String::from);
 
+                    // Extract per-turn model
+                    let turn_model = entry
+                        .get("message")
+                        .and_then(|m| m.get("model"))
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
+
                     // Extract token usage (take max per request due to streaming)
                     if let Some(usage) = entry.get("message").and_then(|m| m.get("usage")) {
                         let tokens = TokenUsage {
@@ -146,6 +153,7 @@ impl LogFormat for ClaudeCodeFormat {
                             cache_create: usage
                                 .get("cache_creation_input_tokens")
                                 .and_then(|v| v.as_u64()),
+                            model: turn_model.clone(),
                         };
                         if let Some(ref req_id) = request_id {
                             let existing = request_tokens.entry(req_id.clone()).or_default();
@@ -158,6 +166,9 @@ impl LogFormat for ClaudeCodeFormat {
                             if let Some(cc) = tokens.cache_create {
                                 *existing.cache_create.get_or_insert(0) =
                                     existing.cache_create.unwrap_or(0).max(cc);
+                            }
+                            if tokens.model.is_some() {
+                                existing.model = tokens.model;
                             }
                         }
                     }

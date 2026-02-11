@@ -104,6 +104,9 @@ pub struct TokenUsage {
     pub cache_read: Option<u64>,
     /// Tokens written to cache.
     pub cache_create: Option<u64>,
+    /// Model used for this API call (if known per-turn).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 impl Session {

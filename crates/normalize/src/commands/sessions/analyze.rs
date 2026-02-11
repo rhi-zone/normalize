@@ -2,7 +2,8 @@
 
 use crate::output::{OutputFormat, OutputFormatter};
 use crate::sessions::{
-    SessionAnalysis, ToolStats, analyze_session, parse_session, parse_session_with_format,
+    DedupTokenStats, SessionAnalysis, ToolStats, analyze_session, parse_session,
+    parse_session_with_format,
 };
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
@@ -144,6 +145,21 @@ pub fn cmd_sessions_analyze_multi(
                         aggregate.retry_hotspots.push(rh);
                     }
                 }
+
+                // Aggregate actual cost
+                if let Some(cost) = a.actual_cost {
+                    *aggregate.actual_cost.get_or_insert(0.0) += cost;
+                }
+
+                // Aggregate dedup token stats
+                if let Some(dedup) = a.dedup_tokens {
+                    let agg = aggregate
+                        .dedup_tokens
+                        .get_or_insert(DedupTokenStats::default());
+                    agg.unique_input += dedup.unique_input;
+                    agg.unique_output += dedup.unique_output;
+                    agg.total_billed += dedup.total_billed;
+                }
             }
             Err(e) => {
                 eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
@@ -170,6 +186,14 @@ pub fn cmd_sessions_analyze_multi(
     // Extract common tool patterns from all chains
     use crate::sessions::extract_tool_patterns;
     aggregate.tool_patterns = extract_tool_patterns(&all_chains);
+
+    // Recompute uniqueness_ratio for aggregate dedup stats
+    if let Some(dedup) = &mut aggregate.dedup_tokens
+        && dedup.total_billed > 0
+    {
+        dedup.uniqueness_ratio =
+            (dedup.unique_input + dedup.unique_output) as f64 / dedup.total_billed as f64;
+    }
 
     // Update format to show aggregate info
     aggregate.format = format!("aggregate ({} sessions)", session_count);

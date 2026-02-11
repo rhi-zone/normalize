@@ -124,6 +124,7 @@ impl LogFormat for GeminiCliFormat {
                             output: tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0),
                             cache_read: tokens.get("cached").and_then(|v| v.as_u64()),
                             cache_create: None,
+                            model: msg.get("model").and_then(|v| v.as_str()).map(String::from),
                         });
                     }
                 }

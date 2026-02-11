@@ -261,6 +261,7 @@ impl LogFormat for CodexFormat {
                                     .unwrap_or(0),
                             cache_read: total.get("cached_input_tokens").and_then(|v| v.as_u64()),
                             cache_create: None,
+                            model: session.metadata.model.clone(),
                         });
                     }
                 }

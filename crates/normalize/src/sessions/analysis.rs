@@ -69,20 +69,79 @@ impl ModelPricing {
     };
 
     pub const OPUS_4_5: ModelPricing = ModelPricing {
-        name: "Claude Opus 4.6",
+        name: "Claude Opus 4.5/4.6",
         input_per_mtok: 5.0,
         output_per_mtok: 25.0,
         cache_write_per_mtok: 6.25,
         cache_read_per_mtok: 0.50,
     };
 
-    pub const HAIKU_4: ModelPricing = ModelPricing {
+    pub const OPUS_3: ModelPricing = ModelPricing {
+        name: "Claude Opus 3/4/4.1",
+        input_per_mtok: 15.0,
+        output_per_mtok: 75.0,
+        cache_write_per_mtok: 18.75,
+        cache_read_per_mtok: 1.50,
+    };
+
+    pub const HAIKU_4_5: ModelPricing = ModelPricing {
         name: "Claude Haiku 4.5",
         input_per_mtok: 1.0,
         output_per_mtok: 5.0,
         cache_write_per_mtok: 1.25,
         cache_read_per_mtok: 0.10,
     };
+
+    pub const HAIKU_3_5: ModelPricing = ModelPricing {
+        name: "Claude Haiku 3.5",
+        input_per_mtok: 0.80,
+        output_per_mtok: 4.0,
+        cache_write_per_mtok: 1.0,
+        cache_read_per_mtok: 0.08,
+    };
+
+    pub const HAIKU_3: ModelPricing = ModelPricing {
+        name: "Claude Haiku 3",
+        input_per_mtok: 0.25,
+        output_per_mtok: 1.25,
+        cache_write_per_mtok: 0.30,
+        cache_read_per_mtok: 0.03,
+    };
+
+    /// Look up pricing from a model identifier string (e.g. "claude-opus-4-6").
+    pub fn from_model_str(model: &str) -> Option<&'static ModelPricing> {
+        let m = model.to_lowercase();
+        if m.contains("opus") {
+            if m.contains("4-5") || m.contains("4.5") || m.contains("4-6") || m.contains("4.6") {
+                Some(&Self::OPUS_4_5)
+            } else {
+                Some(&Self::OPUS_3)
+            }
+        } else if m.contains("sonnet") {
+            Some(&Self::SONNET_4_5)
+        } else if m.contains("haiku") {
+            if m.contains("4") {
+                Some(&Self::HAIKU_4_5)
+            } else if m.contains("3-5") || m.contains("3.5") {
+                Some(&Self::HAIKU_3_5)
+            } else {
+                Some(&Self::HAIKU_3)
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Calculate cost for a single turn's token usage.
+    pub fn calculate_turn_cost(&self, usage: &normalize_chat_sessions::TokenUsage) -> f64 {
+        let input_cost = (usage.input as f64 / 1_000_000.0) * self.input_per_mtok;
+        let output_cost = (usage.output as f64 / 1_000_000.0) * self.output_per_mtok;
+        let cache_write_cost =
+            (usage.cache_create.unwrap_or(0) as f64 / 1_000_000.0) * self.cache_write_per_mtok;
+        let cache_read_cost =
+            (usage.cache_read.unwrap_or(0) as f64 / 1_000_000.0) * self.cache_read_per_mtok;
+        input_cost + output_cost + cache_write_cost + cache_read_cost
+    }
 
     /// Calculate cost for given token usage.
     pub fn calculate_cost(&self, stats: &TokenStats) -> CostBreakdown {
@@ -277,6 +336,19 @@ impl ToolPattern {
     }
 }
 
+/// Token deduplication statistics.
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
+pub struct DedupTokenStats {
+    /// Input tokens representing genuinely new content.
+    pub unique_input: u64,
+    /// Output tokens (always unique).
+    pub unique_output: u64,
+    /// Total billed tokens (input + output).
+    pub total_billed: u64,
+    /// Ratio of unique tokens to total billed (0.0-1.0).
+    pub uniqueness_ratio: f64,
+}
+
 /// Complete analysis of a session.
 #[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
 pub struct SessionAnalysis {
@@ -305,6 +377,10 @@ pub struct SessionAnalysis {
     pub command_stats: Vec<CommandStats>,
     /// Commands that failed and were retried
     pub retry_hotspots: Vec<RetryHotspot>,
+    /// Actual cost computed from per-turn model pricing (None if no models found).
+    pub actual_cost: Option<f64>,
+    /// Token deduplication statistics.
+    pub dedup_tokens: Option<DedupTokenStats>,
 }
 
 impl SessionAnalysis {
@@ -416,46 +492,85 @@ impl SessionAnalysis {
             // Cost breakdown
             lines.push("## Cost Estimate".to_string());
             lines.push(String::new());
-            let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
-            lines.push(format!(
-                "**{} (default)**: ${:.2}",
-                sonnet.model, sonnet.total_cost
-            ));
-            lines.push(format!("  - Input: ${:.2}", sonnet.input_cost));
-            lines.push(format!("  - Output: ${:.2}", sonnet.output_cost));
-            if sonnet.cache_write_cost > 0.0 {
-                lines.push(format!("  - Cache write: ${:.2}", sonnet.cache_write_cost));
-            }
-            if sonnet.cache_read_cost > 0.0 {
-                lines.push(format!("  - Cache read: ${:.2}", sonnet.cache_read_cost));
-            }
-            if sonnet.cache_savings > 0.0 {
-                let savings_pct =
-                    (sonnet.cache_savings / (sonnet.total_cost + sonnet.cache_savings)) * 100.0;
+
+            if let Some(actual) = self.actual_cost {
+                lines.push(format!("**Actual cost**: ${:.2}", actual));
+                lines.push(String::new());
+
+                let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
+                let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
+                let haiku = ModelPricing::HAIKU_4_5.calculate_cost(ts);
+                lines.push("**What-if pricing:**".to_string());
+                lines.push(format!("  - {}: ${:.2}", sonnet.model, sonnet.total_cost));
+                lines.push(format!("  - {}: ${:.2}", opus.model, opus.total_cost));
+                lines.push(format!("  - {}: ${:.2}", haiku.model, haiku.total_cost));
+            } else {
+                let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
                 lines.push(format!(
-                    "  - Cache savings: ${:.2} ({:.1}%)",
-                    sonnet.cache_savings, savings_pct
+                    "**{} (default)**: ${:.2}",
+                    sonnet.model, sonnet.total_cost
+                ));
+                lines.push(format!("  - Input: ${:.2}", sonnet.input_cost));
+                lines.push(format!("  - Output: ${:.2}", sonnet.output_cost));
+                if sonnet.cache_write_cost > 0.0 {
+                    lines.push(format!("  - Cache write: ${:.2}", sonnet.cache_write_cost));
+                }
+                if sonnet.cache_read_cost > 0.0 {
+                    lines.push(format!("  - Cache read: ${:.2}", sonnet.cache_read_cost));
+                }
+                if sonnet.cache_savings > 0.0 {
+                    let savings_pct =
+                        (sonnet.cache_savings / (sonnet.total_cost + sonnet.cache_savings)) * 100.0;
+                    lines.push(format!(
+                        "  - Cache savings: ${:.2} ({:.1}%)",
+                        sonnet.cache_savings, savings_pct
+                    ));
+                }
+                lines.push(String::new());
+
+                let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
+                let haiku = ModelPricing::HAIKU_4_5.calculate_cost(ts);
+                lines.push("**Alternative models:**".to_string());
+                lines.push(format!(
+                    "  - {}: ${:.2} ({:.1}x)",
+                    opus.model,
+                    opus.total_cost,
+                    opus.total_cost / sonnet.total_cost
+                ));
+                lines.push(format!(
+                    "  - {}: ${:.2} ({:.1}x)",
+                    haiku.model,
+                    haiku.total_cost,
+                    haiku.total_cost / sonnet.total_cost
                 ));
             }
             lines.push(String::new());
 
-            // Alternative models
-            let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
-            let haiku = ModelPricing::HAIKU_4.calculate_cost(ts);
-            lines.push("**Alternative models:**".to_string());
-            lines.push(format!(
-                "  - {}: ${:.2} ({:.1}x)",
-                opus.model,
-                opus.total_cost,
-                opus.total_cost / sonnet.total_cost
-            ));
-            lines.push(format!(
-                "  - {}: ${:.2} ({:.1}x)",
-                haiku.model,
-                haiku.total_cost,
-                haiku.total_cost / sonnet.total_cost
-            ));
-            lines.push(String::new());
+            // Token efficiency
+            if let Some(dedup) = &self.dedup_tokens {
+                lines.push("## Token Efficiency".to_string());
+                lines.push(String::new());
+                lines.push(format!(
+                    "- **Unique input**: {}",
+                    format_tokens(dedup.unique_input)
+                ));
+                lines.push(format!(
+                    "- **Unique output**: {}",
+                    format_tokens(dedup.unique_output)
+                ));
+                lines.push(format!(
+                    "- **Uniqueness ratio**: {:.1}%",
+                    dedup.uniqueness_ratio * 100.0
+                ));
+                let redundant = dedup
+                    .total_billed
+                    .saturating_sub(dedup.unique_input + dedup.unique_output);
+                lines.push(format!(
+                    "- **Redundant context**: {}",
+                    format_tokens(redundant)
+                ));
+                lines.push(String::new());
+            }
 
             // Token growth
             if !self.context_per_turn.is_empty() && self.context_per_turn.iter().any(|&c| c > 0) {
@@ -796,43 +911,91 @@ impl SessionAnalysis {
 
             // Cost breakdown
             writeln!(out, "\x1b[1;36m━━━ Cost Estimate ━━━\x1b[0m").unwrap();
-            let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
-            writeln!(
-                out,
-                "\x1b[1m{}\x1b[0m: \x1b[32m${:.2}\x1b[0m",
-                sonnet.model, sonnet.total_cost
-            )
-            .unwrap();
-            if sonnet.cache_savings > 0.0 {
-                let savings_pct =
-                    (sonnet.cache_savings / (sonnet.total_cost + sonnet.cache_savings)) * 100.0;
+
+            if let Some(actual) = self.actual_cost {
                 writeln!(
                     out,
-                    "  Cache savings: \x1b[33m${:.2}\x1b[0m ({:.1}%)",
-                    sonnet.cache_savings, savings_pct
+                    "\x1b[1mActual cost:\x1b[0m \x1b[32m${:.2}\x1b[0m",
+                    actual
+                )
+                .unwrap();
+
+                let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
+                let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
+                let haiku = ModelPricing::HAIKU_4_5.calculate_cost(ts);
+                writeln!(
+                    out,
+                    "What-if: {} ${:.2} | {} ${:.2} | {} ${:.2}",
+                    sonnet.model,
+                    sonnet.total_cost,
+                    opus.model,
+                    opus.total_cost,
+                    haiku.model,
+                    haiku.total_cost
+                )
+                .unwrap();
+            } else {
+                let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
+                writeln!(
+                    out,
+                    "\x1b[1m{}\x1b[0m: \x1b[32m${:.2}\x1b[0m",
+                    sonnet.model, sonnet.total_cost
+                )
+                .unwrap();
+                if sonnet.cache_savings > 0.0 {
+                    let savings_pct =
+                        (sonnet.cache_savings / (sonnet.total_cost + sonnet.cache_savings)) * 100.0;
+                    writeln!(
+                        out,
+                        "  Cache savings: \x1b[33m${:.2}\x1b[0m ({:.1}%)",
+                        sonnet.cache_savings, savings_pct
+                    )
+                    .unwrap();
+                }
+                writeln!(
+                    out,
+                    "  Input: ${:.2} | Output: ${:.2}",
+                    sonnet.input_cost, sonnet.output_cost
+                )
+                .unwrap();
+
+                let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
+                let haiku = ModelPricing::HAIKU_4_5.calculate_cost(ts);
+                writeln!(
+                    out,
+                    "If {}: ${:.2} (\x1b[31m{:.1}x\x1b[0m) | If {}: ${:.2} (\x1b[32m{:.1}x\x1b[0m)",
+                    opus.model,
+                    opus.total_cost,
+                    opus.total_cost / sonnet.total_cost,
+                    haiku.model,
+                    haiku.total_cost,
+                    haiku.total_cost / sonnet.total_cost
                 )
                 .unwrap();
             }
-            writeln!(
-                out,
-                "  Input: ${:.2} | Output: ${:.2}",
-                sonnet.input_cost, sonnet.output_cost
-            )
-            .unwrap();
 
-            let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
-            let haiku = ModelPricing::HAIKU_4.calculate_cost(ts);
-            writeln!(
-                out,
-                "If {}: ${:.2} (\x1b[31m{:.1}x\x1b[0m) | If {}: ${:.2} (\x1b[32m{:.1}x\x1b[0m)",
-                opus.model,
-                opus.total_cost,
-                opus.total_cost / sonnet.total_cost,
-                haiku.model,
-                haiku.total_cost,
-                haiku.total_cost / sonnet.total_cost
-            )
-            .unwrap();
+            // Token efficiency
+            if let Some(dedup) = &self.dedup_tokens {
+                writeln!(out).unwrap();
+                writeln!(out, "\x1b[1;36m━━━ Token Efficiency ━━━\x1b[0m").unwrap();
+                writeln!(
+                    out,
+                    "Unique input: {} | Unique output: {}",
+                    format_tokens(dedup.unique_input),
+                    format_tokens(dedup.unique_output)
+                )
+                .unwrap();
+                writeln!(
+                    out,
+                    "Uniqueness: \x1b[33m{:.1}%\x1b[0m",
+                    dedup.uniqueness_ratio * 100.0
+                )
+                .unwrap();
+                let redundant = dedup
+                    .total_billed
+                    .saturating_sub(dedup.unique_input + dedup.unique_output);
+                writeln!(out, "Redundant context: {}", format_tokens(redundant)).unwrap();
+            }
             writeln!(out).unwrap();
 
             // Token growth visualization
@@ -1731,6 +1894,11 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
 
     // Analyze token usage and build output_tokens_per_turn
     analysis.total_turns = session.turns.len();
+    let mut actual_cost_sum: f64 = 0.0;
+    let mut has_model_pricing = false;
+    let mut prev_context: u64 = 0;
+    let mut unique_input: u64 = 0;
+
     for turn in &session.turns {
         if let Some(usage) = &turn.token_usage {
             analysis.token_stats.api_calls += 1;
@@ -1747,10 +1915,41 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
             analysis.token_stats.update_context(context);
             analysis.context_per_turn.push(context);
             output_tokens_per_turn.push(usage.output);
+
+            // Actual cost from per-turn model
+            if let Some(model_str) = &usage.model
+                && let Some(pricing) = ModelPricing::from_model_str(model_str)
+            {
+                actual_cost_sum += pricing.calculate_turn_cost(usage);
+                has_model_pricing = true;
+            }
+
+            // Dedup: unique input = only context growth
+            unique_input += context.saturating_sub(prev_context);
+            prev_context = context;
         } else {
             analysis.context_per_turn.push(0);
             output_tokens_per_turn.push(0);
         }
+    }
+
+    if has_model_pricing {
+        analysis.actual_cost = Some(actual_cost_sum);
+    }
+
+    // Compute dedup token stats
+    let total_billed = analysis.token_stats.total_input
+        + analysis.token_stats.cache_read
+        + analysis.token_stats.total_output;
+    if total_billed > 0 {
+        let unique_output = analysis.token_stats.total_output;
+        let unique_total = unique_input + unique_output;
+        analysis.dedup_tokens = Some(DedupTokenStats {
+            unique_input,
+            unique_output,
+            total_billed,
+            uniqueness_ratio: unique_total as f64 / total_billed as f64,
+        });
     }
 
     // Build command stats and retry hotspots
