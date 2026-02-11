@@ -1,11 +1,11 @@
 //! Session parsing and analysis.
 //!
-//! Parsing is provided by the moss-sessions crate.
+//! Parsing is provided by the normalize-sessions crate.
 //! Analysis (computing metrics from parsed sessions) lives here in the CLI.
 
 mod analysis;
 
-// Re-export parsing types from moss-sessions
+// Re-export parsing types from normalize-sessions
 pub use normalize_chat_sessions::{
     ContentBlock, FormatRegistry, LogFormat, Message, Role, Session, SessionFile, SessionMetadata,
     TokenUsage, Turn, detect_format, get_format, list_formats, parse_session,

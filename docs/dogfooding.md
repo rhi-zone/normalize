@@ -1,13 +1,13 @@
 # Dogfooding Findings
 
-Using moss on itself. Patterns and observations from CLI usage.
+Using normalize on itself. Patterns and observations from CLI usage.
 
 ## View Primitive
 
 **What Works:**
-- Fuzzy path resolution: `view skeleton.rs` finds `crates/moss/src/skeleton.rs`
+- Fuzzy path resolution: `view skeleton.rs` finds `crates/normalize/src/skeleton.rs`
 - Symbol paths: `view skeleton.rs/SkeletonExtractor`
-- Underscore/hyphen equivalence: `normalize-api` matches `moss_api`
+- Underscore/hyphen equivalence: `normalize-api` matches `normalize_api`
 - `--depth` controls expansion level
 - `--json` for structured output
 
@@ -30,10 +30,10 @@ Using moss on itself. Patterns and observations from CLI usage.
 
 Effective pattern for understanding unfamiliar code:
 
-1. `moss view .` - get tree structure
-2. `moss view <file>` - file skeleton with symbols
-3. `moss analyze --complexity` - find complex areas
-4. `moss view <file>/<symbol>` - drill into specific symbol
+1. `normalize view .` - get tree structure
+2. `normalize view <file>` - file skeleton with symbols
+3. `normalize analyze --complexity` - find complex areas
+4. `normalize view <file>/<symbol>` - drill into specific symbol
 
 ## Token Efficiency
 

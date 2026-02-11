@@ -1,6 +1,6 @@
 //! Surface-level syntax translation between languages.
 //!
-//! `moss-surface-syntax` provides a common IR for imperative code and
+//! `normalize-surface-syntax` provides a common IR for imperative code and
 //! translates between language syntaxes (TypeScript, Lua, etc.) at the
 //! surface level - it maps syntax, not deep semantics.
 //!

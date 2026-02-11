@@ -44,14 +44,14 @@ async fn cmd_call_graph_async(
     let idx = match index::open_if_enabled(root).await {
         Some(i) => i,
         None => {
-            eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");
+            eprintln!("Indexing disabled or failed. Run: normalize index rebuild --call-graph");
             return 1;
         }
     };
 
     let stats = idx.call_graph_stats().await.unwrap_or_default();
     if stats.calls == 0 {
-        eprintln!("Call graph not indexed. Run: moss reindex --call-graph");
+        eprintln!("Call graph not indexed. Run: normalize reindex --call-graph");
         return 1;
     }
 

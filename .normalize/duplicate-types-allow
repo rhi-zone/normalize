@@ -1,6 +1,6 @@
 # Duplicate Types Allowlist
 #
-# CI runs: moss analyze duplicate-types --min-overlap 90
+# CI runs: normalize analyze duplicate-types --min-overlap 90
 #
 # Threshold rationale:
 # - Overlap is calculated as: common_fields / smaller_type_fields
@@ -12,7 +12,7 @@
 #   Args/Config patterns, or domain types that naturally share fields
 #
 # To add entries, use the CLI (preferred):
-#   moss analyze duplicate-types --allow "TypeA" "TypeB" --reason "why they're distinct"
+#   normalize analyze duplicate-types --allow "TypeA" "TypeB" --reason "why they're distinct"
 #
 # Format: TypeA TypeB (one pair per line, # comments allowed)
 # Order doesn't matter. Document why pairs are intentionally distinct.
@@ -220,7 +220,7 @@ FileIndex SymbolIndex
 LuaTree LuaNode
 
 # LLM configs share model/provider fields
-LlmClient MossAgentSession
+LlmClient NormalizeAgentSession
 
 # Content-based types share id/content
 Hunk BuiltinRule

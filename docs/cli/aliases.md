@@ -1,13 +1,13 @@
-# moss aliases
+# normalize aliases
 
 List filter aliases for `--exclude` and `--only` flags.
 
 ## Usage
 
 ```bash
-moss aliases              # List all aliases
-moss aliases --json       # JSON output
-moss aliases --root <DIR> # Specify project root
+normalize aliases              # List all aliases
+normalize aliases --json       # JSON output
+normalize aliases --root <DIR> # Specify project root
 ```
 
 ## Builtin Aliases
@@ -41,7 +41,7 @@ generated = []  # Disable @generated
 ## Usage with Commands
 
 ```bash
-moss view . --exclude @tests
-moss analyze --only @config
-moss text-search "TODO" --exclude @generated
+normalize view . --exclude @tests
+normalize analyze --only @config
+normalize text-search "TODO" --exclude @generated
 ```

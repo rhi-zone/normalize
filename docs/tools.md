@@ -1,8 +1,8 @@
-# Moss Tools
+# Normalize Tools
 
-**CLI**: `moss <command> [options]` — all commands support `--json`
+**CLI**: `normalize <command> [options]` — all commands support `--json`
 
-**MCP Server**: `moss mcp-server`
+**MCP Server**: `normalize mcp-server`
 
 ## Core Primitives
 
@@ -13,7 +13,7 @@ Three tools for all codebase operations:
 Show tree, file skeleton, or symbol source.
 
 ```
-moss view [target] [options]
+normalize view [target] [options]
 ```
 
 - `view` — project tree
@@ -29,7 +29,7 @@ moss view [target] [options]
 Structural code modifications via subcommands.
 
 ```
-moss edit <target> <subcommand>
+normalize edit <target> <subcommand>
 ```
 
 - `delete` — remove symbol
@@ -44,7 +44,7 @@ moss edit <target> <subcommand>
 Codebase analysis via subcommands.
 
 ```
-moss analyze [subcommand] [options]
+normalize analyze [subcommand] [options]
 ```
 
 - `health` — file counts, line counts, avg complexity
@@ -61,7 +61,7 @@ moss analyze [subcommand] [options]
 Regex search using ripgrep.
 
 ```
-moss text-search <pattern> [options]
+normalize text-search <pattern> [options]
 ```
 
 - `-i` — case-insensitive
@@ -72,10 +72,10 @@ moss text-search <pattern> [options]
 
 ### sessions
 
-Analyze agent session logs (Claude Code, Codex, Gemini, Moss).
+Analyze agent session logs (Claude Code, Codex, Gemini, Normalize).
 
 ```
-moss sessions [session_id] [options]
+normalize sessions [session_id] [options]
 ```
 
 - `--format <fmt>` — `claude` (default), `codex`, `gemini`, `normalize`
@@ -85,4 +85,4 @@ moss sessions [session_id] [options]
 
 ## DWIM Resolution
 
-Tool names are resolved with fuzzy matching. Fuzzy path resolution also works: `dwim.py` → `src/moss/dwim.py`
+Tool names are resolved with fuzzy matching. Fuzzy path resolution also works: `dwim.py` → `src/normalize/dwim.py`

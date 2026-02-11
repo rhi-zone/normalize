@@ -1,6 +1,6 @@
 # Duplicate Functions Allowlist
 #
-# CI runs: moss analyze duplicate-functions --min-lines 15
+# CI runs: normalize analyze duplicate-functions --min-lines 15
 #
 # Threshold rationale:
 # - Functions under 15 lines are often simple patterns (constructors, getters,
@@ -9,148 +9,148 @@
 # - This threshold eliminates ~95% of false positives while catching significant clones
 #
 # To add entries, use the CLI (preferred):
-#   moss analyze duplicate-functions --allow "file:symbol" --reason "why it's intentional"
+#   normalize analyze duplicate-functions --allow "file:symbol" --reason "why it's intentional"
 #
 # Format: file:symbol (one per line, # comments allowed)
 # Groups of related entries should be documented with a comment explaining why
 # they're intentionally parallel rather than candidates for extraction.
 
 # Legitimate parallel structures in openapi/jsonschema crates
-crates/moss-openapi/src/lib.rs:find_generator
-crates/moss-openapi/src/lib.rs:generators
-crates/moss-jsonschema/src/lib.rs:find_generator
-crates/moss-jsonschema/src/lib.rs:generators
+crates/normalize-openapi/src/lib.rs:find_generator
+crates/normalize-openapi/src/lib.rs:generators
+crates/normalize-jsonschema/src/lib.rs:find_generator
+crates/normalize-jsonschema/src/lib.rs:generators
 
 # Diagnostic constructors (intentionally parallel error/warning)
-crates/moss-tools/src/diagnostic.rs:error
-crates/moss-tools/src/diagnostic.rs:warning
+crates/normalize-tools/src/diagnostic.rs:error
+crates/normalize-tools/src/diagnostic.rs:warning
 
 # Parser/extractor constructors (common pattern)
-crates/moss/src/complexity.rs:new
-crates/moss/src/deps.rs:new
-crates/moss/src/edit.rs:new
-crates/moss/src/skeleton.rs:new
+crates/normalize/src/complexity.rs:new
+crates/normalize/src/deps.rs:new
+crates/normalize/src/edit.rs:new
+crates/normalize/src/skeleton.rs:new
 
 # FFI bindings and tool registry (parallel registration patterns)
-crates/moss-languages/src/ffi.rs:bindings
-crates/moss-languages/src/ffi.rs:add_binding
-crates/moss-tools/src/registry.rs:tools
-crates/moss-tools/src/registry.rs:register
+crates/normalize-languages/src/ffi.rs:bindings
+crates/normalize-languages/src/ffi.rs:add_binding
+crates/normalize-tools/src/registry.rs:tools
+crates/normalize-tools/src/registry.rs:register
 
 # Config getters (trivial boolean accessors)
-crates/moss/src/commands/todo.rs:show_all
-crates/moss/src/commands/grep.rs:ignore_case
-crates/moss/src/commands/view.rs:line_numbers
-crates/moss/src/commands/view.rs:show_docs
-crates/moss/src/commands/analyze.rs:compact
-crates/moss/src/commands/analyze.rs:clones
-crates/moss/src/config.rs:enabled
-crates/moss/src/daemon.rs:enabled
-crates/moss/src/daemon.rs:auto_start
+crates/normalize/src/commands/todo.rs:show_all
+crates/normalize/src/commands/grep.rs:ignore_case
+crates/normalize/src/commands/view.rs:line_numbers
+crates/normalize/src/commands/view.rs:show_docs
+crates/normalize/src/commands/analyze.rs:compact
+crates/normalize/src/commands/analyze.rs:clones
+crates/normalize/src/config.rs:enabled
+crates/normalize/src/daemon.rs:enabled
+crates/normalize/src/daemon.rs:auto_start
 
 # Session analysis counters (trivial sum accessors)
-crates/moss/src/sessions/analysis.rs:total_tool_calls
-crates/moss/src/sessions/analysis.rs:total_errors
+crates/normalize/src/sessions/analysis.rs:total_tool_calls
+crates/normalize/src/sessions/analysis.rs:total_errors
 
 # Count wrappers (delegate to count_by_severity)
-crates/moss-tools/src/tools.rs:error_count
-crates/moss-tools/src/tools.rs:warning_count
+crates/normalize-tools/src/tools.rs:error_count
+crates/normalize-tools/src/tools.rs:warning_count
 
 # AnalyzeConfig pass flags (trivial boolean accessors)
-crates/moss/src/commands/analyze.rs:health
-crates/moss/src/commands/analyze.rs:complexity
-crates/moss/src/commands/analyze.rs:security
+crates/normalize/src/commands/analyze.rs:health
+crates/normalize/src/commands/analyze.rs:complexity
+crates/normalize/src/commands/analyze.rs:security
 
 # Python stdlib lookup (similar but distinct)
-crates/moss-languages/src/python.rs:get_python_version
-crates/moss-languages/src/python.rs:find_python_stdlib
+crates/normalize-languages/src/python.rs:get_python_version
+crates/normalize-languages/src/python.rs:find_python_stdlib
 
 # C/C++ shared include directive handling (same preprocessor syntax)
-crates/moss-languages/src/c.rs:extract_imports
-crates/moss-languages/src/cpp.rs:extract_imports
+crates/normalize-languages/src/c.rs:extract_imports
+crates/normalize-languages/src/cpp.rs:extract_imports
 
 # Query functions (intentionally parallel highlight/injection)
-crates/moss/src/tree.rs:get_highlight_query
-crates/moss/src/tree.rs:get_injection_query
+crates/normalize/src/tree.rs:get_highlight_query
+crates/normalize/src/tree.rs:get_injection_query
 
 # Shader languages share comment/docstring syntax
-crates/moss-languages/src/glsl.rs:extract_docstring
-crates/moss-languages/src/hlsl.rs:extract_docstring
-crates/moss-languages/src/glsl.rs:extract_public_symbols
-crates/moss-languages/src/hlsl.rs:extract_public_symbols
+crates/normalize-languages/src/glsl.rs:extract_docstring
+crates/normalize-languages/src/hlsl.rs:extract_docstring
+crates/normalize-languages/src/glsl.rs:extract_public_symbols
+crates/normalize-languages/src/hlsl.rs:extract_public_symbols
 
 # Shell languages share comment patterns (# prefix)
-crates/moss-languages/src/awk.rs:extract_docstring
-crates/moss-languages/src/fish.rs:extract_docstring
-crates/moss-languages/src/jq.rs:extract_docstring
-crates/moss-languages/src/zsh.rs:extract_docstring
+crates/normalize-languages/src/awk.rs:extract_docstring
+crates/normalize-languages/src/fish.rs:extract_docstring
+crates/normalize-languages/src/jq.rs:extract_docstring
+crates/normalize-languages/src/zsh.rs:extract_docstring
 
 # Config/DSL languages share comment patterns (# prefix)
-crates/moss-languages/src/nix.rs:extract_docstring
-crates/moss-languages/src/perl.rs:extract_docstring
-crates/moss-languages/src/vim.rs:extract_docstring
+crates/normalize-languages/src/nix.rs:extract_docstring
+crates/normalize-languages/src/perl.rs:extract_docstring
+crates/normalize-languages/src/vim.rs:extract_docstring
 
 # Simple container extraction (name from first child, standard signature)
-crates/moss-languages/src/devicetree.rs:extract_container
-crates/moss-languages/src/kdl.rs:extract_container
-crates/moss-languages/src/verilog.rs:extract_container
-crates/moss-languages/src/rescript.rs:extract_container
-crates/moss-languages/src/agda.rs:extract_container
-crates/moss-languages/src/tlaplus.rs:extract_container
-crates/moss-languages/src/matlab.rs:extract_container
-crates/moss-languages/src/matlab.rs:extract_type
+crates/normalize-languages/src/devicetree.rs:extract_container
+crates/normalize-languages/src/kdl.rs:extract_container
+crates/normalize-languages/src/verilog.rs:extract_container
+crates/normalize-languages/src/rescript.rs:extract_container
+crates/normalize-languages/src/agda.rs:extract_container
+crates/normalize-languages/src/tlaplus.rs:extract_container
+crates/normalize-languages/src/matlab.rs:extract_container
+crates/normalize-languages/src/matlab.rs:extract_type
 
 # Simple function extraction patterns (not yet using helper)
-crates/moss-languages/src/matlab.rs:extract_function
-crates/moss-languages/src/starlark.rs:extract_function
-crates/moss-languages/src/thrift.rs:extract_function
-crates/moss-languages/src/batch.rs:extract_function
-crates/moss-languages/src/groovy.rs:extract_function
-crates/moss-languages/src/scss.rs:extract_function
-crates/moss-languages/src/svelte.rs:extract_function
+crates/normalize-languages/src/matlab.rs:extract_function
+crates/normalize-languages/src/starlark.rs:extract_function
+crates/normalize-languages/src/thrift.rs:extract_function
+crates/normalize-languages/src/batch.rs:extract_function
+crates/normalize-languages/src/groovy.rs:extract_function
+crates/normalize-languages/src/scss.rs:extract_function
+crates/normalize-languages/src/svelte.rs:extract_function
 
 # JavaScript test patterns (jest/vitest conventions)
-crates/moss-languages/src/javascript.rs:is_test_symbol
-crates/moss-languages/src/vue.rs:is_test_symbol
-crates/moss-languages/src/typescript.rs:is_test_symbol
-crates/moss-languages/src/svelte.rs:is_test_symbol
+crates/normalize-languages/src/javascript.rs:is_test_symbol
+crates/normalize-languages/src/vue.rs:is_test_symbol
+crates/normalize-languages/src/typescript.rs:is_test_symbol
+crates/normalize-languages/src/svelte.rs:is_test_symbol
 
 # Shell public symbol extraction (all exports via declare)
-crates/moss-languages/src/bash.rs:extract_public_symbols
-crates/moss-languages/src/fish.rs:extract_public_symbols
-crates/moss-languages/src/zsh.rs:extract_public_symbols
-crates/moss-languages/src/bash.rs:extract_function
-crates/moss-languages/src/vue.rs:extract_function
+crates/normalize-languages/src/bash.rs:extract_public_symbols
+crates/normalize-languages/src/fish.rs:extract_public_symbols
+crates/normalize-languages/src/zsh.rs:extract_public_symbols
+crates/normalize-languages/src/bash.rs:extract_function
+crates/normalize-languages/src/vue.rs:extract_function
 
 # Import format (JS module conventions)
-crates/moss-languages/src/vue.rs:format_import
-crates/moss-languages/src/svelte.rs:format_import
+crates/normalize-languages/src/vue.rs:format_import
+crates/normalize-languages/src/svelte.rs:format_import
 
 # Import extraction (keyword-based import patterns)
-crates/moss-languages/src/caddy.rs:extract_imports
-crates/moss-languages/src/capnp.rs:extract_imports
-crates/moss-languages/src/idris.rs:extract_imports
-crates/moss-languages/src/lean.rs:extract_imports
+crates/normalize-languages/src/caddy.rs:extract_imports
+crates/normalize-languages/src/capnp.rs:extract_imports
+crates/normalize-languages/src/idris.rs:extract_imports
+crates/normalize-languages/src/lean.rs:extract_imports
 
 # TypeScript duplicate methods (same impl in TypeScript and TSX)
-crates/moss-languages/src/typescript.rs:container_body
-crates/moss-languages/src/typescript.rs:is_test_symbol
-crates/moss-languages/src/typescript.rs:package_sources
+crates/normalize-languages/src/typescript.rs:container_body
+crates/normalize-languages/src/typescript.rs:is_test_symbol
+crates/normalize-languages/src/typescript.rs:package_sources
 
 # Java/Kotlin/Groovy test patterns (JUnit conventions)
-crates/moss-languages/src/groovy.rs:is_test_symbol
-crates/moss-languages/src/java.rs:is_test_symbol
-crates/moss-languages/src/kotlin.rs:is_test_symbol
+crates/normalize-languages/src/groovy.rs:is_test_symbol
+crates/normalize-languages/src/java.rs:is_test_symbol
+crates/normalize-languages/src/kotlin.rs:is_test_symbol
 
 # Generator lookup pattern (openapi/jsonschema crates)
-crates/moss-openapi/src/lib.rs:get_generator
-crates/moss-jsonschema/src/lib.rs:get_generator
+crates/normalize-openapi/src/lib.rs:get_generator
+crates/normalize-jsonschema/src/lib.rs:get_generator
 
 # FFI new() constructor pattern
-crates/moss-languages/src/ffi.rs:new
-crates/moss-cli-parser/src/formats/mod.rs:new
+crates/normalize-languages/src/ffi.rs:new
+crates/normalize-cli-parser/src/formats/mod.rs:new
 
 # Language node_name implementations (name child lookup)
-crates/moss-languages/src/batch.rs:node_name
-crates/moss-languages/src/d.rs:node_name
-crates/moss-languages/src/matlab.rs:node_name
+crates/normalize-languages/src/batch.rs:node_name
+crates/normalize-languages/src/d.rs:node_name
+crates/normalize-languages/src/matlab.rs:node_name

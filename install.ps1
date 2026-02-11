@@ -1,4 +1,4 @@
-# Moss CLI installer for Windows
+# Normalize CLI installer for Windows
 # Usage: irm https://raw.githubusercontent.com/rhi-zone/normalize/master/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
@@ -38,5 +38,5 @@ if ($UserPath -notlike "*$InstallDir*") {
 }
 
 Write-Host ""
-Write-Host "Installed moss $Version to $InstallDir"
-Write-Host "Restart your terminal, then run 'moss --help' to get started"
+Write-Host "Installed normalize $Version to $InstallDir"
+Write-Host "Restart your terminal, then run 'normalize --help' to get started"

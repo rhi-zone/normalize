@@ -84,40 +84,40 @@ Bug report with reproduction steps or error message.
 
 ## Example Session
 
-**Bug**: "moss view crashes on empty files"
+**Bug**: "normalize view crashes on empty files"
 
 ```
 Turn 1: Reproduce
-  $(run echo "" > /tmp/empty.rs && ./target/debug/moss view /tmp/empty.rs)
+  $(run echo "" > /tmp/empty.rs && ./target/debug/normalize view /tmp/empty.rs)
   → thread 'main' panicked at 'index out of bounds'
 
 Turn 2: Locate via stack trace
   $(text-search "index out of bounds" --only "*.rs")
   → No direct match, search for view command
-  $(view crates/moss/src/commands/view/mod.rs --types-only)
+  $(view crates/normalize/src/commands/view/mod.rs --types-only)
 
 Turn 3: Find the crash site
-  $(text-search "lines\[" path:crates/moss/src/commands/view)
+  $(text-search "lines\[" path:crates/normalize/src/commands/view)
   → view/mod.rs:142: let first_line = lines[0];
 
 Turn 4: Understand
-  $(view crates/moss/src/commands/view/mod.rs:135-150)
+  $(view crates/normalize/src/commands/view/mod.rs:135-150)
   → No check for empty lines array before indexing
 
 Turn 5: Fix
-  $(edit crates/moss/src/commands/view/mod.rs)
+  $(edit crates/normalize/src/commands/view/mod.rs)
   - let first_line = lines[0];
   + let first_line = lines.first().unwrap_or(&"");
 
 Turn 6: Add test
-  $(edit crates/moss/src/commands/view/tests.rs)
+  $(edit crates/normalize/src/commands/view/tests.rs)
   + #[test]
   + fn test_view_empty_file() { ... }
 
 Turn 7: Validate
-  $(run cargo test -p rhizome-moss view)
+  $(run cargo test -p rhizome-normalize view)
   → All tests pass
-  $(run ./target/debug/moss view /tmp/empty.rs)
+  $(run ./target/debug/normalize view /tmp/empty.rs)
   → No crash, shows empty output
 ```
 

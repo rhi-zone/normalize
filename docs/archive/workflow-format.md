@@ -1,6 +1,6 @@
 # Lua Workflows
 
-Moss uses Lua (LuaJIT) for workflow scripting. Lua was chosen over TOML because once you need conditionals, you're writing code anyway.
+Normalize uses Lua (LuaJIT) for workflow scripting. Lua was chosen over TOML because once you need conditionals, you're writing code anyway.
 
 ## Why Lua?
 
@@ -16,14 +16,14 @@ Moss uses Lua (LuaJIT) for workflow scripting. Lua was chosen over TOML because 
   workflows/
     test.lua           # Custom workflow
     deploy.lua         # Another workflow
-    moss.lua           # LuaCats type definitions (auto-generated)
+    normalize.lua           # LuaCats type definitions (auto-generated)
 ```
 
-Run with: `moss workflow run test`
+Run with: `normalize workflow run test`
 
 ## Available Functions
 
-### Moss Commands
+### Normalize Commands
 
 ```lua
 -- view(target) or view{target=..., depth=..., deps=..., context=...}
@@ -105,7 +105,7 @@ auto{
 }
 ```
 
-The LLM can call moss commands via text format: `> view src/main.rs`
+The LLM can call normalize commands via text format: `> view src/main.rs`
 
 ### manual{} - Interactive Menu
 
@@ -155,10 +155,10 @@ end
 
 ## Type Definitions
 
-For IDE support, moss generates LuaCats type definitions:
+For IDE support, normalize generates LuaCats type definitions:
 
 ```lua
--- .normalize/workflows/moss.lua (auto-generated)
+-- .normalize/workflows/normalize.lua (auto-generated)
 ---@class ViewOpts
 ---@field target? string
 ---@field depth? integer

@@ -18,7 +18,7 @@ use normalize::commands::view::ViewArgs;
 use normalize::serve::{self, ServeArgs};
 
 #[derive(Parser)]
-#[command(name = "moss")]
+#[command(name = "normalize")]
 #[command(about = "Fast code intelligence CLI")]
 struct Cli {
     #[command(subcommand)]
@@ -78,10 +78,10 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
-    /// Initialize moss in current directory
+    /// Initialize normalize in current directory
     Init(commands::init::InitArgs),
 
-    /// Manage the global moss daemon
+    /// Manage the global normalize daemon
     Daemon {
         #[command(subcommand)]
         action: commands::daemon::DaemonAction,
@@ -140,7 +140,7 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
-    /// Start a moss server (MCP, HTTP, LSP)
+    /// Start a normalize server (MCP, HTTP, LSP)
     Serve(ServeArgs),
 
     /// Generate code from API spec

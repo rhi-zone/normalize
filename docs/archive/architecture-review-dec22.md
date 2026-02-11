@@ -8,13 +8,13 @@ Session reviewing TODO items led to uncovering significant architectural debt. T
 
 **SkeletonAPI wraps rust_shim wraps Rust CLI:**
 ```
-MossToolExecutor("skeleton.format")
+NormalizeToolExecutor("skeleton.format")
     → api.skeleton.format()
         → rust_shim.rust_skeleton()
             → subprocess Rust CLI
                 → SkeletonExtractor
 ```
-Four layers to do what `subprocess.run(["moss", "view", path])` would do.
+Four layers to do what `subprocess.run(["normalize", "view", path])` would do.
 
 **Fix:** Call `rust_shim.passthrough()` directly. Remove Python wrapper methods.
 
@@ -33,9 +33,9 @@ Four layers to do what `subprocess.run(["moss", "view", path])` would do.
 
 | Command | What it does |
 |---------|--------------|
-| Rust `moss edit --replace` | Tree-sitter structural ops |
-| Python `moss edit --method structural` | Incomplete, only handles rename |
-| Python `moss edit --method synthesis` | LLM-based |
+| Rust `normalize edit --replace` | Tree-sitter structural ops |
+| Python `normalize edit --method structural` | Incomplete, only handles rename |
+| Python `normalize edit --method synthesis` | LLM-based |
 
 Same name, different behavior.
 
@@ -60,13 +60,13 @@ retry = "exponential"    # or fixed, none
 
 ```
 Rust CLI:
-  moss view <path>              # View file/symbol
-  moss edit <path> --replace    # Structural edit
-  moss analyze <path>           # Analysis
+  normalize view <path>              # View file/symbol
+  normalize edit <path> --replace    # Structural edit
+  normalize analyze <path>           # Analysis
 
 Python CLI:
-  moss run <workflow>           # Predefined steps (deterministic)
-  moss agent <task>             # LLM-driven (dynamic)
+  normalize run <workflow>           # Predefined steps (deterministic)
+  normalize agent <task>             # LLM-driven (dynamic)
 
 Shared:
   rust_shim.passthrough()       # Call Rust CLI
@@ -109,7 +109,7 @@ Key decisions needed:
 
 ## Progress (Dec 22 continued)
 
-Created `src/moss/execution/__init__.py` (~450 lines) with composable primitives:
+Created `src/normalize/execution/__init__.py` (~450 lines) with composable primitives:
 
 | Strategy Type | Implementations |
 |---------------|-----------------|

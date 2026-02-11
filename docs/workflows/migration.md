@@ -60,7 +60,7 @@ Updating code to new versions or patterns: framework upgrades, API changes, patt
 | Assess | `view`, `text-search`, changelogs |
 | Plan | Document, `analyze` impact |
 | Execute | `edit`, codemods, refactoring tools |
-| Verify | Tests, `moss analyze`, monitoring |
+| Verify | Tests, `normalize analyze`, monitoring |
 
 ## Migration Strategies
 

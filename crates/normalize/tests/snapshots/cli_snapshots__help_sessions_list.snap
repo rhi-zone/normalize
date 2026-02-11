@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 328
 expression: "snapshot_help(&[\"sessions\", \"list\"])"
 ---
 List sessions
@@ -15,7 +14,7 @@ Options:
       --project <PROJECT>   Filter by specific project path
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --all-projects        Show sessions from all projects (not just current)
-      --format <FORMAT>     Force specific format: claude, codex, gemini, moss
+      --format <FORMAT>     Force specific format: claude, codex, gemini, normalize
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)

@@ -1,4 +1,4 @@
-//! Build script for moss - rebuilds SPA when source changes.
+//! Build script for normalize - rebuilds SPA when source changes.
 
 #[cfg(feature = "sessions-web")]
 use std::fs;

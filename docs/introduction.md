@@ -1,15 +1,15 @@
-# Moss
+# Normalize
 
 **Code intelligence CLI for navigating and analyzing codebases.**
 
-Moss understands code structure (functions, classes, imports) rather than treating code as text. This enables precise navigation, accurate analysis, and structural modifications.
+Normalize understands code structure (functions, classes, imports) rather than treating code as text. This enables precise navigation, accurate analysis, and structural modifications.
 
 ## Quick Start
 
 ```bash
 # Build from source
 git clone https://github.com/rhi-zone/normalize
-cd moss
+cd normalize
 cargo build --release
 
 # Or with Nix
@@ -17,22 +17,22 @@ nix develop
 cargo build --release
 
 # View a file's structure
-moss view src/main.rs
+normalize view src/main.rs
 
 # Analyze codebase health
-moss analyze health
+normalize analyze health
 
 # Search for a symbol by name
-moss view MyClass
+normalize view MyClass
 ```
 
 ## Core Commands
 
 | Command | Purpose | Example |
 |---------|---------|---------|
-| `view` | Navigate structure | `moss view src/` or `moss view MyClass` |
-| `analyze` | Quality metrics | `moss analyze health` or `moss analyze complexity` |
-| `tools` | Run linters | `moss tools lint` or `moss tools test` |
+| `view` | Navigate structure | `normalize view src/` or `normalize view MyClass` |
+| `analyze` | Quality metrics | `normalize analyze health` or `normalize analyze complexity` |
+| `tools` | Run linters | `normalize tools lint` or `normalize tools test` |
 
 ## What It Does
 

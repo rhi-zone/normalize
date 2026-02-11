@@ -1,4 +1,4 @@
-# moss index
+# normalize index
 
 Manage the file index and call graph for faster operations.
 
@@ -15,16 +15,16 @@ Manage the file index and call graph for faster operations.
 
 ```bash
 # Check index status
-moss index status
+normalize index status
 
 # Rebuild everything
-moss index rebuild
+normalize index rebuild
 
 # Incremental refresh
-moss index refresh
+normalize index refresh
 
 # Clear index
-moss index clear
+normalize index clear
 ```
 
 ## Options
@@ -44,10 +44,10 @@ The index (`.normalize/index.db`) stores:
 
 ## Index-Optional Design
 
-All moss commands work without an index:
-- `moss view` falls back to filesystem + parsing
-- `moss analyze` parses files on demand
-- `moss grep` uses ripgrep directly
+All normalize commands work without an index:
+- `normalize view` falls back to filesystem + parsing
+- `normalize analyze` parses files on demand
+- `normalize grep` uses ripgrep directly
 
 The index provides:
 - Faster symbol search

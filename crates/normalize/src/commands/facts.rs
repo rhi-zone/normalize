@@ -2,7 +2,7 @@
 
 use crate::index;
 use crate::output::OutputFormat;
-use crate::paths::get_moss_dir;
+use crate::paths::get_normalize_dir;
 use crate::rules;
 use crate::skeleton;
 use clap::Subcommand;
@@ -255,7 +255,7 @@ async fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
         return cmd_storage(&root, json);
     }
 
-    let moss_dir = get_moss_dir(&root);
+    let moss_dir = get_normalize_dir(&root);
     let db_path = moss_dir.join("index.sqlite");
 
     let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
@@ -651,11 +651,11 @@ fn cmd_storage(root: &Path, json: bool) -> i32 {
     let index_path = root.join(".normalize").join("index.sqlite");
     let index_size = std::fs::metadata(&index_path).map(|m| m.len()).unwrap_or(0);
 
-    // Package cache: ~/.cache/moss/packages/
+    // Package cache: ~/.cache/normalize/packages/
     let cache_dir = get_cache_dir().map(|d| d.join("packages"));
     let cache_size = cache_dir.as_ref().map(|d| dir_size(d)).unwrap_or(0);
 
-    // Global cache: ~/.cache/moss/ (total)
+    // Global cache: ~/.cache/normalize/ (total)
     let global_cache_dir = get_cache_dir();
     let global_size = global_cache_dir.as_ref().map(|d| dir_size(d)).unwrap_or(0);
 
@@ -1086,11 +1086,11 @@ async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
 
 fn get_cache_dir() -> Option<PathBuf> {
     if let Ok(cache) = std::env::var("XDG_CACHE_HOME") {
-        Some(PathBuf::from(cache).join("moss"))
+        Some(PathBuf::from(cache).join("normalize"))
     } else if let Ok(home) = std::env::var("HOME") {
-        Some(PathBuf::from(home).join(".cache").join("moss"))
+        Some(PathBuf::from(home).join(".cache").join("normalize"))
     } else if let Ok(home) = std::env::var("USERPROFILE") {
-        Some(PathBuf::from(home).join(".cache").join("moss"))
+        Some(PathBuf::from(home).join(".cache").join("normalize"))
     } else {
         None
     }

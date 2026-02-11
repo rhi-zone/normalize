@@ -83,22 +83,22 @@ This balances stability (don't break the base model) with responsiveness (tools 
 - **PPO/DPO**: Preference-based learning for agent-tool alignment
 - **Test-time methods**: Gradient-based and contrastive refinement at inference
 
-## Relevance to Moss
+## Relevance to Normalize
 
 **Current state:**
-- Moss tools (view, analyze, grep) are **T1** - agent-agnostic, reusable across any LLM
+- Normalize tools (view, analyze, grep) are **T1** - agent-agnostic, reusable across any LLM
 - Index refresh is **T1 adaptation** - tools improve independently via file watching
-- No agent adaptation (A1/A2) - moss doesn't fine-tune LLMs
+- No agent adaptation (A1/A2) - normalize doesn't fine-tune LLMs
 
 **Implications:**
-- T1 is the right choice for moss: general-purpose tools work with any agent
-- If moss ever needed specialization, T2 (agent-supervised tool adaptation) would be the path
-- A1/A2 require fine-tuning LLMs, which is outside moss's scope (use the best available models)
+- T1 is the right choice for normalize: general-purpose tools work with any agent
+- If normalize ever needed specialization, T2 (agent-supervised tool adaptation) would be the path
+- A1/A2 require fine-tuning LLMs, which is outside normalize's scope (use the best available models)
 
 **Design validation:**
-- "Tool misalignment" is exactly what moss's structural tools address - give agents better tools, not more context
-- "Generalization gaps" supports moss's approach of broad language support (98 languages)
-- Framework confirms moss's implicit strategy: invest in T1 (tool quality), outsource A1/A2 to model providers
+- "Tool misalignment" is exactly what normalize's structural tools address - give agents better tools, not more context
+- "Generalization gaps" supports normalize's approach of broad language support (98 languages)
+- Framework confirms normalize's implicit strategy: invest in T1 (tool quality), outsource A1/A2 to model providers
 
 ## Friction Signals (Usage Telemetry)
 
@@ -109,8 +109,8 @@ The paper's "T2" (agent-supervised tool adaptation) maps to a practical question
 | Signal | What It Means | Example |
 |--------|---------------|---------|
 | Correction patterns | Agent struggled, user fixed | "You're right", "Should have", "Fair point" after tool call |
-| Long tool chains | Agent can't get what it needs | 5+ `moss view` calls without acting |
-| Tool avoidance | Agent works around the tool | Uses `grep` instead of `moss view`, spawns Explore agent |
+| Long tool chains | Agent can't get what it needs | 5+ `normalize view` calls without acting |
+| Tool avoidance | Agent works around the tool | Uses `grep` instead of `normalize view`, spawns Explore agent |
 | Follow-up patterns | Output was incomplete | `view --types-only` → immediately `view <symbol>` |
 | Repeated queries | First result wasn't useful | Same file/symbol viewed multiple times |
 

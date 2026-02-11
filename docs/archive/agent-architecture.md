@@ -40,13 +40,13 @@ Roles are implemented in `agent.lua` as `ROLE_PROMPTS` tables.
 - **Purpose**: answer questions about the codebase
 - **Tools**: view, text-search, run (read-only shell)
 - **Output**: answer with evidence
-- **Usage**: `moss @agent --v2 "how does X work?"`
+- **Usage**: `normalize @agent --v2 "how does X work?"`
 
 ### Auditor
 - **Purpose**: find issues (security, quality, patterns)
 - **Tools**: view, text-search, run (read-only shell)
 - **Output**: findings with locations and severity
-- **Usage**: `moss @agent --audit "find unwrap on user input"`
+- **Usage**: `normalize @agent --audit "find unwrap on user input"`
 
 Auditor evaluator output format:
 ```
@@ -66,7 +66,7 @@ $(answer
 - **Purpose**: make changes to fix issues
 - **Tools**: view, text-search, edit, run (with validation)
 - **Output**: applied changes + verification
-- **Usage**: `moss @agent --refactor "rename foo to bar"`
+- **Usage**: `normalize @agent --refactor "rename foo to bar"`
 - **Note**: Always plans first (--plan implicit)
 
 ## Tool Access Levels
@@ -82,16 +82,16 @@ $(answer
 
 Currently explicit via shortcuts:
 ```
-moss @agent --v2 "how does X work?"      # investigator (default)
-moss @agent --audit "find security issues"  # auditor
-moss @agent --refactor "rename foo to bar"  # refactorer
+normalize @agent --v2 "how does X work?"      # investigator (default)
+normalize @agent --audit "find security issues"  # auditor
+normalize @agent --refactor "rename foo to bar"  # refactorer
 ```
 
 Auto-dispatch via LLM classifier:
 ```
-moss @agent --auto "find security vulnerabilities"  # → auditor
-moss @agent --auto "how does X work?"               # → investigator
-moss @agent --auto "rename foo to bar"              # → refactorer
+normalize @agent --auto "find security vulnerabilities"  # → auditor
+normalize @agent --auto "how does X work?"               # → investigator
+normalize @agent --auto "rename foo to bar"              # → refactorer
 ```
 
 Uses lightweight LLM call to classify intent. Enables:

@@ -1,6 +1,6 @@
-//! Server commands for moss (MCP, HTTP, LSP).
+//! Server commands for normalize (MCP, HTTP, LSP).
 //!
-//! Servers expose moss functionality over various protocols.
+//! Servers expose normalize functionality over various protocols.
 
 use clap::{Args, Subcommand};
 use serde::Deserialize;

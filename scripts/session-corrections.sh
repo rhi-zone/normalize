@@ -14,11 +14,11 @@ PATTERN="${1:-*}"
 
 # Build once, run fast
 cargo build --quiet --package normalize-cli --release 2>/dev/null
-MOSS="./target/release/moss"
+NORMALIZE="./target/release/normalize"
 
 # Single pass: extract all Claude text responses with category tags
 TMPFILE=$(mktemp)
-$MOSS sessions "$PATTERN" --jq '
+$NORMALIZE sessions "$PATTERN" --jq '
   select(.type == "assistant") |
   .message.content[]? |
   select(.type == "text") |
@@ -49,7 +49,7 @@ echo
 echo "=== User Correction Messages (sample) ==="
 echo "(What users say when correcting - for CLAUDE.md rules)"
 echo
-$MOSS sessions "$PATTERN" --jq '
+$NORMALIZE sessions "$PATTERN" --jq '
   select(.type == "user") |
   .message |
   select(.content | type == "string") |

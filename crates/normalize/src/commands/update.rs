@@ -1,4 +1,4 @@
-//! Self-update command for moss CLI.
+//! Self-update command for normalize CLI.
 
 use std::io::Read;
 
@@ -18,7 +18,7 @@ pub fn cmd_update(check_only: bool, format: &crate::output::OutputFormat) -> i32
 
     let response = match client
         .get(&url)
-        .set("User-Agent", "moss-cli")
+        .set("User-Agent", "normalize-cli")
         .set("Accept", "application/vnd.github+json")
         .call()
     {
@@ -72,7 +72,7 @@ pub fn cmd_update(check_only: bool, format: &crate::output::OutputFormat) -> i32
     if check_only {
         if !json {
             println!();
-            println!("Update available! Run 'moss update' to install.");
+            println!("Update available! Run 'normalize update' to install.");
         }
         return 0;
     }
@@ -189,7 +189,7 @@ pub fn cmd_update(check_only: bool, format: &crate::output::OutputFormat) -> i32
 
     println!();
     println!("Updated successfully to v{}!", latest_version);
-    println!("Restart moss to use the new version.");
+    println!("Restart normalize to use the new version.");
 
     0
 }
@@ -220,9 +220,9 @@ fn get_target_triple() -> String {
 /// Get the expected asset name for a target
 fn get_asset_name(target: &str) -> String {
     if target.contains("windows") {
-        format!("moss-{}.zip", target)
+        format!("normalize-{}.zip", target)
     } else {
-        format!("moss-{}.tar.gz", target)
+        format!("normalize-{}.tar.gz", target)
     }
 }
 
@@ -344,7 +344,7 @@ impl Sha256 {
     }
 }
 
-/// Extract the moss binary from a tar.gz archive
+/// Extract the normalize binary from a tar.gz archive
 fn extract_tar_gz(data: &[u8]) -> Result<Vec<u8>, String> {
     let decoder = flate2::read::GzDecoder::new(data);
     let mut archive = tar::Archive::new(decoder);
@@ -353,7 +353,7 @@ fn extract_tar_gz(data: &[u8]) -> Result<Vec<u8>, String> {
         let mut entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path().map_err(|e| e.to_string())?;
 
-        if path.file_name().map(|n| n == "moss").unwrap_or(false) {
+        if path.file_name().map(|n| n == "normalize").unwrap_or(false) {
             let mut contents = Vec::new();
             entry
                 .read_to_end(&mut contents)
@@ -362,10 +362,10 @@ fn extract_tar_gz(data: &[u8]) -> Result<Vec<u8>, String> {
         }
     }
 
-    Err("moss binary not found in archive".to_string())
+    Err("normalize binary not found in archive".to_string())
 }
 
-/// Extract the moss binary from a zip archive
+/// Extract the normalize binary from a zip archive
 fn extract_zip(data: &[u8]) -> Result<Vec<u8>, String> {
     use std::io::Cursor;
 
@@ -376,14 +376,14 @@ fn extract_zip(data: &[u8]) -> Result<Vec<u8>, String> {
         let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
         let name = file.name().to_string();
 
-        if name == "moss.exe" || name == "moss" {
+        if name == "normalize.exe" || name == "normalize" {
             let mut contents = Vec::new();
             file.read_to_end(&mut contents).map_err(|e| e.to_string())?;
             return Ok(contents);
         }
     }
 
-    Err("moss binary not found in archive".to_string())
+    Err("normalize binary not found in archive".to_string())
 }
 
 /// Replace the current binary with new data

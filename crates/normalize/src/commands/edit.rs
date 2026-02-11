@@ -1,4 +1,4 @@
-//! Edit command for moss CLI.
+//! Edit command for normalize CLI.
 
 use clap::Args;
 use std::path::{Path, PathBuf};
@@ -1034,7 +1034,7 @@ pub fn cmd_undo_redo(
                 })
             );
         } else {
-            eprintln!("No shadow history exists. Make an edit first with `moss edit`.");
+            eprintln!("No shadow history exists. Make an edit first with `normalize edit`.");
         }
         return 1;
     }

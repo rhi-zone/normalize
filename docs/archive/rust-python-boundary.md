@@ -42,7 +42,7 @@ Put it in **Python** if:
 | Fast queries | `callers`, `callees`, `deps`, `complexity` |
 | Daemon | Background indexing, file watching |
 
-### Python (src/moss/)
+### Python (src/normalize/)
 
 | Category | Examples |
 |----------|----------|

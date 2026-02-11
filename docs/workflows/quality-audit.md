@@ -57,7 +57,7 @@ Finding code quality issues: complexity, duplication, maintainability problems.
 
 | Phase | Tools |
 |-------|-------|
-| Measure | `moss analyze`, coverage tools, linters |
+| Measure | `normalize analyze`, coverage tools, linters |
 | Analyze | Manual review, `view` |
 | Prioritize | Judgment, stakeholder input |
 | Report | Document findings |
@@ -67,46 +67,46 @@ Finding code quality issues: complexity, duplication, maintainability problems.
 ### Complexity
 ```bash
 # Find complex functions
-moss analyze complexity --threshold 15
+normalize analyze complexity --threshold 15
 
 # Find long functions
-moss analyze length --threshold 100
+normalize analyze length --threshold 100
 ```
 
 ### Duplication
 ```bash
 # Find duplicate functions
-moss analyze duplicate-functions
+normalize analyze duplicate-functions
 
 # Find similar type definitions
-moss analyze duplicate-types
+normalize analyze duplicate-types
 ```
 
 ### Maintainability
 ```bash
 # Overall health check
-moss analyze health
+normalize analyze health
 
 # Full analysis with grades
-moss analyze all
+normalize analyze all
 ```
 
 ### Testing
 ```bash
 # Check test coverage
-moss analyze test-coverage
+normalize analyze test-coverage
 
 # Find untested code paths
-moss analyze untested
+normalize analyze untested
 ```
 
 ### Documentation
 ```bash
 # Check doc coverage
-moss analyze docs
+normalize analyze docs
 
 # Find undocumented public APIs
-moss view src --types-only --undocumented
+normalize view src --types-only --undocumented
 ```
 
 ## Quality Metrics
@@ -134,25 +134,25 @@ moss view src --types-only --undocumented
 
 ```
 Turn 1: Run comprehensive analysis
-  $(moss analyze all)
+  $(normalize analyze all)
   → Overall grade: C
   → Complexity: B
   → Duplication: D
   → Coverage: C
 
 Turn 2: Investigate duplication
-  $(moss analyze duplicate-functions)
+  $(normalize analyze duplicate-functions)
   → 12 duplicate function pairs
   → 3 clusters of similar validation logic
 
 Turn 3: Find worst complexity offenders
-  $(moss analyze complexity --threshold 20)
+  $(normalize analyze complexity --threshold 20)
   → src/parser.rs:parse_expression (CC: 45)
   → src/handlers.rs:handle_request (CC: 32)
   → src/validator.rs:validate (CC: 28)
 
 Turn 4: Check test coverage for complex code
-  $(moss analyze coverage path:src/parser.rs)
+  $(normalize analyze coverage path:src/parser.rs)
   → parse_expression: 23% coverage
   → High complexity + low coverage = high risk
 

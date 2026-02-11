@@ -58,7 +58,7 @@ Sources are Lua modules that populate memory via `store()`. Not a special API - 
 ```lua
 -- .normalize/sources/session.lua
 -- Remembers current session automatically
-moss.on("file_opened", function(file)
+normalize.on("file_opened", function(file)
   store("Working on " .. file, {context = file, weight = 0.5})
 end)
 ```

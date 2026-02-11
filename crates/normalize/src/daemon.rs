@@ -17,11 +17,11 @@ use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
 
-/// Get global daemon socket path (~/.config/moss/daemon.sock)
+/// Get global daemon socket path (~/.config/normalize/daemon.sock)
 pub fn global_socket_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("moss")
+        .join("normalize")
         .join("daemon.sock")
 }
 

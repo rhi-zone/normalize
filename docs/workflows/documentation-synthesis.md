@@ -137,7 +137,7 @@ grep -r "^pub " --include="*.rs" src/ | grep -v "pub(crate)"
 grep -r "^export " --include="*.ts" src/
 
 # Dependencies between modules
-# (use moss analyze or similar tools)
+# (use normalize analyze or similar tools)
 ```
 
 ### Git History for Context
@@ -305,7 +305,7 @@ Generate documentation that explains:
 cargo depgraph | dot -Tpng > deps.png
 
 # Analyze module coupling
-moss analyze --complexity src/
+normalize analyze --complexity src/
 
 # Identify entry points
 grep -r "fn main" --include="*.rs" src/

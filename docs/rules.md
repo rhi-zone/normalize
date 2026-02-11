@@ -269,14 +269,14 @@ normalize rules update
 normalize rules remove security
 ```
 
-Imported rules are tracked in `.normalize/rules.lock` (project) or `~/.config/moss/rules.lock` (global).
+Imported rules are tracked in `.normalize/rules.lock` (project) or `~/.config/normalize/rules.lock` (global).
 
 ## Loading Order
 
 Rules are loaded in this order (later rules override earlier ones by `id`):
 
 1. **Embedded builtins** (compiled into the binary)
-2. **Global rules** (`~/.config/moss/rules/*.scm`)
+2. **Global rules** (`~/.config/normalize/rules/*.scm`)
 3. **Project rules** (`.normalize/rules/*.scm`)
 
 ## Builtin Rules

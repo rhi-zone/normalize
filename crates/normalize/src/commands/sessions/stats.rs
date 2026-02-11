@@ -236,7 +236,7 @@ pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFi
 }
 
 /// Extract repository name from session path.
-/// For paths like ~/.claude/projects/-home-me-git-moss/session.jsonl, returns "moss"
+/// For paths like ~/.claude/projects/-home-me-git-normalize/session.jsonl, returns "normalize"
 /// For other paths, returns the parent directory name.
 fn extract_repo_name(path: &Path) -> String {
     // Try to find .claude/projects/ in the path
@@ -248,7 +248,7 @@ fn extract_repo_name(path: &Path) -> String {
             let proj_dir = &after_projects[..slash_idx];
 
             // Clean up the project directory name
-            // -home-me-git-moss -> moss
+            // -home-me-git-normalize -> normalize
             if let Some(last_dash) = proj_dir.rfind('-') {
                 return proj_dir[last_dash + 1..].to_string();
             }

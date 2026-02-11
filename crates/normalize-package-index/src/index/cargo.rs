@@ -31,7 +31,7 @@ impl PackageIndex for CargoIndex {
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
         let url = format!("{}/crates/{}", Self::CRATES_API, name);
         let response: serde_json::Value = ureq::get(&url)
-            .set("User-Agent", "moss-packages/0.1")
+            .set("User-Agent", "normalize-packages/0.1")
             .call()?
             .into_json()?;
 
@@ -138,7 +138,7 @@ impl PackageIndex for CargoIndex {
     fn fetch_all_versions(&self, name: &str) -> Result<Vec<PackageMeta>, IndexError> {
         let url = format!("{}/crates/{}", Self::CRATES_API, name);
         let response: serde_json::Value = ureq::get(&url)
-            .set("User-Agent", "moss-packages/0.1")
+            .set("User-Agent", "normalize-packages/0.1")
             .call()?
             .into_json()?;
 
@@ -234,7 +234,7 @@ impl PackageIndex for CargoIndex {
     fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
         let url = format!("{}/crates/{}/versions", Self::CRATES_API, name);
         let response: serde_json::Value = ureq::get(&url)
-            .set("User-Agent", "moss-packages/0.1")
+            .set("User-Agent", "normalize-packages/0.1")
             .call()?
             .into_json()?;
 
@@ -257,7 +257,7 @@ impl PackageIndex for CargoIndex {
     fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
         let url = format!("{}/crates?q={}&per_page=50", Self::CRATES_API, query);
         let response: serde_json::Value = ureq::get(&url)
-            .set("User-Agent", "moss-packages/0.1")
+            .set("User-Agent", "normalize-packages/0.1")
             .call()?
             .into_json()?;
 

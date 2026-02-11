@@ -1,11 +1,11 @@
-# moss sessions plans
+# normalize sessions plans
 
 List and view Claude Code plans from `~/.claude/plans/`.
 
 ## Usage
 
 ```bash
-moss sessions plans [OPTIONS] [NAME]
+normalize sessions plans [OPTIONS] [NAME]
 ```
 
 ## Arguments
@@ -26,19 +26,19 @@ moss sessions plans [OPTIONS] [NAME]
 
 ```bash
 # List recent plans
-moss sessions plans
+normalize sessions plans
 
 # List more plans
-moss sessions plans --limit 50
+normalize sessions plans --limit 50
 
 # View a specific plan by name
-moss sessions plans my-feature
+normalize sessions plans my-feature
 
 # View plan with JSON output
-moss sessions plans my-feature --json
+normalize sessions plans my-feature --json
 
 # Fuzzy match plan names
-moss sessions plans feature  # matches "my-feature", "new-feature", etc.
+normalize sessions plans feature  # matches "my-feature", "new-feature", etc.
 ```
 
 ## Output Format

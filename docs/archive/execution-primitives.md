@@ -371,7 +371,7 @@ For computed values: plugins extend TOML, or use Python directly.
 
 ## Prototype Status
 
-Implemented in `src/moss/execution/__init__.py` (~450 lines):
+Implemented in `src/normalize/execution/__init__.py` (~450 lines):
 
 - [x] Scope with pluggable ContextStrategy
 - [x] Context strategies: FlatContext, TaskListContext, TaskTreeContext
@@ -387,7 +387,7 @@ Implemented in `src/moss/execution/__init__.py` (~450 lines):
 Works:
 ```python
 # Agent loop with composable strategies
-from moss.execution import agent_loop, TaskTreeContext, InMemoryCache, SimpleLLM
+from normalize.execution import agent_loop, TaskTreeContext, InMemoryCache, SimpleLLM
 
 result = agent_loop(
     task="Fix type errors in main.py",
@@ -432,7 +432,7 @@ with Scope(context=TaskTreeContext()) as outer:
 
 ### Final: Remove DWIMLoop
 
-- [ ] Wire `moss agent` CLI to use `run_workflow("dwim.toml", task)`
+- [ ] Wire `normalize agent` CLI to use `run_workflow("dwim.toml", task)`
 - [ ] Delete `dwim_loop.py` (1151 lines → 0)
 
 ## End Goal

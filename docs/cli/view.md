@@ -1,4 +1,4 @@
-# moss view
+# normalize view
 
 View directories, files, symbols, or line ranges. The primary way to explore code.
 
@@ -20,24 +20,24 @@ View directories, files, symbols, or line ranges. The primary way to explore cod
 
 ```bash
 # Directory tree
-moss view .
-moss view src/
+normalize view .
+normalize view src/
 
 # File skeleton (signatures only)
-moss view src/main.rs
-moss view src/main.rs --types-only
+normalize view src/main.rs
+normalize view src/main.rs --types-only
 
 # Symbol within file
-moss view src/main.rs/main
-moss view src/config.rs/Config/new
+normalize view src/main.rs/main
+normalize view src/config.rs/Config/new
 
 # Symbol search (finds across codebase)
-moss view Config
-moss view Config/new
+normalize view Config
+normalize view Config/new
 
 # Line-based
-moss view src/main.rs:42        # Symbol at line 42
-moss view src/main.rs:10-50     # Lines 10-50
+normalize view src/main.rs:42        # Symbol at line 42
+normalize view src/main.rs:10-50     # Lines 10-50
 ```
 
 ## Options
@@ -99,22 +99,22 @@ show_docs = false      # Show full docstrings by default
 ### Replace Read tool
 ```bash
 # Instead of Read tool for specific lines
-moss view src/main.rs:10-50
+normalize view src/main.rs:10-50
 
 # Instead of Read for file overview
-moss view src/main.rs --types-only
+normalize view src/main.rs --types-only
 ```
 
 ### Explore codebase structure
 ```bash
-moss view .                    # Project tree
-moss view src/ -d 2            # Deeper tree with symbols
-moss view . --type function    # All functions
+normalize view .                    # Project tree
+normalize view src/ -d 2            # Deeper tree with symbols
+normalize view . --type function    # All functions
 ```
 
 ### Navigate to symbol
 ```bash
-moss view Config               # Find Config anywhere
-moss view config.rs/Config     # Config in specific file
-moss view Config/new           # Method within class
+normalize view Config               # Find Config anywhere
+normalize view config.rs/Config     # Config in specific file
+normalize view Config/new           # Method within class
 ```

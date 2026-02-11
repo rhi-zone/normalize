@@ -1,6 +1,6 @@
 # Lua CLI Library Design
 
-Opinionated CLI parsing for moss scripts.
+Opinionated CLI parsing for normalize scripts.
 
 ## Goals
 
@@ -60,7 +60,7 @@ cli.run {
 
 ### Subcommands
 
-Nested commands (e.g., `moss @git remote add`):
+Nested commands (e.g., `normalize @git remote add`):
 
 ```lua
 cli.run {
@@ -92,9 +92,9 @@ cli.run {
 
 Usage:
 ```
-moss @git remote add origin https://...
-moss @git remote list
-moss @git remote           # runs 'list' (default)
+normalize @git remote add origin https://...
+normalize @git remote list
+normalize @git remote           # runs 'list' (default)
 ```
 
 ### Handlers
@@ -167,10 +167,10 @@ commands = {
 ### Generated Help
 
 ```
-$ moss @todo --help
+$ normalize @todo --help
 todo - TODO list manager
 
-Usage: moss @todo <command> [options]
+Usage: normalize @todo <command> [options]
 
 Commands:
   add <text>     Add a new item
@@ -181,10 +181,10 @@ Options:
   -h, --help     Show this help
   --version      Show version
 
-$ moss @todo add --help
+$ normalize @todo add --help
 todo add - Add a new item
 
-Usage: moss @todo add <text>
+Usage: normalize @todo add <text>
 
 Arguments:
   text    Item text (can be multiple words)
@@ -237,16 +237,16 @@ app:arg("file", {
 ### Error Handling
 
 ```
-$ moss @myapp --count abc
+$ normalize @myapp --count abc
 Error: --count: expected number, got 'abc'
 
-$ moss @myapp --level 10
+$ normalize @myapp --level 10
 Error: --level: must be between 1 and 5
 
-$ moss @myapp
+$ normalize @myapp
 Error: missing required argument: file
 
-Run 'moss @myapp --help' for usage.
+Run 'normalize @myapp --help' for usage.
 ```
 
 ## Implementation Notes
@@ -255,7 +255,7 @@ Run 'moss @myapp --help' for usage.
 
 Option A: Builtin Lua module (like `ts`, `view`, `edit`)
 - Pro: Always available, no require path issues
-- Con: More code in moss binary
+- Con: More code in normalize binary
 
 Option B: Bundled .lua file loaded via require
 - Pro: Pure Lua, easy to modify
@@ -265,7 +265,7 @@ Recommendation: **Option A** - builtin module. CLI parsing is fundamental enough
 
 ### Template Integration
 
-New template: `moss script new foo --template cli`
+New template: `normalize script new foo --template cli`
 
 ```lua
 local cli = require("cli")
@@ -316,7 +316,7 @@ cli.run {
 }
 ```
 
-Usage: `moss @app --verbose build` or `moss @app build --verbose`
+Usage: `normalize @app --verbose build` or `normalize @app build --verbose`
 
 ### Command Aliases
 

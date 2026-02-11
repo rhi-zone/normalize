@@ -13,7 +13,7 @@
       in
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "moss";
+          pname = "normalize";
           version = "0.1.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;

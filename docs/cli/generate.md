@@ -1,21 +1,21 @@
-# moss generate
+# normalize generate
 
 Generate code from API specifications.
 
 ## Usage
 
 ```bash
-moss generate <SPEC> [OPTIONS]
+normalize generate <SPEC> [OPTIONS]
 ```
 
 ## Examples
 
 ```bash
 # From OpenAPI spec
-moss generate openapi.yaml --output src/api/
+normalize generate openapi.yaml --output src/api/
 
 # From GraphQL schema
-moss generate schema.graphql --lang typescript
+normalize generate schema.graphql --lang typescript
 ```
 
 ## Supported Formats

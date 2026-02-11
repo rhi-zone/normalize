@@ -64,7 +64,7 @@ fn get_injection_query(grammar: &str, language: &tree_sitter::Language) -> Optio
 
 /// Unified node for viewing directories, files, and symbols.
 ///
-/// This is the common abstraction for `moss view` - directories contain files,
+/// This is the common abstraction for `normalize view` - directories contain files,
 /// files contain symbols, symbols can contain nested symbols.
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct ViewNode {

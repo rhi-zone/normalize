@@ -1,4 +1,4 @@
-//! Daemon management commands for moss CLI.
+//! Daemon management commands for normalize CLI.
 
 use crate::daemon::{self, DaemonClient, Response, global_socket_path};
 use clap::Subcommand;

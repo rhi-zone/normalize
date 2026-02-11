@@ -1,33 +1,33 @@
-# moss text-search
+# normalize text-search
 
 Fast text search using ripgrep.
 
 ## Usage
 
 ```bash
-moss text-search <PATTERN> [OPTIONS]
+normalize text-search <PATTERN> [OPTIONS]
 ```
 
 ## Examples
 
 ```bash
 # Search in current directory
-moss text-search "fn parse"
-moss text-search "TODO|FIXME"
+normalize text-search "fn parse"
+normalize text-search "TODO|FIXME"
 
 # Case insensitive
-moss text-search "config" -i
+normalize text-search "config" -i
 
 # With file filtering
-moss text-search "impl.*Config" --only "*.rs"
-moss text-search "async" --exclude "@tests"
+normalize text-search "impl.*Config" --only "*.rs"
+normalize text-search "async" --exclude "@tests"
 
 # Limit results
-moss text-search "error" --limit 20
+normalize text-search "error" --limit 20
 
 # JSON output
-moss text-search "Config" --json
-moss text-search "Config" --jq '.matches[]'
+normalize text-search "Config" --json
+normalize text-search "Config" --jq '.matches[]'
 ```
 
 ## Options
@@ -46,18 +46,18 @@ moss text-search "Config" --jq '.matches[]'
 
 ## Aliases
 
-Moss path aliases work with `--only` and `--exclude`:
+Normalize path aliases work with `--only` and `--exclude`:
 
 ```bash
-moss text-search "test" --only @tests      # Only test files
-moss text-search "config" --exclude @generated
+normalize text-search "test" --only @tests      # Only test files
+normalize text-search "config" --exclude @generated
 ```
 
 ## vs ripgrep
 
-`moss text-search` is a thin wrapper around ripgrep with:
-- Integration with moss path aliases (`@tests`, `@config`, etc.)
-- Consistent output formatting with other moss commands
+`normalize text-search` is a thin wrapper around ripgrep with:
+- Integration with normalize path aliases (`@tests`, `@config`, etc.)
+- Consistent output formatting with other normalize commands
 - JSON output for scripting
 
 For advanced ripgrep features (context lines, file types, word boundaries), use `rg` directly.

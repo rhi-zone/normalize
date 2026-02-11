@@ -15,7 +15,7 @@ Users want to:
 
 Rules are loaded from:
 1. Builtins (embedded in binary)
-2. User global (`~/.config/moss/rules/*.scm`)
+2. User global (`~/.config/normalize/rules/*.scm`)
 3. Project (`.normalize/rules/*.scm`)
 
 No mechanism for importing from external sources.
@@ -24,22 +24,22 @@ No mechanism for importing from external sources.
 
 ### Phase 1: URL-based import
 
-Add `moss rules add <url>` command:
+Add `normalize rules add <url>` command:
 
 ```bash
 # Add a single rule from URL
-moss rules add https://raw.githubusercontent.com/user/rules/main/no-dbg.scm
+normalize rules add https://raw.githubusercontent.com/user/rules/main/no-dbg.scm
 
 # Add to global rules (default is project)
-moss rules add --global https://...
+normalize rules add --global https://...
 
 # List imported rules with sources
-moss rules list --sources
+normalize rules list --sources
 ```
 
 **Behavior:**
 - Downloads .scm file
-- Saves to `.normalize/rules/` (or `~/.config/moss/rules/` with `--global`)
+- Saves to `.normalize/rules/` (or `~/.config/normalize/rules/` with `--global`)
 - Creates `.normalize/rules.lock` tracking source URLs
 
 **rules.lock format:**
@@ -53,10 +53,10 @@ added = "2025-01-08"
 **Update command:**
 ```bash
 # Update all imported rules
-moss rules update
+normalize rules update
 
 # Update specific rule
-moss rules update no-dbg
+normalize rules update no-dbg
 ```
 
 ### Phase 2: Rule packages (future)
@@ -65,7 +65,7 @@ Reference a git repo with multiple rules:
 
 ```bash
 # Add all rules from a repo
-moss rules add-repo https://github.com/user/rust-rules.git
+normalize rules add-repo https://github.com/user/rust-rules.git
 
 # Saves to .normalize/rules/vendor/rust-rules/
 ```
@@ -84,17 +84,17 @@ extends = [
 If there's enough demand, a central registry like crates.io:
 
 ```bash
-moss rules add rust-best-practices@1.0
+normalize rules add rust-best-practices@1.0
 ```
 
 ## Implementation
 
 ### Phase 1 scope
 
-1. Add `moss rules add <url>` command
+1. Add `normalize rules add <url>` command
 2. Add `.normalize/rules.lock` tracking
-3. Add `moss rules update` command
-4. Add `moss rules list --sources`
+3. Add `normalize rules update` command
+4. Add `normalize rules list --sources`
 
 ### File structure
 
@@ -139,6 +139,6 @@ Deferred: Requires infrastructure, not enough demand yet.
 
 ## Decisions
 
-1. **Explicit updates** - `moss rules update` required, no auto-update
+1. **Explicit updates** - `normalize rules update` required, no auto-update
 2. **Private URLs** - Deferred. Auth token storage is tricky (env vars? keychain?)
 3. **Breaking changes** - Open. Options: show diff before applying, pin by hash, etc.

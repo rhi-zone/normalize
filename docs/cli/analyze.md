@@ -1,4 +1,4 @@
-# moss analyze
+# normalize analyze
 
 Analyze codebase quality: health, complexity, security, duplicates, hotspots.
 
@@ -33,35 +33,35 @@ Analyze codebase quality: health, complexity, security, duplicates, hotspots.
 
 ```bash
 # Quick health check
-moss analyze
+normalize analyze
 
 # Comprehensive overview
-moss analyze overview
+normalize analyze overview
 
 # Find complex functions
-moss analyze complexity --threshold 15
+normalize analyze complexity --threshold 15
 
 # Security scan
-moss analyze security
+normalize analyze security
 
 # Find code duplicates
-moss analyze duplicate-functions
+normalize analyze duplicate-functions
 
 # Git hotspots (frequently changed files)
-moss analyze hotspots
+normalize analyze hotspots
 
 # Trace a symbol's data flow
-moss analyze trace parse_config
+normalize analyze trace parse_config
 
 # Call graph
-moss analyze callers handle_request
-moss analyze callees main
+normalize analyze callers handle_request
+normalize analyze callees main
 
 # Syntax rules
-moss analyze rules              # Run all rules
-moss analyze rules --list       # List available rules
-moss analyze rules --fix        # Auto-fix issues
-moss analyze rules --sarif      # SARIF output for IDEs
+normalize analyze rules              # Run all rules
+normalize analyze rules --list       # List available rules
+normalize analyze rules --fix        # Auto-fix issues
+normalize analyze rules --sarif      # SARIF output for IDEs
 ```
 
 ## Options
@@ -120,8 +120,8 @@ Patterns can be excluded via `.normalize/` allow files:
 
 Add via CLI:
 ```bash
-moss analyze files --allow "**/generated/*.rs" --reason "generated code"
-moss analyze hotspots --allow "CHANGELOG.md" --reason "expected to change often"
+normalize analyze files --allow "**/generated/*.rs" --reason "generated code"
+normalize analyze hotspots --allow "CHANGELOG.md" --reason "expected to change often"
 ```
 
 ## Config

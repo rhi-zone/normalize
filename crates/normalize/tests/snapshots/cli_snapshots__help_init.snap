@@ -1,9 +1,8 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 52
 expression: "snapshot_help(&[\"init\"])"
 ---
-Initialize moss in current directory
+Initialize normalize in current directory
 
 Usage: normalize init [OPTIONS]
 

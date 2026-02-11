@@ -7,7 +7,7 @@ Three-tool interface for codebase navigation, modification, and analysis.
 Unified read operation. Shows nodes or lists matches.
 
 ```
-moss view <target> [options]
+normalize view <target> [options]
 ```
 
 ### Target Resolution
@@ -39,12 +39,12 @@ Fuzzy, forgiving:
 ### Examples
 
 ```
-moss view src/foo.py              # show file structure
-moss view router                  # fuzzy → show ToolRouter
-moss view --type class            # list all classes
-moss view --calls resolve_tool    # what calls resolve_tool?
-moss view MyClass --deps          # show class with dependencies
-moss view src/ --type function    # functions in src/
+normalize view src/foo.py              # show file structure
+normalize view router                  # fuzzy → show ToolRouter
+normalize view --type class            # list all classes
+normalize view --calls resolve_tool    # what calls resolve_tool?
+normalize view MyClass --deps          # show class with dependencies
+normalize view src/ --type function    # functions in src/
 ```
 
 ## edit
@@ -52,7 +52,7 @@ moss view src/ --type function    # functions in src/
 Unified write operation. Modify nodes structurally.
 
 ```
-moss edit <target> <operation> [content]
+normalize edit <target> <operation> [content]
 ```
 
 ### Operations
@@ -60,54 +60,54 @@ moss edit <target> <operation> [content]
 #### Delete
 Remove a node entirely.
 ```
-moss edit src/foo.py/MyClass --delete
-moss edit src/foo.py/func --delete
+normalize edit src/foo.py/MyClass --delete
+normalize edit src/foo.py/func --delete
 ```
 
 #### Replace
 Swap node content.
 ```
-moss edit src/foo.py/func --replace "def func(): return 2"
+normalize edit src/foo.py/func --replace "def func(): return 2"
 ```
 
 #### Insert (sibling-relative)
 Insert before/after the target node.
 ```
-moss edit src/foo.py/MyClass --before "# Class comment"
-moss edit src/foo.py/MyClass --after "class Other: pass"
+normalize edit src/foo.py/MyClass --before "# Class comment"
+normalize edit src/foo.py/MyClass --after "class Other: pass"
 ```
 
 #### Insert (container-relative)
 Insert as first/last child of target container.
 ```
-moss edit src/foo.py --prepend "import os"           # top of file
-moss edit src/foo.py --append "# EOF"                # end of file
-moss edit src/foo.py/MyClass --prepend "x = 1"       # first in class body
-moss edit src/foo.py/MyClass --append "def last(): pass"  # last in class body
+normalize edit src/foo.py --prepend "import os"           # top of file
+normalize edit src/foo.py --append "# EOF"                # end of file
+normalize edit src/foo.py/MyClass --prepend "x = 1"       # first in class body
+normalize edit src/foo.py/MyClass --append "def last(): pass"  # last in class body
 ```
 
 #### Move
 Cut node and insert at new location.
 ```
-moss edit src/foo.py/func --move-before src/bar.py/other
-moss edit src/foo.py/func --move-after src/bar.py/other
-moss edit src/foo.py/func --move-prepend src/bar.py/MyClass  # into class
-moss edit src/foo.py/func --move-append src/bar.py           # end of file
+normalize edit src/foo.py/func --move-before src/bar.py/other
+normalize edit src/foo.py/func --move-after src/bar.py/other
+normalize edit src/foo.py/func --move-prepend src/bar.py/MyClass  # into class
+normalize edit src/foo.py/func --move-append src/bar.py           # end of file
 ```
 
 #### Copy
 Copy node to new location (original remains).
 ```
-moss edit src/foo.py/func --copy-before src/bar.py/other
-moss edit src/foo.py/func --copy-after src/bar.py/other
-moss edit src/foo.py/func --copy-prepend src/bar.py/MyClass
-moss edit src/foo.py/func --copy-append src/bar.py
+normalize edit src/foo.py/func --copy-before src/bar.py/other
+normalize edit src/foo.py/func --copy-after src/bar.py/other
+normalize edit src/foo.py/func --copy-prepend src/bar.py/MyClass
+normalize edit src/foo.py/func --copy-append src/bar.py
 ```
 
 #### Swap
 Exchange positions of two nodes.
 ```
-moss edit src/foo.py/func1 --swap src/foo.py/func2
+normalize edit src/foo.py/func1 --swap src/foo.py/func2
 ```
 
 ### Special Cases
@@ -139,7 +139,7 @@ Content is provided as a string. The tool:
 Unified analysis operation. Computes properties of codebase nodes.
 
 ```
-moss analyze [target] [options]
+normalize analyze [target] [options]
 ```
 
 ### Target Resolution
@@ -159,10 +159,10 @@ Running with no flags runs all analyses.
 ### Examples
 
 ```
-moss analyze                       # full codebase analysis
-moss analyze src/                  # analyze src directory
-moss analyze --complexity          # just complexity
-moss analyze src/foo.py --security # security scan of one file
+normalize analyze                       # full codebase analysis
+normalize analyze src/                  # analyze src directory
+normalize analyze --complexity          # just complexity
+normalize analyze src/foo.py --security # security scan of one file
 ```
 
 ### Output

@@ -52,10 +52,10 @@ Keeping dependencies current: security patches, bug fixes, new features.
 
 | Phase | Tools |
 |-------|-------|
-| Audit | `moss package outdated`, `cargo audit` |
+| Audit | `normalize package outdated`, `cargo audit` |
 | Evaluate | Changelogs, release notes, `view` |
 | Update | `cargo update`, `npm update`, etc. |
-| Verify | Test suite, `moss lint`, manual testing |
+| Verify | Test suite, `normalize lint`, manual testing |
 
 ## Update Strategies
 
@@ -106,7 +106,7 @@ High risk: breaking changes expected
 
 ```
 Turn 1: Audit outdated packages
-  $(moss package outdated)
+  $(normalize package outdated)
   → serde 1.0.190 → 1.0.195 (patch)
   → tokio 1.32.0 → 1.35.0 (minor)
   → axum 0.6.20 → 0.7.4 (major)

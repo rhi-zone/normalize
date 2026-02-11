@@ -104,7 +104,7 @@ pub fn cmd_lint_run(
             println!("{{\"tools\": [], \"diagnostics\": []}}");
         } else {
             eprintln!("No relevant tools found for this project.");
-            eprintln!("Use 'moss lint list' to see available tools.");
+            eprintln!("Use 'normalize lint list' to see available tools.");
         }
         return 0;
     }

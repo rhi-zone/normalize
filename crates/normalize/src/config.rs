@@ -1,7 +1,7 @@
-//! Configuration system for moss.
+//! Configuration system for normalize.
 //!
 //! Loads config from:
-//! 1. Global: ~/.config/moss/config.toml
+//! 1. Global: ~/.config/normalize/config.toml
 //! 2. Per-project: .normalize/config.toml (overrides global)
 //!
 //! Example config.toml:
@@ -69,7 +69,7 @@ pub struct IndexConfig {
 }
 
 /// Unified alias configuration for @ prefix expansion.
-/// Used for both command targets (`moss view @todo`) and filters (`--only @tests`).
+/// Used for both command targets (`normalize view @todo`) and filters (`--only @tests`).
 ///
 /// Example:
 /// ```toml
@@ -213,7 +213,7 @@ pub struct NormalizeConfig {
 impl NormalizeConfig {
     /// Load configuration for a project.
     ///
-    /// Loads global config from ~/.config/moss/config.toml,
+    /// Loads global config from ~/.config/normalize/config.toml,
     /// then merges with per-project config from .normalize/config.toml.
     pub fn load(root: &Path) -> Self {
         let mut config = Self::default_enabled();
@@ -245,7 +245,7 @@ impl NormalizeConfig {
             .map(std::path::PathBuf::from)
             .ok()
             .or_else(|| dirs::home_dir().map(|h| h.join(".config")))?;
-        Some(config_home.join("moss").join("config.toml"))
+        Some(config_home.join("normalize").join("config.toml"))
     }
 
     /// Load config from a file path.

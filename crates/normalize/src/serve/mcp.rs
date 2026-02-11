@@ -1,10 +1,10 @@
-//! MCP (Model Context Protocol) server for moss.
+//! MCP (Model Context Protocol) server for normalize.
 //!
-//! Exposes moss CLI as an MCP tool for LLM integration.
+//! Exposes normalize CLI as an MCP tool for LLM integration.
 //! Compile with `--features mcp` to enable.
 //!
 //! Two modes (matching Python implementation):
-//! 1. Single-tool mode (default): One "moss" tool that accepts CLI-style commands
+//! 1. Single-tool mode (default): One "normalize" tool that accepts CLI-style commands
 //!    - Lower token overhead for tool definitions (~50 vs ~8K tokens)
 //!    - Better for LLMs that handle CLI-style inputs well
 //!
@@ -25,22 +25,22 @@ mod implementation {
     use schemars::JsonSchema;
     use serde::Deserialize;
 
-    /// Request for the moss tool.
+    /// Request for the normalize tool.
     #[derive(Debug, Deserialize, JsonSchema)]
-    pub struct MossRequest {
+    pub struct NormalizeRequest {
         /// view <path> [--deps|--focus|--full] | edit <path> --delete|--replace|--before|--after|--prepend|--append | analyze [--health|--complexity] | grep <pattern>
         pub command: String,
     }
 
-    /// MCP server that wraps moss CLI.
+    /// MCP server that wraps normalize CLI.
     #[derive(Clone)]
-    pub struct MossServer {
+    pub struct NormalizeServer {
         root: Arc<String>,
         tool_router: ToolRouter<Self>,
     }
 
     #[tool_router]
-    impl MossServer {
+    impl NormalizeServer {
         /// Create a new MCP server for the given root directory.
         pub fn new(root: &str) -> Self {
             Self {
@@ -51,18 +51,19 @@ mod implementation {
 
         /// Code intelligence primitives.
         #[tool(description = "Code intelligence: view, analyze, grep")]
-        async fn moss(
+        async fn normalize(
             &self,
-            Parameters(req): Parameters<MossRequest>,
+            Parameters(req): Parameters<NormalizeRequest>,
         ) -> Result<CallToolResult, McpError> {
             let root = self.root.clone();
             let command = req.command;
-            let result = tokio::task::spawn_blocking(move || execute_moss_command(&command, &root))
-                .await
-                .unwrap_or_else(|e| CommandResult {
-                    output: format!("Task panicked: {}", e),
-                    exit_code: 1,
-                });
+            let result =
+                tokio::task::spawn_blocking(move || execute_normalize_command(&command, &root))
+                    .await
+                    .unwrap_or_else(|e| CommandResult {
+                        output: format!("Task panicked: {}", e),
+                        exit_code: 1,
+                    });
 
             let content = if result.exit_code == 0 {
                 Content::text(&result.output)
@@ -78,11 +79,11 @@ mod implementation {
     }
 
     #[tool_handler]
-    impl rmcp::ServerHandler for MossServer {
+    impl rmcp::ServerHandler for NormalizeServer {
         fn get_info(&self) -> ServerInfo {
             ServerInfo {
                 instructions: Some(
-                    "Use the 'moss' tool to query code intelligence for the codebase.".into(),
+                    "Use the 'normalize' tool to query code intelligence for the codebase.".into(),
                 ),
                 capabilities: ServerCapabilities::builder().enable_tools().build(),
                 ..Default::default()
@@ -90,14 +91,14 @@ mod implementation {
         }
     }
 
-    /// Result of executing a moss CLI command.
+    /// Result of executing a normalize CLI command.
     struct CommandResult {
         output: String,
         exit_code: i32,
     }
 
-    /// Execute a moss CLI command.
-    fn execute_moss_command(command: &str, root: &str) -> CommandResult {
+    /// Execute a normalize CLI command.
+    fn execute_normalize_command(command: &str, root: &str) -> CommandResult {
         let current_exe = match std::env::current_exe() {
             Ok(exe) => exe,
             Err(e) => {
@@ -154,14 +155,14 @@ mod implementation {
 
     /// Run the MCP server.
     pub async fn run_server(_root: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let server = MossServer::new(_root);
+        let server = NormalizeServer::new(_root);
         let service = server.serve(stdio()).await?;
         service.waiting().await?;
         Ok(())
     }
 }
 
-/// Command handler for `moss serve mcp`.
+/// Command handler for `normalize serve mcp`.
 pub fn cmd_serve_mcp(root: Option<&std::path::Path>) -> i32 {
     #[cfg(feature = "mcp")]
     {

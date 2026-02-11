@@ -160,7 +160,7 @@ pub struct SessionsArgs {
     #[arg(short, long, global = true)]
     pub root: Option<PathBuf>,
 
-    /// Force specific format: claude, codex, gemini, moss
+    /// Force specific format: claude, codex, gemini, normalize
     #[arg(long, global = true)]
     pub format: Option<String>,
 

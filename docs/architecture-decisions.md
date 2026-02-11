@@ -4,7 +4,7 @@ Key architectural decisions and their rationale.
 
 ## Language Choice: Pure Rust
 
-**Decision**: Moss is implemented entirely in Rust.
+**Decision**: Normalize is implemented entirely in Rust.
 
 ### Why Rust?
 
@@ -32,7 +32,7 @@ Key architectural decisions and their rationale.
 
 ```
 crates/
-├── moss/                         # Core library + CLI
+├── normalize/                         # Core library + CLI
 ├── normalize-languages/          # 98 language definitions
 ├── normalize-ecosystems/         # Project dependency management (Ecosystem trait)
 ├── normalize-package-index/      # Distro/registry index ingestion (PackageIndex trait)
@@ -55,8 +55,8 @@ crates/
 
 ### Loading Order
 
-1. `MOSS_GRAMMAR_PATH` environment variable
-2. `~/.config/moss/grammars/`
+1. `NORMALIZE_GRAMMAR_PATH` environment variable
+2. `~/.config/normalize/grammars/`
 3. Built-in fallback (if compiled with grammar features)
 
 ## Lua for Workflows
@@ -95,11 +95,11 @@ enabled = true  # Set to false to disable indexing entirely
 
 ## Command Naming: `text-search` Not `grep`
 
-**Decision**: Use `moss text-search` for text pattern matching instead of `moss grep`.
+**Decision**: Use `normalize text-search` for text pattern matching instead of `normalize grep`.
 
 ### Why Not `grep`?
 
-1. **AI agent confusion**: LLMs like Claude (especially Opus 4.5) conflate `moss grep` with unix grep syntax. They constantly try `moss grep pattern file` (unix style) instead of `moss text-search pattern` (our style).
+1. **AI agent confusion**: LLMs like Claude (especially Opus 4.5) conflate `normalize grep` with unix grep syntax. They constantly try `normalize grep pattern file` (unix style) instead of `normalize text-search pattern` (our style).
 
 2. **Mental model conflict**: Unix grep has 50+ years of muscle memory. Our command uses ripgrep internally but has different semantics (no positional file args, `--only` instead of file patterns). Fighting the unix grep mental model wastes tokens and causes errors.
 

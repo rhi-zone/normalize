@@ -1,6 +1,6 @@
 # Lua Test Library Design
 
-Minimal test framework for moss scripts.
+Minimal test framework for normalize scripts.
 
 ## Goals
 

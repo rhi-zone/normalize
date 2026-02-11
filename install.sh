@@ -1,5 +1,5 @@
 #!/bin/bash
-# Moss CLI installer
+# Normalize CLI installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | bash
 
 set -e
@@ -61,5 +61,5 @@ fi
 
 chmod +x "$INSTALL_DIR/normalize"
 
-echo "Installed moss $LATEST to $INSTALL_DIR/normalize"
-echo "Run 'moss --help' to get started"
+echo "Installed normalize $LATEST to $INSTALL_DIR/normalize"
+echo "Run 'normalize --help' to get started"

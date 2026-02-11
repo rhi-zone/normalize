@@ -2,7 +2,7 @@
 
 Hybrid loops use `CompositeToolExecutor` to route tool calls to different backends based on prefix. This enables loops that combine local structural tools with external MCP servers and LLM calls.
 
-Note: For declarative workflow definitions, see `moss workflow` which uses TOML files. This doc covers the low-level `AgentLoop` execution primitives.
+Note: For declarative workflow definitions, see `normalize workflow` which uses TOML files. This doc covers the low-level `AgentLoop` execution primitives.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ Note: For declarative workflow definitions, see `moss workflow` which uses TOML 
 │                    CompositeToolExecutor                     │
 ├─────────────────────────────────────────────────────────────┤
 │  Prefix Routing:                                            │
-│    "moss."  → MossToolExecutor (structural analysis)        │
+│    "normalize."  → NormalizeToolExecutor (structural analysis)        │
 │    "mcp."   → MCPToolExecutor (external MCP server)         │
 │    "llm."   → LLMToolExecutor (LLM generation)              │
 │    (no prefix) → default executor                           │
@@ -21,24 +21,24 @@ Note: For declarative workflow definitions, see `moss workflow` which uses TOML 
 ## Basic Usage
 
 ```python
-from moss.agent_loop import (
+from normalize.agent_loop import (
     AgentLoop,
     AgentLoopRunner,
     CompositeToolExecutor,
     LLMToolExecutor,
     LoopStep,
-    MossToolExecutor,
+    NormalizeToolExecutor,
     StepType,
 )
 
 # Create individual executors
-moss_executor = MossToolExecutor(root=project_root)
+moss_executor = NormalizeToolExecutor(root=project_root)
 llm_executor = LLMToolExecutor(config=llm_config)
 
 # Combine them with prefix routing
 composite = CompositeToolExecutor(
     executors={
-        "moss.": moss_executor,
+        "normalize.": moss_executor,
         "llm.": llm_executor,
     },
     default=moss_executor,
@@ -48,7 +48,7 @@ composite = CompositeToolExecutor(
 loop = AgentLoop(
     name="hybrid_analysis",
     steps=[
-        LoopStep(name="view_file", tool="moss.skeleton.format"),
+        LoopStep(name="view_file", tool="normalize.skeleton.format"),
         LoopStep(name="analyze", tool="llm.analyze", input_from="view_file"),
     ],
     exit_conditions=["analyze.success"],
@@ -62,7 +62,7 @@ result = await runner.run(loop, initial_input)
 ## With External MCP Server
 
 ```python
-from moss.agent_loop import MCPServerConfig, MCPToolExecutor
+from normalize.agent_loop import MCPServerConfig, MCPToolExecutor
 
 # Configure MCP server
 mcp_config = MCPServerConfig(
@@ -78,7 +78,7 @@ await mcp_executor.connect()
 # Add to composite
 composite = CompositeToolExecutor(
     executors={
-        "moss.": moss_executor,
+        "normalize.": moss_executor,
         "mcp.": mcp_executor,
         "llm.": llm_executor,
     }
@@ -89,7 +89,7 @@ loop = AgentLoop(
     name="with_mcp",
     steps=[
         LoopStep(name="read", tool="mcp.read_file"),
-        LoopStep(name="analyze", tool="moss.skeleton.format", input_from="read"),
+        LoopStep(name="analyze", tool="normalize.skeleton.format", input_from="read"),
     ],
     ...
 )
@@ -104,15 +104,15 @@ The `CompositeToolExecutor` automatically strips the prefix before passing to th
 
 | Loop Tool Name | Executor | Actual Tool Called |
 |----------------|----------|-------------------|
-| `moss.skeleton.format` | MossToolExecutor | `skeleton.format` | <!-- doc-check: ignore -->
+| `normalize.skeleton.format` | NormalizeToolExecutor | `skeleton.format` | <!-- doc-check: ignore -->
 | `mcp.read_file` | MCPToolExecutor | `read_file` |
 | `llm.analyze` | LLMToolExecutor | `analyze` |
 
-## Available MossAPI Tools
+## Available NormalizeAPI Tools
 
-Tools available via `MossToolExecutor` (use with `moss.` prefix). These are internal Python wrappers that shell out to the Rust CLI. For direct CLI usage, prefer `moss view`, `moss edit`, `moss analyze`.
+Tools available via `NormalizeToolExecutor` (use with `normalize.` prefix). These are internal Python wrappers that shell out to the Rust CLI. For direct CLI usage, prefer `normalize view`, `normalize edit`, `normalize analyze`.
 
-- `skeleton.format` - Extract file skeleton as text (wraps `moss view`)
+- `skeleton.format` - Extract file skeleton as text (wraps `normalize view`)
 - `skeleton.extract` - Extract skeleton as data structure
 - `skeleton.expand` - Get full source of a symbol
 - `validation.validate` - Run syntax and linting checks
@@ -139,7 +139,7 @@ If no exit conditions are specified, the loop exits after all steps complete.
 
 ## Best Practices
 
-1. **Use meaningful prefixes**: `moss.`, `mcp.`, `llm.` clearly indicate the tool source
+1. **Use meaningful prefixes**: `normalize.`, `mcp.`, `llm.` clearly indicate the tool source
 2. **Set a default executor**: Handle unprefixed tools gracefully
 3. **Connect MCP before running**: MCP executors require async connection
 4. **Disconnect on cleanup**: Always disconnect MCP executors when done

@@ -1,4 +1,4 @@
-# moss tools
+# normalize tools
 
 External tool orchestration - linters, formatters, and test runners.
 
@@ -12,11 +12,11 @@ External tool orchestration - linters, formatters, and test runners.
 ## Usage
 
 ```bash
-moss tools lint [PATH]    # Run linters
-moss tools test [PATH]    # Run tests
+normalize tools lint [PATH]    # Run linters
+normalize tools test [PATH]    # Run tests
 ```
 
 ## See Also
 
-- [moss tools lint](lint.md) - Linter details
-- [moss tools test](test.md) - Test runner details
+- [normalize tools lint](lint.md) - Linter details
+- [normalize tools test](test.md) - Test runner details

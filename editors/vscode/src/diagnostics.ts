@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { LintResult, Diagnostic } from './runner';
 
-export class MossDiagnostics {
+export class NormalizeDiagnostics {
     updateDiagnosticsFromLint(
         collection: vscode.DiagnosticCollection,
         results: LintResult[]

@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Moss API",
-    "description": "Code intelligence API for moss",
+    "title": "Normalize API",
+    "description": "Code intelligence API for normalize",
     "license": {
       "name": "MIT",
       "identifier": "MIT"

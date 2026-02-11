@@ -1,13 +1,13 @@
 # Builtin Syntax Rules
 
-Design and guidance for built-in syntax linting rules shipped with moss.
+Design and guidance for built-in syntax linting rules shipped with normalize.
 
 ## Rule Loading Order
 
 Rules are loaded in this order (later overrides earlier by `id`):
 
-1. **Embedded builtins** - compiled into the moss binary
-2. **User global** - `~/.config/moss/rules/*.scm`
+1. **Embedded builtins** - compiled into the normalize binary
+2. **User global** - `~/.config/normalize/rules/*.scm`
 3. **Project** - `.normalize/rules/*.scm`
 
 To disable a builtin, add to `.normalize/config.toml`:
@@ -391,7 +391,7 @@ This means we can concatenate arbitrary rule queries without conflict, as long a
 
 ### Embedding Rules
 
-Rules are in `crates/moss/src/commands/analyze/builtin_rules/`:
+Rules are in `crates/normalize/src/commands/analyze/builtin_rules/`:
 
 ```rust
 pub const BUILTIN_RULES: &[BuiltinRule] = &[
@@ -405,16 +405,16 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
 
 ### Testing Rules
 
-To test a rule against the moss codebase:
+To test a rule against the normalize codebase:
 
 ```bash
-moss analyze rules --rule "rust/unnecessary-let"
+normalize analyze rules --rule "rust/unnecessary-let"
 ```
 
 To get SARIF output for IDE integration:
 
 ```bash
-moss analyze rules --sarif > results.sarif
+normalize analyze rules --sarif > results.sarif
 ```
 
 ### Debug Output
@@ -422,7 +422,7 @@ moss analyze rules --sarif > results.sarif
 Enable timing information with `--debug`:
 
 ```bash
-moss analyze rules --debug timing
+normalize analyze rules --debug timing
 # [timing] file collection: 6ms
 # [timing] query compilation: 90ms (4 grammars)
 # [timing] file processing: 500ms (554 findings)

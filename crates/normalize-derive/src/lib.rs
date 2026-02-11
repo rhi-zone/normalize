@@ -1,4 +1,4 @@
-//! Derive macros for moss.
+//! Derive macros for normalize.
 
 use proc_macro::TokenStream;
 use quote::quote;

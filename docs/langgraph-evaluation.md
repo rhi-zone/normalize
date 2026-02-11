@@ -1,10 +1,10 @@
 # LangGraph Evaluation
 
-Evaluating moss's relationship to LangGraph and the broader agent ecosystem.
+Evaluating normalize's relationship to LangGraph and the broader agent ecosystem.
 
 ## TL;DR
 
-Moss is a **code intelligence tool**, not an agent framework. LangGraph handles orchestration well; we handle context well. These are complementary, not competing.
+Normalize is a **code intelligence tool**, not an agent framework. LangGraph handles orchestration well; we handle context well. These are complementary, not competing.
 
 **Our differentiator**: Working memory, not chat history. Current agents (LangGraph, Claude, Cursor) think in conversation - messages accumulate until truncated. But thinking isn't conversation. Agents need structured working memory they can manage. That's the gap.
 
@@ -41,13 +41,13 @@ flowchart TB
         C5[Call graphs, dependencies]
     end
 
-    ContextLayer --> MossAPI
+    ContextLayer --> NormalizeAPI
 
-    subgraph MossAPI["MossAPI (Core Tools)"]
+    subgraph NormalizeAPI["NormalizeAPI (Core Tools)"]
         view & edit & analyze
     end
 
-    MossAPI --> RustCLI[Rust CLI]
+    NormalizeAPI --> RustCLI[Rust CLI]
 ```
 
 ## What LangGraph Does Well
@@ -77,7 +77,7 @@ flowchart TB
 
 ## Layer Responsibilities
 
-| Layer | Ships with moss? | Could use external? |
+| Layer | Ships with normalize? | Could use external? |
 |-------|------------------|---------------------|
 | Frontends | TUI, CLI, MCP | IDE plugins, web, A2A |
 | Orchestration | Yes (low friction OOTB) | LangGraph, Claude, etc. |
@@ -87,7 +87,7 @@ flowchart TB
 
 ## Practical Implications
 
-### MossAPI should be tool-shaped
+### NormalizeAPI should be tool-shaped
 Pure, stateless tools that any orchestrator can call:
 - `view(locator)` → structured code view
 - `edit(path, task)` → safe modification
@@ -95,11 +95,11 @@ Pure, stateless tools that any orchestrator can call:
 
 ### Orchestration is optional, separate
 - Orchestration now lives in [spore](https://github.com/user/spore)
-- Moss provides intelligence primitives, not agent loops
+- Normalize provides intelligence primitives, not agent loops
 - External callers (LangGraph, Claude, spore) bring their own orchestration
 
 ### Context Layer is the product
-What makes moss valuable:
+What makes normalize valuable:
 - **Working memory primitives** - Structure over chat history
 - Skeleton extraction (structure without implementation)
 - Fisheye views (focused context with surrounding awareness)
@@ -110,14 +110,14 @@ The key insight: thinking ≠ conversation. Agents need working memory, not mess
 
 ## LangGraph Integration (If Wanted)
 
-Moss as tool provider, LangGraph as orchestrator:
+Normalize as tool provider, LangGraph as orchestrator:
 
 ```python
 from langgraph.graph import StateGraph
 from langchain_core.tools import tool
-from moss import MossAPI
+from normalize import NormalizeAPI
 
-api = MossAPI.for_project(".")
+api = NormalizeAPI.for_project(".")
 
 @tool
 def view_code(locator: str) -> str:
@@ -135,7 +135,7 @@ def analyze_code(target: str) -> str:
     return api.analyze.analyze(target)
 
 # LangGraph handles orchestration
-# Moss handles code intelligence
+# Normalize handles code intelligence
 ```
 
 ## LangSmith Studio
@@ -143,27 +143,27 @@ def analyze_code(target: str) -> str:
 Nice for debugging agent decisions, but:
 - Paid service dependency
 - Reflects LangGraph's model, not ours
-- Our TUI may better reflect moss's context-centric model
+- Our TUI may better reflect normalize's context-centric model
 
 Not a reason to adopt or reject LangGraph.
 
 ## Recommendations
 
-1. **Don't add orchestration to moss** - That's spore's domain
-2. **Do keep MossAPI tool-shaped** - Usable by any orchestrator
+1. **Don't add orchestration to normalize** - That's spore's domain
+2. **Do keep NormalizeAPI tool-shaped** - Usable by any orchestrator
 3. **Do make Context Layer explicit** - Reusable by external callers
 4. **Consider LangGraph integration** - As one frontend, not foundation
 
 ## Summary
 
-| Concern | LangGraph | Moss |
+| Concern | LangGraph | Normalize |
 |---------|-----------|------|
 | Orchestration | ✓ Their strength | Not in scope (see spore) |
 | Working memory | ✗ Chat history | ✓ Structured, manageable |
 | Persistence | ✓ Mature | Shadow Git (code-specific) |
 | Multi-frontend | ✗ Python graphs | ✓ MCP, TUI, CLI, HTTP, A2A |
 
-**Moss provides working memory primitives.**
+**Normalize provides working memory primitives.**
 **LangGraph provides orchestration.**
 
-The fundamental problem: current agents think in chat history, but thinking isn't conversation. Agents need structured working memory. Moss provides the primitives for that.
+The fundamental problem: current agents think in chat history, but thinking isn't conversation. Agents need structured working memory. Normalize provides the primitives for that.

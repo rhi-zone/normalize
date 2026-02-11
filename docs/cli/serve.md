@@ -1,6 +1,6 @@
-# moss serve
+# normalize serve
 
-Start a moss server (MCP, HTTP, or LSP).
+Start a normalize server (MCP, HTTP, or LSP).
 
 ## Modes
 
@@ -14,13 +14,13 @@ Start a moss server (MCP, HTTP, or LSP).
 
 ```bash
 # MCP server (for Claude, etc.)
-moss serve mcp
+normalize serve mcp
 
 # HTTP API
-moss serve http --port 8080
+normalize serve http --port 8080
 
 # LSP
-moss serve lsp
+normalize serve lsp
 ```
 
 ## MCP Tools

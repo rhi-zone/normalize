@@ -1,9 +1,9 @@
 {
-  "name": "moss-vscode",
-  "displayName": "Moss",
-  "description": "Moss code analysis and introspection for VS Code",
+  "name": "normalize-vscode",
+  "displayName": "Normalize",
+  "description": "Normalize code analysis and introspection for VS Code",
   "version": "0.1.0",
-  "publisher": "moss",
+  "publisher": "normalize",
   "repository": {
     "type": "git",
     "url": "https://github.com/rhi-zone/normalize"
@@ -38,45 +38,45 @@
   "contributes": {
     "commands": [
       {
-        "command": "moss.lint",
-        "title": "Moss: Run Lint"
+        "command": "normalize.lint",
+        "title": "Normalize: Run Lint"
       },
       {
-        "command": "moss.lintFix",
-        "title": "Moss: Run Lint with Auto-fix"
+        "command": "normalize.lintFix",
+        "title": "Normalize: Run Lint with Auto-fix"
       },
       {
-        "command": "moss.showSkeleton",
-        "title": "Moss: Show Code Skeleton"
+        "command": "normalize.showSkeleton",
+        "title": "Normalize: Show Code Skeleton"
       },
       {
-        "command": "moss.analyzeHealth",
-        "title": "Moss: Analyze Health"
+        "command": "normalize.analyzeHealth",
+        "title": "Normalize: Analyze Health"
       },
       {
-        "command": "moss.viewTree",
-        "title": "Moss: View Directory Tree"
+        "command": "normalize.viewTree",
+        "title": "Normalize: View Directory Tree"
       }
     ],
     "configuration": {
-      "title": "Moss",
+      "title": "Normalize",
       "properties": {
-        "moss.binaryPath": {
+        "normalize.binaryPath": {
           "type": "string",
-          "default": "moss",
-          "description": "Path to the moss binary"
+          "default": "normalize",
+          "description": "Path to the normalize binary"
         },
-        "moss.enableDiagnostics": {
+        "normalize.enableDiagnostics": {
           "type": "boolean",
           "default": true,
-          "description": "Show moss lint violations as diagnostics"
+          "description": "Show normalize lint violations as diagnostics"
         },
-        "moss.runOnSave": {
+        "normalize.runOnSave": {
           "type": "boolean",
           "default": false,
-          "description": "Run moss lint on file save"
+          "description": "Run normalize lint on file save"
         },
-        "moss.lintCategories": {
+        "normalize.lintCategories": {
           "type": "array",
           "items": {
             "type": "string",
@@ -90,24 +90,24 @@
     "menus": {
       "editor/context": [
         {
-          "command": "moss.showSkeleton",
-          "group": "moss"
+          "command": "normalize.showSkeleton",
+          "group": "normalize"
         },
         {
-          "command": "moss.lint",
-          "group": "moss"
+          "command": "normalize.lint",
+          "group": "normalize"
         }
       ],
       "explorer/context": [
         {
-          "command": "moss.lint",
+          "command": "normalize.lint",
           "when": "explorerResourceIsFolder",
-          "group": "moss"
+          "group": "normalize"
         },
         {
-          "command": "moss.viewTree",
+          "command": "normalize.viewTree",
           "when": "explorerResourceIsFolder",
-          "group": "moss"
+          "group": "normalize"
         }
       ]
     }

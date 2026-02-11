@@ -173,7 +173,7 @@ Avoid "Expert" personas. Use **In-Context Learning** via project-specific files 
 - `StyleGuide.py` (or `.ts`, `.go`, etc.) - Code style examples in the target repository
 - `Architecture.md` - High-level architecture documentation in the target repository
 
-These files live in the repository being operated on, not in moss itself.
+These files live in the repository being operated on, not in normalize itself.
 
 ### Concept-First Engineering
 Encourage modularity by breaking features into atomic **Concepts** with decoupled **Synchronizations**. This reduces the complexity of individual edits.

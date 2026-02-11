@@ -346,7 +346,7 @@ Specific questions show you've done homework and need targeted help.
 
 ## LLM-Specific Techniques
 
-LLMs (and LLM-powered tools like moss) can accelerate onboarding:
+LLMs (and LLM-powered tools like normalize) can accelerate onboarding:
 
 ### Automated Survey
 

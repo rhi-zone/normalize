@@ -103,7 +103,7 @@ Evaluator sees all outputs in order:
 Turn 1 (explorer):
 `text-search "enum Provider"`
 ```
-crates/moss/src/workflow/llm.rs:38: pub enum Provider {
+crates/normalize/src/workflow/llm.rs:38: pub enum Provider {
 ```
 
 Turn 2 (explorer):
@@ -123,7 +123,7 @@ pub enum Provider {
 
 **Implemented** in `agent.lua` as `--v2` flag. Usage:
 ```bash
-moss @agent "query" --v2 --max-turns 10
+normalize @agent "query" --v2 --max-turns 10
 ```
 
 ### Actual MACHINE Config
@@ -165,7 +165,7 @@ Memory commands: $(keep 1 3), $(keep), $(drop 2), $(note finding)
 Example good response:
 "The search found `support_for_extension` in registry.rs.
 $(note Language detection uses support_for_extension())
-$(answer moss detects language by file extension via support_for_extension())"
+$(answer normalize detects language by file extension via support_for_extension())"
 ]],
             context = "working_memory",
             next = "explorer",
@@ -184,7 +184,7 @@ $(answer moss detects language by file extension via support_for_extension())"
    - 4 turns: explore → evaluate (need more) → explore → evaluate → done
    - Correct answer: 13 variants
 
-3. **Open-ended query**: "What commands are available in moss CLI?"
+3. **Open-ended query**: "What commands are available in normalize CLI?"
    - 4 turns: multiple explorations → comprehensive list
    - Found 11 commands correctly
 
@@ -211,7 +211,7 @@ $(answer moss detects language by file extension via support_for_extension())"
 - After: "You are an EVALUATOR, not an explorer. NEVER output commands. NEVER say 'I need to'..."
 
 **Results** (post-fix):
-- "How does moss detect language?" → 4 turns, correct answer (was 12 turns, no answer)
+- "How does normalize detect language?" → 4 turns, correct answer (was 12 turns, no answer)
 - "What CLI commands?" → 2 turns, comprehensive answer
 - "Purpose of normalize-languages?" → 2 turns (Gemini), correct answer
 
@@ -219,7 +219,7 @@ $(answer moss detects language by file extension via support_for_extension())"
 
 Optional planning state that runs before exploration. Usage:
 ```bash
-moss @agent "complex task" --v2 --plan --max-turns 12
+normalize @agent "complex task" --v2 --plan --max-turns 12
 ```
 
 Flow: planner → explorer → evaluator → (repeat or done)

@@ -1,7 +1,7 @@
 //! Embedded builtin rules for syntax-based linting.
 //!
 //! Rules are embedded at compile time and loaded as the lowest-priority source.
-//! Users can override or disable them via ~/.config/moss/rules/ or .normalize/rules/.
+//! Users can override or disable them via ~/.config/normalize/rules/ or .normalize/rules/.
 
 use crate::BuiltinRule;
 

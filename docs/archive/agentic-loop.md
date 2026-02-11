@@ -48,8 +48,8 @@ Design for an indefinite agent loop where the LLM outputs terse intents and DWIM
 Terse, token-efficient. Verb + target(s):
 
 ```
-view src/moss/agent_loop.py
-view src/moss/agent_loop.py/Patch
+view src/normalize/agent_loop.py
+view src/normalize/agent_loop.py/Patch
 analyze --complexity
 edit -f patches.py "add type check for anchor"
 done
@@ -69,9 +69,9 @@ No prose, no "I will now...", just action.
 
 ### Existing Infrastructure
 
-- `moss.dwim` - has `resolve_core_primitive()`, simple alias matching
-- `moss.session` - tracks tool calls, file changes, LLM usage
-- `moss.agent_loop` - has `AgentLoopRunner`, executors, metrics
+- `normalize.dwim` - has `resolve_core_primitive()`, simple alias matching
+- `normalize.session` - tracks tool calls, file changes, LLM usage
+- `normalize.agent_loop` - has `AgentLoopRunner`, executors, metrics
 - `litellm` - unified LLM access
 
 ### What Needs Building
@@ -86,11 +86,11 @@ No prose, no "I will now...", just action.
 User: "Fix the type error in Patch.apply"
 
 ```
-LLM: view src/moss/patches.py
+LLM: view src/normalize/patches.py
      → Routes to view command (Rust CLI)
      → Returns: class Patch, def apply(...) skeleton
 
-LLM: view src/moss/patches.py/Patch/apply
+LLM: view src/normalize/patches.py/Patch/apply
      → Routes to view with symbol path
      → Returns: full function source
 

@@ -1,11 +1,11 @@
-# moss update
+# normalize update
 
-Self-update moss to the latest version.
+Self-update normalize to the latest version.
 
 ## Usage
 
 ```bash
-moss update
+normalize update
 ```
 
 ## Process

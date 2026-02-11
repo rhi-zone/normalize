@@ -1,4 +1,4 @@
-//! Moss - Fast code intelligence library and CLI.
+//! Normalize - Fast code intelligence library and CLI.
 //!
 //! This crate provides code intelligence features including:
 //! - File indexing with SQLite storage

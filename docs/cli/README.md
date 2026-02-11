@@ -1,6 +1,6 @@
 # CLI Architecture
 
-Moss provides a unified CLI for code intelligence. Three core primitives: **view**, **edit**, **analyze**.
+Normalize provides a unified CLI for code intelligence. Three core primitives: **view**, **edit**, **analyze**.
 
 ## Command Categories
 
@@ -21,7 +21,7 @@ Moss provides a unified CLI for code intelligence. Three core primitives: **view
 | Command | Purpose |
 |---------|---------|
 | [index](index.md) | Manage file index and call graph |
-| [init](init.md) | Initialize moss in a project |
+| [init](init.md) | Initialize normalize in a project |
 | [daemon](daemon.md) | Background daemon for faster operations |
 
 ### Code Quality
@@ -41,7 +41,7 @@ Moss provides a unified CLI for code intelligence. Three core primitives: **view
 | [grammars](grammars.md) | Manage tree-sitter grammars |
 | [sessions](sessions.md) | Analyze agent session logs |
 | [plans](plans.md) | View Claude Code plans |
-| [update](update.md) | Self-update moss |
+| [update](update.md) | Self-update normalize |
 | [aliases](aliases.md) | Manage filter aliases |
 | [serve](serve.md) | Start MCP/HTTP/LSP server |
 | [generate](generate.md) | Generate code from API specs |
@@ -57,6 +57,6 @@ All commands support:
 ## Design Principles
 
 1. **Index-optional**: All commands work without an index (graceful degradation via filesystem)
-2. **Unified interface**: `moss view` handles dirs, files, symbols, line ranges
+2. **Unified interface**: `normalize view` handles dirs, files, symbols, line ranges
 3. **Composable output**: JSON output + jq for scripting
-4. **Replace builtin tools**: moss view/grep replaces Read/Grep for code-aware operations
+4. **Replace builtin tools**: normalize view/grep replaces Read/Grep for code-aware operations

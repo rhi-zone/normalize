@@ -1,10 +1,10 @@
 # Agent Design Notes
 
-Design decisions and implementation notes for `moss @agent`.
+Design decisions and implementation notes for `normalize @agent`.
 
 ## Current Implementation
 
-**File:** `crates/moss/src/commands/scripts/agent.lua`
+**File:** `crates/normalize/src/commands/scripts/agent.lua`
 
 ### System Prompt
 
@@ -39,10 +39,10 @@ Key design choices:
 ### CLI Usage
 
 ```bash
-moss @agent "What language is this project?"
-moss @agent --provider anthropic "List dependencies"
-moss @agent --max-turns 10 "Refactor the auth module"
-moss @agent --explain "What does this do?"  # Asks for step-by-step reasoning
+normalize @agent "What language is this project?"
+normalize @agent --provider anthropic "List dependencies"
+normalize @agent --max-turns 10 "Refactor the auth module"
+normalize @agent --explain "What does this do?"  # Asks for step-by-step reasoning
 ```
 
 ### Architecture
@@ -398,7 +398,7 @@ Agent should learn this pattern, not rediscover it each time.
 
 ## Adaptation (from agent-adaptation.md)
 
-Moss tools are **T1** (agent-agnostic). They improve independently:
+Normalize tools are **T1** (agent-agnostic). They improve independently:
 - Index refresh via file watching
 - Grammar updates
 - Output format improvements
@@ -412,9 +412,9 @@ Not doing **A1/A2** (agent adaptation) - that requires fine-tuning LLMs, outside
 
 ## Related Files
 
-- `crates/moss/src/commands/scripts/agent.lua` - Agent loop implementation
-- `crates/moss/src/workflow/lua_runtime.rs` - Lua bindings including `llm.chat()`
-- `crates/moss/src/workflow/llm.rs` - Multi-provider LLM client
+- `crates/normalize/src/commands/scripts/agent.lua` - Agent loop implementation
+- `crates/normalize/src/workflow/lua_runtime.rs` - Lua bindings including `llm.chat()`
+- `crates/normalize/src/workflow/llm.rs` - Multi-provider LLM client
 - `docs/research/agent-adaptation.md` - Adaptation framework analysis
 - `docs/lua-api.md` - Available Lua bindings
 

@@ -1,8 +1,8 @@
 # Claude Code Session Log Analysis
 
-Historical analysis of session logs from `~/.claude/projects/-home-me-git-moss/`.
+Historical analysis of session logs from `~/.claude/projects/-home-me-git-normalize/`.
 
-> **Note:** This analysis predates the spore split. References to `moss @agent` and `moss workflow` describe functionality that now lives in [spore](https://github.com/user/spore).
+> **Note:** This analysis predates the spore split. References to `normalize @agent` and `normalize workflow` describe functionality that now lives in [spore](https://github.com/user/spore).
 
 ## Session Overview
 
@@ -148,7 +148,7 @@ Subagents don't edit files - they gather information for the main session.
 
 ## Future Work
 
-Could build a `moss analyze-logs` command that:
+Could build a `normalize analyze-logs` command that:
 - Parses Claude Code session logs
 - Computes tool success rates
 - Identifies error patterns
@@ -214,17 +214,17 @@ depends on subscription tier, not raw API rates.*
 
 **9x cheaper** than Opus ($263 → $28) - output pricing dominates ($25/M → $3/M).
 
-#### b) Moss Paradigm (conservative 10x context reduction)
+#### b) Normalize Paradigm (conservative 10x context reduction)
 
 Target: 10K tokens/call instead of 100K (conservative; vision is 1-5K).
 
-| Metric | Current | Moss |
+| Metric | Current | Normalize |
 |--------|---------|------|
 | Context/call | 100K | 10K |
 | Total input | 370M | 37M |
 | Output (est. 30% reduction) | 1.45M | 1.0M |
 
-**Moss + Opus 4.5:**
+**Normalize + Opus 4.5:**
 
 | Component | Tokens | Rate | Cost |
 |-----------|--------|------|------|
@@ -236,7 +236,7 @@ Target: 10K tokens/call instead of 100K (conservative; vision is 1-5K).
 
 **5x cheaper** than current ($263 → $50).
 
-**Moss + Gemini Flash:**
+**Normalize + Gemini Flash:**
 
 | Component | Tokens | Rate | Cost |
 |-----------|--------|------|------|
@@ -253,10 +253,10 @@ Target: 10K tokens/call instead of 100K (conservative; vision is 1-5K).
 |---------------|------|------------|
 | Opus 4.5 (current) | $263 | baseline |
 | Gemini Flash (same paradigm) | $28 | 9x cheaper |
-| Opus 4.5 + Moss | $50 | 5x cheaper |
-| Gemini Flash + Moss | $7 | 38x cheaper |
+| Opus 4.5 + Normalize | $50 | 5x cheaper |
+| Gemini Flash + Normalize | $7 | 38x cheaper |
 
-The moss paradigm's value compounds with cheaper models. Reduced context means:
+The normalize paradigm's value compounds with cheaper models. Reduced context means:
 - Less to cache/transmit
 - More focused model attention (better quality)
 - Faster response times
@@ -285,7 +285,7 @@ Every tool (Claude Code, Cursor, Copilot, etc.) uses similar approaches. Not bec
 4. "Good enough" for short sessions
 5. Engineering complexity / risk aversion
 
-### The Better Approach (Moss Vision)
+### The Better Approach (Normalize Vision)
 
 **For code:** Merkle tree of structural views
 - Hash AST/modules/deps
@@ -312,7 +312,7 @@ Curated context isn't just cheaper - it's *better*:
 
 ## Correction Patterns Meta-Analysis
 
-Analysis of user corrections across 20 moss sessions (Jan 2026), using `moss sessions show --jq` to extract patterns.
+Analysis of user corrections across 20 normalize sessions (Jan 2026), using `normalize sessions show --jq` to extract patterns.
 
 ### Summary
 
@@ -349,7 +349,7 @@ Arbitrary limits, missing pagination, silent truncation.
 
 Patterns that don't match the rest of the codebase.
 
-- "You're right - that's inconsistent. Agent is just a Lua module, should work via `moss @agent` like other scripts"
+- "You're right - that's inconsistent. Agent is just a Lua module, should work via `normalize @agent` like other scripts"
 - "You're right - scripts ARE embedded (`include_str!`). My earlier statement was wrong"
 - "Good point - `--list` vs `list` subcommand - `tools lint list` IS consistent. `--list` would be inconsistent"
 
@@ -398,7 +398,7 @@ These patterns suggest rules like:
 
 Extraction command:
 ```bash
-moss sessions show <SESSION> --jq 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text'
+normalize sessions show <SESSION> --jq 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text'
 ```
 
 Pattern matching via grep on combined output from all sessions.

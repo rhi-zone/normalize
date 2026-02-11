@@ -1,4 +1,4 @@
-# moss package
+# normalize package
 
 Package management utilities: info, dependencies, outdated checks.
 
@@ -15,18 +15,18 @@ Package management utilities: info, dependencies, outdated checks.
 
 ```bash
 # Package info
-moss package info serde
-moss package info react
+normalize package info serde
+normalize package info react
 
 # List dependencies
-moss package list
+normalize package list
 
 # Dependency tree
-moss package tree
-moss package tree --depth 2
+normalize package tree
+normalize package tree --depth 2
 
 # Check outdated
-moss package outdated
+normalize package outdated
 ```
 
 ## Supported Ecosystems

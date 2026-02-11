@@ -236,7 +236,7 @@ Turn 4: Generate initial queries
   ...
 
 Turn 5: Verify against sample files
-  $(run moss highlight sample.x)
+  $(run normalize highlight sample.x)
   → Check: are keywords highlighted? types? strings?
 
 Turn 6: D × C check
@@ -247,7 +247,7 @@ Turn 6: D × C check
     - Is it handled in queries?
 
 Turn 7: Compare with similar language
-  $(run diff <(moss highlight sample.rs) <(moss highlight sample.x))
+  $(run diff <(normalize highlight sample.rs) <(normalize highlight sample.x))
   → Similar constructs should highlight similarly
 
 Turn 8: Iterate until coverage complete

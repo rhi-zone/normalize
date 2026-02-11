@@ -60,7 +60,7 @@ Improving code without changing behavior: restructuring, renaming, simplifying.
 | Understand | `view`, `analyze callers/callees`, `text-search` |
 | Plan | Document target state |
 | Execute | `edit`, IDE refactoring |
-| Verify | Test suite, `moss analyze` |
+| Verify | Test suite, `normalize analyze` |
 
 ## Refactoring Catalog
 
@@ -138,7 +138,7 @@ After: Single function, called from all places
 
 ```
 Turn 1: Identify duplication
-  $(moss analyze duplicate-functions)
+  $(normalize analyze duplicate-functions)
   → validate_email in users.rs and contacts.rs
   → validate_phone in users.rs and orders.rs
 
@@ -177,7 +177,7 @@ Turn 7: Update second caller
   $(git commit)
 
 Turn 8: Verify no duplication
-  $(moss analyze duplicate-functions)
+  $(normalize analyze duplicate-functions)
   → validate_email no longer duplicated
 ```
 

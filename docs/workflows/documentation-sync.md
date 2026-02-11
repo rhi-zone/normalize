@@ -55,23 +55,23 @@ Keeping documentation in sync with code: preventing stale docs, broken examples.
 
 | Phase | Tools |
 |-------|-------|
-| Detect | `moss analyze check-refs`, `moss analyze stale-docs` |
+| Detect | `normalize analyze check-refs`, `normalize analyze stale-docs` |
 | Locate | `text-search`, `view` |
 | Update | `edit`, write tools |
-| Verify | `moss analyze check-examples`, manual testing |
+| Verify | `normalize analyze check-examples`, manual testing |
 
 ## Detection Methods
 
 ### Automated Checks
 ```bash
 # Check for broken doc references
-moss analyze check-refs
+normalize analyze check-refs
 
 # Find docs referencing renamed/removed code
-moss analyze stale-docs
+normalize analyze stale-docs
 
 # Verify example code still works
-moss analyze check-examples
+normalize analyze check-examples
 ```
 
 ### Manual Checks
@@ -85,7 +85,7 @@ moss analyze check-examples
 ### Renamed Symbols
 ```
 Problem: Doc references `old_function_name`
-Detection: moss analyze stale-docs
+Detection: normalize analyze stale-docs
 Fix: Update to `new_function_name`
 ```
 
@@ -106,7 +106,7 @@ Fix: Update description
 ### Broken Examples
 ```
 Problem: Example code doesn't compile/run
-Detection: moss analyze check-examples
+Detection: normalize analyze check-examples
 Fix: Update example or fix code
 ```
 
@@ -125,7 +125,7 @@ Fix: Update example or fix code
 
 ```
 Turn 1: Find stale references
-  $(moss analyze stale-docs)
+  $(normalize analyze stale-docs)
   → docs/api.md references `get_user` (now `fetch_user`)
   → docs/examples.md uses old function name
 
@@ -151,7 +151,7 @@ Turn 5: Keep migration.md
   → Add note: "In versions < 2.0, this was called `get_user`"
 
 Turn 6: Verify
-  $(moss analyze check-refs)
+  $(normalize analyze check-refs)
   → No broken references
   $(cargo test --doc)
   → Doc tests pass
@@ -173,8 +173,8 @@ pub fn fetch_user(id: u64) -> Result<User> { ... }
 ```yaml
 - name: Check documentation
   run: |
-    moss analyze check-refs
-    moss analyze stale-docs
+    normalize analyze check-refs
+    normalize analyze stale-docs
     cargo test --doc
 ```
 

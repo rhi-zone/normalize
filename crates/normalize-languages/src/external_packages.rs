@@ -10,7 +10,7 @@
 //!
 //! This module contains:
 //! - ResolvedPackage: Common result type for package resolution
-//! - Global cache: ~/.cache/moss/ for indexed packages
+//! - Global cache: ~/.cache/normalize/ for indexed packages
 //! - PackageIndex: SQLite-backed package/symbol index
 
 use std::path::PathBuf;
@@ -34,7 +34,7 @@ pub struct ResolvedPackage {
 // Global Cache
 // =============================================================================
 
-/// Get the global moss cache directory (~/.cache/moss/).
+/// Get the global normalize cache directory (~/.cache/normalize/).
 pub fn get_global_cache_dir() -> Option<PathBuf> {
     let cache_base = if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
         PathBuf::from(xdg)
@@ -46,12 +46,12 @@ pub fn get_global_cache_dir() -> Option<PathBuf> {
         return None;
     };
 
-    let moss_cache = cache_base.join("moss");
-    if !moss_cache.exists() {
-        std::fs::create_dir_all(&moss_cache).ok()?;
+    let normalize_cache = cache_base.join("normalize");
+    if !normalize_cache.exists() {
+        std::fs::create_dir_all(&normalize_cache).ok()?;
     }
 
-    Some(moss_cache)
+    Some(normalize_cache)
 }
 
 /// Get the path to the unified global package index database.

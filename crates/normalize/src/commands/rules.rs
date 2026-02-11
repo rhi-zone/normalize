@@ -12,7 +12,7 @@ pub enum RulesAction {
         /// URL to download the rule from
         url: String,
 
-        /// Install to global rules (~/.config/moss/rules/) instead of project
+        /// Install to global rules (~/.config/normalize/rules/) instead of project
         #[arg(long)]
         #[serde(default)]
         global: bool,
@@ -84,7 +84,7 @@ pub fn cmd_rules(action: RulesAction, format: &crate::output::OutputFormat) -> i
 
 fn rules_dir(global: bool) -> Option<PathBuf> {
     if global {
-        dirs::config_dir().map(|d| d.join("moss").join("rules"))
+        dirs::config_dir().map(|d| d.join("normalize").join("rules"))
     } else {
         Some(PathBuf::from(".normalize").join("rules"))
     }
@@ -92,7 +92,7 @@ fn rules_dir(global: bool) -> Option<PathBuf> {
 
 fn lock_file_path(global: bool) -> Option<PathBuf> {
     if global {
-        dirs::config_dir().map(|d| d.join("moss").join("rules.lock"))
+        dirs::config_dir().map(|d| d.join("normalize").join("rules.lock"))
     } else {
         Some(PathBuf::from(".normalize").join("rules.lock"))
     }
@@ -247,7 +247,7 @@ fn cmd_list(sources: bool, json: bool) -> i32 {
     } else if all_rules.is_empty() {
         println!("No custom rules installed.");
         println!();
-        println!("Add a rule with: moss rules add <url>");
+        println!("Add a rule with: normalize rules add <url>");
     } else {
         for (scope, id, source) in &all_rules {
             if sources {

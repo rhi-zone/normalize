@@ -1,4 +1,4 @@
-# moss grammars
+# normalize grammars
 
 Manage tree-sitter grammars for parsing.
 
@@ -14,17 +14,17 @@ Manage tree-sitter grammars for parsing.
 
 ```bash
 # List all grammars
-moss grammars list
+normalize grammars list
 
 # Grammar info
-moss grammars info rust
-moss grammars info typescript
+normalize grammars info rust
+normalize grammars info typescript
 
 # Verify
-moss grammars check
+normalize grammars check
 ```
 
 ## Supported Languages
 
-Moss includes grammars for 90+ languages via arborium.
-See `moss grammars list` for the full list.
+Normalize includes grammars for 90+ languages via arborium.
+See `normalize grammars list` for the full list.

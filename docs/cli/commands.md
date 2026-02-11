@@ -2,7 +2,7 @@
 
 ## Command Structure
 
-Moss has 17 top-level commands organized by domain:
+Normalize has 17 top-level commands organized by domain:
 
 ### Core Operations
 | Command | Description |
@@ -18,13 +18,13 @@ Moss has 17 top-level commands organized by domain:
 | `index` | Manage file index |
 | `daemon` | Background process management |
 | `grammars` | Tree-sitter grammar management |
-| `init` | Initialize moss in a directory |
+| `init` | Initialize normalize in a directory |
 | `update` | Self-update |
 
 ### Ecosystem Integration
 | Command | Description |
 |---------|-------------|
-| `sessions` | Agent session logs (Claude Code, Codex, Gemini, Moss) |
+| `sessions` | Agent session logs (Claude Code, Codex, Gemini, Normalize) |
 | `package` | Package management (info, list, tree, why, outdated, audit) |
 | `tools` | External tool orchestration (lint, test) |
 | `serve` | Server protocols (mcp, http, lsp) |
@@ -54,7 +54,7 @@ Moss has 17 top-level commands organized by domain:
 - Consistent: `grammars list`, `script list`, `daemon list`, `package list`
 
 ### Positional args for primary targets
-- `moss view src/main.rs` not `moss view --file src/main.rs`
+- `normalize view src/main.rs` not `normalize view --file src/main.rs`
 
 ## Output Formats
 
@@ -69,7 +69,7 @@ All commands support these global flags:
 
 ## Configuration
 
-Configuration in `.normalize/config.toml` or `~/.config/moss/config.toml`:
+Configuration in `.normalize/config.toml` or `~/.config/normalize/config.toml`:
 
 ```toml
 [daemon]

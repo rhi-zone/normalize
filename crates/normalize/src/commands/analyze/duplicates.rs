@@ -350,7 +350,7 @@ pub fn cmd_allow_duplicate_function(
         Some(g) => g,
         None => {
             eprintln!("No duplicate function group found containing: {}", location);
-            eprintln!("Run `moss analyze --duplicate-functions` to see available groups.");
+            eprintln!("Run `normalize analyze --duplicate-functions` to see available groups.");
             return 1;
         }
     };

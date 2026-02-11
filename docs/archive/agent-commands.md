@@ -1,6 +1,6 @@
 # Agent Commands Reference
 
-Complete list of commands available to the moss agent.
+Complete list of commands available to the normalize agent.
 
 ## Exploration
 

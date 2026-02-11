@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 343
 expression: "snapshot_help(&[\"sessions\", \"plans\"])"
 ---
 List and view agent plans (from ~/.claude/plans/, etc.)
@@ -12,7 +11,7 @@ Arguments:
 
 Options:
   -r, --root <ROOT>         Root directory (defaults to current directory)
-      --format <FORMAT>     Force specific format: claude, codex, gemini, moss
+      --format <FORMAT>     Force specific format: claude, codex, gemini, normalize
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)

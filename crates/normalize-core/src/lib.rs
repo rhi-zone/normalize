@@ -1,6 +1,6 @@
-//! Core traits for moss.
+//! Core traits for normalize.
 //!
-//! This crate provides foundational traits used across moss sub-crates.
+//! This crate provides foundational traits used across normalize sub-crates.
 
 mod merge;
 

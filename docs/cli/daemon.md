@@ -1,4 +1,4 @@
-# moss daemon
+# normalize daemon
 
 Manage the background daemon for faster operations.
 
@@ -14,9 +14,9 @@ Manage the background daemon for faster operations.
 ## Examples
 
 ```bash
-moss daemon start
-moss daemon status
-moss daemon stop
+normalize daemon start
+normalize daemon status
+normalize daemon stop
 ```
 
 ## Purpose

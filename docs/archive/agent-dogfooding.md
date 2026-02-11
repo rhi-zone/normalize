@@ -1,13 +1,13 @@
 # Agent Dogfooding (Historical)
 
-Archived insights from using the moss agent on itself. Agent functionality now lives in [spore](https://github.com/user/spore).
+Archived insights from using the normalize agent on itself. Agent functionality now lives in [spore](https://github.com/user/spore).
 
 ## What Works
 
 - **Ephemeral context model**: 1-turn output visibility forces explicit memory curation via `$(keep)`/`$(note)`
 - **State machine (explorer/evaluator)**: Prevents pre-answering; evaluator curates, explorer acts
 - **Session logging**: JSONL logs in `.normalize/agent/logs/` enable post-hoc analysis
-- **`moss sessions --format moss`**: List/grep agent sessions for debugging
+- **`normalize sessions --format normalize`**: List/grep agent sessions for debugging
 - **Working memory**: Synthesized notes (`$(note)`) survive longer than raw outputs
 
 ## Friction Points Discovered
@@ -18,7 +18,7 @@ Archived insights from using the moss agent on itself. Agent functionality now l
 - **Text-search syntax confusion**: Agent used grep syntax (`\|`) with text-search despite tool being renamed
   - Shows agents don't understand tool semantics, just syntax
 - **Large file edits**: Edit tool match failures on large deletions
-- **Context compaction**: Claude Code's auto-compaction lost in-progress work (moss's dynamic reshaping avoids this)
+- **Context compaction**: Claude Code's auto-compaction lost in-progress work (normalize's dynamic reshaping avoids this)
 
 ## Key Insights
 
@@ -30,7 +30,7 @@ Archived insights from using the moss agent on itself. Agent functionality now l
 ## Session Analysis Workflow
 
 ```bash
-moss sessions --format moss                    # list recent agent sessions
-moss sessions --format moss --grep "benchmark" # filter by content
-moss sessions <id> --analyze                   # full analysis
+normalize sessions --format normalize                    # list recent agent sessions
+normalize sessions --format normalize --grep "benchmark" # filter by content
+normalize sessions <id> --analyze                   # full analysis
 ```

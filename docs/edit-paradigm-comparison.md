@@ -44,9 +44,9 @@ Source: [Gemini CLI tools](https://github.com/google-gemini/gemini-cli/tree/main
 3. **Regex fallback** - May match unintended locations
 4. **Hidden complexity** - Model doesn't learn from failures if tool auto-fixes
 
-## Implications for Moss
+## Implications for Normalize
 
-Moss should follow the Claude Code pattern:
+Normalize should follow the Claude Code pattern:
 - Strict matching with explicit failures
 - Force the model to be precise
 - No self-correction that hides problems

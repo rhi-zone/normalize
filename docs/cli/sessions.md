@@ -1,12 +1,12 @@
-# moss sessions
+# normalize sessions
 
-Analyze Claude Code, Codex, Gemini CLI, and Moss agent session logs.
+Analyze Claude Code, Codex, Gemini CLI, and Normalize agent session logs.
 
 ## Usage
 
 ```bash
-moss sessions [OPTIONS] [SESSION_ID]
-moss sessions plans [NAME]
+normalize sessions [OPTIONS] [SESSION_ID]
+normalize sessions plans [NAME]
 ```
 
 ## Subcommands
@@ -42,22 +42,22 @@ moss sessions plans [NAME]
 
 ```bash
 # List Claude Code sessions (default)
-moss sessions
+normalize sessions
 
-# List Moss agent sessions
-moss sessions --format moss
+# List Normalize agent sessions
+normalize sessions --format normalize
 
 # Filter sessions by content
-moss sessions --format moss --grep "benchmark"
+normalize sessions --format normalize --grep "benchmark"
 
 # Show specific session with analysis
-moss sessions abc123 --analyze
+normalize sessions abc123 --analyze
 
 # Show session with jq filtering
-moss sessions abc123 --jq '.tool_stats'
+normalize sessions abc123 --jq '.tool_stats'
 
 # JSON output for scripting
-moss sessions --json
+normalize sessions --json
 ```
 
 ## Session Analysis

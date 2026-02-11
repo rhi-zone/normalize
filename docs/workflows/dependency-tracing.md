@@ -62,34 +62,34 @@ Understanding what depends on what: "What uses X?", "What does X depend on?"
 ### What Uses X (Reverse Dependencies)
 ```bash
 # Find all callers of a function
-moss analyze callers function_name
+normalize analyze callers function_name
 
 # Find all references to a type
-moss text-search "TypeName" --only "*.rs"
+normalize text-search "TypeName" --only "*.rs"
 
 # Find all imports of a module
-moss text-search "use crate::module" --only "*.rs"
+normalize text-search "use crate::module" --only "*.rs"
 ```
 
 ### What X Uses (Forward Dependencies)
 ```bash
 # Find all functions called by X
-moss analyze callees function_name
+normalize analyze callees function_name
 
 # View imports in a file
-moss view src/module.rs --deps
+normalize view src/module.rs --deps
 
 # Check package dependencies
-moss package deps
+normalize package deps
 ```
 
 ### Transitive Dependencies
 ```bash
 # Trace full call chain
-moss analyze trace symbol_name
+normalize analyze trace symbol_name
 
 # Build full dependency tree
-moss package tree
+normalize package tree
 ```
 
 ## Dependency Categories

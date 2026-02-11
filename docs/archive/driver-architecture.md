@@ -16,7 +16,7 @@ A **Driver** decides what action to take next for a task. Different drivers impl
 
 ```python
 from typing import Protocol, Any
-from moss.session import Task
+from normalize.session import Task
 
 class Action:
     """An action to execute."""
@@ -200,14 +200,14 @@ External packages can register drivers via entry points:
 
 ```toml
 # pyproject.toml
-[project.entry-points."moss.drivers"]
+[project.entry-points."normalize.drivers"]
 my_driver = "my_package:MyCustomDriver"
 ```
 
 Or programmatically:
 
 ```python
-from moss.drivers import DriverRegistry
+from normalize.drivers import DriverRegistry
 
 class MyCustomDriver:
     name = "custom"

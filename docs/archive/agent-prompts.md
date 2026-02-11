@@ -361,11 +361,11 @@ Source: https://ischemist.com/writings/long-form/how-vibe-coding-killed-cursor
 
 4. **Human as retrieval system**: Manual context curation (bash scripts collecting relevant files) beats agent-driven discovery.
 
-### Implications for Moss Agent
+### Implications for Normalize Agent
 
 **Our approach has the same fundamental problems:**
 
-| Problem | Article's Critique | Moss Agent |
+| Problem | Article's Critique | Normalize Agent |
 |---------|-------------------|------------|
 | Tunnel vision | ripgrep misses semantic context | $(text-search) has same limitation |
 | Context loss | Tool loop forgets previous context | Ephemeral model *actively discards* context each turn |
@@ -382,7 +382,7 @@ Arguments YES:
 
 Arguments MAYBE NOT:
 - We target *investigation*, not code generation (different task)
-- Moss has structural awareness ($(view symbol), $(view --types-only)) beyond raw ripgrep
+- Normalize has structural awareness ($(view symbol), $(view --types-only)) beyond raw ripgrep
 - Memory commands ($(note), $(keep)) attempt to address context loss
 - Small questions ("how many X") work fine - complex synthesis doesn't
 
@@ -392,6 +392,6 @@ Arguments MAYBE NOT:
 
 1. **Accumulating context**: Keep ALL outputs in context, use summarization only when hitting limits
 2. **Upfront collection**: Like the article suggests - collect relevant files first, then ask question
-3. **Hybrid**: Moss collects context (using its structural awareness), dumps it all to LLM in one shot
-4. **Index-first**: Use Moss's index to pre-select relevant files, skip the agent loop entirely
+3. **Hybrid**: Normalize collects context (using its structural awareness), dumps it all to LLM in one shot
+4. **Index-first**: Use Normalize's index to pre-select relevant files, skip the agent loop entirely
 

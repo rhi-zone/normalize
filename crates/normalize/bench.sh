@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Benchmark suite for moss CLI commands
+# Benchmark suite for normalize CLI commands
 # Usage: ./bench.sh [--quick]
 #
 # Runs each command multiple times and reports average time.
@@ -14,13 +14,13 @@ fi
 
 # Build release first
 echo "Building release binary..."
-cargo build --release -p rhizome-moss 2>/dev/null
+cargo build --release -p normalize 2>/dev/null
 
-MOSS="./target/release/moss"
+NORMALIZE="./target/release/normalize"
 
 # Ensure index exists
 echo "Ensuring index is up to date..."
-$MOSS reindex >/dev/null 2>&1
+$NORMALIZE reindex >/dev/null 2>&1
 
 # Function to benchmark a command (uses built-in TIMEFORMAT)
 bench() {
@@ -31,7 +31,7 @@ bench() {
     for ((i=1; i<=RUNS; i++)); do
         # Use bash's time and parse real time
         local output
-        output=$( { time $MOSS "$@" >/dev/null 2>&1; } 2>&1 )
+        output=$( { time $NORMALIZE "$@" >/dev/null 2>&1; } 2>&1 )
         # Extract real time (format: "real 0m0.003s")
         local real_time=$(echo "$output" | grep real | sed 's/real[[:space:]]*//' | sed 's/m/\*60+/' | sed 's/s//')
         # Convert to milliseconds using awk
@@ -44,7 +44,7 @@ bench() {
 }
 
 echo ""
-echo "=== Moss CLI Benchmark ==="
+echo "=== Normalize CLI Benchmark ==="
 echo "Runs per command: $RUNS"
 echo ""
 
@@ -57,22 +57,22 @@ bench "path (deep)" path "moss_api"
 # Symbol extraction benchmarks
 echo ""
 echo "--- Symbol Extraction ---"
-bench "symbols" symbols src/moss/cli.py
-bench "skeleton" skeleton src/moss/cli.py
+bench "symbols" symbols src/normalize/cli.py
+bench "skeleton" skeleton src/normalize/cli.py
 bench "expand" expand main
 
 # Call graph benchmarks
 echo ""
 echo "--- Call Graph ---"
 bench "callers (indexed)" callers serialize
-bench "callees" callees serialize --file src/moss/gen/serialize.py
+bench "callees" callees serialize --file src/normalize/gen/serialize.py
 
 # Analysis benchmarks
 echo ""
 echo "--- Analysis ---"
-bench "complexity" complexity src/moss/cli.py
-bench "deps" deps src/moss/cli.py
-bench "anchors" anchors src/moss/cli.py
+bench "complexity" complexity src/normalize/cli.py
+bench "deps" deps src/normalize/cli.py
+bench "anchors" anchors src/normalize/cli.py
 
 # Tree benchmarks
 echo ""
@@ -88,7 +88,7 @@ bench "search-tree" search-tree cli
 # Health/summary
 echo ""
 echo "--- Overview ---"
-bench "summarize" summarize src/moss/cli.py
+bench "summarize" summarize src/normalize/cli.py
 bench "health" health
 
 echo ""

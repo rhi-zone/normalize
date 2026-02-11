@@ -192,7 +192,7 @@ fn build_matcher(patterns: &[String]) -> Result<Gitignore, String> {
         .map_err(|e| format!("failed to build filter: {}", e))
 }
 
-/// Get all resolved aliases for display (moss filter aliases).
+/// Get all resolved aliases for display (normalize filter aliases).
 pub fn list_aliases(config: &AliasConfig, languages: &[&str]) -> Vec<ResolvedAlias> {
     let mut aliases = Vec::new();
     let builtin_names = AliasConfig::builtin_names();

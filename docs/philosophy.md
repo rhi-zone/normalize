@@ -1,11 +1,11 @@
-# Moss Philosophy
+# Normalize Philosophy
 
-This document contains the design philosophy and architectural overview for Moss.
+This document contains the design philosophy and architectural overview for Normalize.
 For behavioral rules and conventions, see `CLAUDE.md`.
 
 ## Project Overview
 
-Moss is **structural code intelligence as a platform**. It provides tools for understanding, navigating, and modifying code at a structural level (AST, control flow, dependencies) rather than treating code as text.
+Normalize is **structural code intelligence as a platform**. It provides tools for understanding, navigating, and modifying code at a structural level (AST, control flow, dependencies) rather than treating code as text.
 
 | User | Interface | Use Case |
 |------|-----------|----------|
@@ -15,7 +15,7 @@ Moss is **structural code intelligence as a platform**. It provides tools for un
 | CI/CD | CLI | Quality gates, validation, analysis |
 | Tool Builder | Library | Build custom tools on structural primitives |
 
-Moss is useful alone and powerful with AI. A human can `moss view` to understand a file; an agent can use the same capability to build context for code generation.
+Normalize is useful alone and powerful with AI. A human can `normalize view` to understand a file; an agent can use the same capability to build context for code generation.
 
 ## Architecture
 
@@ -113,7 +113,7 @@ Put smarts in the tool, not the schema. Tool definitions cost context. With only
 
 #### Friction Minimization Loop
 
-Moss's meta-goal: make it easier to reduce friction, which accelerates development, which makes it easier to improve moss.
+Normalize's meta-goal: make it easier to reduce friction, which accelerates development, which makes it easier to improve normalize.
 
 ```
 Workflows documented → Failure modes identified → Encoded as tooling → Friction reduced → Faster iteration → (loop)
@@ -191,7 +191,7 @@ This isn't just about LLMs—it's about scriptability, CI/CD, and reproducibilit
 
 #### Minimizing Error Rates
 
-Validation and heuristics are primary citizens in Moss. Because LLMs are not 100% reliable, we must never trust their output implicitly:
+Validation and heuristics are primary citizens in Normalize. Because LLMs are not 100% reliable, we must never trust their output implicitly:
 - **Verification First**: Every change must pass through a domain-specific validator (compiler, linter, test suite)
 - **Heuristic Guardrails**: Use structural rules to detect obvious mistakes before they reach the validator
 - **Correction over perfection**: Focus on fast feedback loops that allow the agent to correct itself based on deterministic error signals
@@ -231,7 +231,7 @@ This is a conscious tradeoff: defaults optimize for breadth (works for everyone)
 Note: With only 3 primitives, tool selection ambiguity is eliminated. This applies to path and symbol resolution, not tool choice.
 
 **Suggest obvious corrections**: When something seems wrong, suggest the likely fix. Not "here's what you could do" (overwhelming) but "did you mean X?" (helpful).
-- Symbol not found → "Did you mean: `moss text-search 'foo' file.rs`"
+- Symbol not found → "Did you mean: `normalize text-search 'foo' file.rs`"
 - File not found → suggest fuzzy matches or similar names
 - Operation failed → suggest the recovery action
 
@@ -245,7 +245,7 @@ The goal: users should never wonder "did that work?" or "what did that do?"
 
 #### Works Anywhere
 
-**Messy codebases**: Real-world code is often messy. Moss should:
+**Messy codebases**: Real-world code is often messy. Normalize should:
 - Handle legacy code without requiring refactoring first
 - Degrade gracefully when AST parsing fails (text fallbacks)
 - Support incremental improvement (clean up as you go, or don't)
@@ -295,13 +295,13 @@ Same mental model across all interfaces:
 - Composability: Small pieces combine flexibly
 - Refactorability: Can restructure without rewriting everything
 
-**Library-first**: The core should be a reusable Rust library (`crates/moss/`). Interfaces (CLI, MCP, LSP) are thin wrappers around the library.
+**Library-first**: The core should be a reusable Rust library (`crates/normalize/`). Interfaces (CLI, MCP, LSP) are thin wrappers around the library.
 
 **Everything is a plugin**: Where possible, use plugin protocols instead of hardcoded implementations. Even "native" integrations should implement the same plugin interface as third-party ones.
 
 #### Resource Efficiency
 
-Moss should be extremely lightweight. High memory usage is a bug:
+Normalize should be extremely lightweight. High memory usage is a bug:
 - **Low RAM footprint**: Favor streaming and lazy loading over large in-memory caches
 - **Minimal context**: Never send full code when a skeleton or snippet suffices
 - **Transparent metrics**: Every command should optionally show context and RAM usage breakdowns

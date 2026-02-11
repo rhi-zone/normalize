@@ -1,13 +1,13 @@
-# moss tools lint
+# normalize tools lint
 
 Run linters, formatters, and type checkers.
 
 ## Usage
 
 ```bash
-moss tools lint [PATH]       # Run linters (default)
-moss tools lint run [PATH]   # Explicit run
-moss tools lint list         # List available linters
+normalize tools lint [PATH]       # Run linters (default)
+normalize tools lint run [PATH]   # Explicit run
+normalize tools lint list         # List available linters
 ```
 
 ## Options
@@ -23,21 +23,21 @@ moss tools lint list         # List available linters
 
 ```bash
 # Lint current directory
-moss tools lint
+normalize tools lint
 
 # Lint specific path
-moss tools lint src/
+normalize tools lint src/
 
 # With auto-fix
-moss tools lint --fix
+normalize tools lint --fix
 
 # List available tools
-moss tools lint list
+normalize tools lint list
 ```
 
 ## Detected Tools
 
-Moss auto-detects and runs appropriate tools:
+Normalize auto-detects and runs appropriate tools:
 
 | Language | Linters |
 |----------|---------|
@@ -48,4 +48,4 @@ Moss auto-detects and runs appropriate tools:
 
 ## See Also
 
-- [moss tools test](test.md) - Run test runners
+- [normalize tools test](test.md) - Run test runners

@@ -13,14 +13,14 @@ cargo clippy --all-targets --all-features -- -D warnings 2>/dev/null || {
     echo "  Warning: clippy check failed or not available (non-critical)"
 }
 
-# Run moss rules if binary exists
-if [ -x "./target/release/moss" ] || [ -x "./target/debug/moss" ]; then
-    MOSS="${MOSS:-./target/release/moss}"
-    [ -x "$MOSS" ] || MOSS="./target/debug/moss"
+# Run normalize rules if binary exists
+if [ -x "./target/release/normalize" ] || [ -x "./target/debug/normalize" ]; then
+    NORMALIZE="${NORMALIZE:-./target/release/normalize}"
+    [ -x "$NORMALIZE" ] || NORMALIZE="./target/debug/normalize"
 
-    if [ -x "$MOSS" ]; then
-        echo "Running moss rules..."
-        $MOSS analyze rules --rule rust/tuple-return crates/ || {
+    if [ -x "$NORMALIZE" ]; then
+        echo "Running normalize rules..."
+        $NORMALIZE analyze rules --rule rust/tuple-return crates/ || {
             echo "  Error: tuple return rule violations found"
             exit 1
         }

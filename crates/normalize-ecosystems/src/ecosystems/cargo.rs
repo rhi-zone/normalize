@@ -355,7 +355,7 @@ fn fetch_crates_io_info(query: &PackageQuery) -> Result<PackageInfo, PackageErro
 
     // If version specified, fetch that version directly
     // Otherwise, get crate metadata first to find latest version
-    let headers = &[("User-Agent", "moss-packages")];
+    let headers = &[("User-Agent", "normalize-packages")];
 
     let version = if let Some(v) = &query.version {
         v.clone()

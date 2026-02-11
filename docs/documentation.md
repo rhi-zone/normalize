@@ -24,9 +24,9 @@ fn foo() {}
 ```
 
 View levels:
-- `moss view file.rs --skeleton` - structure only, no docs
-- `moss view file.rs` - code + summary (first paragraph)
-- `moss view file.rs --docs` - code + full docs
+- `normalize view file.rs --skeleton` - structure only, no docs
+- `normalize view file.rs` - code + summary (first paragraph)
+- `normalize view file.rs --docs` - code + full docs
 
 ## External Docs
 
@@ -42,7 +42,7 @@ Each external doc declares what code it covers:
 ...
 ```
 
-`moss analyze --docs` detects when covered code has changed significantly since doc was last updated. Uses git blame + doc modification time.
+`normalize analyze --docs` detects when covered code has changed significantly since doc was last updated. Uses git blame + doc modification time.
 
 ## Examples as Tests
 
@@ -68,24 +68,24 @@ Docs reference by marker (syntax - not yet implemented):
 
     {​{example: tests/parser_test.rs#basic-usage}​}
 
-Validate with `moss analyze --check-examples`. Future: `moss docs build` will expand these.
+Validate with `normalize analyze --check-examples`. Future: `normalize docs build` will expand these.
 
 ## Implementation
 
 ### Phase 1: Inline doc levels
 - [x] Parse double-blank convention in doc comments
-- [x] `--docs` flag for `moss view`
+- [x] `--docs` flag for `normalize view`
 - [x] Update skeleton extraction to use summary only
 
 ### Phase 2: External doc tracking
 - [x] `<!-- covers: ... -->` parser
-- [x] `moss analyze --stale-docs` to detect stale docs
-- [ ] Integration with `moss view` to show related docs
+- [x] `normalize analyze --stale-docs` to detect stale docs
+- [ ] Integration with `normalize view` to show related docs
 
 ### Phase 3: Example extraction
 - [x] `[example: name]` marker parser
-- [x] `{​{example: path#name}}` reference validation (`moss analyze --check-examples`)
-- [ ] `{​{example: path#name}}` expansion (future `moss docs build`)
+- [x] `{​{example: path#name}}` reference validation (`normalize analyze --check-examples`)
+- [ ] `{​{example: path#name}}` expansion (future `normalize docs build`)
 - [ ] Test that examples compile/run
 
 ## Open Questions

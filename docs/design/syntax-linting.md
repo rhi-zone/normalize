@@ -40,18 +40,18 @@ Rules in `.normalize/rules/` as `.scm` files with TOML frontmatter:
 
 ```bash
 # Run all rules
-moss analyze rules
+normalize analyze rules
 
 # Run specific rule
-moss analyze rules --rule no-grammar-loader-new
+normalize analyze rules --rule no-grammar-loader-new
 
 # List available rules
-moss analyze rules --list
+normalize analyze rules --list
 
 # Authoring helpers
-moss analyze ast <file>           # Show AST for a file
-moss analyze ast <file> --at 42   # Show AST node at line 42
-moss analyze query <file> <query> # Test query against file
+normalize analyze ast <file>           # Show AST for a file
+normalize analyze ast <file> --at 42   # Show AST node at line 42
+normalize analyze query <file> <query> # Test query against file
 ```
 
 ### Authoring Tools
@@ -60,7 +60,7 @@ To help write queries, expose AST inspection:
 
 ```bash
 # Dump full AST with node types
-$ moss analyze ast src/main.rs
+$ normalize analyze ast src/main.rs
 (source_file
   (function_item
     name: (identifier) "main"
@@ -69,7 +69,7 @@ $ moss analyze ast src/main.rs
         (call_expression ...)))))
 
 # Show node at cursor/line
-$ moss analyze ast src/main.rs --at 42
+$ normalize analyze ast src/main.rs --at 42
 Line 42 is inside:
   call_expression (L42:5-42:30)
     function: scoped_identifier (L42:5-42:22)
@@ -78,7 +78,7 @@ Line 42 is inside:
     arguments: arguments (L42:23-42:30)
 
 # Test a query interactively
-$ moss analyze query src/main.rs '(call_expression function: (scoped_identifier) @fn)'
+$ normalize analyze query src/main.rs '(call_expression function: (scoped_identifier) @fn)'
 3 matches:
   src/main.rs:42 - GrammarLoader::new()
   src/main.rs:55 - Config::load()
@@ -88,8 +88,8 @@ $ moss analyze query src/main.rs '(call_expression function: (scoped_identifier)
 ### Rule Storage
 
 1. **Project rules**: `.normalize/rules/*.scm`
-2. **Global rules**: `~/.config/moss/rules/*.scm`
-3. **Builtin rules**: Compiled into moss (optional, curated set)
+2. **Global rules**: `~/.config/normalize/rules/*.scm`
+3. **Builtin rules**: Compiled into normalize (optional, curated set)
 
 ### Configuration
 
@@ -144,10 +144,10 @@ The `@match` capture is required and marks where the finding is reported.
 
 ### Phase 1: MVP
 
-1. `moss analyze ast <file>` - dump AST
-2. `moss analyze query <file> <query>` - test queries
+1. `normalize analyze ast <file>` - dump AST
+2. `normalize analyze query <file> <query>` - test queries
 3. Rule files with basic format
-4. `moss analyze rules` - run all rules
+4. `normalize analyze rules` - run all rules
 
 ### Phase 2: Polish
 

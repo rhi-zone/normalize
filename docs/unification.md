@@ -9,9 +9,9 @@ See `docs/philosophy.md` for the "Generalize, Don't Multiply" tenet.
 **Decision**: Three composable primitives instead of many specialized commands.
 
 **Alternatives rejected**:
-- `moss show-imports`, `moss show-deps`, `moss show-callees`, `moss show-symbols` → unified under `view` with flags
-- `moss health`, `moss complexity`, `moss security`, `moss hotspots` → unified under `analyze` with flags
-- `moss edit-function`, `moss rename-symbol`, `moss add-import` → unified under `edit` with structural targeting
+- `normalize show-imports`, `normalize show-deps`, `normalize show-callees`, `normalize show-symbols` → unified under `view` with flags
+- `normalize health`, `normalize complexity`, `normalize security`, `normalize hotspots` → unified under `analyze` with flags
+- `normalize edit-function`, `normalize rename-symbol`, `normalize add-import` → unified under `edit` with structural targeting
 
 **Why**: Each new command adds cognitive load. Flags on a core command are discoverable via `--help`. Same path resolution, filtering, and output formatting applies everywhere.
 
@@ -49,7 +49,7 @@ See `docs/philosophy.md` for the "Generalize, Don't Multiply" tenet.
 
 **Alternatives rejected**:
 - `--format=json`, `--format=yaml`, `--format=csv`, `--format=table`
-- Separate commands: `moss view-json`, `moss view-table`
+- Separate commands: `normalize view-json`, `normalize view-table`
 
 **Why**: JSON is the universal interchange format. jq is powerful enough for any transformation. Adding more formats means more code to maintain.
 

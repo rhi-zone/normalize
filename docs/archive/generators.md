@@ -1,11 +1,11 @@
 # Interface Generators
 
-Moss follows a **library-first design**: the core is `MossAPI` in `src/moss/moss_api.py`, and all interfaces (CLI, HTTP, MCP, LSP, TUI, gRPC) are generated from it.
+Normalize follows a **library-first design**: the core is `NormalizeAPI` in `src/normalize/normalize_api.py`, and all interfaces (CLI, HTTP, MCP, LSP, TUI, gRPC) are generated from it.
 
 ## Overview
 
 ```
-MossAPI (moss_api.py)
+NormalizeAPI (normalize_api.py)
     │
     ▼
 introspect_api() → list[SubAPI]
@@ -22,7 +22,7 @@ introspect_api() → list[SubAPI]
 
 ### 1. Introspection (`gen/introspect.py`)
 
-The `introspect_api()` function analyzes `MossAPI` to extract:
+The `introspect_api()` function analyzes `NormalizeAPI` to extract:
 
 - **SubAPIs**: Classes like `SkeletonAPI`, `HealthAPI`, `RAGAPI`
 - **Methods**: Public methods with their signatures
@@ -30,7 +30,7 @@ The `introspect_api()` function analyzes `MossAPI` to extract:
 - **Return types**: For serialization hints
 
 ```python
-from moss.gen import introspect_api
+from normalize.gen import introspect_api
 
 sub_apis = introspect_api()
 # Returns: [SubAPI(name="skeleton", methods=[...]), SubAPI(name="health", ...)]
@@ -40,7 +40,7 @@ sub_apis = introspect_api()
 
 To add a new MCP/HTTP/CLI tool:
 
-1. **Add API class** to `moss_api.py`:
+1. **Add API class** to `normalize_api.py`:
    ```python
    @dataclass
    class MyNewAPI:
@@ -59,7 +59,7 @@ To add a new MCP/HTTP/CLI tool:
            return f"Result: {arg}"
    ```
 
-2. **Add accessor** to `MossAPI`:
+2. **Add accessor** to `NormalizeAPI`:
    ```python
    @property
    def my_new(self) -> MyNewAPI:
@@ -75,9 +75,9 @@ To add a new MCP/HTTP/CLI tool:
 
 4. **Regenerate interfaces**:
    ```bash
-   moss gen --target=mcp   # Regenerate MCP server
-   moss gen --target=http  # Regenerate HTTP routes
-   moss gen --target=all   # Regenerate everything
+   normalize gen --target=mcp   # Regenerate MCP server
+   normalize gen --target=http  # Regenerate HTTP routes
+   normalize gen --target=all   # Regenerate everything
    ```
 
 ### 3. Generators
@@ -87,7 +87,7 @@ To add a new MCP/HTTP/CLI tool:
 Generates MCP tool definitions for the Model Context Protocol:
 
 ```python
-from moss.gen import generate_mcp_definitions
+from normalize.gen import generate_mcp_definitions
 
 tools = generate_mcp_definitions()
 # Returns: list of MCP Tool objects with schemas
@@ -100,7 +100,7 @@ The MCP server in `mcp_server.py` uses these definitions directly.
 Generates FastAPI routes:
 
 ```python
-from moss.gen import generate_http, generate_openapi
+from normalize.gen import generate_http, generate_openapi
 
 routes = generate_http()  # FastAPI router
 openapi_spec = generate_openapi()  # OpenAPI JSON
@@ -111,7 +111,7 @@ openapi_spec = generate_openapi()  # OpenAPI JSON
 Generates argparse command structure:
 
 ```python
-from moss.gen import generate_cli
+from normalize.gen import generate_cli
 
 parser = generate_cli()
 ```
@@ -121,7 +121,7 @@ parser = generate_cli()
 Generates Textual terminal UI:
 
 ```python
-from moss.gen import run_tui
+from normalize.gen import run_tui
 
 run_tui()  # Launches interactive TUI
 ```
@@ -131,7 +131,7 @@ run_tui()  # Launches interactive TUI
 Generates Language Server Protocol workspace commands:
 
 ```python
-from moss.gen import generate_lsp_commands
+from normalize.gen import generate_lsp_commands
 
 commands = generate_lsp_commands()
 ```
@@ -141,7 +141,7 @@ commands = generate_lsp_commands()
 Generates Protocol Buffers and Python servicer:
 
 ```python
-from moss.gen import generate_proto, generate_servicer_code
+from normalize.gen import generate_proto, generate_servicer_code
 
 proto_content = generate_proto()
 servicer_code = generate_servicer_code()
@@ -164,15 +164,15 @@ The CI checks that generated specs match committed versions:
 python scripts/check_gen_drift.py
 
 # Auto-update specs
-moss gen --target=mcp --output=specs/mcp_tools.json
-moss gen --target=openapi --output=specs/openapi.json
+normalize gen --target=mcp --output=specs/mcp_tools.json
+normalize gen --target=openapi --output=specs/openapi.json
 ```
 
 Pre-commit hooks automatically update specs when API changes.
 
 ## Design Principles
 
-1. **Single Source of Truth**: `MossAPI` is canonical; interfaces derive from it
+1. **Single Source of Truth**: `NormalizeAPI` is canonical; interfaces derive from it
 2. **Docstrings are Documentation**: Method docstrings become tool descriptions
 3. **Type Hints are Schemas**: Python types become JSON schemas
 4. **Consistent Serialization**: All outputs use the same formatting

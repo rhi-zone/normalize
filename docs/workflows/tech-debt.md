@@ -57,7 +57,7 @@ Managing accumulated technical debt: tracking, prioritizing, paying down.
 
 | Phase | Tools |
 |-------|-------|
-| Inventory | `moss analyze all`, `grep TODO/FIXME/HACK` |
+| Inventory | `normalize analyze all`, `grep TODO/FIXME/HACK` |
 | Assess | `view`, `analyze complexity/coverage` |
 | Prioritize | Judgment, stakeholder input |
 | Address | Normal development workflow |
@@ -134,7 +134,7 @@ Managing accumulated technical debt: tracking, prioritizing, paying down.
 
 ```
 Turn 1: Run quality analysis
-  $(moss analyze all)
+  $(normalize analyze all)
   → Grade: C
   → 15 complexity warnings
   → 8 duplicate code blocks
@@ -147,12 +147,12 @@ Turn 2: Find TODO/FIXME markers
   → 4 HACK markers
 
 Turn 3: Assess complexity hotspots
-  $(moss analyze complexity --threshold 15)
+  $(normalize analyze complexity --threshold 15)
   → parse_request: CC 32, modified 15 times this year
   → High complexity + frequent changes = high priority
 
 Turn 4: Assess test debt
-  $(moss analyze coverage)
+  $(normalize analyze coverage)
   → src/payments/: 12% coverage
   → Handles money = high risk = high priority
 

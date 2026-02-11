@@ -62,7 +62,7 @@ async fn cmd_check_refs_async(root: &Path, format: &crate::output::OutputFormat)
     let idx = match index::open_if_enabled(root).await {
         Some(i) => i,
         None => {
-            eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");
+            eprintln!("Indexing disabled or failed. Run: normalize index rebuild --call-graph");
             return 1;
         }
     };
@@ -71,7 +71,7 @@ async fn cmd_check_refs_async(root: &Path, format: &crate::output::OutputFormat)
     let all_symbols = idx.all_symbol_names().await.unwrap_or_default();
 
     if all_symbols.is_empty() {
-        eprintln!("No symbols indexed. Run: moss index rebuild --call-graph");
+        eprintln!("No symbols indexed. Run: normalize index rebuild --call-graph");
         return 1;
     }
 

@@ -1,10 +1,10 @@
 # Comprehensive Architecture Overview
 
-This document provides a complete picture of Moss's architecture, current capabilities, and identified gaps.
+This document provides a complete picture of Normalize's architecture, current capabilities, and identified gaps.
 
 ## Core Concept: Unified Codebase Tree
 
-Moss treats the codebase as a single tree where filesystem and AST are levels of the same hierarchy:
+Normalize treats the codebase as a single tree where filesystem and AST are levels of the same hierarchy:
 
 ```
 project/                    # root node
@@ -19,7 +19,7 @@ Uniform addressing with `/`: `src/main.py/Foo/bar` addresses the method `bar` in
 
 ## Three Primitives
 
-Instead of 100+ specialized tools, Moss provides three composable primitives:
+Instead of 100+ specialized tools, Normalize provides three composable primitives:
 
 | Primitive | Purpose | Read/Write |
 |-----------|---------|------------|
@@ -140,7 +140,7 @@ Use case: Get entire architectural map for ~5k tokens instead of 100k.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Python (src/moss/)                       │
+│                     Python (src/normalize/)                       │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐│
 │  │   CLI    │ │   TUI    │ │   MCP    │ │   Workflows      ││
 │  │ (cli.py) │ │(tui.py)  │ │  Server  │ │ (execution/)     ││
@@ -185,10 +185,10 @@ Goal: Reduce overlap. Python wraps Rust, doesn't reimplement.
 
 | File | Lines | Issue |
 |------|-------|-------|
-| `src/moss/cli.py` | 5687 | ~40 `cmd_*` functions in one file |
-| `src/moss/moss_api.py` | 4148 | ~15 API classes in one file |
+| `src/normalize/cli.py` | 5687 | ~40 `cmd_*` functions in one file |
+| `src/normalize/normalize_api.py` | 4148 | ~15 API classes in one file |
 | `crates/normalize-cli/src/main.rs` | 3655 | Monolithic Rust CLI |
-| `src/moss/tui.py` | 2028 | TUI app + 6 mode classes |
+| `src/normalize/tui.py` | 2028 | TUI app + 6 mode classes |
 
 ### Recommended Splits
 
@@ -203,10 +203,10 @@ cli/
 └── utilities.py     # init, config, status
 ```
 
-**moss_api.py → api/ package:**
+**normalize_api.py → api/ package:**
 ```
 api/
-├── __init__.py      # MossAPI facade
+├── __init__.py      # NormalizeAPI facade
 ├── edit.py          # EditAPI
 ├── skeleton.py      # SkeletonAPI
 ├── tree.py          # TreeAPI
@@ -217,7 +217,7 @@ api/
 
 ## Plugin Architecture
 
-Moss uses Protocol classes for extensibility:
+Normalize uses Protocol classes for extensibility:
 
 | Plugin Type | Protocol | Location |
 |-------------|----------|----------|
@@ -269,7 +269,7 @@ Features:
 ### Low Priority (Nice to Have)
 
 7. **Split cli.py** - Housekeeping, not blocking
-8. **Split moss_api.py** - Housekeeping, not blocking
+8. **Split normalize_api.py** - Housekeeping, not blocking
 9. **Split main.rs** - Already partially done
 
 ## Next Steps

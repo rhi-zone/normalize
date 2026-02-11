@@ -1,13 +1,13 @@
-# moss tools test
+# normalize tools test
 
 Run native test runners for detected languages.
 
 ## Usage
 
 ```bash
-moss tools test [PATH] [-- ARGS]   # Run tests (default)
-moss tools test run [PATH]         # Explicit run
-moss tools test list               # List available runners
+normalize tools test [PATH] [-- ARGS]   # Run tests (default)
+normalize tools test run [PATH]         # Explicit run
+normalize tools test list               # List available runners
 ```
 
 ## Options
@@ -22,17 +22,17 @@ moss tools test list               # List available runners
 
 ```bash
 # Run all tests
-moss tools test
+normalize tools test
 
 # Run tests in path
-moss tools test src/
+normalize tools test src/
 
 # Pass args to test runner
-moss tools test -- --nocapture
-moss tools test -- -v
+normalize tools test -- --nocapture
+normalize tools test -- -v
 
 # List available runners
-moss tools test list
+normalize tools test list
 ```
 
 ## Detected Runners
@@ -46,4 +46,4 @@ moss tools test list
 
 ## See Also
 
-- [moss tools lint](lint.md) - Run linters
+- [normalize tools lint](lint.md) - Run linters

@@ -35,9 +35,9 @@ The LLM has access to:
 - Outperforms RAG/retrieval on information-dense tasks
 - 58% F1 on quadratic-complexity task where base models get 0.1%
 
-## Alignment with Moss
+## Alignment with Normalize
 
-| RLM Concept | Moss Equivalent | Notes |
+| RLM Concept | Normalize Equivalent | Notes |
 |-------------|-----------------|-------|
 | Prompt as environment variable | Files on disk | Queryable via `view`, `text-search` |
 | Python REPL for state | Agent ephemeral context | `$(keep)` for persistence |
@@ -49,7 +49,7 @@ The LLM has access to:
 
 ### Validated Design Decisions
 
-1. **Dynamic context over append-only** - RLM confirms "context rot" in full-ingestion. Moss's reshapeable context avoids this.
+1. **Dynamic context over append-only** - RLM confirms "context rot" in full-ingestion. Normalize's reshapeable context avoids this.
 
 2. **Search as primitive** - "Search capability enables long-context handling" - justifies `text-search`, `view` as core tools.
 
@@ -57,15 +57,15 @@ The LLM has access to:
 
 4. **Sub-agent decomposition** - "Sub-calls help with information-dense inputs" - justifies Explore agent pattern.
 
-### Gaps in Moss
+### Gaps in Normalize
 
 1. **No true recursive self-invocation** - Agent can spawn sub-agents but can't call itself with modified context. RLM's `llm_query()` is more fluid.
 
 2. **No programmatic chunking** - Human picks what to view. RLM lets model decide chunk boundaries dynamically.
 
-3. **No REPL state persistence** - Moss ephemeral context expires after 1 turn. RLM REPL persists variables across iterations.
+3. **No REPL state persistence** - Normalize ephemeral context expires after 1 turn. RLM REPL persists variables across iterations.
 
-4. **No explicit decomposition prompting** - RLM system prompt encourages "look through entire context before answering". Moss doesn't guide decomposition strategy.
+4. **No explicit decomposition prompting** - RLM system prompt encourages "look through entire context before answering". Normalize doesn't guide decomposition strategy.
 
 ## Implementation Ideas
 
@@ -96,12 +96,12 @@ for i in range(10):
         answer = llm_query(f"Answer {query} given:\n{chunk}")
 ```
 
-Moss could expose similar primitives:
+Normalize could expose similar primitives:
 - `view path --chunk N` - return Nth chunk of large file
 - `view path --around "pattern"` - context around matches
 
 ### Cost Control
-RLM notes high variance in costs due to recursion depth. Moss mitigations:
+RLM notes high variance in costs due to recursion depth. Normalize mitigations:
 - Depth limits on sub-agent spawning
 - Token budgets per investigation
 - Early termination on diminishing returns

@@ -1,27 +1,27 @@
 import * as vscode from 'vscode';
-import { MossRunner } from './runner';
-import { MossDiagnostics } from './diagnostics';
+import { NormalizeRunner } from './runner';
+import { NormalizeDiagnostics } from './diagnostics';
 import { SkeletonViewProvider } from './skeleton';
 
-let runner: MossRunner;
-let diagnostics: MossDiagnostics;
+let runner: NormalizeRunner;
+let diagnostics: NormalizeDiagnostics;
 let skeletonProvider: SkeletonViewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Moss extension activated');
+    console.log('Normalize extension activated');
 
     // Initialize components
-    runner = new MossRunner();
-    diagnostics = new MossDiagnostics();
+    runner = new NormalizeRunner();
+    diagnostics = new NormalizeDiagnostics();
     skeletonProvider = new SkeletonViewProvider();
 
     // Register diagnostics collection
-    const diagnosticCollection = vscode.languages.createDiagnosticCollection('moss');
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('normalize');
     context.subscriptions.push(diagnosticCollection);
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand('moss.lint', async (uri?: vscode.Uri) => {
+        vscode.commands.registerCommand('normalize.lint', async (uri?: vscode.Uri) => {
             const targetPath = uri?.fsPath ?? vscode.window.activeTextEditor?.document.uri.fsPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (!targetPath) {
                 vscode.window.showErrorMessage('No file or workspace folder open');
@@ -31,7 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
             await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: 'Running Moss lint...',
+                    title: 'Running Normalize lint...',
                     cancellable: false
                 },
                 async () => {
@@ -43,20 +43,20 @@ export function activate(context: vscode.ExtensionContext) {
                         const tools = results.filter(r => r.success).map(r => r.tool).join(', ');
 
                         if (totalDiagnostics === 0) {
-                            vscode.window.showInformationMessage(`Moss: No issues found (${tools})`);
+                            vscode.window.showInformationMessage(`Normalize: No issues found (${tools})`);
                         } else {
                             vscode.window.showWarningMessage(
-                                `Moss: Found ${totalDiagnostics} issue(s) from ${tools}`
+                                `Normalize: Found ${totalDiagnostics} issue(s) from ${tools}`
                             );
                         }
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Moss error: ${error}`);
+                        vscode.window.showErrorMessage(`Normalize error: ${error}`);
                     }
                 }
             );
         }),
 
-        vscode.commands.registerCommand('moss.lintFix', async (uri?: vscode.Uri) => {
+        vscode.commands.registerCommand('normalize.lintFix', async (uri?: vscode.Uri) => {
             const targetPath = uri?.fsPath ?? vscode.window.activeTextEditor?.document.uri.fsPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (!targetPath) {
                 vscode.window.showErrorMessage('No file or workspace folder open');
@@ -66,7 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
             await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
-                    title: 'Running Moss lint with auto-fix...',
+                    title: 'Running Normalize lint with auto-fix...',
                     cancellable: false
                 },
                 async () => {
@@ -76,20 +76,20 @@ export function activate(context: vscode.ExtensionContext) {
 
                         const remainingDiagnostics = results.reduce((sum, r) => sum + r.diagnostics.length, 0);
                         if (remainingDiagnostics === 0) {
-                            vscode.window.showInformationMessage('Moss: All issues fixed');
+                            vscode.window.showInformationMessage('Normalize: All issues fixed');
                         } else {
                             vscode.window.showWarningMessage(
-                                `Moss: ${remainingDiagnostics} unfixable issue(s) remaining`
+                                `Normalize: ${remainingDiagnostics} unfixable issue(s) remaining`
                             );
                         }
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Moss error: ${error}`);
+                        vscode.window.showErrorMessage(`Normalize error: ${error}`);
                     }
                 }
             );
         }),
 
-        vscode.commands.registerCommand('moss.showSkeleton', async () => {
+        vscode.commands.registerCommand('normalize.showSkeleton', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showErrorMessage('No active editor');
@@ -100,11 +100,11 @@ export function activate(context: vscode.ExtensionContext) {
                 const skeleton = await runner.runSkeleton(editor.document.uri.fsPath);
                 skeletonProvider.showSkeleton(skeleton, editor.document.fileName);
             } catch (error) {
-                vscode.window.showErrorMessage(`Moss error: ${error}`);
+                vscode.window.showErrorMessage(`Normalize error: ${error}`);
             }
         }),
 
-        vscode.commands.registerCommand('moss.viewTree', async (uri?: vscode.Uri) => {
+        vscode.commands.registerCommand('normalize.viewTree', async (uri?: vscode.Uri) => {
             const targetPath = uri?.fsPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (!targetPath) {
                 vscode.window.showErrorMessage('No workspace folder open');
@@ -119,11 +119,11 @@ export function activate(context: vscode.ExtensionContext) {
                 });
                 await vscode.window.showTextDocument(doc);
             } catch (error) {
-                vscode.window.showErrorMessage(`Moss error: ${error}`);
+                vscode.window.showErrorMessage(`Normalize error: ${error}`);
             }
         }),
 
-        vscode.commands.registerCommand('moss.analyzeHealth', async () => {
+        vscode.commands.registerCommand('normalize.analyzeHealth', async () => {
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
             if (!workspaceFolder) {
                 vscode.window.showErrorMessage('No workspace folder open');
@@ -145,7 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
                         });
                         await vscode.window.showTextDocument(doc);
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Moss error: ${error}`);
+                        vscode.window.showErrorMessage(`Normalize error: ${error}`);
                     }
                 }
             );
@@ -153,7 +153,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Set up on-save diagnostics if enabled
-    const config = vscode.workspace.getConfiguration('moss');
+    const config = vscode.workspace.getConfiguration('normalize');
     if (config.get<boolean>('runOnSave')) {
         context.subscriptions.push(
             vscode.workspace.onDidSaveTextDocument(async (document) => {
@@ -173,7 +173,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Watch for configuration changes
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((e) => {
-            if (e.affectsConfiguration('moss.binaryPath')) {
+            if (e.affectsConfiguration('normalize.binaryPath')) {
                 runner.updateBinaryPath();
             }
         })
@@ -181,5 +181,5 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-    console.log('Moss extension deactivated');
+    console.log('Normalize extension deactivated');
 }

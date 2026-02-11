@@ -1,4 +1,4 @@
-//! LSP (Language Server Protocol) server for moss.
+//! LSP (Language Server Protocol) server for normalize.
 //!
 //! Provides IDE integration with document symbols, workspace symbols, and hover.
 
@@ -10,7 +10,7 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-/// Moss LSP backend.
+/// Normalize LSP backend.
 struct MossBackend {
     client: Client,
     root: Mutex<Option<PathBuf>>,
@@ -34,7 +34,7 @@ impl MossBackend {
         *self.root.lock().await = Some(root);
     }
 
-    /// Convert moss symbol kind to LSP SymbolKind.
+    /// Convert normalize symbol kind to LSP SymbolKind.
     fn to_lsp_symbol_kind(kind: &str) -> SymbolKind {
         match kind {
             "class" | "struct" => SymbolKind::CLASS,
@@ -85,7 +85,7 @@ impl LanguageServer for MossBackend {
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
-                name: "moss".to_string(),
+                name: "normalize".to_string(),
                 version: Some(env!("CARGO_PKG_VERSION").to_string()),
             }),
         })
@@ -93,7 +93,7 @@ impl LanguageServer for MossBackend {
 
     async fn initialized(&self, _: InitializedParams) {
         self.client
-            .log_message(MessageType::INFO, "moss LSP server initialized")
+            .log_message(MessageType::INFO, "normalize LSP server initialized")
             .await;
     }
 

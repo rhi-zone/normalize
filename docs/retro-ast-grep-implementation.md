@@ -2,7 +2,7 @@
 
 ## Summary
 
-Adding ast-grep pattern support to `moss analyze query` took ~30 turns when it could have been done in ~10. This document analyzes why.
+Adding ast-grep pattern support to `normalize analyze query` took ~30 turns when it could have been done in ~10. This document analyzes why.
 
 ## What Was Built
 
@@ -22,7 +22,7 @@ Adding ast-grep pattern support to `moss analyze query` took ~30 turns when it c
 
 **What I should have done:** Before writing any code, check how similar commands handle output:
 ```bash
-grep -rn "OutputFormat\|highlight_source" crates/moss/src/commands
+grep -rn "OutputFormat\|highlight_source" crates/normalize/src/commands
 ```
 
 This would have revealed:
@@ -110,7 +110,7 @@ cargo tree -p ast-grep-core | grep tree-sitter
 - Auto-detection via `starts_with('(')` is simple and effective
 - The `DynLang` adapter design is clean
 - Multi-file search with grammar grouping is efficient
-- Final output is consistent with rest of moss
+- Final output is consistent with rest of normalize
 
 ## Suggested CLAUDE.md Addition
 
@@ -124,7 +124,7 @@ cargo tree -p ast-grep-core | grep tree-sitter
 
 2. Search for patterns:
    ```bash
-   grep -rn "OutputFormat\|highlight_source\|format.is_json" crates/moss/src/commands
+   grep -rn "OutputFormat\|highlight_source\|format.is_json" crates/normalize/src/commands
    ```
 
 3. Result structs should include metadata needed for formatting (e.g., grammar name for syntax highlighting)

@@ -14,7 +14,7 @@ When an LLM writes `cmd_complexity()`, then later writes `cmd_security()`, it do
 
 This is fundamental to how LLMs work with limited context windows and session boundaries.
 
-## Case Study: Moss CLI (2025-12-25)
+## Case Study: Normalize CLI (2025-12-25)
 
 Exploration of redundancy in Rust and Python CLIs revealed systemic inconsistencies.
 
@@ -36,7 +36,7 @@ Exploration of redundancy in Rust and Python CLIs revealed systemic inconsistenc
 |-------|-------|-------|
 | Directory validation | ~20 commands | Same Path resolve + exists check |
 | Output format handling | ~29 commands | JSON/markdown/compact branching |
-| MossAPI init + error handling | ~15 commands | try/except wrapper pattern |
+| NormalizeAPI init + error handling | ~15 commands | try/except wrapper pattern |
 | Comma-separated string parsing | ~8 commands | `[t.strip() for t in s.split(",")]` |
 | Analysis command template | 5 commands | complexity/clones/security/patterns/weaknesses |
 | Server command pattern | 4 commands | Import + run + KeyboardInterrupt handling |
@@ -61,7 +61,7 @@ Most subtle (hard to notice):
 ## Detection Approaches
 
 ### What we have
-- `moss clones` - textual clone detection
+- `normalize clones` - textual clone detection
 
 ### What we could build
 - **Structural clone detection** - same AST shape, different identifiers

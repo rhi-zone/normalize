@@ -1,10 +1,10 @@
-# moss edit
+# normalize edit
 
 Structural code modification using tree-sitter for precise edits.
 
 ## Target Syntax
 
-Same as `moss view`:
+Same as `normalize view`:
 - `path/to/file` - Edit file
 - `file/Symbol` - Edit symbol
 - `file/Parent/Child` - Nested symbol
@@ -27,22 +27,22 @@ Position (`--at`): `before`, `after`, `prepend`, `append`
 
 ```bash
 # Delete a function
-moss edit src/old.rs/deprecated_fn delete
+normalize edit src/old.rs/deprecated_fn delete
 
 # Replace a function
-moss edit src/main.rs/parse_config replace "fn parse_config() { todo!() }"
+normalize edit src/main.rs/parse_config replace "fn parse_config() { todo!() }"
 
 # Swap two functions
-moss edit src/lib.rs/foo swap bar
+normalize edit src/lib.rs/foo swap bar
 
 # Insert before a symbol
-moss edit src/lib.rs/Config insert "/// Documentation" --at before
+normalize edit src/lib.rs/Config insert "/// Documentation" --at before
 
 # Move function into a class
-moss edit src/api.rs/helper move MyClass --at append
+normalize edit src/api.rs/helper move MyClass --at append
 
 # Copy function after another
-moss edit src/lib.rs/original copy target --at after
+normalize edit src/lib.rs/original copy target --at after
 ```
 
 ## Glob Patterns
@@ -51,19 +51,19 @@ Edit multiple symbols matching a pattern:
 
 ```bash
 # Delete all test_* functions
-moss edit "file.py/test_*" delete --multiple
+normalize edit "file.py/test_*" delete --multiple
 
 # Replace all foo_* with placeholder
-moss edit "file.py/foo*" replace "pass" --multiple
+normalize edit "file.py/foo*" replace "pass" --multiple
 
 # Insert comment before all matching symbols
-moss edit "file.py/deprecated_*" insert "# DEPRECATED" --at before --multiple
+normalize edit "file.py/deprecated_*" insert "# DEPRECATED" --at before --multiple
 
 # Move all matching symbols into a container
-moss edit "file.py/helper_*" move HelperClass --at append --multiple
+normalize edit "file.py/helper_*" move HelperClass --at append --multiple
 
 # Copy all matching symbols after a target
-moss edit "file.py/util_*" copy utilities --at after --multiple
+normalize edit "file.py/util_*" copy utilities --at after --multiple
 ```
 
 The `--multiple` flag is required when a pattern matches more than one symbol (safety measure).
@@ -81,7 +81,7 @@ The `swap` operation is not supported with glob patterns because the pairing sem
 
 ```bash
 # This will error:
-moss edit "file.py/foo*" swap "file.py/bar*" --multiple
+normalize edit "file.py/foo*" swap "file.py/bar*" --multiple
 # Error: 'swap' is not supported with glob patterns (ambiguous pairing)
 ```
 
@@ -118,7 +118,7 @@ For bulk swapping, use multiple individual swap commands or a script.
 
 ## Structural vs Text Edits
 
-`moss edit` uses tree-sitter for structural awareness:
+`normalize edit` uses tree-sitter for structural awareness:
 - Understands symbol boundaries
 - Preserves formatting
 - Handles nested structures

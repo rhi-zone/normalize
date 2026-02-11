@@ -1,4 +1,4 @@
-//! Initialize moss in a project directory.
+//! Initialize normalize in a project directory.
 
 use clap::Args;
 use std::fs;
@@ -83,7 +83,7 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
         };
 
         let default_config = format!(
-            r#"# Moss configuration
+            r#"# Normalize configuration
 # See: https://github.com/rhi-zone/normalize
 
 [daemon]
@@ -120,7 +120,7 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
     if changes.is_empty() {
         println!("Already initialized.");
     } else {
-        println!("Initialized moss:");
+        println!("Initialized normalize:");
         for change in &changes {
             println!("  {}", change);
         }
@@ -172,7 +172,7 @@ const GITIGNORE_ENTRIES: &[&str] = &[
     "!.normalize/memory/",
 ];
 
-/// Update .gitignore with moss entries. Returns list of changes made.
+/// Update .gitignore with normalize entries. Returns list of changes made.
 fn update_gitignore(path: &Path) -> Vec<String> {
     let mut changes = Vec::new();
 
@@ -197,7 +197,7 @@ fn update_gitignore(path: &Path) -> Vec<String> {
                 );
             }
             EntryStatus::Present(line_num) => {
-                // Track where existing moss entries are for best insertion point
+                // Track where existing normalize entries are for best insertion point
                 insert_after = Some(insert_after.map_or(line_num, |prev| prev.max(line_num)));
             }
         }
@@ -211,7 +211,7 @@ fn update_gitignore(path: &Path) -> Vec<String> {
     let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
 
     if let Some(idx) = insert_after {
-        // Insert near existing moss entries
+        // Insert near existing normalize entries
         let insert_pos = idx + 1;
         for (i, entry) in to_add.iter().enumerate() {
             new_lines.insert(insert_pos + i, entry.to_string());
@@ -222,7 +222,7 @@ fn update_gitignore(path: &Path) -> Vec<String> {
         if !new_lines.is_empty() && !new_lines.last().is_none_or(|l| l.is_empty()) {
             new_lines.push(String::new());
         }
-        new_lines.push("# Moss".to_string());
+        new_lines.push("# Normalize".to_string());
         for entry in &to_add {
             new_lines.push(entry.to_string());
             changes.push(format!("Added '{}' to .gitignore", entry));

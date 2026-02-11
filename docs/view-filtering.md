@@ -30,8 +30,8 @@ Cross-command filtering for view, analyze, and future batch operations.
 
 **Option A: Globs Only (no categories)**
 ```bash
-moss view src/ --exclude="*_test*" --exclude="test_*" --exclude="**/tests/**"
-moss view src/ --only="*.rs"
+normalize view src/ --exclude="*_test*" --exclude="test_*" --exclude="**/tests/**"
+normalize view src/ --only="*.rs"
 ```
 - Pro: Simple, no magic, users know globs
 - Pro: No DSL creep
@@ -40,8 +40,8 @@ moss view src/ --only="*.rs"
 
 **Option B: Separate Flags**
 ```bash
-moss view src/ --exclude-category=tests --exclude-pattern="*.gen.go"
-moss view src/ --only-category=tests
+normalize view src/ --exclude-category=tests --exclude-pattern="*.gen.go"
+normalize view src/ --only-category=tests
 ```
 - Pro: Explicit, no ambiguity
 - Con: Four flags instead of two
@@ -49,8 +49,8 @@ moss view src/ --only-category=tests
 
 **Option C: Sigil/Prefix**
 ```bash
-moss view src/ --exclude=@tests --exclude="*.gen.go"
-moss view src/ --only=@tests --only="*.rs"
+normalize view src/ --exclude=@tests --exclude="*.gen.go"
+normalize view src/ --only=@tests --only="*.rs"
 ```
 - Pro: One flag pair, explicit distinction
 - Con: DSL creep (what's next, `#regex:` prefix?)
@@ -58,7 +58,7 @@ moss view src/ --only=@tests --only="*.rs"
 
 **Option D: Smart Detection**
 ```bash
-moss view src/ --exclude=tests --exclude="*.gen.go"
+normalize view src/ --exclude=tests --exclude="*.gen.go"
 ```
 - Pro: Clean syntax
 - Con: Magic (contains `*?[` → glob, else category)
@@ -70,8 +70,8 @@ moss view src/ --exclude=tests --exclude="*.gen.go"
 Built-in aliases with config override. `@name` expands to glob patterns.
 
 ```bash
-moss view src/ --exclude=@tests          # expands to built-in test patterns
-moss view src/ --exclude="*.gen.go"      # literal glob
+normalize view src/ --exclude=@tests          # expands to built-in test patterns
+normalize view src/ --exclude="*.gen.go"      # literal glob
 ```
 
 Built-in aliases (language-aware, no config needed):
@@ -98,8 +98,8 @@ config = []                                   # disable built-in (matches nothin
 
 **Option F: Subcommand for Complex Filtering**
 ```bash
-moss view src/ --exclude="*_test*"       # simple glob only
-moss filter tests | moss view src/       # piped filter spec (overdesigned?)
+normalize view src/ --exclude="*_test*"       # simple glob only
+normalize filter tests | normalize view src/       # piped filter spec (overdesigned?)
 ```
 - Pro: Simple base case, complex cases are explicit
 - Con: Overengineered
@@ -120,8 +120,8 @@ Current `-t/--type` accepts single value. Extend to:
 
 Examples:
 ```bash
-moss view file.py -t class,function      # Classes and top-level functions
-moss view file.py -t method              # Only methods (inside classes)
+normalize view file.py -t class,function      # Classes and top-level functions
+normalize view file.py -t method              # Only methods (inside classes)
 ```
 
 ## Design Decisions
@@ -190,10 +190,10 @@ These flags should work identically across view, analyze, and future batch comma
 
 LLMs working with a codebase need to know what aliases are available and what they expand to. A user's config may override built-ins or add custom aliases.
 
-**Solution:** `moss filter aliases` command
+**Solution:** `normalize filter aliases` command
 
 ```bash
-$ moss filter aliases
+$ normalize filter aliases
 Aliases:
   @tests     *_test.go, test_*.py, *_test.rs, ...  (detected: go, python, rust)
   @config    *.toml, *.yaml, *.json, ...
@@ -205,7 +205,7 @@ Aliases:
 
 With config overrides:
 ```bash
-$ moss filter aliases
+$ normalize filter aliases
 Aliases:
   @tests     (disabled)                             # tests = [] in config
   @config    *.toml, *.yaml, *.json, ...

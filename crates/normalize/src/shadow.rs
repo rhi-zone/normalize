@@ -1,7 +1,7 @@
 //! Shadow Git - automatic edit history tracking.
 //!
 //! Maintains a hidden git repository (`.normalize/shadow/`) that automatically
-//! commits after each `moss edit` operation, preserving full edit history.
+//! commits after each `normalize edit` operation, preserving full edit history.
 
 use normalize_derive::Merge;
 use serde::{Deserialize, Serialize};
@@ -88,7 +88,7 @@ impl Shadow {
     }
 
     /// Initialize shadow git repository if it doesn't exist.
-    /// Called on first edit, not on `moss init`.
+    /// Called on first edit, not on `normalize init`.
     fn init(&self) -> Result<(), ShadowError> {
         if self.exists() {
             return Ok(());
@@ -119,11 +119,11 @@ impl Shadow {
 
         // Configure git user for commits (shadow-specific, doesn't affect user's git)
         let _ = Command::new("git")
-            .args(["config", "user.email", "shadow@moss.local"])
+            .args(["config", "user.email", "shadow@normalize.local"])
             .current_dir(&self.worktree)
             .status();
         let _ = Command::new("git")
-            .args(["config", "user.name", "Moss Shadow"])
+            .args(["config", "user.name", "Normalize Shadow"])
             .current_dir(&self.worktree)
             .status();
 
@@ -224,7 +224,7 @@ impl Shadow {
             .map(|p| p.display().to_string())
             .collect();
 
-        let mut commit_msg = format!("moss edit: {} {}\n\n", info.operation, info.target);
+        let mut commit_msg = format!("normalize edit: {} {}\n\n", info.operation, info.target);
 
         if let Some(ref msg) = info.message {
             commit_msg.push_str(&format!("Message: {}\n", msg));
@@ -564,7 +564,7 @@ impl Shadow {
     ///
     /// If `file_filter` is Some, only undo changes to files matching that path.
     /// If `force` is false, checks for external modifications first and fails
-    /// if any files have been modified outside of moss.
+    /// if any files have been modified outside of normalize.
     ///
     /// If `cross_checkpoint` is false, refuses to undo past a git commit boundary.
     pub fn undo(
@@ -699,7 +699,7 @@ impl Shadow {
                 .status();
 
             let undo_msg = format!(
-                "moss edit: undo {}\n\nOperation: undo\nTarget: {}\nUndone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
+                "normalize edit: undo {}\n\nOperation: undo\nTarget: {}\nUndone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
                 entry.target,
                 entry.target,
                 entry.hash,
@@ -724,7 +724,7 @@ impl Shadow {
         Ok(results)
     }
 
-    /// Detect files that have been modified externally since last moss edit.
+    /// Detect files that have been modified externally since last normalize edit.
     /// Returns list of file paths that differ between actual filesystem and shadow git HEAD.
     fn detect_conflicts(&self, entries: &[HistoryEntry]) -> Vec<String> {
         let mut conflicts = Vec::new();
@@ -856,7 +856,7 @@ impl Shadow {
             .status();
 
         let redo_msg = format!(
-            "moss edit: redo {}\n\nOperation: redo\nTarget: {}\nRedone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
+            "normalize edit: redo {}\n\nOperation: redo\nTarget: {}\nRedone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
             latest.target,
             latest.target,
             undone_hash,
@@ -1008,7 +1008,7 @@ impl Shadow {
             .status();
 
         let goto_msg = format!(
-            "moss edit: goto {}\n\nOperation: goto\nTarget: {}\nGoto-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
+            "normalize edit: goto {}\n\nOperation: goto\nTarget: {}\nGoto-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
             ref_str,
             ref_str,
             target_hash,

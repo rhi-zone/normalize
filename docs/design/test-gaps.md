@@ -18,7 +18,7 @@ The gap between 0 and 1 direct test callers is categorical, not quantitative. Ze
 
 ## Solution
 
-New subcommand: `moss analyze test-gaps`
+New subcommand: `normalize analyze test-gaps`
 
 Uses the existing call graph index to find public functions with zero callers from test context. Sorts results by risk to surface the most dangerous gaps first.
 
@@ -26,31 +26,31 @@ Uses the existing call graph index to find public functions with zero callers fr
 
 ```bash
 # Find all functions with no direct test caller
-moss analyze test-gaps
+normalize analyze test-gaps
 
 # Scope to a directory
-moss analyze test-gaps src/commands/
+normalize analyze test-gaps src/commands/
 
 # Scope to a specific file
-moss analyze test-gaps src/index.rs
+normalize analyze test-gaps src/index.rs
 
 # Show all functions (including tested ones), sorted by test calls ascending
-moss analyze test-gaps --all
+normalize analyze test-gaps --all
 
 # Only functions above a risk threshold
-moss analyze test-gaps --min-risk 10
+normalize analyze test-gaps --min-risk 10
 
 # Limit output
-moss analyze test-gaps --limit 20
+normalize analyze test-gaps --limit 20
 
 # Allow a known-untested function
-moss analyze test-gaps --allow src/main.rs:main --reason "Entry point, integration tested"
+normalize analyze test-gaps --allow src/main.rs:main --reason "Entry point, integration tested"
 
 # SARIF output for IDE integration
-moss analyze test-gaps --sarif
+normalize analyze test-gaps --sarif
 
 # JSON for scripting
-moss analyze test-gaps --json
+normalize analyze test-gaps --json
 ```
 
 ### Output
@@ -182,8 +182,8 @@ These might seem like candidates for exclusion but are intentionally kept:
 
 Requires call graph index. If not available:
 ```
-$ moss analyze test-gaps
-Error: Call graph not indexed. Run: moss index reindex --call-graph
+$ normalize analyze test-gaps
+Error: Call graph not indexed. Run: normalize index reindex --call-graph
 ```
 
 ### Data Flow

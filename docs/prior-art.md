@@ -1,17 +1,17 @@
 # Prior Art & Research References
 
-Related work that influenced moss's design or represents the competitive landscape.
+Related work that influenced normalize's design or represents the competitive landscape.
 
 ## Program Synthesis
 
 ### DreamCoder
 - **Paper**: [DreamCoder: Bootstrapping Inductive Program Synthesis with Wake-Sleep Library Learning](https://arxiv.org/abs/2006.08381)
-- **Relevance**: Moss aims to be "DreamCoder for LLMs" - using LLMs as the synthesis engine rather than enumeration, but with similar goals of discovering reusable abstractions
+- **Relevance**: Normalize aims to be "DreamCoder for LLMs" - using LLMs as the synthesis engine rather than enumeration, but with similar goals of discovering reusable abstractions
 - **Key ideas**:
   - Compression-based abstraction discovery
   - MDL (Minimum Description Length) scoring for abstractions
   - Library learning: extract common patterns into reusable primitives
-- **Moss approach**: Instead of enumerating programs, we use LLMs with structural context. The abstraction discovery could still apply to learned preferences/patterns.
+- **Normalize approach**: Instead of enumerating programs, we use LLMs with structural context. The abstraction discovery could still apply to learned preferences/patterns.
 
 ### Other Synthesis Systems
 
@@ -35,7 +35,7 @@ Related work that influenced moss's design or represents the competitive landsca
 - **Z3**: SMT solver used by many synthesis tools
 - **Rosette**: Solver-aided programming (uses Z3)
 
-See `docs/synthesis-generators.md` for how these map to moss generator plugins.
+See `docs/synthesis-generators.md` for how these map to normalize generator plugins.
 
 ## Coding Agents (2024-2025 Landscape)
 
@@ -52,11 +52,11 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
 
 **Performance**: 12.47% pass@1 on SWE-bench (18% on Lite subset) with GPT-4 Turbo - 3-5x improvement over RAG-only approaches
 
-**Moss Observations:**
+**Normalize Observations:**
 - SWE-agent proves that **interface design matters more than model scaling** for agent performance
-- Their ACI approach aligns with moss's philosophy: give agents better tools, not just more context
-- Moss's structural views (skeleton, CFG) could complement SWE-agent's search commands
-- Consider: moss could export an "ACI" that provides skeleton-aware navigation
+- Their ACI approach aligns with normalize's philosophy: give agents better tools, not just more context
+- Normalize's structural views (skeleton, CFG) could complement SWE-agent's search commands
+- Consider: normalize could export an "ACI" that provides skeleton-aware navigation
 
 ### Aider
 - **Repo**: https://github.com/paul-gauthier/aider
@@ -73,11 +73,11 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
 
 **2024-2025 Timeline**: Voice interface, GUI, file watching, thinking tokens support
 
-**Moss Observations:**
-- Architect/Editor split is powerful - moss could use a "Planner" + "Executor" pattern
-- Their edit format problem is exactly what moss's anchor-based patching solves
-- PageRank repo mapping is interesting; moss's skeleton view serves similar purpose
-- Git integration patterns worth studying - aider auto-commits like moss envisions
+**Normalize Observations:**
+- Architect/Editor split is powerful - normalize could use a "Planner" + "Executor" pattern
+- Their edit format problem is exactly what normalize's anchor-based patching solves
+- PageRank repo mapping is interesting; normalize's skeleton view serves similar purpose
+- Git integration patterns worth studying - aider auto-commits like normalize envisions
 
 ### OpenHands (formerly OpenDevin)
 - **Repo**: https://github.com/All-Hands-AI/OpenHands
@@ -92,11 +92,11 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
 - **Multi-Agent Delegation**: `AgentDelegateAction` allows generalist to delegate to specialists
 - **Micro Agents**: Task-specialized agents that reuse generalist infrastructure
 
-**Moss Observations:**
-- Event stream architecture aligns well with moss's event bus design
-- Their multi-agent delegation via `AgentDelegateAction` is similar to moss's ticket-based agent model
-- Sandbox approach is important for safety; moss's Shadow Git serves similar purpose for git operations
-- Agent Hub concept maps to moss's plugin architecture
+**Normalize Observations:**
+- Event stream architecture aligns well with normalize's event bus design
+- Their multi-agent delegation via `AgentDelegateAction` is similar to normalize's ticket-based agent model
+- Sandbox approach is important for safety; normalize's Shadow Git serves similar purpose for git operations
+- Agent Hub concept maps to normalize's plugin architecture
 
 ### Claude Code (Anthropic)
 - **Site**: https://www.anthropic.com/claude-code
@@ -175,15 +175,15 @@ Example workflow: 3 projects, each with its own Claude Code session, context-swi
 
 Within-project parallelization makes sense when you're *forced* to work on one codebase (team project, single product) but have independent surfaces. If you have multiple projects, cross-project parallelization avoids the coordination costs.
 
-**Moss Observations:**
-- Claude Code's design validates moss's "library is the API" approach
-- Their hooks system is similar to moss's policy engine concept
-- Checkpoints map to moss's Shadow Git approach
+**Normalize Observations:**
+- Claude Code's design validates normalize's "library is the API" approach
+- Their hooks system is similar to normalize's policy engine concept
+- Checkpoints map to normalize's Shadow Git approach
 - MCP integration shows importance of protocol interoperability
 - The SDK release confirms: agent infrastructure is becoming a platform play
 - Boris's Plan Mode + auto-accept pattern could inform spore agent UX
-- CLAUDE.md as institutional memory is similar to moss's approach
-- Verification loops are critical - moss already runs tests unprompted
+- CLAUDE.md as institutional memory is similar to normalize's approach
+- Verification loops are critical - normalize already runs tests unprompted
 
 **Community Resources:**
 
@@ -192,7 +192,7 @@ Within-project parallelization makes sense when you're *forced* to work on one c
   - **Agents**: Specialized assistants with severity levels (Critical/Warning/Suggestion)
   - **Hooks**: PreToolUse, PostToolUse, UserPromptSubmit, Stop lifecycle events
   - **Maintenance**: GitHub Actions for scheduled quality checks
-  - **Patterns for moss**: Scoring-based script/workflow selection, formalized severity levels, expanded hook triggering
+  - **Patterns for normalize**: Scoring-based script/workflow selection, formalized severity levels, expanded hook triggering
 
 **Practitioner Experiences:**
 
@@ -213,9 +213,9 @@ Two contrasting experiences with Claude Code at different scales:
   - Experience matters: can guide architectural decisions, not just define features
 - **Conclusion**: Force multiplier, but requires experienced developer oversight
 
-**Rhizome Ecosystem (moss authors, Dec 2025 - ongoing)** - Large-scale systems development:
+**Rhizome Ecosystem (normalize authors, Dec 2025 - ongoing)** - Large-scale systems development:
 - **Scale**: 13 projects, ~493k lines of code (scc counts)
-- **Projects**: moss (126k), resin (111k), burn-models (97k), rescribe (35k), ooxml (35k), dew (34k), cambium (12k), trellis (11k), spore (10k), flora (9k), pith (7k), nursery (5k), claude-code-hub (2k)
+- **Projects**: normalize (126k), resin (111k), burn-models (97k), rescribe (35k), ooxml (35k), dew (34k), cambium (12k), trellis (11k), spore (10k), flora (9k), pith (7k), nursery (5k), claude-code-hub (2k)
 - **Timeline**: ~5 weeks (started Dec 17, 2025)
 - **Tool**: Vanilla Claude Code - same tool as Gewirtz
 - **Mental model**: Collaborative peer with domain expertise gaps, not "junior developer"
@@ -300,15 +300,15 @@ Key finding: **Scaffolding can outweigh raw model scale.** Sonnet+CCA beats Opus
 3. **Automated agent synthesis**: Meta-agent learns tool-use conventions better than hand-designed
 4. **Adaptive compression**: Planner-driven summarization outperforms naive truncation (1.4→2.7 planning iterations/trajectory)
 
-**Moss Observations:**
-- **Hierarchical memory validates moss's approach**: Moss uses composable loops with structured handoffs rather than append-only conversation
-- **Note-taking for cross-session learning**: Moss could adopt hindsight notes pattern—document failures in `.normalize/notes/` for retrieval
-- **Dual visibility pattern**: Moss's "user sees summary, agent sees structured data" aligns with AX/UX separation
-- **Meta-agent**: Automated agent tuning is interesting—could apply to moss prompt/tool refinement
-- **Extension system**: Similar to moss's tool architecture, validates modular approach
-- **Key insight**: "Tool sophistication matters as much as model upgrades" matches moss philosophy
+**Normalize Observations:**
+- **Hierarchical memory validates normalize's approach**: Normalize uses composable loops with structured handoffs rather than append-only conversation
+- **Note-taking for cross-session learning**: Normalize could adopt hindsight notes pattern—document failures in `.normalize/notes/` for retrieval
+- **Dual visibility pattern**: Normalize's "user sees summary, agent sees structured data" aligns with AX/UX separation
+- **Meta-agent**: Automated agent tuning is interesting—could apply to normalize prompt/tool refinement
+- **Extension system**: Similar to normalize's tool architecture, validates modular approach
+- **Key insight**: "Tool sophistication matters as much as model upgrades" matches normalize philosophy
 
-**Implications for Moss Agent:**
+**Implications for Normalize Agent:**
 - [ ] Add hindsight note-taking: Record failures + resolutions in `.normalize/agent/notes/`
 - [ ] Consider planner-driven compression: Summarize based on task structure, not just token count
 - [ ] Evaluate meta-agent approach for prompt tuning
@@ -329,11 +329,11 @@ Key finding: **Scaffolding can outweigh raw model scale.** Sonnet+CCA beats Opus
 
 **Adoption**: >500M ARR, half of Fortune 500, every Coinbase engineer uses it
 
-**Moss Observations:**
+**Normalize Observations:**
 - Cursor's success proves the IDE integration path is viable
-- Their codebase indexing is similar to moss's embedding/RAG goals
-- @files/@folders referencing maps to moss's context management
-- Bugbot shows value of continuous monitoring - moss could watch for issues during synthesis
+- Their codebase indexing is similar to normalize's embedding/RAG goals
+- @files/@folders referencing maps to normalize's context management
+- Bugbot shows value of continuous monitoring - normalize could watch for issues during synthesis
 
 ### Goose (Block)
 - **Repo**: https://github.com/block/goose
@@ -342,7 +342,7 @@ Key finding: **Scaffolding can outweigh raw model scale.** Sonnet+CCA beats Opus
 
 **Key Architecture Insights:**
 - **Tech Stack**: Rust (59.6%) + TypeScript (32.9%), available as desktop app + CLI
-- **MCP-First Design**: Extensions are MCP servers - the same protocol moss uses
+- **MCP-First Design**: Extensions are MCP servers - the same protocol normalize uses
 - **Modular Crates**: `goose` (core), `goose-cli`, `goose-server`, `goose-mcp`, `goose-bench`
 - **Multi-Model**: Tetrate Agent Router, OpenRouter, OpenAI, Anthropic, Gemini - any LLM
 - **Local Execution**: Runs on-machine for privacy and control
@@ -377,7 +377,7 @@ Configurable mid-session via `/mode` command or settings.
 
 **Error Handling:**
 - Captures errors and sends back to model for resolution (doesn't halt)
-- Similar to moss's validator loop concept
+- Similar to normalize's validator loop concept
 
 **Agent Internals** (`crates/goose/src/agents/`):
 - `subagent_handler.rs` - Multi-agent delegation
@@ -423,36 +423,36 @@ Goose's context revision is sophisticated and worth studying:
    - Remove leading/trailing assistant messages
    - Shadow map pattern preserves non-visible messages during fixes
 
-**Moss Observations:**
+**Normalize Observations:**
 - **MCP alignment**: Goose validates MCP as the right protocol choice - they're all-in
 - **Trust model similarity**: Their 4 permission modes map almost exactly to our Smart Trust Levels design
-- **Context Revision**: Their token optimization is more sophisticated than moss's current approach
-- **Extension security**: Malware scanning is interesting - moss could add similar checks for MCP servers
-- **Skills directory**: `.goose/skills` pattern similar to Claude Code's - could adopt for moss
+- **Context Revision**: Their token optimization is more sophisticated than normalize's current approach
+- **Extension security**: Malware scanning is interesting - normalize could add similar checks for MCP servers
+- **Skills directory**: `.goose/skills` pattern similar to Claude Code's - could adopt for normalize
 - **Rust + MCP**: Proves Rust is viable for agent infrastructure (we're Python, but could learn from their patterns)
 
-**Context Revision Takeaways for Moss:**
+**Context Revision Takeaways for Normalize:**
 
-Goose uses multi-turn conversation with accumulated context. Moss uses a different paradigm:
+Goose uses multi-turn conversation with accumulated context. Normalize uses a different paradigm:
 **composable loops with structured data handoffs** (`LoopContext`). Each LLM call is single-shot.
 
-What applies to moss:
+What applies to normalize:
 - [x] Tool responses ephemeral by design (each LLM call is fresh, no history)
 - [x] Smart context selection (skeleton > full file) already core philosophy
 - [ ] Structured summary sections for prompt building (User Intent, Technical, Pending Tasks)
 
 What doesn't apply (different architecture):
-- Auto-compaction: moss doesn't accumulate conversation, no need to compress
+- Auto-compaction: normalize doesn't accumulate conversation, no need to compress
 - Dual visibility: no persistent conversation to hide from agent
 - Progressive tool removal: tool outputs don't persist between steps
 
 Key insight: Goose's context revision is reactive (compress when full).
-Moss's approach is proactive (include only what's needed, structured views by default).
+Normalize's approach is proactive (include only what's needed, structured views by default).
 
-**Key Differentiator vs Moss:**
-- Goose is more "general agent" (terminal, web, files), moss is more "structural awareness"
-- Goose relies on MCP for everything; moss has native AST/structural tools
-- Goose has mature desktop app; moss is library-first
+**Key Differentiator vs Normalize:**
+- Goose is more "general agent" (terminal, web, files), normalize is more "structural awareness"
+- Goose relies on MCP for everything; normalize has native AST/structural tools
+- Goose has mature desktop app; normalize is library-first
 - Both: multi-model, local execution, MCP integration, verification loops
 
 ### Sourcegraph
@@ -501,12 +501,12 @@ Not a dependency graph, but semantic understanding through:
 - Code Review Agent, Migration Agent, Testing Agent in EAP
 - Agent API for building custom agents on Sourcegraph infrastructure
 
-**Moss Observations:**
-- **Foundational influence**: Sourcegraph's code graph concept directly influenced moss's index design
-- **SCIP/LSIF**: Moss uses tree-sitter instead (simpler, no build pipeline integration needed)
-- **zoekt trigrams**: Similar to moss's SQLite FTS for path search
-- **Precise vs search-based**: Moss is "search-based" level (AST parsing, not full type resolution)
-- **Scale difference**: Sourcegraph handles millions of repos; moss focuses on single-codebase depth
+**Normalize Observations:**
+- **Foundational influence**: Sourcegraph's code graph concept directly influenced normalize's index design
+- **SCIP/LSIF**: Normalize uses tree-sitter instead (simpler, no build pipeline integration needed)
+- **zoekt trigrams**: Similar to normalize's SQLite FTS for path search
+- **Precise vs search-based**: Normalize is "search-based" level (AST parsing, not full type resolution)
+- **Scale difference**: Sourcegraph handles millions of repos; normalize focuses on single-codebase depth
 - **Key learning**: Universal code intelligence is infrastructure, not a feature - agents need it
 
 **What Sourcegraph Does Better:**
@@ -515,7 +515,7 @@ Not a dependency graph, but semantic understanding through:
 - Language-agnostic precise navigation via SCIP
 - Mature batch changes for large refactors
 
-**What Moss Does Differently:**
+**What Normalize Does Differently:**
 - Single-codebase focus with deeper structural views (skeleton, CFG)
 - No build pipeline integration needed
 - Library-first API design
@@ -523,7 +523,7 @@ Not a dependency graph, but semantic understanding through:
 
 ## Competitive Analysis Summary
 
-### What Competitors Do Better Than Moss Currently:
+### What Competitors Do Better Than Normalize Currently:
 
 1. **SWE-agent**: Proven SWE-bench results, well-designed ACI interface
 2. **Aider**: Mature edit format handling, architect/editor separation
@@ -533,7 +533,7 @@ Not a dependency graph, but semantic understanding through:
 6. **Goose**: MCP-native architecture, mature desktop app, extension security (malware scanning)
 7. **Sourcegraph**: Cross-repo search at scale, precise navigation via SCIP, batch changes
 
-### Moss's Unique Differentiators:
+### Normalize's Unique Differentiators:
 
 1. **Structural Awareness**: AST-based understanding vs text-based (skeleton, CFG, anchors)
 2. **Verification Loops**: Type checking, tests, linting integrated into synthesis
@@ -553,11 +553,11 @@ Not a dependency graph, but semantic understanding through:
 ### Questions Answered:
 
 1. **Is structural-awareness actually better?** Unknown - need SWE-bench evaluation
-2. **What's moss's weakness?** Less mature, no benchmark results yet, not widely used
+2. **What's normalize's weakness?** Less mature, no benchmark results yet, not widely used
 3. **Are they solving the same problem?** Yes and no:
    - Same: AI-assisted code modification
-   - Different: Moss emphasizes synthesis (creating code from specs) over repair (fixing bugs)
-   - Different: Moss's structural views vs their text-based approaches
+   - Different: Normalize emphasizes synthesis (creating code from specs) over repair (fixing bugs)
+   - Different: Normalize's structural views vs their text-based approaches
 
 ## Critical Analysis: Agent Architecture Limitations
 
@@ -586,18 +586,18 @@ Agents can't know what context they need before they see it:
 
 This chicken-and-egg problem causes agents to guess, miss relevant context, and loop.
 
-### Implications for Moss Agent Design
+### Implications for Normalize Agent Design
 
 **Current agent approach has the same problems:**
 
-| Problem | Article's Critique | Moss Agent |
+| Problem | Article's Critique | Normalize Agent |
 |---------|-------------------|------------|
 | Tunnel vision | ripgrep misses semantic context | $(text-search) has same limitation |
 | Context loss | Tool loop forgets previous context | Ephemeral model discards outputs each turn |
 | Sequential inefficiency | Each tool call adds latency | Multi-turn design maximizes round-trips |
 | Discovery failure | Agent can't find what it doesn't know to look for | Same problem |
 
-**But Moss has something bash scripts don't: structural knowledge.**
+**But Normalize has something bash scripts don't: structural knowledge.**
 
 The index knows:
 - What symbols exist and where
@@ -605,7 +605,7 @@ The index knows:
 - What imports what (dependency graph)
 - Type hierarchies and definitions
 
-### Hypothesis: Moss as Context Collector, Not Agent
+### Hypothesis: Normalize as Context Collector, Not Agent
 
 Instead of LLM-driven discovery:
 ```
@@ -618,24 +618,24 @@ LLM: "I need to find Provider"
 Use index-driven collection:
 ```
 User: "How many Provider variants?"
-Moss: *uses index*
+Normalize: *uses index*
   → Provider is enum at llm.rs:38
   → collect: definition + all usages + related types
 LLM: *sees everything in one shot*
   → "13"
 ```
 
-The agent loop solves the wrong problem. Moss already knows the codebase structure. The LLM should reason over pre-collected context, not discover it.
+The agent loop solves the wrong problem. Normalize already knows the codebase structure. The LLM should reason over pre-collected context, not discover it.
 
 ### Proposed Architecture Pivot
 
 1. **Query understanding**: LLM interprets user question (what are they asking about?)
-2. **Structural collection**: Moss uses index to gather relevant symbols, callers, dependencies
+2. **Structural collection**: Normalize uses index to gather relevant symbols, callers, dependencies
 3. **Single-shot reasoning**: LLM receives full context, produces answer
 
 This inverts the current design:
-- Current: LLM drives discovery, Moss executes commands
-- Proposed: Moss drives collection, LLM reasons over result
+- Current: LLM drives discovery, Normalize executes commands
+- Proposed: Normalize drives collection, LLM reasons over result
 
 The LLM's strength is synthesis and reasoning. The index's strength is structural navigation. Use each for what it's good at.
 
@@ -654,9 +654,9 @@ The LLM's strength is synthesis and reasoning. The index's strength is structura
 
 **Security**: TLS 1.3 in transit, AES 256 at rest. No data stored on Warp servers. No training on user data.
 
-**Moss Observations:**
-- Dispatch mode is interesting - moss could have a "trust level" that determines how much confirmation is needed
-- Active AI (proactive suggestions) could inform moss's policy engine - suggest fixes before failures
+**Normalize Observations:**
+- Dispatch mode is interesting - normalize could have a "trust level" that determines how much confirmation is needed
+- Active AI (proactive suggestions) could inform normalize's policy engine - suggest fixes before failures
 - Terminal-level integration gives access to system events that IDE plugins can't see
 
 ### Zed (GPU-Accelerated Editor)
@@ -675,11 +675,11 @@ The LLM's strength is synthesis and reasoning. The index's strength is structura
 
 **Model Flexibility**: Claude 3.7 Sonnet, bring-your-own keys, Ollama for local models.
 
-**Moss Observations:**
-- ACP is interesting - moss could implement an ACP adapter to work inside Zed
-- Their B-tree buffer is similar to what moss's structural editor needs
+**Normalize Observations:**
+- ACP is interesting - normalize could implement an ACP adapter to work inside Zed
+- Their B-tree buffer is similar to what normalize's structural editor needs
 - Edit Prediction is a form of synthesis - predicting code before it's written
-- Background AI work (continues while you code) aligns with moss's async design
+- Background AI work (continues while you code) aligns with normalize's async design
 
 ## Protocols & Standards
 
@@ -721,19 +721,19 @@ The LLM's strength is synthesis and reasoning. The index's strength is structura
     "My Custom Agent": {
       "type": "custom",
       "command": "python",
-      "args": ["-m", "moss.acp_server"],
+      "args": ["-m", "normalize.acp_server"],
       "env": {}
     }
   }
 }
 ```
 
-**Moss Implementation Plan:**
-- [ ] Create `moss.acp_server` module
+**Normalize Implementation Plan:**
+- [ ] Create `normalize.acp_server` module
 - [ ] Implement ACP JSON-RPC handlers
-- [ ] Map moss tools to ACP capabilities (multi-file edit, codebase context)
+- [ ] Map normalize tools to ACP capabilities (multi-file edit, codebase context)
 - [ ] Test with Zed as client
-- Priority: High - gives moss access to Zed's growing user base
+- Priority: High - gives normalize access to Zed's growing user base
 
 ### Agent2Agent Protocol (A2A)
 - **Site**: https://a2a-protocol.org
@@ -765,14 +765,14 @@ The LLM's strength is synthesis and reasoning. The index's strength is structura
 - Partners: Atlassian, Salesforce, SAP, ServiceNow, PayPal, MongoDB, LangChain, etc.
 - Version 0.3: gRPC support, signed security cards, extended Python SDK
 
-**Moss Evaluation:**
-- **Fit with ticket-based model**: A2A's task-based communication aligns well with moss's ticket-based agent design
-- **Complements MCP**: Moss already has MCP server; A2A would add agent-to-agent capabilities
+**Normalize Evaluation:**
+- **Fit with ticket-based model**: A2A's task-based communication aligns well with normalize's ticket-based agent design
+- **Complements MCP**: Normalize already has MCP server; A2A would add agent-to-agent capabilities
 - **Use cases**:
-  - Moss as "remote agent" providing structural analysis to other agents
-  - Moss delegating specialized tasks (e.g., security scanning) to external agents
+  - Normalize as "remote agent" providing structural analysis to other agents
+  - Normalize delegating specialized tasks (e.g., security scanning) to external agents
   - Multi-agent workflows coordinated via A2A
-- **Implementation approach**: A2A server exposing moss tools, A2A client for delegation
+- **Implementation approach**: A2A server exposing normalize tools, A2A client for delegation
 - **Priority**: Medium - valuable for ecosystem interop, but not blocking core functionality
 
 ### Agent Frameworks: Google ADK vs LangGraph
@@ -811,12 +811,12 @@ Key features:
 | Observability | OpenTelemetry-first | LangSmith/Langfuse |
 | Control | Abstracted orchestration | Full state machine control |
 
-**Moss Observations:**
-- Both validate need for structured agent loops (like moss's AgentLoop)
-- ADK's MCP integration aligns with moss's approach
-- LangGraph's graph model is similar to moss's step-based loops
-- Moss differentiates via structural awareness (skeleton, AST), not orchestration
-- Could potentially export moss tools as ADK/LangGraph integrations
+**Normalize Observations:**
+- Both validate need for structured agent loops (like normalize's AgentLoop)
+- ADK's MCP integration aligns with normalize's approach
+- LangGraph's graph model is similar to normalize's step-based loops
+- Normalize differentiates via structural awareness (skeleton, AST), not orchestration
+- Could potentially export normalize tools as ADK/LangGraph integrations
 
 ### Windsurf (Codeium's Agentic IDE)
 - **Site**: https://windsurf.com (formerly https://codeium.com/windsurf)
@@ -833,11 +833,11 @@ Key features:
 
 **Security**: SOC 2 Type II, FedRAMP High, ZDR (Zero Data Retention) options, self-hosted deployments.
 
-**Moss Observations:**
-- Rules system is like moss's policy engine - could sync or interop
-- Supercomplete (intent prediction) is what moss's DWIM aims for
-- Their deep fork approach shows IDE integration limits - why moss prioritizes library-first
-- Cascade's multi-step planning + tool calls is very similar to moss's planner → executor flow
+**Normalize Observations:**
+- Rules system is like normalize's policy engine - could sync or interop
+- Supercomplete (intent prediction) is what normalize's DWIM aims for
+- Their deep fork approach shows IDE integration limits - why normalize prioritizes library-first
+- Cascade's multi-step planning + tool calls is very similar to normalize's planner → executor flow
 
 ### Google Antigravity
 - **Site**: https://antigravityai.org
@@ -854,10 +854,10 @@ Key features:
 
 **Origin**: Google acquired Windsurf team for $2.4B, so Antigravity builds on that foundation.
 
-**Moss Observations:**
-- Manager View for multi-agent is what moss's ticket-based agent model enables
-- Self-validation aligns with moss's verification loops
-- Browser access for UI testing is interesting - moss could add browser automation tools
+**Normalize Observations:**
+- Manager View for multi-agent is what normalize's ticket-based agent model enables
+- Self-validation aligns with normalize's verification loops
+- Browser access for UI testing is interesting - normalize could add browser automation tools
 - The Windsurf acquisition shows value of agentic IDE approach
 
 ### VS Code + GitHub Copilot
@@ -871,11 +871,11 @@ Key features:
 - **Three Extension Points**: Built-in tools, extension-contributed tools, MCP servers
 - **LSP → MCP**: VS Code team invented LSP in 2016, MCP was inspired by it, now MCP returns to VS Code
 
-**Moss Observations:**
-- 128 tool limit is interesting - moss should be aware of tool count constraints
-- MCP standardization means moss's MCP server can integrate directly
-- Their tool architecture (workspace search, file read, terminal, errors, apply) maps well to moss tools
-- Agent mode's error-monitoring loop is exactly what moss's validator does
+**Normalize Observations:**
+- 128 tool limit is interesting - normalize should be aware of tool count constraints
+- MCP standardization means normalize's MCP server can integrate directly
+- Their tool architecture (workspace search, file read, terminal, errors, apply) maps well to normalize tools
+- Agent mode's error-monitoring loop is exactly what normalize's validator does
 
 ## Program Synthesis Systems (Detailed)
 
@@ -889,10 +889,10 @@ Key features:
 - Outperformed SAT-based synthesis tools on integers, lists, and trees
 - Used within LoopInvGen, a high-performing SyGuS synthesizer
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `EnumerativeGenerator` should enumerate ASTs bottom-up
 - Key insight: special handling for conditionals and recursion patterns
-- Could use moss's skeleton to identify likely recursion patterns in codebase
+- Could use normalize's skeleton to identify likely recursion patterns in codebase
 
 ### Myth (Type-and-Example-Directed)
 - **Paper**: "Type-and-Example-Directed Program Synthesis" (PLDI 2015)
@@ -905,10 +905,10 @@ Key features:
 - Proof-theoretic techniques from type theory
 - Smyth (successor) adds sketching: "Smyth = Sketching + Myth"
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `EnumerativeGenerator` could use Python type hints as refinement constraints
-- Combining types + examples is powerful - moss has both (tests = examples, type hints = types)
-- Refinement trees could map to moss's AST representation
+- Combining types + examples is powerful - normalize has both (tests = examples, type hints = types)
+- Refinement trees could map to normalize's AST representation
 
 ### SyPet (Component-Based Synthesis)
 - **Paper**: "Component-Based Synthesis for Complex APIs" (POPL 2017)
@@ -920,10 +920,10 @@ Key features:
 - **Two-Phase**: (1) Sketch generation via Petri net reachability, (2) Sketch completion via SAT
 - Outperformed InSynth and CodeHint on real-world tasks
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `ComponentGenerator` should build type graph from available functions
 - Petri net approach is elegant for API composition
-- Could use moss's `deps` and `external-deps` to know available components
+- Could use normalize's `deps` and `external-deps` to know available components
 - SAT for argument binding is tractable for small sketches
 
 ### Synquid (Refinement Type Synthesis)
@@ -939,7 +939,7 @@ Key features:
 - Uses Z3 SMT solver for constraint solving
 - Evaluated on 64 synthesis problems
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `SMTGenerator` should translate Python specs to Z3 constraints
 - Refinement types are more expressive than plain types - could use docstrings/contracts
 - Z3 integration via `pip install z3-solver`
@@ -956,7 +956,7 @@ Key features:
 - 2-way information exchange: LLM → enumerator → LLM
 - Achieves 80% benchmark completion (vs lower for either alone)
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `NeuralGuidedGenerator` should use this hybrid approach
 - LLM provides probability distribution over likely programs
 - Enumerator explores systematically using that distribution
@@ -983,11 +983,11 @@ Key features:
 
 **Status**: As of Oct 2025, Microsoft stopped releasing new PROSE SDK versions.
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `PBEGenerator` should define a Python-subset DSL
 - Key challenge: disambiguation when multiple programs fit examples
 - Ranking could use: complexity (prefer simpler), coverage (prefer more general)
-- Could integrate with moss's test suite as example source
+- Could integrate with normalize's test suite as example source
 
 ### Sketch / Rosette (Solver-Aided Synthesis)
 - **Rosette Site**: https://emina.github.io/rosette/
@@ -1008,7 +1008,7 @@ Key features:
 ; Solver finds c such that assertions pass
 ```
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `SketchGenerator` should support Python-style hole syntax
 - Could use comments: `# HOLE: int` or type annotations: `x: Hole[int]`
 - Translate to Z3 constraints (same as SMTGenerator)
@@ -1036,11 +1036,11 @@ Key features:
 - Unification-based search
 - Purely relational programs run forward, backward, or "strangely"
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `RelationalGenerator` could embed miniKanren in Python
 - Libraries exist: `kanren` (Python), `microKanren` (minimal impl)
 - Key use case: given output spec, find program that produces it
-- Could write moss tools as relations for "inverse" queries
+- Could write normalize tools as relations for "inverse" queries
 
 ### DeepCoder (Neural-Guided Synthesis)
 - **Paper**: "DeepCoder: Learning to Write Programs" (ICLR 2017)
@@ -1063,7 +1063,7 @@ Key features:
 - Repo: https://github.com/nathanael-fijalkow/DeepSynth
 - Combines ML predictions with efficient enumeration
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `NeuralGuidedGenerator` could train small model on codebase patterns
 - Predict likely imports, function names, patterns
 - Use predictions to weight enumeration (not replace it)
@@ -1083,7 +1083,7 @@ Key features:
 
 **Results**: Synthesized programs for lists, trees, nested structures. Notably synthesized a program believed to be the world's earliest functional pearl.
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `BidirectionalStrategy` should combine type hints + tests
 - Generate hypotheses about function structure from signature
 - Use test cases to constrain subexpression synthesis
@@ -1112,7 +1112,7 @@ Key features:
 - Can solve problems other PBE systems cannot
 - Good for exploration, less good for quick synthesis
 
-**Moss Implementation Notes:**
+**Normalize Implementation Notes:**
 - `GeneticGenerator` could use pyshgp as backend
 - Best for problems where other methods fail
 - Could use as "last resort" synthesizer
@@ -1144,11 +1144,11 @@ Key features:
 - 2 orders of magnitude less memory
 - Comparable library quality
 
-**Moss Implementation Notes:**
-- Core idea: moss should learn abstractions from synthesized code
+**Normalize Implementation Notes:**
+- Core idea: normalize should learn abstractions from synthesized code
 - After each synthesis, check if pattern should join library
 - Could use Stitch for efficient library extraction
-- Long-term: moss learns project-specific idioms
+- Long-term: normalize learns project-specific idioms
 
 ## Code Generation Benchmarks
 
@@ -1179,7 +1179,7 @@ The field is shifting from "Can the model code?" to "Can the model engineer?"
 
 **Key Insight**: Real-world engineering benchmarks (SWE-bench, RepoBench) matter more than toy problems. Models that ace HumanEval may fail on actual codebases.
 
-**Moss Evaluation Strategy:**
+**Normalize Evaluation Strategy:**
 - [ ] Start with SWE-bench Lite (manageable size)
 - [ ] Add RepoBench for multi-file context evaluation
 - [ ] Use EvalPlus to avoid false positives
@@ -1215,10 +1215,10 @@ The field is shifting from "Can the model code?" to "Can the model engineer?"
 - Agent architecture matters as much as model capability
 - Multiple attempts (pass@k) significantly improves scores
 
-### Moss Evaluation Plan
+### Normalize Evaluation Plan
 - [ ] Install SWE-bench harness: `pip install swebench`
 - [ ] Start with Lite subset (smaller, faster iteration)
-- [ ] Compare: moss patches vs raw LLM patches
+- [ ] Compare: normalize patches vs raw LLM patches
 - [ ] Measure: Does skeleton context improve patch accuracy?
 - [ ] Measure: Does anchor-based patching reduce failed applies?
 
@@ -1244,8 +1244,8 @@ Applying AI-generated code changes is "surprisingly difficult." LLMs generate va
 - **Confidence scores**: Only apply if confidence > threshold (e.g., 0.95)
 - **Error feedback**: When patches fail, explain why so LLM can retry
 
-### Moss's Anchor-Based Approach
-Moss uses structural anchors (AST nodes) rather than line numbers:
+### Normalize's Anchor-Based Approach
+Normalize uses structural anchors (AST nodes) rather than line numbers:
 - Anchors identify code by structure, not position
 - Robust to reformatting, comment changes, nearby edits
 - Maps to actual semantic units (functions, classes, blocks)
@@ -1292,7 +1292,7 @@ Moss uses structural anchors (AST nodes) rather than line numbers:
 - Advanced memory systems: 80-90% token reduction
 - 26% quality improvement with 90%+ token reduction (via intelligent memory)
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - Already have: `context_memory.py` with summarization
 - Needed: Token budget tracking, auto-compact trigger
 - Consider: Hybrid approach (masking + summarization)
@@ -1314,8 +1314,8 @@ MCP tool definitions use JSON Schema, which is verbose:
 - Avoids: tool-call tokens, intermediate result round-trips
 - Key quote: "The output of each tool call must feed into the LLM's neural network, just to be copied over to the inputs of the next call, wasting time, energy, and tokens"
 
-**Moss implications:**
-- For moss loop (where we control both sides), could use terse function signatures
+**Normalize implications:**
+- For normalize loop (where we control both sides), could use terse function signatures
 - `grep(pattern, path?, glob?, limit=100)` = ~70 chars vs ~900 chars JSON Schema
 - Potential 10x reduction in tool definition overhead
 
@@ -1357,8 +1357,8 @@ Semantics-based APR can frame repair as synthesis:
 3. **Deep Learning**: End-to-end neural repair (current SOTA)
 4. **Semantics-based**: Symbolic execution + synthesis
 
-### Moss Positioning
-Moss spans both:
+### Normalize Positioning
+Normalize spans both:
 - **Synthesis**: Generate code from specs (type hints, tests, natural language)
 - **Repair**: Fix validation failures in synthesis loop
 - Key insight: Repair is often easier than synthesis (smaller search space)
@@ -1389,11 +1389,11 @@ Moss spans both:
 - Tasks: Q&A about screenshots, navigation, summarization
 - Links Vision Encoder → Connector → LLM
 
-### Moss Implementation Notes
-- Could add `moss ui-to-code <screenshot>` command
-- Multi-agent approach aligns with moss's architecture
+### Normalize Implementation Notes
+- Could add `normalize ui-to-code <screenshot>` command
+- Multi-agent approach aligns with normalize's architecture
 - Use existing skeleton view to validate generated structure
-- Consider: Figma/Sketch plugin that calls moss
+- Consider: Figma/Sketch plugin that calls normalize
 
 ## Formal Verification of Synthesized Code
 
@@ -1427,11 +1427,11 @@ Verify that LLM-generated code matches user intent, not just "passes tests."
 - 38% proof coverage overall, 57% for simpler theorems
 - Best-first tree search helps significantly
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - Consider Dafny integration for verified synthesis
 - Could generate specs from type hints + docstrings
 - Verification as alternative to testing for critical code
-- Long-term: `moss synth --verify` flag
+- Long-term: `normalize synth --verify` flag
 
 ## Interactive Program Synthesis
 
@@ -1460,7 +1460,7 @@ Interactive synthesis treats the user as an oracle, refining programs through fe
 - Users annotate/correct visually
 - Effective for complex collaborative behaviors
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - TUI could show synthesis progress interactively
 - User could approve/reject intermediate steps
 - Self-Refine pattern: generate → validate → refine loop
@@ -1493,8 +1493,8 @@ to reason securely—they minimize path to passing result.
 ### Model-Specific Issues
 - DeepSeek-R1: 50% more vulns when prompted with politically sensitive topics
 
-### Implications for Moss
-**This is critical for moss's design:**
+### Implications for Normalize
+**This is critical for normalize's design:**
 - [ ] **Security validation by default**: Run security linters (bandit, semgrep) in validator loop
 - [ ] **Explicit security prompting**: Include security requirements in synthesis specs
 - [ ] **Iteration monitoring**: Track vulnerability count across refinement iterations
@@ -1502,7 +1502,7 @@ to reason securely—they minimize path to passing result.
 - [ ] **Secure defaults**: Err on side of safer code patterns
 - [ ] **User awareness**: Warn when generating security-sensitive code (auth, crypto, input handling)
 
-**Key insight**: Moss's structural awareness could help—AST analysis can detect
+**Key insight**: Normalize's structural awareness could help—AST analysis can detect
 vulnerable patterns that text-based tools miss.
 
 ## Prompt Engineering for Code Generation
@@ -1533,11 +1533,11 @@ vulnerable patterns that text-based tools miss.
 - Build evals that measure prompt performance
 - Monitor as you iterate and upgrade models
 
-### Moss Implementation Notes
-- Prompt templates in `moss.prompts` module
+### Normalize Implementation Notes
+- Prompt templates in `normalize.prompts` module
 - Few-shot examples from codebase (use existing similar code)
 - Self-review in validator loop (LLM reviews its own output)
-- Consider: `moss prompt --template <name>` for standardized prompts
+- Consider: `normalize prompt --template <name>` for standardized prompts
 
 ## Automated Test Generation
 
@@ -1578,9 +1578,9 @@ vulnerable patterns that text-based tools miss.
 - All models better for Python
 - Less-benchmarked languages (Go, Kotlin) worse
 
-### Moss Implementation Notes
-- Already have: `moss coverage` for pytest-cov stats
-- Needed: `moss gen-tests <file>` command
+### Normalize Implementation Notes
+- Already have: `normalize coverage` for pytest-cov stats
+- Needed: `normalize gen-tests <file>` command
 - Use existing tests as few-shot examples
 - Target: Improve coverage for uncovered functions
 - Consider: Mutation testing integration (mutmut)
@@ -1615,10 +1615,10 @@ vulnerable patterns that text-based tools miss.
 - **Fine-Tuning**: CodeLlama + LoRA for domain-specific docs
 - **Cost Control**: Use open-source models (Llama, Gemma) for free generation
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - Already have: AST parsing, skeleton view
-- Could add: `moss explain <symbol>` - explain any code
-- Could add: `moss document <file>` - generate missing docstrings
+- Could add: `normalize explain <symbol>` - explain any code
+- Could add: `normalize document <file>` - generate missing docstrings
 - Use skeleton as context for explanations
 - Consider: Dynamic docs in TUI/LSP (hover for explanation)
 
@@ -1656,7 +1656,7 @@ vulnerable patterns that text-based tools miss.
 - Trained via RL to adaptively sequence agents
 - Dynamic response to evolving task states
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - Ticket-based model already isolates agents
 - Add: Dynamic orchestrator that assigns tickets
 - Consider: RL-based ticket prioritization
@@ -1696,7 +1696,7 @@ Running powerful coding AI locally is now practical, not aspirational.
 - State-of-the-art on coding benchmarks
 - Install: `ollama pull deepseek-coder:33b`
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - Support local models via Ollama integration
 - Allow model selection in config
 - Fallback chain: local → API
@@ -1740,10 +1740,10 @@ Formats:
 - Cross-language adaptation
 - Accuracy vs latency trade-off (especially real-time IDE)
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - Anchor-based patching is similar to FIM (prefix + suffix)
 - Could use FIM models for hole-filling synthesis
-- AST-FIM aligns with moss's structural awareness
+- AST-FIM aligns with normalize's structural awareness
 - Consider: FIM for `SketchGenerator` (fill holes in templates)
 
 ## Query-Based Code Analysis
@@ -1771,11 +1771,11 @@ Formats:
 - API misuse detection
 - Migration analysis
 
-**Moss Observations:**
-- CodeQL's "code as data" is similar to moss's SQLite index approach
-- QL queries could inform moss's structural queries
-- Consider: Export moss index in CodeQL-compatible format
-- Data flow analysis is more advanced than moss's current callers/callees
+**Normalize Observations:**
+- CodeQL's "code as data" is similar to normalize's SQLite index approach
+- QL queries could inform normalize's structural queries
+- Consider: Export normalize index in CodeQL-compatible format
+- Data flow analysis is more advanced than normalize's current callers/callees
 
 **Research Value:**
 - How to represent code relationally
@@ -1828,7 +1828,7 @@ Even queries like "Session management code" yield poor results.
 2. **Second stage**: Reranking (slower, better model)
 3. **Enhancements**: HyDE, hybrid vector-search
 
-### Moss Implementation Notes
+### Normalize Implementation Notes
 - Already have: grep-based search, AST parsing
 - Needed: Semantic search with code embeddings
 - Use skeleton as natural language descriptions
@@ -1863,8 +1863,8 @@ Finding the buggy line(s) is often harder than fixing them.
 2. **Navigation**: Explore codebase to find relevant code
 3. **Confirmation**: Verify the suspicious location
 
-### Moss Implementation Notes
-- Could add `moss localize <failing_test>` command
+### Normalize Implementation Notes
+- Could add `normalize localize <failing_test>` command
 - Use skeleton + deps for project context
 - Iterative: narrow down with each attempt
 - Integrate with validator loop (when tests fail, localize first)
@@ -1910,8 +1910,8 @@ Traditional tools (parsing, symbol resolution) are more reliable for:
 
 AI is easier to set up but "you can never be sure if it gets everything."
 
-### Moss Implementation Notes
-- `moss refactor` command with specific patterns:
+### Normalize Implementation Notes
+- `normalize refactor` command with specific patterns:
   - Extract method, rename, move
   - Use RefactoringMirror pattern (LLM identifies, tool applies)
 - Mine project history for anti-patterns
@@ -1952,8 +1952,8 @@ AI is easier to set up but "you can never be sure if it gets everything."
 - Migrate components while maintaining integration
 - Don't attempt full system rewrites
 
-### Moss Implementation Notes
-- Could add `moss migrate <file> --to <lang>` command
+### Normalize Implementation Notes
+- Could add `normalize migrate <file> --to <lang>` command
 - Use tests as equivalence oracles
 - Incremental: function-by-function, not whole-file
 - Generate type mappings between languages
@@ -2011,8 +2011,8 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-### Moss Implementation Notes
-- `moss review` command for PR analysis
+### Normalize Implementation Notes
+- `normalize review` command for PR analysis
 - Integration: GitHub Action / GitLab CI
 - Use skeleton + deps for context
 - Categories: bugs, security, style, performance
@@ -2084,11 +2084,11 @@ jobs:
 
 **Triggers**: Optimize when context utilization >70%. Targets: 50-70% token reduction, 70%+ cache hits.
 
-**Moss Observations:**
+**Normalize Observations:**
 
 **Actually Useful:**
-- **Tool Consolidation Principle**: Validates moss's few-powerful-tools philosophy (view, edit, analyze)
-- **Progressive disclosure**: Moss's skeleton view is exactly this pattern
+- **Tool Consolidation Principle**: Validates normalize's few-powerful-tools philosophy (view, edit, analyze)
+- **Progressive disclosure**: Normalize's skeleton view is exactly this pattern
 - **Memory architecture spectrum**: Could inform cross-session learning design
 
 **Addresses Symptoms, Not Causes:**
@@ -2098,7 +2098,7 @@ Most techniques here are reactive fixes for the **append-only trajectory** anti-
 
 The root cause: treating conversation as an append-only log that inevitably fills up.
 
-Moss's approach differs on two axes:
+Normalize's approach differs on two axes:
 1. **Structural awareness**: Load only what's needed (skeleton, targeted extraction)
 2. **Dynamic context**: Trajectory is not append-only - context can be reshaped throughout execution
 
@@ -2109,6 +2109,6 @@ When context is dynamic rather than accumulated, compression/masking become unne
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness
-- [ ] Compare moss's anchor-based patching vs search/replace vs diff
+- [ ] Compare normalize's anchor-based patching vs search/replace vs diff
 - [ ] Measure structural context (skeleton) value vs raw file context
-- [ ] Test architect/editor pattern with moss infrastructure
+- [ ] Test architect/editor pattern with normalize infrastructure

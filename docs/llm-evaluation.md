@@ -1,6 +1,6 @@
 # LLM Introspection Tools Evaluation
 
-Findings from using Moss's introspection tools.
+Findings from using Normalize's introspection tools.
 
 ## DWIM Effectiveness
 
@@ -23,11 +23,11 @@ Findings from using Moss's introspection tools.
 - Good for deciding what to explore next
 
 **query --inherits** — Finding subclasses
-- `moss query src/ --inherits Exception --type class` found all 4 exception classes instantly
+- `normalize query src/ --inherits Exception --type class` found all 4 exception classes instantly
 - Much faster than grep for semantic queries
 
 **JSON + Python** — Custom analysis
-- `moss --json deps src/ | python3 -c "..."` enables arbitrary analysis
+- `normalize --json deps src/ | python3 -c "..."` enables arbitrary analysis
 - Built dependency graph, found most-imported modules
 
 **skeleton** — Code structure
@@ -43,13 +43,13 @@ Findings from using Moss's introspection tools.
 
 ## Usage Patterns
 
-**Understanding a file**: `moss context <file>`
+**Understanding a file**: `normalize context <file>`
 
-**Finding implementations**: `moss query <dir> --inherits <base>` or `--signature <pattern>`
+**Finding implementations**: `normalize query <dir> --inherits <base>` or `--signature <pattern>`
 
-**Dependency analysis**: `moss --json deps <dir> | python3 -c "..."`
+**Dependency analysis**: `normalize --json deps <dir> | python3 -c "..."`
 
-**Symbol inventory**: `moss --json skeleton <dir> | python3 -c "..."`
+**Symbol inventory**: `normalize --json skeleton <dir> | python3 -c "..."`
 
 ## Test Results
 
@@ -59,10 +59,10 @@ DWIM:
 - Alias resolution: 8/8 (100%)
 - NL routing top-3: 8/8 (100%)
 
-Tools on Moss codebase:
+Tools on Normalize codebase:
 - context: Shows 596 lines, 4 classes, 15 functions, 5 methods for dwim.py
 - query --inherits Exception: Found 4 exception classes
-- deps analysis: Identified moss.views (7 imports) as most-used internal module
+- deps analysis: Identified normalize.views (7 imports) as most-used internal module
 - skeleton: Extracted 19 top-level symbols correctly
 ```
 

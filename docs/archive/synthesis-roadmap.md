@@ -1,6 +1,6 @@
 # Synthesis Generator Roadmap
 
-This document tracks alternative code generation approaches for moss synthesis that don't rely on LLMs.
+This document tracks alternative code generation approaches for normalize synthesis that don't rely on LLMs.
 
 ## Current Generators
 

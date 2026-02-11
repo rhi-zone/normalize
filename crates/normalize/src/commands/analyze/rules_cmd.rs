@@ -215,7 +215,7 @@ fn print_sarif(rules: &[Rule], findings: &[Finding], root: &Path) {
         "runs": [{
             "tool": {
                 "driver": {
-                    "name": "moss",
+                    "name": "normalize",
                     "version": env!("CARGO_PKG_VERSION"),
                     "informationUri": "https://github.com/rhi-zone/normalize",
                     "rules": sarif_rules
@@ -228,7 +228,7 @@ fn print_sarif(rules: &[Rule], findings: &[Finding], root: &Path) {
     println!("{}", serde_json::to_string_pretty(&sarif).unwrap());
 }
 
-/// Convert moss severity to SARIF level.
+/// Convert normalize severity to SARIF level.
 fn severity_to_sarif_level(severity: Severity) -> &'static str {
     match severity {
         Severity::Error => "error",

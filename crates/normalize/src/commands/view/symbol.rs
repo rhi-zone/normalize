@@ -626,7 +626,7 @@ pub fn cmd_view_symbol(
                     if text_matches.len() == 1 { "" } else { "s" }
                 );
                 eprintln!(
-                    "Did you mean: moss text-search '{}' {}",
+                    "Did you mean: normalize text-search '{}' {}",
                     symbol_name, file_path
                 );
             }

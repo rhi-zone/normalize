@@ -1,14 +1,14 @@
 # Shadow Git Design
 
-Auto-track edits made via `moss edit` for undo/redo capability.
+Auto-track edits made via `normalize edit` for undo/redo capability.
 
 ## Problem
 
-When `moss edit` modifies files, there's no easy way to undo changes. Users must rely on git or manual backups.
+When `normalize edit` modifies files, there's no easy way to undo changes. Users must rely on git or manual backups.
 
 ## Solution
 
-Maintain a hidden git repository (`.normalize/shadow/`) that automatically commits after each `moss edit` operation, preserving full edit history as a tree.
+Maintain a hidden git repository (`.normalize/shadow/`) that automatically commits after each `normalize edit` operation, preserving full edit history as a tree.
 
 ## Why Shadow Git?
 
@@ -17,8 +17,8 @@ Maintain a hidden git repository (`.normalize/shadow/`) that automatically commi
 Use cases:
 - **Oops recovery**: "That delete was wrong, undo it"
 - **Experiment freely**: Try aggressive refactors knowing you can always go back
-- **Audit trail**: See exactly what moss changed, when, and why
-- **Checkpoint comparison**: "What did moss do since my last git commit?"
+- **Audit trail**: See exactly what normalize changed, when, and why
+- **Checkpoint comparison**: "What did normalize do since my last git commit?"
 - **Partial rollback**: Undo specific hunks while keeping others
 
 Philosophy:
@@ -32,40 +32,40 @@ Philosophy:
 ## Core Features
 
 ### Automatic Tracking
-- Every `moss edit` operation creates a shadow commit
+- Every `normalize edit` operation creates a shadow commit
 - External tools (e.g., spore) can integrate with shadow git for tracking their edits
 - Commit message includes: operation, target, timestamp, optional user message
-- Only tracks files modified by moss, not external changes
+- Only tracks files modified by normalize, not external changes
 
 ### Edit Messages
 ```bash
-moss edit src/foo.rs/bar delete --message "Removing deprecated function"
-moss edit src/foo.rs/bar delete --reason "Removing deprecated function"  # alias
+normalize edit src/foo.rs/bar delete --message "Removing deprecated function"
+normalize edit src/foo.rs/bar delete --reason "Removing deprecated function"  # alias
 ```
 
 Optional `--message` (or `--reason`) flag attaches a description to the edit, displayed in history and undo output.
 
 ### Undo/Redo
 ```bash
-moss edit --undo              # Revert last moss edit, prints what was undone
-moss edit --undo 3            # Revert last 3 edits, prints summary of each
-moss edit --undo --dry-run    # Preview what would be undone
-moss edit --redo              # Re-apply last undone edit
-moss edit --goto <ref>        # Jump to specific commit
+normalize edit --undo              # Revert last normalize edit, prints what was undone
+normalize edit --undo 3            # Revert last 3 edits, prints summary of each
+normalize edit --undo --dry-run    # Preview what would be undone
+normalize edit --redo              # Re-apply last undone edit
+normalize edit --goto <ref>        # Jump to specific commit
 ```
 
 ### History (read-only)
 ```bash
-moss history                  # Show recent moss edits
-moss history src/foo.rs       # Show edits for specific file
-moss history --all            # Show full tree structure
-moss history --json           # Machine-readable output (for LLM/scripting)
-moss history --status         # Uncommitted shadow edits since last git commit
-moss history --diff <ref>     # Show what a commit changed
-moss history --diff 2         # Diff for commit 2
+normalize history                  # Show recent normalize edits
+normalize history src/foo.rs       # Show edits for specific file
+normalize history --all            # Show full tree structure
+normalize history --json           # Machine-readable output (for LLM/scripting)
+normalize history --status         # Uncommitted shadow edits since last git commit
+normalize history --diff <ref>     # Show what a commit changed
+normalize history --diff 2         # Diff for commit 2
 ```
 
-JSON output example (`moss history --json`):
+JSON output example (`normalize history --json`):
 ```json
 {
   "head": 3,
@@ -95,9 +95,9 @@ JSON output example (`moss history --json`):
 }
 ```
 
-Flat structure for script/CI use. Tree structure (branches) visible via `moss history --all` text output; reconstruct from edit order if needed programmatically.
+Flat structure for script/CI use. Tree structure (branches) visible via `normalize history --all` text output; reconstruct from edit order if needed programmatically.
 
-Note: `moss history` is the primary interface for shadow git. Mutations (`--undo`, `--redo`, `--goto`) work on both `moss history` and `moss edit` for convenience.
+Note: `normalize history` is the primary interface for shadow git. Mutations (`--undo`, `--redo`, `--goto`) work on both `normalize history` and `normalize edit` for convenience.
 
 Undo output includes:
 - Files changed
@@ -141,13 +141,13 @@ Undo/redo mechanics:
 
 **Conflict handling**: If reverse patch doesn't apply (file was modified externally):
 - Abort undo and report conflict
-- User must resolve manually (e.g., discard external changes or use `moss edit --force-undo`)
+- User must resolve manually (e.g., discard external changes or use `normalize edit --force-undo`)
 - `--force-undo` overwrites file with shadow's known state (destructive)
 
 **Branch navigation**: To restore a different branch:
 ```bash
-moss edit --goto <ref>        # Move HEAD to ref, restore file to that state
-moss edit --goto 2            # Go to commit 2 (by number from --history)
+normalize edit --goto <ref>        # Move HEAD to ref, restore file to that state
+normalize edit --goto 2            # Go to commit 2 (by number from --history)
 ```
 
 ### Directory Structure
@@ -161,19 +161,19 @@ moss edit --goto 2            # Go to commit 2 (by number from --history)
     worktree/                 # Working copy of tracked files
 ```
 
-The shadow repo tracks files in a separate worktree, not the user's actual files. On each `moss edit`:
+The shadow repo tracks files in a separate worktree, not the user's actual files. On each `normalize edit`:
 1. Copy current file state to worktree (captures "before")
 2. Apply edit to user's file
 3. Copy new file state to worktree (captures "after")
 4. Commit the change
 
-**Initialization**: Shadow git is created on first `moss edit` (if `[shadow] enabled = true`, which is the default). The "initial state" commit (commit 0) captures the file's state before that edit. No shadow repo exists until edits are made.
+**Initialization**: Shadow git is created on first `normalize edit` (if `[shadow] enabled = true`, which is the default). The "initial state" commit (commit 0) captures the file's state before that edit. No shadow repo exists until edits are made.
 
 ### Shadow Commit Format
 
 Commit message (structured for parsing):
 ```
-moss edit: delete src/foo.rs/deprecated_fn
+normalize edit: delete src/foo.rs/deprecated_fn
 
 Message: Removing deprecated function
 Operation: delete
@@ -184,7 +184,7 @@ Git-HEAD: abc123
 
 For workflow-driven edits:
 ```
-moss edit: insert src/foo.rs/new_handler
+normalize edit: insert src/foo.rs/new_handler
 
 Workflow: @api-scaffold
 Operation: insert
@@ -205,7 +205,7 @@ Each partial undo creates a new shadow commit with just those reversals.
 
 ### Multi-File Edits
 
-Some operations may touch multiple files (future: cross-file refactors like `moss move`):
+Some operations may touch multiple files (future: cross-file refactors like `normalize move`):
 - Shadow commit is atomic: all files in one commit
 - Partial undo (file level) available via `--file` flag
 - `--history src/foo.rs` filters to show only commits affecting that file
@@ -214,8 +214,8 @@ Some operations may touch multiple files (future: cross-file refactors like `mos
 
 If sensitive content was accidentally committed:
 ```bash
-moss edit --prune <commit-range>  # Remove commits from shadow history
-moss edit --prune-file src/secrets.rs  # Remove all history for a file
+normalize edit --prune <commit-range>  # Remove commits from shadow history
+normalize edit --prune-file src/secrets.rs  # Remove all history for a file
 ```
 
 Uses `git filter-branch` or similar under the hood. Important for:
@@ -241,19 +241,19 @@ Uses `git filter-branch` or similar under the hood. Important for:
 
 ### D4: External changes
 - **Decision**: Re-sync by reading current file state before commit
-- **Rationale**: Shadow tracks moss edits, not manual edits; patch may fail if file diverged
+- **Rationale**: Shadow tracks normalize edits, not manual edits; patch may fail if file diverged
 
 ### D5: Relationship to real git
-- **Decision**: Real git is source of truth; shadow tracks uncommitted moss edits
+- **Decision**: Real git is source of truth; shadow tracks uncommitted normalize edits
 - **Rationale**: Once user commits in real git, they've accepted those changes. Shadow serves the gap between edits and commits.
 - **Mechanics**:
   - Shadow records real git HEAD at each shadow commit (for context)
-  - On each `moss edit`, check if real git HEAD changed since last shadow commit → checkpoint
+  - On each `normalize edit`, check if real git HEAD changed since last shadow commit → checkpoint
   - `--undo` by default won't cross checkpoint boundaries (user explicitly committed)
   - `--undo --cross-checkpoint` allows undoing past a real commit (with warning)
-  - `moss edit --status` shows: shadow edits since last real commit
+  - `normalize edit --status` shows: shadow edits since last real commit
 - **Git operations that change files** (`git reset`, `git checkout`, `git stash pop`):
-  - Detected on next `moss edit` via HEAD or file content mismatch
+  - Detected on next `normalize edit` via HEAD or file content mismatch
   - Shadow re-syncs: records new file state as baseline, creates checkpoint
   - Old shadow history preserved but marked as pre-divergence
 - **Decision**: Keep old shadow history after checkpoint (archaeology). Disk is cheap, lost work is expensive. Manual `--prune` available if needed.
@@ -272,30 +272,30 @@ Uses `git filter-branch` or similar under the hood. Important for:
 ## Implementation Plan
 
 ### Phase 1: Basic Infrastructure
-- [ ] Create `.normalize/shadow/` git repo on first `moss edit`
+- [ ] Create `.normalize/shadow/` git repo on first `normalize edit`
 - [ ] Commit file state before each edit
 - [ ] `--message`/`--reason` flag for edit descriptions
-- [ ] `moss history` command (list recent edits)
-- [ ] `moss history --json` for machine-readable output
-- [ ] `moss history --diff <ref>` to view changes
+- [ ] `normalize history` command (list recent edits)
+- [ ] `normalize history --json` for machine-readable output
+- [ ] `normalize history --diff <ref>` to view changes
 
 ### Phase 2: Undo/Redo + Git Integration
-- [x] `moss edit --undo` applies reverse patch, moves HEAD backward
-- [x] `moss edit --undo N` reverts N edits in sequence
-- [x] `moss edit --undo --dry-run` preview without applying
-- [x] `moss edit --undo --file` partial undo for specific file
-- [x] `moss edit --redo` moves HEAD forward
-- [x] `moss edit --goto <ref>` jumps to arbitrary commit
+- [x] `normalize edit --undo` applies reverse patch, moves HEAD backward
+- [x] `normalize edit --undo N` reverts N edits in sequence
+- [x] `normalize edit --undo --dry-run` preview without applying
+- [x] `normalize edit --undo --file` partial undo for specific file
+- [x] `normalize edit --redo` moves HEAD forward
+- [x] `normalize edit --goto <ref>` jumps to arbitrary commit
 - [x] Conflict detection and `--force` for external modifications
-- [x] `moss history --all` shows full tree structure
-- [x] `moss history <file>` filters to commits affecting that file
-- [x] `moss history --status` shows uncommitted shadow edits
+- [x] `normalize history --all` shows full tree structure
+- [x] `normalize history <file>` filters to commits affecting that file
+- [x] `normalize history --status` shows uncommitted shadow edits
 - [x] Checkpoint integration: record real git HEAD, respect commit boundaries
   - `--undo` refuses to cross git commit boundaries by default
   - `--cross-checkpoint` allows undoing past real git commits
 
 ### Phase 3: Security + Polish
-- [x] `moss history --prune N` for removing old commits (keep last N)
+- [x] `normalize history --prune N` for removing old commits (keep last N)
 - [x] `warn_on_delete` confirmation in config (requires --yes/-y)
 
 ## Risks
@@ -314,28 +314,28 @@ Uses `git filter-branch` or similar under the hood. Important for:
 ### Basic undo/redo
 
 ```bash
-$ moss edit src/foo.rs/old_fn delete --message "Cleanup"
+$ normalize edit src/foo.rs/old_fn delete --message "Cleanup"
 delete: old_fn in src/foo.rs
 
-$ moss edit src/foo.rs/helper rename new_helper
+$ normalize edit src/foo.rs/helper rename new_helper
 rename: helper -> new_helper in src/foo.rs
 
-$ moss history
+$ normalize history
   2. [HEAD] rename: helper -> new_helper in src/foo.rs
   1. delete: old_fn in src/foo.rs "Cleanup"
 
-$ moss edit --undo 2
+$ normalize edit --undo 2
 Undoing 2 edits:
   [2] rename: helper -> new_helper
   [1] delete: old_fn "Cleanup"
 Files restored: src/foo.rs
 HEAD now at: (initial state)
 
-$ moss edit src/foo.rs/new_fn insert "fn new_fn() {}"
+$ normalize edit src/foo.rs/new_fn insert "fn new_fn() {}"
 insert: new_fn in src/foo.rs
 (created branch from initial state)
 
-$ moss history --all
+$ normalize history --all
   * 3. [HEAD] insert: new_fn in src/foo.rs
   |
   | 2. rename: helper -> new_helper in src/foo.rs
@@ -347,25 +347,25 @@ $ moss history --all
 ### Checkpoint behavior (real git integration)
 
 ```bash
-$ moss edit src/foo.rs/bar delete
+$ normalize edit src/foo.rs/bar delete
 delete: bar in src/foo.rs
 
 $ git add -A && git commit -m "Remove bar"
 [main abc123] Remove bar
 
-$ moss edit src/foo.rs/baz delete
+$ normalize edit src/foo.rs/baz delete
 delete: baz in src/foo.rs
 (checkpoint: git commit abc123)
 
-$ moss edit --undo
+$ normalize edit --undo
 Undoing: delete baz in src/foo.rs
 Files restored: src/foo.rs
 
-$ moss edit --undo
+$ normalize edit --undo
 error: Cannot undo past checkpoint (git commit abc123).
 hint: Use --undo --cross-checkpoint to undo past real git commits.
 
-$ moss history --status
+$ normalize history --status
 Shadow edits since last commit: 0
 Last checkpoint: abc123 "Remove bar"
 ```

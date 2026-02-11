@@ -1,6 +1,6 @@
 # Agent V2 Design
 
-Goal state for `moss @agent` - autonomous coding agent.
+Goal state for `normalize @agent` - autonomous coding agent.
 
 ## Core Principles
 
@@ -96,9 +96,9 @@ If user sends a message while you're working:
 
 | Surface | How |
 |---------|-----|
-| CLI | `moss @agent "task"` |
+| CLI | `normalize @agent "task"` |
 | IDE | Extension calls CLI, streams output |
-| CI | `moss @agent --non-interactive --task-file tasks.md` |
+| CI | `normalize @agent --non-interactive --task-file tasks.md` |
 | MCP | Agent as MCP server for other tools |
 
 ## Multi-Agent Coordination
@@ -145,12 +145,12 @@ Memory storage: `.normalize/memory/` directory, checked into git
 - `preferences.md` - user/team preferences
 - `decisions.md` - past design decisions and rationale
 
-Note: `moss init` gitignore must NOT exclude `.normalize/memory/` (unlike other `.normalize/` contents)
+Note: `normalize init` gitignore must NOT exclude `.normalize/memory/` (unlike other `.normalize/` contents)
 
 Organization: both manual and LLM-assisted
 - User can edit `.normalize/memory/*.md` directly
 - Agent can reorganize/consolidate via LLM when prompted
-- `moss memory organize` - LLM pass to dedupe/categorize
+- `normalize memory organize` - LLM pass to dedupe/categorize
 
 ## Implemented
 

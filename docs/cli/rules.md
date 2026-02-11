@@ -1,4 +1,4 @@
-# moss rules
+# normalize rules
 
 Manage custom analysis rules - add from URLs, list, update, and remove.
 
@@ -9,12 +9,12 @@ Manage custom analysis rules - add from URLs, list, update, and remove.
 Add a rule from a URL:
 
 ```bash
-moss rules add https://example.com/rules/no-console-log.scm
-moss rules add https://example.com/rules/require-error-handling.scm --global
+normalize rules add https://example.com/rules/no-console-log.scm
+normalize rules add https://example.com/rules/require-error-handling.scm --global
 ```
 
 Options:
-- `--global` - Install to global rules (~/.config/moss/rules/) instead of project
+- `--global` - Install to global rules (~/.config/normalize/rules/) instead of project
 
 The rule file must have TOML frontmatter with an `id` field:
 
@@ -38,9 +38,9 @@ The rule file must have TOML frontmatter with an `id` field:
 List installed rules:
 
 ```bash
-moss rules list
-moss rules list --sources  # Show source URLs
-moss rules list --json
+normalize rules list
+normalize rules list --sources  # Show source URLs
+normalize rules list --json
 ```
 
 Output:
@@ -57,8 +57,8 @@ Output:
 Update imported rules from their source URLs:
 
 ```bash
-moss rules update              # Update all imported rules
-moss rules update no-console-log  # Update specific rule
+normalize rules update              # Update all imported rules
+normalize rules update no-console-log  # Update specific rule
 ```
 
 Only rules with tracked sources (added via URL) will be updated. Local rules are skipped.
@@ -68,14 +68,14 @@ Only rules with tracked sources (added via URL) will be updated. Local rules are
 Remove an imported rule:
 
 ```bash
-moss rules remove no-console-log
+normalize rules remove no-console-log
 ```
 
 This removes both the rule file and its entry in the lock file.
 
 ## Lock File
 
-Imported rules are tracked in `.normalize/rules.lock` (project) or `~/.config/moss/rules.lock` (global):
+Imported rules are tracked in `.normalize/rules.lock` (project) or `~/.config/normalize/rules.lock` (global):
 
 ```toml
 [rules.no-console-log]
@@ -89,19 +89,19 @@ added = "2024-01-15"
 Import a rule from GitHub:
 
 ```bash
-moss rules add https://raw.githubusercontent.com/org/repo/main/rules/security.scm
+normalize rules add https://raw.githubusercontent.com/org/repo/main/rules/security.scm
 ```
 
 Check what rules are installed:
 
 ```bash
-moss rules list --sources
+normalize rules list --sources
 ```
 
 Update all rules to latest versions:
 
 ```bash
-moss rules update
+normalize rules update
 ```
 
 ## See Also

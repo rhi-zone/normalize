@@ -2,7 +2,7 @@
 //!
 //! # Architecture
 //!
-//! Similar to moss-sessions and moss-languages, this crate uses a trait-based
+//! Similar to normalize-chat-sessions and normalize-languages, this crate uses a trait-based
 //! extensible architecture. Each CLI framework has a corresponding parser that
 //! implements the `CliFormat` trait.
 //!

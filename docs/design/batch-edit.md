@@ -2,12 +2,12 @@
 
 ## Problem
 
-Currently, editing N files requires N sequential `moss edit` calls:
+Currently, editing N files requires N sequential `normalize edit` calls:
 
 ```bash
-moss edit src/main.py/foo replace "..."
-moss edit src/utils.py/bar replace "..."
-moss edit src/config.py/baz delete
+normalize edit src/main.py/foo replace "..."
+normalize edit src/utils.py/bar replace "..."
+normalize edit src/config.py/baz delete
 ```
 
 Each call:
@@ -35,7 +35,7 @@ A batch edit API that:
 
 Option A: JSON file input
 ```bash
-moss edit --batch edits.json
+normalize edit --batch edits.json
 ```
 
 Where `edits.json`:
@@ -49,12 +49,12 @@ Where `edits.json`:
 
 Option B: Stdin input
 ```bash
-cat edits.json | moss edit --batch -
+cat edits.json | normalize edit --batch -
 ```
 
 Option C: Multi-arg syntax
 ```bash
-moss edit --batch \
+normalize edit --batch \
   src/main.py/foo::replace::"new content" \
   src/utils.py/bar::delete
 ```
@@ -84,7 +84,7 @@ edit.batch({
 
 ### Implementation
 
-Core batch edit logic in `crates/moss/src/edit.rs`:
+Core batch edit logic in `crates/normalize/src/edit.rs`:
 
 ```rust
 pub struct BatchEdit {

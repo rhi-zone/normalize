@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 428
 expression: "snapshot_help(&[\"rules\", \"add\"])"
 ---
 Add a rule from a URL
@@ -11,7 +10,7 @@ Arguments:
   <URL>  URL to download the rule from
 
 Options:
-      --global              Install to global rules (~/.config/moss/rules/) instead of project
+      --global              Install to global rules (~/.config/normalize/rules/) instead of project
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

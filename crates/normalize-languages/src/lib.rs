@@ -1,4 +1,4 @@
-//! Language support for moss.
+//! Language support for normalize.
 //!
 //! This crate provides the `Language` trait and implementations for
 //! various programming languages. Each language struct IS its support implementation.

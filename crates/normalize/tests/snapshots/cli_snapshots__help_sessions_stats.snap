@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 338
 expression: "snapshot_help(&[\"sessions\", \"stats\"])"
 ---
 Show aggregate statistics across sessions
@@ -15,7 +14,7 @@ Options:
       --project <PROJECT>   Filter by specific project path
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --all-projects        Show sessions from all projects (not just current)
-      --format <FORMAT>     Force specific format: claude, codex, gemini, moss
+      --format <FORMAT>     Force specific format: claude, codex, gemini, normalize
       --by-repo             Group statistics by repository
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
       --json                Output as JSON

@@ -178,7 +178,7 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
 ];
 
 /// Load all rules from all sources, merged by ID.
-/// Order: builtins → ~/.config/moss/rules/ → .normalize/rules/
+/// Order: builtins → ~/.config/normalize/rules/ → .normalize/rules/
 /// Then applies config overrides (deny, enabled, allow).
 pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<FactsRule> {
     let mut rules_by_id: HashMap<String, FactsRule> = HashMap::new();
@@ -190,9 +190,9 @@ pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<Fac
         }
     }
 
-    // 2. Load user global rules (~/.config/moss/rules/)
+    // 2. Load user global rules (~/.config/normalize/rules/)
     if let Some(config_dir) = dirs::config_dir() {
-        let user_rules_dir = config_dir.join("moss").join("rules");
+        let user_rules_dir = config_dir.join("normalize").join("rules");
         for rule in load_rules_from_dir(&user_rules_dir) {
             rules_by_id.insert(rule.id.clone(), rule);
         }

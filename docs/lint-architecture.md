@@ -159,7 +159,7 @@ Diagnostics (warnings/errors)
 - Supports: recursion, negation, aggregation, lattices, string predicates
 - Uses ascent-interpreter (pterror's fork): ascent-syntax → ascent-ir → ascent-eval
 - Builtin rules are embedded via `include_str!` and loaded automatically
-- User rules: `~/.config/moss/rules/*.dl` and `.normalize/rules/*.dl`
+- User rules: `~/.config/normalize/rules/*.dl` and `.normalize/rules/*.dl`
 
 ### Path 2: Compiled (dylib via abi_stable)
 

@@ -17,10 +17,10 @@ We have the codebase tree. Telemetry should leverage this:
 **Unified log model**: All session formats are plugins.
 - Claude Code JSONL
 - Gemini CLI logs
-- Moss internal sessions
+- Normalize internal sessions
 - Cline/Roo/Aider formats
 
-Moss sessions are "first-class" only in that we capture maximal metadata, but implementation is still a plugin like any other format.
+Normalize sessions are "first-class" only in that we capture maximal metadata, but implementation is still a plugin like any other format.
 
 **Plugin interface**: Each format parser produces a common `SessionData` structure.
 
@@ -32,7 +32,7 @@ Moss sessions are "first-class" only in that we capture maximal metadata, but im
 
 ## Modes
 
-- Post-hoc: `moss telemetry` CLI, HTML dashboards
+- Post-hoc: `normalize telemetry` CLI, HTML dashboards
 - Real-time: live metrics during session (future: TUI integration)
 
 ## Data Model
@@ -51,11 +51,11 @@ Codebase-aware metrics:
 ## CLI Design
 
 ```
-moss telemetry                    # Aggregate stats (all moss sessions)
-moss telemetry -s <id>            # Specific moss session
-moss telemetry -l *.jsonl         # External logs (auto-detect format)
-moss telemetry --html             # Dashboard output
-moss telemetry --watch            # Real-time mode (future)
+normalize telemetry                    # Aggregate stats (all normalize sessions)
+normalize telemetry -s <id>            # Specific normalize session
+normalize telemetry -l *.jsonl         # External logs (auto-detect format)
+normalize telemetry --html             # Dashboard output
+normalize telemetry --watch            # Real-time mode (future)
 ```
 
 ## Integration Points

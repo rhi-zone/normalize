@@ -59,7 +59,7 @@ export interface SarifDiagnostic {
     }[];
 }
 
-export class MossRunner {
+export class NormalizeRunner {
     private binaryPath: string;
 
     constructor() {
@@ -67,15 +67,15 @@ export class MossRunner {
     }
 
     private getBinaryPath(): string {
-        const config = vscode.workspace.getConfiguration('moss');
-        return config.get<string>('binaryPath') ?? 'moss';
+        const config = vscode.workspace.getConfiguration('normalize');
+        return config.get<string>('binaryPath') ?? 'normalize';
     }
 
     updateBinaryPath(): void {
         this.binaryPath = this.getBinaryPath();
     }
 
-    private async runMoss(args: string[], cwd?: string): Promise<string> {
+    private async runNormalize(args: string[], cwd?: string): Promise<string> {
         return new Promise((resolve, reject) => {
             const process = spawn(this.binaryPath, args, {
                 cwd: cwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
@@ -107,7 +107,7 @@ export class MossRunner {
     }
 
     async runLint(targetPath: string, fix: boolean = false): Promise<LintResult[]> {
-        const config = vscode.workspace.getConfiguration('moss');
+        const config = vscode.workspace.getConfiguration('normalize');
         const categories = config.get<string[]>('lintCategories') ?? ['linter'];
 
         const args = ['lint', targetPath, '--sarif'];
@@ -121,7 +121,7 @@ export class MossRunner {
         }
 
         try {
-            const output = await this.runMoss(args, path.dirname(targetPath));
+            const output = await this.runNormalize(args, path.dirname(targetPath));
             const sarif = JSON.parse(output) as SarifResult;
 
             return sarif.runs.map((run) => ({
@@ -146,7 +146,7 @@ export class MossRunner {
             }));
         } catch (error) {
             return [{
-                tool: 'moss',
+                tool: 'normalize',
                 diagnostics: [],
                 success: false,
                 error: String(error),
@@ -156,16 +156,16 @@ export class MossRunner {
 
     async runSkeleton(filePath: string): Promise<string> {
         const args = ['view', filePath];
-        return await this.runMoss(args, path.dirname(filePath));
+        return await this.runNormalize(args, path.dirname(filePath));
     }
 
     async runViewTree(dirPath: string, depth: number = 2): Promise<string> {
         const args = ['view', dirPath, '--depth', String(depth)];
-        return await this.runMoss(args, dirPath);
+        return await this.runNormalize(args, dirPath);
     }
 
     async runAnalyzeHealth(targetPath: string): Promise<string> {
         const args = ['analyze', '--health', targetPath, '--json'];
-        return await this.runMoss(args, targetPath);
+        return await this.runNormalize(args, targetPath);
     }
 }

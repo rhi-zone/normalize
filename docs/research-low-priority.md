@@ -1,10 +1,10 @@
 # Low-Priority Research (Resource-Intensive)
 
-These topics require significant compute resources (GPU time, training infrastructure) or are less immediately actionable for moss. Explore when resources permit or if moss gains traction that justifies the investment.
+These topics require significant compute resources (GPU time, training infrastructure) or are less immediately actionable for normalize. Explore when resources permit or if normalize gains traction that justifies the investment.
 
 ## Inference & Optimization
 
-Topics related to making LLM inference faster/cheaper. Useful if moss scales to high-volume usage.
+Topics related to making LLM inference faster/cheaper. Useful if normalize scales to high-volume usage.
 
 - [ ] Speculative decoding for faster code generation
 - [ ] Model quantization trade-offs for code quality
@@ -36,7 +36,7 @@ Even more resource-intensive - training from scratch or significant fine-tuning.
 ## When to Prioritize These
 
 Consider moving items to main TODO.md when:
-- Moss has production users with scale requirements
+- Normalize has production users with scale requirements
 - Specific performance bottlenecks are identified
 - Funding/resources become available for training
 - A specific use case requires fine-tuned behavior

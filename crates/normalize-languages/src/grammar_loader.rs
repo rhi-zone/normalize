@@ -13,7 +13,7 @@
 //!
 //! Arborium grammar crates embed the ABI version in their parser.c source. When arborium
 //! updates to use newer tree-sitter, grammars must be recompiled. Stale grammars in
-//! `~/.config/moss/grammars/` may cause `LanguageError { version: N }` if incompatible.
+//! `~/.config/normalize/grammars/` may cause `LanguageError { version: N }` if incompatible.
 //!
 //! # Lifetime Requirements
 //!
@@ -74,13 +74,13 @@ impl GrammarLoader {
     /// Create a new grammar loader with default search paths.
     ///
     /// Search order:
-    /// 1. `MOSS_GRAMMAR_PATH` environment variable (colon-separated)
-    /// 2. `~/.config/moss/grammars/`
+    /// 1. `NORMALIZE_GRAMMAR_PATH` environment variable (colon-separated)
+    /// 2. `~/.config/normalize/grammars/`
     pub fn new() -> Self {
         let mut paths = Vec::new();
 
         // Environment variable takes priority
-        if let Ok(env_path) = std::env::var("MOSS_GRAMMAR_PATH") {
+        if let Ok(env_path) = std::env::var("NORMALIZE_GRAMMAR_PATH") {
             for p in env_path.split(':') {
                 if !p.is_empty() {
                     paths.push(PathBuf::from(p));
@@ -90,7 +90,7 @@ impl GrammarLoader {
 
         // User config directory
         if let Some(config) = dirs::config_dir() {
-            paths.push(config.join("moss/grammars"));
+            paths.push(config.join("normalize/grammars"));
         }
 
         Self {
@@ -323,7 +323,7 @@ mod tests {
 
         // SAFETY: This is a test that runs single-threaded
         unsafe {
-            std::env::set_var("MOSS_GRAMMAR_PATH", grammar_path.to_str().unwrap());
+            std::env::set_var("NORMALIZE_GRAMMAR_PATH", grammar_path.to_str().unwrap());
         }
 
         let loader = GrammarLoader::new();
@@ -338,7 +338,7 @@ mod tests {
         // Clean up
         // SAFETY: This is a test that runs single-threaded
         unsafe {
-            std::env::remove_var("MOSS_GRAMMAR_PATH");
+            std::env::remove_var("NORMALIZE_GRAMMAR_PATH");
         }
     }
 }

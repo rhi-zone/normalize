@@ -456,7 +456,7 @@ mod tests {
     use crate::GrammarLoader;
 
     /// Dump all valid node kinds for a grammar (useful for fixing invalid kinds).
-    /// Run with: cargo test -p rhizome-moss-languages dump_node_kinds -- --nocapture
+    /// Run with: cargo test -p rhizome-normalize-languages dump_node_kinds -- --nocapture
     #[test]
     #[ignore]
     fn dump_node_kinds() {
@@ -539,7 +539,7 @@ mod tests {
 
     /// Cross-check grammar node kinds against Language implementations.
     /// Finds potentially useful kinds that exist in the grammar but aren't used.
-    /// Run with: cargo test -p rhizome-moss-languages cross_check_node_kinds -- --nocapture --ignored
+    /// Run with: cargo test -p rhizome-normalize-languages cross_check_node_kinds -- --nocapture --ignored
     #[test]
     #[ignore]
     fn cross_check_node_kinds() {

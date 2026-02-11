@@ -1,12 +1,12 @@
 # normalize-chat-sessions Refactor: Unified Parsing
 
-**Status: Complete** - Implemented in normalize-chat-sessions, analysis moved to `crates/moss/src/sessions/analysis.rs`.
+**Status: Complete** - Implemented in normalize-chat-sessions, analysis moved to `crates/normalize/src/sessions/analysis.rs`.
 
 ## Problem
 
 normalize-chat-sessions previously conflated two concerns:
 
-1. **Parsing** - converting format-specific logs (Claude Code JSONL, Gemini CLI JSON, Codex, Moss Agent) into structured data
+1. **Parsing** - converting format-specific logs (Claude Code JSONL, Gemini CLI JSON, Codex, Normalize Agent) into structured data
 2. **Analysis** - computing statistics (tool call counts, token usage, error patterns, parallelization opportunities)
 
 The `LogFormat` trait's `analyze()` method does both, returning `SessionAnalysis` which contains pre-computed aggregations:
@@ -25,7 +25,7 @@ pub struct SessionAnalysis {
 
 This is problematic because:
 
-- **Analysis is subjective** - what metrics matter depends on the consumer. Iris wants different insights than `moss sessions`.
+- **Analysis is subjective** - what metrics matter depends on the consumer. Iris wants different insights than `normalize sessions`.
 - **Iteration requires recompilation** - changing what's analyzed means changing Rust code.
 - **Raw data is inaccessible** - consumers can't access the underlying messages/events without re-parsing.
 
@@ -118,7 +118,7 @@ pub trait LogFormat: Send + Sync {
 
 ### 3. Analysis as Consumer Code
 
-Analysis moves out of normalize-chat-sessions entirely. Consumers (moss CLI, spore-sessions Lua bindings, Iris) compute their own metrics:
+Analysis moves out of normalize-chat-sessions entirely. Consumers (normalize CLI, spore-sessions Lua bindings, Iris) compute their own metrics:
 
 ```lua
 -- In Lua (via spore-sessions)
@@ -137,7 +137,7 @@ for _, turn in ipairs(session.turns) do
 end
 ```
 
-For `moss sessions` CLI, analysis helpers can live in normalize-cli or a separate `normalize-chat-sessions-analysis` crate that operates on `Session`.
+For `normalize sessions` CLI, analysis helpers can live in normalize-cli or a separate `normalize-chat-sessions-analysis` crate that operates on `Session`.
 
 ## Rationale
 
@@ -149,15 +149,15 @@ For `moss sessions` CLI, analysis helpers can live in normalize-cli or a separat
 
 4. **Simpler core** - normalize-chat-sessions becomes a pure parser. Smaller API surface, easier to maintain, clearer purpose.
 
-5. **Composability** - Different consumers can share the parser but compute different analyses. `moss sessions --compact` and Iris insights don't need to agree on what to track.
+5. **Composability** - Different consumers can share the parser but compute different analyses. `normalize sessions --compact` and Iris insights don't need to agree on what to track.
 
 ## Migration (Complete)
 
 1. ~~Add `Session` type and `parse()` method to `LogFormat` trait~~ Done
-2. ~~Implement `parse()` for each format~~ Done (Claude Code, Gemini CLI, Codex, Moss Agent)
-3. ~~Move analysis logic to moss CLI~~ Done (`crates/moss/src/sessions/analysis.rs`)
+2. ~~Implement `parse()` for each format~~ Done (Claude Code, Gemini CLI, Codex, Normalize Agent)
+3. ~~Move analysis logic to normalize CLI~~ Done (`crates/normalize/src/sessions/analysis.rs`)
 4. ~~Remove `analyze()` from trait~~ Done
-5. ~~`SessionAnalysis` becomes internal to moss CLI~~ Done
+5. ~~`SessionAnalysis` becomes internal to normalize CLI~~ Done
 
 ## spore-normalize-chat-sessions Integration
 
@@ -165,9 +165,9 @@ With parsing exposed, `spore-normalize-chat-sessions` provides Lua bindings:
 
 ```rust
 // spore-normalize-chat-sessions/src/lib.rs
-pub struct MossSessionsIntegration;
+pub struct NormalizeSessionsIntegration;
 
-impl Integration for MossSessionsIntegration {
+impl Integration for NormalizeSessionsIntegration {
     fn register(&self, lua: &Lua) -> Result<()> {
         let sessions = lua.create_table()?;
 

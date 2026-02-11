@@ -57,7 +57,7 @@ Improving test coverage: identifying gaps, adding meaningful tests.
 | Phase | Tools |
 |-------|-------|
 | Measure | `cargo tarpaulin`, `nyc`, coverage tools |
-| Prioritize | `moss analyze complexity`, `view` |
+| Prioritize | `normalize analyze complexity`, `view` |
 | Write | Test framework, `edit` |
 | Verify | Coverage report, CI |
 

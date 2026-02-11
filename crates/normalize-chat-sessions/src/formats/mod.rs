@@ -83,7 +83,7 @@ pub struct SessionFile {
 
 /// Trait for session log format plugins.
 pub trait LogFormat: Send + Sync {
-    /// Format identifier (e.g., "claude", "codex", "gemini", "moss").
+    /// Format identifier (e.g., "claude", "codex", "gemini", "normalize").
     fn name(&self) -> &'static str;
 
     /// Get the sessions directory for this format.

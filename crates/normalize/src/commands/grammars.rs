@@ -17,9 +17,10 @@ impl OutputFormatter for GrammarListReport {
     fn format_text(&self) -> String {
         if self.grammars.is_empty() {
             let mut lines = vec!["No grammars installed.".to_string(), String::new()];
-            lines.push("Install grammars with: moss grammars install".to_string());
+            lines.push("Install grammars with: normalize grammars install".to_string());
             lines.push(
-                "Or set MOSS_GRAMMAR_PATH to a directory containing .so/.dylib files".to_string(),
+                "Or set NORMALIZE_GRAMMAR_PATH to a directory containing .so/.dylib files"
+                    .to_string(),
             );
             lines.join("\n")
         } else {
@@ -146,7 +147,7 @@ fn cmd_paths(format: &crate::output::OutputFormat) -> i32 {
     let mut raw_paths = Vec::new();
 
     // Environment variable
-    if let Ok(env_path) = std::env::var("MOSS_GRAMMAR_PATH") {
+    if let Ok(env_path) = std::env::var("NORMALIZE_GRAMMAR_PATH") {
         for p in env_path.split(':') {
             if !p.is_empty() {
                 raw_paths.push(("env", PathBuf::from(p)));
@@ -156,7 +157,7 @@ fn cmd_paths(format: &crate::output::OutputFormat) -> i32 {
 
     // User config directory
     if let Some(config) = dirs::config_dir() {
-        raw_paths.push(("config", config.join("moss/grammars")));
+        raw_paths.push(("config", config.join("normalize/grammars")));
     }
 
     let paths: Vec<GrammarPath> = raw_paths
@@ -179,7 +180,7 @@ fn cmd_install(version: Option<String>, force: bool, json: bool) -> i32 {
 
     // Determine install directory
     let install_dir = match dirs::config_dir() {
-        Some(config) => config.join("moss/grammars"),
+        Some(config) => config.join("normalize/grammars"),
         None => {
             eprintln!("Could not determine config directory");
             return 1;
@@ -234,7 +235,7 @@ fn cmd_install(version: Option<String>, force: bool, json: bool) -> i32 {
 
     let response = match client
         .get(&release_url)
-        .set("User-Agent", "moss-cli")
+        .set("User-Agent", "normalize-cli")
         .set("Accept", "application/vnd.github+json")
         .call()
     {
@@ -257,7 +258,7 @@ fn cmd_install(version: Option<String>, force: bool, json: bool) -> i32 {
 
     // Find grammar asset for this platform
     let target = get_target_triple();
-    let asset_name = format!("moss-grammars-{}.tar.gz", target);
+    let asset_name = format!("normalize-grammars-{}.tar.gz", target);
 
     let assets = body["assets"].as_array();
     let asset_url = assets.and_then(|arr| {

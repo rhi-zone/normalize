@@ -1,6 +1,6 @@
-//! HTTP REST API server for moss.
+//! HTTP REST API server for normalize.
 //!
-//! Exposes moss functionality over HTTP for integration with other tools.
+//! Exposes normalize functionality over HTTP for integration with other tools.
 
 use crate::index::FileIndex;
 use crate::skeleton::SkeletonExtractor;
@@ -20,9 +20,9 @@ use utoipa::{OpenApi, ToSchema};
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "Moss API",
+        title = "Normalize API",
         version = "0.1.0",
-        description = "Code intelligence API for moss"
+        description = "Code intelligence API for normalize"
     ),
     paths(health, list_files, get_file, list_symbols, get_symbol, search),
     components(schemas(

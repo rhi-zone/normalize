@@ -6,7 +6,7 @@ export class SkeletonViewProvider {
         const fileName = path.basename(filePath);
 
         const panel = vscode.window.createWebviewPanel(
-            'mossSkeleton',
+            'normalizeSkeleton',
             `Skeleton: ${fileName}`,
             vscode.ViewColumn.Beside,
             {

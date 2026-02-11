@@ -12,7 +12,7 @@ struct CacheEntry {
     cached_at: u64, // Unix timestamp
 }
 
-/// Get base cache directory: ~/.cache/moss
+/// Get base cache directory: ~/.cache/normalize
 fn cache_base() -> Option<PathBuf> {
     let base = if let Ok(cache) = std::env::var("XDG_CACHE_HOME") {
         PathBuf::from(cache)
@@ -23,10 +23,10 @@ fn cache_base() -> Option<PathBuf> {
     } else {
         return None;
     };
-    Some(base.join("moss"))
+    Some(base.join("normalize"))
 }
 
-/// Get cache directory: ~/.cache/moss/packages
+/// Get cache directory: ~/.cache/normalize/packages
 fn cache_dir() -> Option<PathBuf> {
     Some(cache_base()?.join("packages"))
 }

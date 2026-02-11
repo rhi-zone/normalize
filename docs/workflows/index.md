@@ -7,7 +7,7 @@ Design documents for structured patterns accomplishing common software engineeri
 A workflow is a repeatable pattern that combines:
 - **Trigger**: What initiates it (user request, file change, schedule)
 - **Goal**: What success looks like
-- **Tools**: Which moss primitives are needed
+- **Tools**: Which normalize primitives are needed
 - **Decomposition**: How to break it into steps
 - **Validation**: How to verify it worked
 
@@ -62,7 +62,7 @@ What must be true before starting? Index built, tests passing, etc.
 How to break this into steps? Sequential, parallel, recursive?
 
 ## Tools Used
-Which moss primitives? view, edit, text-search, analyze, etc.
+Which normalize primitives? view, edit, text-search, analyze, etc.
 
 ## Validation
 How to verify success? Tests pass, lint clean, human approval?

@@ -407,7 +407,7 @@ fn run_cli_snapshot(binary: PathBuf, output: Option<PathBuf>, name: Option<Strin
         return 1;
     }
 
-    // Recursively discover all commands using moss-cli-parser
+    // Recursively discover all commands using normalize-cli-parser
     fn discover_commands(
         binary: &std::path::Path,
         prefix: &[String],
@@ -433,7 +433,7 @@ fn run_cli_snapshot(binary: PathBuf, output: Option<PathBuf>, name: Option<Strin
             Err(_) => return result,
         };
 
-        // Parse help output using moss-cli-parser
+        // Parse help output using normalize-cli-parser
         let spec = match normalize_cli_parser::parse_help(&help) {
             Ok(s) => s,
             Err(_) => return result,

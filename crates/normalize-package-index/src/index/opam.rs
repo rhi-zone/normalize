@@ -91,7 +91,7 @@ impl PackageIndex for Opam {
         // First, list versions from GitHub API
         let api_url = format!("{}/{}", Self::GITHUB_API, name);
         let response: serde_json::Value = ureq::get(&api_url)
-            .set("User-Agent", "moss-packages/0.1")
+            .set("User-Agent", "normalize-packages/0.1")
             .set("Accept", "application/vnd.github.v3+json")
             .call()?
             .into_json()?;
@@ -147,7 +147,7 @@ impl PackageIndex for Opam {
     fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
         let api_url = format!("{}/{}", Self::GITHUB_API, name);
         let response: serde_json::Value = ureq::get(&api_url)
-            .set("User-Agent", "moss-packages/0.1")
+            .set("User-Agent", "normalize-packages/0.1")
             .set("Accept", "application/vnd.github.v3+json")
             .call()?
             .into_json()?;
@@ -185,7 +185,7 @@ impl PackageIndex for Opam {
         );
 
         let response: serde_json::Value = ureq::get(&search_url)
-            .set("User-Agent", "moss-packages/0.1")
+            .set("User-Agent", "normalize-packages/0.1")
             .set("Accept", "application/vnd.github.v3+json")
             .call()?
             .into_json()?;

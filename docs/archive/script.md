@@ -1,27 +1,27 @@
-# moss script
+# normalize script
 
-Run Lua scripts with moss bindings.
+Run Lua scripts with normalize bindings.
 
 ## Usage
 
 ```bash
-moss script <PATH>
-moss <PATH>           # Direct invocation for .lua files
-moss @<script-name>   # Run from .normalize/scripts/
+normalize script <PATH>
+normalize <PATH>           # Direct invocation for .lua files
+normalize @<script-name>   # Run from .normalize/scripts/
 ```
 
 ## Examples
 
 ```bash
 # Run a script
-moss script analyze.lua
+normalize script analyze.lua
 
 # Direct invocation
-moss ./my-script.lua
+normalize ./my-script.lua
 
 # Named script from .normalize/scripts/
-moss @todo list
-moss @cleanup
+normalize @todo list
+normalize @cleanup
 ```
 
 ## Script Location
@@ -37,21 +37,21 @@ Scripts have access to:
 
 ```lua
 -- File operations
-moss.read(path)
-moss.write(path, content)
-moss.glob(pattern)
-moss.grep(pattern, path)
+normalize.read(path)
+normalize.write(path, content)
+normalize.glob(pattern)
+normalize.grep(pattern, path)
 
 -- Tree-sitter
-moss.parse(path)
-moss.skeleton(path)
+normalize.parse(path)
+normalize.skeleton(path)
 
 -- Subprocess
-moss.exec(cmd, args)
+normalize.exec(cmd, args)
 
 -- Output
-moss.print(...)
-moss.json(value)
+normalize.print(...)
+normalize.json(value)
 ```
 
 See `docs/scripting.md` for full API.

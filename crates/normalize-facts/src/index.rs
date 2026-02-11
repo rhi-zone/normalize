@@ -1845,9 +1845,9 @@ mod tests {
     #[tokio::test]
     async fn test_index_creation() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
-        fs::write(dir.path().join("src/moss/dwim.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
+        fs::write(dir.path().join("src/myapp/dwim.py"), "").unwrap();
 
         let mut index = FileIndex::open(&dir.path().join("index.sqlite"), dir.path())
             .await

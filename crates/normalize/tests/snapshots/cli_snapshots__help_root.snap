@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 26
 expression: "snapshot_help(&[])"
 ---
 Fast code intelligence CLI
@@ -12,8 +11,8 @@ Commands:
   edit         Edit a node in the codebase tree (structural code modification)
   history      View shadow git edit history
   facts        Manage code facts (file index, symbols, calls, imports)
-  init         Initialize moss in current directory
-  daemon       Manage the global moss daemon
+  init         Initialize normalize in current directory
+  daemon       Manage the global normalize daemon
   update       Check for and install updates
   grammars     Manage tree-sitter grammars for parsing
   analyze      Analyze codebase (health, complexity, security, duplicates, docs)
@@ -23,7 +22,7 @@ Commands:
   sessions     Analyze Claude Code and other agent session logs
   package      Package management: info, list, tree, outdated
   tools        External ecosystem tools (linters, formatters, test runners)
-  serve        Start a moss server (MCP, HTTP, LSP)
+  serve        Start a normalize server (MCP, HTTP, LSP)
   generate     Generate code from API spec
   rules        Manage custom analysis rules
   translate    Translate code between programming languages

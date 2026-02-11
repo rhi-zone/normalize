@@ -102,7 +102,7 @@ Execute mode (`-x`): Non-interactive, full tool approval for autonomy.
 
 **Background agents**: 10-15+ minute tasks. Use CI pipelines as feedback (tests, linters) rather than replicating local env.
 
-## Relevance to Moss
+## Relevance to Normalize
 
 Potential applications:
 1. **Subagent pattern** for context multiplication - spawn fresh contexts for isolated tasks
@@ -113,7 +113,7 @@ Potential applications:
 6. **No compaction** - explicit handoffs over automatic truncation
 
 Questions to explore:
-- Should moss TUI support spawning subagents?
+- Should normalize TUI support spawning subagents?
 - Oracle pattern worth implementing? (expensive model for stuck situations)
 - Background agent support for long-running analysis?
 

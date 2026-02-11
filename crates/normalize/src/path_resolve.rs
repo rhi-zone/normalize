@@ -339,9 +339,9 @@ pub fn all_files(root: &Path) -> Vec<PathMatch> {
 /// Handles:
 /// - Absolute paths: /tmp/foo.py (if file exists)
 /// - Extension patterns: .rs, .py (returns all matching files)
-/// - Exact paths: src/moss/dwim.py
+/// - Exact paths: src/myapp/dwim.py
 /// - Partial filenames: dwim.py, dwim
-/// - Directory names: moss, src
+/// - Directory names: myapp, src
 pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
     // Handle absolute paths first - check if file exists directly
     if query.starts_with('/') {
@@ -556,7 +556,7 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
     }
 
     // Try suffix match (query is end of path)
-    // e.g., "analyze/report.rs" matches "crates/moss/src/commands/analyze/report.rs"
+    // e.g., "analyze/report.rs" matches "crates/myapp/src/commands/analyze/report.rs"
     if query.contains('/') || query.contains('\\') {
         let query_suffix = query.replace('\\', "/");
         let mut suffix_matches: Vec<PathMatch> = Vec::new();
@@ -673,34 +673,34 @@ mod tests {
     #[test]
     fn test_exact_match() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
-        let matches = resolve("src/moss/cli.py", dir.path());
+        let matches = resolve("src/myapp/cli.py", dir.path());
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].path, "src/moss/cli.py");
+        assert_eq!(matches[0].path, "src/myapp/cli.py");
     }
 
     #[test]
     fn test_filename_match() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/dwim.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/dwim.py"), "").unwrap();
 
         let matches = resolve("dwim.py", dir.path());
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].path, "src/moss/dwim.py");
+        assert_eq!(matches[0].path, "src/myapp/dwim.py");
     }
 
     #[test]
     fn test_stem_match() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/dwim.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/dwim.py"), "").unwrap();
 
         let matches = resolve("dwim", dir.path());
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].path, "src/moss/dwim.py");
+        assert_eq!(matches[0].path, "src/myapp/dwim.py");
     }
 
     #[test]
@@ -728,13 +728,13 @@ mod tests {
     #[test]
     fn test_unified_path_file_only() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
-        let result = resolve_unified("src/moss/cli.py", dir.path());
+        let result = resolve_unified("src/myapp/cli.py", dir.path());
         assert!(result.is_some());
         let u = result.unwrap();
-        assert_eq!(u.file_path, "src/moss/cli.py");
+        assert_eq!(u.file_path, "src/myapp/cli.py");
         assert!(u.symbol_path.is_empty());
         assert!(!u.is_directory);
     }
@@ -742,14 +742,14 @@ mod tests {
     #[test]
     fn test_unified_path_with_symbol() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
         // File with symbol path
-        let result = resolve_unified("src/moss/cli.py/Foo/bar", dir.path());
+        let result = resolve_unified("src/myapp/cli.py/Foo/bar", dir.path());
         assert!(result.is_some());
         let u = result.unwrap();
-        assert_eq!(u.file_path, "src/moss/cli.py");
+        assert_eq!(u.file_path, "src/myapp/cli.py");
         assert_eq!(u.symbol_path, vec!["Foo", "bar"]);
         assert!(!u.is_directory);
     }
@@ -757,13 +757,13 @@ mod tests {
     #[test]
     fn test_unified_path_directory() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
-        let result = resolve_unified("src/moss", dir.path());
+        let result = resolve_unified("src/myapp", dir.path());
         assert!(result.is_some());
         let u = result.unwrap();
-        assert_eq!(u.file_path, "src/moss");
+        assert_eq!(u.file_path, "src/myapp");
         assert!(u.symbol_path.is_empty());
         assert!(u.is_directory);
     }
@@ -771,56 +771,56 @@ mod tests {
     #[test]
     fn test_unified_path_rust_style_separator() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
         // Rust-style :: separator
-        let result = resolve_unified("src/moss/cli.py::Foo::bar", dir.path());
+        let result = resolve_unified("src/myapp/cli.py::Foo::bar", dir.path());
         assert!(result.is_some());
         let u = result.unwrap();
-        assert_eq!(u.file_path, "src/moss/cli.py");
+        assert_eq!(u.file_path, "src/myapp/cli.py");
         assert_eq!(u.symbol_path, vec!["Foo", "bar"]);
     }
 
     #[test]
     fn test_unified_path_hash_separator() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
         // URL fragment-style # separator
-        let result = resolve_unified("src/moss/cli.py#Foo", dir.path());
+        let result = resolve_unified("src/myapp/cli.py#Foo", dir.path());
         assert!(result.is_some());
         let u = result.unwrap();
-        assert_eq!(u.file_path, "src/moss/cli.py");
+        assert_eq!(u.file_path, "src/myapp/cli.py");
         assert_eq!(u.symbol_path, vec!["Foo"]);
     }
 
     #[test]
     fn test_unified_path_colon_separator() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
         // Compact : separator
-        let result = resolve_unified("src/moss/cli.py:Foo:bar", dir.path());
+        let result = resolve_unified("src/myapp/cli.py:Foo:bar", dir.path());
         assert!(result.is_some());
         let u = result.unwrap();
-        assert_eq!(u.file_path, "src/moss/cli.py");
+        assert_eq!(u.file_path, "src/myapp/cli.py");
         assert_eq!(u.symbol_path, vec!["Foo", "bar"]);
     }
 
     #[test]
     fn test_unified_path_fuzzy_file() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("src/moss")).unwrap();
-        fs::write(dir.path().join("src/moss/cli.py"), "").unwrap();
+        fs::create_dir_all(dir.path().join("src/myapp")).unwrap();
+        fs::write(dir.path().join("src/myapp/cli.py"), "").unwrap();
 
         // Fuzzy file match with symbol
         let result = resolve_unified("cli.py/Foo", dir.path());
         assert!(result.is_some());
         let u = result.unwrap();
-        assert_eq!(u.file_path, "src/moss/cli.py");
+        assert_eq!(u.file_path, "src/myapp/cli.py");
         assert_eq!(u.symbol_path, vec!["Foo"]);
     }
 

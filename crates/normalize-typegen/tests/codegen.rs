@@ -1,4 +1,4 @@
-//! Integration tests for moss-typegen.
+//! Integration tests for normalize-typegen.
 
 use normalize_typegen::{
     input::{parse_json_schema, parse_openapi},

@@ -4,7 +4,7 @@
 //! - Claude Code (JSONL)
 //! - Gemini CLI (JSON)
 //! - OpenAI Codex CLI (JSONL)
-//! - Moss Agent (JSONL)
+//! - Normalize Agent (JSONL)
 //!
 //! # Architecture
 //!

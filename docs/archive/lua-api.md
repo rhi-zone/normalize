@@ -1,6 +1,6 @@
 # Lua API Reference
 
-Rust bindings exposed to Lua workflows. See `crates/moss/src/workflow/lua_runtime/`.
+Rust bindings exposed to Lua workflows. See `crates/normalize/src/workflow/lua_runtime/`.
 
 ## Stability
 
@@ -14,7 +14,7 @@ APIs are marked with stability levels:
 
 | Category | Stable | Experimental | Internal |
 |----------|--------|--------------|----------|
-| Moss commands | `view`, `analyze`, `grep` | `edit`, `index`, `lint` | - |
+| Normalize commands | `view`, `analyze`, `grep` | `edit`, `index`, `lint` | - |
 | Helpers | `shell`, `read_file`, `write_file`, `file_exists`, `print` | `is_dirty`, `tests_pass` | - |
 | Memory | `store`, `recall`, `forget` | - | - |
 | Shadow | `shadow.*` | `shadow.worktree.*` | - |
@@ -36,9 +36,9 @@ The `agent.*` submodules are implementation details:
 
 These are internal to `agent.lua` and may change without notice.
 
-## Moss Commands (Stable)
+## Normalize Commands (Stable)
 
-Wrappers around moss CLI commands, run as subprocesses.
+Wrappers around normalize CLI commands, run as subprocesses.
 
 | Function | Stability | Description |
 |----------|-----------|-------------|

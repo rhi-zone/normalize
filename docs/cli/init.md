@@ -1,11 +1,11 @@
-# moss init
+# normalize init
 
-Initialize moss in a project directory.
+Initialize normalize in a project directory.
 
 ## Usage
 
 ```bash
-moss init [--index]
+normalize init [--index]
 ```
 
 ## What It Does
@@ -13,7 +13,7 @@ moss init [--index]
 1. Creates `.normalize/` directory
 2. Creates `.normalize/config.toml` with defaults
 3. Detects TODO files (TODO.md, TASKS.md, etc.) and adds to aliases
-4. Updates `.gitignore` with moss entries
+4. Updates `.gitignore` with normalize entries
 
 ## Options
 
@@ -24,7 +24,7 @@ moss init [--index]
 ### .normalize/config.toml
 
 ```toml
-# Moss configuration
+# Normalize configuration
 # See: https://github.com/rhi-zone/normalize
 
 [daemon]
@@ -47,7 +47,7 @@ todo = ["TODO.md"]  # If TODO.md exists
 ### .gitignore Entries
 
 ```gitignore
-# Moss - ignore .normalize/ in subdirectories entirely
+# Normalize - ignore .normalize/ in subdirectories entirely
 **/.normalize/
 
 # Root .normalize/ - ignore all but config/allow files
@@ -61,7 +61,7 @@ todo = ["TODO.md"]  # If TODO.md exists
 
 ## Idempotent
 
-Running `moss init` multiple times is safe:
+Running `normalize init` multiple times is safe:
 - Skips existing files
 - Only adds missing gitignore entries
 - Reports what was created/skipped

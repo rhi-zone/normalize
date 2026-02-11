@@ -1,4 +1,4 @@
-//! Moss @agent JSONL format parser.
+//! Normalize @agent JSONL format parser.
 
 use super::{LogFormat, SessionFile, list_jsonl_sessions, peek_lines};
 use crate::{ContentBlock, Message, Role, Session, Turn};
@@ -9,10 +9,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-/// Moss agent session log format (JSONL).
+/// Normalize agent session log format (JSONL).
 pub struct NormalizeAgentFormat;
 
-/// Event types in moss agent logs.
+/// Event types in normalize agent logs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "event")]
 pub enum AgentEvent {
@@ -68,11 +68,11 @@ pub enum AgentEvent {
     Unknown,
 }
 
-/// Parsed moss agent session.
+/// Parsed normalize agent session.
 /// Used by Lua bindings and future session listing features.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct MossAgentSession {
+pub struct NormalizeAgentSession {
     pub session_id: String,
     pub timestamp: Option<String>,
     pub prompt: Option<String>,
@@ -94,7 +94,7 @@ pub struct CommandInfo {
 }
 
 #[allow(dead_code)]
-impl MossAgentSession {
+impl NormalizeAgentSession {
     /// Parse a session from a log file path.
     pub fn parse(path: &Path) -> Option<Self> {
         let file = File::open(path).ok()?;
@@ -176,14 +176,14 @@ impl LogFormat for NormalizeAgentFormat {
             return 0.0;
         }
 
-        // Peek at first few lines for moss agent events
+        // Peek at first few lines for normalize agent events
         for line in peek_lines(path, 3) {
             if let Ok(entry) = serde_json::from_str::<Value>(&line) {
-                // Moss agent logs have "event" field
+                // Normalize agent logs have "event" field
                 if let Some(event) = entry.get("event").and_then(|v| v.as_str())
                     && matches!(event, "session_start" | "task" | "turn_start")
                 {
-                    // Check for moss-specific fields
+                    // Check for normalize-specific fields
                     if entry.get("moss_root").is_some()
                         || entry.get("user_prompt").is_some()
                         || entry.get("working_memory_count").is_some()

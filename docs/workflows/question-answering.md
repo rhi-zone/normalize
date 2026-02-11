@@ -58,24 +58,24 @@ Accurate answer with supporting evidence (file:line references).
 
 ## Example Session
 
-**Question**: "How does moss handle syntax highlighting?"
+**Question**: "How does normalize handle syntax highlighting?"
 
 ```
 Turn 1: Search for key terms
   $(text-search "highlight" --only "*.rs")
-  → crates/moss/src/highlight.rs, crates/moss/src/commands/view/mod.rs
+  → crates/normalize/src/highlight.rs, crates/normalize/src/commands/view/mod.rs
 
 Turn 2: View high-level structure
-  $(view crates/moss/src/highlight.rs --types-only)
+  $(view crates/normalize/src/highlight.rs --types-only)
   → Functions: highlight_code, get_highlight_config, ...
 
 Turn 3: Drill into main function
-  $(view crates/moss/src/highlight.rs/highlight_code)
+  $(view crates/normalize/src/highlight.rs/highlight_code)
   → Uses tree-sitter queries, loads highlight.scm files
 
 Turn 4: Synthesize answer
-  $(answer "Moss uses tree-sitter highlight queries (.scm files) loaded via
-   highlight_code() in crates/moss/src/highlight.rs:45. Each grammar has
+  $(answer "Normalize uses tree-sitter highlight queries (.scm files) loaded via
+   highlight_code() in crates/normalize/src/highlight.rs:45. Each grammar has
    a highlights.scm that maps node types to highlight groups...")
 ```
 

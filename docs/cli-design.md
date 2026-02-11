@@ -12,11 +12,11 @@
 - `index` - Manage file index (rebuild, stats, files, packages)
 - `daemon` - Background process management
 - `grammars` - Tree-sitter grammar management
-- `init` - Initialize moss in a directory
+- `init` - Initialize normalize in a directory
 - `update` - Self-update
 
 ### Ecosystem Integration
-- `sessions` - Agent session logs (Claude Code, Codex, Gemini, Moss)
+- `sessions` - Agent session logs (Claude Code, Codex, Gemini, Normalize)
   - `plans` - Agent-generated plans
 - `package` - Package management (info, list, tree, why, outdated, audit)
 - `tools` - External tool orchestration
@@ -49,8 +49,8 @@ Consistent pattern across: `grammars list`, `script list`, `daemon list`, `packa
 Not: `--list` flag (inconsistent with above).
 
 ### 5. Positional args for primary targets
-`moss view src/main.rs` not `moss view --file src/main.rs`
-`moss sessions <id>` not `moss sessions --id <id>`
+`normalize view src/main.rs` not `normalize view --file src/main.rs`
+`normalize sessions <id>` not `normalize sessions --id <id>`
 
 ### 6. Flags for modifiers
 `--json`, `--pretty`, `--compact` - output format

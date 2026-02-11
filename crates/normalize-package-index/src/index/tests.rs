@@ -1,7 +1,7 @@
 //! Network tests for package index fetchers.
 //!
 //! These tests hit real APIs and are disabled by default.
-//! Run with: cargo test -p rhizome-moss-packages --features test-network
+//! Run with: cargo test -p rhizome-normalize-packages --features test-network
 
 #![cfg(feature = "test-network")]
 

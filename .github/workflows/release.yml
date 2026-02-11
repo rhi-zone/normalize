@@ -167,13 +167,13 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          name: Moss CLI ${{ steps.version.outputs.version }}
+          name: Normalize CLI ${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           files: |
             release/*
           body: |
-            ## Moss CLI ${{ steps.version.outputs.version }}
+            ## Normalize CLI ${{ steps.version.outputs.version }}
 
             ### Installation
 

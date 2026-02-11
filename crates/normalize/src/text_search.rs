@@ -222,7 +222,7 @@ fn add_symbol_context(matches: &mut [GrepMatch], root: &Path) {
             }
 
             if let Some(sym) = best {
-                // Format name with parent if present (use / for consistency with moss paths)
+                // Format name with parent if present (use / for consistency with normalize paths)
                 let name = if let Some(parent) = &sym.parent {
                     format!("{}/{}", parent, sym.name)
                 } else {

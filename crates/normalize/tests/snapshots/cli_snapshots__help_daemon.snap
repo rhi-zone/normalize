@@ -1,9 +1,8 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 57
 expression: "snapshot_help(&[\"daemon\"])"
 ---
-Manage the global moss daemon
+Manage the global normalize daemon
 
 Usage: normalize daemon [OPTIONS] <COMMAND>
 
