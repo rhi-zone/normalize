@@ -51,6 +51,7 @@ normalize-openapi = { path = "../normalize-openapi", version = "0.1.0" }
 normalize-ecosystems = { path = "../normalize-ecosystems", version = "0.1.0" }
 normalize-chat-sessions = { path = "../normalize-chat-sessions", version = "0.1.0", features = ["schema"] }
 normalize-session-analysis = { path = "../normalize-session-analysis", version = "0.1.0" }
+normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.1.0" }
 normalize-tools = { path = "../normalize-tools", version = "0.1.0" }
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }
 normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.1.0", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }

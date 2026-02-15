@@ -3441,6 +3441,7 @@ dependencies = [
  "normalize-local-deps",
  "normalize-openapi",
  "normalize-output",
+ "normalize-path-resolve",
  "normalize-session-analysis",
  "normalize-surface-syntax",
  "normalize-syntax-rules",
@@ -3745,6 +3746,16 @@ dependencies = [
  "urlencoding",
  "xz2",
  "zstd",
+]
+
+[[package]]
+name = "normalize-path-resolve"
+version = "0.1.0"
+dependencies = [
+ "glob",
+ "ignore",
+ "nucleo-matcher",
+ "tempfile",
 ]
 
 [[package]]

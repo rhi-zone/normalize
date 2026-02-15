@@ -1,0 +1,15 @@
+[package]
+name = "normalize-path-resolve"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Path resolution and fuzzy matching for normalize"
+
+[dependencies]
+glob = "0.3.3"
+ignore.workspace = true
+nucleo-matcher.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
