@@ -4,8 +4,8 @@
 //! Analysis is intentionally in the CLI, not the parsing library,
 //! because what metrics matter is subjective and consumer-specific.
 
-use crate::output::OutputFormatter;
 use normalize_chat_sessions::{ContentBlock, Session};
+use normalize_output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
