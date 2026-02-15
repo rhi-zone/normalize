@@ -1,0 +1,17 @@
+[package]
+name = "normalize-output"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Output formatting for normalize CLI commands"
+
+[dependencies]
+normalize-core = { path = "../normalize-core", version = "0.1.0" }
+normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
+serde.workspace = true
+serde_json.workspace = true
+schemars = "1"
+jaq-core = "2"
+jaq-std = "2"
+jaq-json = { version = "1", features = ["serde_json"] }

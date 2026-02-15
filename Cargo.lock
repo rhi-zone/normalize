@@ -3442,6 +3442,7 @@ dependencies = [
  "normalize-languages",
  "normalize-local-deps",
  "normalize-openapi",
+ "normalize-output",
  "normalize-surface-syntax",
  "normalize-syntax-rules",
  "normalize-tools",
@@ -3693,6 +3694,20 @@ dependencies = [
 name = "normalize-openapi"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "normalize-output"
+version = "0.1.0"
+dependencies = [
+ "jaq-core",
+ "jaq-json",
+ "jaq-std",
+ "normalize-core",
+ "normalize-derive",
+ "schemars",
+ "serde",
  "serde_json",
 ]
 

@@ -23,6 +23,7 @@ members = [
     "crates/normalize-chat-sessions",
     "crates/normalize-tools",
     "crates/normalize-local-deps",
+    "crates/normalize-output",
     "xtask",
 ]
 
