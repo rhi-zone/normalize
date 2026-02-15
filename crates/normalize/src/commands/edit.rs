@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::commands::aliases::detect_project_languages;
 use crate::config::NormalizeConfig;
+use crate::edit::EditorExt;
 use crate::filter::Filter;
 use crate::shadow::{EditInfo, Shadow};
 use crate::{daemon, edit, path_resolve};

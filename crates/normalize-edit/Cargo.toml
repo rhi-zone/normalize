@@ -1,0 +1,12 @@
+[package]
+name = "normalize-edit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Structural code editing for normalize"
+
+[dependencies]
+tree-sitter = "0.26"
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+normalize-view = { path = "../normalize-view", version = "0.1.0" }

@@ -1,0 +1,16 @@
+[package]
+name = "normalize-shadow"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shadow git history tracking for normalize edit operations"
+
+[dependencies]
+normalize-core = { path = "../normalize-core", version = "0.1.0" }
+normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+schemars = "1"
+
+[dev-dependencies]
+tempfile = "3"

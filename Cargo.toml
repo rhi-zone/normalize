@@ -28,6 +28,8 @@ members = [
     "crates/normalize-facts-rules-interpret",
     "crates/normalize-view",
     "crates/normalize-path-resolve",
+    "crates/normalize-shadow",
+    "crates/normalize-edit",
     "xtask",
 ]
 

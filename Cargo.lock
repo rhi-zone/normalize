@@ -3433,6 +3433,7 @@ dependencies = [
  "normalize-core",
  "normalize-derive",
  "normalize-ecosystems",
+ "normalize-edit",
  "normalize-facts",
  "normalize-facts-core",
  "normalize-facts-rules-api",
@@ -3443,6 +3444,7 @@ dependencies = [
  "normalize-output",
  "normalize-path-resolve",
  "normalize-session-analysis",
+ "normalize-shadow",
  "normalize-surface-syntax",
  "normalize-syntax-rules",
  "normalize-tools",
@@ -3515,6 +3517,15 @@ dependencies = [
  "toml",
  "ureq",
  "urlencoding",
+]
+
+[[package]]
+name = "normalize-edit"
+version = "0.1.0"
+dependencies = [
+ "normalize-languages",
+ "normalize-view",
+ "tree-sitter",
 ]
 
 [[package]]
@@ -3767,6 +3778,17 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "normalize-shadow"
+version = "0.1.0"
+dependencies = [
+ "normalize-core",
+ "normalize-derive",
+ "schemars",
+ "serde",
+ "tempfile",
 ]
 
 [[package]]
