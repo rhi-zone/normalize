@@ -1,0 +1,11 @@
+[package]
+name = "normalize-deps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Module dependency extraction (imports, exports, re-exports) for normalize"
+
+[dependencies]
+tree-sitter = "0.26"
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }

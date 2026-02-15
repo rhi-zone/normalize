@@ -51,13 +51,13 @@ use crate::commands::analyze::AnalyzeConfig;
 use crate::commands::text_search::TextSearchConfig;
 use crate::commands::view::ViewConfig;
 use crate::daemon::DaemonConfig;
+use crate::filter::AliasConfig;
 use crate::output::PrettyConfig;
 use crate::shadow::ShadowConfig;
 use normalize_core::Merge;
 use normalize_derive::Merge;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::Path;
 
 /// Index configuration.
@@ -66,126 +66,6 @@ use std::path::Path;
 pub struct IndexConfig {
     /// Whether to create and use the file index. Default: true
     pub enabled: Option<bool>,
-}
-
-/// Unified alias configuration for @ prefix expansion.
-/// Used for both command targets (`normalize view @todo`) and filters (`--only @tests`).
-///
-/// Example:
-/// ```toml
-/// [aliases]
-/// todo = ["TODO.md"]              # @todo → specific file
-/// config = [".normalize/config.toml"]  # overrides built-in @config
-/// vendor = ["vendor/**"]          # custom filter alias
-/// tests = []                      # disable built-in @tests
-/// ```
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, JsonSchema)]
-#[serde(default)]
-pub struct AliasConfig {
-    /// Map alias names to paths/patterns. Empty array disables the alias.
-    #[serde(flatten)]
-    pub entries: HashMap<String, Vec<String>>,
-}
-
-impl AliasConfig {
-    /// Names of all built-in aliases.
-    pub fn builtin_names() -> &'static [&'static str] {
-        &["tests", "config", "build", "docs", "generated"]
-    }
-
-    /// Get values for an alias, falling back to builtins.
-    /// Returns None if alias is unknown or disabled (empty array).
-    ///
-    /// For language-aware builtins like @tests, pass detected languages.
-    pub fn get(&self, name: &str) -> Option<Vec<String>> {
-        self.get_with_languages(name, &[])
-    }
-
-    /// Get values for an alias with language context for builtins like @tests.
-    pub fn get_with_languages(&self, name: &str, languages: &[&str]) -> Option<Vec<String>> {
-        // Check user config first
-        if let Some(values) = self.entries.get(name) {
-            if values.is_empty() {
-                return None; // Disabled
-            }
-            return Some(values.clone());
-        }
-
-        // Fall back to builtins
-        Self::builtin(name, languages)
-    }
-
-    /// Built-in alias patterns.
-    fn builtin(name: &str, languages: &[&str]) -> Option<Vec<String>> {
-        let patterns: Vec<&str> = match name {
-            "tests" => {
-                let mut p = vec!["**/test_*.py", "**/*_test.py", "**/tests/**"];
-                for lang in languages {
-                    match *lang {
-                        "go" => p.extend(["*_test.go", "**/*_test.go"]),
-                        "rust" => p.extend(["**/tests/**/*.rs"]),
-                        "javascript" | "typescript" => p.extend([
-                            "**/*.test.js",
-                            "**/*.spec.js",
-                            "**/*.test.ts",
-                            "**/*.spec.ts",
-                            "**/__tests__/**",
-                        ]),
-                        "java" => p.extend(["**/test/**", "**/*Test.java"]),
-                        "ruby" => {
-                            p.extend(["**/test/**", "**/*_test.rb", "**/spec/**", "**/*_spec.rb"])
-                        }
-                        _ => {}
-                    }
-                }
-                p
-            }
-            "config" => vec![
-                "*.toml",
-                "*.yaml",
-                "*.yml",
-                "*.json",
-                "*.ini",
-                "*.cfg",
-                ".env",
-                ".env.*",
-                "*.config.js",
-                "*.config.ts",
-            ],
-            "build" => vec![
-                "target/**",
-                "dist/**",
-                "build/**",
-                "out/**",
-                "node_modules/**",
-                ".next/**",
-                ".nuxt/**",
-                "__pycache__/**",
-                "*.pyc",
-            ],
-            "docs" => vec![
-                "*.md",
-                "*.rst",
-                "*.txt",
-                "docs/**",
-                "doc/**",
-                "README*",
-                "CHANGELOG*",
-                "LICENSE*",
-            ],
-            "generated" => vec![
-                "*.gen.*",
-                "*.generated.*",
-                "*.pb.go",
-                "*.pb.rs",
-                "*_generated.go",
-                "*_generated.rs",
-                "generated/**",
-            ],
-            _ => return None,
-        };
-        Some(patterns.into_iter().map(String::from).collect())
-    }
 }
 
 impl IndexConfig {

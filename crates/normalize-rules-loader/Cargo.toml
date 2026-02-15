@@ -1,0 +1,12 @@
+[package]
+name = "normalize-rules-loader"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Rule pack discovery, loading, and execution for normalize"
+
+[dependencies]
+abi_stable = "0.11"
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
+dirs = "5"

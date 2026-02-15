@@ -3431,6 +3431,7 @@ dependencies = [
  "normalize-chat-sessions",
  "normalize-cli-parser",
  "normalize-core",
+ "normalize-deps",
  "normalize-derive",
  "normalize-ecosystems",
  "normalize-edit",
@@ -3438,11 +3439,13 @@ dependencies = [
  "normalize-facts-core",
  "normalize-facts-rules-api",
  "normalize-facts-rules-interpret",
+ "normalize-filter",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-openapi",
  "normalize-output",
  "normalize-path-resolve",
+ "normalize-rules-loader",
  "normalize-session-analysis",
  "normalize-shadow",
  "normalize-surface-syntax",
@@ -3495,6 +3498,14 @@ dependencies = [
 [[package]]
 name = "normalize-core"
 version = "0.1.0"
+
+[[package]]
+name = "normalize-deps"
+version = "0.1.0"
+dependencies = [
+ "normalize-languages",
+ "tree-sitter",
+]
 
 [[package]]
 name = "normalize-derive"
@@ -3587,6 +3598,17 @@ dependencies = [
  "serde_json",
  "syn 2.0.114",
  "toml",
+]
+
+[[package]]
+name = "normalize-filter"
+version = "0.1.0"
+dependencies = [
+ "ignore",
+ "normalize-core",
+ "normalize-derive",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
@@ -3767,6 +3789,15 @@ dependencies = [
  "ignore",
  "nucleo-matcher",
  "tempfile",
+]
+
+[[package]]
+name = "normalize-rules-loader"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "dirs",
+ "normalize-facts-rules-api",
 ]
 
 [[package]]
