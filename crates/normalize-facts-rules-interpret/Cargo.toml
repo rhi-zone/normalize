@@ -1,0 +1,22 @@
+[package]
+name = "normalize-facts-rules-interpret"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Interpreted Datalog rule evaluation for normalize code facts"
+
+[dependencies]
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
+normalize-core = { path = "../normalize-core", version = "0.1.0" }
+normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
+ascent-eval.workspace = true
+ascent-ir.workspace = true
+ascent-syntax.workspace = true
+syn = { version = "2.0", features = ["full"] }
+serde.workspace = true
+serde_json.workspace = true
+toml = "0.8"
+glob = "0.3.3"
+dirs = "5"
+schemars = "1"

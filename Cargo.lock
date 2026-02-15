@@ -3408,9 +3408,6 @@ name = "normalize"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "ascent-eval",
- "ascent-ir",
- "ascent-syntax",
  "assert_cmd",
  "ast-grep-core",
  "axum 0.8.8",
@@ -3439,6 +3436,7 @@ dependencies = [
  "normalize-facts",
  "normalize-facts-core",
  "normalize-facts-rules-api",
+ "normalize-facts-rules-interpret",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-openapi",
@@ -3457,7 +3455,6 @@ dependencies = [
  "serde",
  "serde_json",
  "streaming-iterator",
- "syn 2.0.114",
  "tar",
  "tempfile",
  "tokio",
@@ -3557,6 +3554,25 @@ dependencies = [
  "abi_stable",
  "ascent",
  "normalize-facts-rules-api",
+]
+
+[[package]]
+name = "normalize-facts-rules-interpret"
+version = "0.1.0"
+dependencies = [
+ "ascent-eval",
+ "ascent-ir",
+ "ascent-syntax",
+ "dirs",
+ "glob",
+ "normalize-core",
+ "normalize-derive",
+ "normalize-facts-rules-api",
+ "schemars",
+ "serde",
+ "serde_json",
+ "syn 2.0.114",
+ "toml",
 ]
 
 [[package]]

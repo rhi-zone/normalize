@@ -62,7 +62,7 @@ pub struct AnalyzeConfig {
     pub rules: RulesConfig,
     /// Fact rules (Datalog) configuration
     #[serde(default, rename = "facts-rules")]
-    pub facts_rules: crate::interpret::FactsRulesConfig,
+    pub facts_rules: normalize_facts_rules_interpret::FactsRulesConfig,
     /// Default lines of context to show in query preview
     #[serde(rename = "query-context-lines")]
     pub query_context_lines: Option<usize>,

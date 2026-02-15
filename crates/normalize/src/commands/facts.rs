@@ -7,6 +7,7 @@ use crate::rules;
 use crate::skeleton;
 use clap::Subcommand;
 use normalize_facts_rules_api::Relations;
+use normalize_facts_rules_interpret as interpret;
 use normalize_languages::external_packages;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -851,7 +852,7 @@ async fn cmd_check(
     rules_file: Option<&Path>,
     list: bool,
     json: bool,
-    config: &crate::interpret::FactsRulesConfig,
+    config: &interpret::FactsRulesConfig,
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -863,7 +864,7 @@ async fn cmd_check(
     }
 
     // Auto-discover rules with config overrides
-    let all_rules = crate::interpret::load_all_rules(&root, config);
+    let all_rules = interpret::load_all_rules(&root, config);
 
     if list {
         if json {
@@ -921,7 +922,7 @@ async fn cmd_check(
     let use_colors = !json && std::io::stdout().is_terminal();
 
     for rule in &all_rules {
-        match crate::interpret::run_rule(rule, &relations) {
+        match interpret::run_rule(rule, &relations) {
             Ok(diagnostics) => all_diagnostics.extend(diagnostics),
             Err(e) => {
                 eprintln!("Error running rule '{}': {}", rule.id, e);
@@ -930,7 +931,7 @@ async fn cmd_check(
     }
 
     // Filter inline normalize-facts-allow: comments in source files
-    crate::interpret::filter_inline_allowed(&mut all_diagnostics, &root);
+    interpret::filter_inline_allowed(&mut all_diagnostics, &root);
 
     if json {
         println!(
@@ -971,7 +972,7 @@ async fn cmd_check_file(root: &Path, rules_file: &Path, json: bool) -> i32 {
         }
     };
 
-    let diagnostics = match crate::interpret::run_rules_file(rules_file, &relations) {
+    let diagnostics = match interpret::run_rules_file(rules_file, &relations) {
         Ok(d) => d,
         Err(e) => {
             eprintln!("Error: {}", e);

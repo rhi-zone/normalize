@@ -40,11 +40,8 @@ normalize-output = { path = "../normalize-output", version = "0.1.0" }
 normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
 normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
+normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.1.0" }
 abi_stable = "0.11"
-ascent-eval.workspace = true
-ascent-ir.workspace = true
-ascent-syntax.workspace = true
-syn = { version = "2.0", features = ["full"] }
 normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
 normalize-local-deps = { path = "../normalize-local-deps", version = "0.1.0" }
 normalize-typegen = { path = "../normalize-typegen", version = "0.1.0", features = ["input-typescript"] }
