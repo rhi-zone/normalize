@@ -23,7 +23,7 @@
 //! dangling pointers (use-after-free, likely segfault).
 //!
 //! Safe patterns:
-//! - Use a global singleton loader (see `normalize::parsers::grammar_loader()`)
+//! - Use the global singleton (see [`crate::parsers::grammar_loader()`])
 //! - Keep the loader in scope for the duration of tree usage
 //! - Return `(Tree, GrammarLoader)` tuples from helper functions
 //!

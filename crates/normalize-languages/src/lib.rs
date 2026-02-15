@@ -40,6 +40,7 @@ pub mod ecmascript;
 pub mod external_packages;
 pub mod ffi;
 mod grammar_loader;
+pub mod parsers;
 mod registry;
 mod traits;
 

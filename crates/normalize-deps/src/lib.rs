@@ -2,27 +2,11 @@
 //!
 //! Extracts imports and exports from source files.
 
+use normalize_languages::parsers::parse_with_grammar;
 use normalize_languages::{
-    Export, GrammarLoader, Import, Language, SymbolKind, support_for_grammar, support_for_path,
+    Export, Import, Language, SymbolKind, support_for_grammar, support_for_path,
 };
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
-
-// Grammar loader singleton (avoids reloading grammars for each parse)
-static GRAMMAR_LOADER: OnceLock<Arc<GrammarLoader>> = OnceLock::new();
-
-fn grammar_loader() -> Arc<GrammarLoader> {
-    GRAMMAR_LOADER
-        .get_or_init(|| Arc::new(GrammarLoader::new()))
-        .clone()
-}
-
-fn parse_with_grammar(grammar: &str, source: &str) -> Option<tree_sitter::Tree> {
-    let language = grammar_loader().get(grammar)?;
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&language).ok()?;
-    parser.parse(source, None)
-}
 
 /// A re-export statement (export * from './module' or export { foo } from './module')
 #[derive(Debug, Clone)]
