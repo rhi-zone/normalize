@@ -3446,6 +3446,7 @@ dependencies = [
  "normalize-syntax-rules",
  "normalize-tools",
  "normalize-typegen",
+ "normalize-view",
  "notify",
  "nu-ansi-term",
  "nucleo-matcher",
@@ -3810,6 +3811,22 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tree-sitter",
+]
+
+[[package]]
+name = "normalize-view"
+version = "0.1.0"
+dependencies = [
+ "ignore",
+ "normalize-facts",
+ "normalize-facts-core",
+ "normalize-languages",
+ "nu-ansi-term",
+ "schemars",
+ "serde",
+ "streaming-iterator",
+ "tempfile",
  "tree-sitter",
 ]
 

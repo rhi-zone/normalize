@@ -38,6 +38,7 @@ normalize-core = { path = "../normalize-core", version = "0.1.0" }
 normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
 normalize-output = { path = "../normalize-output", version = "0.1.0" }
 normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
+normalize-view = { path = "../normalize-view", version = "0.1.0" }
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
 normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
 normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.1.0" }

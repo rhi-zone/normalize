@@ -1,0 +1,21 @@
+[package]
+name = "normalize-view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "View tree, skeleton extraction, and syntax highlighting"
+
+[dependencies]
+normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
+normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+ignore.workspace = true
+nu-ansi-term = "0.50"
+serde.workspace = true
+schemars = "1"
+streaming-iterator = "0.1"
+tree-sitter = "0.26"
+
+[dev-dependencies]
+tempfile = "3"
