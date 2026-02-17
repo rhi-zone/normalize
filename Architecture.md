@@ -4,88 +4,123 @@ High-level architecture for in-context learning. See `docs/` for detailed docume
 
 ## Core Concept
 
-Normalize is a **tooling orchestration layer** with structural awareness. It understands code structure (AST, CFG, dependencies) rather than treating code as raw text.
+Normalize is a **fast code intelligence CLI** implemented entirely in Rust. It understands code structure (AST, symbols, imports, dependencies) via tree-sitter grammars rather than treating code as raw text.
 
 ## Key Components
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        CLI (cli.py)                         │
+│                     CLI (normalize)                          │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Skeleton   │  │     CFG      │  │ Dependencies │      │
-│  │  Extractor   │  │   Builder    │  │   Analyzer   │      │
+│  │     View     │  │     Edit     │  │   Analyze    │      │
+│  │  (symbols,   │  │ (structural  │  │ (health,     │      │
+│  │   tree)      │  │  refactors)  │  │  complexity) │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 │         │                 │                 │               │
 │         └─────────────────┼─────────────────┘               │
 │                           ▼                                 │
-│                   ┌──────────────┐                          │
-│                   │    Views     │ (Plugin System)          │
-│                   └──────────────┘                          │
-│                           │                                 │
-│  ┌──────────────┐        │        ┌──────────────┐         │
-│  │   Synthesis  │◄───────┴───────►│  Validators  │         │
-│  │  Framework   │                 │              │         │
-│  └──────────────┘                 └──────────────┘         │
-│         │                                 │                 │
-│         └─────────────────┬───────────────┘                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  Languages   │  │    Facts     │  │    Rules     │      │
+│  │  (98 langs,  │  │ (SQLite DB,  │  │ (syntax +    │      │
+│  │  tree-sitter)│  │  extraction) │  │  Datalog)    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│         │                 │                 │               │
+│         └─────────────────┼─────────────────┘               │
 │                           ▼                                 │
-│                   ┌──────────────┐                          │
-│                   │  Shadow Git  │ (Atomic Commits)         │
-│                   └──────────────┘                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  Shadow Git  │  │  Ecosystems  │  │    Tools     │      │
+│  │  (edit       │  │  (deps,      │  │  (linters,   │      │
+│  │   history)   │  │   packages)  │  │   runners)   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Module Organization
+## Crate Organization
+
+30 crates, organized by domain:
 
 ```
-src/normalize/
-├── cli.py              # Command-line interface
-├── skeleton.py         # AST → function/class signatures
-├── cfg.py              # Control flow graph builder
-├── dependencies.py     # Import/export analysis
-├── plugins/            # View plugins (tree-sitter, markdown, etc.)
-├── synthesis/          # Code synthesis framework
-│   ├── framework.py    # Main synthesis engine
-│   ├── strategies/     # Decomposition strategies
-│   └── plugins/        # Generators, validators, libraries
-├── validators.py       # Syntax, ruff, pytest validation
-├── shadow_git.py       # Git-based atomic operations
-├── events.py           # Event bus for component communication
-└── memory.py           # Episodic memory for context
+crates/
+├── normalize/                     # Main CLI binary
+├── normalize-core/                # Core types and utilities
+├── normalize-derive/              # Proc macros
+├── normalize-output/              # OutputFormatter trait, format flags
+│
+├── normalize-languages/           # Language trait (98 implementations)
+├── normalize-language-meta/       # Language metadata (extensions, names)
+├── normalize-grammars/            # Tree-sitter grammar loading (publish=false)
+│
+├── normalize-view/                # View command logic
+├── normalize-edit/                # Edit command logic
+├── normalize-shadow/              # Shadow git (edit history)
+├── normalize-filter/              # --exclude/--only filtering
+├── normalize-path-resolve/        # Path resolution utilities
+│
+├── normalize-facts/               # Fact extraction + SQLite storage
+├── normalize-facts-core/          # Fact data types (Symbol, Import, etc.)
+├── normalize-facts-rules-api/     # Stable ABI for rule plugins (abi_stable)
+├── normalize-facts-rules-builtins/# Built-in fact rules (cdylib)
+├── normalize-facts-rules-interpret/# Interpreted Datalog rules
+│
+├── normalize-syntax-rules/        # Tree-sitter query rules (.scm)
+├── normalize-rules-loader/        # Rule loading infrastructure
+│
+├── normalize-deps/                # Dependency analysis
+├── normalize-local-deps/          # LocalDeps trait (import resolution)
+├── normalize-ecosystems/          # Ecosystem trait (cargo, npm, pip)
+├── normalize-package-index/       # PackageIndex trait (apt, brew)
+│
+├── normalize-tools/               # External tool orchestration
+├── normalize-cli-parser/          # CLI help output parsing
+├── normalize-chat-sessions/       # Agent session log parsing
+├── normalize-session-analysis/    # Session analysis logic
+│
+├── normalize-surface-syntax/      # Syntax translation (readers/writers)
+├── normalize-typegen/             # Type codegen (multiple backends)
+├── normalize-openapi/             # OpenAPI client generation
+└── xtask/                         # Build automation (publish=false)
 ```
+
+## CLI Commands (19)
+
+| Command | Description |
+|---------|-------------|
+| `view` | View directory/file/symbol structure |
+| `edit` | Structural code modifications |
+| `history` | Shadow git edit history |
+| `analyze` | Codebase analysis (21 subcommands) |
+| `text-search` | Fast ripgrep-based text search |
+| `facts` | Manage code facts (symbols, imports, calls) |
+| `rules` | Manage and run analysis rules |
+| `init` | Initialize normalize in a directory |
+| `daemon` | Background process management |
+| `grammars` | Tree-sitter grammar management |
+| `update` | Self-update |
+| `sessions` | Agent session log analysis |
+| `package` | Package management (info, tree, audit) |
+| `tools` | External tools (lint, test) |
+| `serve` | Server protocols (MCP, HTTP, LSP) |
+| `generate` | Code generation (client, types, cli-snapshot) |
+| `aliases` | List filter aliases |
+| `context` | Show directory context (.context.md files) |
+| `translate` | Translate code between languages |
 
 ## Data Flow
 
-1. **Input**: Task description, target file/symbol
-2. **Analysis**: Extract skeleton, build CFG, analyze dependencies
-3. **Synthesis**: Decompose problem → generate code → validate
-4. **Output**: Validated code with atomic git commit
+1. **Parse**: Tree-sitter grammars parse source into ASTs
+2. **Extract**: Language trait implementations extract symbols, imports, calls
+3. **Store**: Facts stored in SQLite (`.normalize/facts.db`)
+4. **Analyze**: Rules (syntax + Datalog) run against extracted facts
+5. **Present**: Results formatted via OutputFormatter trait
 
 ## Key Patterns
 
-### Plugin System
-Views are provided by plugins discovered via entry points:
-- `normalize.plugins` - View plugins (skeleton, cfg, deps)
-- `normalize.synthesis.generators` - Code generators
-- `normalize.synthesis.validators` - Code validators
-
-### Synthesis Loop
-```
-Specification → Decompose → Generate → Validate → (retry if failed) → Solution
-```
-
-### Structural Awareness
-Code is understood through its structure:
-- **Skeleton**: What functions/classes exist, their signatures
-- **CFG**: How control flows through functions
-- **Dependencies**: What imports what
-
-## Conventions
-
-- **Commits as units of work**: Each commit is a logical change
-- **Tests at all levels**: Unit, integration, E2E
-- **ruff for linting**: `ruff check` and `ruff format`
-- **Type hints**: All public APIs are typed
+- **Language trait**: Required methods, 98 implementations — syntax/AST extraction
+- **LocalDeps trait**: Default methods, ~10 implementations — filesystem/package discovery
+- **Ecosystem trait**: Package management (cargo, npm, pip, go, etc.)
+- **OutputFormatter trait**: `format_text()` + `format_pretty()` for consistent output
+- **Runtime dispatch**: Traits + registry for open-ended extensibility
+- **Index-optional**: All commands work without facts DB (graceful degradation)

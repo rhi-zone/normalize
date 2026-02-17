@@ -2,14 +2,15 @@
 
 ## Command Structure
 
-Normalize has 18 top-level commands organized by domain:
+Normalize has 19 top-level commands organized by domain:
 
 ### Core Operations
 | Command | Description |
 |---------|-------------|
 | `view` | View directory/file/symbol structure |
 | `edit` | Structural code modifications |
-| `analyze` | Codebase analysis (16 subcommands) |
+| `history` | Shadow git edit history |
+| `analyze` | Codebase analysis (21 subcommands) |
 | `text-search` | Fast ripgrep-based text search |
 
 ### Infrastructure
@@ -29,14 +30,14 @@ Normalize has 18 top-level commands organized by domain:
 | `package` | Package management (info, list, tree, why, outdated, audit) |
 | `tools` | External tool orchestration (lint, test) |
 | `serve` | Server protocols (mcp, http, lsp) |
-| `generate` | Code generation (client, types) |
+| `generate` | Code generation (client, types, cli-snapshot) |
+| `translate` | Translate code between programming languages |
 
 ### Utility
 | Command | Description |
 |---------|-------------|
 | `aliases` | List filter aliases |
-| `history` | Shadow git edit history |
-| `script` | Lua script management |
+| `context` | Show directory context (.context.md files) |
 
 ## Design Principles
 
@@ -48,11 +49,11 @@ Normalize has 18 top-level commands organized by domain:
 - Not: `list-sessions`, `list-grammars`, `list-packages`
 
 ### Subcommands for related operations
-- `analyze` has 16 subcommands because they're all "analysis"
-- Better than 16 top-level commands
+- `analyze` has 21 subcommands because they're all "analysis"
+- Better than 21 top-level commands
 
 ### `list` as subcommand, not flag
-- Consistent: `grammars list`, `script list`, `daemon list`, `package list`
+- Consistent: `grammars list`, `daemon list`, `package list`
 
 ### Positional args for primary targets
 - `normalize view src/main.rs` not `normalize view --file src/main.rs`
@@ -64,6 +65,7 @@ All commands support these global flags:
 | Flag | Description |
 |------|-------------|
 | `--json` | Output as JSON |
+| `--jsonl` | Output as JSON Lines |
 | `--jq EXPR` | Filter JSON with jq expression |
 | `--pretty` | Human-friendly output with colors |
 | `--compact` | LLM-optimized output |

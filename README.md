@@ -125,6 +125,60 @@ normalize serve http --port 8080     # REST API server
 normalize serve lsp                  # LSP server for IDEs
 ```
 
+### edit - Structural Code Modification
+
+Edit code by targeting symbols structurally:
+
+```bash
+normalize edit src/main.rs/old_fn delete       # Delete a symbol
+normalize edit src/main.rs/Foo replace < new.rs # Replace symbol content
+normalize edit src/main.rs/bar insert --after   # Insert after symbol
+normalize edit --undo                           # Undo last edit
+normalize edit --dry-run src/main.rs/Foo delete # Preview without applying
+```
+
+### history - Shadow Git Edit History
+
+View the history of structural edits:
+
+```bash
+normalize history                    # Recent edit history
+normalize history src/main.rs        # History for a specific file
+normalize history --diff <ref>       # Show diff for a commit
+normalize history --status           # Uncommitted shadow edits
+```
+
+### context - Directory Context
+
+Show hierarchical `.context.md` files:
+
+```bash
+normalize context                    # Context for current directory
+normalize context src/               # Context for specific path
+normalize context --list             # Show file paths only
+```
+
+### rules - Analysis Rules
+
+Manage and run syntax + fact rules:
+
+```bash
+normalize rules list                 # List all rules
+normalize rules run                  # Run all rules
+normalize rules add <url>            # Add a rule from URL
+normalize rules run --type syntax    # Run only syntax rules
+```
+
+### translate - Code Translation
+
+Translate code between programming languages:
+
+```bash
+normalize translate src/main.ts --to python    # TypeScript to Python
+normalize translate src/lib.py --to lua        # Python to Lua
+normalize translate - --from ts --to lua       # Stdin with explicit langs
+```
+
 ### facts - Manage Code Facts
 
 Manage the file index containing symbols, imports, calls, and other relationships:
@@ -136,24 +190,15 @@ normalize facts files                # List indexed files
 normalize facts check                # Run Datalog rules against facts
 ```
 
-### script - Lua Scripts
-
-Run Lua scripts for automation:
-
-```bash
-normalize script run my_script.lua   # Run a Lua script
-normalize script list                # List available scripts
-```
-
 ### sessions - Session Analysis
 
 Analyze Claude Code and other agent session logs:
 
 ```bash
-normalize sessions                   # List recent sessions
-normalize sessions <id>              # Show session details
-normalize sessions <id> --analyze    # Full session analysis
-normalize sessions --serve           # Web viewer at localhost:3939
+normalize sessions list              # List recent sessions
+normalize sessions show <id>         # Show session details
+normalize sessions stats             # Aggregate statistics
+normalize sessions plans             # View agent plans
 ```
 
 ## Configuration
@@ -161,8 +206,8 @@ normalize sessions --serve           # Web viewer at localhost:3939
 Create `.normalize/config.toml`:
 
 ```toml
-[index]
-enabled = true
+[facts]
+# enabled = true
 
 [view]
 depth = 1

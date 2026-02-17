@@ -45,7 +45,7 @@ Good: `sessions`, `grammars list`, `package list`
 This is better than 16 top-level commands that pollute the namespace.
 
 ### 4. `list` as subcommand, not flag
-Consistent pattern across: `grammars list`, `script list`, `daemon list`, `package list`, `tools lint list`, `tools test list`.
+Consistent pattern across: `grammars list`, `daemon list`, `package list`, `tools lint list`, `tools test list`.
 Not: `--list` flag (inconsistent with above).
 
 ### 5. Positional args for primary targets

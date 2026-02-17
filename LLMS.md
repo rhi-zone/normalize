@@ -6,7 +6,7 @@ Quick reference for AI agents working with codebases using Normalize.
 
 ```bash
 # Get project overview
-normalize analyze --overview
+normalize analyze health
 
 # View codebase structure
 normalize view
@@ -19,10 +19,10 @@ normalize view src/main.rs
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `normalize analyze --overview` | Project health snapshot | First thing when entering a codebase |
+| `normalize analyze health` | Codebase metrics and health score | First thing when entering a codebase |
 | `normalize view src/` | Code structure (symbols, hierarchy) | Understanding architecture |
 | `normalize view --deps FILE` | Import/export analysis | Before modifying a file |
-| `normalize analyze --health` | Codebase metrics and health score | Checking project state |
+| `normalize analyze complexity` | Cyclomatic complexity report | Checking code quality |
 | `normalize text-search "pattern"` | Search code | Finding usage, definitions |
 | `normalize package audit` | Security vulnerability scan | Checking dependencies |
 
@@ -39,8 +39,8 @@ JSON is useful for parsing but more verbose. Plain text is token-efficient.
 
 **Starting work on a codebase:**
 ```bash
-normalize analyze --overview   # Quick health check
-normalize view                 # See structure
+normalize analyze health      # Quick health check
+normalize view                # See structure
 normalize view src/            # Drill into source
 ```
 
@@ -55,15 +55,14 @@ normalize view FILE/ClassName  # View specific symbol
 ```bash
 normalize view FILE/symbol            # See signature and docstring
 normalize view --full FILE/symbol     # Full source code
-normalize analyze --calls FILE/symbol # What does it call?
-normalize analyze --called-by symbol  # What calls it?
+normalize analyze callers FILE/symbol # What calls it?
+normalize analyze callees FILE/symbol # What does it call?
 ```
 
 **After making changes:**
 ```bash
-normalize lint                  # Run linters
-normalize analyze --lint        # Full lint analysis
-normalize analyze --health      # Health check
+normalize tools lint           # Run linters
+normalize analyze health       # Health check
 ```
 
 **Checking dependencies:**
@@ -96,20 +95,22 @@ normalize view -d 2                # Depth 2 (nested symbols)
 ### analyze - Analysis
 
 ```bash
-normalize analyze                  # Health + complexity + security
-normalize analyze --overview       # Comprehensive overview
-normalize analyze --health         # Health metrics
-normalize analyze --complexity     # Cyclomatic complexity
-normalize analyze --lint           # Run all linters
-normalize analyze --hotspots       # High-churn files
+normalize analyze health           # Health metrics
+normalize analyze complexity       # Cyclomatic complexity
+normalize analyze security         # Security scan
+normalize analyze hotspots         # High-churn files
+normalize analyze callers symbol   # What calls this?
+normalize analyze callees symbol   # What does this call?
+normalize analyze all              # Run all analysis passes
 ```
 
-### lint - Linters
+### tools - Linters and Test Runners
 
 ```bash
-normalize lint                     # Auto-detect and run
-normalize lint --fix               # Auto-fix issues
-normalize lint --list              # Available tools
+normalize tools lint               # Auto-detect and run
+normalize tools lint --fix         # Auto-fix issues
+normalize tools lint --list        # Available tools
+normalize tools test               # Run native test runners
 ```
 
 ### text-search - Search
@@ -122,7 +123,7 @@ normalize text-search "TODO" --only "*.rs"
 ## Key Insights
 
 - `normalize view` is the primary navigation command - works on dirs, files, and symbols
-- `normalize analyze` is the primary analysis command - health, complexity, security, lint
+- `normalize analyze` is the primary analysis command with subcommands: health, complexity, security, hotspots, callers, callees, etc.
 - `normalize text-search` for text search, `normalize view` for structural navigation
 - Use `--json` when you need to parse output programmatically
-- The index (`.normalize/index.sqlite`) caches symbols for fast lookups
+- The facts DB (`.normalize/facts.db`) caches symbols for fast lookups

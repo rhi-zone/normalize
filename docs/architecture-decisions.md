@@ -32,15 +32,44 @@ Key architectural decisions and their rationale.
 
 ```
 crates/
-├── normalize/                         # Core library + CLI
-├── normalize-languages/          # 98 language definitions
-├── normalize-ecosystems/         # Project dependency management (Ecosystem trait)
-├── normalize-package-index/      # Distro/registry index ingestion (PackageIndex trait)
-├── normalize-tools/              # MCP tool generation
-├── normalize-derive/             # Proc macros (must be separate)
-├── normalize-openapi/            # OpenAPI generation
-├── normalize-typegen/            # Type codegen (single crate, multiple backends)
-└── normalize-surface-syntax/     # Syntax translation (single crate, multiple readers/writers)
+├── normalize/                         # Main CLI binary
+├── normalize-core/                    # Core types and utilities
+├── normalize-derive/                  # Proc macros (must be separate)
+├── normalize-output/                  # OutputFormatter trait, format flags
+│
+├── normalize-languages/               # Language trait (98 implementations)
+├── normalize-language-meta/           # Language metadata (extensions, names)
+├── normalize-grammars/                # Tree-sitter grammar loading (publish=false)
+│
+├── normalize-view/                    # View command logic
+├── normalize-edit/                    # Edit command logic
+├── normalize-shadow/                  # Shadow git (edit history)
+├── normalize-filter/                  # --exclude/--only filtering
+├── normalize-path-resolve/            # Path resolution utilities
+│
+├── normalize-facts/                   # Fact extraction + SQLite storage
+├── normalize-facts-core/              # Fact data types (Symbol, Import, etc.)
+├── normalize-facts-rules-api/         # Stable ABI for rule plugins (abi_stable)
+├── normalize-facts-rules-builtins/    # Built-in fact rules (cdylib)
+├── normalize-facts-rules-interpret/   # Interpreted Datalog rules
+│
+├── normalize-syntax-rules/            # Tree-sitter query rules (.scm)
+├── normalize-rules-loader/            # Rule loading infrastructure
+│
+├── normalize-deps/                    # Dependency analysis
+├── normalize-local-deps/              # LocalDeps trait (import resolution)
+├── normalize-ecosystems/              # Ecosystem trait (cargo, npm, pip)
+├── normalize-package-index/           # PackageIndex trait (apt, brew)
+│
+├── normalize-tools/                   # External tool orchestration
+├── normalize-cli-parser/              # CLI help output parsing
+├── normalize-chat-sessions/           # Agent session log parsing
+├── normalize-session-analysis/        # Session analysis logic
+│
+├── normalize-surface-syntax/          # Syntax translation (readers/writers)
+├── normalize-typegen/                 # Type codegen (multiple backends)
+├── normalize-openapi/                 # OpenAPI client generation
+└── xtask/                             # Build automation (publish=false)
 ```
 
 ## Dynamic Grammar Loading

@@ -6,9 +6,8 @@ Analyze codebase quality: health, complexity, security, duplicates, hotspots.
 
 | Subcommand | Description |
 |------------|-------------|
-| (none) | Default: health analysis |
 | `health` | File counts, complexity stats, large file warnings |
-| `overview` | Comprehensive project summary with grade |
+| `architecture` | Codebase architecture: coupling, cycles, dependencies |
 | `complexity` | Cyclomatic complexity analysis |
 | `length` | Function length analysis |
 | `security` | Security vulnerability patterns |
@@ -17,10 +16,10 @@ Analyze codebase quality: health, complexity, security, duplicates, hotspots.
 | `hotspots` | Git history hotspots (frequently changed files) |
 | `duplicate-functions` | Detect code clones |
 | `duplicate-types` | Detect similar type definitions |
+| `test-gaps` | Find public functions with no direct test caller |
 | `trace` | Trace value provenance for a symbol |
 | `callers` | Show what calls a symbol |
 | `callees` | Show what a symbol calls |
-| `lint` | Run configured linters |
 | `check-refs` | Check documentation for broken links |
 | `stale-docs` | Find docs with stale code references |
 | `check-examples` | Check example references in docs |
@@ -35,8 +34,8 @@ Analyze codebase quality: health, complexity, security, duplicates, hotspots.
 # Quick health check
 normalize analyze
 
-# Comprehensive overview
-normalize analyze overview
+# Architecture analysis
+normalize analyze architecture
 
 # Find complex functions
 normalize analyze complexity --threshold 15

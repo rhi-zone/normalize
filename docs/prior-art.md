@@ -1774,7 +1774,7 @@ Formats:
 **Normalize Observations:**
 - CodeQL's "code as data" is similar to normalize's SQLite index approach
 - QL queries could inform normalize's structural queries
-- Consider: Export normalize index in CodeQL-compatible format
+- Consider: Export normalize facts in CodeQL-compatible format
 - Data flow analysis is more advanced than normalize's current callers/callees
 
 **Research Value:**

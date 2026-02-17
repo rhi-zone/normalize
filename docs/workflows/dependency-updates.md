@@ -55,7 +55,7 @@ Keeping dependencies current: security patches, bug fixes, new features.
 | Audit | `normalize package outdated`, `cargo audit` |
 | Evaluate | Changelogs, release notes, `view` |
 | Update | `cargo update`, `npm update`, etc. |
-| Verify | Test suite, `normalize lint`, manual testing |
+| Verify | Test suite, `normalize tools lint`, manual testing |
 
 ## Update Strategies
 

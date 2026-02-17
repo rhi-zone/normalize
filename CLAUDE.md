@@ -6,7 +6,7 @@ Behavioral rules for Claude Code in this repository.
 
 ## Publishing
 
-**Published on [crates.io](https://crates.io/crates/normalize)** as 14 crates. All at v0.1.0 (early, in active development). `normalize-grammars` is `publish = false` (build-time grammar data).
+**Published on [crates.io](https://crates.io/crates/normalize)** as 28 crates (+ 2 `publish = false`: `normalize-grammars`, `xtask`). All at v0.1.0 (early, in active development).
 
 ## Architecture
 
