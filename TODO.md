@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Add rule writing guide (`docs/rules.md`) and link from `docs/cli/rules.md`
+- [x] Add rule writing guide (`docs/syntax-rules.md`) and link from `docs/cli/rules.md`
 - [x] Rule sharing/import: `normalize rules add/update/list/remove` (Phase 1 complete)
 - [x] Auto-fix support: `normalize analyze rules --fix` with fix templates
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
@@ -87,7 +87,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - ~~Fact rules (interpreted + compiled): zero user-facing docs~~ → `docs/fact-rules.md`
   - ~~`facts` subcommands (`rebuild`, `files`, `packages`, `check`, `rules`): undocumented~~ → `docs/cli/facts.md`
   - ~~CLI drift from refactoring (renames, moved subcommands, new flags)~~ → fixed `index`→`facts` in commands.md, README
-  - ~~Need fact rules writing guide equivalent to `docs/rules.md` for syntax rules~~ → `docs/fact-rules.md`
+  - ~~Need fact rules writing guide equivalent to `docs/syntax-rules.md` for syntax rules~~ → `docs/fact-rules.md`
 - [x] Remove `normalize @` and `normalize workflow` references from docs - spore handles workflow running now
   - Archived: script.md, agent*.md, lua-cli.md, agent-state-machine.md, workflow-format.md, agent-commands.md, lua-api.md, agent-dogfooding.md
   - Updated: shadow-git.md, log-analysis.md, workflows/README.md, security-audit.md, dogfooding.md, langgraph-evaluation.md, prior-art.md

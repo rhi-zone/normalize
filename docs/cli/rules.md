@@ -129,7 +129,7 @@ added = "2024-01-15"
 
 ## See Also
 
-- [Syntax Rules Writing Guide](../rules.md) — Create `.scm` rules with tree-sitter queries
+- [Syntax Rules Writing Guide](../syntax-rules.md) — Create `.scm` rules with tree-sitter queries
 - [Fact Rules Writing Guide](../fact-rules.md) — Create `.dl` rules with Datalog
 - [facts](facts.md) — `normalize facts` command (lower-level fact rule execution)
 - [analyze](analyze.md) — Run analysis with rules

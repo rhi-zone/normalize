@@ -1,6 +1,6 @@
 # Writing Fact Rules
 
-This guide covers writing fact rules for `normalize`. Fact rules use [Datalog](https://en.wikipedia.org/wiki/Datalog) to query relationships extracted from code — symbols, imports, calls, visibility, and more. They complement [syntax rules](rules.md), which match AST patterns within individual files.
+This guide covers writing fact rules for `normalize`. Fact rules use [Datalog](https://en.wikipedia.org/wiki/Datalog) to query relationships extracted from code — symbols, imports, calls, visibility, and more. They complement [syntax rules](syntax-rules.md), which match AST patterns within individual files.
 
 ## Quick Start
 
@@ -408,6 +408,6 @@ Fact rules are loaded in this order (later rules override earlier ones by `id`):
 
 ## See Also
 
-- [Writing Syntax Rules](rules.md) — tree-sitter query-based rules for AST patterns
+- [Writing Syntax Rules](syntax-rules.md) — tree-sitter query-based rules for AST patterns
 - [CLI: facts](cli/facts.md) — `normalize facts` command reference
 - [CLI: rules](cli/rules.md) — `normalize rules` unified command reference
