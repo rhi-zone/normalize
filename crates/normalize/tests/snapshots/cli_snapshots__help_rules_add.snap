@@ -11,6 +11,7 @@ Arguments:
 
 Options:
       --global              Install to global rules (~/.config/normalize/rules/) instead of project
+  -r, --root <ROOT>         Root directory (defaults to current directory)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

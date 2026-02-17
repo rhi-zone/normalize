@@ -1,14 +1,15 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 433
 expression: "snapshot_help(&[\"rules\", \"list\"])"
 ---
-List installed rules
+List all rules (syntax + fact, builtin + user)
 
 Usage: normalize rules list [OPTIONS]
 
 Options:
       --sources             Show source URLs for imported rules
+      --type <TYPE>         Filter by rule type [default: all] [possible values: all, syntax, fact]
+  -r, --root <ROOT>         Root directory (defaults to current directory)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

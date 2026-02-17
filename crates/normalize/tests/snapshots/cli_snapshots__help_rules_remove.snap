@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 443
 expression: "snapshot_help(&[\"rules\", \"remove\"])"
 ---
 Remove an imported rule
@@ -11,6 +10,7 @@ Arguments:
   <RULE_ID>  Rule ID to remove
 
 Options:
+  -r, --root <ROOT>         Root directory (defaults to current directory)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

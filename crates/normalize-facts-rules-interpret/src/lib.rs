@@ -84,8 +84,10 @@ relation error(String, String);
 #[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct FactsRuleOverride {
-    /// Promote all warnings from this rule to errors.
+    /// Promote all warnings from this rule to errors (deprecated: use severity).
     pub deny: Option<bool>,
+    /// Override the rule's severity (error, warning, info).
+    pub severity: Option<String>,
     /// Enable or disable the rule.
     pub enabled: Option<bool>,
     /// Additional patterns to allow (suppress matching diagnostics).
@@ -102,6 +104,38 @@ pub struct FactsRulesConfig(pub HashMap<String, FactsRuleOverride>);
 // Rule types and loading
 // =============================================================================
 
+/// Severity level for rule findings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Severity {
+    Error,
+    #[default]
+    Warning,
+    Info,
+}
+
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Severity::Error => write!(f, "error"),
+            Severity::Warning => write!(f, "warning"),
+            Severity::Info => write!(f, "info"),
+        }
+    }
+}
+
+impl std::str::FromStr for Severity {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "error" => Ok(Severity::Error),
+            "warning" | "warn" => Ok(Severity::Warning),
+            "info" | "note" => Ok(Severity::Info),
+            _ => Err(format!("unknown severity: {}", s)),
+        }
+    }
+}
+
 /// A Datalog fact rule definition.
 #[derive(Debug)]
 pub struct FactsRule {
@@ -113,8 +147,8 @@ pub struct FactsRule {
     pub message: String,
     /// Glob patterns for diagnostic messages to suppress.
     pub allow: Vec<Pattern>,
-    /// Promote warnings to errors (deny mode).
-    pub deny: bool,
+    /// Severity level for diagnostics from this rule.
+    pub severity: Severity,
     /// Whether this rule is enabled.
     pub enabled: bool,
     /// Whether this is a builtin rule.
@@ -207,8 +241,13 @@ pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<Fac
     // 4. Apply config overrides
     for (rule_id, override_cfg) in &config.0 {
         if let Some(rule) = rules_by_id.get_mut(rule_id) {
-            if let Some(deny) = override_cfg.deny {
-                rule.deny = deny;
+            // severity takes precedence over deny
+            if let Some(ref sev_str) = override_cfg.severity {
+                if let Ok(sev) = sev_str.parse::<Severity>() {
+                    rule.severity = sev;
+                }
+            } else if override_cfg.deny == Some(true) {
+                rule.severity = Severity::Error;
             }
             if let Some(enabled) = override_cfg.enabled {
                 rule.enabled = enabled;
@@ -339,10 +378,17 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         })
         .unwrap_or_default();
 
-    let deny = frontmatter
+    let severity = if let Some(sev_str) = frontmatter.get("severity").and_then(|v| v.as_str()) {
+        sev_str.parse::<Severity>().unwrap_or(Severity::Warning)
+    } else if frontmatter
         .get("deny")
         .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+        .unwrap_or(false)
+    {
+        Severity::Error
+    } else {
+        Severity::Warning
+    };
 
     let enabled = frontmatter
         .get("enabled")
@@ -354,7 +400,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         source: source_str.trim().to_string(),
         message,
         allow,
-        deny,
+        severity,
         enabled,
         builtin: is_builtin,
         source_path: PathBuf::new(),
@@ -408,13 +454,21 @@ pub fn run_rule(
         diagnostics.retain(|d| !rule.allow.iter().any(|p| p.matches(d.message.as_str())));
     }
 
-    // Promote warnings to errors in deny mode
-    if rule.deny {
-        for d in &mut diagnostics {
-            if d.level == DiagnosticLevel::Warning {
+    // Apply severity: promote or demote diagnostics
+    match rule.severity {
+        Severity::Error => {
+            for d in &mut diagnostics {
                 d.level = DiagnosticLevel::Error;
             }
         }
+        Severity::Info => {
+            for d in &mut diagnostics {
+                if d.level == DiagnosticLevel::Warning {
+                    d.level = DiagnosticLevel::Hint;
+                }
+            }
+        }
+        Severity::Warning => {} // default, no change
     }
 
     Ok(diagnostics)
@@ -982,7 +1036,7 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         relations.add_symbol("a.py", "foo", "function", 1);
 
         let rule = parse_rule_content(content, "strict-rule", false).unwrap();
-        assert!(rule.deny);
+        assert_eq!(rule.severity, Severity::Error);
 
         let result = run_rule(&rule, &relations).unwrap();
         assert_eq!(result.len(), 1);
@@ -994,11 +1048,11 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         let mut relations = Relations::new();
         relations.add_symbol("a.py", "foo", "function", 1);
 
-        // self-import has deny=false by default
+        // self-import has severity=warning by default
         let rule = find_builtin("self-import");
-        assert!(!rule.deny);
+        assert_eq!(rule.severity, Severity::Warning);
 
-        // Apply config override
+        // Apply config override with deny=true (legacy)
         let mut config = FactsRulesConfig::default();
         config.0.insert(
             "self-import".to_string(),
@@ -1011,7 +1065,7 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         // Load with config
         let rules = load_all_rules(Path::new("/nonexistent"), &config);
         let self_import = rules.iter().find(|r| r.id == "self-import").unwrap();
-        assert!(self_import.deny);
+        assert_eq!(self_import.severity, Severity::Error);
     }
 
     #[test]

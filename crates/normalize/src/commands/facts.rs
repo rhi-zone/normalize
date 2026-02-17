@@ -7,7 +7,6 @@ use crate::rules;
 use crate::skeleton;
 use clap::Subcommand;
 use normalize_facts_rules_api::Relations;
-use normalize_facts_rules_interpret as interpret;
 use normalize_languages::external_packages;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -148,13 +147,13 @@ pub fn cmd_facts(action: FactsAction, root: Option<&Path>, format: &OutputFormat
                 .map(|p| p.to_path_buf())
                 .unwrap_or_else(|| std::env::current_dir().unwrap());
             let config = crate::config::NormalizeConfig::load(&effective_root);
-            rt.block_on(cmd_check(
-                root,
+            super::rules::cmd_run_facts(
+                &effective_root,
                 rules_file.as_deref(),
                 list,
                 json,
                 &config.analyze.facts_rules,
-            ))
+            )
         }
     }
 }
@@ -843,168 +842,8 @@ async fn cmd_rules(
     }
 }
 
-// =============================================================================
-// Check (interpreted rules)
-// =============================================================================
-
-async fn cmd_check(
-    root: Option<&Path>,
-    rules_file: Option<&Path>,
-    list: bool,
-    json: bool,
-    config: &interpret::FactsRulesConfig,
-) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // If a specific file is given, run just that file (original behavior)
-    if let Some(path) = rules_file {
-        return cmd_check_file(&root, path, json).await;
-    }
-
-    // Auto-discover rules with config overrides
-    let all_rules = interpret::load_all_rules(&root, config);
-
-    if list {
-        if json {
-            let rules_json: Vec<_> = all_rules
-                .iter()
-                .map(|r| {
-                    serde_json::json!({
-                        "id": r.id,
-                        "message": r.message,
-                        "builtin": r.builtin,
-                        "source_path": if r.source_path.as_os_str().is_empty() {
-                            None
-                        } else {
-                            Some(r.source_path.display().to_string())
-                        },
-                    })
-                })
-                .collect();
-            println!("{}", serde_json::to_string_pretty(&rules_json).unwrap());
-        } else {
-            let builtin_count = all_rules.iter().filter(|r| r.builtin).count();
-            let project_count = all_rules.len() - builtin_count;
-            println!(
-                "{} fact rules ({} builtin, {} project)",
-                all_rules.len(),
-                builtin_count,
-                project_count
-            );
-            println!();
-            for rule in &all_rules {
-                let source = if rule.builtin { "builtin" } else { "project" };
-                println!("  {:30} [{}] {}", rule.id, source, rule.message);
-            }
-        }
-        return 0;
-    }
-
-    if all_rules.is_empty() {
-        println!("No fact rules found.");
-        return 0;
-    }
-
-    // Build relations from index
-    let relations = match build_relations_from_index(&root).await {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Error building relations: {}", e);
-            eprintln!("Run `normalize facts rebuild` first to index the codebase.");
-            return 1;
-        }
-    };
-
-    // Run all rules
-    let mut all_diagnostics = Vec::new();
-    let use_colors = !json && std::io::stdout().is_terminal();
-
-    for rule in &all_rules {
-        match interpret::run_rule(rule, &relations) {
-            Ok(diagnostics) => all_diagnostics.extend(diagnostics),
-            Err(e) => {
-                eprintln!("Error running rule '{}': {}", rule.id, e);
-            }
-        }
-    }
-
-    // Filter inline normalize-facts-allow: comments in source files
-    interpret::filter_inline_allowed(&mut all_diagnostics, &root);
-
-    if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&all_diagnostics).unwrap()
-        );
-    } else if all_diagnostics.is_empty() {
-        println!("No issues found ({} rules checked).", all_rules.len());
-    } else {
-        for diag in &all_diagnostics {
-            println!("{}", rules::format_diagnostic(diag, use_colors));
-        }
-        println!(
-            "\n{} issue(s) found ({} rules checked).",
-            all_diagnostics.len(),
-            all_rules.len()
-        );
-    }
-
-    if all_diagnostics
-        .iter()
-        .any(|d| d.level == normalize_facts_rules_api::DiagnosticLevel::Error)
-    {
-        1
-    } else {
-        0
-    }
-}
-
-/// Run a single .dl file directly (explicit path mode)
-async fn cmd_check_file(root: &Path, rules_file: &Path, json: bool) -> i32 {
-    let relations = match build_relations_from_index(root).await {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Error building relations: {}", e);
-            eprintln!("Run `normalize facts rebuild` first to index the codebase.");
-            return 1;
-        }
-    };
-
-    let diagnostics = match interpret::run_rules_file(rules_file, &relations) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return 1;
-        }
-    };
-
-    let use_colors = !json && std::io::stdout().is_terminal();
-
-    if json {
-        println!("{}", serde_json::to_string_pretty(&diagnostics).unwrap());
-    } else if diagnostics.is_empty() {
-        println!("No issues found.");
-    } else {
-        for diag in &diagnostics {
-            println!("{}", rules::format_diagnostic(diag, use_colors));
-        }
-        println!("\n{} issue(s) found.", diagnostics.len());
-    }
-
-    if diagnostics
-        .iter()
-        .any(|d| d.level == normalize_facts_rules_api::DiagnosticLevel::Error)
-    {
-        1
-    } else {
-        0
-    }
-}
-
 /// Build Relations from the index
-async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
+pub async fn build_relations_from_index(root: &Path) -> Result<Relations, String> {
     let idx = index::open(root)
         .await
         .map_err(|e| format!("Failed to open index: {}", e))?;

@@ -146,10 +146,14 @@ enum Commands {
     /// Generate code from API spec
     Generate(GenerateArgs),
 
-    /// Manage custom analysis rules
+    /// Manage and run analysis rules (syntax + fact)
     Rules {
         #[command(subcommand)]
         action: RulesAction,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long, global = true)]
+        root: Option<PathBuf>,
     },
 
     /// Translate code between programming languages
@@ -335,7 +339,9 @@ fn main() {
         Commands::Generate(args) => {
             commands::generate::run(args, cli.input_schema, cli.params_json.as_deref())
         }
-        Commands::Rules { action } => commands::rules::cmd_rules(action, &format),
+        Commands::Rules { action, root } => {
+            commands::rules::cmd_rules(action, root.as_deref(), &format)
+        }
         Commands::Translate(args) => {
             commands::translate::run(args, cli.input_schema, cli.params_json.as_deref())
         }
