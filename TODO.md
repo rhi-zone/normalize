@@ -75,8 +75,20 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] Rename `normalize filter aliases` to `normalize aliases`: removes unnecessary namespace layer
 - [x] Unify `lint`/`test` under `normalize tools`: `normalize tools lint [run|list]`, `normalize tools test [run|list]`
 - [x] Remove `analyze lint`: duplicate of `normalize lint`, adds no value
+- [ ] Unify `normalize rules` as umbrella for all rule types:
+  - `normalize rules list` — lists ALL rules (syntax + fact, builtin + user), default behavior
+  - `normalize rules add` — adds rules (detects `.scm` vs `.dl` by extension)
+  - `normalize rules run` — runs all rules (replaces `analyze rules` + `facts check`)
+  - Current `normalize rules` only manages syntax rules but claims the generic namespace
+  - Current `normalize facts rules` / `normalize facts check` are the fact rule equivalents
+  - Need consistent severity model: syntax uses `severity`, facts uses `deny` (bool) — should unify
 
 ### Documentation Cleanup
+- [ ] Comprehensive docs audit: run each command's `--help` and compare against `docs/`. Known gaps:
+  - Fact rules (interpreted + compiled): zero user-facing docs
+  - `facts` subcommands (`rebuild`, `files`, `packages`, `check`, `rules`): undocumented
+  - CLI drift from refactoring (renames, moved subcommands, new flags)
+  - Need fact rules writing guide equivalent to `docs/rules.md` for syntax rules
 - [x] Remove `normalize @` and `normalize workflow` references from docs - spore handles workflow running now
   - Archived: script.md, agent*.md, lua-cli.md, agent-state-machine.md, workflow-format.md, agent-commands.md, lua-api.md, agent-dogfooding.md
   - Updated: shadow-git.md, log-analysis.md, workflows/README.md, security-audit.md, dogfooding.md, langgraph-evaluation.md, prior-art.md
@@ -215,6 +227,9 @@ Implementation:
 - [x] Dylib loading: find/load rule packs from known paths
 - [x] `normalize facts check <rules.dl>` - interpreted Datalog via ascent-interpreter
 - [ ] `normalize facts compile <rules.dl>` command to build custom packs (sandboxed codegen)
+- [ ] Self-install builtin dylib: `normalize facts rules` should auto-install compiled builtins to `~/.local/share/normalize/rules/` on first run (or at build/install time). Currently requires manual copy.
+- [ ] More builtin interpreted fact rules: unused_import, missing_export, deep_nesting, layering_violation, barrel_file, bidirectional_deps (current: 11 builtins)
+- [ ] Unify `normalize rules` namespace: currently `normalize rules` only manages syntax rules but claims a generic name. Should become umbrella for all rule types (syntax + facts). `normalize rules list` shows ALL rules by default. See "CLI Cleanup" section.
 
 **`implements` relation extraction — completed for 19 languages:**
 
