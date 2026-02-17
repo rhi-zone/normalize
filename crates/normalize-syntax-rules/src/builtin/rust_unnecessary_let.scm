@@ -3,6 +3,7 @@
 # severity = "info"
 # message = "Unnecessary let binding - consider using the value directly"
 # languages = ["rust"]
+# enabled = false
 # ---
 
 ; Detects: let x = y; where both are simple identifiers

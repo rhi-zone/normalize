@@ -208,6 +208,7 @@ struct UnifiedRule {
     severity: String,
     source: &'static str,
     message: String,
+    enabled: bool,
 }
 
 fn cmd_list(
@@ -230,6 +231,7 @@ fn cmd_list(
                 severity: r.severity.to_string(),
                 source,
                 message: r.message.clone(),
+                enabled: r.enabled,
             });
         }
     }
@@ -245,6 +247,7 @@ fn cmd_list(
                 severity: r.severity.to_string(),
                 source,
                 message: r.message.clone(),
+                enabled: r.enabled,
             });
         }
     }
@@ -262,6 +265,7 @@ fn cmd_list(
                     "severity": r.severity,
                     "source": r.source,
                     "message": r.message,
+                    "enabled": r.enabled,
                 })
             })
             .collect();
@@ -271,24 +275,36 @@ fn cmd_list(
     } else {
         let syntax_count = all_rules.iter().filter(|r| r.rule_type == "syntax").count();
         let fact_count = all_rules.iter().filter(|r| r.rule_type == "fact").count();
+        let disabled_count = all_rules.iter().filter(|r| !r.enabled).count();
 
-        println!(
-            "{} rules ({} syntax, {} fact)\n",
-            all_rules.len(),
-            syntax_count,
-            fact_count
-        );
+        if disabled_count > 0 {
+            println!(
+                "{} rules ({} syntax, {} fact) — {} disabled\n",
+                all_rules.len(),
+                syntax_count,
+                fact_count,
+                disabled_count
+            );
+        } else {
+            println!(
+                "{} rules ({} syntax, {} fact)\n",
+                all_rules.len(),
+                syntax_count,
+                fact_count
+            );
+        }
 
         for r in &all_rules {
+            let disabled_marker = if r.enabled { "" } else { "  [disabled]" };
             if sources {
                 println!(
-                    "  [{}]  {:30} {:9} {:7}  {}",
-                    r.rule_type, r.id, r.severity, r.source, r.message
+                    "  [{}]  {:30} {:9} {:7}  {}{}",
+                    r.rule_type, r.id, r.severity, r.source, r.message, disabled_marker
                 );
             } else {
                 println!(
-                    "  [{}]  {:30} {:9} {}",
-                    r.rule_type, r.id, r.severity, r.message
+                    "  [{}]  {:30} {:9} {}{}",
+                    r.rule_type, r.id, r.severity, r.message, disabled_marker
                 );
             }
         }
@@ -362,9 +378,10 @@ async fn run_fact_rules(
     }
 
     // Auto-discover rules with config overrides
-    let all_rules = interpret::load_all_rules(root, config);
+    let all_rules_unfiltered = interpret::load_all_rules(root, config);
 
     if list_only {
+        let all_rules = &all_rules_unfiltered;
         if json {
             let rules_json: Vec<_> = all_rules
                 .iter()
@@ -393,7 +410,7 @@ async fn run_fact_rules(
                 project_count
             );
             println!();
-            for rule in &all_rules {
+            for rule in all_rules {
                 let source = if rule.builtin { "builtin" } else { "project" };
                 println!(
                     "  {:30} [{}] {} {}",
@@ -404,17 +421,22 @@ async fn run_fact_rules(
         return 0;
     }
 
+    // Filter to enabled rules for execution
+    let all_rules: Vec<_> = all_rules_unfiltered
+        .into_iter()
+        .filter(|r| r.enabled)
+        .collect();
+
     if all_rules.is_empty() {
         println!("No fact rules found.");
         return 0;
     }
 
-    // Build relations from index
-    let relations = match super::facts::build_relations_from_index(root).await {
+    // Build relations from index (auto-build if missing)
+    let relations = match ensure_relations(root).await {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error building relations: {}", e);
-            eprintln!("Run `normalize facts rebuild` first to index the codebase.");
             return 1;
         }
     };
@@ -463,13 +485,39 @@ async fn run_fact_rules(
     }
 }
 
+/// Build relations from the index, auto-building the index if it doesn't exist.
+async fn ensure_relations(root: &Path) -> Result<normalize_facts_rules_api::Relations, String> {
+    match super::facts::build_relations_from_index(root).await {
+        Ok(r) => Ok(r),
+        Err(_) => {
+            eprintln!("Facts index not found. Building...");
+            let mut idx = crate::index::open(root)
+                .await
+                .map_err(|e| format!("Failed to open index: {}", e))?;
+            let count = idx
+                .refresh()
+                .await
+                .map_err(|e| format!("Failed to index files: {}", e))?;
+            eprintln!("Indexed {} files.", count);
+            let stats = idx
+                .refresh_call_graph()
+                .await
+                .map_err(|e| format!("Failed to index call graph: {}", e))?;
+            eprintln!(
+                "Indexed {} symbols, {} calls, {} imports.",
+                stats.symbols, stats.calls, stats.imports
+            );
+            super::facts::build_relations_from_index(root).await
+        }
+    }
+}
+
 /// Run a single .dl file directly (explicit path mode)
 async fn run_fact_rules_file(root: &Path, rules_file: &Path, json: bool) -> i32 {
-    let relations = match super::facts::build_relations_from_index(root).await {
+    let relations = match ensure_relations(root).await {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error building relations: {}", e);
-            eprintln!("Run `normalize facts rebuild` first to index the codebase.");
             return 1;
         }
     };

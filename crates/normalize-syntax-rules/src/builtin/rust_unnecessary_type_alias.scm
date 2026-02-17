@@ -3,6 +3,7 @@
 # severity = "info"
 # message = "Type alias to simple type - consider using the type directly"
 # languages = ["rust"]
+# enabled = false
 # ---
 
 ; Detects: type X = Y; where both are simple type identifiers

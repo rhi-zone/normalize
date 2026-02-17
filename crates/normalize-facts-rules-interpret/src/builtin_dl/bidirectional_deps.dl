@@ -1,7 +1,6 @@
 # ---
 # id = "bidirectional-deps"
 # message = "Two files import each other (bidirectional coupling)"
-# enabled = false
 # ---
 
 relation imports_file(String, String);

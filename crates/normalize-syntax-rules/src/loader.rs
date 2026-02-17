@@ -80,8 +80,7 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
         }
     }
 
-    // Filter out disabled rules
-    rules_by_id.into_values().filter(|r| r.enabled).collect()
+    rules_by_id.into_values().collect()
 }
 
 /// Load rules from a directory.

@@ -5,6 +5,7 @@
 # languages = ["rust"]
 # requires = { "rust.edition" = ">=2024" }
 # allow = ["**/tests/**"]
+# enabled = false
 # ---
 
 ; Match if-let containing another if-let as sole block content

@@ -3,6 +3,7 @@
 # severity = "info"
 # message = "Function returns tuple - consider using a struct with named fields"
 # languages = ["rust"]
+# enabled = false
 # ---
 
 ; Detects functions returning tuple types like (A, B)

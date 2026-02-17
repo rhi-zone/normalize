@@ -4,6 +4,7 @@
 # message = "fmt.Print found - consider using structured logging"
 # languages = ["go"]
 # allow = ["**/tests/**", "**/*_test.go", "**/examples/**", "**/cmd/**"]
+# enabled = false
 # ---
 
 ((call_expression

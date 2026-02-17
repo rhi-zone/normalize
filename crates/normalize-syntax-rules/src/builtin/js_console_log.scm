@@ -5,6 +5,7 @@
 # languages = ["javascript", "typescript", "tsx", "jsx"]
 # allow = ["**/tests/**", "**/*.test.*", "**/*.spec.*"]
 # fix = ""
+# enabled = false
 # ---
 
 ; Detects: console.log(), console.debug(), console.info() as full statement

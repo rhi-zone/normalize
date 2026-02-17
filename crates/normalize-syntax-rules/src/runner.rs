@@ -147,6 +147,7 @@ pub fn run_rules(
     // Filter rules first
     let active_rules: Vec<&Rule> = rules
         .iter()
+        .filter(|r| r.enabled)
         .filter(|r| filter_rule.is_none_or(|f| r.id == f))
         .collect();
 

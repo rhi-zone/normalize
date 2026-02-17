@@ -4,6 +4,7 @@
 # message = ".unwrap() found - consider using ? or .expect() with context"
 # languages = ["rust"]
 # allow = ["**/tests/**", "**/test_*.rs", "**/*_test.rs", "**/*_tests.rs", "**/examples/**", "**/benches/**"]
+# enabled = false
 # ---
 
 ; Detects: .unwrap() calls

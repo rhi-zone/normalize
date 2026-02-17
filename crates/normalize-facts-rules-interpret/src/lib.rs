@@ -284,8 +284,7 @@ pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<Fac
         }
     }
 
-    // Filter out disabled rules
-    rules_by_id.into_values().filter(|r| r.enabled).collect()
+    rules_by_id.into_values().collect()
 }
 
 /// Load rules from a directory (only `.dl` files).
@@ -1119,7 +1118,8 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         // fan-out is disabled by default
         let default_config = FactsRulesConfig::default();
         let rules = load_all_rules(Path::new("/nonexistent"), &default_config);
-        assert!(rules.iter().all(|r| r.id != "fan-out"));
+        let fan_out = rules.iter().find(|r| r.id == "fan-out").unwrap();
+        assert!(!fan_out.enabled);
 
         // Enable via config
         let mut config = FactsRulesConfig::default();
@@ -1131,7 +1131,8 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
             },
         );
         let rules = load_all_rules(Path::new("/nonexistent"), &config);
-        assert!(rules.iter().any(|r| r.id == "fan-out"));
+        let fan_out = rules.iter().find(|r| r.id == "fan-out").unwrap();
+        assert!(fan_out.enabled);
     }
 
     #[test]
@@ -1662,16 +1663,23 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
 
     #[test]
     fn test_new_builtins_parse() {
-        for id in &[
-            "unused-import",
-            "barrel-file",
-            "bidirectional-deps",
-            "deep-nesting",
-            "layering-violation",
-            "missing-export",
-        ] {
+        // These rules should be disabled by default
+        for id in &["barrel-file", "layering-violation", "missing-export"] {
             let rule = find_builtin(id);
             assert!(!rule.enabled, "{} should be disabled by default", id);
+            assert!(rule.builtin, "{} should be builtin", id);
+        }
+
+        // These rules should be enabled by default
+        for id in &[
+            "unused-import",
+            "bidirectional-deps",
+            "deep-nesting",
+            "god-class",
+            "long-function",
+        ] {
+            let rule = find_builtin(id);
+            assert!(rule.enabled, "{} should be enabled by default", id);
             assert!(rule.builtin, "{} should be builtin", id);
         }
     }

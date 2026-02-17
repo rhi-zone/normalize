@@ -4,6 +4,7 @@
 # message = "print() found - consider using logging module"
 # languages = ["python"]
 # allow = ["**/tests/**", "**/test_*.py", "**/*_test.py", "**/examples/**", "**/__main__.py"]
+# enabled = false
 # ---
 
 ((call

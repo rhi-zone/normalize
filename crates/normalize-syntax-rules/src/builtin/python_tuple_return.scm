@@ -3,6 +3,7 @@
 # severity = "info"
 # message = "Function returns tuple - consider using a dataclass or NamedTuple"
 # languages = ["python"]
+# enabled = false
 # ---
 
 ; Detects functions with return type annotation tuple[...]

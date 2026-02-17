@@ -3,6 +3,7 @@
 # severity = "info"
 # message = "Function returns tuple - consider using an interface with named properties"
 # languages = ["typescript", "tsx"]
+# enabled = false
 # ---
 
 ; Detects functions returning tuple types like [A, B]

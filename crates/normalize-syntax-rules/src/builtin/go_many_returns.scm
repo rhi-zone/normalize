@@ -3,6 +3,7 @@
 # severity = "info"
 # message = "Function has 3+ return values - consider using a struct"
 # languages = ["go"]
+# enabled = false
 # ---
 
 ; Detects functions with 3 or more return values

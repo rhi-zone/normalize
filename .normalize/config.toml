@@ -14,9 +14,7 @@ clones = true
 [analyze.rules."rust/println-debug"]
 enabled = false
 
-# Allow console.log in test fixtures
-[analyze.rules."js/console-log"]
-allow = ["**/fixtures/**"]
+# js/console-log: re-enabled below with allow patterns
 
 # Enable numeric literal suffix rule (disabled by default)
 [analyze.rules."rust/numeric-type-annotation"]
@@ -25,6 +23,45 @@ enabled = true
 # Enforce struct returns over tuples (dogfooding our own rule)
 [analyze.rules."rust/tuple-return"]
 severity = "error"
+enabled = true
+
+# Re-enable info-level rules for dogfooding (disabled by default for new users)
+[analyze.rules."rust/unwrap-in-impl"]
+enabled = true
+
+[analyze.rules."rust/unnecessary-let"]
+enabled = true
+
+[analyze.rules."rust/unnecessary-type-alias"]
+enabled = true
+
+[analyze.rules."rust/chained-if-let"]
+enabled = true
+
+[analyze.rules."js/console-log"]
+enabled = true
+allow = ["**/fixtures/**"]
+
+[analyze.rules."js/unnecessary-const"]
+enabled = true
+
+[analyze.rules."python/print-debug"]
+enabled = true
+
+[analyze.rules."python/tuple-return"]
+enabled = true
+
+[analyze.rules."go/fmt-print"]
+enabled = true
+
+[analyze.rules."go/many-returns"]
+enabled = true
+
+[analyze.rules."typescript/tuple-return"]
+enabled = true
+
+[analyze.rules."no-todo-comment"]
+enabled = true
 
 [aliases]
 todo = ["TODO.md"]

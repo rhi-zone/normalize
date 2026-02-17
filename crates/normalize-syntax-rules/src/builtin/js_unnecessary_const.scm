@@ -3,6 +3,7 @@
 # severity = "info"
 # message = "Unnecessary const binding - consider using the value directly"
 # languages = ["javascript", "typescript", "tsx", "jsx"]
+# enabled = false
 # ---
 
 ; Detects: const x = y; where both are simple identifiers

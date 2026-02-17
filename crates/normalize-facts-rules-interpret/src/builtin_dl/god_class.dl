@@ -1,7 +1,6 @@
 # ---
 # id = "god-class"
 # message = "Type defines too many methods (>20)"
-# enabled = false
 # ---
 
 relation method_of(String, String, String);
