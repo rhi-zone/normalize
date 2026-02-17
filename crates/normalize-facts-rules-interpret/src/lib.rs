@@ -209,6 +209,30 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
         id: "missing-impl",
         content: include_str!("builtin_dl/missing_impl.dl"),
     },
+    BuiltinFactsRule {
+        id: "unused-import",
+        content: include_str!("builtin_dl/unused_import.dl"),
+    },
+    BuiltinFactsRule {
+        id: "barrel-file",
+        content: include_str!("builtin_dl/barrel_file.dl"),
+    },
+    BuiltinFactsRule {
+        id: "bidirectional-deps",
+        content: include_str!("builtin_dl/bidirectional_deps.dl"),
+    },
+    BuiltinFactsRule {
+        id: "deep-nesting",
+        content: include_str!("builtin_dl/deep_nesting.dl"),
+    },
+    BuiltinFactsRule {
+        id: "layering-violation",
+        content: include_str!("builtin_dl/layering_violation.dl"),
+    },
+    BuiltinFactsRule {
+        id: "missing-export",
+        content: include_str!("builtin_dl/missing_export.dl"),
+    },
 ];
 
 /// Load all rules from all sources, merged by ID.
@@ -1454,6 +1478,202 @@ warning("strict-rule", file) <-- symbol(file, _, _, _);
         rule.enabled = true;
         let result = run_rule(&rule, &relations).unwrap();
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_unused_import_fires() {
+        let mut relations = Relations::new();
+        relations.add_import("a.py", "b.py", "helper");
+        // "helper" is never called in a.py
+
+        let mut rule = find_builtin("unused-import");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "helper");
+    }
+
+    #[test]
+    fn test_unused_import_no_fire() {
+        let mut relations = Relations::new();
+        relations.add_import("a.py", "b.py", "helper");
+        relations.add_call("a.py", "main", "helper", 5);
+
+        let mut rule = find_builtin("unused-import");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_unused_import_wildcard_ignored() {
+        let mut relations = Relations::new();
+        relations.add_import("a.py", "b.py", "*");
+
+        let mut rule = find_builtin("unused-import");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_barrel_file_fires() {
+        let mut relations = Relations::new();
+        // File with only imports, no own symbols
+        relations.add_import("index.ts", "a.ts", "foo");
+        relations.add_import("index.ts", "b.ts", "bar");
+
+        let mut rule = find_builtin("barrel-file");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "index.ts");
+    }
+
+    #[test]
+    fn test_barrel_file_no_fire() {
+        let mut relations = Relations::new();
+        relations.add_import("app.ts", "utils.ts", "helper");
+        relations.add_symbol("app.ts", "main", "function", 1);
+
+        let mut rule = find_builtin("barrel-file");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_bidirectional_deps_fires() {
+        let mut relations = Relations::new();
+        relations.add_import("a.py", "b.py", "foo");
+        relations.add_import("b.py", "a.py", "bar");
+
+        let mut rule = find_builtin("bidirectional-deps");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_bidirectional_deps_no_fire() {
+        let mut relations = Relations::new();
+        relations.add_import("a.py", "b.py", "foo");
+        relations.add_import("a.py", "c.py", "bar");
+
+        let mut rule = find_builtin("bidirectional-deps");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_deep_nesting_fires() {
+        let mut relations = Relations::new();
+        // 5 levels: Top -> A -> B -> C -> TooDeep (4 parent hops = >3)
+        relations.add_symbol("a.py", "Top", "class", 1);
+        relations.add_symbol("a.py", "A", "class", 5);
+        relations.add_parent("a.py", "A", "Top");
+        relations.add_symbol("a.py", "B", "class", 10);
+        relations.add_parent("a.py", "B", "A");
+        relations.add_symbol("a.py", "C", "class", 15);
+        relations.add_parent("a.py", "C", "B");
+        relations.add_symbol("a.py", "TooDeep", "function", 20);
+        relations.add_parent("a.py", "TooDeep", "C");
+
+        let mut rule = find_builtin("deep-nesting");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        let messages: Vec<&str> = result.iter().map(|d| d.message.as_str()).collect();
+        assert!(messages.contains(&"TooDeep"));
+    }
+
+    #[test]
+    fn test_deep_nesting_no_fire() {
+        let mut relations = Relations::new();
+        // 2 levels: MyClass -> method (only 1 parent hop)
+        relations.add_symbol("a.py", "MyClass", "class", 1);
+        relations.add_symbol("a.py", "method", "method", 5);
+        relations.add_parent("a.py", "method", "MyClass");
+
+        let mut rule = find_builtin("deep-nesting");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_layering_violation_fires() {
+        let mut relations = Relations::new();
+        // Both files have test attributes
+        relations.add_symbol("test_a.py", "test_foo", "function", 1);
+        relations.add_attribute("test_a.py", "test_foo", "#[test]");
+        relations.add_symbol("test_b.py", "test_bar", "function", 1);
+        relations.add_attribute("test_b.py", "test_bar", "#[test]");
+        relations.add_import("test_a.py", "test_b.py", "helper");
+
+        let mut rule = find_builtin("layering-violation");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "test_a.py");
+    }
+
+    #[test]
+    fn test_layering_violation_no_fire() {
+        let mut relations = Relations::new();
+        // test_a has test attribute, utils does not
+        relations.add_symbol("test_a.py", "test_foo", "function", 1);
+        relations.add_attribute("test_a.py", "test_foo", "#[test]");
+        relations.add_symbol("utils.py", "helper", "function", 1);
+        relations.add_import("test_a.py", "utils.py", "helper");
+
+        let mut rule = find_builtin("layering-violation");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_missing_export_fires() {
+        let mut relations = Relations::new();
+        relations.add_symbol("utils.py", "helper", "function", 1);
+        relations.add_visibility("utils.py", "helper", "public");
+        // No file imports utils.py
+
+        let mut rule = find_builtin("missing-export");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message.as_str(), "utils.py");
+    }
+
+    #[test]
+    fn test_missing_export_no_fire() {
+        let mut relations = Relations::new();
+        relations.add_symbol("utils.py", "helper", "function", 1);
+        relations.add_visibility("utils.py", "helper", "public");
+        relations.add_import("app.py", "utils.py", "helper");
+
+        let mut rule = find_builtin("missing-export");
+        rule.enabled = true;
+        let result = run_rule(&rule, &relations).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_new_builtins_parse() {
+        for id in &[
+            "unused-import",
+            "barrel-file",
+            "bidirectional-deps",
+            "deep-nesting",
+            "layering-violation",
+            "missing-export",
+        ] {
+            let rule = find_builtin(id);
+            assert!(!rule.enabled, "{} should be disabled by default", id);
+            assert!(rule.builtin, "{} should be builtin", id);
+        }
     }
 
     /// Helper to find and parse a builtin rule by ID.

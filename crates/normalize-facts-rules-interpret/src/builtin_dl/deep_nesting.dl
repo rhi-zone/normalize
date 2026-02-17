@@ -1,0 +1,14 @@
+# ---
+# id = "deep-nesting"
+# message = "Symbol is nested more than 3 levels deep"
+# enabled = false
+# ---
+
+relation nested4(String, String);
+nested4(file, d) <--
+    parent(file, d, c),
+    parent(file, c, b),
+    parent(file, b, a),
+    parent(file, a, _);
+
+warning("deep-nesting", d) <-- nested4(_, d);

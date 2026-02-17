@@ -1,0 +1,11 @@
+# ---
+# id = "bidirectional-deps"
+# message = "Two files import each other (bidirectional coupling)"
+# enabled = false
+# ---
+
+relation imports_file(String, String);
+imports_file(a, b) <-- import(a, b, _);
+
+warning("bidirectional-deps", a) <--
+    imports_file(a, b), imports_file(b, a), if a < b;

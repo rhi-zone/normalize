@@ -1,0 +1,16 @@
+# ---
+# id = "unused-import"
+# message = "Imported name is never referenced in the importing file"
+# enabled = false
+# allow = ["**/tests/**", "**/__init__.py", "**/mod.rs", "**/lib.rs", "**/index.ts", "**/index.js"]
+# ---
+
+relation imported_name(String, String);
+imported_name(file, name) <-- import(file, _, name), if name != "*";
+
+relation used_name(String, String);
+used_name(file, name) <-- call(file, _, name, _);
+
+warning("unused-import", name) <--
+    imported_name(file, name),
+    !used_name(file, name);

@@ -1,0 +1,20 @@
+# ---
+# id = "missing-export"
+# message = "Public function is defined but file is never imported"
+# enabled = false
+# allow = ["**/main.rs", "**/main.py", "**/main.go", "**/main.ts", "**/main.js", "**/tests/**"]
+# ---
+
+relation public_in_file(String, String);
+public_in_file(file, name) <--
+    symbol(file, name, kind, _),
+    visibility(file, name, vis),
+    if kind == "function" || kind == "method",
+    if vis == "public";
+
+relation file_is_imported(String);
+file_is_imported(file) <-- import(_, file, _);
+
+warning("missing-export", file) <--
+    public_in_file(file, _),
+    !file_is_imported(file);

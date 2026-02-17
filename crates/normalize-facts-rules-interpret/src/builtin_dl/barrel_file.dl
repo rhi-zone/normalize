@@ -1,0 +1,15 @@
+# ---
+# id = "barrel-file"
+# message = "File only re-exports from other modules (barrel/index file)"
+# enabled = false
+# ---
+
+relation file_has_import(String);
+file_has_import(file) <-- import(file, _, _);
+
+relation file_has_own_symbol(String);
+file_has_own_symbol(file) <--
+    symbol(file, name, kind, _),
+    if kind == "function" || kind == "method" || kind == "class";
+
+warning("barrel-file", file) <-- file_has_import(file), !file_has_own_symbol(file);

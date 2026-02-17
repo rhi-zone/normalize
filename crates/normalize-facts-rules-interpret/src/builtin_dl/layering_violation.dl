@@ -1,0 +1,15 @@
+# ---
+# id = "layering-violation"
+# message = "Test code imports from another test file"
+# enabled = false
+# allow = ["**/test_helpers/**", "**/test_utils/**", "**/conftest.py", "**/fixtures/**"]
+# ---
+
+relation is_test_symbol(String);
+is_test_symbol(file) <-- attribute(file, _, attr), if attr == "#[test]" || attr == "#[cfg(test)]" || attr == "@Test" || attr == "@test" || attr == "@pytest.mark";
+
+warning("layering-violation", from_file) <--
+    import(from_file, to_file, _),
+    is_test_symbol(from_file),
+    is_test_symbol(to_file),
+    if from_file != to_file;

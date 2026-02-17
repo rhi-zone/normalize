@@ -75,13 +75,12 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] Rename `normalize filter aliases` to `normalize aliases`: removes unnecessary namespace layer
 - [x] Unify `lint`/`test` under `normalize tools`: `normalize tools lint [run|list]`, `normalize tools test [run|list]`
 - [x] Remove `analyze lint`: duplicate of `normalize lint`, adds no value
-- [ ] Unify `normalize rules` as umbrella for all rule types:
-  - `normalize rules list` — lists ALL rules (syntax + fact, builtin + user), default behavior
+- [x] Unify `normalize rules` as umbrella for all rule types:
+  - `normalize rules list` — lists ALL rules (syntax + fact, builtin + user), with `--type` filter
   - `normalize rules add` — adds rules (detects `.scm` vs `.dl` by extension)
-  - `normalize rules run` — runs all rules (replaces `analyze rules` + `facts check`)
-  - Current `normalize rules` only manages syntax rules but claims the generic namespace
-  - Current `normalize facts rules` / `normalize facts check` are the fact rule equivalents
-  - Need consistent severity model: syntax uses `severity`, facts uses `deny` (bool) — should unify
+  - `normalize rules run` — runs all rules, with `--type` filter
+  - `facts check` delegates to unified rules infrastructure
+  - Severity model unified: both use `Severity` enum (error/warning/info), `deny` backward-compat mapped
 
 ### Documentation Cleanup
 - [ ] Comprehensive docs audit: run each command's `--help` and compare against `docs/`. Known gaps:
@@ -228,8 +227,8 @@ Implementation:
 - [x] `normalize facts check <rules.dl>` - interpreted Datalog via ascent-interpreter
 - [ ] `normalize facts compile <rules.dl>` command to build custom packs (sandboxed codegen)
 - [ ] Self-install builtin dylib: `normalize facts rules` should auto-install compiled builtins to `~/.local/share/normalize/rules/` on first run (or at build/install time). Currently requires manual copy.
-- [ ] More builtin interpreted fact rules: unused_import, missing_export, deep_nesting, layering_violation, barrel_file, bidirectional_deps (current: 11 builtins)
-- [ ] Unify `normalize rules` namespace: currently `normalize rules` only manages syntax rules but claims a generic name. Should become umbrella for all rule types (syntax + facts). `normalize rules list` shows ALL rules by default. See "CLI Cleanup" section.
+- [x] More builtin interpreted fact rules: unused_import, missing_export, deep_nesting, layering_violation, barrel_file, bidirectional_deps (now 17 builtins, 3 enabled by default)
+- [x] Unify `normalize rules` namespace: `normalize rules list/run/add` now handle both syntax + fact rules. `facts check` delegates to unified infrastructure.
 
 **`implements` relation extraction — completed for 19 languages:**
 
