@@ -1,22 +1,71 @@
 # normalize rules
 
-Manage custom analysis rules - add from URLs, list, update, and remove.
+Manage and run analysis rules (syntax + fact). This is the unified entry point for all rule types — tree-sitter syntax rules (`.scm`) and Datalog fact rules (`.dl`).
 
 ## Subcommands
 
-### add
+| Subcommand | Description |
+|------------|-------------|
+| `list` | List all rules (syntax + fact, builtin + user) |
+| `run` | Run rules against the codebase |
+| `add` | Add a rule from a URL |
+| `update` | Update imported rules from their sources |
+| `remove` | Remove an imported rule |
 
-Add a rule from a URL:
+### list
+
+List installed rules:
 
 ```bash
-normalize rules add https://example.com/rules/no-console-log.scm
-normalize rules add https://example.com/rules/require-error-handling.scm --global
+normalize rules list                # All rules
+normalize rules list --type syntax  # Syntax rules only
+normalize rules list --type fact    # Fact rules only
+normalize rules list --sources      # Show source URLs
+normalize rules list --json
 ```
 
 Options:
-- `--global` - Install to global rules (~/.config/normalize/rules/) instead of project
+- `--type <TYPE>` — Filter by rule type: `all`, `syntax`, `fact` (default: `all`)
+- `--sources` — Show source URLs for imported rules
 
-The rule file must have TOML frontmatter with an `id` field:
+### run
+
+Run rules against the codebase:
+
+```bash
+normalize rules run                         # Run all rules
+normalize rules run --type syntax           # Syntax rules only
+normalize rules run --type fact             # Fact rules only
+normalize rules run --rule rust/unwrap-in-impl  # Specific rule
+normalize rules run --fix                   # Apply auto-fixes (syntax only)
+normalize rules run --sarif                 # SARIF output
+normalize rules run src/                    # Target specific path
+```
+
+Arguments:
+- `[TARGET]` — Target directory or file
+
+Options:
+- `--rule <RULE>` — Specific rule ID to run
+- `--type <TYPE>` — Filter by rule type: `all`, `syntax`, `fact` (default: `all`)
+- `--fix` — Apply auto-fixes (syntax rules only)
+- `--sarif` — Output in SARIF format
+- `--debug <FLAGS>` — Debug flags (comma-separated)
+
+### add
+
+Add a rule from a URL. Supports both `.scm` (syntax) and `.dl` (fact) files:
+
+```bash
+normalize rules add https://example.com/rules/no-console-log.scm
+normalize rules add https://example.com/rules/circular-deps.dl
+normalize rules add https://example.com/rules/security.scm --global
+```
+
+Options:
+- `--global` — Install to global rules (`~/.config/normalize/rules/`) instead of project
+
+The rule file must have TOML frontmatter with an `id` field. Syntax rules use `.scm`:
 
 ```scheme
 # ---
@@ -33,23 +82,17 @@ The rule file must have TOML frontmatter with an `id` field:
   (#eq? @prop "log")) @match
 ```
 
-### list
+Fact rules use `.dl`:
 
-List installed rules:
+```datalog
+# ---
+# id = "too-many-imports"
+# message = "File imports more than 20 modules"
+# ---
 
-```bash
-normalize rules list
-normalize rules list --sources  # Show source URLs
-normalize rules list --json
-```
-
-Output:
-```
-[project] no-console-log (from https://example.com/rules/no-console-log.scm)
-[project] no-todo-comment (local)
-[global] require-tests
-
-3 rule(s) installed
+relation import_count(String, i32);
+import_count(file, c) <-- import(file, _, _), agg c = count() in import(file, _, _);
+warning("too-many-imports", file) <-- import_count(file, c), if c > 20;
 ```
 
 ### update
@@ -84,27 +127,9 @@ sha256 = "abc123..."
 added = "2024-01-15"
 ```
 
-## Examples
-
-Import a rule from GitHub:
-
-```bash
-normalize rules add https://raw.githubusercontent.com/org/repo/main/rules/security.scm
-```
-
-Check what rules are installed:
-
-```bash
-normalize rules list --sources
-```
-
-Update all rules to latest versions:
-
-```bash
-normalize rules update
-```
-
 ## See Also
 
-- [analyze](analyze.md) - Run analysis with rules
-- [Rule Writing Guide](../rules.md) - Create custom rules
+- [Syntax Rules Writing Guide](../rules.md) — Create `.scm` rules with tree-sitter queries
+- [Fact Rules Writing Guide](../fact-rules.md) — Create `.dl` rules with Datalog
+- [facts](facts.md) — `normalize facts` command (lower-level fact rule execution)
+- [analyze](analyze.md) — Run analysis with rules

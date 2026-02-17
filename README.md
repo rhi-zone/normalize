@@ -125,15 +125,15 @@ normalize serve http --port 8080     # REST API server
 normalize serve lsp                  # LSP server for IDEs
 ```
 
-### index - Manage Index
+### facts - Manage Code Facts
 
-Control the file and symbol index:
+Manage the file index containing symbols, imports, calls, and other relationships:
 
 ```bash
-normalize index status               # Index stats
-normalize index refresh              # Refresh file index
-normalize index reindex              # Full reindex
-normalize index reindex --call-graph # Include call graph
+normalize facts stats                # Index stats
+normalize facts rebuild              # Rebuild the index
+normalize facts files                # List indexed files
+normalize facts check                # Run Datalog rules against facts
 ```
 
 ### script - Lua Scripts

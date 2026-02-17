@@ -83,11 +83,11 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - Severity model unified: both use `Severity` enum (error/warning/info), `deny` backward-compat mapped
 
 ### Documentation Cleanup
-- [ ] Comprehensive docs audit: run each command's `--help` and compare against `docs/`. Known gaps:
-  - Fact rules (interpreted + compiled): zero user-facing docs
-  - `facts` subcommands (`rebuild`, `files`, `packages`, `check`, `rules`): undocumented
-  - CLI drift from refactoring (renames, moved subcommands, new flags)
-  - Need fact rules writing guide equivalent to `docs/rules.md` for syntax rules
+- [x] Comprehensive docs audit: run each command's `--help` and compare against `docs/`. Known gaps:
+  - ~~Fact rules (interpreted + compiled): zero user-facing docs~~ → `docs/fact-rules.md`
+  - ~~`facts` subcommands (`rebuild`, `files`, `packages`, `check`, `rules`): undocumented~~ → `docs/cli/facts.md`
+  - ~~CLI drift from refactoring (renames, moved subcommands, new flags)~~ → fixed `index`→`facts` in commands.md, README
+  - ~~Need fact rules writing guide equivalent to `docs/rules.md` for syntax rules~~ → `docs/fact-rules.md`
 - [x] Remove `normalize @` and `normalize workflow` references from docs - spore handles workflow running now
   - Archived: script.md, agent*.md, lua-cli.md, agent-state-machine.md, workflow-format.md, agent-commands.md, lua-api.md, agent-dogfooding.md
   - Updated: shadow-git.md, log-analysis.md, workflows/README.md, security-audit.md, dogfooding.md, langgraph-evaluation.md, prior-art.md

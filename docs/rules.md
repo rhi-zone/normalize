@@ -345,6 +345,8 @@ normalize ships with 24 builtin rules:
 
 ## See Also
 
-- [CLI: analyze rules](cli/rules.md) - Command reference
-- [Design: syntax linting](design/syntax-linting.md) - Architecture decisions
-- [Design: builtin rules](design/builtin-rules.md) - Builtin rule development
+- [Writing Fact Rules](fact-rules.md) — Datalog-based rules for cross-file analysis
+- [CLI: rules](cli/rules.md) — Unified `normalize rules` command reference
+- [CLI: analyze rules](cli/rules.md) — Command reference
+- [Design: syntax linting](design/syntax-linting.md) — Architecture decisions
+- [Design: builtin rules](design/builtin-rules.md) — Builtin rule development

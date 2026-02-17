@@ -49,8 +49,8 @@ normalize view MyClass
 Create `.normalize/config.toml`:
 
 ```toml
-[index]
-enabled = true
+[facts]
+# enabled = true
 
 [view]
 depth = 1

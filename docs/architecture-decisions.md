@@ -89,8 +89,8 @@ Once you need conditionals (`if is_dirty() then commit() end`), you're fighting 
 ### Configuration
 
 ```toml
-[index]
-enabled = true  # Set to false to disable indexing entirely
+[facts]
+# enabled = true  # Set to false to disable indexing entirely
 ```
 
 ## Command Naming: `text-search` Not `grep`

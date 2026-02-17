@@ -2,7 +2,7 @@
 
 ## Command Structure
 
-Normalize has 17 top-level commands organized by domain:
+Normalize has 18 top-level commands organized by domain:
 
 ### Core Operations
 | Command | Description |
@@ -15,7 +15,8 @@ Normalize has 17 top-level commands organized by domain:
 ### Infrastructure
 | Command | Description |
 |---------|-------------|
-| `index` | Manage file index |
+| `facts` | Manage code facts (file index, symbols, calls, imports) |
+| `rules` | Manage and run analysis rules (syntax + fact) |
 | `daemon` | Background process management |
 | `grammars` | Tree-sitter grammar management |
 | `init` | Initialize normalize in a directory |
@@ -75,8 +76,8 @@ Configuration in `.normalize/config.toml` or `~/.config/normalize/config.toml`:
 [daemon]
 enabled = true
 
-[index]
-enabled = true
+[facts]
+# See docs/cli/facts.md for rule overrides
 
 [aliases]
 tests = ["*_test.go", "**/__tests__/**"]

@@ -183,7 +183,7 @@ These might seem like candidates for exclusion but are intentionally kept:
 Requires call graph index. If not available:
 ```
 $ normalize analyze test-gaps
-Error: Call graph not indexed. Run: normalize index reindex --call-graph
+Error: Call graph not indexed. Run: normalize facts rebuild
 ```
 
 ### Data Flow

@@ -20,7 +20,8 @@ Normalize provides a unified CLI for code intelligence. Three core primitives: *
 ### Index & Infrastructure
 | Command | Purpose |
 |---------|---------|
-| [index](index.md) | Manage file index and call graph |
+| [facts](facts.md) | Manage code facts (symbols, imports, calls) |
+| [rules](rules.md) | Manage and run analysis rules (syntax + fact) |
 | [init](init.md) | Initialize normalize in a project |
 | [daemon](daemon.md) | Background daemon for faster operations |
 
