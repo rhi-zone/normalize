@@ -309,6 +309,21 @@ impl FileIndex {
         )
         .await?;
 
+        // Migrate existing tables: add columns that may be missing from older schemas.
+        // SQLite errors on duplicate ADD COLUMN, so we ignore failures.
+        conn.execute(
+            "ALTER TABLE symbols ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'",
+            (),
+        )
+        .await
+        .ok();
+        conn.execute(
+            "ALTER TABLE symbols ADD COLUMN is_impl INTEGER NOT NULL DEFAULT 0",
+            (),
+        )
+        .await
+        .ok();
+
         // Check schema version
         let mut rows = conn
             .query(
