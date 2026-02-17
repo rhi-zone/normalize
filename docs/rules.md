@@ -1,6 +1,6 @@
 # Writing Syntax Rules
 
-This guide covers writing custom analysis rules for `normalize analyze rules`. Rules use [tree-sitter](https://tree-sitter.github.io/) queries with TOML frontmatter for metadata.
+This guide covers writing custom syntax rules for normalize. Rules use [tree-sitter](https://tree-sitter.github.io/) queries with TOML frontmatter for metadata. Run them via `normalize rules run` (unified, runs both syntax + fact rules) or `normalize analyze rules` (syntax-only).
 
 ## Quick Start
 
@@ -20,10 +20,11 @@ Create a rule file in `.normalize/rules/`:
 Run it:
 
 ```bash
-normalize analyze rules
-normalize analyze rules --rule no-todo-comment  # Run specific rule
-normalize analyze rules --fix                   # Apply auto-fixes
-normalize analyze rules --list                  # List all rules
+normalize rules run                             # Run all rules (syntax + fact)
+normalize rules run --type syntax               # Syntax rules only
+normalize rules run --rule no-todo-comment       # Run specific rule
+normalize rules run --fix                        # Apply auto-fixes
+normalize rules list                             # List all rules
 ```
 
 ## Rule File Format
@@ -217,8 +218,8 @@ Captures from the query are available as `$capture_name`. The special `$match` r
 Run fixes:
 
 ```bash
-normalize analyze rules --fix                       # Fix all
-normalize analyze rules --rule rust/unwrap-to-expect --fix  # Fix one rule
+normalize rules run --fix                                  # Fix all
+normalize rules run --rule rust/unwrap-to-expect --fix     # Fix one rule
 ```
 
 Fixes are applied in reverse byte-offset order to preserve positions. Multiple fixes to the same file are applied in one pass.
@@ -342,6 +343,7 @@ normalize ships with 24 builtin rules:
 - **Cross-language rules** work when the query nodes exist in the grammar. A rule without `languages` is validated per-grammar and silently skipped for incompatible languages.
 - **Test rules incrementally** with `normalize analyze query` before adding frontmatter.
 - **Prefer `#match?` over `#eq?`** when you need partial matching or case-insensitive patterns.
+- **Use `normalize rules run`** instead of `normalize analyze rules` — the unified command runs both syntax and fact rules.
 
 ## See Also
 
