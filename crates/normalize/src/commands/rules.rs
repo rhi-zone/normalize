@@ -185,6 +185,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let json = format.is_json();
+    let use_colors = format.use_colors();
 
     match action {
         RulesAction::List {
@@ -202,6 +203,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
                 enabled,
                 disabled,
                 json,
+                use_colors,
             },
             &config,
         ),
@@ -236,10 +238,15 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
         RulesAction::Disable { id_or_tag, dry_run } => {
             cmd_enable_disable(&effective_root, &id_or_tag, false, dry_run, &config)
         }
-        RulesAction::Show { id } => cmd_show(&effective_root, &id, json, &config),
-        RulesAction::Tags { show_rules, tag } => {
-            cmd_tags(&effective_root, show_rules, tag.as_deref(), json, &config)
-        }
+        RulesAction::Show { id } => cmd_show(&effective_root, &id, json, use_colors, &config),
+        RulesAction::Tags { show_rules, tag } => cmd_tags(
+            &effective_root,
+            show_rules,
+            tag.as_deref(),
+            json,
+            use_colors,
+            &config,
+        ),
         RulesAction::Add { url, global } => cmd_add(&url, global, json),
         RulesAction::Update { rule_id } => cmd_update(rule_id.as_deref(), json),
         RulesAction::Remove { rule_id } => cmd_remove(&rule_id, json),
@@ -284,6 +291,56 @@ pub fn cmd_run_facts(
     rt.block_on(run_fact_rules(
         root, rules_file, list_only, json, config, None,
     ))
+}
+
+// =============================================================================
+// Tag colors
+// =============================================================================
+
+/// Deterministic color for a tag name.
+///
+/// Uses a stable hash of the tag string to pick from a curated palette.
+/// Red and yellow are reserved for severity indicators and are never used.
+fn tag_color(tag: &str) -> nu_ansi_term::Color {
+    use nu_ansi_term::Color;
+    // Curated palette: readable on both dark and light terminals.
+    // Red / Yellow omitted — reserved for error / warning severity.
+    const PALETTE: &[Color] = &[
+        Color::Cyan,
+        Color::Green,
+        Color::Blue,
+        Color::Magenta,
+        Color::Fixed(93),  // purple
+        Color::Fixed(37),  // teal
+        Color::Fixed(67),  // steel blue
+        Color::Fixed(107), // olive green
+        Color::Fixed(135), // medium purple
+        Color::Fixed(73),  // cadet blue
+    ];
+    // FNV-1a hash for a stable, fast, dependency-free result
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in tag.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    PALETTE[(hash as usize) % PALETTE.len()]
+}
+
+/// Render a tag as `[tag]` with optional color.
+fn paint_tag(tag: &str, use_colors: bool) -> String {
+    if use_colors {
+        format!("[{}]", tag_color(tag).paint(tag))
+    } else {
+        format!("[{}]", tag)
+    }
+}
+
+/// Render a list of tags, space-separated, with optional colors.
+fn paint_tags(tags: &[String], use_colors: bool) -> String {
+    tags.iter()
+        .map(|t| paint_tag(t, use_colors))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 // =============================================================================
@@ -356,6 +413,7 @@ struct ListFilters<'a> {
     enabled: bool,
     disabled: bool,
     json: bool,
+    use_colors: bool,
 }
 
 fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::NormalizeConfig) -> i32 {
@@ -366,6 +424,7 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
         enabled: enabled_filter,
         disabled: disabled_filter,
         json,
+        use_colors,
     } = filters;
     let mut all_rules = Vec::new();
 
@@ -468,7 +527,7 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
             let tags_str = if r.tags.is_empty() {
                 String::new()
             } else {
-                format!("  [{}]", r.tags.join(", "))
+                format!("  {}", paint_tags(&r.tags, use_colors))
             };
             if sources {
                 println!(
@@ -678,7 +737,13 @@ fn cmd_enable_disable(
 // Show
 // =============================================================================
 
-fn cmd_show(root: &Path, id: &str, json: bool, config: &crate::config::NormalizeConfig) -> i32 {
+fn cmd_show(
+    root: &Path,
+    id: &str,
+    json: bool,
+    use_colors: bool,
+    config: &crate::config::NormalizeConfig,
+) -> i32 {
     // Search syntax rules first, then fact rules
     let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
     let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
@@ -739,7 +804,7 @@ fn cmd_show(root: &Path, id: &str, json: bool, config: &crate::config::Normalize
             println!("  severity: {}", r.severity);
             println!("  enabled:  {}", r.enabled);
             if !r.tags.is_empty() {
-                println!("  tags:     {}", r.tags.join(", "));
+                println!("  tags:     {}", paint_tags(&r.tags, use_colors));
             }
             if !r.languages.is_empty() {
                 println!("  langs:    {}", r.languages.join(", "));
@@ -775,7 +840,7 @@ fn cmd_show(root: &Path, id: &str, json: bool, config: &crate::config::Normalize
             println!("  severity: {}", r.severity);
             println!("  enabled:  {}", r.enabled);
             if !r.tags.is_empty() {
-                println!("  tags:     {}", r.tags.join(", "));
+                println!("  tags:     {}", paint_tags(&r.tags, use_colors));
             }
             if !r.allow.is_empty() {
                 println!(
@@ -814,6 +879,7 @@ fn cmd_tags(
     show_rules: bool,
     tag_filter: Option<&str>,
     json: bool,
+    use_colors: bool,
     config: &crate::config::NormalizeConfig,
 ) -> i32 {
     // Collect all rules from both tiers
@@ -915,13 +981,18 @@ fn cmd_tags(
 
     for (tag, (origin, ids)) in &tag_map {
         let count = ids.len();
+        let tag_display = if use_colors {
+            tag_color(tag).paint(tag.as_str()).to_string()
+        } else {
+            tag.clone()
+        };
         if show_rules {
             let ids_str: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
-            println!("{:20} [{}]  {}", tag, origin, ids_str.join("  "));
+            println!("{:20} [{}]  {}", tag_display, origin, ids_str.join("  "));
         } else {
             println!(
                 "{:20} [{}]  {} rule{}",
-                tag,
+                tag_display,
                 origin,
                 count,
                 if count == 1 { "" } else { "s" }
