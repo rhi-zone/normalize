@@ -46,6 +46,11 @@ pub enum RulesAction {
         #[arg(long)]
         #[serde(default)]
         disabled: bool,
+
+        /// Hide the description line (compact one-line-per-rule output)
+        #[arg(long)]
+        #[serde(default)]
+        no_desc: bool,
     },
 
     /// Run rules against the codebase
@@ -194,6 +199,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
             tag,
             enabled,
             disabled,
+            no_desc,
         } => cmd_list(
             &effective_root,
             ListFilters {
@@ -202,6 +208,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
                 tag: tag.as_deref(),
                 enabled,
                 disabled,
+                no_desc,
                 json,
                 use_colors,
             },
@@ -326,12 +333,25 @@ fn tag_color(tag: &str) -> nu_ansi_term::Color {
     PALETTE[(hash as usize) % PALETTE.len()]
 }
 
-/// Render a tag as `[tag]` with optional color.
+/// Render a tag: colored name without brackets in pretty mode, `[tag]` in plain.
 fn paint_tag(tag: &str, use_colors: bool) -> String {
     if use_colors {
-        format!("[{}]", tag_color(tag).paint(tag))
+        tag_color(tag).paint(tag).to_string()
     } else {
         format!("[{}]", tag)
+    }
+}
+
+/// Color a severity string: error=red, warning=yellow, info=dark-gray.
+fn paint_severity(severity: &str, use_colors: bool) -> String {
+    if !use_colors {
+        return severity.to_string();
+    }
+    match severity {
+        "error" => nu_ansi_term::Color::Red.paint(severity).to_string(),
+        "warning" => nu_ansi_term::Color::Yellow.paint(severity).to_string(),
+        "info" => nu_ansi_term::Color::Blue.paint(severity).to_string(),
+        _ => nu_ansi_term::Color::DarkGray.paint(severity).to_string(),
     }
 }
 
@@ -412,6 +432,7 @@ struct ListFilters<'a> {
     tag: Option<&'a str>,
     enabled: bool,
     disabled: bool,
+    no_desc: bool,
     json: bool,
     use_colors: bool,
 }
@@ -423,6 +444,7 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
         tag: tag_filter,
         enabled: enabled_filter,
         disabled: disabled_filter,
+        no_desc,
         json,
         use_colors,
     } = filters;
@@ -529,16 +551,22 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
             } else {
                 format!("  {}", paint_tags(&r.tags, use_colors))
             };
+            let sev = paint_severity(&r.severity, use_colors);
+            // First line: type, id, severity, (source), tags, disabled marker
             if sources {
                 println!(
-                    "  [{}]  {:30} {:9} {:7}  {}{}{}",
-                    r.rule_type, r.id, r.severity, r.source, r.message, tags_str, disabled_marker
+                    "  [{}]  {:30} {:9} {:7}{}{}",
+                    r.rule_type, r.id, sev, r.source, tags_str, disabled_marker
                 );
             } else {
                 println!(
-                    "  [{}]  {:30} {:9} {}{}{}",
-                    r.rule_type, r.id, r.severity, r.message, tags_str, disabled_marker
+                    "  [{}]  {:30} {:9}{}{}",
+                    r.rule_type, r.id, sev, tags_str, disabled_marker
                 );
+            }
+            // Second line: description (suppressed by --no-desc)
+            if !no_desc {
+                println!("            {}", r.message);
             }
         }
     }
@@ -801,7 +829,10 @@ fn cmd_show(
     match (found_syntax, found_fact) {
         (Some(r), _) => {
             println!("{} [syntax]", r.id);
-            println!("  severity: {}", r.severity);
+            println!(
+                "  severity: {}",
+                paint_severity(&r.severity.to_string(), use_colors)
+            );
             println!("  enabled:  {}", r.enabled);
             if !r.tags.is_empty() {
                 println!("  tags:     {}", paint_tags(&r.tags, use_colors));
@@ -837,7 +868,10 @@ fn cmd_show(
         }
         (_, Some(r)) => {
             println!("{} [fact]", r.id);
-            println!("  severity: {}", r.severity);
+            println!(
+                "  severity: {}",
+                paint_severity(&r.severity.to_string(), use_colors)
+            );
             println!("  enabled:  {}", r.enabled);
             if !r.tags.is_empty() {
                 println!("  tags:     {}", paint_tags(&r.tags, use_colors));
