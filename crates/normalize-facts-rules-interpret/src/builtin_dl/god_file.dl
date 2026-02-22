@@ -1,6 +1,7 @@
 # ---
 # id = "god-file"
 # message = "File defines too many functions (>50)"
+# tags = ["architecture", "complexity"]
 # allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs"]
 # ---
 

@@ -1,6 +1,7 @@
 # ---
 # id = "layering-violation"
 # message = "Test code imports from another test file"
+# tags = ["architecture"]
 # enabled = false
 # allow = ["**/test_helpers/**", "**/test_utils/**", "**/conftest.py", "**/fixtures/**"]
 # ---

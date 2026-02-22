@@ -1,6 +1,7 @@
 # ---
 # id = "ruby/binding-pry"
 # severity = "warning"
+# tags = ["debug-print", "cleanup"]
 # message = "binding.pry found - remove debug statement before committing"
 # languages = ["ruby"]
 # allow = ["**/tests/**", "**/test/**", "**/spec/**"]

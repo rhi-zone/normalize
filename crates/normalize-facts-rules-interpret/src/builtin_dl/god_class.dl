@@ -1,6 +1,7 @@
 # ---
 # id = "god-class"
 # message = "Type defines too many methods (>20)"
+# tags = ["complexity"]
 # ---
 
 relation method_of(String, String, String);

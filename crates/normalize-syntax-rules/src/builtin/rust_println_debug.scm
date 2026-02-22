@@ -1,6 +1,7 @@
 # ---
 # id = "rust/println-debug"
 # severity = "info"
+# tags = ["debug-print", "cleanup"]
 # message = "println!/print! found - consider using tracing or log crate"
 # languages = ["rust"]
 # allow = ["**/tests/**", "**/examples/**", "**/bin/**", "**/main.rs"]

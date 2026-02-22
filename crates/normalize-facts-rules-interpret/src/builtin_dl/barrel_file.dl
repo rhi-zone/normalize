@@ -1,6 +1,7 @@
 # ---
 # id = "barrel-file"
 # message = "File only re-exports from other modules (barrel/index file)"
+# tags = ["architecture"]
 # enabled = false
 # ---
 

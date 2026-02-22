@@ -1,6 +1,7 @@
 # ---
 # id = "js/console-log"
 # severity = "info"
+# tags = ["debug-print", "cleanup"]
 # message = "console.log/debug found - remove before committing"
 # languages = ["javascript", "typescript", "tsx", "jsx"]
 # allow = ["**/tests/**", "**/*.test.*", "**/*.spec.*"]

@@ -1,6 +1,7 @@
 # ---
 # id = "circular-deps"
 # message = "Circular dependency detected between modules"
+# tags = ["architecture"]
 # ---
 
 relation reaches(String, String);

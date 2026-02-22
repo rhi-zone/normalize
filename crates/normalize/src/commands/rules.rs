@@ -32,6 +32,20 @@ pub enum RulesAction {
         #[arg(long, default_value = "all")]
         #[serde(default)]
         r#type: RuleType,
+
+        /// Filter by tag (e.g. "debug-print", "security")
+        #[arg(long)]
+        tag: Option<String>,
+
+        /// Filter to enabled rules only
+        #[arg(long)]
+        #[serde(default)]
+        enabled: bool,
+
+        /// Filter to disabled rules only
+        #[arg(long)]
+        #[serde(default)]
+        disabled: bool,
     },
 
     /// Run rules against the codebase
@@ -39,6 +53,10 @@ pub enum RulesAction {
         /// Specific rule ID to run
         #[arg(long)]
         rule: Option<String>,
+
+        /// Filter by tag (e.g. "debug-print", "security")
+        #[arg(long)]
+        tag: Option<String>,
 
         /// Apply auto-fixes (syntax rules only)
         #[arg(long)]
@@ -129,11 +147,27 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
     let json = format.is_json();
 
     match action {
-        RulesAction::List { sources, r#type } => {
-            cmd_list(&effective_root, sources, &r#type, json, &config)
-        }
+        RulesAction::List {
+            sources,
+            r#type,
+            tag,
+            enabled,
+            disabled,
+        } => cmd_list(
+            &effective_root,
+            ListFilters {
+                sources,
+                type_filter: &r#type,
+                tag: tag.as_deref(),
+                enabled,
+                disabled,
+                json,
+            },
+            &config,
+        ),
         RulesAction::Run {
             rule,
+            tag,
             fix,
             sarif,
             target,
@@ -147,6 +181,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
             cmd_run(
                 &target_root,
                 rule.as_deref(),
+                tag.as_deref(),
                 fix,
                 sarif,
                 &r#type,
@@ -176,6 +211,7 @@ pub fn cmd_run_syntax(
     crate::commands::analyze::rules_cmd::cmd_rules(
         root,
         filter_rule,
+        None,
         list_only,
         fix,
         format,
@@ -209,15 +245,27 @@ struct UnifiedRule {
     source: &'static str,
     message: String,
     enabled: bool,
+    tags: Vec<String>,
 }
 
-fn cmd_list(
-    root: &Path,
+struct ListFilters<'a> {
     sources: bool,
-    type_filter: &RuleType,
+    type_filter: &'a RuleType,
+    tag: Option<&'a str>,
+    enabled: bool,
+    disabled: bool,
     json: bool,
-    config: &crate::config::NormalizeConfig,
-) -> i32 {
+}
+
+fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::NormalizeConfig) -> i32 {
+    let ListFilters {
+        sources,
+        type_filter,
+        tag: tag_filter,
+        enabled: enabled_filter,
+        disabled: disabled_filter,
+        json,
+    } = filters;
     let mut all_rules = Vec::new();
 
     // Load syntax rules
@@ -232,6 +280,7 @@ fn cmd_list(
                 source,
                 message: r.message.clone(),
                 enabled: r.enabled,
+                tags: r.tags.clone(),
             });
         }
     }
@@ -248,8 +297,20 @@ fn cmd_list(
                 source,
                 message: r.message.clone(),
                 enabled: r.enabled,
+                tags: r.tags.clone(),
             });
         }
+    }
+
+    // Apply filters (all compose via AND)
+    if let Some(tag) = tag_filter {
+        all_rules.retain(|r| r.tags.iter().any(|t| t == tag));
+    }
+    if enabled_filter {
+        all_rules.retain(|r| r.enabled);
+    }
+    if disabled_filter {
+        all_rules.retain(|r| !r.enabled);
     }
 
     // Sort by type then id for stable output
@@ -266,6 +327,7 @@ fn cmd_list(
                     "source": r.source,
                     "message": r.message,
                     "enabled": r.enabled,
+                    "tags": r.tags,
                 })
             })
             .collect();
@@ -296,15 +358,20 @@ fn cmd_list(
 
         for r in &all_rules {
             let disabled_marker = if r.enabled { "" } else { "  [disabled]" };
+            let tags_str = if r.tags.is_empty() {
+                String::new()
+            } else {
+                format!("  [{}]", r.tags.join(", "))
+            };
             if sources {
                 println!(
-                    "  [{}]  {:30} {:9} {:7}  {}{}",
-                    r.rule_type, r.id, r.severity, r.source, r.message, disabled_marker
+                    "  [{}]  {:30} {:9} {:7}  {}{}{}",
+                    r.rule_type, r.id, r.severity, r.source, r.message, tags_str, disabled_marker
                 );
             } else {
                 println!(
-                    "  [{}]  {:30} {:9} {}{}",
-                    r.rule_type, r.id, r.severity, r.message, disabled_marker
+                    "  [{}]  {:30} {:9} {}{}{}",
+                    r.rule_type, r.id, r.severity, r.message, tags_str, disabled_marker
                 );
             }
         }
@@ -321,6 +388,7 @@ fn cmd_list(
 fn cmd_run(
     root: &Path,
     filter_rule: Option<&str>,
+    filter_tag: Option<&str>,
     fix: bool,
     sarif: bool,
     type_filter: &RuleType,
@@ -341,6 +409,7 @@ fn cmd_run(
         let code = crate::commands::analyze::rules_cmd::cmd_rules(
             root,
             filter_rule,
+            filter_tag,
             false,
             fix,
             &format,

@@ -1,6 +1,7 @@
 # ---
 # id = "dead-api"
 # message = "Public function never called from another file"
+# tags = ["architecture"]
 # enabled = false
 # allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs", "**/main.rs", "**/main.py", "**/main.go", "**/main.ts", "**/main.js"]
 # ---

@@ -13,6 +13,7 @@ use std::path::Path;
 pub fn cmd_rules(
     root: &Path,
     filter_rule: Option<&str>,
+    filter_tag: Option<&str>,
     list_only: bool,
     fix: bool,
     format: &crate::output::OutputFormat,
@@ -68,7 +69,7 @@ pub fn cmd_rules(
 
     // Run rules with the global grammar loader
     let loader = grammar_loader();
-    let findings = run_rules(&rules, root, &loader, filter_rule, debug);
+    let findings = run_rules(&rules, root, &loader, filter_rule, filter_tag, debug);
 
     // Apply fixes if requested
     if fix {

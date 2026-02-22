@@ -137,6 +137,7 @@ pub fn run_rules(
     root: &Path,
     loader: &GrammarLoader,
     filter_rule: Option<&str>,
+    filter_tag: Option<&str>,
     debug: &DebugFlags,
 ) -> Vec<Finding> {
     let start = std::time::Instant::now();
@@ -144,11 +145,12 @@ pub fn run_rules(
     let mut findings = Vec::new();
     let source_registry = builtin_registry();
 
-    // Filter rules first
+    // Filter rules first (all filters compose via AND)
     let active_rules: Vec<&Rule> = rules
         .iter()
         .filter(|r| r.enabled)
         .filter(|r| filter_rule.is_none_or(|f| r.id == f))
+        .filter(|r| filter_tag.is_none_or(|t| r.tags.iter().any(|tag| tag == t)))
         .collect();
 
     if active_rules.is_empty() {

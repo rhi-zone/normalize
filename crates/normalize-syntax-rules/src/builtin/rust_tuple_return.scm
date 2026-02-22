@@ -1,6 +1,7 @@
 # ---
 # id = "rust/tuple-return"
 # severity = "info"
+# tags = ["style"]
 # message = "Function returns tuple - consider using a struct with named fields"
 # languages = ["rust"]
 # enabled = false

@@ -1,6 +1,7 @@
 # ---
 # id = "python/tuple-return"
 # severity = "info"
+# tags = ["style"]
 # message = "Function returns tuple - consider using a dataclass or NamedTuple"
 # languages = ["python"]
 # enabled = false

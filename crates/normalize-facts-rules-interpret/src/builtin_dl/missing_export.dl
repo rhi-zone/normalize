@@ -1,6 +1,7 @@
 # ---
 # id = "missing-export"
 # message = "Public function is defined but file is never imported"
+# tags = ["architecture"]
 # enabled = false
 # allow = ["**/main.rs", "**/main.py", "**/main.go", "**/main.ts", "**/main.js", "**/tests/**"]
 # ---

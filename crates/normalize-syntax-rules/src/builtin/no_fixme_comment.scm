@@ -1,6 +1,7 @@
 # ---
 # id = "no-fixme-comment"
 # severity = "warning"
+# tags = ["cleanup"]
 # message = "FIXME comment found - fix before merging"
 # ---
 

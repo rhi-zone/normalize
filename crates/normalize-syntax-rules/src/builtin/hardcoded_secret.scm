@@ -1,6 +1,7 @@
 # ---
 # id = "hardcoded-secret"
 # severity = "error"
+# tags = ["security"]
 # message = "Potential hardcoded secret - use environment variables or config"
 # languages = ["rust"]
 # allow = ["**/tests/**", "**/examples/**", "**/*.md"]

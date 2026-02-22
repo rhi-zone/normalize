@@ -1,6 +1,7 @@
 # ---
 # id = "go/many-returns"
 # severity = "info"
+# tags = ["style"]
 # message = "Function has 3+ return values - consider using a struct"
 # languages = ["go"]
 # enabled = false

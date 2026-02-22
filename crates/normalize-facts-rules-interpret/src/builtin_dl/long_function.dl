@@ -1,6 +1,7 @@
 # ---
 # id = "long-function"
 # message = "Function body exceeds 100 lines"
+# tags = ["complexity"]
 # allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs"]
 # ---
 

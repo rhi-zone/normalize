@@ -1,6 +1,7 @@
 # ---
 # id = "rust/todo-macro"
 # severity = "warning"
+# tags = ["cleanup"]
 # message = "todo!() macro found - implement before merging"
 # languages = ["rust"]
 # allow = ["**/tests/**", "**/*_test.rs", "**/test_*.rs"]

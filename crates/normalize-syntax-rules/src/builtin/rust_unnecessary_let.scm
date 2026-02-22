@@ -1,6 +1,7 @@
 # ---
 # id = "rust/unnecessary-let"
 # severity = "info"
+# tags = ["style"]
 # message = "Unnecessary let binding - consider using the value directly"
 # languages = ["rust"]
 # enabled = false

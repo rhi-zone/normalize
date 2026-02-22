@@ -31,6 +31,9 @@ pub struct RuleOverride {
     /// Additional file patterns to allow (skip) for this rule.
     #[serde(default)]
     pub allow: Vec<String>,
+    /// Additional tags to add to this rule (appends to built-in tags).
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// Load all rules from all sources, merged by ID.
@@ -75,6 +78,12 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
             for pattern_str in &override_cfg.allow {
                 if let Ok(pattern) = Pattern::new(pattern_str) {
                     rule.allow.push(pattern);
+                }
+            }
+            // Append additional tags from config (additive, does not replace)
+            for tag in &override_cfg.tags {
+                if !rule.tags.contains(tag) {
+                    rule.tags.push(tag.clone());
                 }
             }
         }
@@ -224,6 +233,17 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    let tags: Vec<String> = frontmatter
+        .get("tags")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+
     Some(Rule {
         id,
         query_str: query_str.trim().to_string(),
@@ -236,5 +256,6 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         builtin: is_builtin,
         requires,
         fix,
+        tags,
     })
 }

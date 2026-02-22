@@ -1,6 +1,7 @@
 # ---
 # id = "duplicate-symbol"
 # message = "Same symbol name defined in multiple files"
+# tags = ["architecture"]
 # enabled = false
 # ---
 

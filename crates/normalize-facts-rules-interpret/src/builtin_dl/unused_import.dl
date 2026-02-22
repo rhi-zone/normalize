@@ -1,6 +1,7 @@
 # ---
 # id = "unused-import"
 # message = "Imported name is never referenced in the importing file"
+# tags = ["cleanup"]
 # allow = ["**/tests/**", "**/__init__.py", "**/mod.rs", "**/lib.rs", "**/index.ts", "**/index.js"]
 # ---
 

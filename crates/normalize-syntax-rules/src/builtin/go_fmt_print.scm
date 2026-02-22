@@ -1,6 +1,7 @@
 # ---
 # id = "go/fmt-print"
 # severity = "info"
+# tags = ["debug-print", "cleanup"]
 # message = "fmt.Print found - consider using structured logging"
 # languages = ["go"]
 # allow = ["**/tests/**", "**/*_test.go", "**/examples/**", "**/cmd/**"]

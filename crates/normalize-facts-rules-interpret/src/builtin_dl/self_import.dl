@@ -1,6 +1,7 @@
 # ---
 # id = "self-import"
 # message = "File imports itself"
+# tags = ["architecture"]
 # ---
 
 warning("self-import", file) <-- import(file, file, _);

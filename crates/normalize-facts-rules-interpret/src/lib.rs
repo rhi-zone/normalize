@@ -93,6 +93,9 @@ pub struct FactsRuleOverride {
     /// Additional patterns to allow (suppress matching diagnostics).
     #[serde(default)]
     pub allow: Vec<String>,
+    /// Additional tags to add to this rule (appends to built-in tags).
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// Configuration for fact rules. Maps rule ID to per-rule overrides.
@@ -155,6 +158,8 @@ pub struct FactsRule {
     pub builtin: bool,
     /// Source file path (empty for builtins).
     pub source_path: PathBuf,
+    /// Tags for grouping and filtering rules by concept (e.g. "architecture", "complexity").
+    pub tags: Vec<String>,
 }
 
 /// A builtin rule definition (id + embedded content).
@@ -279,6 +284,11 @@ pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<Fac
             for pattern_str in &override_cfg.allow {
                 if let Ok(pattern) = Pattern::new(pattern_str) {
                     rule.allow.push(pattern);
+                }
+            }
+            for tag in &override_cfg.tags {
+                if !rule.tags.contains(tag) {
+                    rule.tags.push(tag.clone());
                 }
             }
         }
@@ -418,6 +428,17 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         .and_then(|v| v.as_bool())
         .unwrap_or(true);
 
+    let tags: Vec<String> = frontmatter
+        .get("tags")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+
     Some(FactsRule {
         id,
         source: source_str.trim().to_string(),
@@ -427,6 +448,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         enabled,
         builtin: is_builtin,
         source_path: PathBuf::new(),
+        tags,
     })
 }
 

@@ -1,6 +1,7 @@
 # ---
 # id = "js/unnecessary-const"
 # severity = "info"
+# tags = ["style"]
 # message = "Unnecessary const binding - consider using the value directly"
 # languages = ["javascript", "typescript", "tsx", "jsx"]
 # enabled = false

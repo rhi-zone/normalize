@@ -1,6 +1,7 @@
 # ---
 # id = "hub-file"
 # message = "Module is imported by many files (>30)"
+# tags = ["architecture"]
 # enabled = false
 # ---
 

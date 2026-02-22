@@ -1,6 +1,7 @@
 # ---
 # id = "deep-nesting"
 # message = "Symbol is nested more than 3 levels deep"
+# tags = ["complexity"]
 # ---
 
 relation nested4(String, String);

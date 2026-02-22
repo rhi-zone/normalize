@@ -1,6 +1,7 @@
 # ---
 # id = "bidirectional-deps"
 # message = "Two files import each other (bidirectional coupling)"
+# tags = ["architecture"]
 # ---
 
 relation imports_file(String, String);

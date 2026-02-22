@@ -101,6 +101,8 @@ pub struct Rule {
     /// Use `$capture_name` to reference captures, `$match` for the full match.
     /// Empty string means "delete the match".
     pub fix: Option<String>,
+    /// Tags for grouping and filtering rules by concept (e.g. "debug-print", "security").
+    pub tags: Vec<String>,
 }
 
 /// A builtin rule definition (id, content).

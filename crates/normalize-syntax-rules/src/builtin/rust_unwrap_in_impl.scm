@@ -1,6 +1,7 @@
 # ---
 # id = "rust/unwrap-in-impl"
 # severity = "info"
+# tags = ["error-handling"]
 # message = ".unwrap() found - consider using ? or .expect() with context"
 # languages = ["rust"]
 # allow = ["**/tests/**", "**/test_*.rs", "**/*_test.rs", "**/*_tests.rs", "**/examples/**", "**/benches/**"]

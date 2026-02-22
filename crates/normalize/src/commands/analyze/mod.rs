@@ -752,6 +752,7 @@ pub fn run(
             rules_cmd::cmd_rules(
                 &target_root,
                 rule.as_deref(),
+                None,
                 list,
                 fix,
                 &format,

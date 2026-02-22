@@ -1,6 +1,7 @@
 # ---
 # id = "rust/chained-if-let"
 # severity = "info"
+# tags = ["style"]
 # message = "Nested if-let can be chained with && in Rust 2024+"
 # languages = ["rust"]
 # requires = { "rust.edition" = ">=2024" }

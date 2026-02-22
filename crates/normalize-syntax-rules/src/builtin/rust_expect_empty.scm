@@ -1,6 +1,7 @@
 # ---
 # id = "rust/expect-empty"
 # severity = "warning"
+# tags = ["error-handling"]
 # message = ".expect() with empty string - provide context message"
 # languages = ["rust"]
 # ---

@@ -1,6 +1,7 @@
 # ---
 # id = "orphan-file"
 # message = "File is never imported by any other file"
+# tags = ["architecture"]
 # enabled = false
 # ---
 

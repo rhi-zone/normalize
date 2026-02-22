@@ -1,6 +1,7 @@
 # ---
 # id = "rust/unnecessary-type-alias"
 # severity = "info"
+# tags = ["style"]
 # message = "Type alias to simple type - consider using the type directly"
 # languages = ["rust"]
 # enabled = false

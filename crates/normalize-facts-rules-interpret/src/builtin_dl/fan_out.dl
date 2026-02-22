@@ -1,6 +1,7 @@
 # ---
 # id = "fan-out"
 # message = "Function calls too many distinct functions (>50)"
+# tags = ["architecture", "complexity"]
 # enabled = false
 # ---
 

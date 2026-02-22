@@ -1,6 +1,7 @@
 # ---
 # id = "missing-impl"
 # message = "Class implements interface but is missing required methods"
+# tags = ["correctness"]
 # enabled = false
 # ---
 
