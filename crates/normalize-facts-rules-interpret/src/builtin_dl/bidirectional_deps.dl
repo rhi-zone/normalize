@@ -3,6 +3,22 @@
 # message = "Two files import each other (bidirectional coupling)"
 # tags = ["architecture"]
 # ---
+#
+# Two files that import each other are tightly coupled — a change to either
+# one can require changes to the other, making both harder to test in
+# isolation and harder to move or refactor independently.
+#
+# ## How to fix
+#
+# Extract the shared logic that both sides need into a third module that
+# neither imports from the other, or merge the two files if they truly belong
+# together. Dependency inversion (depend on an interface instead of a
+# concrete module) can also break the cycle.
+#
+# ## When to disable
+#
+# Rarely justified. If two modules genuinely model a symmetric relationship,
+# consider whether they should be one module instead.
 
 relation imports_file(String, String);
 imports_file(a, b) <-- import(a, b, _);

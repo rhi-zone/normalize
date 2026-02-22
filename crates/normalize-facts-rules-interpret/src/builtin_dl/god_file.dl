@@ -4,6 +4,22 @@
 # tags = ["architecture", "complexity"]
 # allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs"]
 # ---
+#
+# A file with more than 50 function definitions is too large to navigate or
+# own. Large files attract unrelated additions over time, become hotspots for
+# merge conflicts, and make it harder to identify which contributor is
+# responsible for which area.
+#
+# ## How to fix
+#
+# Split the file by domain or responsibility into smaller, focused modules.
+# A good split point is a cluster of functions that share private state or
+# always appear together in the call graph.
+#
+# ## When to disable
+#
+# Generated code (protobuf stubs, parser tables, auto-generated bindings)
+# is legitimately large. Add generated file patterns to the allow list.
 
 relation func(String, String);
 func(file, name) <-- symbol(file, name, kind, _), if kind == "function";

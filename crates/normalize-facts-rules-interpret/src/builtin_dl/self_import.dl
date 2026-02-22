@@ -3,5 +3,19 @@
 # message = "File imports itself"
 # tags = ["architecture"]
 # ---
+#
+# A file importing itself is almost always a copy-paste error. It creates a
+# circular dependency with zero benefit: the file already has access to its
+# own symbols without importing them.
+#
+# ## How to fix
+#
+# Remove the self-import. Check whether the import was intended to reference
+# a different module with a similar name.
+#
+# ## When to disable
+#
+# Almost never justified. There is no meaningful case where a file needs to
+# import itself.
 
 warning("self-import", file) <-- import(file, file, _);

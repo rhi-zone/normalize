@@ -5,6 +5,22 @@
 # enabled = false
 # allow = ["**/test_helpers/**", "**/test_utils/**", "**/conftest.py", "**/fixtures/**"]
 # ---
+#
+# When test files import from other test files, the test suite becomes
+# coupled — fixing or reorganizing one test can inadvertently break others
+# that depend on it. Tests should be independent; shared setup should live
+# in dedicated helper modules, not in individual test files.
+#
+# ## How to fix
+#
+# Move shared test utilities, fixtures, and factories into a
+# test_utils/ or test_helpers/ directory. Import helpers from there, not
+# from peer test files.
+#
+# ## When to disable
+#
+# Dedicated test helper directories (test_helpers/, test_utils/, conftest.py,
+# fixtures/) are already excluded in the default allow list.
 
 relation is_test_symbol(String);
 is_test_symbol(file) <-- attribute(file, _, attr), if attr == "#[test]" || attr == "#[cfg(test)]" || attr == "@Test" || attr == "@test" || attr == "@pytest.mark";

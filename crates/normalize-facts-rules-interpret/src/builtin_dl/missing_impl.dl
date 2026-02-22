@@ -4,6 +4,23 @@
 # tags = ["correctness"]
 # enabled = false
 # ---
+#
+# A class that claims to implement an interface but omits required methods is
+# a correctness issue. In dynamically typed languages this will fail at
+# runtime when the missing method is called, often in a hard-to-debug context
+# far from the declaration.
+#
+# ## How to fix
+#
+# Implement all methods required by the interface. If the methods are
+# intentionally absent, the class may be an abstract base class that is not
+# meant to be instantiated directly — document this clearly.
+#
+# ## When to disable
+#
+# Abstract base classes that are expected to be subclassed rather than
+# instantiated are a legitimate exception. Add them to the allow list or
+# annotate them so the rule can distinguish them.
 
 relation interface_method(String, String);
 interface_method(iface, method) <-- type_method(_, iface, method);

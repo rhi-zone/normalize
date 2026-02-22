@@ -4,6 +4,20 @@
 # tags = ["cleanup"]
 # allow = ["**/tests/**", "**/__init__.py", "**/mod.rs", "**/lib.rs", "**/index.ts", "**/index.js"]
 # ---
+#
+# An imported name that is never referenced in the importing file adds noise
+# to the import list and can mislead readers into thinking the file depends
+# on something it does not. Stale imports accumulate after refactoring.
+#
+# ## How to fix
+#
+# Remove the unused import. If the import is for a side effect (registering
+# a plugin, running init code), add a comment documenting the intent.
+#
+# ## When to disable
+#
+# Re-export files, side-effect imports, and common module boundary files
+# (mod.rs, lib.rs, index.ts) are already excluded in the default allow list.
 
 relation imported_name(String, String);
 imported_name(file, name) <-- import(file, _, name), if name != "*";

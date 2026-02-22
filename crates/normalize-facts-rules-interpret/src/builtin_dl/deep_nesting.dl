@@ -3,6 +3,23 @@
 # message = "Symbol is nested more than 3 levels deep"
 # tags = ["complexity"]
 # ---
+#
+# A symbol nested more than 3 levels deep (e.g., a method inside a class
+# inside a namespace inside a module) is hard to navigate and reference.
+# Deep nesting is often a sign that responsibilities have not been split into
+# appropriately sized modules.
+#
+# ## How to fix
+#
+# Extract deeply nested types or functions to a higher scope, or reorganize
+# into a flatter module hierarchy. If nesting reflects domain structure,
+# consider whether separate files or modules would be clearer.
+#
+# ## When to disable
+#
+# Codebases that use deep module hierarchies by design (e.g., generated
+# protocol buffers or framework-imposed nesting) can raise or disable this
+# threshold.
 
 relation nested4(String, String);
 nested4(file, d) <--

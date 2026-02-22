@@ -4,6 +4,23 @@
 # tags = ["architecture"]
 # enabled = false
 # ---
+#
+# Barrel files (also called index files) only re-export symbols from other
+# modules without defining any logic of their own. They create fan-out: a
+# single import pulls in every module the barrel touches, slowing builds and
+# making it hard to see what a file actually depends on.
+#
+# ## How to fix
+#
+# Import directly from the module that defines the symbol rather than going
+# through the barrel. If the barrel is the public API of a library, prefer
+# explicit re-export lists over wildcard re-exports to keep the surface area
+# visible.
+#
+# ## When to disable
+#
+# Intentional public API facades for library crates or packages are a
+# legitimate use of barrel files. Add those entry points to the allow list.
 
 relation file_has_import(String);
 file_has_import(file) <-- import(file, _, _);

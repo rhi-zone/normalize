@@ -4,6 +4,22 @@
 # tags = ["architecture"]
 # enabled = false
 # ---
+#
+# A module imported by more than 30 other files is a single point of change
+# — any edit forces re-compilation or re-evaluation of every dependent, and
+# a breaking change requires touching the entire codebase. Hub files often
+# accumulate unrelated utilities because they are already widely imported.
+#
+# ## How to fix
+#
+# Split the hub into smaller, focused modules so that each importer depends
+# only on what it actually needs. Related groups of exports naturally suggest
+# the split boundaries.
+#
+# ## When to disable
+#
+# Intentional facade modules that form a stable public API layer are expected
+# to be widely imported. Add those to the allow list.
 
 relation import_count(String, i32);
 import_count(to_module, c) <--

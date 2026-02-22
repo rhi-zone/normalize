@@ -3,6 +3,23 @@
 # message = "Type defines too many methods (>20)"
 # tags = ["complexity"]
 # ---
+#
+# A type with more than 20 methods is taking on too many responsibilities.
+# God classes become a catch-all for functionality that has nowhere else to
+# go, making them hard to test, hard to understand, and a source of constant
+# merge conflicts.
+#
+# ## How to fix
+#
+# Identify clusters of related methods and extract them into focused types.
+# The original class can delegate to the new types or be replaced by them
+# entirely. The threshold (20) is configurable in your normalize config.
+#
+# ## When to disable
+#
+# Rarely justified. If a type is large because it implements a rich but
+# coherent interface (e.g., a builder with many option methods), consider
+# whether the threshold should be raised rather than the rule disabled.
 
 relation method_of(String, String, String);
 method_of(file, method, cls) <--

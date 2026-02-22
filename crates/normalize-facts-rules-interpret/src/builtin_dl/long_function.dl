@@ -4,6 +4,22 @@
 # tags = ["complexity"]
 # allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs"]
 # ---
+#
+# Functions longer than 100 lines are hard to hold in mind at once, harder
+# to unit test in isolation, and tend to grow longer over time as new
+# conditions get appended. Cognitive load increases non-linearly with
+# function length.
+#
+# ## How to fix
+#
+# Extract cohesive blocks into well-named helper functions. A good helper
+# name acts as inline documentation — the caller reads "validate_input()",
+# not 20 lines of what that means.
+#
+# ## When to disable
+#
+# Test functions can be long by nature (setup, exercise, many assertions).
+# Test files are already excluded in the default allow list.
 
 relation func_length(String, String, u32);
 func_length(file, name, len) <--

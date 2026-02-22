@@ -5,6 +5,22 @@
 # enabled = false
 # allow = ["**/tests/**", "**/tests.rs", "**/*_test.rs", "**/*_tests.rs", "**/test_*.rs", "**/main.rs", "**/main.py", "**/main.go", "**/main.ts", "**/main.js"]
 # ---
+#
+# A public function that is never called from outside its own file is dead
+# code — it adds maintenance surface without providing value. Dead code tends
+# to accumulate and drift out of sync with the rest of the codebase,
+# creating confusion about intent.
+#
+# ## How to fix
+#
+# If the function is unused, delete it or restrict its visibility to private.
+# If it is used by callers outside this codebase (e.g., a library API),
+# verify that and add the file to the allow list.
+#
+# ## When to disable
+#
+# Library crates with external callers not indexed here, and entry-point files
+# (main.rs, main.py, etc.) are already excluded in the default allow list.
 
 relation public_func(String, String);
 public_func(file, name) <--

@@ -4,6 +4,22 @@
 # tags = ["architecture", "complexity"]
 # enabled = false
 # ---
+#
+# A function that calls more than 50 distinct functions is acting as a
+# god-level orchestrator. Such functions are hard to test because they have
+# too many collaborators, hard to reason about because the call graph spans
+# the whole system, and hard to change without unintended ripple effects.
+#
+# ## How to fix
+#
+# Extract groups of related calls into sub-orchestrators or domain-specific
+# helpers. Each helper should have a clear single responsibility with a
+# smaller, more cohesive fan-out.
+#
+# ## When to disable
+#
+# Top-level application entry points (main, init, setup) may legitimately
+# coordinate many subsystems. Add those files to the allow list.
 
 relation caller_fan_out(String, String, i32);
 caller_fan_out(file, caller, c) <--

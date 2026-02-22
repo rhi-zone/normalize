@@ -6,6 +6,22 @@
 # languages = ["rust"]
 # enabled = false
 # ---
+#
+# `let x = y;` where both sides are simple identifiers (no destructuring,
+# no transformation) creates an alias without adding meaning. The reader
+# must now track two names that refer to the same value, which increases
+# cognitive load without providing clarity.
+#
+# ## How to fix
+#
+# Use the original name directly. If the alias improves clarity (e.g.,
+# `let config = self.config;` at the top of a method to avoid repeated
+# field access), this is a judgment call — use the allow list.
+#
+# ## When to disable
+#
+# This rule is disabled by default (info severity). Intentional aliasing for
+# readability is a legitimate use — disable per file or expression as needed.
 
 ; Detects: let x = y; where both are simple identifiers
 ; Excludes: let mut (mutable), underscore-prefixed names, None (Option variant)

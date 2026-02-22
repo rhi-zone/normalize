@@ -4,6 +4,23 @@
 # tags = ["architecture"]
 # enabled = false
 # ---
+#
+# The same function name defined in multiple files makes text search
+# ambiguous — grep finds all of them and you have to determine which one is
+# relevant. It can also hide subtle differences in behavior between what
+# appear to be the same operation.
+#
+# ## How to fix
+#
+# Rename one of the functions to reflect its distinguishing purpose, or
+# extract the shared implementation into a single module that both callers
+# use.
+#
+# ## When to disable
+#
+# When the same name in unrelated modules is genuinely coincidental (e.g.,
+# `new` or `run`) and the functions serve different domains, the duplication
+# is often acceptable. Add the specific files to the allow list.
 
 relation dup(String, String, String);
 dup(name, file1, file2) <--

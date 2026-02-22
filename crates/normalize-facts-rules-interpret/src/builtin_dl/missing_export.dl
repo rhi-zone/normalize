@@ -5,6 +5,22 @@
 # enabled = false
 # allow = ["**/main.rs", "**/main.py", "**/main.go", "**/main.ts", "**/main.js", "**/tests/**"]
 # ---
+#
+# A file that declares public functions but is never imported by any other
+# file in the codebase has a visibility mismatch: it is advertising an API
+# that nobody in this project consumes. This often indicates dead code or a
+# forgotten export that was never wired up.
+#
+# ## How to fix
+#
+# If the file has no external callers, make the functions private or delete
+# them. If callers exist outside this codebase (library users, external
+# scripts), add the file pattern to the allow list.
+#
+# ## When to disable
+#
+# Library crates with external callers, and entry-point files (main.rs,
+# main.py, etc.), are already excluded in the default allow list.
 
 relation public_in_file(String, String);
 public_in_file(file, name) <--

@@ -4,6 +4,22 @@
 # tags = ["architecture"]
 # enabled = false
 # ---
+#
+# A file that defines symbols but is never imported by any other file in the
+# codebase is dead code. It adds maintenance surface, creates confusion
+# about whether it is still relevant, and tends to drift out of sync with
+# the rest of the project.
+#
+# ## How to fix
+#
+# If the file is needed, import it from the appropriate place. If it is
+# truly unused, delete it. If it was previously imported and is now orphaned,
+# investigate whether a refactoring accidentally dropped the dependency.
+#
+# ## When to disable
+#
+# Entry points and standalone scripts (main.rs, main.py, CLI binaries) are
+# never imported but are intentional. Add those patterns to the allow list.
 
 relation has_symbols(String);
 relation is_imported(String);
