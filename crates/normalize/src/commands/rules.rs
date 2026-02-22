@@ -573,7 +573,13 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
             // Pad plain text BEFORE colorizing so ANSI codes don't corrupt column widths
             let type_col = format!("{:<8}", format!("[{}]", r.rule_type));
             let sev_col = paint_severity(&format!("{:<8}", r.severity), use_colors);
-            let state_col = if r.enabled { "   " } else { "off" };
+            let state_col = if r.enabled {
+                "   ".to_string()
+            } else if use_colors {
+                nu_ansi_term::Color::DarkGray.paint("off").to_string()
+            } else {
+                "off".to_string()
+            };
             let tags_str = if r.tags.is_empty() {
                 String::new()
             } else {
