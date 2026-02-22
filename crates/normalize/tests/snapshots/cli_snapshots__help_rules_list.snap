@@ -9,6 +9,9 @@ Usage: normalize rules list [OPTIONS]
 Options:
       --sources             Show source URLs for imported rules
       --type <TYPE>         Filter by rule type [default: all] [possible values: all, syntax, fact]
+      --tag <TAG>           Filter by tag (e.g. "debug-print", "security")
+      --enabled             Filter to enabled rules only
+      --disabled            Filter to disabled rules only
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)

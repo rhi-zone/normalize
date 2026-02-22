@@ -3467,6 +3467,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml",
+ "toml_edit",
  "tower-lsp",
  "tree-sitter",
  "ureq",

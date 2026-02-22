@@ -82,6 +82,28 @@ pub enum RulesAction {
         debug: Vec<String>,
     },
 
+    /// Enable a rule or all rules matching a tag
+    Enable {
+        /// Rule ID or tag name
+        id_or_tag: String,
+
+        /// Preview changes without writing
+        #[arg(long)]
+        #[serde(default)]
+        dry_run: bool,
+    },
+
+    /// Disable a rule or all rules matching a tag
+    Disable {
+        /// Rule ID or tag name
+        id_or_tag: String,
+
+        /// Preview changes without writing
+        #[arg(long)]
+        #[serde(default)]
+        dry_run: bool,
+    },
+
     /// Show full documentation for a rule
     Show {
         /// Rule ID to show
@@ -207,6 +229,12 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
                 json,
                 &config,
             )
+        }
+        RulesAction::Enable { id_or_tag, dry_run } => {
+            cmd_enable_disable(&effective_root, &id_or_tag, true, dry_run, &config)
+        }
+        RulesAction::Disable { id_or_tag, dry_run } => {
+            cmd_enable_disable(&effective_root, &id_or_tag, false, dry_run, &config)
         }
         RulesAction::Show { id } => cmd_show(&effective_root, &id, json, &config),
         RulesAction::Tags { show_rules, tag } => {
@@ -397,6 +425,173 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
                 );
             }
         }
+    }
+
+    0
+}
+
+// =============================================================================
+// Enable / Disable
+// =============================================================================
+
+fn cmd_enable_disable(
+    root: &Path,
+    id_or_tag: &str,
+    enable: bool,
+    dry_run: bool,
+    config: &crate::config::NormalizeConfig,
+) -> i32 {
+    // Resolve which rule IDs to affect
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+
+    // Try exact ID match first, then tag match
+    let matched_syntax: Vec<&normalize_syntax_rules::Rule> = {
+        let by_id: Vec<_> = syntax_rules.iter().filter(|r| r.id == id_or_tag).collect();
+        if !by_id.is_empty() {
+            by_id
+        } else {
+            syntax_rules
+                .iter()
+                .filter(|r| r.tags.iter().any(|t| t == id_or_tag))
+                .collect()
+        }
+    };
+    let matched_fact: Vec<&interpret::FactsRule> = {
+        let by_id: Vec<_> = fact_rules.iter().filter(|r| r.id == id_or_tag).collect();
+        if !by_id.is_empty() {
+            by_id
+        } else {
+            fact_rules
+                .iter()
+                .filter(|r| r.tags.iter().any(|t| t == id_or_tag))
+                .collect()
+        }
+    };
+
+    if matched_syntax.is_empty() && matched_fact.is_empty() {
+        eprintln!(
+            "No rules found matching '{}' (not a rule ID or tag)",
+            id_or_tag
+        );
+        return 1;
+    }
+
+    let verb = if enable { "enable" } else { "disable" };
+    let config_path = root.join(".normalize").join("config.toml");
+
+    // Collect all changes to apply: (section, rule_id)
+    // syntax rules → [analyze.rules."id"]
+    // fact rules   → [analyze.facts-rules."id"]
+    let changes_syntax: Vec<&str> = matched_syntax
+        .iter()
+        .filter(|r| r.enabled != enable)
+        .map(|r| r.id.as_str())
+        .collect();
+    let changes_fact: Vec<&str> = matched_fact
+        .iter()
+        .filter(|r| r.enabled != enable)
+        .map(|r| r.id.as_str())
+        .collect();
+
+    // Rules already in the desired state
+    let already_syntax: Vec<&str> = matched_syntax
+        .iter()
+        .filter(|r| r.enabled == enable)
+        .map(|r| r.id.as_str())
+        .collect();
+    let already_fact: Vec<&str> = matched_fact
+        .iter()
+        .filter(|r| r.enabled == enable)
+        .map(|r| r.id.as_str())
+        .collect();
+
+    for id in &already_syntax {
+        println!("{}: already {}d (no change)", id, verb);
+    }
+    for id in &already_fact {
+        println!("{}: already {}d (no change)", id, verb);
+    }
+
+    if changes_syntax.is_empty() && changes_fact.is_empty() {
+        return 0;
+    }
+
+    for id in &changes_syntax {
+        if dry_run {
+            println!("[dry-run] would {} {}", verb, id);
+        } else {
+            println!("{}d {}", verb, id);
+        }
+    }
+    for id in &changes_fact {
+        if dry_run {
+            println!("[dry-run] would {} {}", verb, id);
+        } else {
+            println!("{}d {}", verb, id);
+        }
+    }
+
+    if dry_run {
+        return 0;
+    }
+
+    // Load or create the project config as a toml_edit document
+    let content = std::fs::read_to_string(&config_path).unwrap_or_default();
+    let mut doc: toml_edit::DocumentMut = content.parse().unwrap_or_default();
+
+    // Ensure [analyze] is an implicit table (no standalone [analyze] header)
+    if !doc.contains_key("analyze") {
+        let mut t = toml_edit::Table::new();
+        t.set_implicit(true);
+        doc["analyze"] = toml_edit::Item::Table(t);
+    }
+
+    // Apply syntax rule changes → [analyze.rules."id"]
+    if !changes_syntax.is_empty() {
+        let analyze = doc["analyze"].as_table_mut().unwrap();
+        if !analyze.contains_key("rules") {
+            let mut t = toml_edit::Table::new();
+            t.set_implicit(true);
+            analyze["rules"] = toml_edit::Item::Table(t);
+        }
+        let rules_table = analyze["rules"].as_table_mut().unwrap();
+        for id in &changes_syntax {
+            if !rules_table.contains_key(id) {
+                rules_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
+            }
+            rules_table[id]["enabled"] = toml_edit::value(enable);
+        }
+    }
+
+    // Apply fact rule changes → [analyze.facts-rules."id"]
+    if !changes_fact.is_empty() {
+        let analyze = doc["analyze"].as_table_mut().unwrap();
+        if !analyze.contains_key("facts-rules") {
+            let mut t = toml_edit::Table::new();
+            t.set_implicit(true);
+            analyze["facts-rules"] = toml_edit::Item::Table(t);
+        }
+        let facts_table = analyze["facts-rules"].as_table_mut().unwrap();
+        for id in &changes_fact {
+            if !facts_table.contains_key(id) {
+                facts_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
+            }
+            facts_table[id]["enabled"] = toml_edit::value(enable);
+        }
+    }
+
+    // Ensure parent directory exists
+    if let Some(parent) = config_path.parent()
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        eprintln!("Failed to create config directory: {}", e);
+        return 1;
+    }
+
+    if let Err(e) = std::fs::write(&config_path, doc.to_string()) {
+        eprintln!("Failed to write config: {}", e);
+        return 1;
     }
 
     0
