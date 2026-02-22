@@ -76,6 +76,66 @@ All of this works **without any rules**. Rules add enforcement:
 
 ## Use Cases
 
+## Rule File Format
+
+Rules are self-documenting. Each `.scm` or `.dl` file contains three sections:
+
+1. **TOML frontmatter** — machine-readable metadata
+2. **Markdown doc block** — human-readable documentation (optional but encouraged)
+3. **Query/program** — the actual rule logic
+
+```scheme
+# ---
+# id = "rust/unwrap-in-impl"
+# severity = "info"
+# message = ".unwrap() found - consider using ? or .expect() with context"
+# tags = ["safety", "error-handling"]
+# languages = ["rust"]
+# allow = ["**/tests/**", "**/examples/**"]
+# enabled = false
+# ---
+#
+# Unwrap in trait implementations can panic in library code, giving callers
+# no way to handle the error. This is especially problematic in library crates
+# where panicking is considered rude — callers expect to handle failures.
+#
+# ## How to fix
+#
+# Prefer `?` to propagate errors to the caller, or `.expect()` with context
+# if you're genuinely certain the value can't be `None`/`Err`.
+#
+# ## Examples
+#
+# **Bad:**
+# ```rust
+# fn process(&self) -> String {
+#     self.value.lock().unwrap()  // panics if poisoned
+# }
+# ```
+#
+# **Good:**
+# ```rust
+# fn process(&self) -> Result<String, PoisonError> {
+#     Ok(self.value.lock()?.clone())
+# }
+# ```
+#
+# ## When to disable
+#
+# In binary crates or application code where panicking is acceptable,
+# or in test helpers where a panic is the desired failure mode.
+
+; tree-sitter query
+((call_expression
+  function: (field_expression
+    field: (field_identifier) @_method)
+  (#eq? @_method "unwrap")) @match)
+```
+
+The doc block uses `#` comment lines containing markdown. It stays in the same file as the rule — documentation never drifts from the implementation. `rules show <id>` renders it; `rules list --expand` shows the first paragraph truncated.
+
+Aim for the same standard as Clippy, ESLint, or Ruff rule pages: rationale, bad/good examples, remediation, when to disable. All accessible offline.
+
 ### Tier 1: Pure Syntax (syntax-rules, exists today)
 
 AST pattern matching via tree-sitter queries. No semantic understanding.
@@ -258,6 +318,40 @@ These don't exist yet in the `Language` trait.
 
 Phase 3 is significant per-language work and should be driven by specific rule needs.
 
+## What Normalize Should and Shouldn't Implement
+
+The existence of eslint, oxlint, biome, ruff, rust-analyzer, go vet, clangd etc. raises an obvious question: should normalize reimplement checks that already exist in per-language tools?
+
+**No — and the reason is architectural, not just "avoid duplication."**
+
+Per-language linters operate at the **semantic/syntactic layer**: type-aware checks, dataflow analysis, ownership rules, language-specific idioms. They have deep knowledge of one language and sophisticated analysis to match.
+
+Normalize operates at the **structural/architectural layer**: import graphs, module coupling, export surfaces, dependency topology. This layer is:
+- **Cross-language by nature** — the same circular-dependency rule applies to Python, Rust, Go, and Gleam
+- **Not covered by per-language tools** — eslint cannot find a circular dependency between a JS module and a Python module
+- **Expressible over already-extracted facts** — no new extraction needed
+
+The right test for any new check: *can this only be expressed with cross-file or cross-language joins?* If yes, it belongs in normalize. If it's fundamentally about one file's semantics, the per-language tool does it better.
+
+### Layer Boundary in Practice
+
+| Check | Tool | Why |
+|-------|------|-----|
+| Circular deps between modules | normalize | Requires transitive join across all files |
+| Coupling metrics (fan-in/fan-out) | normalize | Requires aggregation over entire import graph |
+| Architecture violations (layer A → layer B) | normalize | Requires path predicates + recursive closure |
+| Cross-language dead exports | normalize | Requires joining across language boundaries |
+| Rust borrow checker violations | rust-analyzer | Requires type + ownership analysis |
+| JS type errors | typescript/eslint | Requires type inference |
+| Python async pitfalls | ruff | Language-specific idiom knowledge |
+| C++ Rule of Three/Five | clang-tidy | Already covered (`cppcoreguidelines-special-member-functions`) |
+
+### Dogfooding is Not the Justification
+
+Running normalize on normalize is valuable — but the value is in finding *architectural* issues (layering violations between crates, coupling hotspots, circular deps), not in replacing clippy. Clippy still runs; normalize adds the structural layer that clippy can't express.
+
+The goal is not a single tool that does everything. The goal is: normalize does the cross-language structural layer extremely well, and composes cleanly with per-language tools for the rest.
+
 ## Differentiation from CodeQL
 
 | | CodeQL | normalize |
@@ -270,6 +364,116 @@ Phase 3 is significant per-language work and should be driven by specific rule n
 | Setup | GitHub-hosted or heavy local install | Single binary |
 
 normalize is the lightweight, broad, structural analysis tool. CodeQL is the heavy, deep, security tool. Different jobs.
+
+## Rule Tags
+
+Tags are the unit of user intent. Rules are the unit of implementation. These are different things and shouldn't be collapsed.
+
+### Built-in tags
+
+Defined in .scm/.dl rule frontmatter:
+
+```toml
+# ---
+# id = "js/console-log"
+# tags = ["debug-print"]
+# languages = ["javascript", "typescript"]
+# ---
+```
+
+Built-in tags group rules by concept across languages. `--tag debug-print` enables all debug print rules for all languages at once — the user thinks in concepts, not language-specific rule IDs.
+
+### User-defined tags in normalize.toml
+
+Two mechanisms, both additive:
+
+**Tag groups** — define a named set of rules/tags (top-down):
+
+```toml
+[rule-tags]
+pre-commit = ["debug-print", "cleanup"]
+strict = ["pre-commit", "dead-api", "circular-deps"]  # tags can reference other tags
+```
+
+**Per-rule tags** — add a rule to a concept (bottom-up):
+
+```toml
+[[rules]]
+id = "js/console-log"
+severity = "error"
+tags = ["pre-commit"]  # appends to built-in tags, does not replace
+```
+
+Both resolve the same way at query time. Resolution is recursive expand-and-deduplicate.
+
+If a user-defined tag name matches a built-in tag, they union — same name means same concept. A user adding `debug-print = ["my-custom-logger"]` in `[rule-tags]` extends the built-in `debug-print` set rather than replacing it.
+
+### CLI surface
+
+```bash
+# Run by concept, not by rule ID
+normalize rules run --tag pre-commit        # fast, all languages
+normalize rules run --tag debug-print --language rust  # filters compose
+
+# Enable/disable by concept or by ID
+normalize rules enable debug-print          # enables all rules tagged debug-print
+normalize rules disable js/console-log      # disables one specific rule
+normalize rules enable debug-print --dry-run  # preview what would change
+
+# Discover
+normalize rules list                         # all rules
+normalize rules list --tag debug-print       # rules matching a tag
+normalize rules list --language rust --enabled  # enabled Rust rules
+normalize rules tags                         # all tags (builtin + user-defined)
+normalize rules tags --show-rules            # expand each tag to its member rules
+normalize rules tags --tag debug-print       # show what's in one tag
+```
+
+### Tag display and color
+
+In `--pretty` output, tags are color-coded using deterministic hashing: the tag name is hashed to an index into a curated palette of visually distinct colors. The same tag always renders in the same color across invocations, with no configuration needed.
+
+The palette is chosen deliberately — ~12 colors readable on both light and dark backgrounds, avoiding red and yellow which are reserved for error/warning severity indicators. Info uses a neutral color (e.g. dim white/blue).
+
+`rules list` shows severity and tags on each row, collapsed by default:
+
+```
+RULE                     LEVEL   TAGS
+rust/println-debug       info    debug-print  cleanup
+js/console-log           error   debug-print  pre-commit
+circular-deps            warn    architecture
+dead-api                 warn    architecture  strict
+```
+
+`--expand` shows options and the first line of documentation per rule:
+
+```
+RULE                     LEVEL   TAGS
+rust/println-debug       info    debug-print  cleanup
+  allow:   **/tests/**  **/examples/**  **/main.rs
+  message: println!/print! found - consider using tracing or log crate
+  docs:    Println in library code leaks debug output to callers...
+
+js/console-log           error   debug-print  pre-commit
+  allow:   **/tests/**  **/*.test.*
+  fix:     (auto-fixable)
+  docs:    console.log left in production code exposes internal state...
+```
+
+`rules show <id>` renders the full documentation for one rule — rationale, examples, remediation, when to disable.
+
+`rules tags --show-rules` expands by tag:
+
+```
+debug-print  [builtin]   js/console-log  python/print-debug  rust/println-debug  go/fmt-print
+cleanup      [builtin]   ...
+pre-commit   [user]      debug-print  cleanup  rust/unwrap-in-impl
+strict       [user]      pre-commit  dead-api  circular-deps
+```
+
+Tag colors are consistent across both views — `debug-print` is always the same color whether it appears as a column in `rules list` or as a header in `rules tags`.
+
+Color applies in `--pretty` mode only. `--compact` and `--json` output is never colored.
 
 ## Inline Suppression
 

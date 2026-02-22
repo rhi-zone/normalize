@@ -91,6 +91,7 @@ Scope is optional but recommended for multi-crate repos.
 ## Negative Constraints
 
 Do not:
+- Ship mutating commands without `--dry-run` - every command that writes, deletes, or modifies anything must support `--dry-run` to preview what would happen
 - Announce actions ("I will now...") - just do them
 - Leave work uncommitted — after completing a task and tests pass, commit immediately without asking
 - Create special cases - design to avoid them
