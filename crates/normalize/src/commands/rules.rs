@@ -347,7 +347,10 @@ fn paint_severity(severity: &str, use_colors: bool) -> String {
     if !use_colors {
         return severity.to_string();
     }
-    match severity {
+    // Trim before matching so pre-padded strings (e.g. "warning ") still match.
+    // The full `severity` string (including padding) is wrapped in the color code
+    // so the visible width is preserved for column alignment.
+    match severity.trim() {
         "error" => nu_ansi_term::Color::Red.paint(severity).to_string(),
         "warning" => nu_ansi_term::Color::Yellow.paint(severity).to_string(),
         "info" => nu_ansi_term::Color::Blue.paint(severity).to_string(),
@@ -544,24 +547,48 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
             );
         }
 
+        // Column headers (pretty mode only)
+        if use_colors {
+            let gray = nu_ansi_term::Color::DarkGray;
+            if sources {
+                println!(
+                    "{}",
+                    gray.paint(format!(
+                        "  {:<8}  {:<30}  {:<8}  {:<3}  {:<7}  TAGS",
+                        "TYPE", "ID", "SEVERITY", "ST", "SOURCE"
+                    ))
+                );
+            } else {
+                println!(
+                    "{}",
+                    gray.paint(format!(
+                        "  {:<8}  {:<30}  {:<8}  ST   TAGS",
+                        "TYPE", "ID", "SEVERITY"
+                    ))
+                );
+            }
+        }
+
         for r in &all_rules {
-            let disabled_marker = if r.enabled { "" } else { "  [disabled]" };
+            // Pad plain text BEFORE colorizing so ANSI codes don't corrupt column widths
+            let type_col = format!("{:<8}", format!("[{}]", r.rule_type));
+            let sev_col = paint_severity(&format!("{:<8}", r.severity), use_colors);
+            let state_col = if r.enabled { "   " } else { "off" };
             let tags_str = if r.tags.is_empty() {
                 String::new()
             } else {
                 format!("  {}", paint_tags(&r.tags, use_colors))
             };
-            let sev = paint_severity(&r.severity, use_colors);
-            // First line: type, id, severity, (source), tags, disabled marker
+            // First line: type, id, severity, state, (source), tags
             if sources {
                 println!(
-                    "  [{}]  {:30} {:9} {:7}{}{}",
-                    r.rule_type, r.id, sev, r.source, tags_str, disabled_marker
+                    "  {}  {:<30}  {}  {}  {:<7}{}",
+                    type_col, r.id, sev_col, state_col, r.source, tags_str
                 );
             } else {
                 println!(
-                    "  [{}]  {:30} {:9}{}{}",
-                    r.rule_type, r.id, sev, tags_str, disabled_marker
+                    "  {}  {:<30}  {}  {}{}",
+                    type_col, r.id, sev_col, state_col, tags_str
                 );
             }
             // Second line: description (suppressed by --no-desc)
