@@ -753,6 +753,7 @@ pub fn run(
                 &target_root,
                 rule.as_deref(),
                 None,
+                None,
                 list,
                 fix,
                 &format,

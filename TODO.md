@@ -191,17 +191,17 @@ Rules (custom enforcement, future):
 - [ ] Dependency path queries ("what's between A and B?")
 
 **Rule tags system** (see `docs/lint-architecture.md`):
-- [ ] Built-in tags in `.scm`/`.dl` frontmatter (`tags = ["debug-print"]`)
-- [ ] `[rule-tags]` in `normalize.toml` — user-defined tag groups, tags can reference other tags
-- [ ] Per-rule `tags = []` in `normalize.toml` — additive, appends to built-in tags
-- [ ] Union semantics: same tag name = same concept, user tags extend built-in tags
-- [ ] `rules list --tag <tag> --language <lang> --enabled --disabled --expand` (filters compose)
-- [ ] `rules run --tag <tag>` (currently only `--rule <id>`)
-- [ ] `rules tags` subcommand — list all tags with origin (builtin/user), `--show-rules` to expand
-- [ ] `rules show <id>` — render full rule documentation offline
-- [ ] `rules enable`/`rules disable <tag-or-id>` — enable/disable by concept, with `--dry-run`
+- [x] Built-in tags in `.scm`/`.dl` frontmatter (`tags = ["debug-print"]`)
+- [x] `[rule-tags]` in `normalize.toml` — user-defined tag groups, tags can reference other tags
+- [x] Per-rule `tags = []` in `normalize.toml` — additive, appends to built-in tags
+- [x] Union semantics: same tag name = same concept, user tags extend built-in tags
+- [x] `rules list --tag <tag> --enabled --disabled` (filters compose)
+- [x] `rules run --tag <tag>`
+- [x] `rules tags` subcommand — list all tags with origin (builtin/user), `--show-rules` to expand
+- [x] `rules show <id>` — render full rule documentation offline
+- [x] `rules enable`/`rules disable <tag-or-id>` — enable/disable by concept, with `--dry-run`
 - [ ] Deterministic tag color hashing in `--pretty` output (curated palette, red/yellow reserved for severity)
-- [ ] Multi-paragraph rule doc block format: frontmatter → markdown comments → query (see `docs/lint-architecture.md`)
+- [x] Multi-paragraph rule doc block format: frontmatter → markdown comments → query (see `docs/lint-architecture.md`)
 
 **Facts & Rules Architecture:**
 

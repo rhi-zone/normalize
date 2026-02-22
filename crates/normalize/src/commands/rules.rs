@@ -5,7 +5,7 @@ use clap::Subcommand;
 use normalize_facts_rules_interpret as interpret;
 use normalize_syntax_rules::{self, DebugFlags};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
@@ -262,6 +262,7 @@ pub fn cmd_run_syntax(
         root,
         filter_rule,
         None,
+        None,
         list_only,
         fix,
         format,
@@ -280,7 +281,57 @@ pub fn cmd_run_facts(
     config: &interpret::FactsRulesConfig,
 ) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(run_fact_rules(root, rules_file, list_only, json, config))
+    rt.block_on(run_fact_rules(
+        root, rules_file, list_only, json, config, None,
+    ))
+}
+
+// =============================================================================
+// Tag expansion
+// =============================================================================
+
+/// Expand a tag name into the set of rule IDs it covers.
+///
+/// Resolution order:
+/// 1. Check `[rule-tags]` for a user-defined group — each entry may be a rule ID
+///    or another tag name (recursed, with cycle detection).
+/// 2. Any rule whose `tags` list contains the tag name directly.
+///
+/// Both sources are unioned together.
+fn expand_tag<'a>(
+    tag: &str,
+    rule_tags: &'a HashMap<String, Vec<String>>,
+    all_rules: &'a [UnifiedRule],
+    visited: &mut HashSet<String>,
+) -> HashSet<&'a str> {
+    if !visited.insert(tag.to_string()) {
+        // Cycle — stop recursing
+        return HashSet::new();
+    }
+
+    let mut ids: HashSet<&'a str> = HashSet::new();
+
+    // Builtin/per-rule tags: rules that carry this tag directly
+    for r in all_rules {
+        if r.tags.iter().any(|t| t == tag) {
+            ids.insert(r.id.as_str());
+        }
+    }
+
+    // User-defined group
+    if let Some(members) = rule_tags.get(tag) {
+        for member in members {
+            // Is it a rule ID?
+            if all_rules.iter().any(|r| r.id == *member) {
+                ids.insert(member.as_str());
+            } else {
+                // Treat as a tag reference — recurse
+                ids.extend(expand_tag(member, rule_tags, all_rules, visited));
+            }
+        }
+    }
+
+    ids
 }
 
 // =============================================================================
@@ -354,7 +405,13 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
 
     // Apply filters (all compose via AND)
     if let Some(tag) = tag_filter {
-        all_rules.retain(|r| r.tags.iter().any(|t| t == tag));
+        let rule_tags = &config.rule_tags.0;
+        let mut visited = HashSet::new();
+        let matching_ids: HashSet<String> = expand_tag(tag, rule_tags, &all_rules, &mut visited)
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+        all_rules.retain(|r| matching_ids.contains(&r.id));
     }
     if enabled_filter {
         all_rules.retain(|r| r.enabled);
@@ -445,29 +502,49 @@ fn cmd_enable_disable(
     let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
     let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
 
-    // Try exact ID match first, then tag match
-    let matched_syntax: Vec<&normalize_syntax_rules::Rule> = {
-        let by_id: Vec<_> = syntax_rules.iter().filter(|r| r.id == id_or_tag).collect();
-        if !by_id.is_empty() {
-            by_id
+    // Build unified list for tag expansion
+    let all_unified: Vec<UnifiedRule> = syntax_rules
+        .iter()
+        .map(|r| UnifiedRule {
+            id: r.id.clone(),
+            rule_type: "syntax",
+            severity: r.severity.to_string(),
+            source: if r.builtin { "builtin" } else { "project" },
+            message: r.message.clone(),
+            enabled: r.enabled,
+            tags: r.tags.clone(),
+        })
+        .chain(fact_rules.iter().map(|r| UnifiedRule {
+            id: r.id.clone(),
+            rule_type: "fact",
+            severity: r.severity.to_string(),
+            source: if r.builtin { "builtin" } else { "project" },
+            message: r.message.clone(),
+            enabled: r.enabled,
+            tags: r.tags.clone(),
+        }))
+        .collect();
+
+    // Exact ID match takes priority; otherwise expand as tag (includes user-defined groups)
+    let rule_tags = &config.rule_tags.0;
+    let matched_ids: HashSet<&str> = {
+        if all_unified.iter().any(|r| r.id == id_or_tag) {
+            // Exact ID match
+            std::iter::once(id_or_tag).collect()
         } else {
-            syntax_rules
-                .iter()
-                .filter(|r| r.tags.iter().any(|t| t == id_or_tag))
-                .collect()
+            let mut visited = HashSet::new();
+            expand_tag(id_or_tag, rule_tags, &all_unified, &mut visited)
         }
     };
-    let matched_fact: Vec<&interpret::FactsRule> = {
-        let by_id: Vec<_> = fact_rules.iter().filter(|r| r.id == id_or_tag).collect();
-        if !by_id.is_empty() {
-            by_id
-        } else {
-            fact_rules
-                .iter()
-                .filter(|r| r.tags.iter().any(|t| t == id_or_tag))
-                .collect()
-        }
-    };
+
+    let matched_syntax: Vec<&normalize_syntax_rules::Rule> = syntax_rules
+        .iter()
+        .filter(|r| matched_ids.contains(r.id.as_str()))
+        .collect();
+    let matched_fact: Vec<&interpret::FactsRule> = fact_rules
+        .iter()
+        .filter(|r| matched_ids.contains(r.id.as_str()))
+        .collect();
 
     if matched_syntax.is_empty() && matched_fact.is_empty() {
         eprintln!(
@@ -743,24 +820,71 @@ fn cmd_tags(
     let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
     let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
 
-    // Build tag → [(id, builtin)] map
-    let mut tag_map: std::collections::BTreeMap<String, Vec<(String, bool)>> =
+    // Build the unified list for expansion
+    let all_unified: Vec<UnifiedRule> = syntax_rules
+        .iter()
+        .map(|r| UnifiedRule {
+            id: r.id.clone(),
+            rule_type: "syntax",
+            severity: r.severity.to_string(),
+            source: if r.builtin { "builtin" } else { "project" },
+            message: r.message.clone(),
+            enabled: r.enabled,
+            tags: r.tags.clone(),
+        })
+        .chain(fact_rules.iter().map(|r| UnifiedRule {
+            id: r.id.clone(),
+            rule_type: "fact",
+            severity: r.severity.to_string(),
+            source: if r.builtin { "builtin" } else { "project" },
+            message: r.message.clone(),
+            enabled: r.enabled,
+            tags: r.tags.clone(),
+        }))
+        .collect();
+
+    // tag → (origin, rule IDs)
+    // "origin" values: "builtin" | "user" | "user-defined"
+    let mut tag_map: std::collections::BTreeMap<String, (String, Vec<String>)> =
         std::collections::BTreeMap::new();
 
+    // 1. Per-rule builtin/config tags
     for r in &syntax_rules {
         for tag in &r.tags {
             tag_map
                 .entry(tag.clone())
-                .or_default()
-                .push((r.id.clone(), r.builtin));
+                .or_insert_with(|| ("builtin".to_string(), Vec::new()))
+                .1
+                .push(r.id.clone());
         }
     }
     for r in &fact_rules {
         for tag in &r.tags {
             tag_map
                 .entry(tag.clone())
-                .or_default()
-                .push((r.id.clone(), r.builtin));
+                .or_insert_with(|| ("builtin".to_string(), Vec::new()))
+                .1
+                .push(r.id.clone());
+        }
+    }
+
+    // 2. User-defined tag groups from [rule-tags]
+    let rule_tags = &config.rule_tags.0;
+    for tag_name in rule_tags.keys() {
+        let entry = tag_map
+            .entry(tag_name.clone())
+            .or_insert_with(|| ("user-defined".to_string(), Vec::new()));
+        // If already exists as a builtin tag, mark as extended
+        if entry.0 == "builtin" {
+            entry.0 = "builtin+user".to_string();
+        }
+        // Expand to get the full resolved ID set
+        let mut visited = HashSet::new();
+        let resolved = expand_tag(tag_name, rule_tags, &all_unified, &mut visited);
+        for id in resolved {
+            if !entry.1.contains(&id.to_string()) {
+                entry.1.push(id.to_string());
+            }
         }
     }
 
@@ -772,14 +896,11 @@ fn cmd_tags(
     if json {
         let out: Vec<_> = tag_map
             .iter()
-            .map(|(tag, rules)| {
-                let builtin_count = rules.iter().filter(|(_, b)| *b).count();
-                let user_count = rules.len() - builtin_count;
+            .map(|(tag, (origin, ids))| {
                 serde_json::json!({
                     "tag": tag,
-                    "builtin_rules": builtin_count,
-                    "user_rules": user_count,
-                    "rules": rules.iter().map(|(id, _)| id).collect::<Vec<_>>(),
+                    "origin": origin,
+                    "rules": ids,
                 })
             })
             .collect();
@@ -792,18 +913,11 @@ fn cmd_tags(
         return 0;
     }
 
-    for (tag, rules) in &tag_map {
-        let builtin_count = rules.iter().filter(|(_, b)| *b).count();
-        let user_count = rules.len() - builtin_count;
-        let origin = match (builtin_count > 0, user_count > 0) {
-            (true, false) => "builtin".to_string(),
-            (false, true) => "user".to_string(),
-            _ => format!("{} builtin, {} user", builtin_count, user_count),
-        };
-        let count = rules.len();
+    for (tag, (origin, ids)) in &tag_map {
+        let count = ids.len();
         if show_rules {
-            let ids: Vec<&str> = rules.iter().map(|(id, _)| id.as_str()).collect();
-            println!("{:20} [{}]  {}", tag, origin, ids.join("  "));
+            let ids_str: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
+            println!("{:20} [{}]  {}", tag, origin, ids_str.join("  "));
         } else {
             println!(
                 "{:20} [{}]  {} rule{}",
@@ -836,6 +950,49 @@ fn cmd_run(
 ) -> i32 {
     let mut exit_code = 0;
 
+    // If the tag is user-defined, expand it to a concrete set of rule IDs so that
+    // both the syntax and fact runners can filter against it.
+    let rule_tags = &config.rule_tags.0;
+    let filter_ids: Option<HashSet<String>> = filter_tag.and_then(|tag| {
+        if rule_tags.contains_key(tag) {
+            // Build unified list for expansion
+            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+            let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+            let all_unified: Vec<UnifiedRule> = syntax_rules
+                .iter()
+                .map(|r| UnifiedRule {
+                    id: r.id.clone(),
+                    rule_type: "syntax",
+                    severity: r.severity.to_string(),
+                    source: if r.builtin { "builtin" } else { "project" },
+                    message: r.message.clone(),
+                    enabled: r.enabled,
+                    tags: r.tags.clone(),
+                })
+                .chain(fact_rules.iter().map(|r| UnifiedRule {
+                    id: r.id.clone(),
+                    rule_type: "fact",
+                    severity: r.severity.to_string(),
+                    source: if r.builtin { "builtin" } else { "project" },
+                    message: r.message.clone(),
+                    enabled: r.enabled,
+                    tags: r.tags.clone(),
+                }))
+                .collect();
+            let mut visited = HashSet::new();
+            let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
+            Some(ids.iter().map(|s| s.to_string()).collect())
+        } else {
+            None // Builtin tag: handled by filter_tag pass-through
+        }
+    });
+    // When using expanded IDs, don't also pass filter_tag (would AND incorrectly)
+    let effective_tag = if filter_ids.is_some() {
+        None
+    } else {
+        filter_tag
+    };
+
     // Run syntax rules
     if matches!(type_filter, RuleType::All | RuleType::Syntax) {
         let debug_flags = DebugFlags::from_args(debug);
@@ -847,7 +1004,8 @@ fn cmd_run(
         let code = crate::commands::analyze::rules_cmd::cmd_rules(
             root,
             filter_rule,
-            filter_tag,
+            effective_tag,
+            filter_ids.as_ref(),
             false,
             fix,
             &format,
@@ -860,9 +1018,17 @@ fn cmd_run(
         }
     }
 
-    // Run fact rules
+    // Run fact rules (pass filter_ids for tag-based filtering)
     if matches!(type_filter, RuleType::All | RuleType::Fact) {
-        let code = cmd_run_facts(root, None, false, json, &config.analyze.facts_rules);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let code = rt.block_on(run_fact_rules(
+            root,
+            None,
+            false,
+            json,
+            &config.analyze.facts_rules,
+            filter_ids.as_ref(),
+        ));
         if code != 0 {
             exit_code = code;
         }
@@ -878,6 +1044,7 @@ async fn run_fact_rules(
     list_only: bool,
     json: bool,
     config: &interpret::FactsRulesConfig,
+    filter_ids: Option<&HashSet<String>>,
 ) -> i32 {
     // If a specific file is given, run just that file
     if let Some(path) = rules_file {
@@ -928,10 +1095,11 @@ async fn run_fact_rules(
         return 0;
     }
 
-    // Filter to enabled rules for execution
+    // Filter to enabled rules for execution, with optional ID allowlist
     let all_rules: Vec<_> = all_rules_unfiltered
         .into_iter()
         .filter(|r| r.enabled)
+        .filter(|r| filter_ids.is_none_or(|ids| ids.contains(&r.id)))
         .collect();
 
     if all_rules.is_empty() {

@@ -74,6 +74,22 @@ impl IndexConfig {
     }
 }
 
+/// User-defined rule tag groups.
+///
+/// Tags can reference rule IDs or other tag names (including built-in tags).
+/// References are resolved transitively at filter time.
+///
+/// Example:
+/// ```toml
+/// [rule-tags]
+/// ci-blockers = ["security", "error-handling"]   # group of tags
+/// my-checks   = ["circular-deps", "hub-file"]    # group of rule IDs
+/// strict      = ["ci-blockers", "my-checks"]     # references other user tags
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, JsonSchema)]
+#[serde(transparent)]
+pub struct RuleTagsConfig(pub std::collections::HashMap<String, Vec<String>>);
+
 /// Root configuration structure.
 #[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, JsonSchema)]
 #[serde(default)]
@@ -88,6 +104,9 @@ pub struct NormalizeConfig {
     pub text_search: TextSearchConfig,
     pub pretty: PrettyConfig,
     pub serve: crate::serve::ServeConfig,
+    /// User-defined rule tag groups (`[rule-tags]` section).
+    #[serde(default, rename = "rule-tags")]
+    pub rule_tags: RuleTagsConfig,
 }
 
 impl NormalizeConfig {

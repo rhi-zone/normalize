@@ -138,6 +138,7 @@ pub fn run_rules(
     loader: &GrammarLoader,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
+    filter_ids: Option<&std::collections::HashSet<String>>,
     debug: &DebugFlags,
 ) -> Vec<Finding> {
     let start = std::time::Instant::now();
@@ -151,6 +152,7 @@ pub fn run_rules(
         .filter(|r| r.enabled)
         .filter(|r| filter_rule.is_none_or(|f| r.id == f))
         .filter(|r| filter_tag.is_none_or(|t| r.tags.iter().any(|tag| tag == t)))
+        .filter(|r| filter_ids.is_none_or(|ids| ids.contains(&r.id)))
         .collect();
 
     if active_rules.is_empty() {
