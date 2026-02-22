@@ -82,6 +82,18 @@ pub enum RulesAction {
         debug: Vec<String>,
     },
 
+    /// List all tags and the rules they group
+    Tags {
+        /// Expand each tag to show its member rules
+        #[arg(long)]
+        #[serde(default)]
+        show_rules: bool,
+
+        /// Show only this specific tag
+        #[arg(long)]
+        tag: Option<String>,
+    },
+
     /// Add a rule from a URL
     Add {
         /// URL to download the rule from
@@ -189,6 +201,9 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
                 json,
                 &config,
             )
+        }
+        RulesAction::Tags { show_rules, tag } => {
+            cmd_tags(&effective_root, show_rules, tag.as_deref(), json, &config)
         }
         RulesAction::Add { url, global } => cmd_add(&url, global, json),
         RulesAction::Update { rule_id } => cmd_update(rule_id.as_deref(), json),
@@ -374,6 +389,96 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
                     r.rule_type, r.id, r.severity, r.message, tags_str, disabled_marker
                 );
             }
+        }
+    }
+
+    0
+}
+
+// =============================================================================
+// Tags
+// =============================================================================
+
+fn cmd_tags(
+    root: &Path,
+    show_rules: bool,
+    tag_filter: Option<&str>,
+    json: bool,
+    config: &crate::config::NormalizeConfig,
+) -> i32 {
+    // Collect all rules from both tiers
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+
+    // Build tag → [(id, builtin)] map
+    let mut tag_map: std::collections::BTreeMap<String, Vec<(String, bool)>> =
+        std::collections::BTreeMap::new();
+
+    for r in &syntax_rules {
+        for tag in &r.tags {
+            tag_map
+                .entry(tag.clone())
+                .or_default()
+                .push((r.id.clone(), r.builtin));
+        }
+    }
+    for r in &fact_rules {
+        for tag in &r.tags {
+            tag_map
+                .entry(tag.clone())
+                .or_default()
+                .push((r.id.clone(), r.builtin));
+        }
+    }
+
+    // Apply tag filter
+    if let Some(t) = tag_filter {
+        tag_map.retain(|k, _| k == t);
+    }
+
+    if json {
+        let out: Vec<_> = tag_map
+            .iter()
+            .map(|(tag, rules)| {
+                let builtin_count = rules.iter().filter(|(_, b)| *b).count();
+                let user_count = rules.len() - builtin_count;
+                serde_json::json!({
+                    "tag": tag,
+                    "builtin_rules": builtin_count,
+                    "user_rules": user_count,
+                    "rules": rules.iter().map(|(id, _)| id).collect::<Vec<_>>(),
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&out).unwrap());
+        return 0;
+    }
+
+    if tag_map.is_empty() {
+        println!("No tags found.");
+        return 0;
+    }
+
+    for (tag, rules) in &tag_map {
+        let builtin_count = rules.iter().filter(|(_, b)| *b).count();
+        let user_count = rules.len() - builtin_count;
+        let origin = match (builtin_count > 0, user_count > 0) {
+            (true, false) => "builtin".to_string(),
+            (false, true) => "user".to_string(),
+            _ => format!("{} builtin, {} user", builtin_count, user_count),
+        };
+        let count = rules.len();
+        if show_rules {
+            let ids: Vec<&str> = rules.iter().map(|(id, _)| id.as_str()).collect();
+            println!("{:20} [{}]  {}", tag, origin, ids.join("  "));
+        } else {
+            println!(
+                "{:20} [{}]  {} rule{}",
+                tag,
+                origin,
+                count,
+                if count == 1 { "" } else { "s" }
+            );
         }
     }
 
