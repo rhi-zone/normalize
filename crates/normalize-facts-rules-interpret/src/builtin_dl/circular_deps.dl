@@ -3,6 +3,21 @@
 # message = "Circular dependency detected between modules"
 # tags = ["architecture"]
 # ---
+#
+# Circular dependencies make modules impossible to test in isolation and create
+# tight coupling that resists refactoring. A depends on B depends on C depends
+# on A — changing any one requires understanding all three.
+#
+# ## How to fix
+#
+# Introduce an abstraction that both sides depend on (dependency inversion),
+# or extract the shared logic into a new module that neither side imports from
+# the other.
+#
+# ## When to disable
+#
+# Rarely justified. If you have intentional mutual recursion between modules,
+# consider merging them into one.
 
 relation reaches(String, String);
 relation cycle(String, String);

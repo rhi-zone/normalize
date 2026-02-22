@@ -103,6 +103,8 @@ pub struct Rule {
     pub fix: Option<String>,
     /// Tags for grouping and filtering rules by concept (e.g. "debug-print", "security").
     pub tags: Vec<String>,
+    /// Documentation from the markdown comment block between frontmatter and query.
+    pub doc: Option<String>,
 }
 
 /// A builtin rule definition (id, content).

@@ -135,12 +135,17 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
     let lines: Vec<&str> = content.lines().collect();
 
     let mut in_frontmatter = false;
+    let mut frontmatter_done = false;
     let mut frontmatter_lines = Vec::new();
+    let mut doc_lines = Vec::new();
     let mut query_lines = Vec::new();
 
     for line in &lines {
         let trimmed = line.trim();
         if trimmed == "# ---" {
+            if in_frontmatter {
+                frontmatter_done = true;
+            }
             in_frontmatter = !in_frontmatter;
             continue;
         }
@@ -148,6 +153,10 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         if in_frontmatter {
             let fm_line = line.strip_prefix('#').unwrap_or(line).trim_start();
             frontmatter_lines.push(fm_line);
+        } else if frontmatter_done && query_lines.is_empty() && trimmed.starts_with('#') {
+            // Doc block: comment lines after frontmatter, before query
+            let doc_line = line.strip_prefix('#').unwrap_or("").trim_start_matches(' ');
+            doc_lines.push(doc_line);
         } else if !frontmatter_lines.is_empty()
             || (frontmatter_lines.is_empty() && !trimmed.is_empty() && !trimmed.starts_with('#'))
         {
@@ -159,6 +168,13 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         (String::new(), content.to_string())
     } else {
         (frontmatter_lines.join("\n"), query_lines.join("\n"))
+    };
+
+    let doc = if doc_lines.is_empty() {
+        None
+    } else {
+        let text = doc_lines.join("\n").trim().to_string();
+        if text.is_empty() { None } else { Some(text) }
     };
 
     let frontmatter: toml::Value = if frontmatter_str.is_empty() {
@@ -257,5 +273,6 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         requires,
         fix,
         tags,
+        doc,
     })
 }

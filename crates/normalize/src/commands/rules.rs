@@ -82,6 +82,12 @@ pub enum RulesAction {
         debug: Vec<String>,
     },
 
+    /// Show full documentation for a rule
+    Show {
+        /// Rule ID to show
+        id: String,
+    },
+
     /// List all tags and the rules they group
     Tags {
         /// Expand each tag to show its member rules
@@ -202,6 +208,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat
                 &config,
             )
         }
+        RulesAction::Show { id } => cmd_show(&effective_root, &id, json, &config),
         RulesAction::Tags { show_rules, tag } => {
             cmd_tags(&effective_root, show_rules, tag.as_deref(), json, &config)
         }
@@ -389,6 +396,137 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
                     r.rule_type, r.id, r.severity, r.message, tags_str, disabled_marker
                 );
             }
+        }
+    }
+
+    0
+}
+
+// =============================================================================
+// Show
+// =============================================================================
+
+fn cmd_show(root: &Path, id: &str, json: bool, config: &crate::config::NormalizeConfig) -> i32 {
+    // Search syntax rules first, then fact rules
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+
+    // Find by ID
+    let found_syntax = syntax_rules.iter().find(|r| r.id == id);
+    let found_fact = fact_rules.iter().find(|r| r.id == id);
+
+    if json {
+        match (found_syntax, found_fact) {
+            (Some(r), _) => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "id": r.id,
+                        "type": "syntax",
+                        "severity": r.severity.to_string(),
+                        "message": r.message,
+                        "tags": r.tags,
+                        "languages": r.languages,
+                        "allow": r.allow.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
+                        "enabled": r.enabled,
+                        "builtin": r.builtin,
+                        "fix": r.fix,
+                        "doc": r.doc,
+                    }))
+                    .unwrap()
+                );
+            }
+            (_, Some(r)) => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "id": r.id,
+                        "type": "fact",
+                        "severity": r.severity.to_string(),
+                        "message": r.message,
+                        "tags": r.tags,
+                        "allow": r.allow.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
+                        "enabled": r.enabled,
+                        "builtin": r.builtin,
+                        "doc": r.doc,
+                    }))
+                    .unwrap()
+                );
+            }
+            _ => {
+                eprintln!("Rule not found: {}", id);
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    match (found_syntax, found_fact) {
+        (Some(r), _) => {
+            println!("{} [syntax]", r.id);
+            println!("  severity: {}", r.severity);
+            println!("  enabled:  {}", r.enabled);
+            if !r.tags.is_empty() {
+                println!("  tags:     {}", r.tags.join(", "));
+            }
+            if !r.languages.is_empty() {
+                println!("  langs:    {}", r.languages.join(", "));
+            }
+            if !r.allow.is_empty() {
+                println!(
+                    "  allow:    {}",
+                    r.allow
+                        .iter()
+                        .map(|p| p.as_str())
+                        .collect::<Vec<_>>()
+                        .join("  ")
+                );
+            }
+            if let Some(ref fix) = r.fix {
+                if fix.is_empty() {
+                    println!("  fix:      (delete match)");
+                } else {
+                    println!("  fix:      {}", fix);
+                }
+            }
+            println!("  message:  {}", r.message);
+            if let Some(ref doc) = r.doc {
+                println!();
+                println!("{}", doc);
+            } else {
+                println!();
+                println!("(no documentation — add a markdown comment block after the frontmatter)");
+            }
+        }
+        (_, Some(r)) => {
+            println!("{} [fact]", r.id);
+            println!("  severity: {}", r.severity);
+            println!("  enabled:  {}", r.enabled);
+            if !r.tags.is_empty() {
+                println!("  tags:     {}", r.tags.join(", "));
+            }
+            if !r.allow.is_empty() {
+                println!(
+                    "  allow:    {}",
+                    r.allow
+                        .iter()
+                        .map(|p| p.as_str())
+                        .collect::<Vec<_>>()
+                        .join("  ")
+                );
+            }
+            println!("  message:  {}", r.message);
+            if let Some(ref doc) = r.doc {
+                println!();
+                println!("{}", doc);
+            } else {
+                println!();
+                println!("(no documentation — add a markdown comment block after the frontmatter)");
+            }
+        }
+        _ => {
+            eprintln!("Rule not found: {}", id);
+            return 1;
         }
     }
 
