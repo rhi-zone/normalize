@@ -2074,6 +2074,7 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
         })
         .collect();
 
+    let empty = pairs.is_empty();
     let report = SimilarBlocksReport {
         files_scanned,
         blocks_analyzed,
@@ -2084,7 +2085,7 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
     };
 
     report.print(format);
-    0
+    if empty { 0 } else { 1 }
 }
 
 // ── Similar functions (fuzzy function-level matching) ─────────────────────────
@@ -2397,6 +2398,7 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
             .then_with(|| b.line_count.cmp(&a.line_count))
     });
 
+    let empty = pairs.is_empty();
     let report = SimilarFunctionsReport {
         files_scanned,
         functions_analyzed,
@@ -2407,7 +2409,7 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
     };
 
     report.print(format);
-    0
+    if empty { 0 } else { 1 }
 }
 
 #[cfg(test)]
