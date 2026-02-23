@@ -183,3 +183,72 @@ src/indexers/opensuse.rs:parse_package:35-131
 ```
 
 Blank-line separated pairs. `--allow` flag takes both locations (or a single string `loc1 + loc2`).
+
+## Noise Reduction (2026-02)
+
+When we first ran all five commands against the normalize codebase with default settings, the raw numbers were:
+
+| Command | Raw output |
+|---------|-----------|
+| `duplicate-functions` | 351 groups |
+| `similar-functions` | 3781 pairs |
+| `similar-blocks` | 4489 pairs |
+| `duplicate-types` | 154 pairs |
+| `duplicate-blocks` | 902 groups |
+
+Almost all of this was noise. We made a series of targeted improvements to get the output usable out of the box.
+
+### Calibration (min-lines, similarity, exact-duplicate filtering)
+
+`similar-functions` and `similar-blocks` default min-lines raised from 5 → 10, similarity threshold from 0.80 → 0.85. Pairs at `sim >= 1.0` are now filtered from `similar-*` (exact matches are already reported by `duplicate-*`; surfacing them twice adds noise with no benefit).
+
+### Lockfile exclusion
+
+Lock files (`Cargo.lock`, `package-lock.json`, `yarn.lock`, etc.) are now excluded by `is_source_file`. They are generated, often large, and their structure produces many spurious block matches.
+
+### Same-name group/pair suppression
+
+The dominant noise class in `duplicate-functions` and `similar-functions` was groups/pairs where all functions share the same name — trait implementations (`fn symbols()`, `fn fmt()`, `fn from()`) spread across many files. These are intentionally parallel, not accidental copy-paste.
+
+- `duplicate-functions`: same-name groups suppressed by default. `--include-trait-impls` restores them. Reduced 351 → 185 groups (−47%).
+- `similar-functions`: same-name pairs suppressed. Reduced 3781 → 537 pairs (−86%).
+- `similar-blocks`: blocks inside same-name *containing functions* suppressed (since blocks don't have names of their own). Reduced 4489 → 1103 pairs (−75%).
+
+### `duplicate-types`: Jaccard overlap + IDF field weighting
+
+The original overlap metric was `common / min(len_a, len_b)` — one-sided, so a 3-field type fully contained in a 50-field type scored 100%. Changed to Jaccard (`common / union`).
+
+Then added IDF weighting: `idf(field) = ln(1 + N / df)` where N = corpus size, df = number of types containing the field. Fields like `name`, `file`, `line` appear in nearly every type and get down-weighted near zero. Domain-specific fields like `implements`, `is_interface_impl`, `severity` are rare and score much higher. This makes the overlap metric sensitive to the *structure* of the type, not just whether two types both happen to have a `name` field.
+
+Also added a hard minimum of ≥3 common fields before scoring. Combined: 154 → 16 pairs (−90%).
+
+### Config-level excludes for intentionally-parallel code
+
+Some directories contain many files implementing the same interface — not copy-paste, just the nature of the abstraction. For normalize itself, `crates/normalize-languages/src/` has ~98 language implementations each with near-identical `Symbol { ... }` constructors across `extract_function`, `extract_container`, and `extract_type`. These are cross-method structural clones; same-name suppression doesn't catch them because the *containing function names differ* across methods.
+
+Added `exclude: Vec<String>` to `AnalyzeConfig` so these directories can be excluded project-wide in `.normalize/config.toml`:
+
+```toml
+[analyze]
+exclude = ["crates/normalize-languages/src/**"]
+```
+
+This merges with any CLI `--exclude` flags. With the language impl files excluded:
+
+| Command | After all improvements |
+|---------|----------------------|
+| `duplicate-functions` | 92 groups |
+| `similar-functions` | 222 pairs |
+| `similar-blocks` | 496 pairs |
+| `duplicate-types` | 16 pairs |
+| `duplicate-blocks` | 789 groups |
+
+### What still needs work
+
+Three remaining improvements were not implemented (noted in TODO.md):
+
+**Per-subcommand config excludes.** Currently `[analyze] exclude` is too coarse — it affects `analyze rules`, `analyze complexity`, etc., not just clone detection. A `[analyze.similar-blocks] exclude` would let us suppress language files only where they produce noise. The `Language` trait impl files are perfectly valid targets for complexity and rules analysis.
+
+**Parallel-impl-directory heuristic.** If >N pairs/groups come from the same directory pair, fold them into a single suppressed note: "48 pairs suppressed within crates/normalize-languages/ — likely parallel trait implementations." This would give a summary line instead of flooding the output, without requiring manual config entries.
+
+**Cross-method same-body suppression.** Same-name suppression works for `extract_function` in file A vs `extract_function` in file B. It cannot suppress `extract_function` in file A vs `extract_container` in file B even when the body is identical — different method names, same `Symbol { ... }` construction pattern. Would require recognising that both methods implement the same trait, which needs semantic information not present in the current token-level clone detection.
