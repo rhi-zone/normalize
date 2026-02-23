@@ -16,7 +16,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
 
 ## Remaining Work
-- `normalize view` symbol not found: show all candidate symbols whose name contains the query as a substring (e.g. `view foo.rs/cmd_dup` → list all symbols matching `*cmd_dup*`). Currently only reports "appears N times" with no actionable list. No fuzzy scoring needed — substring containment is sufficient and predictable.
+- `normalize view` symbol not found: show all candidate symbols close enough to the query by some metric — edit distance, substring containment, word-token overlap (split on `_`/camelCase), or a combination. Goal: `view foo.rs/cmd_dup` should surface `cmd_duplicate_functions_with_count`; `view foo.rs/duplikat_funcs` should too. Currently only reports "appears N times" with no actionable list.
 - Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
   - Requires language-specific namespace semantics - low priority
 - Shadow worktree: true shadow-first mode (edit in shadow, then apply)
