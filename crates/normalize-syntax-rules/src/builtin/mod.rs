@@ -86,6 +86,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "python/tuple-return",
         content: include_str!("python_tuple_return.scm"),
     },
+    BuiltinRule {
+        id: "python/module-assign",
+        content: include_str!("python_module_assign.scm"),
+    },
     // Go rules
     BuiltinRule {
         id: "go/fmt-print",
@@ -103,6 +107,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "ruby/binding-pry",
         content: include_str!("ruby_binding_pry.scm"),
+    },
+    BuiltinRule {
+        id: "ruby/global-var",
+        content: include_str!("ruby_global_var.scm"),
     },
     // Cross-language rules
     BuiltinRule {
