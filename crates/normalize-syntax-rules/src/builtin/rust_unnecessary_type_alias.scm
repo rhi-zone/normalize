@@ -25,6 +25,6 @@
 
 ; Detects: type X = Y; where both are simple type identifiers
 ; May be intentional for re-exports or semantic clarity
-(type_alias_declaration
+(type_item
   name: (type_identifier) @_alias
   type: (type_identifier) @_target) @match
