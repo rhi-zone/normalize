@@ -75,6 +75,7 @@ cache/
 /.normalize/*
 !/.normalize/config.toml
 !/.normalize/duplicate-functions-allow
+!/.normalize/duplicate-blocks-allow
 !/.normalize/duplicate-types-allow
 !/.normalize/hotspots-allow
 !/.normalize/large-files-allow
@@ -83,6 +84,7 @@ cache/
 .normalize/*
 !.normalize/config.toml
 !.normalize/duplicate-functions-allow
+!.normalize/duplicate-blocks-allow
 !.normalize/duplicate-types-allow
 !.normalize/hotspots-allow
 !.normalize/large-files-allow

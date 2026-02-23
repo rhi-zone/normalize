@@ -75,6 +75,59 @@ pub use tsgo::Tsgo;
 
 use crate::Tool;
 
+/// Parse TypeScript compiler output (shared between tsc and tsgo).
+///
+/// Format: `file.ts(10,5): error TS2322: Type 'string' is not assignable to type 'number'.`
+#[cfg(any(feature = "tool-tsc", feature = "tool-tsgo"))]
+pub(super) fn parse_ts_compiler_output(output: &str, tool_name: &str) -> Vec<crate::Diagnostic> {
+    use crate::{Diagnostic, DiagnosticSeverity, Location};
+
+    let mut diagnostics = Vec::new();
+    for line in output.lines() {
+        if let Some((loc_part, rest)) = line.split_once("): ")
+            && let Some((file, pos)) = loc_part.rsplit_once('(')
+        {
+            let parts: Vec<&str> = pos.split(',').collect();
+            if parts.len() >= 2 {
+                let line_num = parts[0].parse().unwrap_or(1);
+                let col_num = parts[1].parse().unwrap_or(1);
+                let (severity, code, message) = if let Some((sev_code, msg)) = rest.split_once(": ")
+                {
+                    let (sev, code) = sev_code.split_once(' ').unwrap_or((sev_code, ""));
+                    let severity = match sev {
+                        "error" => DiagnosticSeverity::Error,
+                        "warning" => DiagnosticSeverity::Warning,
+                        _ => DiagnosticSeverity::Error,
+                    };
+                    (severity, code.to_string(), msg.to_string())
+                } else {
+                    (
+                        DiagnosticSeverity::Error,
+                        "unknown".to_string(),
+                        rest.to_string(),
+                    )
+                };
+                diagnostics.push(Diagnostic {
+                    tool: tool_name.to_string(),
+                    rule_id: code,
+                    message,
+                    severity,
+                    location: Location {
+                        file: file.to_string().into(),
+                        line: line_num,
+                        column: col_num,
+                        end_line: None,
+                        end_column: None,
+                    },
+                    fix: None,
+                    help_url: None,
+                });
+            }
+        }
+    }
+    diagnostics
+}
+
 /// Create a registry with all built-in adapters.
 #[allow(clippy::vec_init_then_push)]
 pub fn all_adapters() -> Vec<Box<dyn Tool>> {

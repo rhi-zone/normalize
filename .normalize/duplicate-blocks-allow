@@ -1,0 +1,22 @@
+# Duplicate Blocks Allowlist
+#
+# CI runs: normalize analyze duplicate-blocks --min-lines 13
+#
+# Format: file:start-end or file:func:start-end (one per line, # comments allowed)
+# Groups of related entries should be documented with a comment explaining why
+# they're intentionally parallel.
+
+# analyze/mod.rs dispatch arms: DuplicateBlocks vs SimilarFunctions
+# Same config-struct pattern for two different analysis subcommands.
+crates/normalize/src/commands/analyze/mod.rs:692-711
+crates/normalize/src/commands/analyze/mod.rs:713-732
+
+# complexity.rs vs length.rs par_iter map block
+# Both map over files to collect function analysis; differ only in analyzer type.
+crates/normalize/src/commands/analyze/complexity.rs:29-48
+crates/normalize/src/commands/analyze/length.rs:28-47
+
+# relations.rs: parallel ABI-stable structs (SymbolFact, ImportFact, CallFact)
+# Each is a distinct Datalog fact type with similar repr(C) layout.
+crates/normalize-facts-rules-api/src/relations.rs:23-37
+crates/normalize-facts-rules-api/src/relations.rs:53-67

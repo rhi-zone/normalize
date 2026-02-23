@@ -160,6 +160,18 @@ struct Slice {
     len: u32,
 }
 
+/// Read a `Slice` from a data buffer at a given byte offset.
+fn read_slice_at(data: &[u8], off: usize) -> Slice {
+    if off + 8 <= data.len() {
+        Slice {
+            off: u32::from_le_bytes(data[off..off + 4].try_into().unwrap_or([0; 4])),
+            len: u32::from_le_bytes(data[off + 4..off + 8].try_into().unwrap_or([0; 4])),
+        }
+    } else {
+        Slice::default()
+    }
+}
+
 #[derive(Debug, Clone)]
 struct BunPackage {
     name: String,
@@ -361,43 +373,11 @@ impl<'a> BunLockb<'a> {
             };
 
             // Read dependencies slice {off: u32, len: u32}
-            let dep_slice_off = pkg_begin + deps_off + i * 8;
-            let dependencies = if dep_slice_off + 8 <= data.len() {
-                Slice {
-                    off: u32::from_le_bytes(
-                        data[dep_slice_off..dep_slice_off + 4]
-                            .try_into()
-                            .unwrap_or([0; 4]),
-                    ),
-                    len: u32::from_le_bytes(
-                        data[dep_slice_off + 4..dep_slice_off + 8]
-                            .try_into()
-                            .unwrap_or([0; 4]),
-                    ),
-                }
-            } else {
-                Slice::default()
-            };
+            let dependencies = read_slice_at(data, pkg_begin + deps_off + i * 8);
 
             // Read resolutions slice (PackageID[]) - not used (deps indices work for both)
             // Kept for potential future version parsing from Resolution field
-            let res_slice_off = pkg_begin + res_off + i * 8;
-            let resolutions = if res_slice_off + 8 <= data.len() {
-                Slice {
-                    off: u32::from_le_bytes(
-                        data[res_slice_off..res_slice_off + 4]
-                            .try_into()
-                            .unwrap_or([0; 4]),
-                    ),
-                    len: u32::from_le_bytes(
-                        data[res_slice_off + 4..res_slice_off + 8]
-                            .try_into()
-                            .unwrap_or([0; 4]),
-                    ),
-                }
-            } else {
-                Slice::default()
-            };
+            let resolutions = read_slice_at(data, pkg_begin + res_off + i * 8);
 
             // Read version from Resolution field
             // v2: 64 bytes, v3+: 72 bytes
