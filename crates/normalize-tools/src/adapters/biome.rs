@@ -184,6 +184,37 @@ fn parse_biome_output(stdout: &str) -> Result<Vec<Diagnostic>, ToolError> {
     Ok(diagnostics)
 }
 
+/// Run a biome subcommand (e.g. "lint" or "format") against the given paths.
+/// `extra_args` are inserted before `--reporter=json` (e.g. `&["--write"]` for fix mode).
+fn run_biome(
+    subcommand: &str,
+    extra_args: &[&str],
+    tool_name: &str,
+    paths: &[&Path],
+    root: &Path,
+) -> Result<ToolResult, ToolError> {
+    let (cmd, base_args) =
+        biome_command().ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
+
+    let path_args: Vec<&str> = if paths.is_empty() {
+        vec!["."]
+    } else {
+        paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
+    };
+
+    let mut command = Command::new(cmd);
+    command.args(&base_args).arg(subcommand);
+    for arg in extra_args {
+        command.arg(arg);
+    }
+    command.arg("--reporter=json");
+    let output = command.args(&path_args).current_dir(root).output()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let diagnostics = parse_biome_output(&stdout)?;
+    Ok(ToolResult::success(tool_name, diagnostics))
+}
+
 impl Tool for BiomeLint {
     fn info(&self) -> &ToolInfo {
         &BIOME_LINT_INFO
@@ -202,25 +233,7 @@ impl Tool for BiomeLint {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = biome_command()
-            .ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
-
-        let path_args: Vec<&str> = if paths.is_empty() {
-            vec!["."]
-        } else {
-            paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
-        };
-
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
-        command.arg("lint").arg("--reporter=json");
-
-        let output = command.args(&path_args).current_dir(root).output()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let diagnostics = parse_biome_output(&stdout)?;
-
-        Ok(ToolResult::success("biome", diagnostics))
+        run_biome("lint", &[], "biome", paths, root)
     }
 
     fn can_fix(&self) -> bool {
@@ -228,25 +241,7 @@ impl Tool for BiomeLint {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = biome_command()
-            .ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
-
-        let path_args: Vec<&str> = if paths.is_empty() {
-            vec!["."]
-        } else {
-            paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
-        };
-
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
-        command.arg("lint").arg("--write").arg("--reporter=json");
-
-        let output = command.args(&path_args).current_dir(root).output()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let diagnostics = parse_biome_output(&stdout)?;
-
-        Ok(ToolResult::success("biome", diagnostics))
+        run_biome("lint", &["--write"], "biome", paths, root)
     }
 }
 
@@ -268,25 +263,7 @@ impl Tool for BiomeFormat {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = biome_command()
-            .ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
-
-        let path_args: Vec<&str> = if paths.is_empty() {
-            vec!["."]
-        } else {
-            paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
-        };
-
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
-        command.arg("format").arg("--reporter=json");
-
-        let output = command.args(&path_args).current_dir(root).output()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let diagnostics = parse_biome_output(&stdout)?;
-
-        Ok(ToolResult::success("biome-fmt", diagnostics))
+        run_biome("format", &[], "biome-fmt", paths, root)
     }
 
     fn can_fix(&self) -> bool {
@@ -294,24 +271,6 @@ impl Tool for BiomeFormat {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = biome_command()
-            .ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
-
-        let path_args: Vec<&str> = if paths.is_empty() {
-            vec!["."]
-        } else {
-            paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
-        };
-
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
-        command.arg("format").arg("--write").arg("--reporter=json");
-
-        let output = command.args(&path_args).current_dir(root).output()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let diagnostics = parse_biome_output(&stdout)?;
-
-        Ok(ToolResult::success("biome-fmt", diagnostics))
+        run_biome("format", &["--write"], "biome-fmt", paths, root)
     }
 }

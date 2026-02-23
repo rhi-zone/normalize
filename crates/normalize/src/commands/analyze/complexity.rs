@@ -6,6 +6,8 @@ use crate::path_resolve;
 use rayon::prelude::*;
 use std::path::Path;
 
+use super::collect_code_files;
+
 /// Analyze complexity of a single file
 pub fn analyze_file_complexity(file_path: &Path) -> Option<ComplexityReport> {
     let content = std::fs::read_to_string(file_path).ok()?;
@@ -22,23 +24,7 @@ pub fn analyze_codebase_complexity(
     allowlist: &[String],
 ) -> ComplexityReport {
     let all_files = path_resolve::all_files(root);
-    let code_files: Vec<_> = all_files
-        .iter()
-        .filter(|f| {
-            f.kind == "file" && {
-                let ext = std::path::Path::new(&f.path)
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("");
-                matches!(ext, "py" | "rs")
-            }
-        })
-        .filter(|f| {
-            filter
-                .map(|flt| flt.matches(Path::new(&f.path)))
-                .unwrap_or(true)
-        })
-        .collect();
+    let code_files = collect_code_files(&all_files, filter);
 
     let all_functions: Vec<_> = code_files
         .par_iter()

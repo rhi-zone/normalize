@@ -613,19 +613,11 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
 // Enable / Disable
 // =============================================================================
 
-fn cmd_enable_disable(
-    root: &Path,
-    id_or_tag: &str,
-    enable: bool,
-    dry_run: bool,
-    config: &crate::config::NormalizeConfig,
-) -> i32 {
-    // Resolve which rule IDs to affect
-    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
-
-    // Build unified list for tag expansion
-    let all_unified: Vec<UnifiedRule> = syntax_rules
+fn build_unified_rules(
+    syntax_rules: &[normalize_syntax_rules::Rule],
+    fact_rules: &[interpret::FactsRule],
+) -> Vec<UnifiedRule> {
+    syntax_rules
         .iter()
         .map(|r| UnifiedRule {
             id: r.id.clone(),
@@ -645,7 +637,20 @@ fn cmd_enable_disable(
             enabled: r.enabled,
             tags: r.tags.clone(),
         }))
-        .collect();
+        .collect()
+}
+
+fn cmd_enable_disable(
+    root: &Path,
+    id_or_tag: &str,
+    enable: bool,
+    dry_run: bool,
+    config: &crate::config::NormalizeConfig,
+) -> i32 {
+    // Resolve which rule IDs to affect
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+    let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
 
     // Exact ID match takes priority; otherwise expand as tag (includes user-defined groups)
     let rule_tags = &config.rule_tags.0;
@@ -956,27 +961,7 @@ fn cmd_tags(
     let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
 
     // Build the unified list for expansion
-    let all_unified: Vec<UnifiedRule> = syntax_rules
-        .iter()
-        .map(|r| UnifiedRule {
-            id: r.id.clone(),
-            rule_type: "syntax",
-            severity: r.severity.to_string(),
-            source: if r.builtin { "builtin" } else { "project" },
-            message: r.message.clone(),
-            enabled: r.enabled,
-            tags: r.tags.clone(),
-        })
-        .chain(fact_rules.iter().map(|r| UnifiedRule {
-            id: r.id.clone(),
-            rule_type: "fact",
-            severity: r.severity.to_string(),
-            source: if r.builtin { "builtin" } else { "project" },
-            message: r.message.clone(),
-            enabled: r.enabled,
-            tags: r.tags.clone(),
-        }))
-        .collect();
+    let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
 
     // tag → (origin, rule IDs)
     // "origin" values: "builtin" | "user" | "user-defined"
@@ -1098,27 +1083,7 @@ fn cmd_run(
             // Build unified list for expansion
             let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
             let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
-            let all_unified: Vec<UnifiedRule> = syntax_rules
-                .iter()
-                .map(|r| UnifiedRule {
-                    id: r.id.clone(),
-                    rule_type: "syntax",
-                    severity: r.severity.to_string(),
-                    source: if r.builtin { "builtin" } else { "project" },
-                    message: r.message.clone(),
-                    enabled: r.enabled,
-                    tags: r.tags.clone(),
-                })
-                .chain(fact_rules.iter().map(|r| UnifiedRule {
-                    id: r.id.clone(),
-                    rule_type: "fact",
-                    severity: r.severity.to_string(),
-                    source: if r.builtin { "builtin" } else { "project" },
-                    message: r.message.clone(),
-                    enabled: r.enabled,
-                    tags: r.tags.clone(),
-                }))
-                .collect();
+            let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
             let mut visited = HashSet::new();
             let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
             Some(ids.iter().map(|s| s.to_string()).collect())

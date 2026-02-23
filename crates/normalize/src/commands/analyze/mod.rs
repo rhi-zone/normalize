@@ -210,6 +210,32 @@ fn append_to_allow_file(root: &Path, filename: &str, pattern: &str, reason: Opti
     0
 }
 
+/// Collect source code files (`.py` and `.rs`) from `root`, applying the optional filter.
+///
+/// Shared by complexity and length analysis passes.
+pub(super) fn collect_code_files<'a>(
+    all_files: &'a [normalize_path_resolve::PathMatch],
+    filter: Option<&Filter>,
+) -> Vec<&'a normalize_path_resolve::PathMatch> {
+    all_files
+        .iter()
+        .filter(|f| {
+            f.kind == "file" && {
+                let ext = std::path::Path::new(&f.path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                matches!(ext, "py" | "rs")
+            }
+        })
+        .filter(|f| {
+            filter
+                .map(|flt| flt.matches(Path::new(&f.path)))
+                .unwrap_or(true)
+        })
+        .collect()
+}
+
 /// Print JSON schema for the command's input arguments.
 pub fn print_input_schema() {
     let schema = schemars::schema_for!(AnalyzeArgs);

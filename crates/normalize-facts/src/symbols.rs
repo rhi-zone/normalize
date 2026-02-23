@@ -546,46 +546,11 @@ impl SymbolParser {
             None => return Vec::new(),
         };
 
+        // Go dot-separated call syntax matches JS/TS: obj.method() → same pattern
         let mut calls = Vec::new();
         let mut cursor = tree.root_node().walk();
-        Self::collect_go_calls_with_lines(&mut cursor, source, base_line, &mut calls);
+        Self::collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
-    }
-
-    fn collect_go_calls_with_lines(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        base_line: usize,
-        calls: &mut Vec<(String, usize, Option<String>)>,
-    ) {
-        loop {
-            let node = cursor.node();
-
-            if node.kind() == "call_expression"
-                && let Some(func_node) = node.child_by_field_name("function")
-            {
-                let func_text = &content[func_node.byte_range()];
-                let line = node.start_position().row + base_line;
-
-                // Go uses . for method calls and package access: pkg.Func(), obj.Method()
-                if let Some(dot_pos) = func_text.rfind('.') {
-                    let qualifier = &func_text[..dot_pos];
-                    let name = &func_text[dot_pos + 1..];
-                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
-                } else {
-                    calls.push((func_text.to_string(), line, None));
-                }
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_go_calls_with_lines(cursor, content, base_line, calls);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
     }
 
     fn find_rust_calls(&self, source: &str) -> Vec<String> {

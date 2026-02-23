@@ -24,6 +24,39 @@ fn length_to_sarif_level(category: LengthCategory) -> &'static str {
     }
 }
 
+fn file_uri(path_str: &str) -> String {
+    let path = Path::new(path_str);
+    path.canonicalize()
+        .ok()
+        .map(|abs| format!("file://{}", abs.display()))
+        .unwrap_or_else(|| path_str.to_string())
+}
+
+fn emit_sarif(rules: Vec<serde_json::Value>, results: Vec<serde_json::Value>, root: &Path) {
+    let sarif = serde_json::json!({
+        "version": "2.1.0",
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "normalize",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "informationUri": "https://github.com/rhi-zone/normalize",
+                    "rules": rules
+                }
+            },
+            "results": results,
+            "invocations": [{
+                "executionSuccessful": true,
+                "workingDirectory": {
+                    "uri": format!("file://{}", root.canonicalize().unwrap_or_else(|_| root.to_path_buf()).display())
+                }
+            }]
+        }]
+    });
+    println!("{}", serde_json::to_string_pretty(&sarif).unwrap());
+}
+
 /// Print complexity report in SARIF format.
 pub fn print_complexity_sarif(functions: &[FunctionComplexity], root: &Path) {
     let rules = vec![
@@ -49,66 +82,27 @@ pub fn print_complexity_sarif(functions: &[FunctionComplexity], root: &Path) {
                 RiskLevel::Critical => "critical-complexity",
                 _ => "high-complexity",
             };
-
-            let uri = f
-                .file_path
-                .as_ref()
-                .map(|p| {
-                    let path = Path::new(p);
-                    path.canonicalize()
-                        .ok()
-                        .map(|abs| format!("file://{}", abs.display()))
-                        .unwrap_or_else(|| p.clone())
-                })
-                .unwrap_or_default();
-
+            let uri = f.file_path.as_deref().map(file_uri).unwrap_or_default();
             serde_json::json!({
                 "ruleId": rule_id,
                 "level": risk_to_sarif_level(f.risk_level()),
                 "message": {
                     "text": format!(
                         "Function '{}' has cyclomatic complexity of {} ({})",
-                        f.short_name(),
-                        f.complexity,
-                        f.risk_level().as_str()
+                        f.short_name(), f.complexity, f.risk_level().as_str()
                     )
                 },
                 "locations": [{
                     "physicalLocation": {
                         "artifactLocation": { "uri": uri },
-                        "region": {
-                            "startLine": f.start_line,
-                            "endLine": f.end_line
-                        }
+                        "region": { "startLine": f.start_line, "endLine": f.end_line }
                     }
                 }]
             })
         })
         .collect();
 
-    let sarif = serde_json::json!({
-        "version": "2.1.0",
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-        "runs": [{
-            "tool": {
-                "driver": {
-                    "name": "normalize",
-                    "version": env!("CARGO_PKG_VERSION"),
-                    "informationUri": "https://github.com/rhi-zone/normalize",
-                    "rules": rules
-                }
-            },
-            "results": results,
-            "invocations": [{
-                "executionSuccessful": true,
-                "workingDirectory": {
-                    "uri": format!("file://{}", root.canonicalize().unwrap_or_else(|_| root.to_path_buf()).display())
-                }
-            }]
-        }]
-    });
-
-    println!("{}", serde_json::to_string_pretty(&sarif).unwrap());
+    emit_sarif(rules, results, root);
 }
 
 /// Print function length report in SARIF format.
@@ -136,64 +130,25 @@ pub fn print_length_sarif(functions: &[FunctionLength], root: &Path) {
                 LengthCategory::TooLong => "too-long-function",
                 _ => "long-function",
             };
-
-            let uri = f
-                .file_path
-                .as_ref()
-                .map(|p| {
-                    let path = Path::new(p);
-                    path.canonicalize()
-                        .ok()
-                        .map(|abs| format!("file://{}", abs.display()))
-                        .unwrap_or_else(|| p.clone())
-                })
-                .unwrap_or_default();
-
+            let uri = f.file_path.as_deref().map(file_uri).unwrap_or_default();
             serde_json::json!({
                 "ruleId": rule_id,
                 "level": length_to_sarif_level(f.category()),
                 "message": {
                     "text": format!(
                         "Function '{}' is {} lines ({})",
-                        f.short_name(),
-                        f.lines,
-                        f.category().as_str()
+                        f.short_name(), f.lines, f.category().as_str()
                     )
                 },
                 "locations": [{
                     "physicalLocation": {
                         "artifactLocation": { "uri": uri },
-                        "region": {
-                            "startLine": f.start_line,
-                            "endLine": f.end_line
-                        }
+                        "region": { "startLine": f.start_line, "endLine": f.end_line }
                     }
                 }]
             })
         })
         .collect();
 
-    let sarif = serde_json::json!({
-        "version": "2.1.0",
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-        "runs": [{
-            "tool": {
-                "driver": {
-                    "name": "normalize",
-                    "version": env!("CARGO_PKG_VERSION"),
-                    "informationUri": "https://github.com/rhi-zone/normalize",
-                    "rules": rules
-                }
-            },
-            "results": results,
-            "invocations": [{
-                "executionSuccessful": true,
-                "workingDirectory": {
-                    "uri": format!("file://{}", root.canonicalize().unwrap_or_else(|_| root.to_path_buf()).display())
-                }
-            }]
-        }]
-    });
-
-    println!("{}", serde_json::to_string_pretty(&sarif).unwrap());
+    emit_sarif(rules, results, root);
 }

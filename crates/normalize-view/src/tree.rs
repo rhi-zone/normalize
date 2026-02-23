@@ -18,48 +18,33 @@ use tree_sitter::{Query, QueryCursor};
 static HIGHLIGHT_QUERY_CACHE: OnceLock<RwLock<HashMap<String, Arc<Query>>>> = OnceLock::new();
 static INJECTION_QUERY_CACHE: OnceLock<RwLock<HashMap<String, Arc<Query>>>> = OnceLock::new();
 
-fn get_highlight_query(grammar: &str, language: &tree_sitter::Language) -> Option<Arc<Query>> {
-    let cache = HIGHLIGHT_QUERY_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-
-    // Check cache first
+fn get_cached_query(
+    cache: &OnceLock<RwLock<HashMap<String, Arc<Query>>>>,
+    grammar: &str,
+    language: &tree_sitter::Language,
+    query_str: Option<Arc<String>>,
+) -> Option<Arc<Query>> {
+    let cache = cache.get_or_init(|| RwLock::new(HashMap::new()));
     if let Ok(read_guard) = cache.read()
         && let Some(query) = read_guard.get(grammar)
     {
         return Some(Arc::clone(query));
     }
-
-    // Not cached - compile and store
-    let loader = grammar_loader();
-    let query_str = loader.get_highlights(grammar)?;
-    let query = Arc::new(Query::new(language, &query_str).ok()?);
-
+    let query = Arc::new(Query::new(language, query_str?.as_str()).ok()?);
     if let Ok(mut write_guard) = cache.write() {
         write_guard.insert(grammar.to_string(), Arc::clone(&query));
     }
-
     Some(query)
 }
 
+fn get_highlight_query(grammar: &str, language: &tree_sitter::Language) -> Option<Arc<Query>> {
+    let query_str = grammar_loader().get_highlights(grammar);
+    get_cached_query(&HIGHLIGHT_QUERY_CACHE, grammar, language, query_str)
+}
+
 fn get_injection_query(grammar: &str, language: &tree_sitter::Language) -> Option<Arc<Query>> {
-    let cache = INJECTION_QUERY_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-
-    // Check cache first
-    if let Ok(read_guard) = cache.read()
-        && let Some(query) = read_guard.get(grammar)
-    {
-        return Some(Arc::clone(query));
-    }
-
-    // Not cached - compile and store
-    let loader = grammar_loader();
-    let query_str = loader.get_injections(grammar)?;
-    let query = Arc::new(Query::new(language, &query_str).ok()?);
-
-    if let Ok(mut write_guard) = cache.write() {
-        write_guard.insert(grammar.to_string(), Arc::clone(&query));
-    }
-
-    Some(query)
+    let query_str = grammar_loader().get_injections(grammar);
+    get_cached_query(&INJECTION_QUERY_CACHE, grammar, language, query_str)
 }
 
 /// Unified node for viewing directories, files, and symbols.
