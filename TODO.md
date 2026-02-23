@@ -643,6 +643,12 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] `--skip-functions` on `duplicate-blocks`: skip function/method nodes to avoid overlap with `duplicate-functions`.
 - [x] `similar-functions`: MinHash LSH scoped to function nodes; named-symbol output; `--skeleton` support.
 - [x] Allow files for `duplicate-blocks` (`duplicate-blocks-allow`) and `similar-blocks` (`similar-blocks-allow`). Key format: `file:func:start-end` or `file:start-end`. `--allow <location> --reason <text>` flags on both commands.
+- **[HIGH]** Improve duplicate/clone detection machinery to work usefully out of the box on any codebase (not just normalize):
+  - `duplicate-functions` / `similar-functions`: trait/interface implementations are legitimately parallel — need a way to detect and suppress this pattern automatically (same method name, different files in same module tree)
+  - `duplicate-types`: field-overlap heuristic is too shallow; many structs share common field names (`file`, `line`, `column`) without being duplicates. Consider: require min field count on both sides, weight rare field names higher, or require structural similarity beyond field names.
+  - `similar-blocks` / `similar-functions`: need minimum size threshold calibration so small boilerplate blocks don't dominate results. Consider: `--min-lines` default too low for `similar-*`.
+  - `duplicate-blocks`: generated files (JSON, lock files) create noise — auto-detect or exclude by default.
+  - Goal: zero false negatives at the default thresholds; false positives acceptable but should be suppressible. See `docs/design/duplicate-detection.md`.
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `normalize analyze ast`, `normalize analyze query` (authoring tools)
   - [x] Phase 1b: `normalize analyze rules` reads .normalize/rules/*.scm with TOML frontmatter
@@ -1031,7 +1037,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
   - Blocked on: agent implementation existing at all
 
 ### CI/Infrastructure
-- Enable `normalize analyze duplicate-blocks` in CI as enforcement (non-zero exit on matches above threshold). Needs `--allow` mechanism (same pattern as duplicate-functions) so existing groups can be acknowledged. High priority — this is the most actionable clone detection signal we have.
+- [x] `normalize analyze duplicate-blocks` returns non-zero exit when unapproved groups found. Allow files exist. Wire into CI with `--exclude '**/*.json' --exclude '**/*.lock'` to suppress generated-file noise.
 
 ## Known Issues
 

@@ -748,9 +748,9 @@ pub fn cmd_duplicate_types(
 
             let common: Vec<String> = set1.intersection(&set2).map(|s| (*s).clone()).collect();
 
-            let min_size = t1.fields.len().min(t2.fields.len());
-            let overlap_percent = if min_size > 0 {
-                (common.len() * 100) / min_size
+            let union_size = set1.union(&set2).count();
+            let overlap_percent = if union_size > 0 {
+                (common.len() * 100) / union_size
             } else {
                 0
             };
@@ -1429,7 +1429,7 @@ pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
     };
 
     report.print(format);
-    0
+    if report.groups.is_empty() { 0 } else { 1 }
 }
 
 // ── Fuzzy / partial clone detection (MinHash LSH) ─────────────────────────────
@@ -1929,7 +1929,7 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
             }
 
             let sim = jaccard_estimate(sig_a, sig_b);
-            if sim < similarity {
+            if sim >= 1.0 || sim < similarity {
                 return None;
             }
 
@@ -2284,7 +2284,7 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
             }
 
             let sim = jaccard_estimate(sig_a, sig_b);
-            if sim < similarity {
+            if sim >= 1.0 || sim < similarity {
                 return None;
             }
 
