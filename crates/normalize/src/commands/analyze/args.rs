@@ -237,6 +237,48 @@ pub enum AnalyzeCommand {
         /// Minimum lines for a block to be considered [default: 5]
         #[arg(long, default_value = "5")]
         min_lines: usize,
+
+        /// Skip function/method nodes (avoid overlap with duplicate-functions)
+        #[arg(long)]
+        #[serde(default)]
+        skip_functions: bool,
+
+        /// Allow a duplicate block group (add to .normalize/duplicate-blocks-allow)
+        /// Accepts file:func:start-end or file:start-end
+        #[arg(long, value_name = "LOCATION")]
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
+    },
+
+    /// Detect similar (fuzzy-matching) functions via MinHash LSH
+    SimilarFunctions {
+        #[arg(long, default_value = "true")]
+        #[serde(default = "default_true")]
+        elide_identifiers: bool,
+
+        #[arg(long)]
+        #[serde(default)]
+        elide_literals: bool,
+
+        #[arg(long)]
+        #[serde(default)]
+        show_source: bool,
+
+        /// Minimum lines for a function to be considered [default: 5]
+        #[arg(long, default_value = "5")]
+        min_lines: usize,
+
+        /// Minimum similarity threshold (0.0–1.0) [default: 0.8]
+        #[arg(long, default_value = "0.8")]
+        similarity: f64,
+
+        /// Skeleton mode: match on control-flow structure, ignoring body content
+        #[arg(long)]
+        #[serde(default)]
+        skeleton: bool,
     },
 
     /// Detect similar (fuzzy-matching) code blocks via MinHash LSH
@@ -266,6 +308,15 @@ pub enum AnalyzeCommand {
         #[arg(long)]
         #[serde(default)]
         skeleton: bool,
+
+        /// Allow a similar block pair (add to .normalize/similar-blocks-allow)
+        /// Accepts file:func:start-end or file:start-end
+        #[arg(long, value_name = "LOCATION")]
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
     },
 
     /// Detect duplicate type definitions

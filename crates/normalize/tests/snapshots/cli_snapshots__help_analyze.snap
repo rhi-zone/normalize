@@ -24,6 +24,7 @@ Commands:
   check-examples       Check example references in documentation
   duplicate-functions  Detect duplicate functions (code clones)
   duplicate-blocks     Detect duplicate code blocks (subtree-level clone detection)
+  similar-functions    Detect similar (fuzzy-matching) functions via MinHash LSH
   similar-blocks       Detect similar (fuzzy-matching) code blocks via MinHash LSH
   duplicate-types      Detect duplicate type definitions
   test-gaps            Find public functions with no direct test caller
@@ -39,11 +40,11 @@ Options:
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
       --pretty              Human-friendly output with colors and formatting
       --compact             Compact output without colors (overrides TTY detection)
+      --output-schema       Output JSON schema for the command's return type
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --exclude <PATTERN>   Exclude paths matching pattern or @alias
-      --output-schema       Output JSON schema for the command's return type
       --input-schema        Output JSON schema for the command's input arguments
       --only <PATTERN>      Include only paths matching pattern or @alias
-      --diff [<BASE>]       Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
       --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
+      --diff [<BASE>]       Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
   -h, --help                Print help

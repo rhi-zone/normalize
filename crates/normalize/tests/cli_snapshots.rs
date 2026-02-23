@@ -313,6 +313,11 @@ fn test_help_analyze_duplicate_blocks() {
 }
 
 #[test]
+fn test_help_analyze_similar_functions() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "similar-functions"]));
+}
+
+#[test]
 fn test_help_analyze_similar_blocks() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "similar-blocks"]));
 }

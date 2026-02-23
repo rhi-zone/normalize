@@ -1078,6 +1078,111 @@ impl OutputFormatter for DuplicateBlocksReport {
 }
 
 /// Walk every node in the tree and hash subtrees at or above min_lines.
+fn is_function_kind(kind: &str) -> bool {
+    kind.contains("function") || kind.contains("method")
+}
+
+// ── Allow-file helpers ────────────────────────────────────────────────────────
+
+/// Find the innermost function/method symbol that contains `line` in `result`.
+fn containing_function(
+    result: &normalize_facts::extract::ExtractResult,
+    line: usize,
+) -> Option<String> {
+    let mut best: Option<(usize, &str)> = None; // (start_line, name)
+    for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+        let kind = sym.kind.as_str();
+        if kind != "function" && kind != "method" {
+            continue;
+        }
+        if sym.start_line <= line && line <= sym.end_line {
+            // Prefer the innermost (latest start line).
+            if best.is_none() || sym.start_line > best.unwrap().0 {
+                best = Some((sym.start_line, &sym.name));
+            }
+        }
+    }
+    best.map(|(_, name)| name.to_string())
+}
+
+/// Format a block location as an allow-file key.
+/// If the block is inside a named function: `file:func:start-end`
+/// Otherwise: `file:start-end`
+fn block_allow_key(
+    file: &str,
+    start_line: usize,
+    end_line: usize,
+    containing_fn: Option<&str>,
+) -> String {
+    match containing_fn {
+        Some(func) => format!("{}:{}:{}-{}", file, func, start_line, end_line),
+        None => format!("{}:{}-{}", file, start_line, end_line),
+    }
+}
+
+fn load_block_allowlist(root: &Path, filename: &str) -> HashSet<String> {
+    let path = root.join(".normalize").join(filename);
+    let mut allowed = HashSet::new();
+    if let Ok(content) = std::fs::read_to_string(&path) {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            allowed.insert(line.to_string());
+        }
+    }
+    allowed
+}
+
+fn write_allow_entry(root: &Path, filename: &str, entries: &[String], reason: Option<&str>) -> i32 {
+    let allow_path = root.join(".normalize").join(filename);
+    let existing = std::fs::read_to_string(&allow_path).unwrap_or_default();
+    let existing_lines: Vec<&str> = existing.lines().collect();
+
+    let to_add: Vec<&str> = entries
+        .iter()
+        .map(|e| e.as_str())
+        .filter(|e| !existing_lines.iter().any(|l| l.trim() == *e))
+        .collect();
+
+    if to_add.is_empty() {
+        println!("All entries already in allowlist.");
+        return 0;
+    }
+
+    let moss_dir = root.join(".normalize");
+    if !moss_dir.exists()
+        && let Err(e) = std::fs::create_dir_all(&moss_dir)
+    {
+        eprintln!("Failed to create .normalize directory: {}", e);
+        return 1;
+    }
+
+    let mut new_lines: Vec<String> = existing_lines.iter().map(|s| s.to_string()).collect();
+    if !new_lines.is_empty() && !new_lines.last().is_none_or(|l| l.is_empty()) {
+        new_lines.push(String::new());
+    }
+    if let Some(r) = reason {
+        new_lines.push(format!("# {}", r));
+    }
+    for entry in &to_add {
+        new_lines.push(entry.to_string());
+    }
+
+    let new_content = new_lines.join("\n") + "\n";
+    if let Err(e) = std::fs::write(&allow_path, new_content) {
+        eprintln!("Failed to write {}: {}", allow_path.display(), e);
+        return 1;
+    }
+
+    for entry in &to_add {
+        println!("Added to .normalize/{}: {}", filename, entry);
+    }
+    0
+}
+
+#[allow(clippy::too_many_arguments)]
 fn collect_block_hashes(
     node: &tree_sitter::Node,
     content: &[u8],
@@ -1085,8 +1190,15 @@ fn collect_block_hashes(
     min_lines: usize,
     elide_identifiers: bool,
     elide_literals: bool,
+    skip_functions: bool,
     out: &mut HashMap<u64, Vec<DuplicateBlockLocation>>,
 ) {
+    let kind = node.kind();
+
+    if skip_functions && is_function_kind(kind) {
+        return;
+    }
+
     let start_line = node.start_position().row + 1;
     let end_line = node.end_position().row + 1;
     let line_count = end_line.saturating_sub(start_line) + 1;
@@ -1109,6 +1221,7 @@ fn collect_block_hashes(
             min_lines,
             elide_identifiers,
             elide_literals,
+            skip_functions,
             out,
         );
     }
@@ -1155,16 +1268,37 @@ fn suppress_contained_blocks(mut groups: Vec<DuplicateBlockGroup>) -> Vec<Duplic
     result
 }
 
-pub fn cmd_duplicate_blocks(
-    root: &Path,
-    min_lines: usize,
-    elide_identifiers: bool,
-    elide_literals: bool,
-    show_source: bool,
-    format: &crate::output::OutputFormat,
-    filter: Option<&Filter>,
-) -> i32 {
+pub struct DuplicateBlocksConfig<'a> {
+    pub root: &'a Path,
+    pub min_lines: usize,
+    pub elide_identifiers: bool,
+    pub elide_literals: bool,
+    pub skip_functions: bool,
+    pub show_source: bool,
+    pub allow: Option<String>,
+    pub reason: Option<String>,
+    pub format: &'a crate::output::OutputFormat,
+    pub filter: Option<&'a Filter>,
+}
+
+pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
+    let DuplicateBlocksConfig {
+        root,
+        min_lines,
+        elide_identifiers,
+        elide_literals,
+        skip_functions,
+        show_source,
+        allow,
+        reason,
+        format,
+        filter,
+    } = cfg;
+    let extractor = Extractor::new();
     let mut hash_groups: HashMap<u64, Vec<DuplicateBlockLocation>> = HashMap::new();
+    // Map file -> extraction result for allow-key computation.
+    let mut file_extractions: HashMap<String, normalize_facts::extract::ExtractResult> =
+        HashMap::new();
     let mut files_scanned = 0usize;
     let mut blocks_hashed = 0usize;
 
@@ -1210,6 +1344,8 @@ pub fn cmd_duplicate_blocks(
             .display()
             .to_string();
 
+        file_extractions.insert(rel_path.clone(), extractor.extract(path, &content));
+
         let before = hash_groups.values().map(|v| v.len()).sum::<usize>();
         collect_block_hashes(
             &tree.root_node(),
@@ -1218,6 +1354,7 @@ pub fn cmd_duplicate_blocks(
             min_lines,
             elide_identifiers,
             elide_literals,
+            skip_functions,
             &mut hash_groups,
         );
         let after = hash_groups.values().map(|v| v.len()).sum::<usize>();
@@ -1241,6 +1378,47 @@ pub fn cmd_duplicate_blocks(
         .collect();
 
     let groups = suppress_contained_blocks(groups_raw);
+
+    // Build a closure that resolves the allow key for a location.
+    let allow_key = |loc: &DuplicateBlockLocation| {
+        let func = file_extractions
+            .get(&loc.file)
+            .and_then(|r| containing_function(r, loc.start_line));
+        block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
+    };
+
+    if let Some(location) = allow {
+        // --allow mode: find the group containing this location, write its keys.
+        let target = groups
+            .iter()
+            .find(|g| g.locations.iter().any(|loc| allow_key(loc) == location));
+        let group = match target {
+            Some(g) => g,
+            None => {
+                eprintln!("No duplicate block group found containing: {}", location);
+                eprintln!("Run `normalize analyze duplicate-blocks` to see available groups.");
+                return 1;
+            }
+        };
+        if reason.is_none() {
+            eprintln!("Reason required for new groups. Use --reason \"...\"");
+            return 1;
+        }
+        let entries: Vec<String> = group.locations.iter().map(&allow_key).collect();
+        return write_allow_entry(root, "duplicate-blocks-allow", &entries, reason.as_deref());
+    }
+
+    // Filter out allowed groups.
+    let allowlist = load_block_allowlist(root, "duplicate-blocks-allow");
+    let groups: Vec<DuplicateBlockGroup> = groups
+        .into_iter()
+        .filter(|g| {
+            // A group is allowed if ALL its locations appear in the allowlist.
+            !g.locations
+                .iter()
+                .all(|loc| allowlist.contains(&allow_key(loc)))
+        })
+        .collect();
 
     let report = DuplicateBlocksReport {
         files_scanned,
@@ -1598,6 +1776,8 @@ pub struct SimilarBlocksConfig<'a> {
     pub elide_literals: bool,
     pub skeleton: bool,
     pub show_source: bool,
+    pub allow: Option<String>,
+    pub reason: Option<String>,
     pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
@@ -1611,10 +1791,15 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
         elide_literals,
         skeleton,
         show_source,
+        allow,
+        reason,
         format,
         filter,
     } = cfg;
+    let extractor = Extractor::new();
     let mut all_blocks: Vec<(DuplicateBlockLocation, [u64; MINHASH_N])> = Vec::new();
+    let mut file_extractions: HashMap<String, normalize_facts::extract::ExtractResult> =
+        HashMap::new();
     let mut files_scanned = 0usize;
 
     let walker = ignore::WalkBuilder::new(root)
@@ -1658,6 +1843,8 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
             .unwrap_or(path)
             .display()
             .to_string();
+
+        file_extractions.insert(rel_path.clone(), extractor.extract(path, &content));
 
         collect_block_signatures(
             &tree.root_node(),
@@ -1770,9 +1957,367 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
 
     let pairs = suppress_overlapping_pairs(pairs);
 
+    let pair_allow_key = |loc: &DuplicateBlockLocation| {
+        let func = file_extractions
+            .get(&loc.file)
+            .and_then(|r| containing_function(r, loc.start_line));
+        block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
+    };
+
+    if let Some(location) = allow {
+        // Find the pair containing this location and write both sides.
+        let target = pairs.iter().find(|p| {
+            pair_allow_key(&p.location_a) == location || pair_allow_key(&p.location_b) == location
+        });
+        let pair = match target {
+            Some(p) => p,
+            None => {
+                eprintln!("No similar block pair found containing: {}", location);
+                eprintln!("Run `normalize analyze similar-blocks` to see available pairs.");
+                return 1;
+            }
+        };
+        if reason.is_none() {
+            eprintln!("Reason required. Use --reason \"...\"");
+            return 1;
+        }
+        let entries = vec![
+            pair_allow_key(&pair.location_a),
+            pair_allow_key(&pair.location_b),
+        ];
+        return write_allow_entry(root, "similar-blocks-allow", &entries, reason.as_deref());
+    }
+
+    // Filter out allowed pairs.
+    let allowlist = load_block_allowlist(root, "similar-blocks-allow");
+    let pairs: Vec<SimilarBlockPair> = pairs
+        .into_iter()
+        .filter(|p| {
+            !(allowlist.contains(&pair_allow_key(&p.location_a))
+                && allowlist.contains(&pair_allow_key(&p.location_b)))
+        })
+        .collect();
+
     let report = SimilarBlocksReport {
         files_scanned,
         blocks_analyzed,
+        threshold: similarity,
+        pairs,
+        show_source,
+        root: root.to_path_buf(),
+    };
+
+    report.print(format);
+    0
+}
+
+// ── Similar functions (fuzzy function-level matching) ─────────────────────────
+
+/// A pair of similar functions.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct SimilarFunctionPair {
+    pub file_a: String,
+    pub symbol_a: String,
+    pub start_line_a: usize,
+    pub end_line_a: usize,
+    pub file_b: String,
+    pub symbol_b: String,
+    pub start_line_b: usize,
+    pub end_line_b: usize,
+    pub similarity: f64,
+    pub line_count: usize,
+}
+
+/// Report from fuzzy function similarity detection.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct SimilarFunctionsReport {
+    files_scanned: usize,
+    functions_analyzed: usize,
+    threshold: f64,
+    pub pairs: Vec<SimilarFunctionPair>,
+    #[serde(skip)]
+    show_source: bool,
+    #[serde(skip)]
+    root: PathBuf,
+}
+
+impl OutputFormatter for SimilarFunctionsReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Similar Function Detection (fuzzy)".to_string());
+        lines.push(String::new());
+        lines.push(format!("Files scanned:      {}", self.files_scanned));
+        lines.push(format!("Functions analyzed: {}", self.functions_analyzed));
+        lines.push(format!(
+            "Threshold:          {:.0}%",
+            self.threshold * 100.0
+        ));
+        lines.push(format!("Similar pairs:      {}", self.pairs.len()));
+
+        if self.pairs.is_empty() {
+            lines.push(String::new());
+            lines.push("No similar functions detected.".to_string());
+            return lines.join("\n");
+        }
+
+        lines.push(String::new());
+
+        for (i, pair) in self.pairs.iter().take(30).enumerate() {
+            lines.push(format!(
+                "{}. {:.0}% similar  ({} lines)",
+                i + 1,
+                pair.similarity * 100.0,
+                pair.line_count,
+            ));
+            lines.push(format!(
+                "   {}:{}  ({}:{}-{})",
+                pair.file_a, pair.symbol_a, pair.file_a, pair.start_line_a, pair.end_line_a
+            ));
+            lines.push(format!(
+                "   {}:{}  ({}:{}-{})",
+                pair.file_b, pair.symbol_b, pair.file_b, pair.start_line_b, pair.end_line_b
+            ));
+
+            if self.show_source {
+                for (file, start, end) in [
+                    (&pair.file_a, pair.start_line_a, pair.end_line_a),
+                    (&pair.file_b, pair.start_line_b, pair.end_line_b),
+                ] {
+                    let full_path = self.root.join(file);
+                    if let Ok(content) = std::fs::read_to_string(&full_path) {
+                        let src_lines: Vec<&str> = content.lines().collect();
+                        let s = start.saturating_sub(1);
+                        let e = end.min(src_lines.len());
+                        lines.push(String::new());
+                        lines.push(format!("   --- {} ---", file));
+                        for src_line in &src_lines[s..e] {
+                            lines.push(format!("   {}", src_line));
+                        }
+                    }
+                }
+            }
+            lines.push(String::new());
+        }
+
+        if self.pairs.len() > 30 {
+            lines.push(format!("... and {} more pairs", self.pairs.len() - 30));
+        }
+
+        lines.join("\n")
+    }
+}
+
+pub struct SimilarFunctionsConfig<'a> {
+    pub root: &'a Path,
+    pub min_lines: usize,
+    pub similarity: f64,
+    pub elide_identifiers: bool,
+    pub elide_literals: bool,
+    pub skeleton: bool,
+    pub show_source: bool,
+    pub format: &'a crate::output::OutputFormat,
+    pub filter: Option<&'a Filter>,
+}
+
+pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
+    let SimilarFunctionsConfig {
+        root,
+        min_lines,
+        similarity,
+        elide_identifiers,
+        elide_literals,
+        skeleton,
+        show_source,
+        format,
+        filter,
+    } = cfg;
+
+    let extractor = Extractor::new();
+    // (location_a, location_b, symbol_name, signature)
+    let mut all_fns: Vec<(String, String, usize, usize, [u64; MINHASH_N])> = Vec::new();
+    let mut files_scanned = 0usize;
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && super::is_source_file(path)
+    }) {
+        let path = entry.path();
+
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        let result = extractor.extract(path, &content);
+
+        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+            let kind = sym.kind.as_str();
+            if kind != "function" && kind != "method" {
+                continue;
+            }
+
+            let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+            if line_count < min_lines {
+                continue;
+            }
+
+            if let Some(node) = find_function_node(&tree, sym.start_line) {
+                let mut tokens = Vec::new();
+                serialize_subtree_tokens(
+                    &node,
+                    content.as_bytes(),
+                    elide_identifiers,
+                    elide_literals,
+                    skeleton,
+                    &mut tokens,
+                );
+                let min_tokens = if skeleton { SHINGLE_K * 4 } else { SHINGLE_K };
+                if tokens.len() < min_tokens {
+                    continue;
+                }
+                if skeleton {
+                    let unique = tokens
+                        .iter()
+                        .collect::<std::collections::HashSet<_>>()
+                        .len();
+                    if (unique as f64 / tokens.len() as f64) < 0.3 {
+                        continue;
+                    }
+                }
+                let sig = compute_minhash(&tokens);
+                all_fns.push((
+                    rel_path.clone(),
+                    sym.name.clone(),
+                    sym.start_line,
+                    sym.end_line,
+                    sig,
+                ));
+            }
+        }
+    }
+
+    let functions_analyzed = all_fns.len();
+
+    // LSH bucketing.
+    let mut band_buckets: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (idx, (_, _, _, _, sig)) in all_fns.iter().enumerate() {
+        for band in 0..LSH_BANDS {
+            let bh = lsh_band_hash(sig, band);
+            let key = bh.wrapping_add((band as u64).wrapping_mul(0x9e3779b97f4a7c15));
+            band_buckets.entry(key).or_default().push(idx);
+        }
+    }
+
+    // Collect candidate pairs.
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
+    let mut candidates: Vec<(usize, usize)> = Vec::new();
+    for bucket in band_buckets.values() {
+        if bucket.len() < 2 {
+            continue;
+        }
+        for i in 0..bucket.len() {
+            for j in i + 1..bucket.len() {
+                let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
+                if seen.insert((a, b)) {
+                    candidates.push((a, b));
+                }
+            }
+        }
+    }
+
+    // Score and filter.
+    let mut pairs: Vec<SimilarFunctionPair> = candidates
+        .into_iter()
+        .filter_map(|(i, j)| {
+            let (file_a, sym_a, start_a, end_a, sig_a) = &all_fns[i];
+            let (file_b, sym_b, start_b, end_b, sig_b) = &all_fns[j];
+
+            if file_a == file_b && start_a == start_b && end_a == end_b {
+                return None;
+            }
+
+            if !skeleton {
+                let len_a = end_a.saturating_sub(*start_a) + 1;
+                let len_b = end_b.saturating_sub(*start_b) + 1;
+                let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
+                if ratio < 0.5 {
+                    return None;
+                }
+            } else {
+                let len_a = end_a.saturating_sub(*start_a) + 1;
+                let len_b = end_b.saturating_sub(*start_b) + 1;
+                let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
+                if ratio < 0.2 {
+                    return None;
+                }
+            }
+
+            let sim = jaccard_estimate(sig_a, sig_b);
+            if sim < similarity {
+                return None;
+            }
+
+            let line_count = end_a
+                .saturating_sub(*start_a)
+                .max(end_b.saturating_sub(*start_b))
+                + 1;
+
+            Some(SimilarFunctionPair {
+                file_a: file_a.clone(),
+                symbol_a: sym_a.clone(),
+                start_line_a: *start_a,
+                end_line_a: *end_a,
+                file_b: file_b.clone(),
+                symbol_b: sym_b.clone(),
+                start_line_b: *start_b,
+                end_line_b: *end_b,
+                similarity: sim,
+                line_count,
+            })
+        })
+        .collect();
+
+    pairs.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.line_count.cmp(&a.line_count))
+    });
+
+    let report = SimilarFunctionsReport {
+        files_scanned,
+        functions_analyzed,
         threshold: similarity,
         pairs,
         show_source,

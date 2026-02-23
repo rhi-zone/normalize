@@ -261,6 +261,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         Some(AnalyzeCommand::DuplicateBlocks { .. }) => {
             crate::output::print_output_schema::<duplicates::DuplicateBlocksReport>();
         }
+        Some(AnalyzeCommand::SimilarFunctions { .. }) => {
+            crate::output::print_output_schema::<duplicates::SimilarFunctionsReport>();
+        }
         Some(AnalyzeCommand::SimilarBlocks { .. }) => {
             crate::output::print_output_schema::<duplicates::SimilarBlocksReport>();
         }
@@ -651,15 +654,40 @@ pub fn run(
             elide_literals,
             show_source,
             min_lines,
-        }) => duplicates::cmd_duplicate_blocks(
-            &effective_root,
+            skip_functions,
+            allow,
+            reason,
+        }) => duplicates::cmd_duplicate_blocks(duplicates::DuplicateBlocksConfig {
+            root: &effective_root,
             min_lines,
             elide_identifiers,
             elide_literals,
+            skip_functions,
             show_source,
-            &format,
-            filter.as_ref(),
-        ),
+            allow,
+            reason,
+            format: &format,
+            filter: filter.as_ref(),
+        }),
+
+        Some(AnalyzeCommand::SimilarFunctions {
+            elide_identifiers,
+            elide_literals,
+            show_source,
+            min_lines,
+            similarity,
+            skeleton,
+        }) => duplicates::cmd_similar_functions(duplicates::SimilarFunctionsConfig {
+            root: &effective_root,
+            min_lines,
+            similarity,
+            elide_identifiers,
+            elide_literals,
+            skeleton,
+            show_source,
+            format: &format,
+            filter: filter.as_ref(),
+        }),
 
         Some(AnalyzeCommand::SimilarBlocks {
             elide_identifiers,
@@ -668,6 +696,8 @@ pub fn run(
             min_lines,
             similarity,
             skeleton,
+            allow,
+            reason,
         }) => duplicates::cmd_similar_blocks(duplicates::SimilarBlocksConfig {
             root: &effective_root,
             min_lines,
@@ -676,6 +706,8 @@ pub fn run(
             elide_literals,
             skeleton,
             show_source,
+            allow,
+            reason,
             format: &format,
             filter: filter.as_ref(),
         }),

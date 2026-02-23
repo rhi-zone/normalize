@@ -640,6 +640,9 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] `analyze duplicate-blocks`: subtree-level clone detection with containment suppression. See `docs/design/duplicate-detection.md`
 - [x] Fuzzy/partial clone detection (`analyze similar-blocks`): MinHash LSH over AST token shingles, 128-dim signatures, 32 bands. Containment + overlap suppression. See `docs/design/duplicate-detection.md`.
 - [x] Skeleton mode (`--skeleton` on `similar-blocks`): serialize structural skeleton only — keep control flow nodes, replace bodies with `<body>` placeholder. Relaxed size ratio (0.2 vs 0.5), degenerate skeleton filtering (min token count + 30% unique token diversity). See `docs/design/duplicate-detection.md`.
+- [x] `--skip-functions` on `duplicate-blocks`: skip function/method nodes to avoid overlap with `duplicate-functions`.
+- [x] `similar-functions`: MinHash LSH scoped to function nodes; named-symbol output; `--skeleton` support.
+- [x] Allow files for `duplicate-blocks` (`duplicate-blocks-allow`) and `similar-blocks` (`similar-blocks-allow`). Key format: `file:func:start-end` or `file:start-end`. `--allow <location> --reason <text>` flags on both commands.
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `normalize analyze ast`, `normalize analyze query` (authoring tools)
   - [x] Phase 1b: `normalize analyze rules` reads .normalize/rules/*.scm with TOML frontmatter

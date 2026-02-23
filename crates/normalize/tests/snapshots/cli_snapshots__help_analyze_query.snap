@@ -1,6 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 327
+assertion_line: 332
 expression: "snapshot_help(&[\"analyze\", \"query\"])"
 ---
 Test a tree-sitter query against files
@@ -38,14 +38,14 @@ Options:
       --compact
           Compact output without colors (overrides TTY detection)
 
+      --output-schema
+          Output JSON schema for the command's return type
+
   -r, --root <ROOT>
           Root directory (defaults to current directory)
 
       --exclude <PATTERN>
           Exclude paths matching pattern or @alias
-
-      --output-schema
-          Output JSON schema for the command's return type
 
       --input-schema
           Output JSON schema for the command's input arguments
@@ -53,11 +53,11 @@ Options:
       --only <PATTERN>
           Include only paths matching pattern or @alias
 
-      --diff [<BASE>]
-          Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
-
       --params-json <JSON>
           Pass command arguments as JSON (overrides CLI args)
+
+      --diff [<BASE>]
+          Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
 
   -h, --help
           Print help (see a summary with '-h')

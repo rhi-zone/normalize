@@ -1,21 +1,19 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
 assertion_line: 317
-expression: "snapshot_help(&[\"analyze\", \"similar-blocks\"])"
+expression: "snapshot_help(&[\"analyze\", \"similar-functions\"])"
 ---
-Detect similar (fuzzy-matching) code blocks via MinHash LSH
+Detect similar (fuzzy-matching) functions via MinHash LSH
 
-Usage: normalize analyze similar-blocks [OPTIONS]
+Usage: normalize analyze similar-functions [OPTIONS]
 
 Options:
       --elide-identifiers        
       --elide-literals           
       --show-source              
-      --min-lines <MIN_LINES>    Minimum lines for a block to be considered [default: 5] [default: 5]
+      --min-lines <MIN_LINES>    Minimum lines for a function to be considered [default: 5] [default: 5]
       --similarity <SIMILARITY>  Minimum similarity threshold (0.0–1.0) [default: 0.8] [default: 0.8]
-      --skeleton                 Skeleton mode: replace block/body subtrees with a placeholder, matching on control-flow structure regardless of body content or size
-      --allow <LOCATION>         Allow a similar block pair (add to .normalize/similar-blocks-allow) Accepts file:func:start-end or file:start-end
-      --reason <REASON>          Reason for allowing
+      --skeleton                 Skeleton mode: match on control-flow structure, ignoring body content
       --json                     Output as JSON
       --jsonl                    Output as JSON Lines (one object per line)
       --jq <EXPR>                Filter JSON output with jq expression (implies --json)

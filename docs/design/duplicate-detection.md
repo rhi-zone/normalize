@@ -7,9 +7,9 @@
 - [x] `analyze duplicate-blocks` — exact subtree-level hashing with containment suppression
 - [x] `analyze similar-blocks` — fuzzy subtree matching via MinHash LSH
 - [x] Skeleton mode (`--skeleton` on `similar-blocks`) — structural matching ignoring bodies
-- [ ] Allow files for `duplicate-blocks` and `similar-blocks` (see Allow File Design below)
-- [ ] `--skip-functions` on `duplicate-blocks` — skip function/method nodes to avoid overlap with `duplicate-functions`
-- [ ] `similar-functions` — MinHash LSH scoped to function/method nodes; like `duplicate-functions` but fuzzy; supports `--skeleton`
+- [x] Allow files for `duplicate-blocks` and `similar-blocks` (see Allow File Design below)
+- [x] `--skip-functions` on `duplicate-blocks` — skip function/method nodes to avoid overlap with `duplicate-functions`
+- [x] `similar-functions` — MinHash LSH scoped to function/method nodes; like `duplicate-functions` but fuzzy; supports `--skeleton`
 - [ ] Enable `duplicate-blocks` in CI as enforcement (needs `--allow` mechanism)
 
 ## What we have today
