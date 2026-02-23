@@ -16,7 +16,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
 
 ## Remaining Work
-- `normalize view` symbol not found: show all candidate symbols close enough to the query by some metric — edit distance, substring containment, word-token overlap (split on `_`/camelCase), or a combination. Goal: `view foo.rs/cmd_dup` should surface `cmd_duplicate_functions_with_count`; `view foo.rs/duplikat_funcs` should too. Currently only reports "appears N times" with no actionable list.
+- `normalize view` symbol not found: show all candidate symbols with **trigram containment ≥ 0.6** against the query (skip if query < 4 chars). Metric: `|trigrams(query) ∩ trigrams(candidate)| / |trigrams(query)|` — asymmetric by design, measures how much of the query appears in the candidate.
+  - Handles prefix typing (`cmd_dup` → all 5 query trigrams appear in `cmd_duplicate_functions_with_count` → 1.0 ✓)
+  - Handles interior substrings (`duplicate_functions` → high containment ✓)
+  - Handles light typos (`duplikat_funcs` → ~8/12 = 0.67 ✓)
+  - Why not edit distance: fails on length difference (short query vs long name always scores poorly even if it's a good prefix match)
+  - Why not Jaccard: same asymmetry problem — short query vs long name gives tiny union, low score
+  - Why not substring: misses any typo
+  - Why not word-token prefix: misses inter-token typos, requires exact token boundaries
+  - Threshold 0.6 and min-length 4 control false positives; anything that passes is worth showing since user has no result anyway
 - Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
   - Requires language-specific namespace semantics - low priority
 - Shadow worktree: true shadow-first mode (edit in shadow, then apply)
