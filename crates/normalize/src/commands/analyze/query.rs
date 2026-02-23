@@ -515,30 +515,7 @@ pub fn cmd_query(
             OutputFormat::Jq { filter, jsonl } => {
                 match crate::output::apply_jq(&json_value, filter) {
                     Ok(lines) => {
-                        for line in lines {
-                            if *jsonl {
-                                // Parse each result and emit as JSONL
-                                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
-                                    if let serde_json::Value::Array(arr) = val {
-                                        for item in arr {
-                                            println!(
-                                                "{}",
-                                                serde_json::to_string(&item).unwrap_or_default()
-                                            );
-                                        }
-                                    } else {
-                                        println!(
-                                            "{}",
-                                            serde_json::to_string(&val).unwrap_or_default()
-                                        );
-                                    }
-                                } else {
-                                    println!("{}", line);
-                                }
-                            } else {
-                                println!("{}", line);
-                            }
-                        }
+                        crate::output::print_jq_lines(&lines, *jsonl);
                     }
                     Err(e) => {
                         eprintln!("jq error: {}", e);

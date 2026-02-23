@@ -609,27 +609,7 @@ fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
         }
         OutputFormat::Jq { filter, jsonl } => match crate::output::apply_jq(value, filter) {
             Ok(results) => {
-                for result in results {
-                    if *jsonl {
-                        // Parse each result and emit as JSONL
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&result) {
-                            if let serde_json::Value::Array(arr) = val {
-                                for item in arr {
-                                    println!(
-                                        "{}",
-                                        serde_json::to_string(&item).unwrap_or_default()
-                                    );
-                                }
-                            } else {
-                                println!("{}", serde_json::to_string(&val).unwrap_or_default());
-                            }
-                        } else {
-                            println!("{}", result);
-                        }
-                    } else {
-                        println!("{}", result);
-                    }
-                }
+                crate::output::print_jq_lines(&results, *jsonl);
             }
             Err(e) => {
                 eprintln!("jq error: {}", e);

@@ -1466,13 +1466,15 @@ pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
 
     // Filter out allowed groups.
     let allowlist = load_block_allowlist(root, "duplicate-blocks-allow");
+    let loc_allowed = |loc: &DuplicateBlockLocation| {
+        allowlist.contains(&allow_key(loc))
+            || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
+    };
     let groups: Vec<DuplicateBlockGroup> = groups
         .into_iter()
         .filter(|g| {
             // A group is allowed if ALL its locations appear in the allowlist.
-            !g.locations
-                .iter()
-                .all(|loc| allowlist.contains(&allow_key(loc)))
+            !g.locations.iter().all(&loc_allowed)
         })
         .collect();
 
@@ -2066,12 +2068,13 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
 
     // Filter out allowed pairs.
     let allowlist = load_block_allowlist(root, "similar-blocks-allow");
+    let loc_in_allowlist = |loc: &DuplicateBlockLocation| {
+        allowlist.contains(&pair_allow_key(loc))
+            || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
+    };
     let pairs: Vec<SimilarBlockPair> = pairs
         .into_iter()
-        .filter(|p| {
-            !(allowlist.contains(&pair_allow_key(&p.location_a))
-                && allowlist.contains(&pair_allow_key(&p.location_b)))
-        })
+        .filter(|p| !(loc_in_allowlist(&p.location_a) && loc_in_allowlist(&p.location_b)))
         .collect();
 
     let empty = pairs.is_empty();
@@ -2193,6 +2196,8 @@ pub struct SimilarFunctionsConfig<'a> {
     pub skeleton: bool,
     pub show_source: bool,
     pub include_trait_impls: bool,
+    pub allow: Option<String>,
+    pub reason: Option<String>,
     pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
@@ -2207,6 +2212,8 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
         skeleton,
         show_source,
         include_trait_impls,
+        allow,
+        reason,
         format,
         filter,
     } = cfg;
@@ -2397,6 +2404,63 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| b.line_count.cmp(&a.line_count))
     });
+
+    let fn_allow_key = |file: &str, symbol: &str, start: usize, end: usize| {
+        format!("{}:{}:{}-{}", file, symbol, start, end)
+    };
+
+    if let Some(location) = allow {
+        let target = pairs.iter().find(|p| {
+            fn_allow_key(&p.file_a, &p.symbol_a, p.start_line_a, p.end_line_a) == location
+                || fn_allow_key(&p.file_b, &p.symbol_b, p.start_line_b, p.end_line_b) == location
+        });
+        let pair = match target {
+            Some(p) => p,
+            None => {
+                eprintln!("No similar function pair found containing: {}", location);
+                eprintln!("Run `normalize analyze similar-functions` to see available pairs.");
+                return 1;
+            }
+        };
+        if reason.is_none() {
+            eprintln!("Reason required. Use --reason \"...\"");
+            return 1;
+        }
+        let entries = vec![
+            fn_allow_key(
+                &pair.file_a,
+                &pair.symbol_a,
+                pair.start_line_a,
+                pair.end_line_a,
+            ),
+            fn_allow_key(
+                &pair.file_b,
+                &pair.symbol_b,
+                pair.start_line_b,
+                pair.end_line_b,
+            ),
+        ];
+        return write_allow_entry(root, "similar-functions-allow", &entries, reason.as_deref());
+    }
+
+    // Filter out allowed pairs.
+    let allowlist = load_block_allowlist(root, "similar-functions-allow");
+    let pairs: Vec<SimilarFunctionPair> = pairs
+        .into_iter()
+        .filter(|p| {
+            !(allowlist.contains(&fn_allow_key(
+                &p.file_a,
+                &p.symbol_a,
+                p.start_line_a,
+                p.end_line_a,
+            )) && allowlist.contains(&fn_allow_key(
+                &p.file_b,
+                &p.symbol_b,
+                p.start_line_b,
+                p.end_line_b,
+            )))
+        })
+        .collect();
 
     let empty = pairs.is_empty();
     let report = SimilarFunctionsReport {

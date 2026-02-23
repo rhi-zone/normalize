@@ -18,9 +18,23 @@ exclude = [
     # Package index has intentionally parallel parsers for each distro/repo —
     # each parser targets a different format but uses similar parsing scaffolding.
     "crates/normalize-package-index/src/**",
+    # Surface-syntax input/output implement the same IR for each language —
+    # intentionally parallel (typescript.rs, lua.rs, python.rs all read/write same nodes).
+    "crates/normalize-surface-syntax/src/**",
     # Test files use similar setup/assertion patterns by design.
     "crates/normalize-typegen/tests/**",
     "**/tests/**",
+    # Specs and CI files are not production code.
+    "specs/**",
+    "action.yml",
+    # Markdown docs have similar structure but are not code.
+    "docs/**",
+    "**/*.md",
+    # Cargo.toml and config files have similar structure by convention.
+    "**/*.toml",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/*.json",
 ]
 # hotspots_exclude = ["*.md", "*.json"]  # example: exclude markdown and JSON
 

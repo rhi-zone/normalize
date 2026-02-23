@@ -195,7 +195,7 @@ pub fn cmd_update(check_only: bool, format: &crate::output::OutputFormat) -> i32
 }
 
 /// Get the target triple for the current platform
-fn get_target_triple() -> String {
+pub(super) fn get_target_triple() -> String {
     let arch = if cfg!(target_arch = "x86_64") {
         "x86_64"
     } else if cfg!(target_arch = "aarch64") {

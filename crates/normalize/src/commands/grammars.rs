@@ -343,27 +343,7 @@ fn cmd_install(version: Option<String>, force: bool, json: bool) -> i32 {
     0
 }
 
-fn get_target_triple() -> String {
-    let arch = if cfg!(target_arch = "x86_64") {
-        "x86_64"
-    } else if cfg!(target_arch = "aarch64") {
-        "aarch64"
-    } else {
-        "unknown"
-    };
-
-    let os = if cfg!(target_os = "linux") {
-        "unknown-linux-gnu"
-    } else if cfg!(target_os = "macos") {
-        "apple-darwin"
-    } else if cfg!(target_os = "windows") {
-        "pc-windows-msvc"
-    } else {
-        "unknown"
-    };
-
-    format!("{}-{}", arch, os)
-}
+use super::update::get_target_triple;
 
 fn extract_grammars(data: &[u8], dest: &std::path::Path) -> Result<usize, String> {
     use flate2::read::GzDecoder;

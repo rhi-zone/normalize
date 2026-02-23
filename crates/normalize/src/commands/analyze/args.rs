@@ -291,6 +291,15 @@ pub enum AnalyzeCommand {
         #[arg(long)]
         #[serde(default)]
         include_trait_impls: bool,
+
+        /// Allow a similar function pair (add to .normalize/similar-functions-allow)
+        /// Accepts file:symbol:start-end or file:start-end
+        #[arg(long, value_name = "LOCATION")]
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
     },
 
     /// Detect similar (fuzzy-matching) code blocks via MinHash LSH

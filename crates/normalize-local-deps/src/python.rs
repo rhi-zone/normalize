@@ -195,67 +195,7 @@ fn is_python_stdlib_module(module_name: &str, stdlib_path: &Path) -> bool {
 
 /// Resolve a Python stdlib import to its source location.
 fn resolve_python_stdlib_import(import_name: &str, stdlib_path: &Path) -> Option<ResolvedPackage> {
-    let parts: Vec<&str> = import_name.split('.').collect();
-    let top_level = parts[0];
-
-    // Check for package (directory)
-    let pkg_dir = stdlib_path.join(top_level);
-    if pkg_dir.is_dir() {
-        if parts.len() == 1 {
-            let init = pkg_dir.join("__init__.py");
-            if init.is_file() {
-                return Some(ResolvedPackage {
-                    path: pkg_dir,
-                    name: import_name.to_string(),
-                    is_namespace: false,
-                });
-            }
-            // Some stdlib packages don't have __init__.py in newer Python
-            return Some(ResolvedPackage {
-                path: pkg_dir,
-                name: import_name.to_string(),
-                is_namespace: true,
-            });
-        } else {
-            // Submodule
-            let mut path = pkg_dir.clone();
-            for part in &parts[1..] {
-                path = path.join(part);
-            }
-
-            if path.is_dir() {
-                let init = path.join("__init__.py");
-                return Some(ResolvedPackage {
-                    path: path.clone(),
-                    name: import_name.to_string(),
-                    is_namespace: !init.is_file(),
-                });
-            }
-
-            let py_file = path.with_extension("py");
-            if py_file.is_file() {
-                return Some(ResolvedPackage {
-                    path: py_file,
-                    name: import_name.to_string(),
-                    is_namespace: false,
-                });
-            }
-
-            return None;
-        }
-    }
-
-    // Check for single-file module
-    let py_file = stdlib_path.join(format!("{}.py", top_level));
-    if py_file.is_file() {
-        return Some(ResolvedPackage {
-            path: py_file,
-            name: import_name.to_string(),
-            is_namespace: false,
-        });
-    }
-
-    None
+    resolve_python_import_from_base(import_name, stdlib_path)
 }
 
 /// Find Python site-packages directory for a project.
@@ -320,15 +260,20 @@ fn find_site_packages_in_venv(venv: &Path) -> Option<PathBuf> {
 /// - Submodule imports (requests.api -> requests/api.py)
 /// - Namespace packages (no __init__.py)
 fn resolve_python_import(import_name: &str, site_packages: &Path) -> Option<ResolvedPackage> {
-    // Split on dots for submodule resolution
+    resolve_python_import_from_base(import_name, site_packages)
+}
+
+/// Shared resolver for Python imports from a given base directory.
+///
+/// Handles packages, modules, submodules, and namespace packages.
+fn resolve_python_import_from_base(import_name: &str, base_path: &Path) -> Option<ResolvedPackage> {
     let parts: Vec<&str> = import_name.split('.').collect();
     let top_level = parts[0];
 
     // Check for package (directory)
-    let pkg_dir = site_packages.join(top_level);
+    let pkg_dir = base_path.join(top_level);
     if pkg_dir.is_dir() {
         if parts.len() == 1 {
-            // Just the package - look for __init__.py
             let init = pkg_dir.join("__init__.py");
             if init.is_file() {
                 return Some(ResolvedPackage {
@@ -375,7 +320,7 @@ fn resolve_python_import(import_name: &str, site_packages: &Path) -> Option<Reso
     }
 
     // Check for single-file module
-    let py_file = site_packages.join(format!("{}.py", top_level));
+    let py_file = base_path.join(format!("{}.py", top_level));
     if py_file.is_file() {
         return Some(ResolvedPackage {
             path: py_file,

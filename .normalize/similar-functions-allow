@@ -1,0 +1,193 @@
+# Similar Functions Allowlist
+#
+# CI runs: normalize analyze similar-functions --min-lines 10
+#
+# These are intentionally similar (not copy-paste) due to:
+# - Language-parallel implementations (each language gets its own handler)
+# - Registry/index lookup patterns (get_X, all_X, find_X with same shape)
+# - Tool adapter boilerplate (each tool has a version() with same shell-run pattern)
+# - Test functions (similar setup/teardown for related test cases)
+# - Format/output variants (same structure, different types/labels)
+#
+# Format: file:symbol:start-end (one per line, # comments allowed)
+
+# Language-parallel call extractors in symbols.rs
+crates/normalize-facts/src/symbols.rs:find_rust_calls_with_lines:359-373
+crates/normalize-facts/src/symbols.rs:find_python_calls_with_lines:307-321
+crates/normalize-facts/src/symbols.rs:find_javascript_calls_with_lines:435-449
+crates/normalize-facts/src/symbols.rs:find_java_calls_with_lines:488-502
+crates/normalize-facts/src/symbols.rs:find_go_calls_with_lines:539-554
+crates/normalize-facts/src/symbols.rs:find_rust_calls:556-569
+crates/normalize-facts/src/symbols.rs:find_python_calls:216-229
+crates/normalize-facts/src/symbols.rs:collect_rust_calls:571-604
+crates/normalize-facts/src/symbols.rs:collect_python_calls:231-258
+crates/normalize-facts/src/symbols.rs:collect_python_calls_with_lines:323-357
+crates/normalize-facts/src/symbols.rs:collect_js_ts_calls_with_lines:451-486
+
+# Registry/index lookup functions (same shape, different data)
+crates/normalize-facts/src/index.rs:all_call_edges:1080-1096
+crates/normalize-facts/src/index.rs:all_symbol_implements:1120-1134
+crates/normalize-facts/src/index.rs:all_type_methods:1136-1148
+crates/normalize-facts/src/index.rs:all_calls_with_lines:1150-1173
+crates/normalize-facts/src/index.rs:all_calls_with_qualifiers:1233-1256
+crates/normalize-facts/src/index.rs:all_symbol_attributes:1217-1231
+crates/normalize-facts/src/index.rs:all_imports:1098-1118
+crates/normalize-facts/src/index.rs:find_by_name:685-705
+crates/normalize-facts/src/index.rs:find_by_stem:707-727
+crates/normalize-facts/src/index.rs:find_callees:877-895
+crates/normalize-facts/src/index.rs:find_importers:1394-1412
+crates/normalize-facts/src/index.rs:find_symbol:915-937
+crates/normalize-facts/src/index.rs:find_type_definitions:1435-1453
+crates/normalize-facts/src/index.rs:get_type_methods:1414-1433
+
+# Tool adapter version() functions (each tool: run --version, parse output)
+crates/normalize-tools/src/adapters/biome.rs:biome_version:129-139
+crates/normalize-tools/src/adapters/eslint.rs:version:69-79
+crates/normalize-tools/src/adapters/mypy.rs:version:60-70
+crates/normalize-tools/src/adapters/oxfmt.rs:version:48-58
+crates/normalize-tools/src/adapters/oxlint.rs:version:94-104
+crates/normalize-tools/src/adapters/prettier.rs:version:51-61
+crates/normalize-tools/src/adapters/pyright.rs:version:83-93
+crates/normalize-tools/src/adapters/ruff.rs:version:75-85
+crates/normalize-tools/src/adapters/tsc.rs:version:47-57
+crates/normalize-tools/src/adapters/tsgo.rs:version:48-58
+
+# Typegen registry lookups
+crates/normalize-typegen/src/registry.rs:get_backend:60-69
+crates/normalize-typegen/src/registry.rs:backends_for_language:71-81
+crates/normalize-typegen/src/registry.rs:backends_by_category:83-93
+
+# Typegen output generators (parallel output variants for different targets)
+crates/normalize-typegen/src/output/pydantic.rs:generate_frozen_model:397-411
+crates/normalize-typegen/src/output/pydantic.rs:generate_simple_model:362-381
+crates/normalize-typegen/src/output/python.rs:generate_frozen_dataclass:455-472
+crates/normalize-typegen/src/output/python.rs:generate_simple_dataclass:398-417
+crates/normalize-typegen/src/output/typescript.rs:generate_with_export:298-312
+crates/normalize-typegen/src/output/typescript.rs:generate_with_readonly:314-331
+crates/normalize-typegen/src/output/zod.rs:generate_with_inferred_types:292-307
+
+# Lockfile finders (each ecosystem has same "find the lockfile" pattern)
+crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs:find_text_lockfile:706-718
+crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs:find_binary_lockfile:720-732
+crates/normalize-ecosystems/src/ecosystems/npm/lockfile_npm.rs:find_lockfile:42-54
+crates/normalize-ecosystems/src/ecosystems/npm/lockfile_pnpm.rs:find_lockfile:53-65
+crates/normalize-ecosystems/src/ecosystems/npm/lockfile_yarn.rs:find_lockfile:44-56
+
+# Bun lockfile binary node building (text vs binary format parsing)
+crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs:build_node:603-640
+crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs:build_node_text:779-818
+
+# Ecosystem/tool registry pattern
+crates/normalize-ecosystems/src/ecosystems/mod.rs:get_ecosystem:122-131
+crates/normalize-tools/src/registry.rs:get_tool:148-157
+crates/normalize-tools/src/test_runners/mod.rs:get_runner:131-140
+crates/normalize-tools/src/test_runners/mod.rs:detect_test_runner:176-195
+
+# JavaScript/TypeScript extract functions (same shape for js/ts/tsx)
+crates/normalize-deps/src/lib.rs:extract_javascript:258-270
+crates/normalize-deps/src/lib.rs:extract_typescript:230-242
+crates/normalize-deps/src/lib.rs:extract_tsx:244-256
+
+# Test functions (similar setup for related scenarios)
+crates/normalize-facts/src/extract.rs:test_extract_rust:727-750
+crates/normalize-facts/src/extract.rs:test_extract_python:700-725
+crates/normalize-facts/src/extract.rs:test_implements_php:1060-1070
+crates/normalize-facts/src/extract.rs:test_implements_graphql:1097-1107
+crates/normalize-view/src/skeleton.rs:test_rust_skeleton:169-193
+crates/normalize-view/src/skeleton.rs:test_python_skeleton:138-167
+crates/normalize-path-resolve/src/lib.rs:test_exact_match:646-655
+crates/normalize-path-resolve/src/lib.rs:test_filename_match:657-666
+crates/normalize-path-resolve/src/lib.rs:test_stem_match:668-677
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_file_only:701-713
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_with_symbol:715-728
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_directory:730-742
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_rust_style_separator:744-756
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_hash_separator:758-770
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_colon_separator:772-784
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_fuzzy_file:786-798
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_absolute:800-814
+crates/normalize-path-resolve/src/lib.rs:test_unified_path_unicode:831-846
+crates/normalize/src/config.rs:test_load_project_config:171-196
+crates/normalize/src/config.rs:test_partial_config:198-219
+crates/normalize/src/commands/context.rs:test_collect_single_context_file:273-283
+crates/normalize/src/commands/context.rs:test_dotfile_takes_priority:300-311
+crates/normalize-output/src/lib.rs:test_pretty_config_highlight:403-415
+crates/normalize-output/src/lib.rs:test_pretty_config_use_colors:386-401
+crates/normalize-facts-rules-interpret/src/lib.rs:test_bidirectional_deps_fires:1587-1597
+crates/normalize-facts-rules-interpret/src/lib.rs:test_bidirectional_deps_no_fire:1599-1609
+crates/normalize-facts-rules-interpret/src/lib.rs:test_dead_api_fires:1458-1474
+crates/normalize-facts-rules-interpret/src/lib.rs:test_dead_api_no_fire:1476-1488
+crates/normalize-facts-rules-interpret/src/lib.rs:test_cycle_detection_interpreted:772-792
+crates/normalize-facts-rules-interpret/src/lib.rs:test_run_builtin_cycle_detection:958-968
+crates/normalize-cli-parser/src/formats/clap.rs:test_detect_clap:231-244
+crates/normalize-cli-parser/src/formats/click.rs:test_detect_click:169-178
+crates/normalize-cli-parser/src/formats/cobra.rs:test_detect_cobra:209-224
+crates/normalize-cli-parser/src/formats/yargs.rs:test_detect_yargs:235-247
+crates/normalize-typegen/src/input/typescript.rs:test_array_types:725-747
+crates/normalize-typegen/src/input/typescript.rs:test_nullable_union:749-767
+
+# View symbol/identifier extractors (different types extracted, same tree-walk shape)
+crates/normalize/src/commands/view/symbol.rs:extract_identifiers:681-691
+crates/normalize/src/commands/view/symbol.rs:extract_type_references:731-742
+
+# path_resolve module wrappers
+crates/normalize/src/path_resolve.rs:resolve:85-94
+crates/normalize/src/path_resolve.rs:resolve_unified:51-61
+crates/normalize/src/path_resolve.rs:resolve_unified_all:63-73
+
+# Format detection functions
+crates/normalize-chat-sessions/src/formats/mod.rs:detect_format:115-127
+crates/normalize-chat-sessions/src/formats/mod.rs:get_format:104-113
+crates/normalize-cli-parser/src/formats/mod.rs:get_format:77-86
+
+# Source file discovery (each language/ecosystem uses same "walk up and find" pattern)
+crates/normalize-syntax-rules/src/sources.rs:find_cargo_toml:207-217
+crates/normalize-syntax-rules/src/sources.rs:find_go_mod:609-619
+crates/normalize-syntax-rules/src/sources.rs:find_package_json:395-405
+crates/normalize-syntax-rules/src/sources.rs:find_pyproject:531-541
+crates/normalize-syntax-rules/src/sources.rs:find_tsconfig:383-393
+crates/normalize-local-deps/src/ecmascript.rs:find_node_modules:70-90
+crates/normalize-local-deps/src/go.rs:find_go_mod:49-69
+crates/normalize-local-deps/src/java.rs:find_java_package_in_gradle:209-232
+crates/normalize-local-deps/src/java.rs:find_java_package_in_maven:131-162
+
+# Import resolvers (local vs external have same dispatch shape)
+crates/normalize-local-deps/src/lib.rs:resolve_local_import:121-132
+crates/normalize-local-deps/src/lib.rs:resolve_external_import:134-143
+
+# OpenAPI/JSON schema generators (one per output language)
+crates/normalize-openapi/src/lib.rs:json_schema_to_py:668-695
+crates/normalize-openapi/src/lib.rs:json_schema_to_rust:579-610
+crates/normalize-openapi/src/lib.rs:json_schema_to_ts:625-656
+
+# Edit/preview (apply vs preview - symmetric operations)
+crates/normalize/src/edit.rs:apply:164-248
+crates/normalize/src/edit.rs:preview:250-329
+
+# File prepend/append (opposite operations, same structure)
+crates/normalize-edit/src/lib.rs:prepend_to_file:259-268
+crates/normalize-edit/src/lib.rs:append_to_file:270-282
+
+# Edit library search/symbol helpers
+crates/normalize-edit/src/lib.rs:find_symbol:57-103
+crates/normalize-edit/src/lib.rs:search_symbols:68-100
+crates/normalize-edit/src/lib.rs:search_symbols:314-338
+crates/normalize-edit/src/lib.rs:find_container_body_via_skeleton:304-341
+
+# SARIF output (complexity vs length - parallel analysis output formats)
+crates/normalize/src/commands/analyze/sarif.rs:print_complexity_sarif:60-106
+crates/normalize/src/commands/analyze/sarif.rs:print_length_sarif:108-154
+
+# Lint command variants (run vs run_once - parallel invocation shapes)
+crates/normalize/src/commands/tools/lint.rs:cmd_lint_run:115-269
+crates/normalize/src/commands/tools/lint.rs:run_lint_once:380-490
+
+# Trace analysis functions (collect vs collect_returns, trace vs trace_returns)
+crates/normalize/src/commands/analyze/trace.rs:collect:614-660
+crates/normalize/src/commands/analyze/trace.rs:collect_returns:718-778
+crates/normalize/src/commands/analyze/trace.rs:extract_calls_from_node:605-664
+crates/normalize/src/commands/analyze/trace.rs:trace_returns:708-790
+
+# CLI parser format-specific parsers (same option-line parsing for each framework)
+crates/normalize-cli-parser/src/formats/argparse.rs:parse_option_line:142-195
+crates/normalize-cli-parser/src/formats/cobra.rs:parse_flag_line:157-203

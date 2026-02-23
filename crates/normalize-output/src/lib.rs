@@ -277,6 +277,31 @@ pub fn apply_jq(value: &serde_json::Value, filter: &str) -> Result<Vec<String>, 
     Ok(results)
 }
 
+/// Print jq-filtered lines to stdout.
+///
+/// When `jsonl` is true, each line is parsed as JSON: arrays are exploded
+/// one item per line, other values are emitted as compact JSON. When false,
+/// each line is printed as-is.
+pub fn print_jq_lines(lines: &[String], jsonl: bool) {
+    for line in lines {
+        if jsonl {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                if let serde_json::Value::Array(arr) = val {
+                    for item in arr {
+                        println!("{}", serde_json::to_string(&item).unwrap_or_default());
+                    }
+                } else {
+                    println!("{}", serde_json::to_string(&val).unwrap_or_default());
+                }
+            } else {
+                println!("{}", line);
+            }
+        } else {
+            println!("{}", line);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

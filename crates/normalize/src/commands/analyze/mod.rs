@@ -718,6 +718,8 @@ pub fn run(
             similarity,
             skeleton,
             include_trait_impls,
+            allow,
+            reason,
         }) => duplicates::cmd_similar_functions(duplicates::SimilarFunctionsConfig {
             root: &effective_root,
             min_lines,
@@ -727,6 +729,8 @@ pub fn run(
             skeleton,
             show_source,
             include_trait_impls,
+            allow,
+            reason,
             format: &format,
             filter: filter.as_ref(),
         }),

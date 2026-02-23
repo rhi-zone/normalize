@@ -77,6 +77,8 @@ cache/
 !/.normalize/duplicate-functions-allow
 !/.normalize/duplicate-blocks-allow
 !/.normalize/duplicate-types-allow
+!/.normalize/similar-functions-allow
+!/.normalize/similar-blocks-allow
 !/.normalize/hotspots-allow
 !/.normalize/large-files-allow
 
@@ -86,6 +88,8 @@ cache/
 !.normalize/duplicate-functions-allow
 !.normalize/duplicate-blocks-allow
 !.normalize/duplicate-types-allow
+!.normalize/similar-functions-allow
+!.normalize/similar-blocks-allow
 !.normalize/hotspots-allow
 !.normalize/large-files-allow
 !.normalize/memory/
