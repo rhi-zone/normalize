@@ -321,6 +321,12 @@ pub enum AnalyzeCommand {
         #[serde(default)]
         skeleton: bool,
 
+        /// Include pairs where both blocks are inside same-name functions (likely trait implementations).
+        /// By default these are suppressed as intentionally parallel, not copy-paste.
+        #[arg(long)]
+        #[serde(default)]
+        include_trait_impls: bool,
+
         /// Allow a similar block pair (add to .normalize/similar-blocks-allow)
         /// Accepts file:func:start-end or file:start-end
         #[arg(long, value_name = "LOCATION")]

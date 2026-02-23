@@ -702,6 +702,7 @@ pub fn run(
             min_lines,
             similarity,
             skeleton,
+            include_trait_impls,
             allow,
             reason,
         }) => duplicates::cmd_similar_blocks(duplicates::SimilarBlocksConfig {
@@ -712,6 +713,7 @@ pub fn run(
             elide_literals,
             skeleton,
             show_source,
+            include_trait_impls,
             allow,
             reason,
             format: &format,

@@ -756,6 +756,20 @@ pub fn cmd_duplicate_types(
         }
     }
 
+    // Compute IDF weights: rare fields count more than ubiquitous ones like name/file/line.
+    // IDF(field) = ln(1 + N / df) where N = corpus size, df = types containing the field.
+    let n = types.len() as f64;
+    let mut field_df: HashMap<&str, usize> = HashMap::new();
+    for t in &types {
+        for f in t.fields.iter() {
+            *field_df.entry(f.as_str()).or_insert(0) += 1;
+        }
+    }
+    let idf = |field: &str| -> f64 {
+        let df = field_df.get(field).copied().unwrap_or(1) as f64;
+        (1.0 + n / df).ln()
+    };
+
     // Find duplicate pairs based on field overlap
     let mut duplicates: Vec<DuplicatePair> = Vec::new();
 
@@ -779,20 +793,25 @@ pub fn cmd_duplicate_types(
                 continue;
             }
 
-            // Calculate field overlap
+            // Calculate IDF-weighted Jaccard overlap.
             let set1: HashSet<_> = t1.fields.iter().collect();
             let set2: HashSet<_> = t2.fields.iter().collect();
 
             let common: Vec<String> = set1.intersection(&set2).map(|s| (*s).clone()).collect();
 
-            let union_size = set1.union(&set2).count();
-            let overlap_percent = if union_size > 0 {
-                (common.len() * 100) / union_size
+            if common.len() < 3 {
+                continue;
+            }
+
+            let weighted_common: f64 = common.iter().map(|f| idf(f)).sum();
+            let weighted_union: f64 = set1.union(&set2).map(|f| idf(f.as_str())).sum();
+            let overlap_percent = if weighted_union > 0.0 {
+                (weighted_common / weighted_union * 100.0) as usize
             } else {
                 0
             };
 
-            if overlap_percent >= min_overlap_percent && common.len() >= 3 {
+            if overlap_percent >= min_overlap_percent {
                 duplicates.push(DuplicatePair {
                     type1: t1.clone(),
                     type2: t2.clone(),
@@ -1813,6 +1832,7 @@ pub struct SimilarBlocksConfig<'a> {
     pub elide_literals: bool,
     pub skeleton: bool,
     pub show_source: bool,
+    pub include_trait_impls: bool,
     pub allow: Option<String>,
     pub reason: Option<String>,
     pub format: &'a crate::output::OutputFormat,
@@ -1828,6 +1848,7 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
         elide_literals,
         skeleton,
         show_source,
+        include_trait_impls,
         allow,
         reason,
         format,
@@ -1993,6 +2014,24 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
     });
 
     let pairs = suppress_overlapping_pairs(pairs);
+
+    // Suppress pairs where both blocks live inside same-name functions (trait implementations).
+    let pairs = if include_trait_impls {
+        pairs
+    } else {
+        pairs
+            .into_iter()
+            .filter(|p| {
+                let fn_a = file_extractions
+                    .get(&p.location_a.file)
+                    .and_then(|r| containing_function(r, p.location_a.start_line));
+                let fn_b = file_extractions
+                    .get(&p.location_b.file)
+                    .and_then(|r| containing_function(r, p.location_b.start_line));
+                !(fn_a.is_some() && fn_a == fn_b)
+            })
+            .collect()
+    };
 
     let pair_allow_key = |loc: &DuplicateBlockLocation| {
         let func = file_extractions
