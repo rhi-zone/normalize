@@ -261,6 +261,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         Some(AnalyzeCommand::DuplicateBlocks { .. }) => {
             crate::output::print_output_schema::<duplicates::DuplicateBlocksReport>();
         }
+        Some(AnalyzeCommand::SimilarBlocks { .. }) => {
+            crate::output::print_output_schema::<duplicates::SimilarBlocksReport>();
+        }
         Some(AnalyzeCommand::DuplicateTypes { .. }) => {
             crate::output::print_output_schema::<duplicates::DuplicateTypesReport>();
         }
@@ -657,6 +660,23 @@ pub fn run(
             &format,
             filter.as_ref(),
         ),
+
+        Some(AnalyzeCommand::SimilarBlocks {
+            elide_identifiers,
+            elide_literals,
+            show_source,
+            min_lines,
+            similarity,
+        }) => duplicates::cmd_similar_blocks(duplicates::SimilarBlocksConfig {
+            root: &effective_root,
+            min_lines,
+            similarity,
+            elide_identifiers,
+            elide_literals,
+            show_source,
+            format: &format,
+            filter: filter.as_ref(),
+        }),
 
         Some(AnalyzeCommand::DuplicateTypes {
             target,

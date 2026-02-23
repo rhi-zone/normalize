@@ -1254,6 +1254,462 @@ pub fn cmd_duplicate_blocks(
     0
 }
 
+// ── Fuzzy / partial clone detection (MinHash LSH) ─────────────────────────────
+
+const MINHASH_N: usize = 128;
+const SHINGLE_K: usize = 3;
+const LSH_BANDS: usize = 32; // 32 bands × 4 rows → good recall at ≥0.7 similarity
+const LSH_ROWS: usize = 4; // MINHASH_N / LSH_BANDS
+
+/// A pair of similar (but not necessarily identical) blocks.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct SimilarBlockPair {
+    pub location_a: DuplicateBlockLocation,
+    pub location_b: DuplicateBlockLocation,
+    /// Estimated Jaccard similarity of their AST token shingles (0.0–1.0)
+    pub similarity: f64,
+    pub line_count: usize,
+}
+
+/// Report from fuzzy block similarity detection.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct SimilarBlocksReport {
+    files_scanned: usize,
+    blocks_analyzed: usize,
+    threshold: f64,
+    pub pairs: Vec<SimilarBlockPair>,
+    #[serde(skip)]
+    show_source: bool,
+    #[serde(skip)]
+    root: PathBuf,
+}
+
+impl OutputFormatter for SimilarBlocksReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Similar Block Detection (fuzzy)".to_string());
+        lines.push(String::new());
+        lines.push(format!("Files scanned:   {}", self.files_scanned));
+        lines.push(format!("Blocks analyzed: {}", self.blocks_analyzed));
+        lines.push(format!("Threshold:       {:.0}%", self.threshold * 100.0));
+        lines.push(format!("Similar pairs:   {}", self.pairs.len()));
+
+        if self.pairs.is_empty() {
+            lines.push(String::new());
+            lines.push("No similar blocks detected.".to_string());
+            return lines.join("\n");
+        }
+
+        lines.push(String::new());
+
+        for (i, pair) in self.pairs.iter().take(30).enumerate() {
+            lines.push(format!(
+                "{}. {:.0}% similar  ({} lines)",
+                i + 1,
+                pair.similarity * 100.0,
+                pair.line_count,
+            ));
+            lines.push(format!(
+                "   {}:{}-{}",
+                pair.location_a.file, pair.location_a.start_line, pair.location_a.end_line
+            ));
+            lines.push(format!(
+                "   {}:{}-{}",
+                pair.location_b.file, pair.location_b.start_line, pair.location_b.end_line
+            ));
+
+            if self.show_source {
+                for loc in [&pair.location_a, &pair.location_b] {
+                    let full_path = self.root.join(&loc.file);
+                    if let Ok(content) = std::fs::read_to_string(&full_path) {
+                        let src_lines: Vec<&str> = content.lines().collect();
+                        let start = loc.start_line.saturating_sub(1);
+                        let end = loc.end_line.min(src_lines.len());
+                        lines.push(String::new());
+                        lines.push(format!("   --- {} ---", loc.file));
+                        for src_line in &src_lines[start..end] {
+                            lines.push(format!("   {}", src_line));
+                        }
+                    }
+                }
+            }
+            lines.push(String::new());
+        }
+
+        if self.pairs.len() > 30 {
+            lines.push(format!("... and {} more pairs", self.pairs.len() - 30));
+        }
+
+        lines.join("\n")
+    }
+}
+
+/// Serialize an AST subtree to a flat token sequence for shingling.
+fn serialize_subtree_tokens(
+    node: &tree_sitter::Node,
+    content: &[u8],
+    elide_identifiers: bool,
+    elide_literals: bool,
+    out: &mut Vec<u64>,
+) {
+    use std::collections::hash_map::DefaultHasher;
+    let kind = node.kind();
+    let mut h = DefaultHasher::new();
+    kind.hash(&mut h);
+
+    if node.child_count() == 0 {
+        let should_include = if is_identifier_kind(kind) {
+            !elide_identifiers
+        } else if is_literal_kind(kind) {
+            !elide_literals
+        } else {
+            false
+        };
+        if should_include {
+            let text = &content[node.start_byte()..node.end_byte()];
+            text.hash(&mut h);
+        }
+    }
+    out.push(h.finish());
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        serialize_subtree_tokens(&child, content, elide_identifiers, elide_literals, out);
+    }
+}
+
+/// Simple universal hash for MinHash: mixes x with a per-function seed.
+#[inline]
+fn minhash_hash(x: u64, seed: u64) -> u64 {
+    let a = 6364136223846793005u64.wrapping_add(seed.wrapping_mul(2654435761));
+    let b = 1442695040888963407u64.wrapping_add(seed.wrapping_mul(1013904223));
+    a.wrapping_mul(x).wrapping_add(b)
+}
+
+/// Compute a MinHash signature over k-shingles of the token sequence.
+fn compute_minhash(tokens: &[u64]) -> [u64; MINHASH_N] {
+    let mut sig = [u64::MAX; MINHASH_N];
+    if tokens.len() < SHINGLE_K {
+        return sig;
+    }
+    for window in tokens.windows(SHINGLE_K) {
+        // Hash the shingle into a single u64.
+        use std::collections::hash_map::DefaultHasher;
+        let mut h = DefaultHasher::new();
+        window.hash(&mut h);
+        let shingle_hash = h.finish();
+
+        for (i, slot) in sig.iter_mut().enumerate() {
+            let v = minhash_hash(shingle_hash, i as u64);
+            if v < *slot {
+                *slot = v;
+            }
+        }
+    }
+    sig
+}
+
+/// Estimate Jaccard similarity from two MinHash signatures.
+fn jaccard_estimate(a: &[u64; MINHASH_N], b: &[u64; MINHASH_N]) -> f64 {
+    let matches = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
+    matches as f64 / MINHASH_N as f64
+}
+
+/// Hash one LSH band of a signature.
+fn lsh_band_hash(sig: &[u64; MINHASH_N], band: usize) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    let start = band * LSH_ROWS;
+    let mut h = DefaultHasher::new();
+    band.hash(&mut h);
+    for v in &sig[start..start + LSH_ROWS] {
+        v.hash(&mut h);
+    }
+    h.finish()
+}
+
+/// Collect all subtrees above min_lines, returning (location, minhash signature).
+fn collect_block_signatures(
+    node: &tree_sitter::Node,
+    content: &[u8],
+    file: &str,
+    min_lines: usize,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    out: &mut Vec<(DuplicateBlockLocation, [u64; MINHASH_N])>,
+) {
+    let start_line = node.start_position().row + 1;
+    let end_line = node.end_position().row + 1;
+    let line_count = end_line.saturating_sub(start_line) + 1;
+
+    if line_count >= min_lines {
+        let mut tokens = Vec::new();
+        serialize_subtree_tokens(
+            node,
+            content,
+            elide_identifiers,
+            elide_literals,
+            &mut tokens,
+        );
+        let sig = compute_minhash(&tokens);
+        out.push((
+            DuplicateBlockLocation {
+                file: file.to_string(),
+                start_line,
+                end_line,
+            },
+            sig,
+        ));
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_block_signatures(
+            &child,
+            content,
+            file,
+            min_lines,
+            elide_identifiers,
+            elide_literals,
+            out,
+        );
+    }
+}
+
+/// Suppress overlapping pairs: if two pairs involve the same two files and
+/// both locations significantly overlap, keep only the largest (first seen,
+/// since pairs are pre-sorted by similarity desc then size desc).
+fn suppress_overlapping_pairs(pairs: Vec<SimilarBlockPair>) -> Vec<SimilarBlockPair> {
+    // Track accepted ranges per file.
+    let mut taken: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
+    let mut result = Vec::new();
+
+    for pair in pairs {
+        let taken_a = taken.entry(pair.location_a.file.clone()).or_default();
+        let overlaps_a = taken_a.iter().any(|&(s, e)| {
+            overlap_ratio(s, e, pair.location_a.start_line, pair.location_a.end_line) > 0.5
+        });
+
+        let taken_b = taken.entry(pair.location_b.file.clone()).or_default();
+        let overlaps_b = taken_b.iter().any(|&(s, e)| {
+            overlap_ratio(s, e, pair.location_b.start_line, pair.location_b.end_line) > 0.5
+        });
+
+        if overlaps_a && overlaps_b {
+            continue;
+        }
+
+        taken
+            .entry(pair.location_a.file.clone())
+            .or_default()
+            .push((pair.location_a.start_line, pair.location_a.end_line));
+        taken
+            .entry(pair.location_b.file.clone())
+            .or_default()
+            .push((pair.location_b.start_line, pair.location_b.end_line));
+
+        result.push(pair);
+    }
+
+    result
+}
+
+fn overlap_ratio(s1: usize, e1: usize, s2: usize, e2: usize) -> f64 {
+    let overlap_start = s1.max(s2);
+    let overlap_end = e1.min(e2);
+    if overlap_end < overlap_start {
+        return 0.0;
+    }
+    let overlap = (overlap_end - overlap_start + 1) as f64;
+    let union = (e1.max(e2) - s1.min(s2) + 1) as f64;
+    overlap / union
+}
+
+pub struct SimilarBlocksConfig<'a> {
+    pub root: &'a Path,
+    pub min_lines: usize,
+    pub similarity: f64,
+    pub elide_identifiers: bool,
+    pub elide_literals: bool,
+    pub show_source: bool,
+    pub format: &'a crate::output::OutputFormat,
+    pub filter: Option<&'a Filter>,
+}
+
+pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
+    let SimilarBlocksConfig {
+        root,
+        min_lines,
+        similarity,
+        elide_identifiers,
+        elide_literals,
+        show_source,
+        format,
+        filter,
+    } = cfg;
+    let mut all_blocks: Vec<(DuplicateBlockLocation, [u64; MINHASH_N])> = Vec::new();
+    let mut files_scanned = 0usize;
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && super::is_source_file(path)
+    }) {
+        let path = entry.path();
+
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        collect_block_signatures(
+            &tree.root_node(),
+            content.as_bytes(),
+            &rel_path,
+            min_lines,
+            elide_identifiers,
+            elide_literals,
+            &mut all_blocks,
+        );
+    }
+
+    let blocks_analyzed = all_blocks.len();
+
+    // LSH: for each band, bucket block indices by their band hash.
+    let mut band_buckets: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (idx, (_, sig)) in all_blocks.iter().enumerate() {
+        for band in 0..LSH_BANDS {
+            let bh = lsh_band_hash(sig, band);
+            // Mix band id into bucket key to avoid cross-band collisions.
+            let key = bh.wrapping_add((band as u64).wrapping_mul(0x9e3779b97f4a7c15));
+            band_buckets.entry(key).or_default().push(idx);
+        }
+    }
+
+    // Collect candidate pairs (deduplicated).
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
+    let mut candidates: Vec<(usize, usize)> = Vec::new();
+    for bucket in band_buckets.values() {
+        if bucket.len() < 2 {
+            continue;
+        }
+        for i in 0..bucket.len() {
+            for j in i + 1..bucket.len() {
+                let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
+                if seen.insert((a, b)) {
+                    candidates.push((a, b));
+                }
+            }
+        }
+    }
+
+    // Score candidates, filter by threshold.
+    let mut pairs: Vec<SimilarBlockPair> = candidates
+        .into_iter()
+        .filter_map(|(i, j)| {
+            let (loc_a, sig_a) = &all_blocks[i];
+            let (loc_b, sig_b) = &all_blocks[j];
+
+            // Skip same-location pairs (a subtree always matches itself).
+            if loc_a.file == loc_b.file
+                && loc_a.start_line == loc_b.start_line
+                && loc_a.end_line == loc_b.end_line
+            {
+                return None;
+            }
+
+            // Skip containment pairs: one subtree fully contains the other in
+            // the same file. These are parent/child AST nodes — not useful signal.
+            if loc_a.file == loc_b.file {
+                let a_contains_b =
+                    loc_a.start_line <= loc_b.start_line && loc_b.end_line <= loc_a.end_line;
+                let b_contains_a =
+                    loc_b.start_line <= loc_a.start_line && loc_a.end_line <= loc_b.end_line;
+                if a_contains_b || b_contains_a {
+                    return None;
+                }
+            }
+
+            // Skip pairs with very different sizes — a 10-line block and a
+            // 100-line block can't be meaningfully "similar".
+            let len_a = loc_a.end_line.saturating_sub(loc_a.start_line) + 1;
+            let len_b = loc_b.end_line.saturating_sub(loc_b.start_line) + 1;
+            let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
+            if ratio < 0.5 {
+                return None;
+            }
+
+            let sim = jaccard_estimate(sig_a, sig_b);
+            if sim < similarity {
+                return None;
+            }
+
+            let line_count = loc_a
+                .end_line
+                .saturating_sub(loc_a.start_line)
+                .max(loc_b.end_line.saturating_sub(loc_b.start_line))
+                + 1;
+
+            Some(SimilarBlockPair {
+                location_a: loc_a.clone(),
+                location_b: loc_b.clone(),
+                similarity: sim,
+                line_count,
+            })
+        })
+        .collect();
+
+    pairs.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.line_count.cmp(&a.line_count))
+    });
+
+    let pairs = suppress_overlapping_pairs(pairs);
+
+    let report = SimilarBlocksReport {
+        files_scanned,
+        blocks_analyzed,
+        threshold: similarity,
+        pairs,
+        show_source,
+        root: root.to_path_buf(),
+    };
+
+    report.print(format);
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

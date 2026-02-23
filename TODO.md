@@ -637,6 +637,8 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] Directory context: `normalize context`, `view --dir-context`
 - Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
+- [x] `analyze duplicate-blocks`: subtree-level clone detection with containment suppression. See `docs/design/duplicate-detection.md`
+- Fuzzy/partial clone detection: MinHash LSH over AST token shingles to surface near-duplicate subtrees (Type 3 clones — drifted copies). Key use case: refactoring discovery where copies have accumulated small differences. See `docs/design/duplicate-detection.md`. Implement as `--similarity <0.0-1.0>` flag on `duplicate-blocks`.
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `normalize analyze ast`, `normalize analyze query` (authoring tools)
   - [x] Phase 1b: `normalize analyze rules` reads .normalize/rules/*.scm with TOML frontmatter
@@ -1025,7 +1027,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
   - Blocked on: agent implementation existing at all
 
 ### CI/Infrastructure
-(No current issues)
+- Enable `normalize analyze duplicate-blocks` in CI as enforcement (non-zero exit on matches above threshold). Needs `--allow` mechanism (same pattern as duplicate-functions) so existing groups can be acknowledged. High priority — this is the most actionable clone detection signal we have.
 
 ## Known Issues
 

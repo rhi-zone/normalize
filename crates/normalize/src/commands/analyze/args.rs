@@ -239,6 +239,29 @@ pub enum AnalyzeCommand {
         min_lines: usize,
     },
 
+    /// Detect similar (fuzzy-matching) code blocks via MinHash LSH
+    SimilarBlocks {
+        #[arg(long, default_value = "true")]
+        #[serde(default = "default_true")]
+        elide_identifiers: bool,
+
+        #[arg(long)]
+        #[serde(default)]
+        elide_literals: bool,
+
+        #[arg(long)]
+        #[serde(default)]
+        show_source: bool,
+
+        /// Minimum lines for a block to be considered [default: 5]
+        #[arg(long, default_value = "5")]
+        min_lines: usize,
+
+        /// Minimum similarity threshold (0.0–1.0) [default: 0.8]
+        #[arg(long, default_value = "0.8")]
+        similarity: f64,
+    },
+
     /// Detect duplicate type definitions
     DuplicateTypes {
         /// Target directory to scan

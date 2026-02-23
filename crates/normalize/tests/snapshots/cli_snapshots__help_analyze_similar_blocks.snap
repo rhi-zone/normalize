@@ -1,0 +1,28 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 317
+expression: "snapshot_help(&[\"analyze\", \"similar-blocks\"])"
+---
+Detect similar (fuzzy-matching) code blocks via MinHash LSH
+
+Usage: normalize analyze similar-blocks [OPTIONS]
+
+Options:
+      --elide-identifiers        
+      --elide-literals           
+      --show-source              
+      --min-lines <MIN_LINES>    Minimum lines for a block to be considered [default: 5] [default: 5]
+      --similarity <SIMILARITY>  Minimum similarity threshold (0.0–1.0) [default: 0.8] [default: 0.8]
+      --json                     Output as JSON
+      --jsonl                    Output as JSON Lines (one object per line)
+      --jq <EXPR>                Filter JSON output with jq expression (implies --json)
+      --pretty                   Human-friendly output with colors and formatting
+      --compact                  Compact output without colors (overrides TTY detection)
+  -r, --root <ROOT>              Root directory (defaults to current directory)
+      --exclude <PATTERN>        Exclude paths matching pattern or @alias
+      --output-schema            Output JSON schema for the command's return type
+      --input-schema             Output JSON schema for the command's input arguments
+      --only <PATTERN>           Include only paths matching pattern or @alias
+      --diff [<BASE>]            Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
+      --params-json <JSON>       Pass command arguments as JSON (overrides CLI args)
+  -h, --help                     Print help
