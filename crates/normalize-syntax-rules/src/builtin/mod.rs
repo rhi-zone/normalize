@@ -49,6 +49,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("rust_tuple_return.scm"),
     },
     BuiltinRule {
+        id: "rust/static-mut",
+        content: include_str!("rust_static_mut.scm"),
+    },
+    BuiltinRule {
         id: "hardcoded-secret",
         content: include_str!("hardcoded_secret.scm"),
     },
@@ -60,6 +64,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "js/unnecessary-const",
         content: include_str!("js_unnecessary_const.scm"),
+    },
+    BuiltinRule {
+        id: "js/module-let",
+        content: include_str!("js_module_let.scm"),
     },
     BuiltinRule {
         id: "typescript/tuple-return",
@@ -86,6 +94,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "go/many-returns",
         content: include_str!("go_many_returns.scm"),
+    },
+    BuiltinRule {
+        id: "go/package-var",
+        content: include_str!("go_package_var.scm"),
     },
     // Ruby rules
     BuiltinRule {
