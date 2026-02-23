@@ -210,6 +210,12 @@ pub enum AnalyzeCommand {
         #[arg(long, default_value = "1")]
         min_lines: usize,
 
+        /// Include groups where all functions share the same name (likely trait implementations).
+        /// By default these are suppressed as intentionally parallel, not copy-paste.
+        #[arg(long)]
+        #[serde(default)]
+        include_trait_impls: bool,
+
         /// Allow a duplicate function group (add to .normalize/duplicate-functions-allow)
         /// Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
         #[arg(long, value_name = "LOCATION")]

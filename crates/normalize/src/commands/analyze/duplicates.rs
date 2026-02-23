@@ -47,6 +47,8 @@ pub struct DuplicateFunctionsReport {
     elide_literals: bool,
     groups: Vec<DuplicateFunctionGroup>,
     #[serde(skip)]
+    suppressed_same_name: usize,
+    #[serde(skip)]
     root: PathBuf,
     #[serde(skip)]
     show_source: bool,
@@ -62,6 +64,12 @@ impl OutputFormatter for DuplicateFunctionsReport {
         lines.push(format!("Duplicate groups: {}", self.groups.len()));
         lines.push(format!("Total duplicates: {}", self.total_duplicates));
         lines.push(format!("Duplicated lines: ~{}", self.duplicated_lines));
+        if self.suppressed_same_name > 0 {
+            lines.push(format!(
+                "Suppressed: {} same-name groups (likely trait impls; use --include-trait-impls to show)",
+                self.suppressed_same_name
+            ));
+        }
         lines.push(String::new());
 
         if self.groups.is_empty() {
@@ -438,15 +446,30 @@ pub fn cmd_allow_duplicate_function(
 }
 
 /// Detect duplicate functions.
+pub struct DuplicateFunctionsConfig<'a> {
+    pub root: &'a Path,
+    pub elide_identifiers: bool,
+    pub elide_literals: bool,
+    pub show_source: bool,
+    pub min_lines: usize,
+    pub include_trait_impls: bool,
+    pub format: &'a crate::output::OutputFormat,
+    pub filter: Option<&'a Filter>,
+}
+
 pub fn cmd_duplicate_functions_with_count(
-    root: &Path,
-    elide_identifiers: bool,
-    elide_literals: bool,
-    show_source: bool,
-    min_lines: usize,
-    format: &crate::output::OutputFormat,
-    filter: Option<&Filter>,
+    cfg: DuplicateFunctionsConfig<'_>,
 ) -> DuplicateFunctionResult {
+    let DuplicateFunctionsConfig {
+        root,
+        elide_identifiers,
+        elide_literals,
+        show_source,
+        min_lines,
+        include_trait_impls,
+        format,
+        filter,
+    } = cfg;
     let json = format.is_json();
     let extractor = Extractor::new();
 
@@ -564,6 +587,19 @@ pub fn cmd_duplicate_functions_with_count(
         })
         .collect();
 
+    // Suppress same-name groups (trait implementations) unless opted in.
+    let suppressed_same_name = if include_trait_impls {
+        0
+    } else {
+        let before = groups.len();
+        groups.retain(|g| {
+            let names: std::collections::HashSet<&str> =
+                g.locations.iter().map(|l| l.symbol.as_str()).collect();
+            names.len() > 1
+        });
+        before - groups.len()
+    };
+
     // Sort by line count (larger duplicates first), then by number of instances
     groups.sort_by(|a, b| {
         b.line_count
@@ -587,6 +623,7 @@ pub fn cmd_duplicate_functions_with_count(
         elide_identifiers,
         elide_literals,
         groups,
+        suppressed_same_name,
         root: root.to_path_buf(),
         show_source,
     };
@@ -755,7 +792,7 @@ pub fn cmd_duplicate_types(
                 0
             };
 
-            if overlap_percent >= min_overlap_percent {
+            if overlap_percent >= min_overlap_percent && common.len() >= 3 {
                 duplicates.push(DuplicatePair {
                     type1: t1.clone(),
                     type2: t2.clone(),

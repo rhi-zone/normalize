@@ -12,6 +12,7 @@ Options:
       --elide-literals         Elide literal values when comparing
       --show-source            Show source code for detected duplicates
       --min-lines <MIN_LINES>  Minimum lines for a function to be considered [default: 1]
+      --include-trait-impls    Include groups where all functions share the same name (likely trait implementations). By default these are suppressed as intentionally parallel, not copy-paste
       --allow <LOCATION>       Allow a duplicate function group (add to .normalize/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
       --reason <REASON>        Reason for allowing
       --json                   Output as JSON

@@ -623,6 +623,7 @@ pub fn run(
             elide_literals,
             show_source,
             min_lines,
+            include_trait_impls,
             allow,
             reason,
         }) => {
@@ -637,13 +638,16 @@ pub fn run(
                 )
             } else {
                 let result = duplicates::cmd_duplicate_functions_with_count(
-                    &effective_root,
-                    elide_identifiers,
-                    elide_literals,
-                    show_source,
-                    min_lines,
-                    &format,
-                    filter.as_ref(),
+                    duplicates::DuplicateFunctionsConfig {
+                        root: &effective_root,
+                        elide_identifiers,
+                        elide_literals,
+                        show_source,
+                        min_lines,
+                        include_trait_impls,
+                        format: &format,
+                        filter: filter.as_ref(),
+                    },
                 );
                 result.exit_code
             }
@@ -1056,13 +1060,17 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: duplicate-functions...");
     }
-    let dup_result = duplicates::cmd_duplicate_functions_with_count(
-        root, true,  // elide_identifiers
-        false, // elide_literals
-        false, // show_source
-        1,     // min_lines
-        format, filter,
-    );
+    let dup_result =
+        duplicates::cmd_duplicate_functions_with_count(duplicates::DuplicateFunctionsConfig {
+            root,
+            elide_identifiers: true,
+            elide_literals: false,
+            show_source: false,
+            min_lines: 1,
+            include_trait_impls: false,
+            format,
+            filter,
+        });
 
     if dup_result.exit_code != 0 {
         exit_code = dup_result.exit_code;
@@ -1154,5 +1162,27 @@ fn run_all_passes(
 
 /// Check if a path is a source file we can analyze.
 pub(crate) fn is_source_file(path: &Path) -> bool {
-    normalize_languages::support_for_path(path).is_some()
+    !is_generated_file(path) && normalize_languages::support_for_path(path).is_some()
+}
+
+/// Known generated/lockfiles that are not useful to analyze for code quality.
+fn is_generated_file(path: &Path) -> bool {
+    let file_name = match path.file_name().and_then(|n| n.to_str()) {
+        Some(n) => n,
+        None => return false,
+    };
+    // Common lock files by exact name
+    matches!(
+        file_name,
+        "package-lock.json"
+            | "yarn.lock"
+            | "pnpm-lock.yaml"
+            | "bun.lockb"
+            | "Cargo.lock"
+            | "composer.lock"
+            | "Gemfile.lock"
+            | "poetry.lock"
+            | "Pipfile.lock"
+            | "packages.lock.json"
+    ) || file_name.ends_with(".lock")
 }
