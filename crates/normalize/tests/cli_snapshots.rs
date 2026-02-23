@@ -308,6 +308,11 @@ fn test_help_analyze_duplicate_types() {
 }
 
 #[test]
+fn test_help_analyze_duplicate_blocks() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "duplicate-blocks"]));
+}
+
+#[test]
 fn test_help_analyze_all() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "all"]));
 }

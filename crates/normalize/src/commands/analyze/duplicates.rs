@@ -991,6 +991,269 @@ fn is_literal_kind(kind: &str) -> bool {
         || kind == "none"
 }
 
+// ── Duplicate block detection (subtree-level) ─────────────────────────────────
+
+/// A location of a duplicate block instance
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct DuplicateBlockLocation {
+    pub file: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+/// A group of duplicate blocks
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct DuplicateBlockGroup {
+    #[serde(serialize_with = "serialize_hash")]
+    hash: u64,
+    pub locations: Vec<DuplicateBlockLocation>,
+    pub line_count: usize,
+}
+
+/// Duplicate blocks analysis report
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct DuplicateBlocksReport {
+    files_scanned: usize,
+    blocks_hashed: usize,
+    pub groups: Vec<DuplicateBlockGroup>,
+    #[serde(skip)]
+    show_source: bool,
+    #[serde(skip)]
+    root: PathBuf,
+}
+
+impl OutputFormatter for DuplicateBlocksReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push("Duplicate Block Detection".to_string());
+        lines.push(String::new());
+        lines.push(format!("Files scanned: {}", self.files_scanned));
+        lines.push(format!("Blocks hashed: {}", self.blocks_hashed));
+        lines.push(format!("Duplicate groups: {}", self.groups.len()));
+
+        if self.groups.is_empty() {
+            lines.push(String::new());
+            lines.push("No duplicate blocks detected.".to_string());
+            return lines.join("\n");
+        }
+
+        lines.push(String::new());
+
+        for (i, group) in self.groups.iter().take(30).enumerate() {
+            lines.push(format!(
+                "{}. {} lines × {} locations",
+                i + 1,
+                group.line_count,
+                group.locations.len()
+            ));
+            for loc in &group.locations {
+                lines.push(format!(
+                    "   {}:{}-{}",
+                    loc.file, loc.start_line, loc.end_line
+                ));
+            }
+            if self.show_source
+                && let Some(first) = group.locations.first()
+            {
+                let full_path = self.root.join(&first.file);
+                if let Ok(content) = std::fs::read_to_string(&full_path) {
+                    let src_lines: Vec<&str> = content.lines().collect();
+                    let start = first.start_line.saturating_sub(1);
+                    let end = first.end_line.min(src_lines.len());
+                    lines.push(String::new());
+                    for src_line in &src_lines[start..end] {
+                        lines.push(format!("   {}", src_line));
+                    }
+                }
+            }
+            lines.push(String::new());
+        }
+
+        if self.groups.len() > 30 {
+            lines.push(format!("... and {} more groups", self.groups.len() - 30));
+        }
+
+        lines.join("\n")
+    }
+}
+
+/// Walk every node in the tree and hash subtrees at or above min_lines.
+fn collect_block_hashes(
+    node: &tree_sitter::Node,
+    content: &[u8],
+    file: &str,
+    min_lines: usize,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    out: &mut HashMap<u64, Vec<DuplicateBlockLocation>>,
+) {
+    let start_line = node.start_position().row + 1;
+    let end_line = node.end_position().row + 1;
+    let line_count = end_line.saturating_sub(start_line) + 1;
+
+    if line_count >= min_lines {
+        let hash = compute_function_hash(node, content, elide_identifiers, elide_literals);
+        out.entry(hash).or_default().push(DuplicateBlockLocation {
+            file: file.to_string(),
+            start_line,
+            end_line,
+        });
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_block_hashes(
+            &child,
+            content,
+            file,
+            min_lines,
+            elide_identifiers,
+            elide_literals,
+            out,
+        );
+    }
+}
+
+/// After bucketing, suppress groups whose locations are fully contained inside
+/// a location from a larger group (in the same file). Returns filtered groups.
+fn suppress_contained_blocks(mut groups: Vec<DuplicateBlockGroup>) -> Vec<DuplicateBlockGroup> {
+    // Sort largest first so we process parents before children.
+    groups.sort_by(|a, b| b.line_count.cmp(&a.line_count));
+
+    // Collect all "taken" ranges per file from already-accepted groups.
+    let mut taken: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
+
+    let mut result = Vec::new();
+
+    for group in groups {
+        let mut kept = Vec::new();
+        for loc in &group.locations {
+            let ranges = taken.entry(loc.file.clone()).or_default();
+            let contained = ranges
+                .iter()
+                .any(|&(s, e)| s <= loc.start_line && loc.end_line <= e);
+            if !contained {
+                kept.push(loc.clone());
+            }
+        }
+        if kept.len() >= 2 {
+            // Register these locations as taken.
+            for loc in &kept {
+                taken
+                    .entry(loc.file.clone())
+                    .or_default()
+                    .push((loc.start_line, loc.end_line));
+            }
+            result.push(DuplicateBlockGroup {
+                hash: group.hash,
+                locations: kept,
+                line_count: group.line_count,
+            });
+        }
+    }
+
+    result
+}
+
+pub fn cmd_duplicate_blocks(
+    root: &Path,
+    min_lines: usize,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    show_source: bool,
+    format: &crate::output::OutputFormat,
+    filter: Option<&Filter>,
+) -> i32 {
+    let mut hash_groups: HashMap<u64, Vec<DuplicateBlockLocation>> = HashMap::new();
+    let mut files_scanned = 0usize;
+    let mut blocks_hashed = 0usize;
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && super::is_source_file(path)
+    }) {
+        let path = entry.path();
+
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        let before = hash_groups.values().map(|v| v.len()).sum::<usize>();
+        collect_block_hashes(
+            &tree.root_node(),
+            content.as_bytes(),
+            &rel_path,
+            min_lines,
+            elide_identifiers,
+            elide_literals,
+            &mut hash_groups,
+        );
+        let after = hash_groups.values().map(|v| v.len()).sum::<usize>();
+        blocks_hashed += after - before;
+    }
+
+    let groups_raw: Vec<DuplicateBlockGroup> = hash_groups
+        .into_iter()
+        .filter(|(_, locs)| locs.len() >= 2)
+        .map(|(hash, locations)| {
+            let line_count = locations
+                .first()
+                .map(|l| l.end_line.saturating_sub(l.start_line) + 1)
+                .unwrap_or(0);
+            DuplicateBlockGroup {
+                hash,
+                locations,
+                line_count,
+            }
+        })
+        .collect();
+
+    let groups = suppress_contained_blocks(groups_raw);
+
+    let report = DuplicateBlocksReport {
+        files_scanned,
+        blocks_hashed,
+        groups,
+        show_source,
+        root: root.to_path_buf(),
+    };
+
+    report.print(format);
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1001,5 +1264,87 @@ mod tests {
         let tmp = tempdir().unwrap();
         let allowlist = load_duplicate_functions_allowlist(tmp.path());
         assert!(allowlist.is_empty());
+    }
+
+    #[test]
+    fn test_suppress_contained_blocks_removes_children() {
+        // Parent group: 20 lines, child group: 5 lines (contained within parent)
+        let parent = DuplicateBlockGroup {
+            hash: 1,
+            locations: vec![
+                DuplicateBlockLocation {
+                    file: "a.rs".into(),
+                    start_line: 1,
+                    end_line: 20,
+                },
+                DuplicateBlockLocation {
+                    file: "b.rs".into(),
+                    start_line: 1,
+                    end_line: 20,
+                },
+            ],
+            line_count: 20,
+        };
+        let child = DuplicateBlockGroup {
+            hash: 2,
+            locations: vec![
+                DuplicateBlockLocation {
+                    file: "a.rs".into(),
+                    start_line: 5,
+                    end_line: 10,
+                },
+                DuplicateBlockLocation {
+                    file: "b.rs".into(),
+                    start_line: 5,
+                    end_line: 10,
+                },
+            ],
+            line_count: 6,
+        };
+        let result = suppress_contained_blocks(vec![parent, child]);
+        assert_eq!(result.len(), 1, "child group should be suppressed");
+        assert_eq!(result[0].line_count, 20);
+    }
+
+    #[test]
+    fn test_suppress_contained_blocks_keeps_non_overlapping() {
+        let a = DuplicateBlockGroup {
+            hash: 1,
+            locations: vec![
+                DuplicateBlockLocation {
+                    file: "a.rs".into(),
+                    start_line: 1,
+                    end_line: 10,
+                },
+                DuplicateBlockLocation {
+                    file: "b.rs".into(),
+                    start_line: 1,
+                    end_line: 10,
+                },
+            ],
+            line_count: 10,
+        };
+        let b = DuplicateBlockGroup {
+            hash: 2,
+            locations: vec![
+                DuplicateBlockLocation {
+                    file: "a.rs".into(),
+                    start_line: 20,
+                    end_line: 30,
+                },
+                DuplicateBlockLocation {
+                    file: "b.rs".into(),
+                    start_line: 20,
+                    end_line: 30,
+                },
+            ],
+            line_count: 11,
+        };
+        let result = suppress_contained_blocks(vec![a, b]);
+        assert_eq!(
+            result.len(),
+            2,
+            "non-overlapping groups should both survive"
+        );
     }
 }

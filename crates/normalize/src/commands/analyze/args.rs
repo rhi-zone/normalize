@@ -220,6 +220,25 @@ pub enum AnalyzeCommand {
         reason: Option<String>,
     },
 
+    /// Detect duplicate code blocks (subtree-level clone detection)
+    DuplicateBlocks {
+        #[arg(long, default_value = "true")]
+        #[serde(default = "default_true")]
+        elide_identifiers: bool,
+
+        #[arg(long)]
+        #[serde(default)]
+        elide_literals: bool,
+
+        #[arg(long)]
+        #[serde(default)]
+        show_source: bool,
+
+        /// Minimum lines for a block to be considered [default: 5]
+        #[arg(long, default_value = "5")]
+        min_lines: usize,
+    },
+
     /// Detect duplicate type definitions
     DuplicateTypes {
         /// Target directory to scan
