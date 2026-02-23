@@ -655,10 +655,15 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] Improve duplicate/clone detection to work usefully out of the box:
   - [x] `duplicate-functions`: same-name groups suppressed by default (`--include-trait-impls` to restore); 351→185 groups
   - [x] `similar-functions`: same-name pairs suppressed by default; min-lines 5→10, similarity 0.80→0.85; 3781→537 pairs
-  - [x] `similar-blocks`: min-lines 5→10, similarity 0.80→0.85; 4489→1106 pairs
-  - [x] `duplicate-types`: Jaccard overlap (not one-sided), require ≥3 common fields; 154→~13 pairs
-  - [x] All analyze commands: auto-exclude lockfiles from is_source_file
-  - Remaining: `duplicate-types` field weighting (rare fields should count more than `name`/`file`/`line`); `similar-blocks` still produces ~1100 pairs with no name-based suppression possible
+  - [x] `similar-blocks`: containing-function same-name suppression (`--include-trait-impls`); min-lines 5→10, similarity 0.80→0.85; 4489→1103 pairs → 600 after suppression
+  - [x] `duplicate-types`: IDF-weighted Jaccard (rare fields outweigh `name`/`file`/`line`), require ≥3 common fields; 154→16 pairs
+  - [x] All analyze commands: auto-exclude lockfiles from `is_source_file`
+  - [x] `.normalize/config.toml`: permanent `exclude = ["crates/normalize-languages/src"]` for this codebase — ~98 language files implement the same trait with identical Symbol constructors across different method names (`extract_function`, `extract_container`, `extract_type`); not suppressible by same-name heuristic since they cross method boundaries
+  - Remaining improvements:
+    - Per-subcommand excludes in config: `[analyze.similar-blocks] exclude = [...]` so language-file exclusion doesn't affect `analyze rules`, `analyze complexity`, etc. (currently the global `[analyze] exclude` is too coarse)
+    - "Parallel impl directory" heuristic: if >N pairs originate from the same directory pair, fold them into a single suppressed note (e.g., "48 pairs suppressed within normalize-languages/ — likely parallel Language trait implementations")
+    - `similar-blocks` / `similar-functions`: cross-file same-containing-function suppression covers same-method-name in different files; doesn't cover same-body-pattern across different method names (the Language impl case)
+    - Consider min-lines bump for `similar-blocks` (currently 10) — the 19-line Symbol constructor is below many useful thresholds; maybe 15-20 default would further cut noise without missing real clones
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `normalize analyze ast`, `normalize analyze query` (authoring tools)
   - [x] Phase 1b: `normalize analyze rules` reads .normalize/rules/*.scm with TOML frontmatter

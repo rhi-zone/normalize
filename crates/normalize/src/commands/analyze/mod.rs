@@ -66,6 +66,9 @@ pub struct AnalyzeConfig {
     /// Default lines of context to show in query preview
     #[serde(rename = "query-context-lines")]
     pub query_context_lines: Option<usize>,
+    /// Patterns to exclude from all analysis (e.g., generated or intentionally parallel code)
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -384,6 +387,14 @@ pub fn run(
 
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&effective_root);
+
+    // Merge config-level excludes with CLI --exclude (CLI takes precedence by being appended last).
+    let mut args = args;
+    for pattern in &config.analyze.exclude {
+        if !args.exclude.contains(pattern) {
+            args.exclude.push(pattern.clone());
+        }
+    }
 
     // Resolve diff files and build filter
     let filter = match resolve_diff_and_filter(&effective_root, &args) {

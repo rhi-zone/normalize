@@ -7,6 +7,11 @@
 
 [analyze]
 clones = true
+# Exclude normalize-languages/src from clone detection: ~98 language files all implement
+# the same Language trait with nearly-identical Symbol constructors across extract_function,
+# extract_container, extract_type. These are intentionally parallel, not copy-paste.
+# Affects all analyze subcommands (no per-subcommand exclude yet — see TODO.md).
+exclude = ["crates/normalize-languages/src/**"]
 # hotspots_exclude = ["*.md", "*.json"]  # example: exclude markdown and JSON
 
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
