@@ -1,7 +1,7 @@
 # ---
 # id = "js/module-let"
 # severity = "info"
-# tags = ["architecture", "style", "mutable-global-state"]
+# tags = ["architecture", "style", "mutable-state", "global-state", "mutable-global-state"]
 # message = "Module-level let - consider const, or encapsulate mutable state in a class or function"
 # languages = ["javascript", "typescript", "tsx", "jsx"]
 # enabled = false

@@ -1,7 +1,7 @@
 # ---
 # id = "go/package-var"
 # severity = "info"
-# tags = ["architecture", "concurrency", "mutable-global-state"]
+# tags = ["architecture", "concurrency", "mutable-state", "global-state", "mutable-global-state"]
 # message = "Package-level var - mutable global state is a concurrency and testability hazard"
 # languages = ["go"]
 # enabled = false

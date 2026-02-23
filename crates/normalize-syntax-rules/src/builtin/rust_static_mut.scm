@@ -1,7 +1,7 @@
 # ---
 # id = "rust/static-mut"
 # severity = "warning"
-# tags = ["correctness", "concurrency", "mutable-global-state"]
+# tags = ["correctness", "concurrency", "mutable-state", "global-state", "mutable-global-state"]
 # message = "Mutable static variable - use a Mutex, RwLock, or OnceLock instead"
 # languages = ["rust"]
 # enabled = false
