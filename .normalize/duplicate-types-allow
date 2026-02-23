@@ -245,3 +245,51 @@ HistoryEntry EditInfo
 
 # Rule config types (same domain)
 RuleOverride Rule
+
+# parallel detection result types in same file; different domains (functions vs blocks)
+DuplicateBlockGroup DuplicateFunctionGroup
+
+# list-level vs detail-level plan representations; different consumer contexts
+PlanInfo PlanListItem
+
+# different modules/crates; AliasItem is CLI output, ResolvedAlias is filter library type
+AliasItem ResolvedAlias
+
+# HTTP response type vs Datalog fact type; cross-crate, different serialization contexts
+IndexedSymbol SymbolFact
+
+# FlatSymbol is typed public API (SymbolKind/Visibility enums); ParsedSymbol is private String-based staging struct before DB insertion
+FlatSymbol ParsedSymbol
+
+# block location in analyze vs Datalog fact; different crates/purposes
+DuplicateBlockLocation SymbolRangeFact
+
+# config structs for similar but distinct analysis passes; share most params by design
+SimilarBlocksConfig SimilarFunctionsConfig
+
+# PublicFunction for test-gap analysis, FunctionComplexity for complexity analysis; parallel but different
+FunctionComplexity PublicFunction
+
+# exact-duplicate vs fuzzy-similar config; share options by design, but different algorithm params
+DuplicateFunctionsConfig SimilarFunctionsConfig
+
+# HTTP response DTO vs Datalog relation; cross-domain
+SymbolFact SymbolInfo
+
+# export metadata in facts-core vs Datalog fact; different domains
+Export SymbolFact
+
+# view output type vs linter span; different crates and purposes
+OxlintSpan ViewLineRangeReport
+
+# view filter result vs HTTP index entry; different shapes in practice
+IndexedSymbol ViewKindFilterEntry
+
+# view filter result vs Datalog fact; cross-domain
+SymbolFact ViewKindFilterEntry
+
+# HTTP detail response vs Datalog range fact; cross-domain
+SymbolDetailResponse SymbolRangeFact
+
+# syntax rule override vs facts rule override; parallel config structs for different rule systems
+FactsRuleOverride RuleOverride

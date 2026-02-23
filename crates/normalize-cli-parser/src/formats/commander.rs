@@ -7,7 +7,7 @@
 //! - `Commands:` section with "help [command]" entry
 //! - Help shows "display help for command"
 
-use super::CliFormat;
+use super::{CliFormat, is_section_header, parse_option_command_sections};
 use crate::{CliCommand, CliOption, CliSpec};
 use regex::Regex;
 
@@ -90,40 +90,14 @@ impl CliFormat for CommanderFormat {
         }
 
         // Parse sections
-        while i < lines.len() {
-            let line = lines[i];
-
-            if line == "Options:" {
-                i += 1;
-                while i < lines.len() && !is_section_header(lines[i]) {
-                    if let Some(opt) = parse_option_line(lines[i]) {
-                        spec.options.push(opt);
-                    }
-                    i += 1;
-                }
-            } else if line == "Commands:" {
-                i += 1;
-                while i < lines.len() && !is_section_header(lines[i]) {
-                    if let Some(cmd) = parse_command_line(lines[i]) {
-                        spec.commands.push(cmd);
-                    }
-                    i += 1;
-                }
-            } else {
-                i += 1;
-            }
-        }
+        let remaining = &lines[i..];
+        let (opts, cmds) =
+            parse_option_command_sections(remaining, parse_option_line, parse_command_line);
+        spec.options.extend(opts);
+        spec.commands.extend(cmds);
 
         Ok(spec)
     }
-}
-
-fn is_section_header(line: &str) -> bool {
-    let trimmed = line.trim();
-    !trimmed.is_empty()
-        && !trimmed.starts_with('-')
-        && !trimmed.starts_with(' ')
-        && trimmed.ends_with(':')
 }
 
 fn parse_option_line(line: &str) -> Option<CliOption> {

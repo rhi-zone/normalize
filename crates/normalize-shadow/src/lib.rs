@@ -654,43 +654,7 @@ impl Shadow {
 
             // For each file in the commit, restore from the parent commit state
             let parent_ref = format!("{}^", entry.hash);
-
-            for file_path in &files_to_undo {
-                let worktree_file = self.worktree.join(file_path);
-                let actual_file = self.root.join(file_path);
-
-                // Try to get the file content from parent commit
-                let show_output = Command::new("git")
-                    .args(["show", &format!("{}:{}", parent_ref, file_path)])
-                    .current_dir(&self.worktree)
-                    .output();
-
-                match show_output {
-                    Ok(output) if output.status.success() => {
-                        // File existed in parent - restore it
-                        if let Some(parent) = actual_file.parent() {
-                            let _ = std::fs::create_dir_all(parent);
-                        }
-                        std::fs::write(&actual_file, &output.stdout).map_err(|e| {
-                            ShadowError::Undo(format!("Failed to write {}: {}", file_path, e))
-                        })?;
-                        // Update worktree too
-                        if let Some(parent) = worktree_file.parent() {
-                            let _ = std::fs::create_dir_all(parent);
-                        }
-                        let _ = std::fs::write(&worktree_file, &output.stdout);
-                    }
-                    _ => {
-                        // File didn't exist in parent (was added) - delete it
-                        if actual_file.exists() {
-                            std::fs::remove_file(&actual_file).map_err(|e| {
-                                ShadowError::Undo(format!("Failed to delete {}: {}", file_path, e))
-                            })?;
-                        }
-                        let _ = std::fs::remove_file(&worktree_file);
-                    }
-                }
-            }
+            self.restore_files_from_ref(&files_to_undo, &parent_ref)?;
 
             // Stage and commit the undo
             let _ = Command::new("git")
@@ -722,6 +686,44 @@ impl Shadow {
         }
 
         Ok(results)
+    }
+
+    /// Restore a set of files from a given git ref into both the real root and the worktree.
+    /// Files that don't exist at `git_ref` are deleted; files that do are written.
+    fn restore_files_from_ref(&self, files: &[String], git_ref: &str) -> Result<(), ShadowError> {
+        for file_path in files {
+            let worktree_file = self.worktree.join(file_path);
+            let actual_file = self.root.join(file_path);
+
+            let show_output = Command::new("git")
+                .args(["show", &format!("{}:{}", git_ref, file_path)])
+                .current_dir(&self.worktree)
+                .output();
+
+            match show_output {
+                Ok(output) if output.status.success() => {
+                    if let Some(parent) = actual_file.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    std::fs::write(&actual_file, &output.stdout).map_err(|e| {
+                        ShadowError::Undo(format!("Failed to write {}: {}", file_path, e))
+                    })?;
+                    if let Some(parent) = worktree_file.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let _ = std::fs::write(&worktree_file, &output.stdout);
+                }
+                _ => {
+                    if actual_file.exists() {
+                        std::fs::remove_file(&actual_file).map_err(|e| {
+                            ShadowError::Undo(format!("Failed to delete {}: {}", file_path, e))
+                        })?;
+                    }
+                    let _ = std::fs::remove_file(&worktree_file);
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Detect files that have been modified externally since last normalize edit.
@@ -812,42 +814,7 @@ impl Shadow {
             .collect();
 
         // For each file, restore from the undone commit state
-        for file_path in &files {
-            let worktree_file = self.worktree.join(file_path);
-            let actual_file = self.root.join(file_path);
-
-            // Get the file content from the undone commit
-            let show_output = Command::new("git")
-                .args(["show", &format!("{}:{}", undone_hash, file_path)])
-                .current_dir(&self.worktree)
-                .output();
-
-            match show_output {
-                Ok(output) if output.status.success() => {
-                    // File existed in undone commit - restore it
-                    if let Some(parent) = actual_file.parent() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                    std::fs::write(&actual_file, &output.stdout).map_err(|e| {
-                        ShadowError::Undo(format!("Failed to write {}: {}", file_path, e))
-                    })?;
-                    // Update worktree too
-                    if let Some(parent) = worktree_file.parent() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                    let _ = std::fs::write(&worktree_file, &output.stdout);
-                }
-                _ => {
-                    // File was deleted in undone commit - delete it
-                    if actual_file.exists() {
-                        std::fs::remove_file(&actual_file).map_err(|e| {
-                            ShadowError::Undo(format!("Failed to delete {}: {}", file_path, e))
-                        })?;
-                    }
-                    let _ = std::fs::remove_file(&worktree_file);
-                }
-            }
-        }
+        self.restore_files_from_ref(&files, undone_hash)?;
 
         // Stage and commit the redo
         let _ = Command::new("git")

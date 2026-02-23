@@ -4,6 +4,32 @@ use crate::ResolvedPackage;
 use std::path::PathBuf;
 use std::process::Command;
 
+/// Parse compiler include paths from stderr output of `cc -E -Wp,-v -xc /dev/null`.
+fn collect_compiler_includes(compiler: &str, paths: &mut Vec<PathBuf>) {
+    if let Ok(output) = Command::new(compiler)
+        .args(["-E", "-Wp,-v", "-xc", "/dev/null"])
+        .output()
+    {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut in_search_list = false;
+        for line in stderr.lines() {
+            if line.contains("#include <...> search starts here:") {
+                in_search_list = true;
+                continue;
+            }
+            if line.contains("End of search list.") {
+                break;
+            }
+            if in_search_list {
+                let path = PathBuf::from(line.trim());
+                if path.is_dir() && !paths.contains(&path) {
+                    paths.push(path);
+                }
+            }
+        }
+    }
+}
+
 /// Get GCC version.
 pub fn get_gcc_version() -> Option<String> {
     let output = Command::new("gcc").args(["--version"]).output().ok()?;
@@ -65,55 +91,9 @@ pub fn find_cpp_include_paths() -> Vec<PathBuf> {
         }
     }
 
-    // Try to get GCC include paths
-    if let Ok(output) = Command::new("gcc")
-        .args(["-E", "-Wp,-v", "-xc", "/dev/null"])
-        .output()
-    {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let mut in_search_list = false;
-
-        for line in stderr.lines() {
-            if line.contains("#include <...> search starts here:") {
-                in_search_list = true;
-                continue;
-            }
-            if line.contains("End of search list.") {
-                break;
-            }
-            if in_search_list {
-                let path = PathBuf::from(line.trim());
-                if path.is_dir() && !paths.contains(&path) {
-                    paths.push(path);
-                }
-            }
-        }
-    }
-
-    // Try clang as well
-    if let Ok(output) = Command::new("clang")
-        .args(["-E", "-Wp,-v", "-xc", "/dev/null"])
-        .output()
-    {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let mut in_search_list = false;
-
-        for line in stderr.lines() {
-            if line.contains("#include <...> search starts here:") {
-                in_search_list = true;
-                continue;
-            }
-            if line.contains("End of search list.") {
-                break;
-            }
-            if in_search_list {
-                let path = PathBuf::from(line.trim());
-                if path.is_dir() && !paths.contains(&path) {
-                    paths.push(path);
-                }
-            }
-        }
-    }
+    // Try to get GCC and clang include paths
+    collect_compiler_includes("gcc", &mut paths);
+    collect_compiler_includes("clang", &mut paths);
 
     // macOS specific paths
     #[cfg(target_os = "macos")]

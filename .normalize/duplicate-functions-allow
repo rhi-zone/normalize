@@ -36,6 +36,12 @@ crates/normalize-languages/src/ffi.rs:bindings
 crates/normalize-languages/src/ffi.rs:add_binding
 crates/normalize-tools/src/registry.rs:tools
 crates/normalize-tools/src/registry.rs:register
+crates/normalize-cli-parser/src/formats/mod.rs:register
+crates/normalize-openapi/src/lib.rs:register
+crates/normalize-tools/src/test_runners/mod.rs:register
+crates/normalize-typegen/src/registry.rs:register_backend
+crates/normalize-chat-sessions/src/formats/mod.rs:register
+crates/normalize-ecosystems/src/ecosystems/mod.rs:register
 
 # Config getters (trivial boolean accessors)
 crates/normalize/src/commands/todo.rs:show_all
@@ -47,6 +53,13 @@ crates/normalize/src/commands/analyze.rs:clones
 crates/normalize/src/config.rs:enabled
 crates/normalize/src/daemon.rs:enabled
 crates/normalize/src/daemon.rs:auto_start
+crates/normalize/src/commands/analyze/mod.rs:health
+crates/normalize/src/commands/analyze/mod.rs:complexity
+crates/normalize/src/commands/analyze/mod.rs:security
+crates/normalize/src/commands/analyze/mod.rs:exclude_interface_impls
+crates/normalize/src/commands/view/mod.rs:line_numbers
+crates/normalize-shadow/src/lib.rs:enabled
+crates/normalize-shadow/src/lib.rs:warn_on_delete
 
 # Session analysis counters (trivial sum accessors)
 crates/normalize/src/sessions/analysis.rs:total_tool_calls
@@ -154,3 +167,261 @@ crates/normalize-cli-parser/src/formats/mod.rs:new
 crates/normalize-languages/src/batch.rs:node_name
 crates/normalize-languages/src/d.rs:node_name
 crates/normalize-languages/src/matlab.rs:node_name
+
+# resolve_unified and resolve_unified_all are structural twin wrappers; extraction requires lifetime gymnastics for no clarity gain
+crates/normalize/src/path_resolve.rs:resolve_unified
+crates/normalize/src/path_resolve.rs:resolve_unified_all
+
+# Registry lookup pattern: each crate has its own registry with the same get_X dispatch shape; parallel not copy-paste
+crates/normalize-cli-parser/src/formats/mod.rs:get_format
+crates/normalize-surface-syntax/src/registry.rs:reader_for_language
+crates/normalize-surface-syntax/src/registry.rs:writer_for_language
+crates/normalize-typegen/src/registry.rs:get_backend
+crates/normalize-chat-sessions/src/formats/mod.rs:get_format
+crates/normalize-ecosystems/src/ecosystems/mod.rs:get_ecosystem
+
+# test_runners and tools registry follow the same struct-with-Vec shape by design (parallel registries)
+crates/normalize-tools/src/test_runners/mod.rs:get_runner
+crates/normalize-tools/src/registry.rs:get_tool
+
+# read_X functions are identical except for the grammar — intentionally parallel language entry points, not copy-paste
+crates/normalize-surface-syntax/src/input/typescript.rs:read_typescript
+crates/normalize-surface-syntax/src/input/lua.rs:read_lua
+crates/normalize-surface-syntax/src/input/python.rs:read_python
+
+# read_array/read_list are language-specific names for the same IR node construction pattern
+crates/normalize-surface-syntax/src/input/typescript.rs:read_array
+crates/normalize-surface-syntax/src/input/python.rs:read_list
+
+# version_cmp is generic semver comparison logic; deno_version_cmp is a rename in a different crate — candidate for dedup but cross-crate dep isn't worth it
+crates/normalize-local-deps/src/java.rs:version_cmp
+crates/normalize-local-deps/src/ecmascript.rs:deno_version_cmp
+
+# list_runners/list_tools are parallel registry list-all fns by design
+crates/normalize-tools/src/test_runners/mod.rs:list_runners
+crates/normalize-tools/src/registry.rs:list_tools
+
+# builder methods for LanguageCapabilities use the same struct-update pattern; intentional parallel DSL
+crates/normalize-language-meta/src/capabilities.rs:build_dsl
+crates/normalize-language-meta/src/capabilities.rs:shell
+
+# builder methods for LanguageCapabilities — intentional parallel
+crates/normalize-language-meta/src/capabilities.rs:none
+crates/normalize-language-meta/src/capabilities.rs:data_format
+
+# add_X methods use identical pattern to insert different relation types — parallel not copy-paste
+crates/normalize-facts-rules-api/src/relations.rs:add_symbol
+crates/normalize-facts-rules-api/src/relations.rs:add_call
+
+# add_X methods use identical pattern to insert different relation types — parallel not copy-paste
+crates/normalize-facts-rules-api/src/relations.rs:add_import
+crates/normalize-facts-rules-api/src/relations.rs:add_visibility
+crates/normalize-facts-rules-api/src/relations.rs:add_attribute
+crates/normalize-facts-rules-api/src/relations.rs:add_parent
+crates/normalize-facts-rules-api/src/relations.rs:add_implements
+crates/normalize-facts-rules-api/src/relations.rs:add_type_method
+
+# parallel stat methods on ComplexityReport and LengthReport — same statistical logic, different types
+crates/normalize/src/analyze/complexity.rs:avg_complexity
+crates/normalize/src/analyze/function_length.rs:avg_length
+
+# parallel stat methods on ComplexityReport and LengthReport
+crates/normalize/src/analyze/complexity.rs:max_complexity
+crates/normalize/src/analyze/function_length.rs:max_length
+
+# risk_to_sarif_level and length_to_sarif_level are parallel severity mappers for different enums
+crates/normalize/src/commands/analyze/sarif.rs:risk_to_sarif_level
+crates/normalize/src/commands/analyze/sarif.rs:length_to_sarif_level
+
+# parallel risk-level counts on ComplexityReport
+crates/normalize/src/analyze/complexity.rs:high_risk_count
+crates/normalize/src/analyze/complexity.rs:critical_risk_count
+
+# parallel length-category counts on LengthReport
+crates/normalize/src/analyze/function_length.rs:long_count
+crates/normalize/src/analyze/function_length.rs:too_long_count
+
+# deps_for_ecosystem / deps_for_language are parallel registry lookups by different key type
+crates/normalize-local-deps/src/registry.rs:deps_for_ecosystem
+crates/normalize-local-deps/src/registry.rs:deps_for_language
+
+# format_text/format_pretty implement OutputFormatter on the same tiny type — parallel by trait design
+crates/normalize/src/commands/sessions/show.rs:format_text
+crates/normalize/src/commands/sessions/show.rs:format_pretty
+
+# analyze_file_complexity/analyze_file_length — parallel single-file entry points for different analyzers
+crates/normalize/src/commands/analyze/complexity.rs:analyze_file_complexity
+crates/normalize/src/commands/analyze/length.rs:analyze_file_length
+
+# unary/while_loop are parallel IR constructors in different modules
+crates/normalize-surface-syntax/src/ir/expr.rs:unary
+crates/normalize-surface-syntax/src/ir/stmt.rs:while_loop
+
+# all_X / list_X registry methods follow the same Vec accessor pattern — parallel architecture
+crates/normalize-languages/src/registry.rs:supported_languages
+crates/normalize-surface-syntax/src/registry.rs:readers
+crates/normalize-surface-syntax/src/registry.rs:writers
+crates/normalize-tools/src/test_runners/mod.rs:all_runners
+crates/normalize-typegen/src/registry.rs:backends
+crates/normalize-ecosystems/src/ecosystems/mod.rs:all_ecosystems
+crates/normalize-local-deps/src/registry.rs:all_local_deps
+
+# list_X returns names from registry Vec — parallel accessor
+crates/normalize-cli-parser/src/formats/mod.rs:list_formats
+crates/normalize-typegen/src/registry.rs:backend_names
+crates/normalize-chat-sessions/src/formats/mod.rs:list_formats
+crates/normalize-ecosystems/src/ecosystems/mod.rs:list_ecosystems
+
+# add_root/remove_root are parallel mutation methods on the same field
+crates/normalize/src/daemon.rs:add_root
+crates/normalize/src/daemon.rs:remove_root
+
+# error/warning/hint are parallel builder methods on DiagnosticLevel
+crates/normalize-facts-rules-api/src/diagnostic.rs:error
+crates/normalize-facts-rules-api/src/diagnostic.rs:warning
+crates/normalize-facts-rules-api/src/diagnostic.rs:hint
+
+# register_reader/register_writer/register are parallel Vec-push registry methods
+crates/normalize-surface-syntax/src/registry.rs:register_reader
+crates/normalize-surface-syntax/src/registry.rs:register_writer
+crates/normalize-local-deps/src/registry.rs:register
+
+# get_highlight_query/get_injection_query are parallel wrappers around the shared get_cached_query
+crates/normalize-view/src/tree.rs:get_highlight_query
+crates/normalize-view/src/tree.rs:get_injection_query
+
+# get_python_version/find_python_stdlib are parallel shell-command helpers
+crates/normalize-local-deps/src/python.rs:get_python_version
+crates/normalize-local-deps/src/python.rs:find_python_stdlib
+
+# get_version/find_package_cache are parallel trait default methods
+crates/normalize-local-deps/src/lib.rs:get_version
+crates/normalize-local-deps/src/lib.rs:find_package_cache
+
+# format_text/format_pretty OutputFormatter impl — parallel by trait design
+crates/normalize-session-analysis/src/lib.rs:format_text
+crates/normalize-session-analysis/src/lib.rs:format_pretty
+
+# newest_mtime/oldest_mtime are parallel fold helpers
+crates/normalize/build.rs:newest_mtime
+crates/normalize/build.rs:oldest_mtime
+
+# Default impls returning Self::default() — Rust boilerplate, cannot be abstracted
+crates/normalize/src/analyze/complexity.rs:default
+crates/normalize/src/analyze/function_length.rs:default
+crates/normalize/src/daemon.rs:default
+crates/normalize/src/edit.rs:default
+crates/normalize-cli-parser/src/formats/mod.rs:default
+crates/normalize-languages/src/ffi.rs:default
+crates/normalize-languages/src/grammar_loader.rs:default
+crates/normalize-surface-syntax/src/output/lua.rs:default
+crates/normalize-surface-syntax/src/output/python.rs:default
+crates/normalize-surface-syntax/src/output/typescript.rs:default
+crates/normalize-tools/src/test_runners/cargo.rs:default
+crates/normalize-tools/src/test_runners/go.rs:default
+crates/normalize-tools/src/test_runners/bun.rs:default
+crates/normalize-tools/src/test_runners/npm.rs:default
+crates/normalize-tools/src/test_runners/pytest.rs:default
+crates/normalize-tools/src/registry.rs:default
+crates/normalize-chat-sessions/src/formats/mod.rs:default
+crates/normalize-syntax-rules/src/runner.rs:loader
+crates/normalize-package-index/src/index/apt.rs:new
+crates/normalize-package-index/src/index/opensuse.rs:default
+crates/normalize-package-index/src/index/ubuntu.rs:new
+crates/normalize-language-meta/src/capabilities.rs:default
+crates/normalize-facts/src/extract.rs:default
+crates/normalize-facts/src/symbols.rs:default
+crates/normalize-view/src/skeleton.rs:default
+crates/normalize-edit/src/lib.rs:default
+crates/normalize-deps/src/lib.rs:default
+
+# language()/name() trait methods returning string literals — parallel per-language trait impls
+crates/normalize-languages/src/ffi.rs:target_lang
+crates/normalize-languages/src/ffi.rs:source_lang
+crates/normalize-languages/src/ffi.rs:source_lang
+crates/normalize-languages/src/python.rs:grammar_name
+crates/normalize-openapi/src/lib.rs:language
+crates/normalize-openapi/src/lib.rs:variant
+crates/normalize-languages/src/rust.rs:grammar_name
+crates/normalize-typegen/src/output/rust.rs:name
+crates/normalize-typegen/src/output/rust.rs:language
+crates/normalize-local-deps/src/rust_lang.rs:ecosystem_key
+crates/normalize-languages/src/typescript.rs:grammar_name
+crates/normalize-surface-syntax/src/input/typescript.rs:language
+crates/normalize-surface-syntax/src/output/typescript.rs:language
+crates/normalize-typegen/src/output/typescript.rs:name
+crates/normalize-typegen/src/output/typescript.rs:language
+crates/normalize-typegen/src/output/valibot.rs:language
+crates/normalize-typegen/src/output/zod.rs:language
+crates/normalize-surface-syntax/src/input/python.rs:language
+crates/normalize-surface-syntax/src/output/python.rs:language
+crates/normalize-typegen/src/output/pydantic.rs:language
+crates/normalize-typegen/src/output/python.rs:name
+crates/normalize-typegen/src/output/python.rs:language
+crates/normalize-ecosystems/src/ecosystems/python.rs:name
+crates/normalize-local-deps/src/python.rs:ecosystem_key
+
+# get_version/find_package_cache/find_stdlib parallel LocalDeps trait default-override methods
+crates/normalize-local-deps/src/rust_lang.rs:get_version
+crates/normalize-local-deps/src/rust_lang.rs:find_package_cache
+crates/normalize-local-deps/src/java.rs:get_version
+crates/normalize-local-deps/src/go.rs:get_version
+crates/normalize-local-deps/src/go.rs:find_package_cache
+crates/normalize-local-deps/src/go.rs:find_stdlib
+
+# name/language/extension trait methods — parallel per-backend trait impls
+crates/normalize-languages/src/go.rs:grammar_name
+crates/normalize-typegen/src/output/go.rs:name
+crates/normalize-typegen/src/output/go.rs:language
+crates/normalize-typegen/src/output/go.rs:extension
+crates/normalize-ecosystems/src/ecosystems/go.rs:name
+crates/normalize-package-index/src/index/go.rs:ecosystem
+crates/normalize-local-deps/src/go.rs:ecosystem_key
+
+# Option-unwrap-or config accessors — parallel by design
+crates/normalize/src/commands/analyze/mod.rs:compact
+crates/normalize/src/commands/analyze/mod.rs:duplicate_functions
+crates/normalize/src/commands/view/mod.rs:show_docs
+crates/normalize/src/commands/text_search.rs:ignore_case
+
+# language/extension trait methods in surface-syntax input/output impls
+crates/normalize-languages/src/lua.rs:grammar_name
+crates/normalize-surface-syntax/src/input/lua.rs:language
+crates/normalize-surface-syntax/src/output/lua.rs:language
+crates/normalize-surface-syntax/src/output/lua.rs:extension
+
+# find_stdlib/find_package_cache/get_version LocalDeps trait methods — parallel per-language impls
+crates/normalize-local-deps/src/typescript.rs:find_stdlib
+crates/normalize-local-deps/src/typescript.rs:find_stdlib
+crates/normalize-local-deps/src/cpp.rs:find_package_cache
+
+# get_version/find_package_cache/find_stdlib — parallel LocalDeps trait methods
+crates/normalize-local-deps/src/python.rs:get_version
+crates/normalize-local-deps/src/python.rs:find_package_cache
+crates/normalize-local-deps/src/python.rs:find_stdlib
+
+# success/len/is_empty — parallel small methods on different types
+crates/normalize-tools/src/test_runners/mod.rs:success
+crates/normalize-session-analysis/src/lib.rs:len
+crates/normalize-session-analysis/src/lib.rs:is_empty
+
+# array/block/return_stmt/break_stmt/continue_stmt — parallel IR node constructors
+crates/normalize-surface-syntax/src/ir/expr.rs:array
+crates/normalize-surface-syntax/src/ir/stmt.rs:block
+crates/normalize-surface-syntax/src/ir/stmt.rs:return_stmt
+
+# extensions/indexable_extensions returning string slices — parallel per-language accessors
+crates/normalize-surface-syntax/src/input/python.rs:extensions
+crates/normalize-local-deps/src/python.rs:indexable_extensions
+
+# total_tool_calls/total_errors — parallel stat accessors
+crates/normalize-session-analysis/src/lib.rs:total_tool_calls
+crates/normalize-session-analysis/src/lib.rs:total_errors
+
+# break_stmt/continue_stmt — parallel IR node constructors
+crates/normalize-surface-syntax/src/ir/stmt.rs:break_stmt
+crates/normalize-surface-syntax/src/ir/stmt.rs:continue_stmt
+
+# list_roots/status — parallel daemon state accessors
+crates/normalize/src/daemon.rs:list_roots
+crates/normalize/src/daemon.rs:status

@@ -407,21 +407,8 @@ impl LanguageServer for MossBackend {
             && let Ok(defs) = index.find_symbol(&word).await
         {
             for (file, _kind, start_line, _end_line) in defs {
-                let target_path = root.join(&file);
-                if let Ok(target_uri) = Url::from_file_path(&target_path) {
-                    locations.push(Location {
-                        uri: target_uri,
-                        range: Range {
-                            start: Position {
-                                line: start_line.saturating_sub(1) as u32,
-                                character: 0,
-                            },
-                            end: Position {
-                                line: start_line.saturating_sub(1) as u32,
-                                character: 0,
-                            },
-                        },
-                    });
+                if let Some(loc) = make_location_at_line(&file, &root, start_line) {
+                    locations.push(loc);
                 }
             }
         }
@@ -429,21 +416,8 @@ impl LanguageServer for MossBackend {
         // Find callers (references)
         if let Ok(callers) = index.find_callers(&word).await {
             for (file, _caller_name, line) in callers {
-                let target_path = root.join(&file);
-                if let Ok(target_uri) = Url::from_file_path(&target_path) {
-                    locations.push(Location {
-                        uri: target_uri,
-                        range: Range {
-                            start: Position {
-                                line: line.saturating_sub(1) as u32,
-                                character: 0,
-                            },
-                            end: Position {
-                                line: line.saturating_sub(1) as u32,
-                                character: 0,
-                            },
-                        },
-                    });
+                if let Some(loc) = make_location_at_line(&file, &root, line) {
+                    locations.push(loc);
                 }
             }
         }
@@ -614,6 +588,24 @@ struct WordAtPosition {
 }
 
 /// Extract the word at a given column position in a line, with start/end positions.
+/// Build an LSP `Location` pointing to the start of a 1-indexed line number.
+fn make_location_at_line(
+    file: &str,
+    root: &std::path::Path,
+    line_1indexed: usize,
+) -> Option<Location> {
+    let path = root.join(file);
+    let uri = Url::from_file_path(&path).ok()?;
+    let line = line_1indexed.saturating_sub(1) as u32;
+    Some(Location {
+        uri,
+        range: Range {
+            start: Position { line, character: 0 },
+            end: Position { line, character: 0 },
+        },
+    })
+}
+
 fn extract_word_with_range(line: &str, col: usize) -> WordAtPosition {
     let chars: Vec<char> = line.chars().collect();
     if col >= chars.len() {

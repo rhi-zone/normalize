@@ -6,7 +6,7 @@
 //! - `positional arguments:` section for subcommands
 //! - `options:` section (lowercase) with `-s, --long VALUE  Description`
 
-use super::CliFormat;
+use super::{CliFormat, parse_command_from_trimmed_line};
 use crate::{CliCommand, CliOption, CliSpec};
 use regex::Regex;
 
@@ -130,45 +130,13 @@ fn is_section_header(line: &str) -> bool {
 /// Format: "  {cmd1,cmd2,cmd3}  Description" or "    cmd  Description"
 fn parse_positional_line(line: &str) -> Option<CliCommand> {
     let trimmed = line.trim();
-    if trimmed.is_empty() || trimmed.starts_with('-') {
-        return None;
-    }
 
     // Check for {cmd1,cmd2,...} format (subcommand choices shown together)
     if trimmed.starts_with('{') {
         return None; // Skip the choices line, individual commands follow
     }
 
-    // Parse "  cmd  Description" format
-    let re = Regex::new(r"^(\S+)\s{2,}(.*)$").unwrap();
-    if let Some(caps) = re.captures(trimmed) {
-        let name = caps.get(1)?.as_str().to_string();
-        let description = caps.get(2).map(|m| m.as_str().to_string());
-
-        // Skip "help" command
-        if name == "help" {
-            return None;
-        }
-
-        Some(CliCommand {
-            name,
-            description,
-            aliases: Vec::new(),
-            options: Vec::new(),
-            subcommands: Vec::new(),
-        })
-    } else if !trimmed.contains(' ') {
-        // Just a command name
-        Some(CliCommand {
-            name: trimmed.to_string(),
-            description: None,
-            aliases: Vec::new(),
-            options: Vec::new(),
-            subcommands: Vec::new(),
-        })
-    } else {
-        None
-    }
+    parse_command_from_trimmed_line(trimmed)
 }
 
 /// Parse an option line.

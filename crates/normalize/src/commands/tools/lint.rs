@@ -49,6 +49,69 @@ impl OutputFormatter for LintListResult {
     }
 }
 
+/// Run a set of tools against `paths` and collect results.
+/// Returns `(all_results, had_errors)`.
+fn run_tools(
+    tools_to_run: &[&dyn normalize_tools::Tool],
+    paths: &[&Path],
+    fix: bool,
+    json: bool,
+    root: &Path,
+) -> (Vec<normalize_tools::ToolResult>, bool) {
+    let mut all_results = Vec::new();
+    let mut had_errors = false;
+
+    for tool in tools_to_run {
+        let info = tool.info();
+
+        if !tool.is_available() {
+            if !json {
+                eprintln!("{}: not installed", info.name);
+            }
+            continue;
+        }
+
+        if !json {
+            let action = if fix && tool.can_fix() {
+                "fixing"
+            } else {
+                "checking"
+            };
+            eprintln!("{}: {}...", info.name, action);
+        }
+
+        let result = if fix && tool.can_fix() {
+            tool.fix(paths, root)
+        } else {
+            tool.run(paths, root)
+        };
+
+        match result {
+            Ok(result) => {
+                if !result.success {
+                    had_errors = true;
+                    if let Some(err) = &result.error
+                        && !json
+                    {
+                        eprintln!("{}: {}", info.name, err);
+                    }
+                } else if result.error_count() > 0 {
+                    had_errors = true;
+                }
+                all_results.push(result);
+            }
+            Err(e) => {
+                had_errors = true;
+                if !json {
+                    eprintln!("{}: {}", info.name, e);
+                }
+            }
+        }
+    }
+
+    (all_results, had_errors)
+}
+
 /// Run linting tools on the codebase.
 pub fn cmd_lint_run(
     target: Option<&str>,
@@ -112,57 +175,7 @@ pub fn cmd_lint_run(
     // Prepare paths
     let paths: Vec<&Path> = target.map(|t| vec![Path::new(t)]).unwrap_or_default();
 
-    // Run tools
-    let mut all_results = Vec::new();
-    let mut had_errors = false;
-
-    for tool in &tools_to_run {
-        let info = tool.info();
-
-        if !tool.is_available() {
-            if !json {
-                eprintln!("{}: not installed", info.name);
-            }
-            continue;
-        }
-
-        if !json {
-            let action = if fix && tool.can_fix() {
-                "fixing"
-            } else {
-                "checking"
-            };
-            eprintln!("{}: {}...", info.name, action);
-        }
-
-        let result = if fix && tool.can_fix() {
-            tool.fix(&paths.to_vec(), root)
-        } else {
-            tool.run(&paths.to_vec(), root)
-        };
-
-        match result {
-            Ok(result) => {
-                if !result.success {
-                    had_errors = true;
-                    if let Some(err) = &result.error
-                        && !json
-                    {
-                        eprintln!("{}: {}", info.name, err);
-                    }
-                } else if result.error_count() > 0 {
-                    had_errors = true;
-                }
-                all_results.push(result);
-            }
-            Err(e) => {
-                had_errors = true;
-                if !json {
-                    eprintln!("{}: {}", info.name, e);
-                }
-            }
-        }
-    }
+    let (all_results, had_errors) = run_tools(&tools_to_run, &paths, fix, json, root);
 
     // Output results
     if sarif {
@@ -417,56 +430,7 @@ fn run_lint_once(
     }
 
     let paths: Vec<&Path> = target.map(|t| vec![Path::new(t)]).unwrap_or_default();
-    let mut all_results = Vec::new();
-    let mut had_errors = false;
-
-    for tool in &tools_to_run {
-        let info = tool.info();
-
-        if !tool.is_available() {
-            if !json {
-                eprintln!("{}: not installed", info.name);
-            }
-            continue;
-        }
-
-        if !json {
-            let action = if fix && tool.can_fix() {
-                "fixing"
-            } else {
-                "checking"
-            };
-            eprintln!("{}: {}...", info.name, action);
-        }
-
-        let result = if fix && tool.can_fix() {
-            tool.fix(&paths.to_vec(), root)
-        } else {
-            tool.run(&paths.to_vec(), root)
-        };
-
-        match result {
-            Ok(result) => {
-                if !result.success {
-                    had_errors = true;
-                    if let Some(err) = &result.error
-                        && !json
-                    {
-                        eprintln!("{}: {}", info.name, err);
-                    }
-                } else if result.error_count() > 0 {
-                    had_errors = true;
-                }
-                all_results.push(result);
-            }
-            Err(e) => {
-                had_errors = true;
-                if !json {
-                    eprintln!("{}: {}", info.name, e);
-                }
-            }
-        }
-    }
+    let (all_results, had_errors) = run_tools(&tools_to_run, &paths, fix, json, root);
 
     // Output results
     if json {

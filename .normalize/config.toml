@@ -11,7 +11,17 @@ clones = true
 # the same Language trait with nearly-identical Symbol constructors across extract_function,
 # extract_container, extract_type. These are intentionally parallel, not copy-paste.
 # Affects all analyze subcommands (no per-subcommand exclude yet — see TODO.md).
-exclude = ["crates/normalize-languages/src/**"]
+exclude = [
+    # ~98 language files implement the same Language trait with nearly-identical
+    # Symbol constructors. Intentionally parallel, not copy-paste.
+    "crates/normalize-languages/src/**",
+    # Package index has intentionally parallel parsers for each distro/repo —
+    # each parser targets a different format but uses similar parsing scaffolding.
+    "crates/normalize-package-index/src/**",
+    # Test files use similar setup/assertion patterns by design.
+    "crates/normalize-typegen/tests/**",
+    "**/tests/**",
+]
 # hotspots_exclude = ["*.md", "*.json"]  # example: exclude markdown and JSON
 
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }

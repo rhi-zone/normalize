@@ -7,7 +7,7 @@
 //! - `Commands:` section with `  <name>  <description>`
 //! - `Options:` section with `  -s, --long <VALUE>  Description`
 
-use super::CliFormat;
+use super::{CliFormat, parse_command_from_trimmed_line};
 use crate::{CliCommand, CliOption, CliSpec};
 use regex::Regex;
 
@@ -155,41 +155,7 @@ fn is_section_header(line: &str) -> bool {
 
 /// Parse a command line like "  run   Run something".
 fn parse_command_line(line: &str) -> Option<CliCommand> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() || trimmed.starts_with('-') {
-        return None;
-    }
-
-    // Split on multiple spaces to separate name from description
-    let re = Regex::new(r"^(\S+)\s{2,}(.*)$").unwrap();
-    if let Some(caps) = re.captures(trimmed) {
-        let name = caps.get(1)?.as_str().to_string();
-        let description = caps.get(2).map(|m| m.as_str().to_string());
-
-        // Skip "help" command as it's meta
-        if name == "help" {
-            return None;
-        }
-
-        Some(CliCommand {
-            name,
-            description,
-            aliases: Vec::new(),
-            options: Vec::new(),
-            subcommands: Vec::new(),
-        })
-    } else if !trimmed.contains(' ') {
-        // Just a command name with no description
-        Some(CliCommand {
-            name: trimmed.to_string(),
-            description: None,
-            aliases: Vec::new(),
-            options: Vec::new(),
-            subcommands: Vec::new(),
-        })
-    } else {
-        None
-    }
+    parse_command_from_trimmed_line(line.trim())
 }
 
 /// Parse an option line like "  -v, --verbose  Enable verbose output".
