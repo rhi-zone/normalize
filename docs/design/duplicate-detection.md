@@ -7,6 +7,9 @@
 - [x] `analyze duplicate-blocks` — exact subtree-level hashing with containment suppression
 - [x] `analyze similar-blocks` — fuzzy subtree matching via MinHash LSH
 - [x] Skeleton mode (`--skeleton` on `similar-blocks`) — structural matching ignoring bodies
+- [ ] Allow files for `duplicate-blocks` and `similar-blocks` (see Allow File Design below)
+- [ ] `--skip-functions` on `duplicate-blocks` — skip function/method nodes to avoid overlap with `duplicate-functions`
+- [ ] `similar-functions` — MinHash LSH scoped to function/method nodes; like `duplicate-functions` but fuzzy; supports `--skeleton`
 - [ ] Enable `duplicate-blocks` in CI as enforcement (needs `--allow` mechanism)
 
 ## What we have today
@@ -139,3 +142,44 @@ Developer knows there's duplication around, say, error handling or config parsin
 **High value, higher complexity:** MinHash LSH for partial matching. The refactoring discovery use case — finding drifted copies — is a strong motivation, and the exploration context tolerates false positives. Also useful for LLM context-assembly deduplication. The two use cases have different access patterns (whole-codebase scan vs. candidate-set dedup) so may want separate surfaces.
 
 **Not worth building:** Full tree edit distance scoring as a standalone feature. The O(n²–n³) cost only pays off as a ranking step after LSH pre-filtering, and even then the use case has to be clear before investing.
+
+## Allow File Design
+
+Allow files let users acknowledge known duplicates that are intentional, preventing CI noise.
+
+### Key format
+
+Line numbers alone are fragile — a line inserted above a block shifts all line numbers and silently breaks allow entries. The function name (when available) anchors the entry to the code, not the file position.
+
+```
+# Inside a function
+src/foo.rs:my_func:10-20
+
+# Module-level block (no containing function)
+src/foo.rs:10-20
+```
+
+Finding the containing function: walk the extractor's symbol tree to find the innermost function/method node whose `start_line..end_line` contains the block's `start_line`. Already a dependency of this module.
+
+Stability guarantee: line shifts *outside* the function don't break the entry. Changes *within* the function may — which is correct behaviour: if the function changed significantly, the duplication may have been resolved and the allow should be re-evaluated.
+
+### Per-command files
+
+| Command | Allow file | Entry format |
+|---------|-----------|--------------|
+| `duplicate-functions` | `.normalize/duplicate-functions-allow` | `file:symbol` |
+| `duplicate-types` | `.normalize/duplicate-types-allow` | `TypeA + TypeB` |
+| `duplicate-blocks` | `.normalize/duplicate-blocks-allow` | `file:func:start-end` or `file:start-end` |
+| `similar-blocks` | `.normalize/similar-blocks-allow` | Two lines: `file:func:start-end` + `file:func:start-end` |
+
+### `similar-blocks` pair entries
+
+Since results are pairs, an allow entry covers both locations:
+
+```
+# reason: intentional parallel implementations
+src/indexers/apt.rs:parse_package:43-99
+src/indexers/opensuse.rs:parse_package:35-131
+```
+
+Blank-line separated pairs. `--allow` flag takes both locations (or a single string `loc1 + loc2`).
