@@ -13,6 +13,7 @@ Options:
       --show-source              
       --min-lines <MIN_LINES>    Minimum lines for a block to be considered [default: 5] [default: 5]
       --similarity <SIMILARITY>  Minimum similarity threshold (0.0–1.0) [default: 0.8] [default: 0.8]
+      --skeleton                 Skeleton mode: replace block/body subtrees with a placeholder, matching on control-flow structure regardless of body content or size
       --json                     Output as JSON
       --jsonl                    Output as JSON Lines (one object per line)
       --jq <EXPR>                Filter JSON output with jq expression (implies --json)

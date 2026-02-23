@@ -1345,15 +1345,50 @@ impl OutputFormatter for SimilarBlocksReport {
 }
 
 /// Serialize an AST subtree to a flat token sequence for shingling.
+/// Returns true for node kinds that represent a block/body — used by skeleton
+/// mode to replace the entire subtree with a `<body>` placeholder token.
+fn is_body_kind(kind: &str) -> bool {
+    // Exact matches for common block/body node names across languages.
+    matches!(
+        kind,
+        "block"                  // Rust, Go, many others
+        | "body"                 // Python, Kotlin
+        | "statement_block"      // JavaScript, TypeScript
+        | "compound_statement"   // C, C++, Bash
+        | "declaration_list"     // C/C++ struct/union body
+        | "field_declaration_list" // Rust struct body
+        | "enum_body"            // Java, Kotlin
+        | "class_body"           // Java, Kotlin, TypeScript
+        | "interface_body"       // Java
+        | "object_body"          // Kotlin
+        | "do_block"             // Ruby
+        | "begin_block"          // Ruby
+        | "block_body" // generic
+    ) || kind.ends_with("_body")
+        || kind.ends_with("_block")
+        || kind.ends_with("_list") && kind.contains("statement")
+}
+
+/// Hash token for skeleton body placeholder — a fixed sentinel value.
+const BODY_PLACEHOLDER: u64 = 0xb0d7_b0d7_b0d7_b0d7;
+
 fn serialize_subtree_tokens(
     node: &tree_sitter::Node,
     content: &[u8],
     elide_identifiers: bool,
     elide_literals: bool,
+    skeleton: bool,
     out: &mut Vec<u64>,
 ) {
     use std::collections::hash_map::DefaultHasher;
     let kind = node.kind();
+
+    // In skeleton mode, replace body/block subtrees with a fixed placeholder.
+    if skeleton && node.child_count() > 0 && is_body_kind(kind) {
+        out.push(BODY_PLACEHOLDER);
+        return;
+    }
+
     let mut h = DefaultHasher::new();
     kind.hash(&mut h);
 
@@ -1374,7 +1409,14 @@ fn serialize_subtree_tokens(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        serialize_subtree_tokens(&child, content, elide_identifiers, elide_literals, out);
+        serialize_subtree_tokens(
+            &child,
+            content,
+            elide_identifiers,
+            elide_literals,
+            skeleton,
+            out,
+        );
     }
 }
 
@@ -1428,6 +1470,7 @@ fn lsh_band_hash(sig: &[u64; MINHASH_N], band: usize) -> u64 {
 }
 
 /// Collect all subtrees above min_lines, returning (location, minhash signature).
+#[allow(clippy::too_many_arguments)]
 fn collect_block_signatures(
     node: &tree_sitter::Node,
     content: &[u8],
@@ -1435,6 +1478,7 @@ fn collect_block_signatures(
     min_lines: usize,
     elide_identifiers: bool,
     elide_literals: bool,
+    skeleton: bool,
     out: &mut Vec<(DuplicateBlockLocation, [u64; MINHASH_N])>,
 ) {
     let start_line = node.start_position().row + 1;
@@ -1448,17 +1492,38 @@ fn collect_block_signatures(
             content,
             elide_identifiers,
             elide_literals,
+            skeleton,
             &mut tokens,
         );
-        let sig = compute_minhash(&tokens);
-        out.push((
-            DuplicateBlockLocation {
-                file: file.to_string(),
-                start_line,
-                end_line,
-            },
-            sig,
-        ));
+        // In skeleton mode a complex function can reduce to very few tokens,
+        // or to a long repetitive sequence (e.g. many match arms all elided).
+        // Both cases produce false positives — filter them out.
+        let min_tokens = if skeleton { SHINGLE_K * 4 } else { SHINGLE_K };
+        let skip = if tokens.len() < min_tokens {
+            true
+        } else if skeleton {
+            // Require at least 30% unique tokens: repetitive skeletons
+            // (long match statements, uniform loop bodies) are not useful signal.
+            let unique = tokens
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            (unique as f64 / tokens.len() as f64) < 0.3
+        } else {
+            false
+        };
+
+        if !skip {
+            let sig = compute_minhash(&tokens);
+            out.push((
+                DuplicateBlockLocation {
+                    file: file.to_string(),
+                    start_line,
+                    end_line,
+                },
+                sig,
+            ));
+        }
     }
 
     let mut cursor = node.walk();
@@ -1470,6 +1535,7 @@ fn collect_block_signatures(
             min_lines,
             elide_identifiers,
             elide_literals,
+            skeleton,
             out,
         );
     }
@@ -1530,6 +1596,7 @@ pub struct SimilarBlocksConfig<'a> {
     pub similarity: f64,
     pub elide_identifiers: bool,
     pub elide_literals: bool,
+    pub skeleton: bool,
     pub show_source: bool,
     pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
@@ -1542,6 +1609,7 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
         similarity,
         elide_identifiers,
         elide_literals,
+        skeleton,
         show_source,
         format,
         filter,
@@ -1598,6 +1666,7 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
             min_lines,
             elide_identifiers,
             elide_literals,
+            skeleton,
             &mut all_blocks,
         );
     }
@@ -1659,13 +1728,17 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
                 }
             }
 
-            // Skip pairs with very different sizes — a 10-line block and a
-            // 100-line block can't be meaningfully "similar".
-            let len_a = loc_a.end_line.saturating_sub(loc_a.start_line) + 1;
-            let len_b = loc_b.end_line.saturating_sub(loc_b.start_line) + 1;
-            let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
-            if ratio < 0.5 {
-                return None;
+            // Skip pairs with very different sizes. In skeleton mode bodies are
+            // elided so size differences are expected — relax from 0.5 to 0.1
+            // (allow up to 10× difference) rather than disabling entirely.
+            {
+                let len_a = loc_a.end_line.saturating_sub(loc_a.start_line) + 1;
+                let len_b = loc_b.end_line.saturating_sub(loc_b.start_line) + 1;
+                let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
+                let min_ratio = if skeleton { 0.2 } else { 0.5 };
+                if ratio < min_ratio {
+                    return None;
+                }
             }
 
             let sim = jaccard_estimate(sig_a, sig_b);

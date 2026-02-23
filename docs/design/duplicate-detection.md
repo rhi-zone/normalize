@@ -6,7 +6,7 @@
 - [x] `analyze duplicate-types` — exact type field overlap
 - [x] `analyze duplicate-blocks` — exact subtree-level hashing with containment suppression
 - [x] `analyze similar-blocks` — fuzzy subtree matching via MinHash LSH
-- [ ] Skeleton mode (`--skeleton`) — structural matching ignoring bodies
+- [x] Skeleton mode (`--skeleton` on `similar-blocks`) — structural matching ignoring bodies
 - [ ] Enable `duplicate-blocks` in CI as enforcement (needs `--allow` mechanism)
 
 ## What we have today

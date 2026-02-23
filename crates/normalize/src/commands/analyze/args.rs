@@ -260,6 +260,12 @@ pub enum AnalyzeCommand {
         /// Minimum similarity threshold (0.0–1.0) [default: 0.8]
         #[arg(long, default_value = "0.8")]
         similarity: f64,
+
+        /// Skeleton mode: replace block/body subtrees with a placeholder, matching
+        /// on control-flow structure regardless of body content or size
+        #[arg(long)]
+        #[serde(default)]
+        skeleton: bool,
     },
 
     /// Detect duplicate type definitions
