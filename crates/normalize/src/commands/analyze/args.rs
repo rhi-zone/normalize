@@ -273,18 +273,24 @@ pub enum AnalyzeCommand {
         #[serde(default)]
         show_source: bool,
 
-        /// Minimum lines for a function to be considered [default: 5]
-        #[arg(long, default_value = "5")]
+        /// Minimum lines for a function to be considered [default: 10]
+        #[arg(long, default_value = "10")]
         min_lines: usize,
 
-        /// Minimum similarity threshold (0.0–1.0) [default: 0.8]
-        #[arg(long, default_value = "0.8")]
+        /// Minimum similarity threshold (0.0–1.0) [default: 0.85]
+        #[arg(long, default_value = "0.85")]
         similarity: f64,
 
         /// Skeleton mode: match on control-flow structure, ignoring body content
         #[arg(long)]
         #[serde(default)]
         skeleton: bool,
+
+        /// Include pairs where both functions share the same name (likely trait implementations).
+        /// By default these are suppressed as intentionally parallel, not copy-paste.
+        #[arg(long)]
+        #[serde(default)]
+        include_trait_impls: bool,
     },
 
     /// Detect similar (fuzzy-matching) code blocks via MinHash LSH
@@ -301,12 +307,12 @@ pub enum AnalyzeCommand {
         #[serde(default)]
         show_source: bool,
 
-        /// Minimum lines for a block to be considered [default: 5]
-        #[arg(long, default_value = "5")]
+        /// Minimum lines for a block to be considered [default: 10]
+        #[arg(long, default_value = "10")]
         min_lines: usize,
 
-        /// Minimum similarity threshold (0.0–1.0) [default: 0.8]
-        #[arg(long, default_value = "0.8")]
+        /// Minimum similarity threshold (0.0–1.0) [default: 0.85]
+        #[arg(long, default_value = "0.85")]
         similarity: f64,
 
         /// Skeleton mode: replace block/body subtrees with a placeholder, matching

@@ -652,12 +652,13 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] `--skip-functions` on `duplicate-blocks`: skip function/method nodes to avoid overlap with `duplicate-functions`.
 - [x] `similar-functions`: MinHash LSH scoped to function nodes; named-symbol output; `--skeleton` support.
 - [x] Allow files for `duplicate-blocks` (`duplicate-blocks-allow`) and `similar-blocks` (`similar-blocks-allow`). Key format: `file:func:start-end` or `file:start-end`. `--allow <location> --reason <text>` flags on both commands.
-- **[HIGH]** Improve duplicate/clone detection machinery to work usefully out of the box on any codebase (not just normalize):
-  - `duplicate-functions` / `similar-functions`: trait/interface implementations are legitimately parallel — need a way to detect and suppress this pattern automatically (same method name, different files in same module tree)
-  - `duplicate-types`: field-overlap heuristic is too shallow; many structs share common field names (`file`, `line`, `column`) without being duplicates. Consider: require min field count on both sides, weight rare field names higher, or require structural similarity beyond field names.
-  - `similar-blocks` / `similar-functions`: need minimum size threshold calibration so small boilerplate blocks don't dominate results. Consider: `--min-lines` default too low for `similar-*`.
-  - `duplicate-blocks`: generated files (JSON, lock files) create noise — auto-detect or exclude by default.
-  - Goal: zero false negatives at the default thresholds; false positives acceptable but should be suppressible. See `docs/design/duplicate-detection.md`.
+- [x] Improve duplicate/clone detection to work usefully out of the box:
+  - [x] `duplicate-functions`: same-name groups suppressed by default (`--include-trait-impls` to restore); 351→185 groups
+  - [x] `similar-functions`: same-name pairs suppressed by default; min-lines 5→10, similarity 0.80→0.85; 3781→537 pairs
+  - [x] `similar-blocks`: min-lines 5→10, similarity 0.80→0.85; 4489→1106 pairs
+  - [x] `duplicate-types`: Jaccard overlap (not one-sided), require ≥3 common fields; 154→~13 pairs
+  - [x] All analyze commands: auto-exclude lockfiles from is_source_file
+  - Remaining: `duplicate-types` field weighting (rare fields should count more than `name`/`file`/`line`); `similar-blocks` still produces ~1100 pairs with no name-based suppression possible
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `normalize analyze ast`, `normalize analyze query` (authoring tools)
   - [x] Phase 1b: `normalize analyze rules` reads .normalize/rules/*.scm with TOML frontmatter

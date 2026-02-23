@@ -2152,6 +2152,7 @@ pub struct SimilarFunctionsConfig<'a> {
     pub elide_literals: bool,
     pub skeleton: bool,
     pub show_source: bool,
+    pub include_trait_impls: bool,
     pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
@@ -2165,6 +2166,7 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
         elide_literals,
         skeleton,
         show_source,
+        include_trait_impls,
         format,
         filter,
     } = cfg;
@@ -2344,6 +2346,10 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
             })
         })
         .collect();
+
+    if !include_trait_impls {
+        pairs.retain(|p| p.symbol_a != p.symbol_b);
+    }
 
     pairs.sort_by(|a, b| {
         b.similarity
