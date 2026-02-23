@@ -4,12 +4,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] Fixture-based tests for all syntax rules (`normalize-syntax-rules`):
+- [x] Fixture-based tests for all syntax rules (`normalize-syntax-rules`):
   - `tests/fixtures/<lang>/<rule-name>/match.<ext>` — must produce ≥1 findings
   - `tests/fixtures/<lang>/<rule-name>/no_match.<ext>` — must produce 0 findings
-  - Single `tests/rule_fixtures.rs` test runner that walks the tree, collects all
-    failures, and panics once with a summary (language-agnostic, no Rust per rule)
-  - `GrammarLoader::new()` is available in `normalize-syntax-rules` tests already
+  - Single `tests/rule_fixtures.rs` test runner (language-agnostic, no Rust per rule)
+  - **New builtin rules must include fixture files** — runner silently skips missing ones
 
 - [x] Add rule writing guide (`docs/syntax-rules.md`) and link from `docs/cli/rules.md`
 - [x] Rule sharing/import: `normalize rules add/update/list/remove` (Phase 1 complete)
