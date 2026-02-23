@@ -530,21 +530,23 @@ fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::Norma
         let fact_count = all_rules.iter().filter(|r| r.rule_type == "fact").count();
         let disabled_count = all_rules.iter().filter(|r| !r.enabled).count();
 
+        let mut parts = Vec::new();
+        if syntax_count > 0 {
+            parts.push(format!("{} syntax", syntax_count));
+        }
+        if fact_count > 0 {
+            parts.push(format!("{} fact", fact_count));
+        }
+        let breakdown = parts.join(", ");
         if disabled_count > 0 {
             println!(
-                "{} rules ({} syntax, {} fact) — {} disabled\n",
+                "{} rules ({}) — {} disabled\n",
                 all_rules.len(),
-                syntax_count,
-                fact_count,
+                breakdown,
                 disabled_count
             );
         } else {
-            println!(
-                "{} rules ({} syntax, {} fact)\n",
-                all_rules.len(),
-                syntax_count,
-                fact_count
-            );
+            println!("{} rules ({})\n", all_rules.len(), breakdown);
         }
 
         // Column headers (pretty mode only)
