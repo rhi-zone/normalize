@@ -21,7 +21,6 @@ pub mod stale_docs;
 pub mod test_gaps;
 pub mod trace;
 
-use crate::commands::aliases::detect_project_languages;
 use crate::config::NormalizeConfig;
 use crate::daemon;
 use crate::filter::Filter;
@@ -367,7 +366,7 @@ fn resolve_diff_and_filter(
     }
 
     if !args.exclude.is_empty() || !only_patterns.is_empty() {
-        match build_filter(effective_root, &args.exclude, &only_patterns) {
+        match super::build_filter(effective_root, &args.exclude, &only_patterns) {
             Some(f) => Ok(Some(f)),
             None => Err(1),
         }
@@ -1032,30 +1031,6 @@ fn get_diff_files(root: &Path, base: &str) -> Result<Vec<String>, String> {
         .collect();
 
     Ok(files)
-}
-
-/// Build filter from exclude/only patterns
-fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<Filter> {
-    if exclude.is_empty() && only.is_empty() {
-        return None;
-    }
-
-    let config = NormalizeConfig::load(root);
-    let languages = detect_project_languages(root);
-    let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
-
-    match Filter::new(exclude, only, &config.aliases, &lang_refs) {
-        Ok(f) => {
-            for warning in f.warnings() {
-                eprintln!("warning: {}", warning);
-            }
-            Some(f)
-        }
-        Err(e) => {
-            eprintln!("error: {}", e);
-            None
-        }
-    }
 }
 
 /// Print analysis report in appropriate format

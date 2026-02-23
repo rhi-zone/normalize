@@ -8,9 +8,7 @@ pub mod search;
 pub mod symbol;
 pub mod tree;
 
-use crate::commands::aliases::detect_project_languages;
 use crate::config::NormalizeConfig;
-use crate::filter::Filter;
 use crate::output::OutputFormatter;
 use crate::tree::DocstringDisplay;
 use crate::{daemon, path_resolve};
@@ -294,26 +292,7 @@ pub fn cmd_view(
     daemon::maybe_start_daemon(&root);
 
     // Build filter if exclude/only patterns are specified
-    let filter = if !exclude.is_empty() || !only.is_empty() {
-        let config = NormalizeConfig::load(&root);
-        let languages = detect_project_languages(&root);
-        let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
-
-        match Filter::new(exclude, only, &config.aliases, &lang_refs) {
-            Ok(f) => {
-                for warning in f.warnings() {
-                    eprintln!("warning: {}", warning);
-                }
-                Some(f)
-            }
-            Err(e) => {
-                eprintln!("error: {}", e);
-                return 1;
-            }
-        }
-    } else {
-        None
-    };
+    let filter = super::build_filter(&root, exclude, only);
 
     // If kind filter is specified without target (or with "."), list matching symbols
     if let Some(kind) = kind_filter {

@@ -3,9 +3,7 @@
 //! Named "text-search" to avoid confusion with unix grep. The internal implementation
 //! uses ripgrep, but the command name indicates purpose rather than tool.
 
-use crate::commands::aliases::detect_project_languages;
 use crate::config::NormalizeConfig;
-use crate::filter::Filter;
 use crate::output::{OutputFormat, OutputFormatter};
 use crate::text_search;
 use clap::Args;
@@ -131,26 +129,7 @@ pub fn cmd_text_search(
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Build filter for --exclude and --only
-    let filter = if !exclude.is_empty() || !only.is_empty() {
-        let config = NormalizeConfig::load(&root);
-        let languages = detect_project_languages(&root);
-        let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
-
-        match Filter::new(exclude, only, &config.aliases, &lang_refs) {
-            Ok(f) => {
-                for warning in f.warnings() {
-                    eprintln!("warning: {}", warning);
-                }
-                Some(f)
-            }
-            Err(e) => {
-                eprintln!("error: {}", e);
-                return 1;
-            }
-        }
-    } else {
-        None
-    };
+    let filter = super::build_filter(&root, exclude, only);
 
     match text_search::grep(pattern, &root, filter.as_ref(), limit, ignore_case) {
         Ok(result) => {

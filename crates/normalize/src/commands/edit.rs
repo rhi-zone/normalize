@@ -3,10 +3,8 @@
 use clap::Args;
 use std::path::{Path, PathBuf};
 
-use crate::commands::aliases::detect_project_languages;
 use crate::config::NormalizeConfig;
 use crate::edit::EditorExt;
-use crate::filter::Filter;
 use crate::shadow::{EditInfo, Shadow};
 use crate::{daemon, edit, path_resolve};
 
@@ -321,31 +319,14 @@ pub fn cmd_edit(
     }
 
     // Apply filter if specified
-    if !exclude.is_empty() || !only.is_empty() {
-        let config = NormalizeConfig::load(&root);
-        let languages = detect_project_languages(&root);
-        let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
-
-        let filter = match Filter::new(exclude, only, &config.aliases, &lang_refs) {
-            Ok(f) => {
-                for warning in f.warnings() {
-                    eprintln!("warning: {}", warning);
-                }
-                f
-            }
-            Err(e) => {
-                eprintln!("error: {}", e);
-                return 1;
-            }
-        };
-
-        if !filter.matches(Path::new(&unified.file_path)) {
-            eprintln!(
-                "Target '{}' excluded by filter (resolved to {})",
-                target, unified.file_path
-            );
-            return 1;
-        }
+    if let Some(filter) = super::build_filter(&root, exclude, only)
+        && !filter.matches(Path::new(&unified.file_path))
+    {
+        eprintln!(
+            "Target '{}' excluded by filter (resolved to {})",
+            target, unified.file_path
+        );
+        return 1;
     }
 
     let file_path = root.join(&unified.file_path);
