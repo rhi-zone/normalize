@@ -1,5 +1,14 @@
 # Duplicate Detection: Design Notes
 
+## Status
+
+- [x] `analyze duplicate-functions` — exact function-level hashing (Type 1/2)
+- [x] `analyze duplicate-types` — exact type field overlap
+- [x] `analyze duplicate-blocks` — exact subtree-level hashing with containment suppression
+- [x] `analyze similar-blocks` — fuzzy subtree matching via MinHash LSH
+- [ ] Skeleton mode (`--skeleton`) — structural matching ignoring bodies
+- [ ] Enable `duplicate-blocks` in CI as enforcement (needs `--allow` mechanism)
+
 ## What we have today
 
 `analyze duplicate-functions` and `analyze duplicate-types` both use **exact structural hashing**:
@@ -52,6 +61,28 @@ For subtrees that are *similar but not identical* — a few statements added, a 
 **Practical hybrid:**
 1. Pre-filter with MinHash LSH to find candidate pairs above ~70% similarity
 2. Score/rank candidates with TED for display
+
+### Skeleton mode
+
+The size ratio filter in `similar-blocks` (reject pairs where one block is >2× the size of the other) prevents a false positive class — a small subtree inside a large parent shares most of its shingles just by being a subset. But it creates a false negative: a short `if/match` arm and a long function with the same *control flow shape* get rejected because their line counts differ.
+
+**Skeleton mode** addresses this by serializing a *structural skeleton* instead of the full token sequence: keep control flow nodes (`if`, `match`, `for`, `while`, function calls, `return`) but replace their bodies/blocks with a fixed `<body>` placeholder token, and skip recursing into them.
+
+```
+fn process_items(items) {          fn handle_events(events) {
+    for item in items {                for event in events {
+        if item.valid() {                  if event.active() {
+            do_thing(item);                    dispatch(event);
+        } else {                           } else {
+            log_error(item);                   record(event);
+        }                                  }
+    }                                  }
+}                                  }
+```
+
+Both have the same skeleton: `for { if { call } else { call } }`. With full token serialization their sizes might still match, but with very different bodies (deeply nested vs flat) the shingle overlap would be low. Skeleton mode surfaces the structural pattern regardless.
+
+**Implementation:** a `--skeleton` flag on `serialize_subtree_tokens` that, when a node's kind is a block/body kind (detected by name: `block`, `body`, `statement_block`, etc.), emits `<body>` and skips children. The size ratio filter can be relaxed or removed in skeleton mode since size differences are expected by design.
 
 ## What the real use cases are
 

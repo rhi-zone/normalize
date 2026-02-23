@@ -638,7 +638,8 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
 - [x] `analyze duplicate-blocks`: subtree-level clone detection with containment suppression. See `docs/design/duplicate-detection.md`
-- Fuzzy/partial clone detection: MinHash LSH over AST token shingles to surface near-duplicate subtrees (Type 3 clones — drifted copies). Key use case: refactoring discovery where copies have accumulated small differences. See `docs/design/duplicate-detection.md`. Implement as `--similarity <0.0-1.0>` flag on `duplicate-blocks`.
+- [x] Fuzzy/partial clone detection (`analyze similar-blocks`): MinHash LSH over AST token shingles, 128-dim signatures, 32 bands. Containment + overlap suppression. See `docs/design/duplicate-detection.md`.
+- Skeleton mode (`--skeleton` on `similar-blocks`): serialize structural skeleton only — keep control flow nodes, replace bodies with `<body>` placeholder. Surfaces control-flow-similar code regardless of body size or content. Relaxes/removes size ratio filter. See `docs/design/duplicate-detection.md`.
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `normalize analyze ast`, `normalize analyze query` (authoring tools)
   - [x] Phase 1b: `normalize analyze rules` reads .normalize/rules/*.scm with TOML frontmatter
