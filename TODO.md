@@ -19,12 +19,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - `normalize view` symbol not found: show all candidate symbols with **trigram containment ≥ 0.6** against the query (skip if query < 4 chars). Metric: `|trigrams(query) ∩ trigrams(candidate)| / |trigrams(query)|` — asymmetric by design, measures how much of the query appears in the candidate.
   - Handles prefix typing (`cmd_dup` → all 5 query trigrams appear in `cmd_duplicate_functions_with_count` → 1.0 ✓)
   - Handles interior substrings (`duplicate_functions` → high containment ✓)
-  - Handles light typos (`duplikat_funcs` → ~8/12 = 0.67 ✓)
+  - Handles light typos (`duplikat_funcs` → shared {dup,upl,pli,_fu,fun,unc} = 6/12 = 0.5 ✓; note: `lik/ika/kat` don't match because "duplicate" has `lic/ica/cat` not `lik/ika/kat`, and `at_/t_f` miss because "duplicate" ends `ate_` not `at_`)
   - Why not edit distance: fails on length difference (short query vs long name always scores poorly even if it's a good prefix match)
   - Why not Jaccard: same asymmetry problem — short query vs long name gives tiny union, low score
   - Why not substring: misses any typo
   - Why not word-token prefix: misses inter-token typos, requires exact token boundaries
-  - Threshold 0.6 and min-length 4 control false positives; anything that passes is worth showing since user has no result anyway
+  - Threshold 0.5 and min-length 4; false positives are cheap (suggestions shown only on failure)
 - Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
   - Requires language-specific namespace semantics - low priority
 - Shadow worktree: true shadow-first mode (edit in shadow, then apply)

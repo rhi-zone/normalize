@@ -613,25 +613,68 @@ pub fn cmd_view_symbol(
             }
             0
         } else {
-            // "Did You Mean?" bridge
-            let text_matches: Vec<_> = content.match_indices(symbol_name).collect();
-            if text_matches.is_empty() {
-                eprintln!("Symbol not found: {}", symbol_name);
+            // Suggest close matches via trigram containment.
+            const TRIGRAM_THRESHOLD: f64 = 0.5;
+            const MIN_QUERY_LEN: usize = 4;
+
+            let mut all_names = Vec::new();
+            collect_symbol_names(&skeleton_result.symbols, &mut all_names);
+
+            let suggestions: Vec<&str> = if symbol_name.len() >= MIN_QUERY_LEN {
+                let mut scored: Vec<(&str, f64)> = all_names
+                    .iter()
+                    .map(|n| (n.as_str(), trigram_containment(symbol_name, n)))
+                    .filter(|(_, score)| *score >= TRIGRAM_THRESHOLD)
+                    .collect();
+                scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                scored.into_iter().map(|(n, _)| n).collect()
+            } else {
+                Vec::new()
+            };
+
+            if suggestions.is_empty() {
+                eprintln!("Symbol '{}' not found in {}", symbol_name, file_path);
             } else {
                 eprintln!(
-                    "Symbol '{}' not found in AST. However, the string '{}' appears {} time{}.",
-                    symbol_name,
-                    symbol_name,
-                    text_matches.len(),
-                    if text_matches.len() == 1 { "" } else { "s" }
-                );
-                eprintln!(
-                    "Did you mean: normalize text-search '{}' {}",
+                    "Symbol '{}' not found in {}. Did you mean:",
                     symbol_name, file_path
                 );
+                for name in &suggestions {
+                    eprintln!("  normalize view {}/{}", file_path, name);
+                }
             }
             1
         }
+    }
+}
+
+/// Trigram containment: fraction of query's character trigrams that appear in candidate.
+/// Asymmetric by design — measures how much of the query is "present in" the candidate.
+fn trigram_containment(query: &str, candidate: &str) -> f64 {
+    if query.len() < 3 {
+        return 0.0;
+    }
+    let q = query.to_lowercase();
+    let c = candidate.to_lowercase();
+    let query_trigrams: HashSet<[u8; 3]> = q
+        .as_bytes()
+        .windows(3)
+        .map(|w| [w[0], w[1], w[2]])
+        .collect();
+    let candidate_trigrams: HashSet<[u8; 3]> = c
+        .as_bytes()
+        .windows(3)
+        .map(|w| [w[0], w[1], w[2]])
+        .collect();
+    let matches = query_trigrams.intersection(&candidate_trigrams).count();
+    matches as f64 / query_trigrams.len() as f64
+}
+
+/// Collect all symbol names (flat) from a symbol tree.
+fn collect_symbol_names(symbols: &[normalize_languages::Symbol], out: &mut Vec<String>) {
+    for sym in symbols {
+        out.push(sym.name.clone());
+        collect_symbol_names(&sym.children, out);
     }
 }
 
