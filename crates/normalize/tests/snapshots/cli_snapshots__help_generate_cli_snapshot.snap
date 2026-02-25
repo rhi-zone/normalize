@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 417
 expression: "snapshot_help(&[\"generate\", \"cli-snapshot\"])"
 ---
 Generate CLI snapshot tests for a binary
@@ -13,6 +12,7 @@ Arguments:
 Options:
   -o, --output <OUTPUT>     Output file for the test (stdout if not specified)
       --name <NAME>         Binary name to use in test (defaults to file stem)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

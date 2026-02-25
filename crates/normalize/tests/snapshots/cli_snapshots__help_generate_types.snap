@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 412
 expression: "snapshot_help(&[\"generate\", \"types\"])"
 ---
 Generate types/validators from schema
@@ -51,6 +50,9 @@ Options:
           Package name (for Go)
           
           [default: types]
+
+      --repos <DIR>
+          Run command across all git repos under DIR (1 level deep)
 
       --json
           Output as JSON

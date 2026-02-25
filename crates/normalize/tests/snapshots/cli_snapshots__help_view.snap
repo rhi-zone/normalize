@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 32
 expression: "snapshot_help(&[\"view\"])"
 ---
 View a node in the codebase tree (directory, file, or symbol)
@@ -31,6 +30,7 @@ Options:
       --only <PATTERN>      Include only paths matching pattern or @alias
   -i, --case-insensitive    Case-insensitive symbol matching
       --history [<N>]       Show git history for symbol (last N changes)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

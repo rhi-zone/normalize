@@ -250,13 +250,12 @@ fn apply_complexity(base: f64, max_complexity: Option<usize>) -> f64 {
     }
 }
 
-/// Analyze git history hotspots
-pub fn cmd_hotspots(
+/// Analyze git history hotspots, returning the report.
+pub fn analyze_hotspots(
     root: &Path,
     exclude_patterns: &[String],
     recency: bool,
-    format: &crate::output::OutputFormat,
-) -> i32 {
+) -> Result<HotspotsReport, String> {
     let excludes: Vec<Pattern> = exclude_patterns
         .iter()
         .filter_map(|p| Pattern::new(p).ok())
@@ -264,17 +263,10 @@ pub fn cmd_hotspots(
 
     let git_dir = root.join(".git");
     if !git_dir.exists() {
-        eprintln!("Not a git repository");
-        return 1;
+        return Err("Not a git repository".to_string());
     }
 
-    let file_stats = match parse_git_churn(root) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("{}", e);
-            return 1;
-        }
-    };
+    let file_stats = parse_git_churn(root)?;
 
     // Filter to existing source files, excluding patterns
     let candidate_paths: Vec<String> = file_stats
@@ -322,11 +314,28 @@ pub fn cmd_hotspots(
     hotspots.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
     hotspots.truncate(20);
 
-    let report = HotspotsReport {
+    Ok(HotspotsReport {
         hotspots,
         has_complexity,
         recency_weighted: recency,
-    };
-    report.print(format);
-    0
+    })
+}
+
+/// Analyze git history hotspots (CLI entry point)
+pub fn cmd_hotspots(
+    root: &Path,
+    exclude_patterns: &[String],
+    recency: bool,
+    format: &crate::output::OutputFormat,
+) -> i32 {
+    match analyze_hotspots(root, exclude_patterns, recency) {
+        Ok(report) => {
+            report.print(format);
+            0
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            1
+        }
+    }
 }

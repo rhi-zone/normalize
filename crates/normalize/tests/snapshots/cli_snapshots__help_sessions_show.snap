@@ -22,6 +22,7 @@ Options:
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
       --ngrams <NGRAMS>     Extract common word sequences (ngrams) of length N (2-4)
       --case-insensitive    Case-insensitive ngram matching
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --pretty              Human-friendly output with colors and formatting

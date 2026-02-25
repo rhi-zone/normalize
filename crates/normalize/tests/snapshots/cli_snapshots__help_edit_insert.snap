@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 138
 expression: "snapshot_help(&[\"edit\", \"insert\"])"
 ---
 Insert content relative to target
@@ -40,6 +39,9 @@ Options:
           Message describing the edit (for shadow git history)
           
           [aliases: --reason]
+
+      --repos <DIR>
+          Run command across all git repos under DIR (1 level deep)
 
       --json
           Output as JSON

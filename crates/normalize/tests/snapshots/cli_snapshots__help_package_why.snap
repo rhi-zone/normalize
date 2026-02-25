@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 364
 expression: "snapshot_help(&[\"package\", \"why\"])"
 ---
 Show why a dependency is in the tree
@@ -13,6 +12,7 @@ Arguments:
 Options:
   -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)
   -r, --root <ROOT>            Root directory (defaults to current directory)
+      --repos <DIR>            Run command across all git repos under DIR (1 level deep)
       --json                   Output as JSON
       --jsonl                  Output as JSON Lines (one object per line)
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)

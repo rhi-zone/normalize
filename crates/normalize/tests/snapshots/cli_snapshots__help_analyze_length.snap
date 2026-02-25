@@ -13,6 +13,7 @@ Options:
       --sarif               Output in SARIF format for IDE integration
       --allow <SYMBOL>      Add function to .normalize/length-allow
       --reason <REASON>     Reason for allowing
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
@@ -20,9 +21,9 @@ Options:
       --compact             Compact output without colors (overrides TTY detection)
       --output-schema       Output JSON schema for the command's return type
       --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --exclude <PATTERN>   Exclude paths matching pattern or @alias
+      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
       --only <PATTERN>      Include only paths matching pattern or @alias
       --diff [<BASE>]       Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
   -h, --help                Print help

@@ -72,14 +72,13 @@ fn truncate_path(path: &str, max_len: usize) -> String {
     }
 }
 
-/// Parse git log to get per-commit file sets, then compute co-change pairs
-pub fn cmd_coupling(
+/// Analyze temporal coupling, returning the report.
+pub fn analyze_coupling(
     root: &Path,
     min_commits: usize,
     limit: usize,
     exclude_patterns: &[String],
-    format: &crate::output::OutputFormat,
-) -> i32 {
+) -> Result<CouplingReport, String> {
     let excludes: Vec<Pattern> = exclude_patterns
         .iter()
         .filter_map(|p| Pattern::new(p).ok())
@@ -87,27 +86,19 @@ pub fn cmd_coupling(
 
     let git_dir = root.join(".git");
     if !git_dir.exists() {
-        eprintln!("Not a git repository");
-        return 1;
+        return Err("Not a git repository".to_string());
     }
 
     // Get per-commit file lists using --name-only with commit delimiters
     // Use %x00 (null byte) as delimiter since it can't appear in filenames
-    let output = match std::process::Command::new("git")
+    let output = std::process::Command::new("git")
         .args(["log", "--pretty=format:%x00", "--name-only"])
         .current_dir(root)
         .output()
-    {
-        Ok(o) => o,
-        Err(e) => {
-            eprintln!("Failed to run git log: {}", e);
-            return 1;
-        }
-    };
+        .map_err(|e| format!("Failed to run git log: {}", e))?;
 
     if !output.status.success() {
-        eprintln!("git log failed");
-        return 1;
+        return Err("git log failed".to_string());
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -196,7 +187,25 @@ pub fn cmd_coupling(
     });
     pairs.truncate(limit);
 
-    let report = CouplingReport { pairs };
-    report.print(format);
-    0
+    Ok(CouplingReport { pairs })
+}
+
+/// Parse git log to get per-commit file sets, then compute co-change pairs (CLI entry point)
+pub fn cmd_coupling(
+    root: &Path,
+    min_commits: usize,
+    limit: usize,
+    exclude_patterns: &[String],
+    format: &crate::output::OutputFormat,
+) -> i32 {
+    match analyze_coupling(root, min_commits, limit, exclude_patterns) {
+        Ok(report) => {
+            report.print(format);
+            0
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            1
+        }
+    }
 }

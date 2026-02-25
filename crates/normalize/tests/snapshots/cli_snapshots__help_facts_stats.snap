@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 159
 expression: "snapshot_help(&[\"facts\", \"stats\"])"
 ---
 Show index statistics (DB size vs codebase size)
@@ -10,6 +9,7 @@ Usage: normalize facts stats [OPTIONS]
 Options:
       --storage             Show storage usage for index and caches
   -r, --root <ROOT>         Root directory (defaults to current directory)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

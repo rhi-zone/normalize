@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 154
 expression: "snapshot_help(&[\"facts\", \"rebuild\"])"
 ---
 Rebuild the file index
@@ -21,6 +20,9 @@ Options:
 
   -r, --root <ROOT>
           Root directory (defaults to current directory)
+
+      --repos <DIR>
+          Run command across all git repos under DIR (1 level deep)
 
       --json
           Output as JSON

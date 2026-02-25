@@ -22,6 +22,9 @@ Options:
   -C, --context <CONTEXT>
           Lines of context to show in preview
 
+      --repos <DIR>
+          Run command across all git repos under DIR (1 level deep)
+
       --json
           Output as JSON
 
@@ -43,14 +46,14 @@ Options:
       --input-schema
           Output JSON schema for the command's input arguments
 
-      --params-json <JSON>
-          Pass command arguments as JSON (overrides CLI args)
-
   -r, --root <ROOT>
           Root directory (defaults to current directory)
 
       --exclude <PATTERN>
           Exclude paths matching pattern or @alias
+
+      --params-json <JSON>
+          Pass command arguments as JSON (overrides CLI args)
 
       --only <PATTERN>
           Include only paths matching pattern or @alias

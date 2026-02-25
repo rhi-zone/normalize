@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 211
 expression: "snapshot_help(&[\"grammars\", \"list\"])"
 ---
 List installed grammars
@@ -8,6 +7,7 @@ List installed grammars
 Usage: normalize grammars list [OPTIONS]
 
 Options:
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

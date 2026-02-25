@@ -132,7 +132,7 @@ impl AnalyzeConfig {
 }
 
 /// Load patterns from a .normalize allow file (e.g., hotspots-allow, large-files-allow)
-fn load_allow_file(root: &Path, filename: &str) -> Vec<String> {
+pub fn load_allow_file(root: &Path, filename: &str) -> Vec<String> {
     let path = root.join(".normalize").join(filename);
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,

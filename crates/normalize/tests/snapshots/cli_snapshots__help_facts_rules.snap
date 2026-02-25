@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 174
 expression: "snapshot_help(&[\"facts\", \"rules\"])"
 ---
 Run compiled rule packs (dylibs) against extracted facts
@@ -12,6 +11,7 @@ Options:
       --pack <PACK>         Path to a specific rule pack dylib
       --list                List available rules instead of running them
   -r, --root <ROOT>         Root directory (defaults to current directory)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

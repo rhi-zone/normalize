@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 190
 expression: "snapshot_help(&[\"daemon\", \"run\"])"
 ---
 Run the daemon in foreground (for debugging)
@@ -8,6 +7,7 @@ Run the daemon in foreground (for debugging)
 Usage: normalize daemon run [OPTIONS]
 
 Options:
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

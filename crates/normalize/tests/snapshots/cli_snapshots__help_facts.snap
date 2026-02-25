@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 47
 expression: "snapshot_help(&[\"facts\"])"
 ---
 Manage code facts (file index, symbols, calls, imports)
@@ -18,6 +17,7 @@ Commands:
 
 Options:
   -r, --root <ROOT>         Root directory (defaults to current directory)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

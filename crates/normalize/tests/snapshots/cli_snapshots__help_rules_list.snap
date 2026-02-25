@@ -14,6 +14,7 @@ Options:
       --disabled            Filter to disabled rules only
       --no-desc             Hide the description line (compact one-line-per-rule output)
   -r, --root <ROOT>         Root directory (defaults to current directory)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

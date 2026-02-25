@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 42
 expression: "snapshot_help(&[\"history\"])"
 ---
 View shadow git edit history
@@ -17,6 +16,7 @@ Options:
       --diff <REF>          Show diff for a specific commit
   -n, --limit <LIMIT>       Maximum number of entries to show [default: 20]
       --prune <KEEP>        Prune shadow history, keeping only the last N commits
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

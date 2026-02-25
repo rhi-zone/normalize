@@ -17,6 +17,7 @@ Options:
   -r, --root <ROOT>         Root directory (defaults to current directory)
       --format <FORMAT>     Force specific format: claude, codex, gemini, normalize
   -l, --limit <LIMIT>       Limit number of sessions [default: 20]
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

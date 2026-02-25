@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 200
 expression: "snapshot_help(&[\"daemon\", \"remove\"])"
 ---
 Remove a root from watching
@@ -11,6 +10,7 @@ Arguments:
   [PATH]  Path to the project root [default: .]
 
 Options:
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

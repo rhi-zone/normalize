@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 62
 expression: "snapshot_help(&[\"update\"])"
 ---
 Check for and install updates
@@ -9,6 +8,7 @@ Usage: normalize update [OPTIONS]
 
 Options:
   -c, --check               Check for updates without installing
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

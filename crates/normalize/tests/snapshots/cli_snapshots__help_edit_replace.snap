@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 128
 expression: "snapshot_help(&[\"edit\", \"replace\"])"
 ---
 Replace target with new content
@@ -17,6 +16,7 @@ Options:
       --only <ONLY>         Only include files matching patterns or aliases
       --multiple            Allow glob patterns to match multiple symbols
   -m, --message <MESSAGE>   Message describing the edit (for shadow git history) [aliases: --reason]
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

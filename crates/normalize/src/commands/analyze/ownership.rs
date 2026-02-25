@@ -148,13 +148,12 @@ fn git_tracked_files(root: &Path) -> Vec<String> {
     }
 }
 
-/// Analyze file ownership via git blame
-pub fn cmd_ownership(
+/// Analyze file ownership via git blame, returning the report.
+pub fn analyze_ownership(
     root: &Path,
     limit: usize,
     exclude_patterns: &[String],
-    format: &crate::output::OutputFormat,
-) -> i32 {
+) -> Result<OwnershipReport, String> {
     let excludes: Vec<Pattern> = exclude_patterns
         .iter()
         .filter_map(|p| Pattern::new(p).ok())
@@ -162,8 +161,7 @@ pub fn cmd_ownership(
 
     let git_dir = root.join(".git");
     if !git_dir.exists() {
-        eprintln!("Not a git repository");
-        return 1;
+        return Err("Not a git repository".to_string());
     }
 
     let tracked = git_tracked_files(root);
@@ -194,7 +192,24 @@ pub fn cmd_ownership(
     });
     files.truncate(limit);
 
-    let report = OwnershipReport { files };
-    report.print(format);
-    0
+    Ok(OwnershipReport { files })
+}
+
+/// Analyze file ownership via git blame (CLI entry point)
+pub fn cmd_ownership(
+    root: &Path,
+    limit: usize,
+    exclude_patterns: &[String],
+    format: &crate::output::OutputFormat,
+) -> i32 {
+    match analyze_ownership(root, limit, exclude_patterns) {
+        Ok(report) => {
+            report.print(format);
+            0
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            1
+        }
+    }
 }

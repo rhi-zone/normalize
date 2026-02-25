@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 385
 expression: "snapshot_help(&[\"tools\", \"test\"])"
 ---
 Run native test runners (cargo test, go test, bun test, etc.)
@@ -18,6 +17,7 @@ Arguments:
 Options:
   -r, --root <ROOT>         Root directory (defaults to current directory)
   -R, --runner <RUNNER>     Specific test runner to use (cargo, go, bun, npm, pytest)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

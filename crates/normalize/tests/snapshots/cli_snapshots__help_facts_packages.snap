@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 169
 expression: "snapshot_help(&[\"facts\", \"packages\"])"
 ---
 Index external packages (stdlib, site-packages) into global cache
@@ -11,6 +10,7 @@ Options:
       --only <ONLY>         Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available
       --clear               Clear existing index before re-indexing
   -r, --root <ROOT>         Root directory (defaults to current directory)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

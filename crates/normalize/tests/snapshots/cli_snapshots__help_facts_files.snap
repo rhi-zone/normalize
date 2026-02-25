@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 164
 expression: "snapshot_help(&[\"facts\", \"files\"])"
 ---
 List indexed files (with optional prefix filter)
@@ -13,6 +12,7 @@ Arguments:
 Options:
   -l, --limit <LIMIT>       Maximum number of files to show [default: 100]
   -r, --root <ROOT>         Root directory (defaults to current directory)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

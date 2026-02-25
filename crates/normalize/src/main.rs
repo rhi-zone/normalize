@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use normalize::commands;
 use normalize::commands::aliases::AliasesArgs;
 use normalize::commands::analyze::AnalyzeArgs;
+use normalize::commands::analyze::AnalyzeCommand;
 use normalize::commands::context::ContextArgs;
 use normalize::commands::edit::EditArgs;
 use normalize::commands::generate::GenerateArgs;
@@ -15,6 +16,7 @@ use normalize::commands::text_search::TextSearchArgs;
 use normalize::commands::tools::ToolsAction;
 use normalize::commands::translate::TranslateArgs;
 use normalize::commands::view::ViewArgs;
+use normalize::output::OutputFormatter;
 use normalize::serve::{self, ServeArgs};
 
 #[derive(Parser)]
@@ -23,6 +25,10 @@ use normalize::serve::{self, ServeArgs};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    /// Run command across all git repos under DIR (1 level deep)
+    #[arg(long, global = true, value_name = "DIR")]
+    repos: Option<PathBuf>,
 
     /// Output as JSON
     #[arg(long, global = true)]
@@ -254,6 +260,12 @@ fn main() {
         &config.pretty,
     );
 
+    // Multi-repo dispatch: run supported commands across all repos under --repos DIR
+    if let Some(ref repos_dir) = cli.repos {
+        let exit_code = run_multi_repo(repos_dir, &cli, &format);
+        std::process::exit(exit_code);
+    }
+
     let exit_code = match cli.command {
         Commands::View(args) => commands::view::run(
             args,
@@ -348,4 +360,81 @@ fn main() {
     };
 
     std::process::exit(exit_code);
+}
+
+/// Run a supported command across all repos under `repos_dir`.
+fn run_multi_repo(repos_dir: &Path, cli: &Cli, format: &normalize::output::OutputFormat) -> i32 {
+    use normalize::multi_repo::{MultiRepoReport, discover_repos};
+
+    let repos = match discover_repos(repos_dir) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("{}", e);
+            return 1;
+        }
+    };
+
+    if repos.is_empty() {
+        eprintln!("No git repositories found under {}", repos_dir.display());
+        return 0;
+    }
+
+    match &cli.command {
+        Commands::Analyze(args) => match &args.command {
+            Some(AnalyzeCommand::Hotspots {
+                recency,
+                allow: None,
+                ..
+            }) => {
+                let recency = *recency;
+                let report = MultiRepoReport::run(&repos, |root| {
+                    let config = normalize::config::NormalizeConfig::load(root);
+                    let mut excludes = config.analyze.hotspots_exclude.clone();
+                    excludes.extend(commands::analyze::load_allow_file(root, "hotspots-allow"));
+                    commands::analyze::hotspots::analyze_hotspots(root, &excludes, recency)
+                });
+                let has_errors = report.has_errors();
+                report.print(format);
+                i32::from(has_errors)
+            }
+            Some(AnalyzeCommand::Ownership { limit }) => {
+                let limit = *limit;
+                let exclude = args.exclude.clone();
+                let report = MultiRepoReport::run(&repos, |root| {
+                    commands::analyze::ownership::analyze_ownership(root, limit, &exclude)
+                });
+                let has_errors = report.has_errors();
+                report.print(format);
+                i32::from(has_errors)
+            }
+            Some(AnalyzeCommand::Coupling { min_commits, limit }) => {
+                let min_commits = *min_commits;
+                let limit = *limit;
+                let exclude = args.exclude.clone();
+                let report = MultiRepoReport::run(&repos, |root| {
+                    commands::analyze::coupling::analyze_coupling(
+                        root,
+                        min_commits,
+                        limit,
+                        &exclude,
+                    )
+                });
+                let has_errors = report.has_errors();
+                report.print(format);
+                i32::from(has_errors)
+            }
+            _ => {
+                eprintln!(
+                    "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling"
+                );
+                1
+            }
+        },
+        _ => {
+            eprintln!(
+                "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling"
+            );
+            1
+        }
+    }
 }

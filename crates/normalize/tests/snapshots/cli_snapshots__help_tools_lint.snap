@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 380
 expression: "snapshot_help(&[\"tools\", \"lint\"])"
 ---
 Run linters, formatters, and type checkers
@@ -22,6 +21,7 @@ Options:
   -c, --category <CATEGORY>  Filter by category: lint, fmt, type
       --sarif                Output in SARIF format
   -w, --watch                Watch for file changes and re-run on save
+      --repos <DIR>          Run command across all git repos under DIR (1 level deep)
       --json                 Output as JSON
       --jsonl                Output as JSON Lines (one object per line)
       --jq <EXPR>            Filter JSON output with jq expression (implies --json)

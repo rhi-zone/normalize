@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 102
 expression: "snapshot_help(&[\"tools\"])"
 ---
 External ecosystem tools (linters, formatters, test runners)
@@ -14,6 +13,7 @@ Commands:
 
 Options:
   -r, --root <ROOT>         Root directory (defaults to current directory)
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

@@ -8,6 +8,7 @@ Usage: normalize init [OPTIONS]
 
 Options:
       --index               Index the codebase after initialization
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)

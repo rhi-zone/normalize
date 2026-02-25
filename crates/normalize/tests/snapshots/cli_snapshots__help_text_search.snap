@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 87
 expression: "snapshot_help(&[\"text-search\"])"
 ---
 Search for text patterns in files (fast ripgrep-based search)
@@ -16,6 +15,7 @@ Options:
   -i, --ignore-case         Case-insensitive search
       --exclude <EXCLUDE>   Exclude files matching patterns or aliases
       --only <ONLY>         Only include files matching patterns or aliases
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
