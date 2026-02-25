@@ -1716,11 +1716,30 @@ pub fn extract_tool_patterns(chains: &[ToolChain]) -> Vec<ToolPattern> {
 pub fn analyze_session(session: &Session) -> SessionAnalysis {
     let mut analysis = SessionAnalysis::new(session.path.clone(), &session.format);
 
-    // Count message types by role
+    // Count message types by role, splitting user messages into human vs tool_result
     for turn in &session.turns {
         for msg in &turn.messages {
             let role_str = msg.role.to_string();
             *analysis.message_counts.entry(role_str).or_insert(0) += 1;
+
+            // Break down user messages: human text vs tool results
+            if msg.role == normalize_chat_sessions::Role::User {
+                let has_tool_result = msg
+                    .content
+                    .iter()
+                    .any(|b| matches!(b, normalize_chat_sessions::ContentBlock::ToolResult { .. }));
+                if has_tool_result {
+                    *analysis
+                        .message_counts
+                        .entry("tool_result".to_string())
+                        .or_insert(0) += 1;
+                } else {
+                    *analysis
+                        .message_counts
+                        .entry("human".to_string())
+                        .or_insert(0) += 1;
+                }
+            }
         }
     }
 
