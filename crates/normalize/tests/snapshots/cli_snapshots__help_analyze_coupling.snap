@@ -1,18 +1,14 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"analyze\", \"duplicate-types\"])"
+expression: "snapshot_help(&[\"analyze\", \"coupling\"])"
 ---
-Detect duplicate type definitions
+Find files that frequently change together (temporal coupling)
 
-Usage: normalize analyze duplicate-types [OPTIONS] [TARGET]
-
-Arguments:
-  [TARGET]  Target directory to scan
+Usage: normalize analyze coupling [OPTIONS]
 
 Options:
-      --min-overlap <MIN_OVERLAP>  Minimum field overlap percentage (default: 70) [default: 70]
-      --allow <TYPE1> <TYPE2>      Allow a duplicate type pair (add to .normalize/duplicate-types-allow)
-      --reason <REASON>            Reason for allowing
+      --min-commits <MIN_COMMITS>  Minimum number of shared commits to report a pair [default: 3]
+      --limit <LIMIT>              Maximum number of pairs to show [default: 20]
       --json                       Output as JSON
       --jsonl                      Output as JSON Lines (one object per line)
       --jq <EXPR>                  Filter JSON output with jq expression (implies --json)

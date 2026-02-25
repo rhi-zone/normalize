@@ -8,6 +8,18 @@ fn default_true() -> bool {
     true
 }
 
+fn default_min_coupling() -> usize {
+    3
+}
+
+fn default_coupling_limit() -> usize {
+    20
+}
+
+fn default_ownership_limit() -> usize {
+    20
+}
+
 /// Analyze command arguments.
 #[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct AnalyzeArgs {
@@ -178,6 +190,32 @@ pub enum AnalyzeCommand {
         /// Reason for allowing
         #[arg(long)]
         reason: Option<String>,
+
+        /// Weight recent changes higher (exponential decay, 180-day half-life)
+        #[arg(long)]
+        #[serde(default)]
+        recency: bool,
+    },
+
+    /// Find files that frequently change together (temporal coupling)
+    Coupling {
+        /// Minimum number of shared commits to report a pair
+        #[arg(long, default_value = "3")]
+        #[serde(default = "default_min_coupling")]
+        min_commits: usize,
+
+        /// Maximum number of pairs to show
+        #[arg(long, default_value = "20")]
+        #[serde(default = "default_coupling_limit")]
+        limit: usize,
+    },
+
+    /// Show per-file ownership concentration from git blame
+    Ownership {
+        /// Maximum number of files to show
+        #[arg(long, default_value = "20")]
+        #[serde(default = "default_ownership_limit")]
+        limit: usize,
     },
 
     /// Check documentation references for broken links

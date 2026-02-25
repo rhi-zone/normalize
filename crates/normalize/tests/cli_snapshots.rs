@@ -283,6 +283,16 @@ fn test_help_analyze_hotspots() {
 }
 
 #[test]
+fn test_help_analyze_coupling() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "coupling"]));
+}
+
+#[test]
+fn test_help_analyze_ownership() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "ownership"]));
+}
+
+#[test]
 fn test_help_analyze_check_refs() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "check-refs"]));
 }

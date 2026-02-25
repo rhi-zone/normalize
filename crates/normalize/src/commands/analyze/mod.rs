@@ -7,11 +7,13 @@ pub mod call_graph;
 pub mod check_examples;
 pub mod check_refs;
 pub mod complexity;
+pub mod coupling;
 pub mod docs;
 pub mod duplicates;
 pub mod files;
 pub mod hotspots;
 pub mod length;
+pub mod ownership;
 pub mod query;
 pub mod report;
 pub mod rules_cmd;
@@ -270,6 +272,12 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::Hotspots { .. }) => {
             crate::output::print_output_schema::<hotspots::HotspotsReport>();
+        }
+        Some(AnalyzeCommand::Coupling { .. }) => {
+            crate::output::print_output_schema::<coupling::CouplingReport>();
+        }
+        Some(AnalyzeCommand::Ownership { .. }) => {
+            crate::output::print_output_schema::<ownership::OwnershipReport>();
         }
         Some(AnalyzeCommand::Architecture) => {
             crate::output::print_output_schema::<architecture::ArchitectureReport>();
@@ -631,7 +639,11 @@ pub fn run(
             &format,
         ),
 
-        Some(AnalyzeCommand::Hotspots { allow, reason }) => {
+        Some(AnalyzeCommand::Hotspots {
+            allow,
+            reason,
+            recency,
+        }) => {
             if let Some(pattern) = allow {
                 append_to_allow_file(
                     &effective_root,
@@ -642,8 +654,16 @@ pub fn run(
             } else {
                 let mut excludes = config.analyze.hotspots_exclude.clone();
                 excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
-                hotspots::cmd_hotspots(&effective_root, &excludes, &format)
+                hotspots::cmd_hotspots(&effective_root, &excludes, recency, &format)
             }
+        }
+
+        Some(AnalyzeCommand::Coupling { min_commits, limit }) => {
+            coupling::cmd_coupling(&effective_root, min_commits, limit, &args.exclude, &format)
+        }
+
+        Some(AnalyzeCommand::Ownership { limit }) => {
+            ownership::cmd_ownership(&effective_root, limit, &args.exclude, &format)
         }
 
         Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, &format),
@@ -1138,7 +1158,7 @@ fn run_all_passes(
     let config = NormalizeConfig::load(root);
     let mut hotspot_excludes = config.analyze.hotspots_exclude.clone();
     hotspot_excludes.extend(load_allow_file(root, "hotspots-allow"));
-    let hotspots_result = hotspots::cmd_hotspots(root, &hotspot_excludes, format);
+    let hotspots_result = hotspots::cmd_hotspots(root, &hotspot_excludes, false, format);
     if hotspots_result != 0 {
         exit_code = hotspots_result;
     }

@@ -15,6 +15,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Auto-fix support: `normalize analyze rules --fix` with fix templates
 - [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
 
+## Next Up
+
+### Git Analysis Enhancements (`analyze hotspots`)
+
+Current `analyze hotspots` is file-level churn only (`commits × √churn`). Enhance with:
+
+- [ ] **Hotspot × complexity**: weight churn by cyclomatic complexity from index (plumbing exists, index opened but unused). Score: `commits × √churn × log(complexity)`. Most impactful — high-churn AND high-complexity files are the riskiest.
+- [ ] **Temporal coupling**: files that change together in the same commits (co-change analysis). Output: pairs/clusters with co-change frequency and support count. Classic "Your Code as a Crime Scene" insight.
+- [ ] **Blame hotspots**: ownership concentration per file via `git blame`. Bus factor (files with single author owning >80%), recently-authored code density, author distribution.
+- [ ] **Recency weighting**: weight recent commits higher (exponential decay). Currently all commits are equal — a file that churned 2 years ago scores the same as one churning now.
+
 ## Remaining Work
 - `normalize view` symbol not found: show all candidate symbols with **trigram containment ≥ 0.6** against the query (skip if query < 4 chars). Metric: `|trigrams(query) ∩ trigrams(candidate)| / |trigrams(query)|` — asymmetric by design, measures how much of the query appears in the candidate.
   - Handles prefix typing (`cmd_dup` → all 5 query trigrams appear in `cmd_duplicate_functions_with_count` → 1.0 ✓)

@@ -1,15 +1,13 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"analyze\", \"health\"])"
+expression: "snapshot_help(&[\"analyze\", \"ownership\"])"
 ---
-Run health analysis (file counts, complexity stats, large file warnings)
+Show per-file ownership concentration from git blame
 
-Usage: normalize analyze health [OPTIONS] [TARGET]
-
-Arguments:
-  [TARGET]  Target file or directory
+Usage: normalize analyze ownership [OPTIONS]
 
 Options:
+      --limit <LIMIT>       Maximum number of files to show [default: 20]
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
