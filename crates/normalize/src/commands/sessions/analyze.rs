@@ -42,6 +42,20 @@ pub fn cmd_sessions_analyze_multi(
     format: Option<&str>,
     output_format: &OutputFormat,
 ) -> i32 {
+    match aggregate_sessions(paths, format) {
+        Some(aggregate) => {
+            aggregate.print(output_format);
+            0
+        }
+        None => {
+            eprintln!("No sessions could be analyzed");
+            1
+        }
+    }
+}
+
+/// Aggregate multiple sessions into a single analysis. Returns None if no sessions could be parsed.
+pub fn aggregate_sessions(paths: &[PathBuf], format: Option<&str>) -> Option<SessionAnalysis> {
     let mut aggregate = SessionAnalysis::new(PathBuf::from("."), "aggregate");
     let mut session_count = 0;
     let mut all_chains = Vec::new();
@@ -168,8 +182,7 @@ pub fn cmd_sessions_analyze_multi(
     }
 
     if session_count == 0 {
-        eprintln!("No sessions could be analyzed");
-        return 1;
+        return None;
     }
 
     // Sort aggregated command stats and details
@@ -198,9 +211,7 @@ pub fn cmd_sessions_analyze_multi(
     // Update format to show aggregate info
     aggregate.format = format!("aggregate ({} sessions)", session_count);
 
-    aggregate.print(output_format);
-
-    0
+    Some(aggregate)
 }
 
 /// Apply jq filter to each line of a JSONL file.

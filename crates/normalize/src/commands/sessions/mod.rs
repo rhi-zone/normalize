@@ -274,10 +274,10 @@ pub enum SessionsCommand {
         #[serde(default)]
         all_projects: bool,
 
-        /// Group statistics by repository
-        #[arg(long)]
+        /// Group statistics by dimension (comma-separated: project, day)
+        #[arg(long, value_delimiter = ',')]
         #[serde(default)]
-        by_repo: bool,
+        group_by: Vec<String>,
     },
 
     /// Start web server for viewing sessions
@@ -410,7 +410,7 @@ pub fn run(
             until,
             project,
             all_projects,
-            by_repo,
+            group_by,
         }) => cmd_sessions_stats(
             args.root.as_deref(),
             args.limit,
@@ -421,7 +421,7 @@ pub fn run(
             until.as_deref(),
             project.as_deref(),
             all_projects,
-            by_repo,
+            &group_by,
             output_format,
         ),
 

@@ -1,8 +1,12 @@
 //! Aggregate statistics across sessions.
 
-use super::{analyze::cmd_sessions_analyze_multi, session_matches_grep};
+use super::{
+    analyze::{aggregate_sessions, cmd_sessions_analyze_multi},
+    session_matches_grep,
+};
 use crate::output::OutputFormat;
 use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -17,7 +21,6 @@ pub(crate) fn parse_date(s: &str) -> Option<SystemTime> {
     let day: u32 = parts[2].parse().ok()?;
 
     // Convert to days since Unix epoch (rough calculation)
-    // This is approximate but good enough for filtering
     let days_since_epoch = (year - 1970) as i64 * 365
         + (year - 1970) as i64 / 4 // leap years approx
         + match month {
@@ -57,7 +60,7 @@ pub fn cmd_sessions_stats(
     until: Option<&str>,
     project_filter: Option<&Path>,
     all_projects: bool,
-    by_repo: bool,
+    group_by: &[String],
     output_format: &OutputFormat,
 ) -> i32 {
     let json = output_format.is_json();
@@ -75,6 +78,16 @@ pub fn cmd_sessions_stats(
         None => registry.get("claude").unwrap(),
     };
 
+    // Validate group_by values
+    let group_project = group_by.iter().any(|g| g == "project");
+    let group_day = group_by.iter().any(|g| g == "day");
+    for g in group_by {
+        if g != "project" && g != "day" {
+            eprintln!("Unknown --group-by value: {} (valid: project, day)", g);
+            return 1;
+        }
+    }
+
     // Compile grep pattern if provided
     let grep_re = grep.and_then(|p| regex::Regex::new(p).ok());
     if grep.is_some() && grep_re.is_none() {
@@ -84,7 +97,6 @@ pub fn cmd_sessions_stats(
 
     // Get sessions from format
     let mut sessions: Vec<SessionFile> = if all_projects {
-        // List sessions from all projects in ~/.claude/projects/
         list_all_project_sessions(format)
     } else {
         let project = if let Some(p) = project_filter {
@@ -114,7 +126,7 @@ pub fn cmd_sessions_stats(
 
     let until_time = if let Some(u) = until {
         match parse_date(u) {
-            Some(t) => Some(t + Duration::from_secs(86400)), // Include the entire day
+            Some(t) => Some(t + Duration::from_secs(86400)),
             None => {
                 eprintln!("Invalid date format: {} (use YYYY-MM-DD)", u);
                 return 1;
@@ -183,12 +195,18 @@ pub fn cmd_sessions_stats(
         );
     }
 
-    // Group by repo if requested
-    if by_repo {
-        return cmd_sessions_stats_by_repo(&sessions, format_name, output_format);
+    // Group and analyze
+    if group_project || group_day {
+        return cmd_sessions_stats_grouped(
+            &sessions,
+            group_project,
+            group_day,
+            format_name,
+            output_format,
+        );
     }
 
-    // Collect paths and analyze
+    // No grouping — analyze all together
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
     cmd_sessions_analyze_multi(&paths, format_name, output_format)
 }
@@ -214,18 +232,15 @@ pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFi
                 continue;
             }
 
-            // List JSONL files in this project directory
             if let Ok(files) = std::fs::read_dir(&proj_dir) {
                 for file in files.filter_map(|f| f.ok()) {
                     let path = file.path();
                     if path.extension().and_then(|e| e.to_str()) == Some("jsonl")
                         && let Ok(meta) = path.metadata()
                         && let Ok(mtime) = meta.modified()
+                        && format.detect(&path) > 0.5
                     {
-                        // Use format's detect to verify it's the right format
-                        if format.detect(&path) > 0.5 {
-                            all_sessions.push(SessionFile { path, mtime });
-                        }
+                        all_sessions.push(SessionFile { path, mtime });
                     }
                 }
             }
@@ -235,11 +250,24 @@ pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFi
     all_sessions
 }
 
+/// Build a group key for a session based on active grouping dimensions.
+fn group_key(session: &SessionFile, by_project: bool, by_day: bool) -> String {
+    let mut parts = Vec::new();
+
+    if by_project {
+        parts.push(extract_repo_name(&session.path));
+    }
+
+    if by_day {
+        parts.push(extract_day(&session.mtime));
+    }
+
+    parts.join("/")
+}
+
 /// Extract repository name from session path.
 /// For paths like ~/.claude/projects/-home-me-git-normalize/session.jsonl, returns "normalize"
-/// For other paths, returns the parent directory name.
 fn extract_repo_name(path: &Path) -> String {
-    // Try to find .claude/projects/ in the path
     let path_str = path.to_string_lossy();
 
     if let Some(projects_idx) = path_str.find(".claude/projects/") {
@@ -247,8 +275,7 @@ fn extract_repo_name(path: &Path) -> String {
         if let Some(slash_idx) = after_projects.find('/') {
             let proj_dir = &after_projects[..slash_idx];
 
-            // Clean up the project directory name
-            // -home-me-git-normalize -> normalize
+            // Clean up: -home-me-git-normalize -> normalize
             if let Some(last_dash) = proj_dir.rfind('-') {
                 return proj_dir[last_dash + 1..].to_string();
             }
@@ -256,7 +283,6 @@ fn extract_repo_name(path: &Path) -> String {
         }
     }
 
-    // Fallback: use parent directory name
     path.parent()
         .and_then(|p| p.file_name())
         .and_then(|n| n.to_str())
@@ -264,45 +290,121 @@ fn extract_repo_name(path: &Path) -> String {
         .to_string()
 }
 
-/// Show statistics grouped by repository.
-fn cmd_sessions_stats_by_repo(
+/// Extract day string (YYYY-MM-DD) from a SystemTime.
+fn extract_day(mtime: &SystemTime) -> String {
+    let secs = mtime
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    // Convert Unix timestamp to date components
+    let days = secs / 86400;
+    // Simplified date calculation (accurate enough for display)
+    let mut y = 1970i64;
+    let mut remaining = days as i64;
+
+    loop {
+        let year_days = if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) {
+            366
+        } else {
+            365
+        };
+        if remaining < year_days {
+            break;
+        }
+        remaining -= year_days;
+        y += 1;
+    }
+
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let month_days = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+
+    let mut m = 0usize;
+    for (i, &md) in month_days.iter().enumerate() {
+        if remaining < md as i64 {
+            m = i;
+            break;
+        }
+        remaining -= md as i64;
+    }
+
+    format!("{:04}-{:02}-{:02}", y, m + 1, remaining + 1)
+}
+
+/// Show statistics grouped by one or more dimensions.
+fn cmd_sessions_stats_grouped(
     sessions: &[SessionFile],
+    by_project: bool,
+    by_day: bool,
     format_name: Option<&str>,
     output_format: &OutputFormat,
 ) -> i32 {
     let json = output_format.is_json();
-    use std::collections::HashMap;
 
-    // Group sessions by repository
-    let mut by_repo: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    // Group sessions
+    let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for session in sessions {
-        let repo = extract_repo_name(&session.path);
-        by_repo.entry(repo).or_default().push(session.path.clone());
+        let key = group_key(session, by_project, by_day);
+        groups.entry(key).or_default().push(session.path.clone());
     }
 
-    // Sort repos by name for consistent output
-    let mut repos: Vec<_> = by_repo.into_iter().collect();
-    repos.sort_by(|a, b| a.0.cmp(&b.0));
+    // Sort groups: by day descending if day grouping, otherwise alphabetically
+    let mut sorted: Vec<_> = groups.into_iter().collect();
+    if by_day && !by_project {
+        sorted.sort_by(|a, b| b.0.cmp(&a.0));
+    } else {
+        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+    }
 
     if json {
-        // For JSON output, analyze each repo and collect results
-        // This would need a more sophisticated structure - defer for now
-        eprintln!("JSON output not yet supported for --by-repo");
-        return 1;
+        // JSON: object keyed by group name, each value is the analysis result
+        let mut results: Vec<String> = Vec::new();
+        for (key, paths) in &sorted {
+            // Capture the analysis output
+            let analysis = analyze_paths_to_json(paths, format_name);
+            results.push(format!(
+                "{}:{}",
+                serde_json::to_string(key).unwrap_or_default(),
+                analysis
+            ));
+        }
+        println!("{{{}}}", results.join(","));
+        return 0;
     }
 
-    // Analyze each repository separately
-    for (repo_name, paths) in repos {
-        println!("=== {} ({} sessions) ===\n", repo_name, paths.len());
+    // Text output: header per group
+    for (key, paths) in sorted {
+        println!("=== {} ({} sessions) ===\n", key, paths.len());
 
         let result = cmd_sessions_analyze_multi(&paths, format_name, output_format);
         if result != 0 {
-            eprintln!("Failed to analyze sessions for {}", repo_name);
+            eprintln!("Failed to analyze sessions for {}", key);
             return result;
         }
 
-        println!("\n");
+        println!();
     }
 
     0
+}
+
+/// Run analysis on paths and return JSON string.
+fn analyze_paths_to_json(paths: &[PathBuf], format_name: Option<&str>) -> String {
+    match aggregate_sessions(paths, format_name) {
+        Some(analysis) => serde_json::to_string(&analysis).unwrap_or_else(|_| "{}".to_string()),
+        None => "{}".to_string(),
+    }
 }
