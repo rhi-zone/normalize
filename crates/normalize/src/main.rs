@@ -423,16 +423,28 @@ fn run_multi_repo(repos_dir: &Path, cli: &Cli, format: &normalize::output::Outpu
                 report.print(format);
                 i32::from(has_errors)
             }
+            Some(AnalyzeCommand::Contributors) => {
+                match commands::analyze::contributors::analyze_contributors(&repos) {
+                    Ok(report) => {
+                        report.print(format);
+                        0
+                    }
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        1
+                    }
+                }
+            }
             _ => {
                 eprintln!(
-                    "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling"
+                    "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling, analyze contributors"
                 );
                 1
             }
         },
         _ => {
             eprintln!(
-                "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling"
+                "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling, analyze contributors"
             );
             1
         }

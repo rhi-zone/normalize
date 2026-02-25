@@ -7,6 +7,7 @@ pub mod call_graph;
 pub mod check_examples;
 pub mod check_refs;
 pub mod complexity;
+pub mod contributors;
 pub mod coupling;
 pub mod docs;
 pub mod duplicates;
@@ -281,6 +282,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::Architecture) => {
             crate::output::print_output_schema::<architecture::ArchitectureReport>();
+        }
+        Some(AnalyzeCommand::Contributors) => {
+            crate::output::print_output_schema::<contributors::ContributorsReport>();
         }
         Some(AnalyzeCommand::CheckRefs) => {
             crate::output::print_output_schema::<check_refs::CheckRefsReport>();
@@ -664,6 +668,11 @@ pub fn run(
 
         Some(AnalyzeCommand::Ownership { limit }) => {
             ownership::cmd_ownership(&effective_root, limit, &args.exclude, &format)
+        }
+
+        Some(AnalyzeCommand::Contributors) => {
+            eprintln!("error: analyze contributors requires --repos <DIR>");
+            1
         }
 
         Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, &format),

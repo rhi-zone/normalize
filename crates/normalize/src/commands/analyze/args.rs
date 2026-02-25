@@ -218,6 +218,9 @@ pub enum AnalyzeCommand {
         limit: usize,
     },
 
+    /// Analyze contributors across repos (requires --repos)
+    Contributors,
+
     /// Check documentation references for broken links
     CheckRefs,
 
