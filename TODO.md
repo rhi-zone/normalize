@@ -21,10 +21,30 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Current `analyze hotspots` is file-level churn only (`commits × √churn`). Enhance with:
 
-- [ ] **Hotspot × complexity**: weight churn by cyclomatic complexity from index (plumbing exists, index opened but unused). Score: `commits × √churn × log(complexity)`. Most impactful — high-churn AND high-complexity files are the riskiest.
-- [ ] **Temporal coupling**: files that change together in the same commits (co-change analysis). Output: pairs/clusters with co-change frequency and support count. Classic "Your Code as a Crime Scene" insight.
-- [ ] **Blame hotspots**: ownership concentration per file via `git blame`. Bus factor (files with single author owning >80%), recently-authored code density, author distribution.
-- [ ] **Recency weighting**: weight recent commits higher (exponential decay). Currently all commits are equal — a file that churned 2 years ago scores the same as one churning now.
+- [x] **Hotspot × complexity**: weight churn by cyclomatic complexity from index. Score: `commits × √churn × log₂(1 + complexity)`.
+- [x] **Temporal coupling**: `analyze coupling` — files that change together in the same commits (co-change analysis).
+- [x] **Blame hotspots**: `analyze ownership` — ownership concentration per file via `git blame`. Bus factor, top author percentage.
+- [x] **Recency weighting**: `--recency` flag — exponential decay (180-day half-life), recent changes weighted higher.
+
+### Cross-Repo Analysis
+
+Analyze across multiple repositories — activity trends, shared patterns, inter-repo dependencies. Operates on a directory of sibling repos or a configured workspace.
+
+**Analysis:**
+- [ ] **Activity over time**: per-repo commit volume, author focus, churn over configurable time windows. "Which repos are active? Which are stagnating? Where is energy going?"
+- [ ] **Inter-repo dependency graph**: which repos import/depend on which (via package manifests: Cargo.toml deps, package.json, go.mod). Visualize the cross-repo architecture.
+- [ ] **Cross-repo duplicates**: find shared code across repos that should be a library. Extend `duplicate-functions`/`similar-functions` to work across repo boundaries.
+- [ ] **Cross-repo hotspots**: aggregate churn/complexity/coupling across repos. Which repo has the most tech debt?
+- [ ] **Cross-repo ownership**: who works on what across the org. Author overlap between repos.
+
+**Commands:**
+- [ ] **Run commands across repos**: `normalize --repos ~/git/org/ tools lint`, `normalize --repos ~/git/org/ analyze hotspots`. Discover projects, run in parallel, aggregate output.
+- [ ] **Cross-repo coupling**: repos that get commits in the same time window (e.g., same day/PR). Indicates hidden cross-repo dependencies.
+
+**Design considerations:**
+- Discovery: `--repos <dir>` scans for `.git` dirs, or `normalize.workspace.toml` lists repos explicitly
+- Output: per-repo breakdown + aggregate summary
+- Incremental: cache per-repo results, only re-analyze changed repos
 
 ## Remaining Work
 - `normalize view` symbol not found: show all candidate symbols with **trigram containment ≥ 0.6** against the query (skip if query < 4 chars). Metric: `|trigrams(query) ∩ trigrams(candidate)| / |trigrams(query)|` — asymmetric by design, measures how much of the query appears in the candidate.
