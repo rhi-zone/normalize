@@ -31,6 +31,7 @@ nix = []       # Nix (flake.nix)
 conan = []     # C++ (conanfile.txt)
 
 [dependencies]
+glob = "0.3"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_json_lenient = "0.2"

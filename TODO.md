@@ -32,14 +32,14 @@ Analyze across multiple repositories — activity trends, shared patterns, inter
 
 **Analysis:**
 - [ ] **Activity over time**: per-repo commit volume, author focus, churn over configurable time windows. "Which repos are active? Which are stagnating? Where is energy going?"
-- [ ] **Inter-repo dependency graph**: which repos import/depend on which (via package manifests: Cargo.toml deps, package.json, go.mod). Visualize the cross-repo architecture.
+- [x] **Inter-repo dependency graph**: which repos import/depend on which (via package manifests: Cargo.toml deps, package.json, go.mod). Visualize the cross-repo architecture. → `analyze repo-coupling`
 - [ ] **Cross-repo duplicates**: find shared code across repos that should be a library. Extend `duplicate-functions`/`similar-functions` to work across repo boundaries.
 - [ ] **Cross-repo hotspots**: aggregate churn/complexity/coupling across repos. Which repo has the most tech debt?
 - [ ] **Cross-repo ownership**: who works on what across the org. Author overlap between repos.
 
 **Commands:**
 - [ ] **Run commands across repos**: `normalize --repos ~/git/org/ tools lint`, `normalize --repos ~/git/org/ analyze hotspots`. Discover projects, run in parallel, aggregate output.
-- [ ] **Cross-repo coupling**: repos that get commits in the same time window (e.g., same day/PR). Indicates hidden cross-repo dependencies.
+- [x] **Cross-repo coupling**: repos that get commits in the same time window (e.g., same day/PR). Indicates hidden cross-repo dependencies. → `analyze repo-coupling`
 
 **Design considerations:**
 - Discovery: `--repos <dir>` scans for `.git` dirs, or `normalize.workspace.toml` lists repos explicitly

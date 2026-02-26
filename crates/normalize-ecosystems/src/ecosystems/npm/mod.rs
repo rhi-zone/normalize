@@ -85,21 +85,21 @@ impl Ecosystem for Npm {
 
         if let Some(d) = parsed.get("dependencies").and_then(|d| d.as_object()) {
             for (name, version) in d {
-                deps.push(Dependency {
-                    name: name.clone(),
-                    version_req: version.as_str().map(String::from),
-                    optional: false,
-                });
+                deps.push(Dependency::registry(
+                    name.clone(),
+                    version.as_str().map(String::from),
+                    false,
+                ));
             }
         }
 
         if let Some(d) = parsed.get("devDependencies").and_then(|d| d.as_object()) {
             for (name, version) in d {
-                deps.push(Dependency {
-                    name: name.clone(),
-                    version_req: version.as_str().map(String::from),
-                    optional: false,
-                });
+                deps.push(Dependency::registry(
+                    name.clone(),
+                    version.as_str().map(String::from),
+                    false,
+                ));
             }
         }
 
@@ -108,11 +108,11 @@ impl Ecosystem for Npm {
             .and_then(|d| d.as_object())
         {
             for (name, version) in d {
-                deps.push(Dependency {
-                    name: name.clone(),
-                    version_req: version.as_str().map(String::from),
-                    optional: true,
-                });
+                deps.push(Dependency::registry(
+                    name.clone(),
+                    version.as_str().map(String::from),
+                    true,
+                ));
             }
         }
 
@@ -138,6 +138,19 @@ impl Ecosystem for Npm {
             "no supported lockfile found in {} or parent directories",
             project_root.display()
         )))
+    }
+
+    fn published_names(&self, project_root: &Path) -> Vec<String> {
+        let manifest = project_root.join("package.json");
+        if let Ok(content) = std::fs::read_to_string(&manifest)
+            && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
+            && let Some(name) = parsed.get("name").and_then(|n| n.as_str())
+            && !name.is_empty()
+        {
+            vec![name.to_string()]
+        } else {
+            Vec::new()
+        }
     }
 
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
@@ -287,29 +300,29 @@ fn parse_npm_json(json_str: &str, package: &str) -> Result<PackageInfo, PackageE
     let mut dependencies = Vec::new();
     if let Some(deps) = v.get("dependencies").and_then(|d| d.as_object()) {
         for (name, version) in deps {
-            dependencies.push(Dependency {
-                name: name.clone(),
-                version_req: version.as_str().map(String::from),
-                optional: false,
-            });
+            dependencies.push(Dependency::registry(
+                name.clone(),
+                version.as_str().map(String::from),
+                false,
+            ));
         }
     }
     if let Some(deps) = v.get("peerDependencies").and_then(|d| d.as_object()) {
         for (name, version) in deps {
-            dependencies.push(Dependency {
-                name: name.clone(),
-                version_req: version.as_str().map(String::from),
-                optional: false,
-            });
+            dependencies.push(Dependency::registry(
+                name.clone(),
+                version.as_str().map(String::from),
+                false,
+            ));
         }
     }
     if let Some(deps) = v.get("optionalDependencies").and_then(|d| d.as_object()) {
         for (name, version) in deps {
-            dependencies.push(Dependency {
-                name: name.clone(),
-                version_req: version.as_str().map(String::from),
-                optional: true,
-            });
+            dependencies.push(Dependency::registry(
+                name.clone(),
+                version.as_str().map(String::from),
+                true,
+            ));
         }
     }
 

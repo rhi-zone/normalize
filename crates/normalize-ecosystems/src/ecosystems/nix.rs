@@ -59,11 +59,11 @@ impl Ecosystem for Nix {
                             if let Some(start) = line.find('"') {
                                 let rest = &line[start + 1..];
                                 if let Some(end) = rest.find('"') {
-                                    deps.push(Dependency {
-                                        name: name.to_string(),
-                                        version_req: Some(rest[..end].to_string()),
-                                        optional: false,
-                                    });
+                                    deps.push(Dependency::registry(
+                                        name.to_string(),
+                                        Some(rest[..end].to_string()),
+                                        false,
+                                    ));
                                 }
                             }
                         }

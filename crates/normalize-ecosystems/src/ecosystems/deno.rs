@@ -86,11 +86,7 @@ impl Ecosystem for Deno {
             for (name, specifier) in imports {
                 let spec_str = specifier.as_str().unwrap_or("");
                 let version = extract_version_from_specifier(spec_str);
-                deps.push(Dependency {
-                    name: name.clone(),
-                    version_req: version,
-                    optional: false,
-                });
+                deps.push(Dependency::registry(name.clone(), version, false));
             }
         }
 

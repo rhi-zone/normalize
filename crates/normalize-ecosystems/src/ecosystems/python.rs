@@ -164,11 +164,11 @@ impl Ecosystem for Python {
                         }
                         _ => None,
                     };
-                    deps.push(crate::Dependency {
-                        name: name.clone(),
+                    deps.push(crate::Dependency::registry(
+                        name.clone(),
                         version_req,
-                        optional: false,
-                    });
+                        false,
+                    ));
                 }
             }
 
@@ -544,11 +544,7 @@ fn parse_requirement(req: &str) -> Option<Dependency> {
     // Check if optional (has marker with "extra")
     let optional = marker.is_some_and(|m| m.contains("extra"));
 
-    Some(Dependency {
-        name,
-        version_req,
-        optional,
-    })
+    Some(Dependency::registry(name, version_req, optional))
 }
 
 #[cfg(test)]

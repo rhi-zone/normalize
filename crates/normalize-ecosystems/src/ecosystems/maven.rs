@@ -165,19 +165,19 @@ fn parse_pom_dependencies(content: &str) -> Result<Vec<Dependency>, PackageError
             optional = false;
         } else if line.contains("</dependency>") {
             if in_dependency && !artifact_id.is_empty() {
-                deps.push(Dependency {
-                    name: if group_id.is_empty() {
+                deps.push(Dependency::registry(
+                    if group_id.is_empty() {
                         artifact_id.clone()
                     } else {
                         format!("{}:{}", group_id, artifact_id)
                     },
-                    version_req: if version.is_empty() {
+                    if version.is_empty() {
                         None
                     } else {
                         Some(version.clone())
                     },
                     optional,
-                });
+                ));
             }
             in_dependency = false;
         } else if in_dependency {
@@ -239,11 +239,11 @@ fn parse_gradle_dependencies(content: &str) -> Result<Vec<Dependency>, PackageEr
                 if let Some(dep) = dep_str {
                     let parts: Vec<&str> = dep.split(':').collect();
                     if parts.len() >= 2 {
-                        deps.push(Dependency {
-                            name: format!("{}:{}", parts[0], parts[1]),
-                            version_req: parts.get(2).map(|s| s.to_string()),
-                            optional: prefix == "compileOnly" || prefix == "testImplementation",
-                        });
+                        deps.push(Dependency::registry(
+                            format!("{}:{}", parts[0], parts[1]),
+                            parts.get(2).map(|s| s.to_string()),
+                            prefix == "compileOnly" || prefix == "testImplementation",
+                        ));
                     }
                 }
             }

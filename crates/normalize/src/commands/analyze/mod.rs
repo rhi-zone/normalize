@@ -16,6 +16,7 @@ pub mod hotspots;
 pub mod length;
 pub mod ownership;
 pub mod query;
+pub mod repo_coupling;
 pub mod report;
 pub mod rules_cmd;
 mod sarif;
@@ -285,6 +286,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::Contributors) => {
             crate::output::print_output_schema::<contributors::ContributorsReport>();
+        }
+        Some(AnalyzeCommand::RepoCoupling { .. }) => {
+            crate::output::print_output_schema::<repo_coupling::RepoCouplingReport>();
         }
         Some(AnalyzeCommand::CheckRefs) => {
             crate::output::print_output_schema::<check_refs::CheckRefsReport>();
@@ -672,6 +676,11 @@ pub fn run(
 
         Some(AnalyzeCommand::Contributors) => {
             eprintln!("error: analyze contributors requires --repos <DIR>");
+            1
+        }
+
+        Some(AnalyzeCommand::RepoCoupling { .. }) => {
+            eprintln!("error: analyze repo-coupling requires --repos <DIR>");
             1
         }
 

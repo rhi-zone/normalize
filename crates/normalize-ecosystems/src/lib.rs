@@ -80,12 +80,71 @@ pub struct Feature {
     pub dependencies: Vec<String>,
 }
 
+/// Source of a dependency (registry, git, local path).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum DepSource {
+    #[default]
+    Registry,
+    Git {
+        url: String,
+    },
+    Path {
+        path: String,
+    },
+}
+
 /// A package dependency.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dependency {
     pub name: String,
+    /// Actual package name if renamed (e.g. cargo `package = "..."`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_name: Option<String>,
     pub version_req: Option<String>,
     pub optional: bool,
+    #[serde(default)]
+    pub source: DepSource,
+}
+
+impl Dependency {
+    /// Create a registry dependency (the common case).
+    pub fn registry(name: impl Into<String>, version_req: Option<String>, optional: bool) -> Self {
+        Self {
+            name: name.into(),
+            package_name: None,
+            version_req,
+            optional,
+            source: DepSource::Registry,
+        }
+    }
+
+    /// Create a git dependency.
+    pub fn git(name: impl Into<String>, url: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            package_name: None,
+            version_req: None,
+            optional: false,
+            source: DepSource::Git { url: url.into() },
+        }
+    }
+
+    /// Create a path dependency.
+    pub fn path(name: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            package_name: None,
+            version_req: None,
+            optional: false,
+            source: DepSource::Path { path: path.into() },
+        }
+    }
+
+    /// The effective package name (package_name if set, otherwise name).
+    pub fn effective_name(&self) -> &str {
+        self.package_name.as_deref().unwrap_or(&self.name)
+    }
 }
 
 /// A node in the dependency tree.
@@ -216,6 +275,12 @@ pub trait Ecosystem: Send + Sync {
     /// Get dependency tree from lockfile.
     /// Returns structured tree data.
     fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError>;
+
+    /// Package names this project publishes (from manifest, no network calls).
+    /// Default: empty vec.
+    fn published_names(&self, _project_root: &Path) -> Vec<String> {
+        Vec::new()
+    }
 
     /// Run security audit for known vulnerabilities.
     /// Default implementation returns empty result (no audit tool available).

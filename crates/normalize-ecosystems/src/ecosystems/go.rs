@@ -75,11 +75,11 @@ impl Ecosystem for Go {
             if line.starts_with("require ") {
                 let rest = line.strip_prefix("require ").unwrap().trim();
                 if let Some((module, version)) = rest.split_once(' ') {
-                    deps.push(Dependency {
-                        name: module.to_string(),
-                        version_req: Some(version.to_string()),
-                        optional: false,
-                    });
+                    deps.push(Dependency::registry(
+                        module.to_string(),
+                        Some(version.to_string()),
+                        false,
+                    ));
                 }
             } else if in_require_block && !line.is_empty() && !line.starts_with("//") {
                 // Inside require block: module/path v1.2.3
@@ -87,11 +87,11 @@ impl Ecosystem for Go {
                 if parts.len() >= 2 {
                     let indirect =
                         parts.len() > 2 && parts[2..].contains(&"//") && line.contains("indirect");
-                    deps.push(Dependency {
-                        name: parts[0].to_string(),
-                        version_req: Some(parts[1].to_string()),
-                        optional: indirect,
-                    });
+                    deps.push(Dependency::registry(
+                        parts[0].to_string(),
+                        Some(parts[1].to_string()),
+                        indirect,
+                    ));
                 }
             }
         }
@@ -148,6 +148,17 @@ impl Ecosystem for Go {
                 dependencies: deps,
             }],
         })
+    }
+
+    fn published_names(&self, project_root: &Path) -> Vec<String> {
+        let go_mod = project_root.join("go.mod");
+        if let Ok(content) = std::fs::read_to_string(&go_mod)
+            && let Some(module_line) = content.lines().find(|l| l.starts_with("module "))
+            && let Some(module) = module_line.strip_prefix("module ").map(|s| s.trim())
+        {
+            return vec![module.to_string()];
+        }
+        Vec::new()
     }
 
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {

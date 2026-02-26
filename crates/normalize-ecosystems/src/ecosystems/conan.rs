@@ -75,11 +75,11 @@ impl Ecosystem for Conan {
                     // Format: pkg/version or pkg/version@user/channel
                     if let Some((name, rest)) = line.split_once('/') {
                         let version = rest.split('@').next().unwrap_or(rest);
-                        deps.push(Dependency {
-                            name: name.to_string(),
-                            version_req: Some(version.to_string()),
-                            optional: false,
-                        });
+                        deps.push(Dependency::registry(
+                            name.to_string(),
+                            Some(version.to_string()),
+                            false,
+                        ));
                     }
                 }
             }
@@ -103,11 +103,11 @@ impl Ecosystem for Conan {
                             let req = &after[..end];
                             if let Some((name, rest)) = req.split_once('/') {
                                 let version = rest.split('@').next().unwrap_or(rest);
-                                deps.push(Dependency {
-                                    name: name.to_string(),
-                                    version_req: Some(version.to_string()),
-                                    optional: false,
-                                });
+                                deps.push(Dependency::registry(
+                                    name.to_string(),
+                                    Some(version.to_string()),
+                                    false,
+                                ));
                             }
                             pos = pos + start + 2 + end;
                         } else {

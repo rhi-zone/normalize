@@ -73,11 +73,7 @@ impl Ecosystem for Hex {
                         None
                     };
                     let optional = rest.contains("optional: true");
-                    deps.push(Dependency {
-                        name,
-                        version_req,
-                        optional,
-                    });
+                    deps.push(Dependency::registry(name, version_req, optional));
                 }
             }
         }
@@ -198,11 +194,11 @@ fn fetch_hex_info(package: &str) -> Result<PackageInfo, PackageError> {
                 .get("optional")
                 .and_then(|o| o.as_bool())
                 .unwrap_or(false);
-            dependencies.push(Dependency {
-                name: dep_name.clone(),
+            dependencies.push(Dependency::registry(
+                dep_name.clone(),
                 version_req,
                 optional,
-            });
+            ));
         }
     }
 

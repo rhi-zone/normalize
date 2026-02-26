@@ -68,21 +68,21 @@ impl Ecosystem for Composer {
                 if name == "php" || name.starts_with("ext-") {
                     continue;
                 }
-                deps.push(Dependency {
-                    name: name.clone(),
-                    version_req: version.as_str().map(String::from),
-                    optional: false,
-                });
+                deps.push(Dependency::registry(
+                    name.clone(),
+                    version.as_str().map(String::from),
+                    false,
+                ));
             }
         }
 
         if let Some(require_dev) = parsed.get("require-dev").and_then(|r| r.as_object()) {
             for (name, version) in require_dev {
-                deps.push(Dependency {
-                    name: name.clone(),
-                    version_req: version.as_str().map(String::from),
-                    optional: false,
-                });
+                deps.push(Dependency::registry(
+                    name.clone(),
+                    version.as_str().map(String::from),
+                    false,
+                ));
             }
         }
 
@@ -186,20 +186,20 @@ fn fetch_packagist_info(package: &str) -> Result<PackageInfo, PackageError> {
                     if dep_name == "php" || dep_name.starts_with("ext-") {
                         continue;
                     }
-                    deps.push(Dependency {
-                        name: dep_name.clone(),
-                        version_req: ver_req.as_str().map(String::from),
-                        optional: false,
-                    });
+                    deps.push(Dependency::registry(
+                        dep_name.clone(),
+                        ver_req.as_str().map(String::from),
+                        false,
+                    ));
                 }
             }
             if let Some(require_dev) = data.get("require-dev").and_then(|r| r.as_object()) {
                 for (dep_name, ver_req) in require_dev {
-                    deps.push(Dependency {
-                        name: dep_name.clone(),
-                        version_req: ver_req.as_str().map(String::from),
-                        optional: true,
-                    });
+                    deps.push(Dependency::registry(
+                        dep_name.clone(),
+                        ver_req.as_str().map(String::from),
+                        true,
+                    ));
                 }
             }
 

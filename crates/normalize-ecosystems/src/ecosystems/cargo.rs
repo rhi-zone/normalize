@@ -1,8 +1,8 @@
 //! Cargo (Rust) ecosystem.
 
 use crate::{
-    AuditResult, Dependency, DependencyTree, Ecosystem, Feature, LockfileManager, PackageError,
-    PackageInfo, PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
+    AuditResult, DepSource, Dependency, DependencyTree, Ecosystem, Feature, LockfileManager,
+    PackageError, PackageInfo, PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -188,6 +188,57 @@ impl Ecosystem for Cargo {
         Ok(DependencyTree { roots })
     }
 
+    fn published_names(&self, project_root: &Path) -> Vec<String> {
+        let manifest = project_root.join("Cargo.toml");
+        let content = match std::fs::read_to_string(&manifest) {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        let parsed: toml::Value = match toml::from_str(&content) {
+            Ok(v) => v,
+            Err(_) => return Vec::new(),
+        };
+
+        // Single package
+        if let Some(name) = parsed
+            .get("package")
+            .and_then(|p| p.get("name"))
+            .and_then(|n| n.as_str())
+        {
+            return vec![name.to_string()];
+        }
+
+        // Workspace: expand members
+        let mut names = Vec::new();
+        if let Some(members) = parsed
+            .get("workspace")
+            .and_then(|w| w.get("members"))
+            .and_then(|m| m.as_array())
+        {
+            for member in members {
+                if let Some(pattern) = member.as_str() {
+                    // Glob-expand member patterns
+                    let full_pattern = project_root.join(pattern).join("Cargo.toml");
+                    if let Ok(entries) = glob::glob(&full_pattern.to_string_lossy()) {
+                        for entry in entries.flatten() {
+                            if let Ok(member_content) = std::fs::read_to_string(&entry)
+                                && let Ok(member_parsed) =
+                                    toml::from_str::<toml::Value>(&member_content)
+                                && let Some(name) = member_parsed
+                                    .get("package")
+                                    .and_then(|p| p.get("name"))
+                                    .and_then(|n| n.as_str())
+                            {
+                                names.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        names
+    }
+
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
         // Try cargo audit (requires cargo-audit installed)
         let output = Command::new("cargo")
@@ -322,11 +373,7 @@ fn find_cargo_lock(
 
 fn parse_cargo_dep(name: &str, value: &toml::Value, optional: bool) -> Dependency {
     match value {
-        toml::Value::String(version) => Dependency {
-            name: name.to_string(),
-            version_req: Some(version.clone()),
-            optional,
-        },
+        toml::Value::String(version) => Dependency::registry(name, Some(version.clone()), optional),
         toml::Value::Table(table) => {
             let version = table
                 .get("version")
@@ -336,17 +383,32 @@ fn parse_cargo_dep(name: &str, value: &toml::Value, optional: bool) -> Dependenc
                 .get("optional")
                 .and_then(|o| o.as_bool())
                 .unwrap_or(optional);
+            let package_name = table
+                .get("package")
+                .and_then(|p| p.as_str())
+                .map(String::from);
+
+            let source = if let Some(git_url) = table.get("git").and_then(|g| g.as_str()) {
+                DepSource::Git {
+                    url: git_url.to_string(),
+                }
+            } else if let Some(path) = table.get("path").and_then(|p| p.as_str()) {
+                DepSource::Path {
+                    path: path.to_string(),
+                }
+            } else {
+                DepSource::Registry
+            };
+
             Dependency {
                 name: name.to_string(),
+                package_name,
                 version_req: version,
                 optional: opt,
+                source,
             }
         }
-        _ => Dependency {
-            name: name.to_string(),
-            version_req: None,
-            optional,
-        },
+        _ => Dependency::registry(name, None, optional),
     }
 }
 

@@ -221,6 +221,17 @@ pub enum AnalyzeCommand {
     /// Analyze contributors across repos (requires --repos)
     Contributors,
 
+    /// Analyze cross-repo coupling: dependency graph + temporal signals (requires --repos)
+    RepoCoupling {
+        /// Window size in hours for temporal grouping
+        #[arg(long, default_value = "24")]
+        window: usize,
+
+        /// Minimum shared windows to report a temporal pair
+        #[arg(long, default_value = "3")]
+        min_windows: usize,
+    },
+
     /// Check documentation references for broken links
     CheckRefs,
 

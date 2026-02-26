@@ -435,16 +435,37 @@ fn run_multi_repo(repos_dir: &Path, cli: &Cli, format: &normalize::output::Outpu
                     }
                 }
             }
+            Some(AnalyzeCommand::RepoCoupling {
+                window,
+                min_windows,
+            }) => {
+                let window = *window;
+                let min_windows = *min_windows;
+                match commands::analyze::repo_coupling::analyze_repo_coupling(
+                    &repos,
+                    window,
+                    min_windows,
+                ) {
+                    Ok(report) => {
+                        report.print(format);
+                        0
+                    }
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        1
+                    }
+                }
+            }
             _ => {
                 eprintln!(
-                    "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling, analyze contributors"
+                    "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling, analyze contributors, analyze repo-coupling"
                 );
                 1
             }
         },
         _ => {
             eprintln!(
-                "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling, analyze contributors"
+                "error: --repos is currently supported for: analyze hotspots, analyze ownership, analyze coupling, analyze contributors, analyze repo-coupling"
             );
             1
         }

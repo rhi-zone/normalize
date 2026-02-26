@@ -84,11 +84,7 @@ impl Ecosystem for Gem {
                         } else {
                             None
                         };
-                        deps.push(Dependency {
-                            name,
-                            version_req,
-                            optional: false,
-                        });
+                        deps.push(Dependency::registry(name, version_req, false));
                     }
                 }
             }
@@ -286,11 +282,11 @@ fn fetch_rubygems_info(package: &str) -> Result<PackageInfo, PackageError> {
                         .get("requirements")
                         .and_then(|r| r.as_str())
                         .map(String::from);
-                    dependencies.push(Dependency {
-                        name: dep_name.to_string(),
+                    dependencies.push(Dependency::registry(
+                        dep_name.to_string(),
                         version_req,
-                        optional: false,
-                    });
+                        false,
+                    ));
                 }
             }
         }
@@ -302,11 +298,11 @@ fn fetch_rubygems_info(package: &str) -> Result<PackageInfo, PackageError> {
                         .get("requirements")
                         .and_then(|r| r.as_str())
                         .map(String::from);
-                    dependencies.push(Dependency {
-                        name: dep_name.to_string(),
+                    dependencies.push(Dependency::registry(
+                        dep_name.to_string(),
                         version_req,
-                        optional: true,
-                    });
+                        true,
+                    ));
                 }
             }
         }

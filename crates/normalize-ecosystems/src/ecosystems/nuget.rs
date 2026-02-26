@@ -79,11 +79,7 @@ impl Ecosystem for Nuget {
                             } else {
                                 None
                             };
-                            deps.push(Dependency {
-                                name,
-                                version_req,
-                                optional: false,
-                            });
+                            deps.push(Dependency::registry(name, version_req, false));
                         }
                     }
                 }
@@ -230,11 +226,7 @@ fn parse_nuspec(xml: &str, package: &str, version: &str) -> Result<PackageInfo, 
                     } else {
                         None
                     };
-                    dependencies.push(Dependency {
-                        name: dep_name,
-                        version_req,
-                        optional: false,
-                    });
+                    dependencies.push(Dependency::registry(dep_name, version_req, false));
                 }
             }
         }

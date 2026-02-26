@@ -293,6 +293,11 @@ fn test_help_analyze_ownership() {
 }
 
 #[test]
+fn test_help_analyze_repo_coupling() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "repo-coupling"]));
+}
+
+#[test]
 fn test_help_analyze_check_refs() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "check-refs"]));
 }
