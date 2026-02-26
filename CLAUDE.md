@@ -58,6 +58,8 @@ Patterns from `docs/log-analysis.md` correction analysis:
 ./target/debug/normalize text-search <pattern> [--only <glob>]
 ```
 
+**text-search uses ripgrep regex, not grep regex.** `|` for alternation (not `\|`). Use `(a|b)` grouping. No BRE/ERE distinction. This has caused silent broken searches repeatedly.
+
 When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exact line content needed by Edit.
 
 ## Workflow
