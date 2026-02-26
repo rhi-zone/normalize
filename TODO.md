@@ -117,19 +117,35 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [ ] Wire up `--output-schema` for: view (10+ implicit modes — needs dedicated refactor pass)
 
 ### CLI Internal Consolidation
-Reduce duplication in command argument definitions and standardize command patterns.
+Eliminate the `cmd_*` middle layer. Commands should be library functions that return `Result<T>`, with CLI plumbing auto-generated.
 
-**High priority:**
-- [ ] Extract shared `FilterArgs` struct for `--exclude`/`--only` (currently independently defined in ~4 command files: analyze/args.rs, edit.rs, text_search.rs, view/mod.rs)
-- [ ] Extract shared `ProjectArgs` struct for `--root` (currently independently defined in ~8 command files: aliases.rs, analyze/args.rs, context.rs, edit.rs, history.rs, sessions/mod.rs, text_search.rs, view/mod.rs)
+**Current problem:** Three layers where two suffice:
+1. `run()` — CLI boilerplate (schema, params-json, config merge, exit codes). Identical across commands.
+2. `cmd_text_search()` — builds a filter, calls library fn, prints result, returns exit code. Barely needed.
+3. `text_search::grep()` — the actual library function.
 
-**Medium priority:**
-- [ ] Standardize command definition pattern: some commands use `Args` struct, some use bare `Action` enum, some use `Args + Action` — pick one convention and migrate
-- [ ] Investigate a shared `Command` trait for all commands (currently loose `run()` functions with varying signatures)
+Layer 2 should not exist. Layer 1 should be generic.
 
-**Backlog:**
-- [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
+**Target:** Each command declares `Input` (Args) + `Output` (result type) + `fn execute(input, ctx) -> Result<Output>`. A `Command` trait + generic runner handles all CLI plumbing:
+```rust
+trait Command {
+    type Input: Args + DeserializeOwned + JsonSchema;
+    type Output: OutputFormatter + JsonSchema;
+    fn execute(input: Self::Input, ctx: &CommandContext) -> Result<Self::Output>;
+}
+```
+One generic `run::<C: Command>()` replaces all per-command `run()` functions and their duplicated schema/params-json/format/exit-code handling.
+
+**Steps:**
+- [ ] Define `Command` trait and `CommandContext` (holds format, config, root)
+- [ ] Implement generic `run::<C: Command>()` that handles schema, params-json, config merge, formatting, exit codes
+- [ ] Extract shared `FilterArgs` struct for `--exclude`/`--only` (currently in ~4 files: analyze/args.rs, edit.rs, text_search.rs, view/mod.rs)
+- [ ] Extract shared `ProjectArgs` struct for `--root` (currently in ~8 files)
+- [ ] Migrate one simple command (text-search) as proof of concept — delete `cmd_text_search`, make `execute()` call `grep()` directly
+- [ ] Migrate remaining commands, deleting `cmd_*` functions
+- [ ] Standardize command definition pattern (some use Args, some Action enum, some both)
 - [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
+- [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
