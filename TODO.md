@@ -126,26 +126,36 @@ Eliminate the `cmd_*` middle layer. Commands should be library functions that re
 
 Layer 2 should not exist. Layer 1 should be generic.
 
-**Target:** Each command declares `Input` (Args) + `Output` (result type) + `fn execute(input, ctx) -> Result<Output>`. A `Command` trait + generic runner handles all CLI plumbing:
+**Target:** Use `server-less` `#[cli]` macro (github:rhi-zone/server-less) to generate CLI from typed methods. Commands become plain library functions, macro handles all plumbing:
 ```rust
-trait Command {
-    type Input: Args + DeserializeOwned + JsonSchema;
-    type Output: OutputFormatter + JsonSchema;
-    fn execute(input: Self::Input, ctx: &CommandContext) -> Result<Self::Output>;
+#[cli(name = "normalize")]
+impl NormalizeService {
+    /// Search file contents for a pattern
+    pub fn grep(&self, pattern: String, root: Option<PathBuf>, ...) -> Result<GrepResult, Error> {
+        text_search::grep(...)
+    }
 }
 ```
-One generic `run::<C: Command>()` replaces all per-command `run()` functions and their duplicated schema/params-json/format/exit-code handling.
+This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle layer, duplicated `--root`/`--exclude`/`--only` definitions.
 
-**Steps:**
-- [ ] Define `Command` trait and `CommandContext` (holds format, config, root)
-- [ ] Implement generic `run::<C: Command>()` that handles schema, params-json, config merge, formatting, exit codes
-- [ ] Extract shared `FilterArgs` struct for `--exclude`/`--only` (currently in ~4 files: analyze/args.rs, edit.rs, text_search.rs, view/mod.rs)
-- [ ] Extract shared `ProjectArgs` struct for `--root` (currently in ~8 files)
-- [ ] Migrate one simple command (text-search) as proof of concept — delete `cmd_text_search`, make `execute()` call `grep()` directly
-- [ ] Migrate remaining commands, deleting `cmd_*` functions
-- [ ] Standardize command definition pattern (some use Args, some Action enum, some both)
+**server-less `#[cli]` gaps to fill first** (in rhi-zone/server-less):
+- [ ] `bool` params as switches (`--verbose` not `--verbose true`)
+- [ ] `Vec<T>` params with `.action(Append)` / `value_delimiter`
+- [ ] Global/shared flags across subcommands (`--json`, `--pretty`, `--root`)
+- [ ] Output formatting integration (`OutputFormatter` trait or equivalent)
+- [ ] `--output-schema` / `--input-schema` / `--params-json` support
+- [ ] Config file loading/merge (normalize's `NormalizeConfig` pattern)
+
+**Steps (normalize side):**
+- [ ] Add `server-less` dependency with `cli` feature
+- [ ] Migrate one simple command (text-search → `grep`) as proof of concept
+- [ ] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method
+- [ ] Migrate remaining commands, deleting `cmd_*` functions and manual Args structs
 - [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
+
+**Also:**
+- [ ] Rename `text-search` command back to `grep` (function is already `grep()`, rename didn't prevent regex syntax confusion — see CLAUDE.md)
 
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
