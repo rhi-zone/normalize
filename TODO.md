@@ -116,6 +116,21 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--jsonl` + `--jq` combination (apply jq filter, then emit results as jsonl)
 - [ ] Wire up `--output-schema` for: view (10+ implicit modes — needs dedicated refactor pass)
 
+### CLI Internal Consolidation
+Reduce duplication in command argument definitions and standardize command patterns.
+
+**High priority:**
+- [ ] Extract shared `FilterArgs` struct for `--exclude`/`--only` (currently independently defined in ~4 command files: analyze/args.rs, edit.rs, text_search.rs, view/mod.rs)
+- [ ] Extract shared `ProjectArgs` struct for `--root` (currently independently defined in ~8 command files: aliases.rs, analyze/args.rs, context.rs, edit.rs, history.rs, sessions/mod.rs, text_search.rs, view/mod.rs)
+
+**Medium priority:**
+- [ ] Standardize command definition pattern: some commands use `Args` struct, some use bare `Action` enum, some use `Args + Action` — pick one convention and migrate
+- [ ] Investigate a shared `Command` trait for all commands (currently loose `run()` functions with varying signatures)
+
+**Backlog:**
+- [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
+- [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
+
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
 - [x] Rename `normalize filter aliases` to `normalize aliases`: removes unnecessary namespace layer
