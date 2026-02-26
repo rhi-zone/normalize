@@ -1,5 +1,6 @@
 //! Analyze command - run analysis on target.
 
+pub mod activity;
 pub mod architecture;
 mod args;
 pub mod ast;
@@ -283,6 +284,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::Architecture) => {
             crate::output::print_output_schema::<architecture::ArchitectureReport>();
+        }
+        Some(AnalyzeCommand::Activity { .. }) => {
+            crate::output::print_output_schema::<activity::ActivityReport>();
         }
         Some(AnalyzeCommand::Contributors) => {
             crate::output::print_output_schema::<contributors::ContributorsReport>();
@@ -672,6 +676,11 @@ pub fn run(
 
         Some(AnalyzeCommand::Ownership { limit }) => {
             ownership::cmd_ownership(&effective_root, limit, &args.exclude, &format)
+        }
+
+        Some(AnalyzeCommand::Activity { .. }) => {
+            eprintln!("error: analyze activity requires --repos <DIR>");
+            1
         }
 
         Some(AnalyzeCommand::Contributors) => {

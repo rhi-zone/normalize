@@ -221,6 +221,17 @@ pub enum AnalyzeCommand {
     /// Analyze contributors across repos (requires --repos)
     Contributors,
 
+    /// Analyze cross-repo activity over time: commit volume, trends, author focus (requires --repos)
+    Activity {
+        /// Window granularity: "month" (default) or "week"
+        #[arg(long, default_value = "month")]
+        window: String,
+
+        /// Number of windows to show (default: 12)
+        #[arg(long, default_value = "12")]
+        windows: usize,
+    },
+
     /// Analyze cross-repo coupling: dependency graph + temporal signals (requires --repos)
     RepoCoupling {
         /// Window size in hours for temporal grouping

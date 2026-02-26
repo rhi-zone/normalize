@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 72
 expression: "snapshot_help(&[\"analyze\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -22,6 +21,7 @@ Commands:
   coupling             Find files that frequently change together (temporal coupling)
   ownership            Show per-file ownership concentration from git blame
   contributors         Analyze contributors across repos (requires --repos)
+  activity             Analyze cross-repo activity over time: commit volume, trends, author focus (requires --repos)
   repo-coupling        Analyze cross-repo coupling: dependency graph + temporal signals (requires --repos)
   check-refs           Check documentation references for broken links
   stale-docs           Find documentation with stale code references
