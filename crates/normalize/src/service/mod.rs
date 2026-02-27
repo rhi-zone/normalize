@@ -18,8 +18,11 @@
 //! `--compact` globals + config) and calls `format_pretty()` or `format_text()`.
 
 pub mod daemon;
+pub mod facts;
 pub mod generate;
 pub mod grammars;
+pub mod package;
+pub mod rules;
 
 use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
@@ -37,8 +40,11 @@ pub struct NormalizeService {
     /// Whether pretty output is active (resolved per-command from globals + config).
     pretty: Cell<bool>,
     daemon: daemon::DaemonService,
+    facts: facts::FactsService,
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
+    package: package::PackageService,
+    rules: rules::RulesService,
 }
 
 impl Default for NormalizeService {
@@ -51,9 +57,12 @@ impl NormalizeService {
     pub fn new() -> Self {
         let pretty = Cell::new(false);
         Self {
-            grammars: grammars::GrammarService::new(&pretty),
             daemon: daemon::DaemonService,
+            facts: facts::FactsService::new(&pretty),
+            grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
+            package: package::PackageService::new(&pretty),
+            rules: rules::RulesService::new(&pretty),
             pretty,
         }
     }
@@ -344,6 +353,21 @@ impl NormalizeService {
     /// Generate code from API spec
     pub fn generate(&self) -> &generate::GenerateService {
         &self.generate
+    }
+
+    /// Extract and query code facts (symbols, imports, calls)
+    pub fn facts(&self) -> &facts::FactsService {
+        &self.facts
+    }
+
+    /// Manage and run analysis rules (syntax + fact)
+    pub fn rules(&self) -> &rules::RulesService {
+        &self.rules
+    }
+
+    /// Package management: info, list, tree, outdated
+    pub fn package(&self) -> &package::PackageService {
+        &self.package
     }
 }
 

@@ -38,6 +38,19 @@ impl std::fmt::Display for FactsContent {
     }
 }
 
+impl std::str::FromStr for FactsContent {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "none" => Ok(Self::None),
+            "symbols" => Ok(Self::Symbols),
+            "calls" => Ok(Self::Calls),
+            "imports" => Ok(Self::Imports),
+            _ => Err(format!("unknown facts content: {s}")),
+        }
+    }
+}
+
 /// Helper for default include contents
 fn default_include() -> Vec<FactsContent> {
     vec![
@@ -968,5 +981,381 @@ fn format_size(bytes: u64) -> String {
         format!("{:.1} KB", bytes as f64 / KB as f64)
     } else {
         format!("{} B", bytes)
+    }
+}
+
+// =============================================================================
+// Service-callable functions (return data instead of printing)
+// =============================================================================
+
+use crate::service::facts::{
+    CommandResult, EcosystemCounts, ExtensionCount, FactsStats, FactsStatsOutput, FileList,
+    PackagesResult, RebuildResult, StorageEntry, StorageReport,
+};
+
+/// Service-callable rebuild.
+pub fn cmd_rebuild_service(
+    root: Option<&str>,
+    include: &[FactsContent],
+) -> Result<RebuildResult, String> {
+    let root_path = root.map(PathBuf::from);
+    let root_ref = root_path.as_deref();
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    rt.block_on(cmd_rebuild_data(root_ref, include))
+}
+
+async fn cmd_rebuild_data(
+    root: Option<&Path>,
+    include: &[FactsContent],
+) -> Result<RebuildResult, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let mut idx = index::open(&root)
+        .await
+        .map_err(|e| format!("Error opening index: {}", e))?;
+
+    let file_count = idx
+        .refresh()
+        .await
+        .map_err(|e| format!("Error refreshing index: {}", e))?;
+
+    let mut result = RebuildResult {
+        files: file_count,
+        symbols: None,
+        calls: None,
+        imports: None,
+    };
+
+    if !include.is_empty() && !include.contains(&FactsContent::None) {
+        let mut stats = idx
+            .refresh_call_graph()
+            .await
+            .map_err(|e| format!("Error indexing call graph: {}", e))?;
+
+        if !include.contains(&FactsContent::Symbols) {
+            let _ = idx.execute("DELETE FROM symbols").await;
+            stats.symbols = 0;
+        }
+        if !include.contains(&FactsContent::Calls) {
+            let _ = idx.execute("DELETE FROM calls").await;
+            stats.calls = 0;
+        }
+        if !include.contains(&FactsContent::Imports) {
+            let _ = idx.execute("DELETE FROM imports").await;
+            stats.imports = 0;
+        }
+
+        result.symbols = Some(stats.symbols);
+        result.calls = Some(stats.calls);
+        result.imports = Some(stats.imports);
+    }
+
+    Ok(result)
+}
+
+/// Service-callable stats.
+pub fn cmd_stats_service(root: Option<&str>, storage: bool) -> Result<FactsStatsOutput, String> {
+    let root_path = root.map(PathBuf::from);
+    let root_ref = root_path.as_deref();
+    if storage {
+        let effective_root = root_ref
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        return Ok(FactsStatsOutput::Storage(build_storage_report(
+            &effective_root,
+        )));
+    }
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    rt.block_on(cmd_stats_data(root_ref))
+        .map(FactsStatsOutput::Stats)
+}
+
+async fn cmd_stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let moss_dir = get_normalize_dir(&root);
+    let db_path = moss_dir.join("index.sqlite");
+    let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
+
+    let idx = index::open(&root)
+        .await
+        .map_err(|e| format!("Failed to open index: {}", e))?;
+
+    let files = idx
+        .all_files()
+        .await
+        .map_err(|e| format!("Failed to read files: {}", e))?;
+
+    let file_count = files.iter().filter(|f| !f.is_dir).count();
+    let dir_count = files.iter().filter(|f| f.is_dir).count();
+
+    let mut ext_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for f in &files {
+        if f.is_dir {
+            continue;
+        }
+        let path = std::path::Path::new(&f.path);
+        let ext = match path.extension().and_then(|e| e.to_str()) {
+            Some(e) => e.to_string(),
+            None => {
+                let full_path = root.join(&f.path);
+                if is_binary_file(&full_path) {
+                    "(binary)".to_string()
+                } else {
+                    "(no ext)".to_string()
+                }
+            }
+        };
+        *ext_counts.entry(ext).or_insert(0) += 1;
+    }
+
+    let mut ext_list: Vec<_> = ext_counts.into_iter().collect();
+    ext_list.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let stats = idx.call_graph_stats().await.unwrap_or_default();
+
+    let mut codebase_size = 0u64;
+    for f in &files {
+        if !f.is_dir {
+            let full_path = root.join(&f.path);
+            if let Ok(meta) = std::fs::metadata(&full_path) {
+                codebase_size += meta.len();
+            }
+        }
+    }
+
+    Ok(FactsStats {
+        db_size_bytes: db_size,
+        codebase_size_bytes: codebase_size,
+        ratio: if codebase_size > 0 {
+            db_size as f64 / codebase_size as f64
+        } else {
+            0.0
+        },
+        file_count,
+        dir_count,
+        symbol_count: stats.symbols,
+        call_count: stats.calls,
+        import_count: stats.imports,
+        extensions: ext_list
+            .into_iter()
+            .take(20)
+            .map(|(ext, count)| ExtensionCount { ext, count })
+            .collect(),
+    })
+}
+
+fn build_storage_report(root: &Path) -> StorageReport {
+    let index_path = root.join(".normalize").join("index.sqlite");
+    let index_size = std::fs::metadata(&index_path).map(|m| m.len()).unwrap_or(0);
+
+    let cache_dir = get_cache_dir().map(|d| d.join("packages"));
+    let cache_size = cache_dir.as_ref().map(|d| dir_size(d)).unwrap_or(0);
+
+    let global_cache_dir = get_cache_dir();
+    let global_size = global_cache_dir.as_ref().map(|d| dir_size(d)).unwrap_or(0);
+
+    StorageReport {
+        index: StorageEntry {
+            path: Some(index_path.display().to_string()),
+            bytes: index_size,
+            human: format_size(index_size),
+        },
+        package_cache: StorageEntry {
+            path: cache_dir.as_ref().map(|d| d.display().to_string()),
+            bytes: cache_size,
+            human: format_size(cache_size),
+        },
+        global_cache: StorageEntry {
+            path: global_cache_dir.as_ref().map(|d| d.display().to_string()),
+            bytes: global_size,
+            human: format_size(global_size),
+        },
+        total_bytes: index_size + global_size,
+        total_human: format_size(index_size + global_size),
+    }
+}
+
+/// Service-callable list files.
+pub fn cmd_list_files_service(
+    prefix: Option<&str>,
+    root: Option<&str>,
+    limit: usize,
+) -> Result<FileList, String> {
+    let root_path = root.map(PathBuf::from);
+    let root_ref = root_path.as_deref();
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    rt.block_on(cmd_list_files_data(prefix, root_ref, limit))
+}
+
+async fn cmd_list_files_data(
+    prefix: Option<&str>,
+    root: Option<&Path>,
+    limit: usize,
+) -> Result<FileList, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let idx = index::open(&root)
+        .await
+        .map_err(|e| format!("Failed to open index: {}", e))?;
+
+    let files = idx
+        .all_files()
+        .await
+        .map_err(|e| format!("Failed to read files: {}", e))?;
+
+    let prefix_str = prefix.unwrap_or("");
+    let filtered: Vec<String> = files
+        .iter()
+        .filter(|f| !f.is_dir && f.path.starts_with(prefix_str))
+        .take(limit)
+        .map(|f| f.path.clone())
+        .collect();
+
+    Ok(FileList { files: filtered })
+}
+
+/// Service-callable packages indexing.
+pub fn cmd_packages_service(
+    only: &[String],
+    clear: bool,
+    root: Option<&str>,
+) -> Result<PackagesResult, String> {
+    let root_path = root.map(PathBuf::from);
+    let root_ref = root_path.as_deref();
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    rt.block_on(cmd_packages_data(only, clear, root_ref))
+}
+
+async fn cmd_packages_data(
+    only: &[String],
+    clear: bool,
+    root: Option<&Path>,
+) -> Result<PackagesResult, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let pkg_index = external_packages::PackageIndex::open()
+        .await
+        .map_err(|e| format!("Failed to open package index: {}", e))?;
+
+    if clear {
+        pkg_index
+            .clear()
+            .await
+            .map_err(|e| format!("Failed to clear index: {}", e))?;
+        eprintln!("Cleared existing index");
+    }
+
+    let mut results: std::collections::HashMap<&str, IndexedCounts> =
+        std::collections::HashMap::new();
+
+    let all_deps = normalize_local_deps::registry::all_local_deps();
+    let available: Vec<&str> = all_deps
+        .iter()
+        .map(|d| d.ecosystem_key())
+        .filter(|k| !k.is_empty())
+        .collect();
+
+    let ecosystems: Vec<&str> = if only.is_empty() {
+        available.clone()
+    } else {
+        only.iter()
+            .map(|s| s.as_str())
+            .filter(|s| available.contains(s))
+            .collect()
+    };
+
+    for eco in only {
+        if !available.contains(&eco.as_str()) {
+            eprintln!(
+                "Error: unknown ecosystem '{}', valid options: {}",
+                eco,
+                available.join(", ")
+            );
+        }
+    }
+
+    for deps in &all_deps {
+        let eco_key = deps.ecosystem_key();
+        if eco_key.is_empty() || !ecosystems.contains(&eco_key) {
+            continue;
+        }
+        if results.contains_key(eco_key) {
+            continue;
+        }
+        let counts = index_language_packages(*deps, &pkg_index, &root, false).await;
+        results.insert(eco_key, counts);
+    }
+
+    Ok(PackagesResult {
+        ecosystems: results
+            .into_iter()
+            .map(|(name, counts)| EcosystemCounts {
+                name: name.to_string(),
+                packages: counts.packages,
+                symbols: counts.symbols,
+            })
+            .collect(),
+    })
+}
+
+/// Service-callable facts rules (compiled dylibs).
+pub fn cmd_facts_rules_service(
+    root: Option<&str>,
+    rule: Option<&str>,
+    pack: Option<&str>,
+    list: bool,
+) -> Result<CommandResult, String> {
+    let root_path = root.map(PathBuf::from);
+    let root_ref = root_path.as_deref();
+    let pack_path = pack.map(PathBuf::from);
+    let pack_ref = pack_path.as_deref();
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    let exit_code = rt.block_on(cmd_rules(root_ref, rule, pack_ref, list, false));
+    if exit_code == 0 {
+        Ok(CommandResult {
+            success: true,
+            message: None,
+            data: None,
+        })
+    } else {
+        Err("Rule execution failed".to_string())
+    }
+}
+
+/// Service-callable facts check (interpreted Datalog).
+pub fn cmd_check_service(
+    root: Option<&str>,
+    rules_file: Option<&str>,
+    list: bool,
+) -> Result<CommandResult, String> {
+    let effective_root = root
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = crate::config::NormalizeConfig::load(&effective_root);
+    let rules_file_path = rules_file.map(PathBuf::from);
+    let exit_code = super::rules::cmd_run_facts(
+        &effective_root,
+        rules_file_path.as_deref(),
+        list,
+        false,
+        &config.analyze.facts_rules,
+    );
+    if exit_code == 0 {
+        Ok(CommandResult {
+            success: true,
+            message: None,
+            data: None,
+        })
+    } else {
+        Err("Check failed".to_string())
     }
 }

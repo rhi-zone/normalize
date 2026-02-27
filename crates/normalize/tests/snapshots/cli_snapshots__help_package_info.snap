@@ -4,21 +4,20 @@ expression: "snapshot_help(&[\"package\", \"info\"])"
 ---
 Query package info from registry
 
-Usage: normalize package info [OPTIONS] <PACKAGE>
+Usage: normalize package info [OPTIONS] [package]
 
 Arguments:
-  <PACKAGE>  Package name to query (optionally with @version)
+  [package]  Package name to query (optionally with @version)
 
 Options:
-  -e, --ecosystem <ECOSYSTEM>  Force specific ecosystem (cargo, npm, python)
-  -r, --root <ROOT>            Root directory (defaults to current directory)
-      --repos <DIR>            Run command across all git repos under DIR (1 level deep)
-      --json                   Output as JSON
-      --jsonl                  Output as JSON Lines (one object per line)
-      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
-      --pretty                 Human-friendly output with colors and formatting
-      --compact                Compact output without colors (overrides TTY detection)
-      --output-schema          Output JSON schema for the command's return type
-      --input-schema           Output JSON schema for the command's input arguments
-      --params-json <JSON>     Pass command arguments as JSON (overrides CLI args)
-  -h, --help                   Print help
+  -e, --ecosystem <ecosystem>      Force specific ecosystem (cargo, npm, python)
+      --jsonl                      Output one JSON object per line (for arrays)
+      --json                       Output machine-readable JSON
+  -r, --root <root>                Root directory (defaults to current directory)
+      --jq <jq>                    Filter output through jq expression
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

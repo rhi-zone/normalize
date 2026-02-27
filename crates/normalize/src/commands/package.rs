@@ -9,7 +9,7 @@ use normalize_ecosystems::{
 use nu_ansi_term::Color::Yellow;
 use std::path::Path;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
 pub enum PackageAction {
     /// Query package info from registry
     Info {
@@ -588,6 +588,54 @@ fn find_ecosystem_by_name(name: &str) -> Option<&'static dyn normalize_ecosystem
 
 fn available_ecosystems() -> Vec<&'static str> {
     all_ecosystems().iter().map(|e| e.name()).collect()
+}
+
+/// Service-callable package command.
+/// Dispatches to the appropriate subcommand based on `action` string.
+pub fn cmd_package_service(
+    action: &str,
+    package: Option<&str>,
+    ecosystem: Option<&str>,
+    root: Option<&str>,
+    use_colors: bool,
+) -> Result<crate::service::package::PackageResult, String> {
+    let package_action = match action {
+        "info" => {
+            let pkg = package.ok_or("package name required")?;
+            PackageAction::Info {
+                package: pkg.to_string(),
+            }
+        }
+        "list" => PackageAction::List,
+        "tree" => PackageAction::Tree,
+        "why" => {
+            let pkg = package.ok_or("package name required")?;
+            PackageAction::Why {
+                package: pkg.to_string(),
+            }
+        }
+        "outdated" => PackageAction::Outdated,
+        "audit" => PackageAction::Audit,
+        _ => return Err(format!("unknown package action: {}", action)),
+    };
+
+    let format = if use_colors {
+        OutputFormat::Pretty { colors: true }
+    } else {
+        OutputFormat::Compact
+    };
+
+    let root_path = root.map(std::path::Path::new);
+    let exit_code = cmd_package(package_action, ecosystem, root_path, format);
+    if exit_code == 0 {
+        Ok(crate::service::package::PackageResult {
+            success: true,
+            message: None,
+            data: None,
+        })
+    } else {
+        Err("Command failed".to_string())
+    }
 }
 
 /// Print a JSON value, applying jq filter if specified.

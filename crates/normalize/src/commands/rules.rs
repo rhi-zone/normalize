@@ -19,6 +19,28 @@ pub enum RuleType {
     Fact,
 }
 
+impl std::fmt::Display for RuleType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::All => f.write_str("all"),
+            Self::Syntax => f.write_str("syntax"),
+            Self::Fact => f.write_str("fact"),
+        }
+    }
+}
+
+impl std::str::FromStr for RuleType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "all" => Ok(Self::All),
+            "syntax" => Ok(Self::Syntax),
+            "fact" => Ok(Self::Fact),
+            _ => Err(format!("unknown rule type: {s}")),
+        }
+    }
+}
+
 #[derive(Subcommand, Deserialize, schemars::JsonSchema)]
 pub enum RulesAction {
     /// List all rules (syntax + fact, builtin + user)
@@ -1588,4 +1610,152 @@ fn sha256_hex(content: &str) -> String {
     let mut hasher = DefaultHasher::new();
     content.hash(&mut hasher);
     format!("{:016x}", hasher.finish())
+}
+
+// =============================================================================
+// Service-callable functions
+// =============================================================================
+
+use crate::service::rules::RuleResult;
+
+fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
+    if exit_code == 0 {
+        Ok(RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
+    } else {
+        Err("Command failed".to_string())
+    }
+}
+
+/// Service-callable list.
+#[allow(clippy::too_many_arguments)]
+pub fn cmd_list_service(
+    root: Option<&str>,
+    sources: bool,
+    type_str: &str,
+    tag: Option<&str>,
+    enabled: bool,
+    disabled: bool,
+    no_desc: bool,
+    use_colors: bool,
+) -> Result<RuleResult, String> {
+    let effective_root = root
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = crate::config::NormalizeConfig::load(&effective_root);
+    let rule_type: RuleType = type_str.parse().unwrap_or_default();
+    let exit_code = cmd_list(
+        &effective_root,
+        ListFilters {
+            sources,
+            type_filter: &rule_type,
+            tag,
+            enabled,
+            disabled,
+            no_desc,
+            json: false,
+            use_colors,
+        },
+        &config,
+    );
+    exit_to_result(exit_code)
+}
+
+/// Service-callable run.
+#[allow(clippy::too_many_arguments)]
+pub fn cmd_run_service(
+    root: Option<&str>,
+    rule: Option<&str>,
+    tag: Option<&str>,
+    fix: bool,
+    sarif: bool,
+    target: Option<&str>,
+    type_str: &str,
+    debug: &[String],
+) -> Result<RuleResult, String> {
+    let effective_root = root
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = crate::config::NormalizeConfig::load(&effective_root);
+    let rule_type: RuleType = type_str.parse().unwrap_or_default();
+    let target_root = target
+        .map(PathBuf::from)
+        .unwrap_or_else(|| effective_root.clone());
+    let exit_code = cmd_run(
+        &target_root,
+        rule,
+        tag,
+        fix,
+        sarif,
+        &rule_type,
+        debug,
+        false,
+        &config,
+    );
+    exit_to_result(exit_code)
+}
+
+/// Service-callable enable/disable.
+pub fn cmd_enable_disable_service(
+    root: Option<&str>,
+    id_or_tag: &str,
+    enable: bool,
+    dry_run: bool,
+) -> Result<RuleResult, String> {
+    let effective_root = root
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = crate::config::NormalizeConfig::load(&effective_root);
+    let exit_code = cmd_enable_disable(&effective_root, id_or_tag, enable, dry_run, &config);
+    exit_to_result(exit_code)
+}
+
+/// Service-callable show.
+pub fn cmd_show_service(
+    root: Option<&str>,
+    id: &str,
+    use_colors: bool,
+) -> Result<RuleResult, String> {
+    let effective_root = root
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = crate::config::NormalizeConfig::load(&effective_root);
+    let exit_code = cmd_show(&effective_root, id, false, use_colors, &config);
+    exit_to_result(exit_code)
+}
+
+/// Service-callable tags.
+pub fn cmd_tags_service(
+    root: Option<&str>,
+    show_rules: bool,
+    tag: Option<&str>,
+    use_colors: bool,
+) -> Result<RuleResult, String> {
+    let effective_root = root
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let config = crate::config::NormalizeConfig::load(&effective_root);
+    let exit_code = cmd_tags(&effective_root, show_rules, tag, false, use_colors, &config);
+    exit_to_result(exit_code)
+}
+
+/// Service-callable add.
+pub fn cmd_add_service(url: &str, global: bool) -> Result<RuleResult, String> {
+    let exit_code = cmd_add(url, global, false);
+    exit_to_result(exit_code)
+}
+
+/// Service-callable update.
+pub fn cmd_update_service(rule_id: Option<&str>) -> Result<RuleResult, String> {
+    let exit_code = cmd_update(rule_id, false);
+    exit_to_result(exit_code)
+}
+
+/// Service-callable remove.
+pub fn cmd_remove_service(rule_id: &str) -> Result<RuleResult, String> {
+    let exit_code = cmd_remove(rule_id, false);
+    exit_to_result(exit_code)
 }

@@ -338,6 +338,9 @@ const SERVER_LESS_COMMANDS: &[&str] = &[
     "daemon",
     "grammars",
     "generate",
+    "facts",
+    "rules",
+    "package",
 ];
 
 /// Try dispatching through server-less for migrated commands.
