@@ -16,6 +16,7 @@ Options:
       --exclude <exclude>          Exclude paths matching pattern
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --repos <repos>              Run across all git repos under DIR (1 level deep)
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help

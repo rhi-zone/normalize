@@ -11,104 +11,143 @@ use std::path::Path;
 
 /// Hotspot data for a file
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct FileHotspot {
-    path: String,
-    commits: usize,
-    lines_added: usize,
-    lines_deleted: usize,
-    max_complexity: Option<usize>,
+pub struct FileHotspot {
+    pub path: String,
+    pub commits: usize,
+    pub lines_added: usize,
+    pub lines_deleted: usize,
+    pub max_complexity: Option<usize>,
     #[serde(skip)]
-    score: f64,
+    pub score: f64,
+}
+
+/// Per-repo hotspots entry for multi-repo runs
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct HotspotsRepoEntry {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub hotspots: Vec<FileHotspot>,
+    pub has_complexity: bool,
+    pub recency_weighted: bool,
 }
 
 /// Hotspots analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct HotspotsReport {
-    hotspots: Vec<FileHotspot>,
+    pub hotspots: Vec<FileHotspot>,
+    pub has_complexity: bool,
+    pub recency_weighted: bool,
+    /// Per-repo results when run with --repos
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repos: Option<Vec<HotspotsRepoEntry>>,
+}
+
+fn format_hotspots_data(
+    hotspots: &[FileHotspot],
     has_complexity: bool,
     recency_weighted: bool,
+) -> String {
+    let mut lines = Vec::new();
+    let title = if recency_weighted {
+        "Git Hotspots (recency-weighted churn)"
+    } else {
+        "Git Hotspots (high churn)"
+    };
+    lines.push(title.to_string());
+    lines.push(String::new());
+
+    if has_complexity {
+        lines.push(format!(
+            "{:<50} {:>8} {:>8} {:>6} {:>8}",
+            "File", "Commits", "Churn", "Cplx", "Score"
+        ));
+        lines.push("-".repeat(86));
+    } else {
+        lines.push(format!(
+            "{:<50} {:>8} {:>8} {:>8}",
+            "File", "Commits", "Churn", "Score"
+        ));
+        lines.push("-".repeat(80));
+    }
+
+    for h in hotspots {
+        let churn = h.lines_added + h.lines_deleted;
+        let display_path = if h.path.len() > 48 {
+            format!("...{}", &h.path[h.path.len() - 45..])
+        } else {
+            h.path.clone()
+        };
+        if has_complexity {
+            let cplx_str = match h.max_complexity {
+                Some(c) => format!("{}", c),
+                None => "-".to_string(),
+            };
+            lines.push(format!(
+                "{:<50} {:>8} {:>8} {:>6} {:>8.0}",
+                display_path, h.commits, churn, cplx_str, h.score
+            ));
+        } else {
+            lines.push(format!(
+                "{:<50} {:>8} {:>8} {:>8.0}",
+                display_path, h.commits, churn, h.score
+            ));
+        }
+    }
+
+    lines.push(String::new());
+
+    let base_formula = if recency_weighted {
+        "\u{2211}(e^(-\u{03bb}\u{00b7}age) \u{00d7} \u{221a}churn_i)"
+    } else {
+        "commits \u{00d7} \u{221a}churn"
+    };
+
+    if has_complexity {
+        lines.push(format!(
+            "Score = {} \u{00d7} log\u{2082}(1 + max_complexity)",
+            base_formula
+        ));
+        lines.push("High scores indicate complex, bug-prone files that change often.".to_string());
+    } else {
+        lines.push(format!("Score = {}", base_formula));
+        lines.push("High scores indicate bug-prone files that change often.".to_string());
+        lines.push("Run with complexity data for risk-weighted scores.".to_string());
+    }
+
+    if recency_weighted {
+        lines.push("Recency half-life: 180 days (recent changes weighted higher).".to_string());
+    }
+
+    lines.join("\n")
 }
 
 impl OutputFormatter for HotspotsReport {
     fn format_text(&self) -> String {
+        if let Some(ref repos) = self.repos {
+            let mut parts = Vec::new();
+            for entry in repos {
+                parts.push(format!("=== {} ===", entry.name));
+                if let Some(ref err) = entry.error {
+                    parts.push(format!("Error: {}", err));
+                } else if entry.hotspots.is_empty() {
+                    parts.push("No hotspots found (no git history or source files)".to_string());
+                } else {
+                    parts.push(format_hotspots_data(
+                        &entry.hotspots,
+                        entry.has_complexity,
+                        entry.recency_weighted,
+                    ));
+                }
+                parts.push(String::new());
+            }
+            return parts.join("\n");
+        }
+
         if self.hotspots.is_empty() {
             return "No hotspots found (no git history or source files)".to_string();
         }
-
-        let mut lines = Vec::new();
-        let title = if self.recency_weighted {
-            "Git Hotspots (recency-weighted churn)"
-        } else {
-            "Git Hotspots (high churn)"
-        };
-        lines.push(title.to_string());
-        lines.push(String::new());
-
-        if self.has_complexity {
-            lines.push(format!(
-                "{:<50} {:>8} {:>8} {:>6} {:>8}",
-                "File", "Commits", "Churn", "Cplx", "Score"
-            ));
-            lines.push("-".repeat(86));
-        } else {
-            lines.push(format!(
-                "{:<50} {:>8} {:>8} {:>8}",
-                "File", "Commits", "Churn", "Score"
-            ));
-            lines.push("-".repeat(80));
-        }
-
-        for h in &self.hotspots {
-            let churn = h.lines_added + h.lines_deleted;
-            let display_path = if h.path.len() > 48 {
-                format!("...{}", &h.path[h.path.len() - 45..])
-            } else {
-                h.path.clone()
-            };
-            if self.has_complexity {
-                let cplx_str = match h.max_complexity {
-                    Some(c) => format!("{}", c),
-                    None => "-".to_string(),
-                };
-                lines.push(format!(
-                    "{:<50} {:>8} {:>8} {:>6} {:>8.0}",
-                    display_path, h.commits, churn, cplx_str, h.score
-                ));
-            } else {
-                lines.push(format!(
-                    "{:<50} {:>8} {:>8} {:>8.0}",
-                    display_path, h.commits, churn, h.score
-                ));
-            }
-        }
-
-        lines.push(String::new());
-
-        let base_formula = if self.recency_weighted {
-            "\u{2211}(e^(-\u{03bb}\u{00b7}age) \u{00d7} \u{221a}churn_i)"
-        } else {
-            "commits \u{00d7} \u{221a}churn"
-        };
-
-        if self.has_complexity {
-            lines.push(format!(
-                "Score = {} \u{00d7} log\u{2082}(1 + max_complexity)",
-                base_formula
-            ));
-            lines.push(
-                "High scores indicate complex, bug-prone files that change often.".to_string(),
-            );
-        } else {
-            lines.push(format!("Score = {}", base_formula));
-            lines.push("High scores indicate bug-prone files that change often.".to_string());
-            lines.push("Run with complexity data for risk-weighted scores.".to_string());
-        }
-
-        if self.recency_weighted {
-            lines.push("Recency half-life: 180 days (recent changes weighted higher).".to_string());
-        }
-
-        lines.join("\n")
+        format_hotspots_data(&self.hotspots, self.has_complexity, self.recency_weighted)
     }
 }
 
@@ -318,6 +357,7 @@ pub fn analyze_hotspots(
         hotspots,
         has_complexity,
         recency_weighted: recency,
+        repos: None,
     })
 }
 

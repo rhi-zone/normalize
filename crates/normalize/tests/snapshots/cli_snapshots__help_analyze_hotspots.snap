@@ -14,6 +14,7 @@ Options:
       --json                       Output machine-readable JSON
   -r, --root <root>                Root directory (defaults to current directory)
       --jq <jq>                    Filter output through jq expression
+      --repos <repos>              Run across all git repos under DIR (1 level deep)
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags

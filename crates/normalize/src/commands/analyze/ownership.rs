@@ -10,58 +10,89 @@ use std::path::Path;
 
 /// Ownership data for a file
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct FileOwnership {
-    path: String,
-    total_lines: usize,
+pub struct FileOwnership {
+    pub path: String,
+    pub total_lines: usize,
     /// Number of distinct authors
-    authors: usize,
+    pub authors: usize,
     /// Top author and their percentage of lines
-    top_author: String,
-    top_author_pct: f64,
+    pub top_author: String,
+    pub top_author_pct: f64,
     /// Bus factor: number of authors needed to cover >50% of lines
-    bus_factor: usize,
+    pub bus_factor: usize,
+}
+
+/// Per-repo ownership entry for multi-repo runs
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct OwnershipRepoEntry {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub files: Vec<FileOwnership>,
 }
 
 /// Ownership analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct OwnershipReport {
-    files: Vec<FileOwnership>,
+    pub files: Vec<FileOwnership>,
+    /// Per-repo results when run with --repos
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repos: Option<Vec<OwnershipRepoEntry>>,
+}
+
+fn format_ownership_data(files: &[FileOwnership]) -> String {
+    let mut lines = Vec::new();
+    lines.push("File Ownership (git blame)".to_string());
+    lines.push(String::new());
+    lines.push(format!(
+        "{:<50} {:>6} {:>4} {:>3} {:<20}",
+        "File", "Lines", "Auth", "BF", "Top Author"
+    ));
+    lines.push("-".repeat(90));
+
+    for f in files {
+        let display_path = truncate_path(&f.path, 48);
+        let top = format!("{} ({:.0}%)", f.top_author, f.top_author_pct * 100.0);
+        let top_display = if top.len() > 28 {
+            format!("{}...", &top[..25])
+        } else {
+            top
+        };
+        lines.push(format!(
+            "{:<50} {:>6} {:>4} {:>3} {:<20}",
+            display_path, f.total_lines, f.authors, f.bus_factor, top_display
+        ));
+    }
+
+    lines.push(String::new());
+    lines.push("BF = Bus Factor (authors needed for >50% ownership)".to_string());
+    lines.push("Low bus factor (1) means single-author risk.".to_string());
+
+    lines.join("\n")
 }
 
 impl OutputFormatter for OwnershipReport {
     fn format_text(&self) -> String {
+        if let Some(ref repos) = self.repos {
+            let mut parts = Vec::new();
+            for entry in repos {
+                parts.push(format!("=== {} ===", entry.name));
+                if let Some(ref err) = entry.error {
+                    parts.push(format!("Error: {}", err));
+                } else if entry.files.is_empty() {
+                    parts.push("No ownership data found".to_string());
+                } else {
+                    parts.push(format_ownership_data(&entry.files));
+                }
+                parts.push(String::new());
+            }
+            return parts.join("\n");
+        }
+
         if self.files.is_empty() {
             return "No ownership data found".to_string();
         }
-
-        let mut lines = Vec::new();
-        lines.push("File Ownership (git blame)".to_string());
-        lines.push(String::new());
-        lines.push(format!(
-            "{:<50} {:>6} {:>4} {:>3} {:<20}",
-            "File", "Lines", "Auth", "BF", "Top Author"
-        ));
-        lines.push("-".repeat(90));
-
-        for f in &self.files {
-            let display_path = truncate_path(&f.path, 48);
-            let top = format!("{} ({:.0}%)", f.top_author, f.top_author_pct * 100.0);
-            let top_display = if top.len() > 28 {
-                format!("{}...", &top[..25])
-            } else {
-                top
-            };
-            lines.push(format!(
-                "{:<50} {:>6} {:>4} {:>3} {:<20}",
-                display_path, f.total_lines, f.authors, f.bus_factor, top_display
-            ));
-        }
-
-        lines.push(String::new());
-        lines.push("BF = Bus Factor (authors needed for >50% ownership)".to_string());
-        lines.push("Low bus factor (1) means single-author risk.".to_string());
-
-        lines.join("\n")
+        format_ownership_data(&self.files)
     }
 }
 
@@ -192,7 +223,7 @@ pub fn analyze_ownership(
     });
     files.truncate(limit);
 
-    Ok(OwnershipReport { files })
+    Ok(OwnershipReport { files, repos: None })
 }
 
 /// Analyze file ownership via git blame (CLI entry point)

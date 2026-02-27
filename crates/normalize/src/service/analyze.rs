@@ -8,7 +8,7 @@ use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::check_examples::CheckExamplesReport;
 use crate::commands::analyze::check_refs::CheckRefsReport;
 use crate::commands::analyze::contributors::ContributorsReport;
-use crate::commands::analyze::coupling::CouplingReport;
+use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
 use crate::commands::analyze::docs::DocCoverageReport;
 use crate::commands::analyze::duplicates::{
     DuplicateBlocksConfig, DuplicateBlocksReport, DuplicateFunctionsConfig,
@@ -16,8 +16,8 @@ use crate::commands::analyze::duplicates::{
     SimilarFunctionsConfig, SimilarFunctionsReport,
 };
 use crate::commands::analyze::files::FileLengthReport;
-use crate::commands::analyze::hotspots::HotspotsReport;
-use crate::commands::analyze::ownership::OwnershipReport;
+use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
+use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
 use crate::commands::analyze::query::MatchResult;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
@@ -600,8 +600,52 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Run across all git repos under DIR (1 level deep)")] repos: Option<String>,
     ) -> Result<HotspotsReport, String> {
         let root_path = Self::root_path(root);
+        if let Some(repos_dir) = repos {
+            let repo_paths = discover_repos(&repos_dir)?;
+            let entries: Vec<HotspotsRepoEntry> = repo_paths
+                .into_iter()
+                .map(|repo_path| {
+                    let name = repo_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let config = crate::config::NormalizeConfig::load(&repo_path);
+                    let mut excludes = config.analyze.hotspots_exclude.clone();
+                    excludes.extend(crate::commands::analyze::load_allow_file(
+                        &repo_path,
+                        "hotspots-allow",
+                    ));
+                    match crate::commands::analyze::hotspots::analyze_hotspots(
+                        &repo_path, &excludes, recency,
+                    ) {
+                        Ok(r) => HotspotsRepoEntry {
+                            name,
+                            error: None,
+                            hotspots: r.hotspots,
+                            has_complexity: r.has_complexity,
+                            recency_weighted: r.recency_weighted,
+                        },
+                        Err(e) => HotspotsRepoEntry {
+                            name,
+                            error: Some(e),
+                            hotspots: vec![],
+                            has_complexity: false,
+                            recency_weighted: recency,
+                        },
+                    }
+                })
+                .collect();
+            return Ok(HotspotsReport {
+                hotspots: vec![],
+                has_complexity: false,
+                recency_weighted: recency,
+                repos: Some(entries),
+            });
+        }
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut excludes = config.analyze.hotspots_exclude.clone();
         excludes.extend(crate::commands::analyze::load_allow_file(
@@ -623,14 +667,43 @@ impl AnalyzeService {
             String,
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Run across all git repos under DIR (1 level deep)")] repos: Option<String>,
     ) -> Result<CouplingReport, String> {
         let root_path = Self::root_path(root);
-        crate::commands::analyze::coupling::analyze_coupling(
-            &root_path,
-            min_commits.unwrap_or(3),
-            limit.unwrap_or(20),
-            &exclude,
-        )
+        let min = min_commits.unwrap_or(3);
+        let lim = limit.unwrap_or(20);
+        if let Some(repos_dir) = repos {
+            let repo_paths = discover_repos(&repos_dir)?;
+            let entries: Vec<CouplingRepoEntry> = repo_paths
+                .into_iter()
+                .map(|repo_path| {
+                    let name = repo_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    match crate::commands::analyze::coupling::analyze_coupling(
+                        &repo_path, min, lim, &exclude,
+                    ) {
+                        Ok(r) => CouplingRepoEntry {
+                            name,
+                            error: None,
+                            pairs: r.pairs,
+                        },
+                        Err(e) => CouplingRepoEntry {
+                            name,
+                            error: Some(e),
+                            pairs: vec![],
+                        },
+                    }
+                })
+                .collect();
+            return Ok(CouplingReport {
+                pairs: vec![],
+                repos: Some(entries),
+            });
+        }
+        crate::commands::analyze::coupling::analyze_coupling(&root_path, min, lim, &exclude)
     }
 
     /// Show per-file ownership concentration from git blame
@@ -642,13 +715,42 @@ impl AnalyzeService {
             String,
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Run across all git repos under DIR (1 level deep)")] repos: Option<String>,
     ) -> Result<OwnershipReport, String> {
         let root_path = Self::root_path(root);
-        crate::commands::analyze::ownership::analyze_ownership(
-            &root_path,
-            limit.unwrap_or(20),
-            &exclude,
-        )
+        let lim = limit.unwrap_or(20);
+        if let Some(repos_dir) = repos {
+            let repo_paths = discover_repos(&repos_dir)?;
+            let entries: Vec<OwnershipRepoEntry> = repo_paths
+                .into_iter()
+                .map(|repo_path| {
+                    let name = repo_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    match crate::commands::analyze::ownership::analyze_ownership(
+                        &repo_path, lim, &exclude,
+                    ) {
+                        Ok(r) => OwnershipRepoEntry {
+                            name,
+                            error: None,
+                            files: r.files,
+                        },
+                        Err(e) => OwnershipRepoEntry {
+                            name,
+                            error: Some(e),
+                            files: vec![],
+                        },
+                    }
+                })
+                .collect();
+            return Ok(OwnershipReport {
+                files: vec![],
+                repos: Some(entries),
+            });
+        }
+        crate::commands::analyze::ownership::analyze_ownership(&root_path, lim, &exclude)
     }
 
     /// Analyze contributors across repos

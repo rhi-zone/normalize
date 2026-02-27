@@ -9,58 +9,91 @@ use std::path::Path;
 
 /// A pair of files with temporal coupling
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct CoupledPair {
-    file_a: String,
-    file_b: String,
+pub struct CoupledPair {
+    pub file_a: String,
+    pub file_b: String,
     /// Number of commits where both files changed
-    shared_commits: usize,
+    pub shared_commits: usize,
     /// Total commits touching file_a
-    commits_a: usize,
+    pub commits_a: usize,
     /// Total commits touching file_b
-    commits_b: usize,
+    pub commits_b: usize,
     /// Confidence: shared / max(commits_a, commits_b)
-    confidence: f64,
+    pub confidence: f64,
+}
+
+/// Per-repo coupling entry for multi-repo runs
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct CouplingRepoEntry {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub pairs: Vec<CoupledPair>,
 }
 
 /// Temporal coupling report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct CouplingReport {
-    pairs: Vec<CoupledPair>,
+    pub pairs: Vec<CoupledPair>,
+    /// Per-repo results when run with --repos
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repos: Option<Vec<CouplingRepoEntry>>,
+}
+
+fn format_coupling_data(pairs: &[CoupledPair]) -> String {
+    let mut lines = Vec::new();
+    lines.push("Temporal Coupling (files that change together)".to_string());
+    lines.push(String::new());
+    lines.push(format!(
+        "{:<45} {:<45} {:>7} {:>6}",
+        "File A", "File B", "Shared", "Conf%"
+    ));
+    lines.push("-".repeat(107));
+
+    for p in pairs {
+        let a = truncate_path(&p.file_a, 43);
+        let b = truncate_path(&p.file_b, 43);
+        lines.push(format!(
+            "{:<45} {:<45} {:>7} {:>5.0}%",
+            a,
+            b,
+            p.shared_commits,
+            p.confidence * 100.0
+        ));
+    }
+
+    lines.push(String::new());
+    lines.push("Confidence = shared commits / max(commits_a, commits_b)".to_string());
+    lines.push("High coupling may indicate hidden dependencies or shotgun surgery.".to_string());
+
+    lines.join("\n")
 }
 
 impl OutputFormatter for CouplingReport {
     fn format_text(&self) -> String {
+        if let Some(ref repos) = self.repos {
+            let mut parts = Vec::new();
+            for entry in repos {
+                parts.push(format!("=== {} ===", entry.name));
+                if let Some(ref err) = entry.error {
+                    parts.push(format!("Error: {}", err));
+                } else if entry.pairs.is_empty() {
+                    parts.push(
+                        "No temporal coupling found (no files change together frequently)"
+                            .to_string(),
+                    );
+                } else {
+                    parts.push(format_coupling_data(&entry.pairs));
+                }
+                parts.push(String::new());
+            }
+            return parts.join("\n");
+        }
+
         if self.pairs.is_empty() {
             return "No temporal coupling found (no files change together frequently)".to_string();
         }
-
-        let mut lines = Vec::new();
-        lines.push("Temporal Coupling (files that change together)".to_string());
-        lines.push(String::new());
-        lines.push(format!(
-            "{:<45} {:<45} {:>7} {:>6}",
-            "File A", "File B", "Shared", "Conf%"
-        ));
-        lines.push("-".repeat(107));
-
-        for p in &self.pairs {
-            let a = truncate_path(&p.file_a, 43);
-            let b = truncate_path(&p.file_b, 43);
-            lines.push(format!(
-                "{:<45} {:<45} {:>7} {:>5.0}%",
-                a,
-                b,
-                p.shared_commits,
-                p.confidence * 100.0
-            ));
-        }
-
-        lines.push(String::new());
-        lines.push("Confidence = shared commits / max(commits_a, commits_b)".to_string());
-        lines
-            .push("High coupling may indicate hidden dependencies or shotgun surgery.".to_string());
-
-        lines.join("\n")
+        format_coupling_data(&self.pairs)
     }
 }
 
@@ -187,7 +220,7 @@ pub fn analyze_coupling(
     });
     pairs.truncate(limit);
 
-    Ok(CouplingReport { pairs })
+    Ok(CouplingReport { pairs, repos: None })
 }
 
 /// Parse git log to get per-commit file sets, then compute co-change pairs (CLI entry point)
