@@ -34,6 +34,7 @@ pub mod path_resolve;
 pub mod paths;
 pub mod rules;
 pub mod serve;
+pub mod service;
 pub mod sessions;
 pub mod shadow;
 pub mod skeleton;

@@ -7,7 +7,7 @@ use std::path::Path;
 
 /// Build a `Filter` from `--exclude` / `--only` patterns, printing any warnings.
 /// Returns `None` if both slices are empty (no filtering needed).
-pub(super) fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<Filter> {
+pub fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<Filter> {
     if exclude.is_empty() && only.is_empty() {
         return None;
     }

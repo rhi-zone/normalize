@@ -3462,6 +3462,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "server-less",
  "streaming-iterator",
  "tar",
  "tempfile",
@@ -4777,6 +4778,68 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "server-less"
+version = "0.1.0"
+source = "git+https://github.com/rhi-zone/server-less#47404e5284d2c28271109c637de8a14a7a99c71c"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "server-less-core",
+ "server-less-macros",
+]
+
+[[package]]
+name = "server-less-core"
+version = "0.1.0"
+source = "git+https://github.com/rhi-zone/server-less#47404e5284d2c28271109c637de8a14a7a99c71c"
+dependencies = [
+ "clap",
+ "futures-core",
+ "http 1.4.0",
+ "jaq-core",
+ "jaq-json",
+ "jaq-std",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "server-less-macros"
+version = "0.1.0"
+source = "git+https://github.com/rhi-zone/server-less#47404e5284d2c28271109c637de8a14a7a99c71c"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "server-less-parse",
+ "server-less-rpc",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "server-less-parse"
+version = "0.1.0"
+source = "git+https://github.com/rhi-zone/server-less#47404e5284d2c28271109c637de8a14a7a99c71c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "server-less-rpc"
+version = "0.1.0"
+source = "git+https://github.com/rhi-zone/server-less#47404e5284d2c28271109c637de8a14a7a99c71c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "server-less-parse",
+ "syn 2.0.114",
 ]
 
 [[package]]

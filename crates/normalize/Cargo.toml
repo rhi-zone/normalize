@@ -58,6 +58,7 @@ normalize-rules-loader = { path = "../normalize-rules-loader", version = "0.1.0"
 normalize-deps = { path = "../normalize-deps", version = "0.1.0" }
 normalize-filter = { path = "../normalize-filter", version = "0.1.0", features = ["config"] }
 normalize-tools = { path = "../normalize-tools", version = "0.1.0" }
+server-less.workspace = true
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }
 normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.1.0", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }
 grep-matcher.workspace = true

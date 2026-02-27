@@ -242,6 +242,11 @@ fn main() {
         return;
     }
 
+    // Route migrated commands through server-less
+    if try_server_less() {
+        return;
+    }
+
     // Parse with custom styles and color choice
     let cli = Cli::command()
         .styles(HELP_STYLES)
@@ -360,6 +365,32 @@ fn main() {
     };
 
     std::process::exit(exit_code);
+}
+
+/// Commands migrated to server-less `#[cli]`.
+const SERVER_LESS_COMMANDS: &[&str] = &["grep"];
+
+/// Try dispatching through server-less for migrated commands.
+/// Returns true if the command was handled, false to fall through to legacy.
+fn try_server_less() -> bool {
+    let args: Vec<String> = std::env::args().collect();
+    let subcmd = match args.get(1) {
+        Some(s) => s.as_str(),
+        None => return false,
+    };
+
+    if !SERVER_LESS_COMMANDS.contains(&subcmd) {
+        return false;
+    }
+
+    let service = normalize::service::NormalizeService::new();
+    match service.cli_run() {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }
+    }
 }
 
 /// Run a supported command across all repos under `repos_dir`.
