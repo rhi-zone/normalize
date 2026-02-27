@@ -138,16 +138,17 @@ impl NormalizeService {
 ```
 This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle layer, duplicated `--root`/`--exclude`/`--only` definitions.
 
-**server-less `#[cli]` gaps to fill first** (in rhi-zone/server-less):
-- [ ] `bool` params as switches (`--verbose` not `--verbose true`)
-- [ ] `Vec<T>` params with `.action(Append)` / `value_delimiter`
-- [ ] Global/shared flags across subcommands (`--json`, `--pretty`, `--root`)
-- [ ] Output formatting integration (`OutputFormatter` trait or equivalent)
-- [ ] `--output-schema` / `--input-schema` / `--params-json` support
-- [ ] Config file loading/merge (normalize's `NormalizeConfig` pattern)
+**server-less `#[cli]` status** (rhi-zone/server-less):
+- [x] `bool` params as switches (`ArgAction::SetTrue`)
+- [x] `Vec<T>` params with Append + comma delimiter
+- [x] Global/shared flags (`global = [...]` + built-in `--json`/`--jsonl`/`--jq`)
+- [x] `defaults = "fn_name"` hook (bridge point for config file loading)
+- [x] `--output-schema` / `--input-schema` / `--params-json` support (full override, JSON string arg)
 
 **Steps (normalize side):**
 - [ ] Add `server-less` dependency with `cli` feature
+- [ ] Wire `OutputFormatter`: `--compact` → `format_text()`, default → `format_pretty()`. server-less handles `--json`/`--jsonl`/`--jq` (serde). We handle text output modes.
+- [ ] Wire `defaults` hook to `NormalizeConfig` loading (config file merge)
 - [ ] Migrate one simple command (text-search → `grep`) as proof of concept
 - [ ] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method
 - [ ] Migrate remaining commands, deleting `cmd_*` functions and manual Args structs
