@@ -2,6 +2,131 @@
 
 use std::io::Read;
 
+/// Service-callable update command (returns structured result).
+pub fn cmd_update_service(check_only: bool) -> Result<crate::service::UpdateResult, String> {
+    const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+    const GITHUB_REPO: &str = "rhi-zone/normalize";
+
+    let client = ureq::agent();
+
+    let url = format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        GITHUB_REPO
+    );
+
+    let response = client
+        .get(&url)
+        .set("User-Agent", "normalize-cli")
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("Failed to check for updates: {}", e))?;
+
+    let body: serde_json::Value = response
+        .into_json()
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let latest_version = body["tag_name"]
+        .as_str()
+        .unwrap_or("unknown")
+        .trim_start_matches('v')
+        .to_string();
+
+    let is_update_available =
+        latest_version != CURRENT_VERSION && version_gt(&latest_version, CURRENT_VERSION);
+
+    if check_only || !is_update_available {
+        return Ok(crate::service::UpdateResult {
+            current_version: CURRENT_VERSION.to_string(),
+            latest_version,
+            update_available: is_update_available,
+            message: None,
+        });
+    }
+
+    // Perform the update
+    eprintln!("Downloading update...");
+
+    let target = get_target_triple();
+    let asset_name = get_asset_name(&target);
+
+    let assets = body["assets"].as_array();
+    let asset_url = assets
+        .and_then(|arr| {
+            arr.iter()
+                .find(|a| a["name"].as_str() == Some(&asset_name))
+                .and_then(|a| a["browser_download_url"].as_str())
+        })
+        .ok_or_else(|| format!("No binary available for your platform: {}", target))?;
+
+    eprintln!("  Downloading {}...", asset_name);
+    let archive_response = client
+        .get(asset_url)
+        .call()
+        .map_err(|e| format!("Failed to download update: {}", e))?;
+
+    let mut archive_data = Vec::new();
+    archive_response
+        .into_reader()
+        .read_to_end(&mut archive_data)
+        .map_err(|e| format!("Failed to read download: {}", e))?;
+
+    // Checksum verification
+    let checksum_url = assets.and_then(|arr| {
+        arr.iter()
+            .find(|a| a["name"].as_str() == Some("SHA256SUMS.txt"))
+            .and_then(|a| a["browser_download_url"].as_str())
+    });
+
+    if let Some(checksum_url) = checksum_url {
+        eprintln!("  Verifying checksum...");
+        if let Ok(resp) = client.get(checksum_url).call()
+            && let Ok(checksums) = resp.into_string()
+        {
+            let expected = checksums
+                .lines()
+                .find(|line| line.contains(&asset_name))
+                .and_then(|line| line.split_whitespace().next());
+
+            if let Some(expected) = expected {
+                let mut hasher = Sha256::new();
+                hasher.update(&archive_data);
+                let hash = hasher.finalize();
+                let actual: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+
+                if actual != expected {
+                    return Err(format!(
+                        "Checksum mismatch!\n  Expected: {}\n  Got:      {}",
+                        expected, actual
+                    ));
+                }
+            }
+        }
+    }
+
+    // Extract binary
+    eprintln!("  Extracting...");
+    let binary_data = if asset_name.ends_with(".tar.gz") {
+        extract_tar_gz(&archive_data)
+    } else if asset_name.ends_with(".zip") {
+        extract_zip(&archive_data)
+    } else {
+        Err(format!("Unknown archive format: {}", asset_name))
+    }?;
+
+    // Replace current binary
+    eprintln!("  Installing...");
+    self_replace(&binary_data)?;
+
+    Ok(crate::service::UpdateResult {
+        current_version: CURRENT_VERSION.to_string(),
+        latest_version,
+        update_available: true,
+        message: Some(
+            "Updated successfully! Restart normalize to use the new version.".to_string(),
+        ),
+    })
+}
+
 /// Run the update command
 pub fn cmd_update(check_only: bool, format: &crate::output::OutputFormat) -> i32 {
     let json = format.is_json();

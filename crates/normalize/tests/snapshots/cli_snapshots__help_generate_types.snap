@@ -4,79 +4,25 @@ expression: "snapshot_help(&[\"generate\", \"types\"])"
 ---
 Generate types/validators from schema
 
-Usage: normalize generate types [OPTIONS] --backend <BACKEND> <INPUT>
+Usage: normalize generate types [OPTIONS] [input]
 
 Arguments:
-  <INPUT>
-          Input schema file (JSON Schema or OpenAPI), use - for stdin
+  [input]  Input schema file (JSON Schema or OpenAPI), use - for stdin
 
 Options:
-  -f, --format <FORMAT>
-          Input format
-
-          Possible values:
-          - auto:        Auto-detect from file content
-          - json-schema: JSON Schema
-          - open-api:    OpenAPI 3.x
-          - typescript:  TypeScript source (extract type definitions)
-          
-          [default: auto]
-
-  -b, --backend <BACKEND>
-          Output backend
-
-          Possible values:
-          - typescript: TypeScript interfaces/types
-          - zod:        Zod schemas (TypeScript)
-          - valibot:    Valibot schemas (TypeScript)
-          - python:     Python dataclasses
-          - pydantic:   Pydantic models
-          - go:         Go structs
-          - rust:       Rust structs with serde
-
-  -o, --output <OUTPUT>
-          Output file (stdout if not specified)
-
-      --export
-          Export all types (add 'export' keyword)
-
-      --infer-types
-          Generate type inference (for Zod/Valibot)
-
-      --readonly
-          Make types readonly/frozen
-
-      --package <PACKAGE>
-          Package name (for Go)
-          
-          [default: types]
-
-      --repos <DIR>
-          Run command across all git repos under DIR (1 level deep)
-
-      --json
-          Output as JSON
-
-      --jsonl
-          Output as JSON Lines (one object per line)
-
-      --jq <EXPR>
-          Filter JSON output with jq expression (implies --json)
-
-      --pretty
-          Human-friendly output with colors and formatting
-
-      --compact
-          Compact output without colors (overrides TTY detection)
-
-      --output-schema
-          Output JSON schema for the command's return type
-
-      --input-schema
-          Output JSON schema for the command's input arguments
-
-      --params-json <JSON>
-          Pass command arguments as JSON (overrides CLI args)
-
-  -h, --help
-          Print help (see a summary with '-h')
+  -b, --backend <backend>          Output backend
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+  -f, --format <format>            Input format (auto, json-schema, openapi, typescript)
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+  -o, --output <output>            Output file (stdout if not specified)
+      --export <export>            Export all types (add 'export' keyword)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --infer-types                Generate type inference (for Zod/Valibot)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --readonly                   Make types readonly/frozen
+      --package <package>          Package name (for Go)
+  -h, --help                       Print help

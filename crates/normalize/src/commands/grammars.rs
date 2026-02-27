@@ -13,6 +13,12 @@ pub struct GrammarListReport {
     grammars: Vec<String>,
 }
 
+impl GrammarListReport {
+    pub fn new(grammars: Vec<String>) -> Self {
+        Self { grammars }
+    }
+}
+
 impl OutputFormatter for GrammarListReport {
     fn format_text(&self) -> String {
         if self.grammars.is_empty() {
@@ -137,10 +143,40 @@ pub fn cmd_grammars(
 fn cmd_list(format: &crate::output::OutputFormat) -> i32 {
     let grammars = parsers::available_external_grammars();
 
-    let report = GrammarListReport { grammars };
+    let report = GrammarListReport::new(grammars);
     report.print(format);
 
     0
+}
+
+/// Build a grammar paths report (used by both legacy and service paths).
+pub fn build_paths_report() -> GrammarPathsReport {
+    let mut raw_paths = Vec::new();
+
+    // Environment variable
+    if let Ok(env_path) = std::env::var("NORMALIZE_GRAMMAR_PATH") {
+        for p in env_path.split(':') {
+            if !p.is_empty() {
+                raw_paths.push(("env", PathBuf::from(p)));
+            }
+        }
+    }
+
+    // User config directory
+    if let Some(config) = dirs::config_dir() {
+        raw_paths.push(("config", config.join("normalize/grammars")));
+    }
+
+    let paths: Vec<GrammarPath> = raw_paths
+        .iter()
+        .map(|(source, path)| GrammarPath {
+            source: source.to_string(),
+            path: path.display().to_string(),
+            exists: path.exists(),
+        })
+        .collect();
+
+    GrammarPathsReport { paths }
 }
 
 fn cmd_paths(format: &crate::output::OutputFormat) -> i32 {
@@ -173,6 +209,103 @@ fn cmd_paths(format: &crate::output::OutputFormat) -> i32 {
     report.print(format);
 
     0
+}
+
+/// Install grammars, returning a structured result (for server-less service).
+pub fn cmd_install_service(
+    version: Option<String>,
+    force: bool,
+) -> Result<crate::service::grammars::GrammarInstallResult, String> {
+    use std::io::Read as _;
+
+    const GITHUB_REPO: &str = "rhi-zone/normalize";
+
+    let install_dir = dirs::config_dir()
+        .map(|c| c.join("normalize/grammars"))
+        .ok_or_else(|| "Could not determine config directory".to_string())?;
+
+    // Check if grammars already exist
+    if install_dir.exists()
+        && !force
+        && let Ok(entries) = std::fs::read_dir(&install_dir)
+    {
+        let count = entries.filter(|e| e.is_ok()).count();
+        if count > 0 {
+            return Ok(crate::service::grammars::GrammarInstallResult {
+                status: "already_installed".to_string(),
+                version: None,
+                path: install_dir.display().to_string(),
+                count,
+            });
+        }
+    }
+
+    let client = ureq::agent();
+
+    let release_url = match &version {
+        Some(v) => format!(
+            "https://api.github.com/repos/{}/releases/tags/{}",
+            GITHUB_REPO, v
+        ),
+        None => format!(
+            "https://api.github.com/repos/{}/releases/latest",
+            GITHUB_REPO
+        ),
+    };
+
+    eprintln!("Fetching release info...");
+
+    let response = client
+        .get(&release_url)
+        .set("User-Agent", "normalize-cli")
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("Failed to fetch release: {}", e))?;
+
+    let body: serde_json::Value = response
+        .into_json()
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let version_str = body["tag_name"].as_str().unwrap_or("unknown").to_string();
+
+    let target = get_target_triple();
+    let asset_name = format!("normalize-grammars-{}.tar.gz", target);
+
+    let assets = body["assets"].as_array();
+    let asset_url = assets
+        .and_then(|arr| {
+            arr.iter()
+                .find(|a| a["name"].as_str() == Some(&asset_name))
+                .and_then(|a| a["browser_download_url"].as_str())
+        })
+        .ok_or_else(|| format!("No grammars available for your platform: {}", target))?;
+
+    eprintln!("Downloading {} grammars...", version_str);
+
+    let archive_response = client
+        .get(asset_url)
+        .call()
+        .map_err(|e| format!("Failed to download grammars: {}", e))?;
+
+    let mut archive_data = Vec::new();
+    archive_response
+        .into_reader()
+        .read_to_end(&mut archive_data)
+        .map_err(|e| format!("Failed to read download: {}", e))?;
+
+    std::fs::create_dir_all(&install_dir)
+        .map_err(|e| format!("Failed to create directory: {}", e))?;
+
+    eprintln!("Installing to {}...", install_dir.display());
+
+    let count = extract_grammars(&archive_data, &install_dir)?;
+
+    Ok(crate::service::grammars::GrammarInstallResult {
+        status: "installed".to_string(),
+        version: Some(version_str),
+        path: install_dir.display().to_string(),
+        count,
+    })
 }
 
 fn cmd_install(version: Option<String>, force: bool, json: bool) -> i32 {

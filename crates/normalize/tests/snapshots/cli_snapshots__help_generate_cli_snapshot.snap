@@ -4,21 +4,20 @@ expression: "snapshot_help(&[\"generate\", \"cli-snapshot\"])"
 ---
 Generate CLI snapshot tests for a binary
 
-Usage: normalize generate cli-snapshot [OPTIONS] <BINARY>
+Usage: normalize generate cli-snapshot [OPTIONS] [binary]
 
 Arguments:
-  <BINARY>  Path to the CLI binary
+  [binary]  Path to the CLI binary
 
 Options:
-  -o, --output <OUTPUT>     Output file for the test (stdout if not specified)
-      --name <NAME>         Binary name to use in test (defaults to file stem)
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-      --jsonl               Output as JSON Lines (one object per line)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --pretty              Human-friendly output with colors and formatting
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help
+      --jsonl                      Output one JSON object per line (for arrays)
+  -o, --output <output>            Output file for the test (stdout if not specified)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+      --name <name>                Binary name to use in test (defaults to file stem)
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

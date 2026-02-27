@@ -328,7 +328,17 @@ fn main() {
 }
 
 /// Commands migrated to server-less `#[cli]`.
-const SERVER_LESS_COMMANDS: &[&str] = &["grep", "aliases", "context", "init"];
+const SERVER_LESS_COMMANDS: &[&str] = &[
+    "grep",
+    "aliases",
+    "context",
+    "init",
+    "update",
+    "translate",
+    "daemon",
+    "grammars",
+    "generate",
+];
 
 /// Try dispatching through server-less for migrated commands.
 /// Returns true if the command was handled, false to fall through to legacy.
