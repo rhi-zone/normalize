@@ -51,7 +51,6 @@ pub struct NormalizeService {
     facts: facts::FactsService,
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
-    history: history::HistoryService,
     package: package::PackageService,
     rules: rules::RulesService,
     serve: serve::ServeService,
@@ -71,11 +70,12 @@ impl NormalizeService {
         Self {
             analyze: analyze::AnalyzeService::new(&pretty),
             daemon: daemon::DaemonService,
-            edit: edit::EditService,
+            edit: edit::EditService {
+                history: history::HistoryService,
+            },
             facts: facts::FactsService::new(&pretty),
             grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
-            history: history::HistoryService,
             package: package::PackageService::new(&pretty),
             rules: rules::RulesService::new(&pretty),
             serve: serve::ServeService,
@@ -494,11 +494,6 @@ impl NormalizeService {
     /// Package management: info, list, tree, outdated
     pub fn package(&self) -> &package::PackageService {
         &self.package
-    }
-
-    /// View shadow git edit history
-    pub fn history(&self) -> &history::HistoryService {
-        &self.history
     }
 
     /// Analyze agent session logs (Claude Code, Codex, Gemini)

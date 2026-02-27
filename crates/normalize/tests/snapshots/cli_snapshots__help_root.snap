@@ -20,7 +20,6 @@ Commands:
   facts      Extract and query code facts (symbols, imports, calls)
   rules      Manage and run analysis rules (syntax + fact)
   package    Package management: info, list, tree, outdated
-  history    View shadow git edit history
   sessions   Analyze agent session logs (Claude Code, Codex, Gemini)
   tools      External ecosystem tools (linters, formatters, test runners)
   edit       Structural editing of code symbols

@@ -163,7 +163,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 - [x] Final cleanup: deleted `Commands` enum, `Cli` struct, legacy clap dispatch. main.rs is now ~50 lines.
 - [x] Restore `--repos` multi-repo support: added `--repos` param to `analyze hotspots`, `analyze ownership`, `analyze coupling`. Report types extended with optional `.repos` field (see docs/architecture-decisions.md).
 - [x] Fix server-less global flag descriptions: updated server-less + added help text via `global = [pretty = "...", compact = "..."]` syntax.
-- [ ] Audit top-level command levels — findings:
+- [x] Audit top-level command levels — findings (actionable items done):
   - `history` is at the wrong level: shadow edit history is a feature of `edit`, not a
     standalone concept. Should be `normalize edit history [list|diff|status|tree|prune]`.
   - `analyze rules` is redundant with top-level `normalize rules run`. The analyze service

@@ -21,7 +21,6 @@ use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
 use crate::commands::analyze::query::MatchResult;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
-use crate::commands::analyze::rules_cmd::RulesOutput;
 use crate::commands::analyze::stale_docs::StaleDocsReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -86,26 +85,6 @@ impl AnalyzeService {
 
     fn display_trace(&self, text: &str) -> String {
         text.to_string()
-    }
-
-    fn display_rules(&self, out: &RulesOutput) -> String {
-        let mut lines = Vec::new();
-        if !out.rules.is_empty() {
-            lines.push(format!("Rules ({})", out.rules.len()));
-            for r in &out.rules {
-                lines.push(format!("  {} [{}] - {}", r.id, r.severity, r.message));
-            }
-        }
-        if !out.findings.is_empty() {
-            lines.push(format!("\nFindings ({})", out.findings.len()));
-            for f in &out.findings {
-                lines.push(format!(
-                    "  {}:{}: {} [{}]",
-                    f.file, f.line, f.message, f.rule_id
-                ));
-            }
-        }
-        lines.join("\n")
     }
 
     fn display_architecture(&self, r: &ArchitectureReport) -> String {
@@ -353,28 +332,6 @@ impl AnalyzeService {
             max_depth.unwrap_or(50),
             recursive,
             case_insensitive,
-        )
-    }
-
-    /// Run syntax rules and report findings
-    #[cli(display_with = "display_rules")]
-    pub fn rules(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'f', help = "Filter to a specific rule ID")] filter_rule: Option<String>,
-        #[param(help = "Only list rules, don't run them")] list_only: bool,
-    ) -> Result<RulesOutput, String> {
-        let root_path = Self::root_path(root);
-        let rules_config = normalize_syntax_rules::RulesConfig(std::collections::HashMap::new());
-        let debug = normalize_syntax_rules::DebugFlags::default();
-        crate::commands::analyze::rules_cmd::build_rules_output(
-            &root_path,
-            filter_rule.as_deref(),
-            list_only,
-            &rules_config,
-            &debug,
         )
     }
 

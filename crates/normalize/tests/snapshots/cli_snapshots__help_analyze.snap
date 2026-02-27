@@ -14,7 +14,6 @@ Commands:
   call-graph           Show callers and/or callees of a symbol
   query                Run tree-sitter or ast-grep queries against the codebase
   trace                Trace value provenance for a symbol
-  rules                Run syntax rules and report findings
   architecture         Show architecture analysis (coupling, cycles, hubs)
   health               Run health analysis (file counts, complexity stats, large file warnings)
   all                  Run all analysis passes

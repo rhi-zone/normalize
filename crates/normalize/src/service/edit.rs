@@ -1,10 +1,13 @@
 //! Edit service for server-less CLI.
 
 use crate::commands::edit::{EditAction, EditResult, Position};
+use crate::service::history::HistoryService;
 use server_less::cli;
 
 /// Edit sub-service.
-pub struct EditService;
+pub struct EditService {
+    pub(crate) history: HistoryService,
+}
 
 #[cli(name = "edit", about = "Structural editing of code symbols")]
 impl EditService {
@@ -196,5 +199,10 @@ impl EditService {
             dry_run,
             message.as_deref(),
         )
+    }
+
+    /// View shadow git edit history
+    pub fn history(&self) -> &HistoryService {
+        &self.history
     }
 }
