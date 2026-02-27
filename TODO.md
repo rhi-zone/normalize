@@ -162,7 +162,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
   - Done: `serve` — ServeService with mcp/http/lsp subcommands
 - [x] Final cleanup: deleted `Commands` enum, `Cli` struct, legacy clap dispatch. main.rs is now ~50 lines.
 - [x] Restore `--repos` multi-repo support: added `--repos` param to `analyze hotspots`, `analyze ownership`, `analyze coupling`. Report types extended with optional `.repos` field (see docs/architecture-decisions.md).
-- [ ] Fix server-less global flag descriptions: `--pretty` shows "Global flag: pretty", `--compact` shows "Global flag: compact" — needs proper help text (pass to server-less agent)
+- [x] Fix server-less global flag descriptions: updated server-less + added help text via `global = [pretty = "...", compact = "..."]` syntax.
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 
 ### CLI Cleanup
