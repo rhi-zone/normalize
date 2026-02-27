@@ -8,9 +8,9 @@ Usage: normalize facts stats [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
       --storage                    Show storage usage for index and caches
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
   -r, --root <root>                Root directory (defaults to current directory)
       --jq <jq>                    Filter output through jq expression

@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 357
 expression: "snapshot_help(&[\"analyze\", \"rules\"])"
 ---
 Run syntax rules and report findings
@@ -9,9 +8,9 @@ Usage: normalize analyze rules [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
   -r, --root <root>                Root directory (defaults to current directory)
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
   -f, --filter-rule <filter-rule>  Filter to a specific rule ID
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression

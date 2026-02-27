@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 347
 expression: "snapshot_help(&[\"analyze\", \"ast\"])"
 ---
 Show AST structure for a file
@@ -13,8 +12,8 @@ Arguments:
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
   -l, --at-line <at-line>          Show node at specific line
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
       --sexp                       Output as S-expression
       --jq <jq>                    Filter output through jq expression

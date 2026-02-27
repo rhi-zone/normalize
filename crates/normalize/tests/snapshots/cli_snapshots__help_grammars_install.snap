@@ -8,9 +8,9 @@ Usage: normalize grammars install [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
       --version <version>          Specific version to install (default: latest)
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
       --force                      Force reinstall even if grammars exist
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression

@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 262
 expression: "snapshot_help(&[\"analyze\", \"files\"])"
 ---
 Show longest files in codebase
@@ -10,8 +9,8 @@ Usage: normalize analyze files [OPTIONS]
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
   -l, --limit <limit>              Number of files to show
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
   -r, --root <root>                Root directory (defaults to current directory)
       --exclude <exclude>          Exclude paths matching pattern

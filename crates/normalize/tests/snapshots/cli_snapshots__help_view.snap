@@ -10,9 +10,9 @@ Arguments:
   [target]  Target: path, path/Symbol, Parent/method, file:line, or SymbolName
 
 Options:
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
   -r, --root <root>                Root directory (defaults to current directory)
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
   -d, --depth <depth>              Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
       --jsonl                      Output one JSON object per line (for arrays)
   -n, --line-numbers               Show line numbers

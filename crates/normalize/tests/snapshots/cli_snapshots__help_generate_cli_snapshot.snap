@@ -12,8 +12,8 @@ Arguments:
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
   -o, --output <output>            Output file for the test (stdout if not specified)
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
       --name <name>                Binary name to use in test (defaults to file stem)
       --jq <jq>                    Filter output through jq expression

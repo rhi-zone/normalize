@@ -207,7 +207,10 @@ impl std::fmt::Display for TranslateResult {
     version = "0.1.0",
     about = "Fast code intelligence CLI",
     defaults = "config_defaults",
-    global = [pretty, compact]
+    global = [
+        pretty = "Human-friendly output with colors and formatting",
+        compact = "Compact output without colors (overrides TTY detection)",
+    ]
 )]
 impl NormalizeService {
     /// View a node in the codebase tree (directory, file, or symbol)

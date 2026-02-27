@@ -8,8 +8,8 @@ Usage: normalize daemon status [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit

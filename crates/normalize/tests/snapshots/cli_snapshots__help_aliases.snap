@@ -7,9 +7,9 @@ List filter aliases (used by --exclude/--only)
 Usage: normalize aliases [OPTIONS]
 
 Options:
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
   -r, --root <root>                Root directory (defaults to current directory)
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
       --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression

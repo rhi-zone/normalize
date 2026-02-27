@@ -8,8 +8,8 @@ Usage: normalize init [OPTIONS]
 
 Options:
       --index                      Index the codebase after initialization
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression

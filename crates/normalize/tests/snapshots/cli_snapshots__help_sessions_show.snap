@@ -12,8 +12,8 @@ Arguments:
 Options:
       --analyze                    Run full analysis instead of summary
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --full                       Show full conversation log
       --json                       Output machine-readable JSON
       --exact                      Require exact/prefix match (disable fuzzy)

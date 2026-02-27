@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 436
 expression: "snapshot_help(&[\"serve\", \"http\"])"
 ---
 Start HTTP server (REST API)
@@ -10,8 +9,8 @@ Usage: normalize serve http [OPTIONS]
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
   -p, --port <port>                Port to listen on [default: 8080]
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
       --openapi                    Output OpenAPI spec and exit (don't start server)
       --jq <jq>                    Filter output through jq expression

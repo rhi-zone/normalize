@@ -9,8 +9,8 @@ Usage: normalize sessions stats [OPTIONS]
 Options:
       --grep <grep>                Filter sessions by grep pattern
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --days <days>                Filter sessions from the last N days
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression

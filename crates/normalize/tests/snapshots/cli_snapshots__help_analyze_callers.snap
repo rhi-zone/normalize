@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 272
 expression: "snapshot_help(&[\"analyze\", \"callers\"])"
 ---
 Show callers of a symbol
@@ -13,8 +12,8 @@ Arguments:
 Options:
   -i, --case-insensitive           Case-insensitive symbol matching
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
-      --compact                    Global flag: compact
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
   -r, --root <root>                Root directory (defaults to current directory)
       --jq <jq>                    Filter output through jq expression

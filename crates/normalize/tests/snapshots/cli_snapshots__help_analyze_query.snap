@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 352
 expression: "snapshot_help(&[\"analyze\", \"query\"])"
 ---
 Run tree-sitter or ast-grep queries against the codebase
@@ -13,8 +12,8 @@ Arguments:
 Options:
       --jsonl                          Output one JSON object per line (for arrays)
   -p, --path <path>                    Path to search (defaults to root)
-      --pretty                         Global flag: pretty
-      --compact                        Global flag: compact
+      --pretty                         Human-friendly output with colors and formatting
+      --compact                        Compact output without colors (overrides TTY detection)
       --json                           Output machine-readable JSON
       --show-source                    Show full source for matches
   -c, --context-lines <context-lines>  Number of context lines

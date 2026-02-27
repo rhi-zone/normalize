@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 282
 expression: "snapshot_help(&[\"analyze\", \"hotspots\"])"
 ---
 Show git history hotspots (frequently changed files)
@@ -9,9 +8,9 @@ Usage: normalize analyze hotspots [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
       --recency                    Weight recent changes higher
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
   -r, --root <root>                Root directory (defaults to current directory)
       --jq <jq>                    Filter output through jq expression

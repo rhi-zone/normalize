@@ -10,9 +10,9 @@ Arguments:
   [pattern]  Regex pattern to search for
 
 Options:
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
   -r, --root <root>                Root directory (defaults to current directory)
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
   -l, --limit <limit>              Maximum number of matches to return
   -i, --ignore-case                Case-insensitive search
       --jsonl                      Output one JSON object per line (for arrays)

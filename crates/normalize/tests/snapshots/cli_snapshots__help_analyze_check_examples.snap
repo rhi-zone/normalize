@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 312
 expression: "snapshot_help(&[\"analyze\", \"check-examples\"])"
 ---
 Check for missing example references in documentation
@@ -9,9 +8,9 @@ Usage: normalize analyze check-examples [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Global flag: pretty
+      --pretty                     Human-friendly output with colors and formatting
   -r, --root <root>                Root directory (defaults to current directory)
-      --compact                    Global flag: compact
+      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
