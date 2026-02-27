@@ -161,7 +161,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
   - Done: `analyze` — AnalyzeService with ~28 subcommands, build_* helpers extracted
   - Done: `serve` — ServeService with mcp/http/lsp subcommands
 - [x] Final cleanup: deleted `Commands` enum, `Cli` struct, legacy clap dispatch. main.rs is now ~50 lines.
-- [ ] Restore `--repos` multi-repo support lost in migration (regression): add `repos: Option<String>` param to `analyze hotspots`, `analyze ownership`, `analyze coupling`; when set, discover repos and run `MultiRepoReport::run`. See docs/architecture-decisions.md for return type design (extend single-repo reports with optional `.repos` field, not a wrapper type).
+- [x] Restore `--repos` multi-repo support: added `--repos` param to `analyze hotspots`, `analyze ownership`, `analyze coupling`. Report types extended with optional `.repos` field (see docs/architecture-decisions.md).
 - [ ] Fix server-less global flag descriptions: `--pretty` shows "Global flag: pretty", `--compact` shows "Global flag: compact" — needs proper help text (pass to server-less agent)
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 
