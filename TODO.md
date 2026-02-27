@@ -161,6 +161,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
   - Deferred: `view` — `cmd_view` has 19 params, prints directly via 10+ code paths. Needs refactor: extract `build_view()` → `ViewOutput` for each mode.
   - Deferred: `analyze` — 29 subcommands, deep config/allowlist/filter integration. Many subcommands already return `OutputFormatter` types; extract `build_*` functions and wire to `AnalyzeService`.
   - Deferred: `serve` — long-running servers (MCP, HTTP, LSP), no structured return type
+- [ ] Final cleanup (after all commands migrated): delete `Commands` enum, `Cli` struct, `HELP_STYLES`, `help_color_choice()`, legacy Args structs, `run()`/`cmd_*()` wrappers for migrated commands, remove clap from normalize crate deps
 - [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 
