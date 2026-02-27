@@ -146,17 +146,23 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 - [x] `--output-schema` / `--input-schema` / `--params-json` support (full override, JSON string arg)
 
 **Steps (normalize side):**
-- [ ] Add `server-less` dependency with `cli` feature
-- [ ] Wire `OutputFormatter`: `--compact` → `format_text()`, default → `format_pretty()`. server-less handles `--json`/`--jsonl`/`--jq` (serde). We handle text output modes.
-- [ ] Wire `defaults` hook to `NormalizeConfig` loading (config file merge)
-- [ ] Migrate one simple command (text-search → `grep`) as proof of concept
-- [ ] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method
+- [x] Add `server-less` dependency with `cli` feature
+- [ ] Wire `OutputFormatter`: `--compact` → `format_text()`, default → `format_pretty()`. Blocked: server-less `display_with` bypasses JSON flags — need to fix server-less first, then use `display_with` for pretty/compact toggle.
+- [x] Wire `defaults` hook to `NormalizeConfig` loading (config file merge)
+- [x] Migrate one simple command (text-search → `grep`) as proof of concept
+- [ ] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method (keeping legacy text-search alongside grep during migration)
 - [ ] Migrate remaining commands, deleting `cmd_*` functions and manual Args structs
 - [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 
+**Known limitations (scaffold):**
+- `--pretty`/`--compact` not wired through server-less yet (needs `display_with` + JSON passthrough fix in server-less)
+- `pattern` is `--pattern` flag, not positional (server-less only infers `_id` names as positional — need `#[param(positional)]` support)
+- `--exclude`/`--only` take comma-separated string, not repeated flags (server-less `Vec<T>` would work but `Option<String>` used for now)
+- Schema output simpler than legacy (server-less uses own schema gen, not schemars)
+
 **Also:**
-- [ ] Rename `text-search` command back to `grep` (function is already `grep()`, rename didn't prevent regex syntax confusion — see CLAUDE.md)
+- [x] Rename `text-search` command to `grep` (via server-less migration — legacy `text-search` kept as alias during transition)
 
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
