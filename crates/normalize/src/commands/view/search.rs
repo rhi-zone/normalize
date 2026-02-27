@@ -157,6 +157,117 @@ fn search_symbols_unindexed(query: &str, root: &Path) -> Vec<index::SymbolMatch>
     matches.into_iter().take(10).map(|(m, _)| m).collect()
 }
 
+/// Compute trigrams (3-char sliding windows) of a string.
+fn trigrams(s: &str) -> std::collections::HashSet<[char; 3]> {
+    let chars: Vec<char> = s.chars().collect();
+    chars.windows(3).map(|w| [w[0], w[1], w[2]]).collect()
+}
+
+/// Asymmetric trigram containment: |trigrams(query) ∩ trigrams(candidate)| / |trigrams(query)|
+/// Measures how much of the query appears in the candidate — good for prefix/substring/light-typo matches.
+fn trigram_containment(
+    query_trigrams: &std::collections::HashSet<[char; 3]>,
+    candidate: &str,
+) -> f32 {
+    if query_trigrams.is_empty() {
+        return 0.0;
+    }
+    let c_trigrams = trigrams(candidate);
+    let intersection = query_trigrams.intersection(&c_trigrams).count();
+    intersection as f32 / query_trigrams.len() as f32
+}
+
+/// Suggest symbols by trigram containment when exact/fuzzy search finds nothing.
+/// Skips if query has fewer than 4 characters (too short to produce meaningful trigrams).
+/// Returns up to `limit` symbols with containment score ≥ `threshold`, sorted by score descending.
+pub fn suggest_symbols_trigram(
+    query: &str,
+    root: &Path,
+    threshold: f32,
+    limit: usize,
+) -> Vec<(index::SymbolMatch, f32)> {
+    use ignore::WalkBuilder;
+
+    let query_lower = query.to_lowercase();
+    if query_lower.chars().count() < 4 {
+        return Vec::new();
+    }
+    let q_trigrams = trigrams(&query_lower);
+    if q_trigrams.is_empty() {
+        return Vec::new();
+    }
+
+    let mut scored: Vec<(index::SymbolMatch, f32)> = Vec::new();
+    let walker = WalkBuilder::new(root).hidden(true).git_ignore(true).build();
+    let extractor = skeleton::SkeletonExtractor::new();
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(lang) = normalize_languages::support_for_path(path) else {
+            continue;
+        };
+        if !lang.has_symbols() {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        let result = extractor.extract(path, &content);
+        let rel_path = path.strip_prefix(root).unwrap_or(path);
+        let file_str = rel_path.to_string_lossy().to_string();
+
+        collect_trigram_symbols(
+            &result.symbols,
+            &q_trigrams,
+            threshold,
+            &file_str,
+            None,
+            &mut scored,
+        );
+    }
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.truncate(limit);
+    scored
+}
+
+fn collect_trigram_symbols(
+    symbols: &[skeleton::SkeletonSymbol],
+    q_trigrams: &std::collections::HashSet<[char; 3]>,
+    threshold: f32,
+    file: &str,
+    parent: Option<&str>,
+    scored: &mut Vec<(index::SymbolMatch, f32)>,
+) {
+    for sym in symbols {
+        let name_lower = sym.name.to_lowercase();
+        let score = trigram_containment(q_trigrams, &name_lower);
+        if score >= threshold {
+            scored.push((
+                index::SymbolMatch {
+                    name: sym.name.clone(),
+                    kind: sym.kind.as_str().to_string(),
+                    file: file.to_string(),
+                    start_line: sym.start_line,
+                    end_line: sym.end_line,
+                    parent: parent.map(|s| s.to_string()),
+                },
+                score,
+            ));
+        }
+        collect_trigram_symbols(
+            &sym.children,
+            q_trigrams,
+            threshold,
+            file,
+            Some(&sym.name),
+            scored,
+        );
+    }
+}
+
 fn collect_matching_symbols(
     symbols: &[skeleton::SkeletonSymbol],
     query: &str,
@@ -201,6 +312,60 @@ fn collect_matching_symbols(
             file,
             Some(&sym.name),
             matches,
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trigram_containment() {
+        let q = "xmd_view_smbl";
+        let q_tri = trigrams(&q.to_lowercase());
+        let score = trigram_containment(&q_tri, "cmd_view_symbol_direct");
+        assert!(score >= 0.5, "expected >= 0.5, got {}", score);
+    }
+
+    #[test]
+    fn test_trigram_threshold_examples() {
+        // prefix typing: 5/5 trigrams of "cmd_dup" in "cmd_duplicate_functions_with_count"
+        let q = trigrams("cmd_dup");
+        let score = trigram_containment(&q, "cmd_duplicate_functions_with_count");
+        assert!(
+            score >= 0.5,
+            "cmd_dup vs cmd_duplicate_functions_with_count: {}",
+            score
+        );
+
+        // short query skipped
+        let result = suggest_symbols_trigram("abc", std::path::Path::new("."), 0.5, 5);
+        assert!(
+            result.is_empty(),
+            "should skip queries shorter than 4 chars"
+        );
+    }
+
+    #[test]
+    fn test_suggest_symbols_finds_typo() {
+        // Run from workspace root — find cmd_view_symbol_direct via typo query
+        let root = std::env::current_dir()
+            .unwrap()
+            .ancestors()
+            .find(|p| p.join("Cargo.toml").exists() && p.join("crates").exists())
+            .unwrap_or(&std::env::current_dir().unwrap())
+            .to_path_buf();
+        let suggestions = suggest_symbols_trigram("xmd_view_smbl", &root, 0.5, 10);
+        assert!(
+            !suggestions.is_empty(),
+            "expected at least one trigram suggestion for typo query"
+        );
+        let names: Vec<_> = suggestions.iter().map(|(s, _)| s.name.as_str()).collect();
+        assert!(
+            names.iter().any(|n| n.contains("cmd_view")),
+            "expected a cmd_view_* symbol in suggestions, got: {:?}",
+            names
         );
     }
 }

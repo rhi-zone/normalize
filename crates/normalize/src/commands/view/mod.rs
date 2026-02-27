@@ -374,6 +374,21 @@ pub fn cmd_view(
     let unified = match (matches.len(), symbol_matches.len()) {
         (0, 0) => {
             eprintln!("No matches for: {}", target);
+            let suggestions = search::suggest_symbols_trigram(target, &root, 0.5, 5);
+            if !suggestions.is_empty() {
+                eprintln!("Did you mean?");
+                for (sym, _score) in suggestions {
+                    let prefix = sym
+                        .parent
+                        .as_deref()
+                        .map(|p| format!("{p}/"))
+                        .unwrap_or_default();
+                    eprintln!(
+                        "  {}{}  ({})  {}:{}",
+                        prefix, sym.name, sym.kind, sym.file, sym.start_line
+                    );
+                }
+            }
             return 1;
         }
         (1, 0) => matches.into_iter().next().unwrap(),
@@ -603,7 +618,25 @@ pub fn build_view_service(
     };
 
     let unified = match (matches.len(), symbol_matches.len()) {
-        (0, 0) => return Err(format!("No matches for: {}", target_str)),
+        (0, 0) => {
+            let mut msg = format!("No matches for: {}", target_str);
+            let suggestions = search::suggest_symbols_trigram(target_str, root, 0.5, 5);
+            if !suggestions.is_empty() {
+                msg.push_str("\nDid you mean?");
+                for (sym, _score) in suggestions {
+                    let prefix = sym
+                        .parent
+                        .as_deref()
+                        .map(|p| format!("{p}/"))
+                        .unwrap_or_default();
+                    msg.push_str(&format!(
+                        "\n  {}{}  ({})  {}:{}",
+                        prefix, sym.name, sym.kind, sym.file, sym.start_line
+                    ));
+                }
+            }
+            return Err(msg);
+        }
         (1, 0) => matches.into_iter().next().unwrap(),
         (0, 1) => {
             let sym = &symbol_matches[0];
