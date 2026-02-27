@@ -46,6 +46,8 @@ use std::path::PathBuf;
 pub struct NormalizeService {
     /// Whether pretty output is active (resolved per-command from globals + config).
     pretty: Cell<bool>,
+    /// Text prefix to prepend to view output (used for --dir-context).
+    view_prefix: Cell<String>,
     analyze: analyze::AnalyzeService,
     daemon: daemon::DaemonService,
     edit: edit::EditService,
@@ -69,6 +71,7 @@ impl NormalizeService {
     pub fn new() -> Self {
         let pretty = Cell::new(false);
         Self {
+            view_prefix: Cell::new(String::new()),
             analyze: analyze::AnalyzeService::new(&pretty),
             daemon: daemon::DaemonService,
             edit: edit::EditService {
@@ -106,13 +109,18 @@ impl NormalizeService {
         self.pretty.set(is_pretty);
     }
 
-    /// Display bridge for GrepResult.
-    fn display_grep(&self, value: &GrepResult) -> String {
+    /// Generic display bridge that respects pretty/compact state.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
         if self.pretty.get() {
             value.format_pretty()
         } else {
             value.format_text()
         }
+    }
+
+    /// Display bridge for GrepResult.
+    fn display_grep(&self, value: &GrepResult) -> String {
+        self.display_output(value)
     }
 
     /// Display bridge for ContextOutput (dispatches to inner type).
@@ -135,9 +143,15 @@ impl NormalizeService {
         }
     }
 
-    /// Display bridge for ViewResult.
-    fn display_view(&self, value: &crate::commands::view::report::ViewResult) -> String {
-        value.text.clone()
+    /// Display bridge for ViewOutput.
+    fn display_view(&self, value: &crate::commands::view::report::ViewOutput) -> String {
+        let prefix = self.view_prefix.take();
+        let text = self.display_output(value);
+        if prefix.is_empty() {
+            text
+        } else {
+            format!("{}{}", prefix, text)
+        }
     }
 }
 
@@ -254,7 +268,7 @@ impl NormalizeService {
         #[param(help = "Show git history for symbol (last N changes)")] history: Option<usize>,
         pretty: bool,
         compact: bool,
-    ) -> Result<crate::commands::view::report::ViewResult, String> {
+    ) -> Result<crate::commands::view::report::ViewOutput, String> {
         let root_path = root
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -271,19 +285,20 @@ impl NormalizeService {
             crate::tree::DocstringDisplay::Summary
         };
 
-        // Handle --dir-context: prepend directory context to text output
-        let prefix = if dir_context {
+        // Handle --dir-context: store prefix so display_view can prepend it
+        if dir_context {
             let target_path = target
                 .as_ref()
                 .map(|t| root_path.join(t))
                 .unwrap_or_else(|| root_path.clone());
-            crate::commands::context::get_merged_context(&root_path, &target_path)
-                .map(|ctx| format!("{}\n\n---\n\n", ctx))
-        } else {
-            None
-        };
+            if let Some(ctx) =
+                crate::commands::context::get_merged_context(&root_path, &target_path)
+            {
+                self.view_prefix.set(format!("{}\n\n---\n\n", ctx));
+            }
+        }
 
-        let mut result = crate::commands::view::build_view_service(
+        crate::commands::view::build_view_service(
             target.as_deref(),
             &root_path,
             depth,
@@ -303,14 +318,7 @@ impl NormalizeService {
             &only,
             case_insensitive,
             history,
-            self.pretty.get(),
-        )?;
-
-        if let Some(prefix_text) = prefix {
-            result.text = format!("{}{}", prefix_text, result.text);
-        }
-
-        Ok(result)
+        )
     }
 
     /// Search for text patterns in files (fast ripgrep-based search)

@@ -501,7 +501,7 @@ pub fn cmd_view(
 /// Build a view result for the service layer.
 ///
 /// Routes to the appropriate sub-function based on the target and options,
-/// returning a typed ViewResult instead of writing directly to stdout.
+/// returning a typed ViewOutput instead of writing directly to stdout.
 #[allow(clippy::too_many_arguments)]
 pub fn build_view_service(
     target: Option<&str>,
@@ -523,8 +523,7 @@ pub fn build_view_service(
     only: &[String],
     case_insensitive: bool,
     history_limit: Option<usize>,
-    use_colors: bool,
-) -> Result<report::ViewResult, String> {
+) -> Result<report::ViewOutput, String> {
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(root);
 
@@ -547,7 +546,7 @@ pub fn build_view_service(
 
     // Handle "." as current directory
     if target_str == "." {
-        return tree::build_view_directory_service(root, depth, raw, filter.as_ref(), use_colors);
+        return tree::build_view_directory_service(root, depth, raw, filter.as_ref());
     }
 
     // Handle line targets: file.rs:30 (symbol at line) or file.rs:30-55 (range)
@@ -559,7 +558,6 @@ pub fn build_view_service(
                 end,
                 root,
                 docstring_mode,
-                use_colors,
             );
         } else {
             return symbol::build_view_symbol_at_line_service(
@@ -570,7 +568,6 @@ pub fn build_view_service(
                 docstring_mode,
                 show_parent,
                 context,
-                use_colors,
             );
         }
     }
@@ -619,7 +616,6 @@ pub fn build_view_service(
                 docstring_mode,
                 show_parent,
                 context,
-                use_colors,
                 case_insensitive,
             );
         }
@@ -654,7 +650,6 @@ pub fn build_view_service(
             depth,
             raw,
             filter.as_ref(),
-            use_colors,
         )
     } else if unified.symbol_path.is_empty() {
         file::build_view_file_service(
@@ -666,7 +661,6 @@ pub fn build_view_service(
             show_tests,
             docstring_mode,
             context,
-            use_colors,
         )
     } else {
         // Check if symbol path contains glob patterns
@@ -688,7 +682,6 @@ pub fn build_view_service(
             docstring_mode,
             show_parent,
             context,
-            use_colors,
             case_insensitive,
         )
     }

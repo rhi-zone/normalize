@@ -1,10 +1,13 @@
 //! Report types for the view command's JSON output.
 //!
-//! Provides a tagged `ViewOutput` enum wrapping all 9 output modes of the view command,
+//! Provides a tagged `ViewOutput` enum wrapping all output modes of the view command,
 //! enabling `--output-schema` support and consistent JSON serialization.
+//! `OutputFormatter` impls render on demand: `format_text()` = plain, `format_pretty()` = ANSI.
 
 use crate::output::OutputFormatter;
-use crate::tree::{FormatOptions, ViewNode};
+use crate::tree::{
+    DocstringDisplay, FormatOptions, ViewNode, ViewNodeKind, format_view_node, highlight_source,
+};
 use serde::Serialize;
 
 /// Unified output type for the view command.
@@ -20,7 +23,7 @@ pub enum ViewOutput {
 
     /// File skeleton view
     #[serde(rename = "file")]
-    File { node: ViewNode },
+    File(ViewFileReport),
 
     /// Full symbol view (with source, imports)
     #[serde(rename = "symbol")]
@@ -28,7 +31,7 @@ pub enum ViewOutput {
 
     /// Symbol found at a specific line number
     #[serde(rename = "symbol_at_line")]
-    SymbolAtLine { node: ViewNode },
+    SymbolAtLine(ViewSymbolNodeReport),
 
     /// Raw line range from a file
     #[serde(rename = "line_range")]
@@ -55,6 +58,18 @@ pub enum ViewOutput {
     FileContent(ViewFileContentReport),
 }
 
+/// File skeleton view with imports and symbol tree.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ViewFileReport {
+    pub path: String,
+    pub line_count: usize,
+    /// Formatted import lines (e.g. "  from foo import bar")
+    pub imports: Vec<String>,
+    /// Formatted export lines
+    pub exports: Vec<String>,
+    pub node: ViewNode,
+}
+
 /// Symbol view with source code and imports.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ViewSymbolReport {
@@ -69,6 +84,21 @@ pub struct ViewSymbolReport {
     pub start_line: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_line: Option<usize>,
+    /// Grammar name for syntax highlighting (e.g. "rust", "python")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grammar: Option<String>,
+    /// Parent / ancestor signatures to show context
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub parent_signatures: Vec<String>,
+}
+
+/// Symbol node view (skeleton, no raw source).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ViewSymbolNodeReport {
+    pub node: ViewNode,
+    /// Ancestor signatures for context
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub parent_signatures: Vec<String>,
 }
 
 /// Line range view.
@@ -78,6 +108,8 @@ pub struct ViewLineRangeReport {
     pub start: usize,
     pub end: usize,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grammar: Option<String>,
 }
 
 /// Glob matches within a file.
@@ -97,6 +129,8 @@ pub struct ViewGlobMatch {
     pub kind: String,
     pub start_line: usize,
     pub end_line: usize,
+    /// Source lines for this match
+    pub source: String,
 }
 
 /// Git history for a symbol or file.
@@ -165,69 +199,269 @@ pub struct ViewSymbolMatchEntry {
 pub struct ViewFileContentReport {
     pub path: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grammar: Option<String>,
 }
+
+// --- Rendering helpers ---
+
+fn text_opts() -> FormatOptions {
+    FormatOptions {
+        minimal: true,
+        use_colors: false,
+        line_numbers: true,
+        docstrings: DocstringDisplay::Summary,
+        skip_root: false,
+        ..Default::default()
+    }
+}
+
+fn pretty_opts() -> FormatOptions {
+    FormatOptions {
+        minimal: false,
+        use_colors: true,
+        line_numbers: true,
+        docstrings: DocstringDisplay::Summary,
+        skip_root: false,
+        ..Default::default()
+    }
+}
+
+fn render_dir(node: &ViewNode, opts: &FormatOptions) -> String {
+    let (dirs, files) = count_dir_file_nodes(node);
+    let lines = format_view_node(node, opts);
+    format!(
+        "{}\n\n{} directories, {} files",
+        lines.join("\n"),
+        dirs,
+        files
+    )
+}
+
+fn render_file(report: &ViewFileReport, opts: &FormatOptions, use_colors: bool) -> String {
+    let mut text = format!("# {}\nLines: {}\n", report.path, report.line_count);
+    if !report.imports.is_empty() {
+        text.push_str("\n## Imports\n");
+        for imp in &report.imports {
+            text.push_str(imp);
+            text.push('\n');
+        }
+    }
+    if !report.exports.is_empty() {
+        text.push_str("\n## Exports\n");
+        for exp in &report.exports {
+            text.push_str(exp);
+            text.push('\n');
+        }
+    }
+    let child_opts = FormatOptions {
+        skip_root: true,
+        ..opts.clone()
+    };
+    let lines = format_view_node(&report.node, &child_opts);
+    if !lines.is_empty() {
+        text.push_str("\n## Symbols\n");
+        for line in lines {
+            text.push_str(&line);
+            text.push('\n');
+        }
+    }
+    let _ = use_colors; // handled via opts
+    text
+}
+
+fn render_symbol(report: &ViewSymbolReport, use_colors: bool) -> String {
+    let mut text = match (report.start_line, report.end_line) {
+        (Some(s), Some(e)) => format!("# {} (L{}-{})\n", report.path, s, e),
+        _ => format!("# {}\n", report.path),
+    };
+    for sig in &report.parent_signatures {
+        text.push_str(sig);
+        text.push('\n');
+    }
+    if !report.parent_signatures.is_empty() {
+        text.push('\n');
+    }
+    if let Some(imports) = &report.imports
+        && !imports.is_empty()
+    {
+        for imp in imports {
+            text.push_str(imp);
+            text.push('\n');
+        }
+        text.push('\n');
+    }
+    if let Some(source) = &report.source {
+        let rendered = if use_colors {
+            if let Some(g) = &report.grammar {
+                highlight_source(source, g, true)
+            } else {
+                source.clone()
+            }
+        } else {
+            source.clone()
+        };
+        text.push_str(&rendered);
+        if !rendered.ends_with('\n') {
+            text.push('\n');
+        }
+    }
+    text
+}
+
+fn render_symbol_node(report: &ViewSymbolNodeReport, opts: &FormatOptions) -> String {
+    let mut text = String::new();
+    // Derive header from node metadata
+    if let Some((start, end)) = report.node.line_range {
+        let kind_str = match &report.node.kind {
+            ViewNodeKind::Symbol(k) => k.as_str(),
+            _ => "",
+        };
+        text.push_str(&format!(
+            "# {} ({}, L{}-{})\n",
+            report.node.name, kind_str, start, end
+        ));
+    }
+    for sig in &report.parent_signatures {
+        text.push_str(sig);
+        text.push('\n');
+    }
+    if !report.parent_signatures.is_empty() {
+        text.push('\n');
+    }
+    let lines = format_view_node(&report.node, opts);
+    for l in lines {
+        text.push_str(&l);
+        text.push('\n');
+    }
+    text
+}
+
+// --- OutputFormatter impl ---
 
 impl OutputFormatter for ViewOutput {
     fn format_text(&self) -> String {
-        // Text output is handled directly by each sub-function (syntax highlighting,
-        // tree rendering, fisheye imports, etc.). This is only used as a fallback.
         match self {
-            ViewOutput::Directory { .. }
-            | ViewOutput::File { .. }
-            | ViewOutput::Symbol(_)
-            | ViewOutput::SymbolAtLine { .. }
-            | ViewOutput::LineRange(_)
-            | ViewOutput::GlobMatches(_)
-            | ViewOutput::History(_)
-            | ViewOutput::KindFilter(_)
-            | ViewOutput::MultipleMatches(_)
-            | ViewOutput::FileContent(_) => serde_json::to_string_pretty(self).unwrap_or_default(),
+            ViewOutput::Directory { node } => render_dir(node, &text_opts()),
+            ViewOutput::File(r) => render_file(r, &text_opts(), false),
+            ViewOutput::Symbol(r) => render_symbol(r, false),
+            ViewOutput::SymbolAtLine(r) => render_symbol_node(r, &text_opts()),
+            ViewOutput::LineRange(r) => {
+                let header = format!("# {}:{}-{}\n\n", r.file, r.start, r.end);
+                let mut text = header + &r.content;
+                if !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text
+            }
+            ViewOutput::GlobMatches(r) => {
+                let mut text = format!("# {}/{} ({} matches)\n\n", r.file, r.pattern, r.count);
+                for m in &r.matches {
+                    text.push_str(&format!(
+                        "## {} ({}, L{}-{})\n",
+                        m.path, m.kind, m.start_line, m.end_line
+                    ));
+                    text.push_str(&m.source);
+                    if !m.source.ends_with('\n') {
+                        text.push('\n');
+                    }
+                    text.push('\n');
+                }
+                text
+            }
+            ViewOutput::History(r) => {
+                let mut text = format!("History for {} (L{}):\n\n", r.file, r.lines);
+                if r.commits.is_empty() {
+                    text.push_str("  No history found.");
+                } else {
+                    for c in &r.commits {
+                        text.push_str(&format!(
+                            "  {} {} {} {}\n",
+                            &c.hash[..8.min(c.hash.len())],
+                            c.date,
+                            c.author,
+                            c.message
+                        ));
+                    }
+                }
+                text
+            }
+            ViewOutput::KindFilter(r) => {
+                let mut text = String::new();
+                for e in &r.symbols {
+                    let parent_str = e
+                        .parent
+                        .as_ref()
+                        .map(|p| format!(" (in {})", p))
+                        .unwrap_or_default();
+                    text.push_str(&format!(
+                        "{}:{} {} {}{}\n",
+                        e.file, e.line, e.kind, e.name, parent_str
+                    ));
+                }
+                text.push_str(&format!("\n{} symbols found", r.symbols.len()));
+                text
+            }
+            ViewOutput::MultipleMatches(r) => {
+                let mut text = String::from("Multiple matches - be more specific:\n");
+                for m in &r.file_matches {
+                    text.push_str(&format!("  {} ({})\n", m.path, m.match_type));
+                }
+                for m in &r.symbol_matches {
+                    let parent = m.parent.as_deref().unwrap_or("");
+                    let sp = if parent.is_empty() {
+                        m.name.clone()
+                    } else {
+                        format!("{}/{}", parent, m.name)
+                    };
+                    text.push_str(&format!("  {}/{} ({})\n", m.path, sp, m.kind));
+                }
+                text
+            }
+            ViewOutput::FileContent(r) => r.content.clone(),
+        }
+    }
+
+    fn format_pretty(&self) -> String {
+        match self {
+            ViewOutput::Directory { node } => render_dir(node, &pretty_opts()),
+            ViewOutput::File(r) => render_file(r, &pretty_opts(), true),
+            ViewOutput::Symbol(r) => render_symbol(r, true),
+            ViewOutput::SymbolAtLine(r) => render_symbol_node(r, &pretty_opts()),
+            ViewOutput::LineRange(r) => {
+                let header = format!("# {}:{}-{}\n\n", r.file, r.start, r.end);
+                let highlighted = if let Some(g) = &r.grammar {
+                    highlight_source(&r.content, g, true)
+                } else {
+                    r.content.clone()
+                };
+                let mut text = header + &highlighted;
+                if !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text
+            }
+            ViewOutput::FileContent(r) => {
+                if let Some(g) = &r.grammar {
+                    highlight_source(&r.content, g, true)
+                } else {
+                    r.content.clone()
+                }
+            }
+            // No color difference for these variants
+            other => other.format_text(),
         }
     }
 }
 
-/// Combined result for service-layer view operations.
-///
-/// Wraps ViewOutput (structured JSON data) alongside pre-rendered text output.
-/// Serializes as ViewOutput for JSON consumers; `text` is used for terminal display.
-pub struct ViewResult {
-    /// Structured output for JSON serialization.
-    pub output: ViewOutput,
-    /// Pre-rendered text output (plain or with ANSI colors).
-    pub text: String,
-}
-
-impl Serialize for ViewResult {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.output.serialize(serializer)
-    }
-}
-
-impl schemars::JsonSchema for ViewResult {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        ViewOutput::schema_name()
-    }
-
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        ViewOutput::json_schema(generator)
-    }
-}
-
-impl OutputFormatter for ViewResult {
-    fn format_text(&self) -> String {
-        self.text.clone()
-    }
-}
-
-impl std::fmt::Display for ViewResult {
+impl std::fmt::Display for ViewOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.text)
+        write!(f, "{}", self.format_text())
     }
 }
 
-/// Helper: count directories and files in a ViewNode tree.
+/// Count directories and files in a ViewNode tree.
 pub fn count_dir_file_nodes(node: &ViewNode) -> (usize, usize) {
-    use crate::tree::ViewNodeKind;
     let mut dirs = 0usize;
     let mut files = 0usize;
     for child in &node.children {
@@ -243,15 +477,4 @@ pub fn count_dir_file_nodes(node: &ViewNode) -> (usize, usize) {
         }
     }
     (dirs, files)
-}
-
-/// Render a ViewNode to text using the given options.
-pub fn render_view_node(node: &ViewNode, minimal: bool, use_colors: bool) -> String {
-    use crate::tree;
-    let options = FormatOptions {
-        minimal,
-        use_colors,
-        ..Default::default()
-    };
-    tree::format_view_node(node, &options).join("\n")
 }

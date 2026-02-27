@@ -1,6 +1,8 @@
 //! Symbol lookup and rendering for view command.
 
-use super::report::{ViewGlobMatch, ViewGlobReport, ViewOutput, ViewResult, ViewSymbolReport};
+use super::report::{
+    ViewGlobMatch, ViewGlobReport, ViewOutput, ViewSymbolNodeReport, ViewSymbolReport,
+};
 use crate::output::OutputFormatter;
 use crate::skeleton::SymbolExt;
 use crate::tree::{DocstringDisplay, FormatOptions};
@@ -131,7 +133,12 @@ pub fn cmd_view_symbol_at_line(
     let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
 
     if json {
-        let report = ViewOutput::SymbolAtLine { node: view_node };
+        let parent_signatures: Vec<String> =
+            ancestors.iter().map(|a| a.signature.clone()).collect();
+        let report = ViewOutput::SymbolAtLine(ViewSymbolNodeReport {
+            node: view_node,
+            parent_signatures,
+        });
         report.print(format);
     } else {
         if depth >= 0 {
@@ -497,6 +504,8 @@ pub fn cmd_view_symbol(
                 source: Some(source.clone()),
                 start_line: None,
                 end_line: None,
+                grammar: grammar.clone(),
+                parent_signatures: vec![],
             });
             report.print(format);
         } else {
@@ -606,6 +615,8 @@ pub fn cmd_view_symbol(
                         source: Some(source.clone()),
                         start_line: Some(sym.start_line),
                         end_line: Some(sym.end_line),
+                        grammar: grammar.clone(),
+                        parent_signatures: vec![],
                     });
                     report.print(format);
                 } else {
@@ -653,7 +664,10 @@ pub fn cmd_view_symbol(
             // Fallback: show skeleton
             let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
             if json {
-                let report = ViewOutput::SymbolAtLine { node: view_node };
+                let report = ViewOutput::SymbolAtLine(ViewSymbolNodeReport {
+                    node: view_node,
+                    parent_signatures: vec![],
+                });
                 report.print(format);
             } else {
                 println!(
@@ -1005,18 +1019,25 @@ pub fn cmd_view_symbol_glob(
     }
 
     if json {
+        let file_lines: Vec<&str> = content.lines().collect();
         let report = ViewOutput::GlobMatches(ViewGlobReport {
             file: file_path.to_string(),
             pattern: pattern.to_string(),
             count: matches.len(),
             matches: matches
                 .iter()
-                .map(|m| ViewGlobMatch {
-                    path: format!("{}/{}", file_path, m.path),
-                    name: m.symbol.name.clone(),
-                    kind: m.symbol.kind.as_str().to_string(),
-                    start_line: m.symbol.start_line,
-                    end_line: m.symbol.end_line,
+                .map(|m| {
+                    let start = m.symbol.start_line.saturating_sub(1);
+                    let end = m.symbol.end_line.min(file_lines.len());
+                    let source = file_lines[start..end].join("\n");
+                    ViewGlobMatch {
+                        path: format!("{}/{}", file_path, m.path),
+                        name: m.symbol.name.clone(),
+                        kind: m.symbol.kind.as_str().to_string(),
+                        start_line: m.symbol.start_line,
+                        end_line: m.symbol.end_line,
+                        source,
+                    }
                 })
                 .collect(),
         });
@@ -1059,12 +1080,11 @@ pub fn build_view_symbol_at_line_service(
     file_path: &str,
     line: usize,
     root: &Path,
-    depth: i32,
-    docstring_mode: crate::tree::DocstringDisplay,
+    _depth: i32,
+    _docstring_mode: crate::tree::DocstringDisplay,
     show_parent: bool,
     _context: bool,
-    use_colors: bool,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let matches = crate::path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => return Err(format!("File not found: {}", file_path)),
@@ -1132,45 +1152,16 @@ pub fn build_view_symbol_at_line_service(
         normalize_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
     let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
 
-    let mut text = String::new();
-    if depth >= 0 {
-        text.push_str(&format!(
-            "# {} ({}, L{}-{})\n",
-            full_symbol_path,
-            sym.kind.as_str(),
-            sym.start_line,
-            sym.end_line
-        ));
-    }
-
-    if show_parent {
-        for ancestor in &ancestors {
-            text.push_str(&ancestor.signature);
-            text.push('\n');
-        }
-        if !ancestors.is_empty() {
-            text.push('\n');
-        }
-    }
-
-    let format_options = crate::tree::FormatOptions {
-        docstrings: docstring_mode,
-        line_numbers: true,
-        skip_root: false,
-        max_depth: None,
-        minimal: !use_colors,
-        use_colors,
+    let parent_signatures = if show_parent {
+        ancestors.iter().map(|a| a.signature.clone()).collect()
+    } else {
+        Vec::new()
     };
-    let lines = crate::tree::format_view_node(&view_node, &format_options);
-    for l in lines {
-        text.push_str(&l);
-        text.push('\n');
-    }
 
-    Ok(ViewResult {
-        output: ViewOutput::SymbolAtLine { node: view_node },
-        text,
-    })
+    Ok(ViewOutput::SymbolAtLine(ViewSymbolNodeReport {
+        node: view_node,
+        parent_signatures,
+    }))
 }
 
 /// Build symbol view for the service layer.
@@ -1179,14 +1170,13 @@ pub fn build_view_symbol_service(
     file_path: &str,
     symbol_path: &[String],
     root: &Path,
-    depth: i32,
+    _depth: i32,
     _full: bool,
-    docstring_mode: crate::tree::DocstringDisplay,
+    _docstring_mode: crate::tree::DocstringDisplay,
     show_parent: bool,
     _context: bool,
-    use_colors: bool,
     case_insensitive: bool,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let full_path = root.join(file_path);
     let content = std::fs::read_to_string(&full_path)
         .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
@@ -1210,72 +1200,47 @@ pub fn build_view_symbol_service(
     if let Some(source) = source_opt {
         let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
 
-        let imports: Vec<String> = deps_result
-            .imports
-            .iter()
-            .map(|i| i.format_summary())
-            .collect();
-
-        let mut text = String::new();
-        if depth >= 0 {
-            if let Some(sym) = parser.find_symbol(&full_path, &content, symbol_name) {
-                text.push_str(&format!(
-                    "# {} (L{}-{})\n",
-                    full_symbol_path, sym.start_line, sym.end_line
-                ));
-            } else {
-                text.push_str(&format!("# {}\n", full_symbol_path));
-            }
-        }
-
-        if !deps_result.imports.is_empty()
+        let imports: Vec<String> = if !deps_result.imports.is_empty()
             && let Some(ref g) = grammar
         {
-            let smart =
-                format_smart_imports_str(&source, g, &full_path, &content, &deps_result.imports);
-            text.push_str(&smart);
-        }
+            format_smart_imports_str(&source, g, &full_path, &content, &deps_result.imports)
+                .lines()
+                .map(|l| l.to_string())
+                .filter(|l| !l.is_empty())
+                .collect()
+        } else {
+            Vec::new()
+        };
 
-        if show_parent {
+        let (start_line, end_line) = parser
+            .find_symbol(&full_path, &content, symbol_name)
+            .map(|sym| (Some(sym.start_line), Some(sym.end_line)))
+            .unwrap_or((None, None));
+
+        let parent_signatures = if show_parent {
             let extractor = skeleton::SkeletonExtractor::new();
             let sr = extractor.extract(&full_path, &content);
             let result = find_symbol_with_parent(&sr.symbols, symbol_name, case_insensitive);
-            let ancestors: Vec<(String, usize)> = result
+            result
                 .ancestors
                 .into_iter()
-                .map(|a| (a.symbol.signature.clone(), a.sibling_count))
-                .collect();
-            for (signature, _) in &ancestors {
-                text.push_str(signature);
-                text.push('\n');
-            }
-            if !ancestors.is_empty() {
-                text.push('\n');
-            }
-        }
-
-        let highlighted = if let Some(ref g) = grammar {
-            crate::tree::highlight_source(&source, g, use_colors)
+                .map(|a| a.symbol.signature.clone())
+                .collect()
         } else {
-            source.clone()
+            Vec::new()
         };
-        text.push_str(&highlighted);
-        if !highlighted.ends_with('\n') {
-            text.push('\n');
-        }
 
-        return Ok(ViewResult {
-            output: ViewOutput::Symbol(ViewSymbolReport {
-                path: full_symbol_path,
-                file: file_path.to_string(),
-                symbol: symbol_name.to_string(),
-                imports: Some(imports),
-                source: Some(source),
-                start_line: None,
-                end_line: None,
-            }),
-            text,
-        });
+        return Ok(ViewOutput::Symbol(ViewSymbolReport {
+            path: full_symbol_path,
+            file: file_path.to_string(),
+            symbol: symbol_name.to_string(),
+            imports: Some(imports),
+            source: Some(source),
+            start_line,
+            end_line,
+            grammar,
+            parent_signatures,
+        }));
     }
 
     // Skeleton extraction path
@@ -1297,73 +1262,33 @@ pub fn build_view_symbol_service(
             let end = std::cmp::min(sym.end_line, lines.len());
             let source: String = lines[start..end].join("\n");
 
-            let mut text = String::new();
-            if depth >= 0 {
-                text.push_str(&format!(
-                    "# {} (L{}-{})\n",
-                    full_symbol_path, sym.start_line, sym.end_line
-                ));
-            }
-
-            if show_parent
-                && symbol_path.len() > 1
-                && let Some(parent_sym) =
-                    find_symbol_ci(&skeleton_result.symbols, &symbol_path[0], case_insensitive)
-            {
-                text.push('\n');
-                text.push_str(&parent_sym.signature);
-                text.push_str("\n\n");
-            }
-
-            let highlighted = if let Some(ref g) = grammar {
-                crate::tree::highlight_source(&source, g, use_colors)
+            let parent_signatures = if show_parent && symbol_path.len() > 1 {
+                find_symbol_ci(&skeleton_result.symbols, &symbol_path[0], case_insensitive)
+                    .map(|p| vec![p.signature.clone()])
+                    .unwrap_or_default()
             } else {
-                source.clone()
+                Vec::new()
             };
-            text.push_str(&highlighted);
-            if !highlighted.ends_with('\n') {
-                text.push('\n');
-            }
 
-            return Ok(ViewResult {
-                output: ViewOutput::Symbol(ViewSymbolReport {
-                    path: full_symbol_path,
-                    file: file_path.to_string(),
-                    symbol: symbol_name.to_string(),
-                    imports: None,
-                    source: Some(source),
-                    start_line: Some(sym.start_line),
-                    end_line: Some(sym.end_line),
-                }),
-                text,
-            });
+            return Ok(ViewOutput::Symbol(ViewSymbolReport {
+                path: full_symbol_path,
+                file: file_path.to_string(),
+                symbol: symbol_name.to_string(),
+                imports: None,
+                source: Some(source),
+                start_line: Some(sym.start_line),
+                end_line: Some(sym.end_line),
+                grammar,
+                parent_signatures,
+            }));
         }
 
         // Fallback: show skeleton node
         let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
-        let mut text = format!(
-            "# {} ({}, L{}-{})\n",
-            full_symbol_path,
-            sym.kind.as_str(),
-            sym.start_line,
-            sym.end_line
-        );
-        let format_options = crate::tree::FormatOptions {
-            docstrings: docstring_mode,
-            line_numbers: true,
-            skip_root: false,
-            max_depth: None,
-            minimal: !use_colors,
-            use_colors,
-        };
-        for l in crate::tree::format_view_node(&view_node, &format_options) {
-            text.push_str(&l);
-            text.push('\n');
-        }
-        return Ok(ViewResult {
-            output: ViewOutput::SymbolAtLine { node: view_node },
-            text,
-        });
+        return Ok(ViewOutput::SymbolAtLine(ViewSymbolNodeReport {
+            node: view_node,
+            parent_signatures: Vec::new(),
+        }));
     }
 
     Err(format!(
@@ -1377,7 +1302,7 @@ pub fn build_view_symbol_glob_service(
     file_path: &str,
     pattern: &str,
     root: &Path,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let full_path = root.join(file_path);
     let content = std::fs::read_to_string(&full_path)
         .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
@@ -1388,47 +1313,29 @@ pub fn build_view_symbol_glob_service(
         return Err(format!("No symbols match pattern: {}", pattern));
     }
 
-    let mut text = format!(
-        "# {}/{} ({} matches)\n\n",
-        file_path,
-        pattern,
-        matches.len()
-    );
-    let lines: Vec<&str> = content.lines().collect();
+    let content_lines: Vec<&str> = content.lines().collect();
 
-    for m in &matches {
-        text.push_str(&format!(
-            "## {} ({}, L{}-{})\n",
-            m.path,
-            m.symbol.kind.as_str(),
-            m.symbol.start_line,
-            m.symbol.end_line
-        ));
-        for i in m.symbol.start_line..=m.symbol.end_line {
-            if i > 0 && i <= lines.len() {
-                text.push_str(lines[i - 1]);
-                text.push('\n');
-            }
-        }
-        text.push('\n');
-    }
-
-    Ok(ViewResult {
-        output: ViewOutput::GlobMatches(ViewGlobReport {
-            file: file_path.to_string(),
-            pattern: pattern.to_string(),
-            count: matches.len(),
-            matches: matches
-                .iter()
-                .map(|m| ViewGlobMatch {
+    Ok(ViewOutput::GlobMatches(ViewGlobReport {
+        file: file_path.to_string(),
+        pattern: pattern.to_string(),
+        count: matches.len(),
+        matches: matches
+            .iter()
+            .map(|m| {
+                let source: String = (m.symbol.start_line..=m.symbol.end_line)
+                    .filter(|&i| i > 0 && i <= content_lines.len())
+                    .map(|i| content_lines[i - 1])
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                ViewGlobMatch {
                     path: format!("{}/{}", file_path, m.path),
                     name: m.symbol.name.clone(),
                     kind: m.symbol.kind.as_str().to_string(),
                     start_line: m.symbol.start_line,
                     end_line: m.symbol.end_line,
-                })
-                .collect(),
-        }),
-        text,
-    })
+                    source,
+                }
+            })
+            .collect(),
+    }))
 }

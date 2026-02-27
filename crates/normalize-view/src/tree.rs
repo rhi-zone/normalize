@@ -173,7 +173,7 @@ pub fn format_view_node(node: &ViewNode, options: &FormatOptions) -> Vec<String>
             format_docstring(
                 doc,
                 &node.name,
-                "    ",
+                "  ",
                 options.docstrings,
                 node.grammar.as_deref(),
                 &mut lines,

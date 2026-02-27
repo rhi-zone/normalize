@@ -1,6 +1,6 @@
 //! Line range viewing for view command.
 
-use super::report::{ViewLineRangeReport, ViewOutput, ViewResult};
+use super::report::{ViewLineRangeReport, ViewOutput};
 use crate::output::OutputFormatter;
 use crate::tree::DocstringDisplay;
 use crate::{parsers, path_resolve, tree};
@@ -114,6 +114,7 @@ pub fn cmd_view_line_range(
             start: actual_start,
             end: actual_end,
             content: source.clone(),
+            grammar: None,
         });
         report.print(format);
         return 0;
@@ -146,8 +147,7 @@ pub fn build_view_line_range_service(
     end: usize,
     root: &std::path::Path,
     docstring_mode: crate::tree::DocstringDisplay,
-    use_colors: bool,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let matches = crate::path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => return Err(format!("File not found: {}", file_path)),
@@ -207,31 +207,13 @@ pub fn build_view_line_range_service(
         lines[range_start..range_end].join("\n")
     };
 
-    let output_text = if use_colors {
-        if let Some(ref g) = grammar {
-            crate::tree::highlight_source(&source, g, true)
-        } else {
-            source.clone()
-        }
-    } else {
-        source.clone()
-    };
-
-    let mut text = format!("# {}:{}-{}\n\n", display_path, actual_start, actual_end);
-    text.push_str(&output_text);
-    if !output_text.ends_with('\n') {
-        text.push('\n');
-    }
-
-    Ok(ViewResult {
-        output: ViewOutput::LineRange(ViewLineRangeReport {
-            file: display_path,
-            start: actual_start,
-            end: actual_end,
-            content: source,
-        }),
-        text,
-    })
+    Ok(ViewOutput::LineRange(ViewLineRangeReport {
+        file: display_path,
+        start: actual_start,
+        end: actual_end,
+        content: source,
+        grammar,
+    }))
 }
 
 /// Find line numbers that contain doc comments within a range.

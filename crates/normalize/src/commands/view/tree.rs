@@ -1,6 +1,6 @@
 //! Directory tree viewing for view command.
 
-use super::report::{ViewKindFilterEntry, ViewKindFilterReport, ViewOutput, ViewResult};
+use super::report::{ViewKindFilterEntry, ViewKindFilterReport, ViewOutput};
 use super::search::has_language_support;
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
@@ -90,14 +90,12 @@ pub fn cmd_view_directory(
 }
 
 /// Build a directory tree view for the service layer.
-/// Returns ViewResult containing the ViewOutput and rendered text.
 pub fn build_view_directory_service(
     dir: &Path,
     depth: i32,
     raw: bool,
     filter: Option<&Filter>,
-    use_colors: bool,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let effective_depth = if depth < 0 {
         None
     } else {
@@ -122,40 +120,7 @@ pub fn build_view_directory_service(
         view_node
     };
 
-    let (dir_count, file_count) = {
-        let mut dirs = 0usize;
-        let mut files = 0usize;
-        fn count(node: &ViewNode, dirs: &mut usize, files: &mut usize) {
-            for child in &node.children {
-                match child.kind {
-                    ViewNodeKind::Directory => {
-                        *dirs += 1;
-                        count(child, dirs, files);
-                    }
-                    ViewNodeKind::File => *files += 1,
-                    ViewNodeKind::Symbol(_) => {}
-                }
-            }
-        }
-        count(&view_node, &mut dirs, &mut files);
-        (dirs, files)
-    };
-
-    let format_options = FormatOptions {
-        minimal: !use_colors,
-        use_colors,
-        ..Default::default()
-    };
-    let lines = tree::format_view_node(&view_node, &format_options);
-    let mut text = lines.join("\n");
-    text.push('\n');
-    text.push('\n');
-    text.push_str(&format!("{} directories, {} files", dir_count, file_count));
-
-    Ok(ViewResult {
-        output: ViewOutput::Directory { node: view_node },
-        text,
-    })
+    Ok(ViewOutput::Directory { node: view_node })
 }
 
 /// Filter a ViewNode tree, removing nodes that don't pass the filter.
@@ -303,7 +268,7 @@ pub fn build_view_filtered_service(
     root: &Path,
     scope: &str,
     kind: &str,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let kind_lower = kind.to_lowercase();
     let kind_filter: Option<&str> = match kind_lower.as_str() {
         "class" | "classes" => Some("class"),
@@ -372,20 +337,7 @@ pub fn build_view_filtered_service(
 
     all_symbols.sort_by(|a, b| (&a.0, a.3).cmp(&(&b.0, b.3)));
 
-    let mut text = String::new();
-    for (file, name, kind_s, line, parent) in &all_symbols {
-        let parent_str = parent
-            .as_ref()
-            .map(|p| format!(" (in {})", p))
-            .unwrap_or_default();
-        text.push_str(&format!(
-            "{}:{} {} {}{}\n",
-            file, line, kind_s, name, parent_str
-        ));
-    }
-    text.push_str(&format!("\n{} symbols found", all_symbols.len()));
-
-    let output = ViewOutput::KindFilter(ViewKindFilterReport {
+    Ok(ViewOutput::KindFilter(ViewKindFilterReport {
         symbols: all_symbols
             .iter()
             .map(|(file, name, kind_s, line, parent)| ViewKindFilterEntry {
@@ -396,7 +348,5 @@ pub fn build_view_filtered_service(
                 parent: parent.clone(),
             })
             .collect(),
-    });
-
-    Ok(ViewResult { output, text })
+    }))
 }

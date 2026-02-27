@@ -1,6 +1,6 @@
 //! Symbol history via git log.
 
-use super::report::{ViewHistoryCommit, ViewHistoryReport, ViewOutput, ViewResult};
+use super::report::{ViewHistoryCommit, ViewHistoryReport, ViewOutput};
 use super::symbol::find_symbol_ci;
 use crate::output::OutputFormatter;
 use crate::path_resolve;
@@ -214,7 +214,7 @@ pub fn build_view_history_service(
     root: &Path,
     limit: usize,
     case_insensitive: bool,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let Some(resolved) = crate::path_resolve::resolve_unified(target, root) else {
         return Err(format!("Could not resolve path: {}", target));
     };
@@ -262,7 +262,7 @@ fn build_line_history_service(
     start_line: usize,
     end_line: usize,
     limit: usize,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let line_range = format!("{},{}:{}", start_line, end_line, file_path);
 
     let output = Command::new("git")
@@ -303,30 +303,9 @@ fn build_line_history_service(
         })
         .collect();
 
-    let mut text = format!(
-        "History for {} (L{}-L{}):\n\n",
-        file_path, start_line, end_line
-    );
-    if commits.is_empty() {
-        text.push_str("  No history found.");
-    } else {
-        for commit in &commits {
-            text.push_str(&format!(
-                "  {} {} {} {}\n",
-                &commit.hash[..8.min(commit.hash.len())],
-                commit.date,
-                commit.author,
-                commit.message
-            ));
-        }
-    }
-
-    Ok(ViewResult {
-        output: ViewOutput::History(ViewHistoryReport {
-            file: file_path.to_string(),
-            lines: format!("{}-{}", start_line, end_line),
-            commits,
-        }),
-        text,
-    })
+    Ok(ViewOutput::History(ViewHistoryReport {
+        file: file_path.to_string(),
+        lines: format!("{}-{}", start_line, end_line),
+        commits,
+    }))
 }

@@ -1,6 +1,6 @@
 //! File skeleton viewing for view command.
 
-use super::report::{ViewFileContentReport, ViewOutput, ViewResult};
+use super::report::{ViewFileContentReport, ViewFileReport, ViewOutput};
 use super::symbol::find_symbol_signature;
 use crate::output::OutputFormatter;
 use crate::skeleton::ExtractResultExt;
@@ -176,6 +176,7 @@ pub fn cmd_view_file(
             let report = ViewOutput::FileContent(ViewFileContentReport {
                 path: file_path.to_string(),
                 content: content.clone(),
+                grammar: None,
             });
             report.print(format);
         } else {
@@ -216,7 +217,13 @@ pub fn cmd_view_file(
 
     if json {
         let view_node = skeleton_result.to_view_node(grammar.as_deref());
-        let report = ViewOutput::File { node: view_node };
+        let report = ViewOutput::File(ViewFileReport {
+            path: file_path.to_string(),
+            line_count: content.lines().count(),
+            imports: vec![],
+            exports: vec![],
+            node: view_node,
+        });
         report.print(format);
     } else {
         println!("# {}", file_path);
@@ -344,33 +351,20 @@ pub fn build_view_file_service(
     show_deps: bool,
     types_only: bool,
     show_tests: bool,
-    docstring_mode: DocstringDisplay,
+    _docstring_mode: DocstringDisplay,
     context: bool,
-    use_colors: bool,
-) -> Result<ViewResult, String> {
+) -> Result<ViewOutput, String> {
     let full_path = root.join(file_path);
     let content = std::fs::read_to_string(&full_path)
         .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
 
     if !(0..=2).contains(&depth) {
-        // Full content view
         let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
-        let output_text = if use_colors {
-            if let Some(ref g) = grammar {
-                tree::highlight_source(&content, g, true)
-            } else {
-                content.clone()
-            }
-        } else {
-            content.clone()
-        };
-        return Ok(ViewResult {
-            output: ViewOutput::FileContent(ViewFileContentReport {
-                path: file_path.to_string(),
-                content: content.clone(),
-            }),
-            text: output_text,
-        });
+        return Ok(ViewOutput::FileContent(ViewFileContentReport {
+            path: file_path.to_string(),
+            content,
+            grammar,
+        }));
     }
 
     let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
@@ -394,60 +388,33 @@ pub fn build_view_file_service(
     };
 
     let view_node = skeleton_result.to_view_node(grammar.as_deref());
+    let line_count = content.lines().count();
 
-    let mut text = format!("# {}\n", file_path);
-    text.push_str(&format!("Lines: {}\n", content.lines().count()));
+    let mut imports = Vec::new();
+    let mut exports = Vec::new();
 
     if let Some(ref deps) = deps_result {
-        let show = show_deps || context;
-        if show && !deps.imports.is_empty() {
-            text.push_str("\n## Imports\n");
-            for imp in &deps.imports {
-                if imp.names.is_empty() {
-                    text.push_str(&format!("  import {}\n", imp.module));
-                } else {
-                    text.push_str(&format!(
-                        "  from {} import {}\n",
-                        imp.module,
-                        imp.names.join(", ")
-                    ));
-                }
-            }
-        }
-
-        if show && !deps.exports.is_empty() {
-            text.push_str("\n## Exports\n");
-            for exp in &deps.exports {
-                text.push_str(&format!("  {}\n", exp.name));
-            }
-        }
-    }
-
-    if depth >= 1 && (!show_deps || context) {
-        let format_options = FormatOptions {
-            docstrings: if context {
-                DocstringDisplay::None
+        for imp in &deps.imports {
+            if imp.names.is_empty() {
+                imports.push(format!("  import {}", imp.module));
             } else {
-                docstring_mode
-            },
-            line_numbers: true,
-            skip_root: true,
-            max_depth: None,
-            minimal: !use_colors,
-            use_colors,
-        };
-        let lines = tree::format_view_node(&view_node, &format_options);
-        if !lines.is_empty() {
-            text.push_str("\n## Symbols\n");
-            for line in lines {
-                text.push_str(&line);
-                text.push('\n');
+                imports.push(format!(
+                    "  from {} import {}",
+                    imp.module,
+                    imp.names.join(", ")
+                ));
             }
+        }
+        for exp in &deps.exports {
+            exports.push(format!("  {}", exp.name));
         }
     }
 
-    Ok(ViewResult {
-        output: ViewOutput::File { node: view_node },
-        text,
-    })
+    Ok(ViewOutput::File(ViewFileReport {
+        path: file_path.to_string(),
+        line_count,
+        imports,
+        exports,
+        node: view_node,
+    }))
 }

@@ -1159,39 +1159,7 @@ The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mi
 
 - VS Code extension: test and publish to marketplace (after first CLI release)
 - Remaining docs: prior-art.md, hybrid-loops.md
-
-## Python Features Not Yet Ported
-
-### Orchestration
-- Session management with checkpointing
-- Driver protocol for agent decision-making
-- Plugin system (partial - Rust traits exist)
-- Event bus, validators, policies
-- PR review, diff analysis
-- TUI (Textual-based explorer)
-- DWIM tool routing with aliases
-
-### LLM-Powered
-- Edit routing (complexity assessment → structural vs LLM)
-- Summarization with local models
-- Working memory with summarization
-
-### Memory System
-See `docs/design/memory.md`. Core API: `store(content, opts)`, `recall(query)`, `forget(query)`.
-SQLite-backed persistence in `.normalize/memory.db`. Slots are user-space (metadata), not special-cased.
-
-### Local NN Budget (from deleted docs)
-| Model | Params | FP16 RAM |
-|-------|--------|----------|
-| all-MiniLM-L6-v2 | 33M | 65MB |
-| distilbart-cnn | 139M | 280MB |
-| T5-small | 60M | 120MB |
-
-Pre-summarization tiers: extractive (free) → small NN → LLM (expensive)
-
-### Usage Patterns (from dogfooding)
-- Investigation flow: `view .` → `view <file> --types-only` → `analyze --complexity` → `view <symbol>`
-- Token efficiency: use `--types-only` for architecture, `--depth` sparingly
+- Memory system: `docs/design/memory.md` — SQLite-backed `store/recall/forget`. Deferred until concrete use case.
 
 ## Implementation Notes
 
