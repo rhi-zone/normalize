@@ -147,7 +147,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 
 **Steps (normalize side):**
 - [x] Add `server-less` dependency with `cli` feature
-- [ ] Wire `OutputFormatter`: `--compact` → `format_text()`, default → `format_pretty()`. Blocked: server-less `display_with` bypasses JSON flags — need to fix server-less first, then use `display_with` for pretty/compact toggle.
+- [x] Wire `OutputFormatter`: `display_with` bridges to `format_pretty()`/`format_text()` via `Cell<bool>` for pretty/compact globals. server-less handles JSON/JSONL/JQ before `display_with`.
 - [x] Wire `defaults` hook to `NormalizeConfig` loading (config file merge)
 - [x] Migrate one simple command (text-search → `grep`) as proof of concept
 - [ ] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method (keeping legacy text-search alongside grep during migration)
@@ -156,10 +156,10 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 
 **Known limitations (scaffold):**
-- `--pretty`/`--compact` not wired through server-less yet (needs `display_with` + JSON passthrough fix in server-less)
-- `pattern` is `--pattern` flag, not positional (server-less only infers `_id` names as positional — need `#[param(positional)]` support)
-- `--exclude`/`--only` take comma-separated string, not repeated flags (server-less `Vec<T>` would work but `Option<String>` used for now)
-- Schema output simpler than legacy (server-less uses own schema gen, not schemars)
+- ~~`--pretty`/`--compact` not wired~~ → resolved via `display_with` + `Cell<bool>` globals
+- ~~`pattern` is `--pattern` flag~~ → resolved via `#[param(positional)]`
+- ~~`--exclude`/`--only` take comma-separated string~~ → resolved via `Vec<String>` (repeated flags + comma delimiter)
+- ~~Schema output simpler~~ → resolved via `jsonschema` feature (schemars)
 
 **Also:**
 - [x] Rename `text-search` command to `grep` (via server-less migration — legacy `text-search` kept as alias during transition)
