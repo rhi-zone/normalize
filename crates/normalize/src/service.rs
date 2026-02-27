@@ -12,39 +12,65 @@
 //!
 //! ## Output formatting
 //!
-//! server-less uses `Display` for default text output and handles `--json`,
-//! `--jsonl`, `--jq` automatically via `Serialize`. Types implementing
-//! `OutputFormatter` get `Display` via `format_text()`.
-//!
-//! TODO: Once server-less `display_with` supports JSON flag passthrough,
-//! switch to `display_with` for `--pretty`/`--compact` toggle.
+//! server-less handles `--json`/`--jsonl`/`--jq` automatically via `Serialize`.
+//! For text output, `display_with` bridges to `OutputFormatter`: each method's
+//! `display_output` reads `self.pretty` (set by the method from `--pretty`/
+//! `--compact` globals + config) and calls `format_pretty()` or `format_text()`.
 
 use crate::commands;
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
 use crate::text_search::{self, GrepResult};
 use server_less::cli;
+use std::cell::Cell;
 use std::path::PathBuf;
 
 /// Root CLI service for normalize.
-#[derive(Default)]
-pub struct NormalizeService;
+pub struct NormalizeService {
+    /// Whether pretty output is active (resolved per-command from globals + config).
+    pretty: Cell<bool>,
+}
+
+impl Default for NormalizeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl NormalizeService {
     pub fn new() -> Self {
-        Self
+        Self {
+            pretty: Cell::new(false),
+        }
     }
 
     /// Provide config-based defaults for parameters.
     ///
     /// Called by server-less when a required parameter is not provided on the CLI.
-    /// Loads config from the current directory (or --root if available) and returns
-    /// the config value as a string.
+    /// Loads config from the current directory and returns the config value as a string.
     fn config_defaults(&self, param: &str) -> Option<String> {
         let config = NormalizeConfig::load(&std::env::current_dir().unwrap_or_default());
         match param {
             "limit" => Some(config.text_search.limit().to_string()),
             _ => None,
+        }
+    }
+
+    /// Resolve pretty/compact state from globals and config, store in `self.pretty`.
+    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
+        let config = NormalizeConfig::load(root);
+        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        self.pretty.set(is_pretty);
+    }
+
+    /// Display bridge for OutputFormatter types.
+    ///
+    /// Only called for text output — server-less handles JSON/JSONL/JQ before this.
+    fn display_output(&self, value: &GrepResult) -> String {
+        if self.pretty.get() {
+            value.format_pretty()
+        } else {
+            value.format_text()
         }
     }
 }
@@ -53,39 +79,37 @@ impl NormalizeService {
     name = "normalize",
     version = "0.1.0",
     about = "Fast code intelligence CLI",
-    defaults = "config_defaults"
+    defaults = "config_defaults",
+    global = [pretty, compact]
 )]
 impl NormalizeService {
     /// Search for text patterns in files (fast ripgrep-based search)
+    #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
     pub fn grep(
         &self,
-        #[param(help = "Regex pattern to search for")] pattern: String,
+        #[param(positional, help = "Regex pattern to search for")] pattern: String,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
         #[param(short = 'l', help = "Maximum number of matches to return")] limit: Option<usize>,
         #[param(short = 'i', help = "Case-insensitive search")] ignore_case: bool,
-        #[param(help = "Exclude files matching patterns or aliases (comma-separated)")]
-        exclude: Option<String>,
-        #[param(help = "Only include files matching patterns or aliases (comma-separated)")]
-        only: Option<String>,
+        #[param(help = "Exclude files matching patterns or aliases")] exclude: Vec<String>,
+        #[param(help = "Only include files matching patterns or aliases")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
     ) -> Result<GrepResult, String> {
         let root_path = root
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
-        let config = NormalizeConfig::load(&root_path);
 
+        self.resolve_format(pretty, compact, &root_path);
+
+        let config = NormalizeConfig::load(&root_path);
         let limit = limit.unwrap_or_else(|| config.text_search.limit());
         let ignore_case = ignore_case || config.text_search.ignore_case();
 
-        let exclude_list: Vec<String> = exclude
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default();
-        let only_list: Vec<String> = only
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default();
-
-        let filter = commands::build_filter(&root_path, &exclude_list, &only_list);
+        let filter = commands::build_filter(&root_path, &exclude, &only);
 
         match text_search::grep(&pattern, &root_path, filter.as_ref(), limit, ignore_case) {
             Ok(result) => {
@@ -99,11 +123,10 @@ impl NormalizeService {
     }
 }
 
-/// Display impl bridges to OutputFormatter::format_text() for server-less CLI output.
+/// Display impl bridges to OutputFormatter::format_text() for contexts outside
+/// server-less dispatch (e.g. direct use of GrepResult).
 impl std::fmt::Display for GrepResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Trim trailing newline from format_text since Display doesn't add one
-        let text = self.format_text();
-        write!(f, "{}", text.trim_end())
+        write!(f, "{}", self.format_text().trim_end())
     }
 }
