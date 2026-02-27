@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 252
 expression: "snapshot_help(&[\"analyze\", \"security\"])"
 ---
 Run security analysis

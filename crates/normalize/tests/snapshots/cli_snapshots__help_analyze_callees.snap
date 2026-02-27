@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 277
 expression: "snapshot_help(&[\"analyze\", \"callees\"])"
 ---
 Show what functions a symbol calls

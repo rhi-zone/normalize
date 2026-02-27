@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 262
 expression: "snapshot_help(&[\"analyze\", \"files\"])"
 ---
 Show longest files in codebase

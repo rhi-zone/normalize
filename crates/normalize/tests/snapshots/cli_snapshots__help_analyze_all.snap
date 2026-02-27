@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 342
 expression: "snapshot_help(&[\"analyze\", \"all\"])"
 ---
 Run all analysis passes

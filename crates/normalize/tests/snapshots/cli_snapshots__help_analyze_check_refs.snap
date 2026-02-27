@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 302
 expression: "snapshot_help(&[\"analyze\", \"check-refs\"])"
 ---
 Check for broken documentation references

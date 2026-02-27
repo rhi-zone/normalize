@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 436
 expression: "snapshot_help(&[\"serve\", \"http\"])"
 ---
 Start HTTP server (REST API)

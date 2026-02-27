@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 357
 expression: "snapshot_help(&[\"analyze\", \"rules\"])"
 ---
 Run syntax rules and report findings

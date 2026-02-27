@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 322
 expression: "snapshot_help(&[\"analyze\", \"duplicate-types\"])"
 ---
 Detect duplicate type definitions

@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 242
 expression: "snapshot_help(&[\"analyze\", \"complexity\"])"
 ---
 Run complexity analysis

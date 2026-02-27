@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 287
 expression: "snapshot_help(&[\"analyze\", \"coupling\"])"
 ---
 Find files that frequently change together (temporal coupling)

@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 431
 expression: "snapshot_help(&[\"serve\", \"mcp\"])"
 ---
 Start MCP server for LLM integration (stdio transport)

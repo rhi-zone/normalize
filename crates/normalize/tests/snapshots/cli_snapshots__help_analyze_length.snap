@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 247
 expression: "snapshot_help(&[\"analyze\", \"length\"])"
 ---
 Run function length analysis

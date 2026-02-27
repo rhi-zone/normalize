@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 272
 expression: "snapshot_help(&[\"analyze\", \"callers\"])"
 ---
 Show callers of a symbol

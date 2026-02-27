@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 441
 expression: "snapshot_help(&[\"serve\", \"lsp\"])"
 ---
 Start LSP server for IDE integration

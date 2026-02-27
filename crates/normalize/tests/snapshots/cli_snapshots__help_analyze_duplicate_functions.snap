@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 317
 expression: "snapshot_help(&[\"analyze\", \"duplicate-functions\"])"
 ---
 Detect duplicate functions (code clones)

@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 72
 expression: "snapshot_help(&[\"analyze\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)

@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 332
 expression: "snapshot_help(&[\"analyze\", \"similar-functions\"])"
 ---
 Detect similar functions via MinHash LSH

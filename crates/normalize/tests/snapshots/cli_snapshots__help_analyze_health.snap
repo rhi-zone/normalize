@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 237
 expression: "snapshot_help(&[\"analyze\", \"health\"])"
 ---
 Run health analysis (file counts, complexity stats, large file warnings)

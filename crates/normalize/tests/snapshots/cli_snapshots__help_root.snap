@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 26
 expression: "snapshot_help(&[])"
 ---
 Fast code intelligence CLI

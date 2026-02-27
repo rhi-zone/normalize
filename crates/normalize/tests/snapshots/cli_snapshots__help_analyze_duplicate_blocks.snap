@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 327
 expression: "snapshot_help(&[\"analyze\", \"duplicate-blocks\"])"
 ---
 Detect duplicate code blocks

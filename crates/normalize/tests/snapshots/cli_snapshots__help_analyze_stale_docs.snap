@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 307
 expression: "snapshot_help(&[\"analyze\", \"stale-docs\"])"
 ---
 Check for stale documentation

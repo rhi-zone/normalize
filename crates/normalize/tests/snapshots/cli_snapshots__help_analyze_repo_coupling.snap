@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 297
 expression: "snapshot_help(&[\"analyze\", \"repo-coupling\"])"
 ---
 Analyze cross-repo coupling

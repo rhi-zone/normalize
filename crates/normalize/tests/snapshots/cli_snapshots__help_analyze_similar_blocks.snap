@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 337
 expression: "snapshot_help(&[\"analyze\", \"similar-blocks\"])"
 ---
 Detect similar code blocks via MinHash LSH

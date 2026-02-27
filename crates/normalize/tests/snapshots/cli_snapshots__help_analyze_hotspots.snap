@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 282
 expression: "snapshot_help(&[\"analyze\", \"hotspots\"])"
 ---
 Show git history hotspots (frequently changed files)

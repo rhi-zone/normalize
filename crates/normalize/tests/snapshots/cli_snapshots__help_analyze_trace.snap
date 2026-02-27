@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 267
 expression: "snapshot_help(&[\"analyze\", \"trace\"])"
 ---
 Trace value provenance for a symbol

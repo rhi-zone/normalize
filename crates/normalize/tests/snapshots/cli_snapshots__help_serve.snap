@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 107
 expression: "snapshot_help(&[\"serve\"])"
 ---
 Start a normalize server (MCP, HTTP, LSP)
