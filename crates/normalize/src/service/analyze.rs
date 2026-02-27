@@ -26,8 +26,8 @@ use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
 
-fn discover_repos(dir: &str) -> Result<Vec<PathBuf>, String> {
-    crate::multi_repo::discover_repos(&PathBuf::from(dir))
+fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
+    crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth)
 }
 
 /// Analyze sub-service (health, complexity, security, duplicates, docs).
@@ -507,11 +507,12 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Run across all git repos under DIR (1 level deep)")] repos: Option<String>,
+        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<HotspotsReport, String> {
         let root_path = Self::root_path(root);
         if let Some(repos_dir) = repos {
-            let repo_paths = discover_repos(&repos_dir)?;
+            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
             let entries: Vec<HotspotsRepoEntry> = repo_paths
                 .into_iter()
                 .map(|repo_path| {
@@ -574,13 +575,14 @@ impl AnalyzeService {
             String,
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Run across all git repos under DIR (1 level deep)")] repos: Option<String>,
+        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<CouplingReport, String> {
         let root_path = Self::root_path(root);
         let min = min_commits.unwrap_or(3);
         let lim = limit.unwrap_or(20);
         if let Some(repos_dir) = repos {
-            let repo_paths = discover_repos(&repos_dir)?;
+            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
             let entries: Vec<CouplingRepoEntry> = repo_paths
                 .into_iter()
                 .map(|repo_path| {
@@ -622,12 +624,13 @@ impl AnalyzeService {
             String,
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Run across all git repos under DIR (1 level deep)")] repos: Option<String>,
+        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<OwnershipReport, String> {
         let root_path = Self::root_path(root);
         let lim = limit.unwrap_or(20);
         if let Some(repos_dir) = repos {
-            let repo_paths = discover_repos(&repos_dir)?;
+            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
             let entries: Vec<OwnershipRepoEntry> = repo_paths
                 .into_iter()
                 .map(|repo_path| {
@@ -664,9 +667,10 @@ impl AnalyzeService {
     #[cli(display_with = "display_contributors")]
     pub fn contributors(
         &self,
-        #[param(help = "Directory containing git repos (1 level deep)")] repos_dir: String,
+        #[param(help = "Directory containing git repos")] repos_dir: String,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<ContributorsReport, String> {
-        let repos = discover_repos(&repos_dir)?;
+        let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
         crate::commands::analyze::contributors::analyze_contributors(&repos)
     }
 
@@ -674,11 +678,12 @@ impl AnalyzeService {
     #[cli(display_with = "display_activity")]
     pub fn activity(
         &self,
-        #[param(help = "Directory containing git repos (1 level deep)")] repos_dir: String,
+        #[param(help = "Directory containing git repos")] repos_dir: String,
         #[param(help = "Window granularity: month (default) or week")] window: Option<String>,
         #[param(help = "Number of windows to show")] windows: Option<usize>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<ActivityReport, String> {
-        let repos = discover_repos(&repos_dir)?;
+        let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
         crate::commands::analyze::activity::analyze_activity(
             &repos,
             window.as_deref().unwrap_or("month"),
@@ -690,13 +695,14 @@ impl AnalyzeService {
     #[cli(display_with = "display_repo_coupling")]
     pub fn repo_coupling(
         &self,
-        #[param(help = "Directory containing git repos (1 level deep)")] repos_dir: String,
+        #[param(help = "Directory containing git repos")] repos_dir: String,
         #[param(help = "Window size in hours for temporal grouping")] window: Option<usize>,
         #[param(help = "Minimum shared windows to report a temporal pair")] min_windows: Option<
             usize,
         >,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<RepoCouplingReport, String> {
-        let repos = discover_repos(&repos_dir)?;
+        let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
         crate::commands::analyze::repo_coupling::analyze_repo_coupling(
             &repos,
             window.unwrap_or(24),
@@ -718,7 +724,8 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Scan across all git repos under DIR (1 level deep)")] repos: Option<String>,
+        #[param(help = "Scan across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
@@ -727,7 +734,7 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
-            discover_repos(&repos_dir)?
+            discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
         } else {
             vec![root_path.clone()]
         };
@@ -805,7 +812,8 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Scan across all git repos under DIR (1 level deep)")] repos: Option<String>,
+        #[param(help = "Scan across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
@@ -814,7 +822,7 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
-            discover_repos(&repos_dir)?
+            discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
         } else {
             vec![root_path.clone()]
         };

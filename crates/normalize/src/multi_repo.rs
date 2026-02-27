@@ -5,42 +5,45 @@ use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
-/// Discover git repositories one level deep under `dir`.
+/// Discover git repositories up to `max_depth` levels deep under `dir`.
 ///
-/// Scans immediate subdirectories for `.git/` directories, skipping hidden dirs.
+/// Scans subdirectories for `.git/` directories, skipping hidden dirs.
+/// Stops recursing into a directory once a `.git` is found (no nested repos).
 /// Returns sorted list of repo paths.
-pub fn discover_repos(dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = std::fs::read_dir(dir)
-        .map_err(|e| format!("Failed to read directory {}: {}", dir.display(), e))?;
-
-    let mut repos: Vec<PathBuf> = entries
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-
-            // Skip non-directories
-            if !path.is_dir() {
-                return None;
-            }
-
-            // Skip hidden directories
-            let name = entry.file_name();
-            let name_str = name.to_str()?;
-            if name_str.starts_with('.') {
-                return None;
-            }
-
-            // Check for .git directory
-            if path.join(".git").is_dir() {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect();
-
+pub fn discover_repos_depth(dir: &Path, max_depth: usize) -> Result<Vec<PathBuf>, String> {
+    let mut repos = Vec::new();
+    collect_repos(dir, max_depth, &mut repos)
+        .map_err(|e| format!("Failed to discover repos in {}: {}", dir.display(), e))?;
     repos.sort();
     Ok(repos)
+}
+
+fn collect_repos(dir: &Path, depth: usize, repos: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    if depth == 0 {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(dir)?.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name_str = name.to_str().unwrap_or("");
+        if name_str.starts_with('.') {
+            continue;
+        }
+        if path.join(".git").is_dir() {
+            repos.push(path);
+        } else if depth > 1 {
+            collect_repos(&path, depth - 1, repos)?;
+        }
+    }
+    Ok(())
+}
+
+/// Discover git repositories one level deep under `dir`.
+pub fn discover_repos(dir: &Path) -> Result<Vec<PathBuf>, String> {
+    discover_repos_depth(dir, 1)
 }
 
 /// Outcome of running a command on a single repo.
