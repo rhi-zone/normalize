@@ -26,14 +26,14 @@ Options:
       --no-parent           Hide parent/ancestor context (shown by default for nested symbols)
       --context             Context view: skeleton + imports combined
       --dir-context         Prepend directory context (.context.md files from hierarchy)
-      --exclude <PATTERN>   Exclude paths matching pattern or @alias
-      --only <PATTERN>      Include only paths matching pattern or @alias
-  -i, --case-insensitive    Case-insensitive symbol matching
-      --history [<N>]       Show git history for symbol (last N changes)
       --repos <DIR>         Run command across all git repos under DIR (1 level deep)
+      --exclude <PATTERN>   Exclude paths matching pattern or @alias
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
+      --only <PATTERN>      Include only paths matching pattern or @alias
+  -i, --case-insensitive    Case-insensitive symbol matching
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+      --history [<N>]       Show git history for symbol (last N changes)
       --pretty              Human-friendly output with colors and formatting
       --compact             Compact output without colors (overrides TTY detection)
       --output-schema       Output JSON schema for the command's return type

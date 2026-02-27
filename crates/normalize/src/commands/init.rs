@@ -1,46 +1,7 @@
 //! Initialize normalize in a project directory.
 
-use clap::Args;
 use std::fs;
 use std::path::Path;
-
-#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
-pub struct InitArgs {
-    /// Index the codebase after initialization
-    #[arg(long)]
-    #[serde(default)]
-    pub index: bool,
-}
-
-/// Print JSON schema for the command's input arguments.
-pub fn print_input_schema() {
-    let schema = schemars::schema_for!(InitArgs);
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&schema).unwrap_or_default()
-    );
-}
-
-/// Run init command.
-pub fn run(args: InitArgs, input_schema: bool, params_json: Option<&str>) -> i32 {
-    if input_schema {
-        print_input_schema();
-        return 0;
-    }
-    // Override args with --params-json if provided
-    let args = match params_json {
-        Some(json) => match serde_json::from_str(json) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                eprintln!("error: invalid --params-json: {}", e);
-                return 1;
-            }
-        },
-        None => args,
-    };
-    let root = std::env::current_dir().unwrap();
-    cmd_init(&root, args.index)
-}
 
 /// Common TODO file names to detect
 const TODO_CANDIDATES: &[&str] = &[
@@ -52,7 +13,7 @@ const TODO_CANDIDATES: &[&str] = &[
     "TASKS",
 ];
 
-fn cmd_init(root: &Path, do_index: bool) -> i32 {
+pub fn cmd_init(root: &Path, do_index: bool) -> i32 {
     let mut changes = Vec::new();
 
     // 1. Create .normalize directory if needed

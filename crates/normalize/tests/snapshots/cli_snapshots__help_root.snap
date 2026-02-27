@@ -7,26 +7,22 @@ Fast code intelligence CLI
 Usage: normalize [OPTIONS] <COMMAND>
 
 Commands:
-  view         View a node in the codebase tree (directory, file, or symbol)
-  edit         Edit a node in the codebase tree (structural code modification)
-  history      View shadow git edit history
-  facts        Manage code facts (file index, symbols, calls, imports)
-  init         Initialize normalize in current directory
-  daemon       Manage the global normalize daemon
-  update       Check for and install updates
-  grammars     Manage tree-sitter grammars for parsing
-  analyze      Analyze codebase (health, complexity, security, duplicates, docs)
-  aliases      List filter aliases (used by --exclude/--only)
-  context      Show directory context (hierarchical .context.md files)
-  text-search  Search for text patterns in files (fast ripgrep-based search)
-  sessions     Analyze Claude Code and other agent session logs
-  package      Package management: info, list, tree, outdated
-  tools        External ecosystem tools (linters, formatters, test runners)
-  serve        Start a normalize server (MCP, HTTP, LSP)
-  generate     Generate code from API spec
-  rules        Manage and run analysis rules (syntax + fact)
-  translate    Translate code between programming languages
-  help         Print this message or the help of the given subcommand(s)
+  view       View a node in the codebase tree (directory, file, or symbol)
+  edit       Edit a node in the codebase tree (structural code modification)
+  history    View shadow git edit history
+  facts      Manage code facts (file index, symbols, calls, imports)
+  daemon     Manage the global normalize daemon
+  update     Check for and install updates
+  grammars   Manage tree-sitter grammars for parsing
+  analyze    Analyze codebase (health, complexity, security, duplicates, docs)
+  sessions   Analyze Claude Code and other agent session logs
+  package    Package management: info, list, tree, outdated
+  tools      External ecosystem tools (linters, formatters, test runners)
+  serve      Start a normalize server (MCP, HTTP, LSP)
+  generate   Generate code from API spec
+  rules      Manage and run analysis rules (syntax + fact)
+  translate  Translate code between programming languages
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
       --repos <DIR>         Run command across all git repos under DIR (1 level deep)

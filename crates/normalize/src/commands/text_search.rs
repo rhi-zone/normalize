@@ -1,15 +1,11 @@
-//! Text search command - search file contents for a pattern.
+//! Text search configuration.
 //!
-//! Named "text-search" to avoid confusion with unix grep. The internal implementation
-//! uses ripgrep, but the command name indicates purpose rather than tool.
+//! The text search command (`grep`) is implemented in the server-less service layer
+//! (`service.rs`). This module retains only the configuration type used by
+//! `NormalizeConfig`.
 
-use crate::config::NormalizeConfig;
-use crate::output::{OutputFormat, OutputFormatter};
-use crate::text_search;
-use clap::Args;
 use normalize_derive::Merge;
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
 
 /// Text search command configuration.
 #[derive(Debug, Clone, Deserialize, serde::Serialize, Default, Merge, schemars::JsonSchema)]
@@ -28,121 +24,5 @@ impl TextSearchConfig {
 
     pub fn ignore_case(&self) -> bool {
         self.ignore_case.unwrap_or(false)
-    }
-}
-
-/// Text search command arguments.
-#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
-pub struct TextSearchArgs {
-    /// Regex pattern to search for
-    pub pattern: String,
-
-    /// Root directory (defaults to current directory)
-    #[arg(short, long)]
-    pub root: Option<PathBuf>,
-
-    /// Maximum number of matches to return
-    #[arg(short, long)]
-    pub limit: Option<usize>,
-
-    /// Case-insensitive search
-    #[arg(short = 'i', long)]
-    #[serde(default)]
-    pub ignore_case: bool,
-
-    /// Exclude files matching patterns or aliases
-    #[arg(long, value_delimiter = ',')]
-    #[serde(default)]
-    pub exclude: Vec<String>,
-
-    /// Only include files matching patterns or aliases
-    #[arg(long, value_delimiter = ',')]
-    #[serde(default)]
-    pub only: Vec<String>,
-}
-
-/// Print JSON schema for the command's input arguments.
-pub fn print_input_schema() {
-    let schema = schemars::schema_for!(TextSearchArgs);
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&schema).unwrap_or_default()
-    );
-}
-
-/// Run text-search command with args.
-pub fn run(
-    args: TextSearchArgs,
-    format: crate::output::OutputFormat,
-    output_schema: bool,
-    input_schema: bool,
-    params_json: Option<&str>,
-) -> i32 {
-    if output_schema {
-        crate::output::print_output_schema::<text_search::GrepResult>();
-        return 0;
-    }
-    if input_schema {
-        print_input_schema();
-        return 0;
-    }
-    // Override args with --params-json if provided
-    let args = match params_json {
-        Some(json) => match serde_json::from_str(json) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                eprintln!("error: invalid --params-json: {}", e);
-                return 1;
-            }
-        },
-        None => args,
-    };
-    let effective_root = args
-        .root
-        .clone()
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = NormalizeConfig::load(&effective_root);
-
-    cmd_text_search(
-        &args.pattern,
-        args.root.as_deref(),
-        args.limit.unwrap_or_else(|| config.text_search.limit()),
-        args.ignore_case || config.text_search.ignore_case(),
-        &format,
-        &args.exclude,
-        &args.only,
-    )
-}
-
-/// Search file contents for a pattern
-pub fn cmd_text_search(
-    pattern: &str,
-    root: Option<&Path>,
-    limit: usize,
-    ignore_case: bool,
-    format: &OutputFormat,
-    exclude: &[String],
-    only: &[String],
-) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Build filter for --exclude and --only
-    let filter = super::build_filter(&root, exclude, only);
-
-    match text_search::grep(pattern, &root, filter.as_ref(), limit, ignore_case) {
-        Ok(result) => {
-            if result.matches.is_empty() && !format.is_json() {
-                eprintln!("No matches found for: {}", pattern);
-                return 1;
-            }
-            result.print(format);
-            0
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            1
-        }
     }
 }

@@ -83,8 +83,8 @@ fn test_help_context() {
 }
 
 #[test]
-fn test_help_text_search() {
-    insta::assert_snapshot!(snapshot_help(&["text-search"]));
+fn test_help_grep() {
+    insta::assert_snapshot!(snapshot_help(&["grep"]));
 }
 
 #[test]

@@ -3,42 +3,25 @@
 //! Collects and merges `.context.md` and `CONTEXT.md` files from the directory
 //! hierarchy, from project root to target path.
 
-use clap::Args;
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::output::{OutputFormat, OutputFormatter};
+use crate::output::OutputFormatter;
 
 /// Context file names to look for (in priority order).
 const CONTEXT_FILES: &[&str] = &[".context.md", "CONTEXT.md"];
-
-#[derive(Args, Debug, serde::Deserialize, schemars::JsonSchema)]
-pub struct ContextArgs {
-    /// Target path to collect context for
-    #[arg(default_value = ".")]
-    #[serde(default = "default_target")]
-    pub target: String,
-
-    /// Root directory (defaults to current directory)
-    #[arg(short, long)]
-    pub root: Option<PathBuf>,
-
-    /// Show only file paths, not content
-    #[arg(long)]
-    #[serde(default)]
-    pub list: bool,
-}
-
-/// Helper for serde default target
-fn default_target() -> String {
-    ".".to_string()
-}
 
 /// Context file list report (--list mode).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ContextListReport {
     paths: Vec<String>,
+}
+
+impl ContextListReport {
+    pub fn new(paths: Vec<String>) -> Self {
+        Self { paths }
+    }
 }
 
 impl OutputFormatter for ContextListReport {
@@ -64,6 +47,18 @@ pub struct ContextReport {
     entries: Vec<ContextEntry>,
 }
 
+impl ContextReport {
+    /// Build from (relative_path, content) pairs.
+    pub fn new(entries: Vec<(String, String)>) -> Self {
+        Self {
+            entries: entries
+                .into_iter()
+                .map(|(path, content)| ContextEntry { path, content })
+                .collect(),
+        }
+    }
+}
+
 impl OutputFormatter for ContextReport {
     fn format_text(&self) -> String {
         if self.entries.is_empty() {
@@ -80,105 +75,6 @@ impl OutputFormatter for ContextReport {
         }
         lines.join("\n")
     }
-}
-
-/// Print JSON schema for the command's input arguments.
-pub fn print_input_schema() {
-    let schema = schemars::schema_for!(ContextArgs);
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&schema).unwrap_or_default()
-    );
-}
-
-/// Run context command.
-pub fn run(
-    args: ContextArgs,
-    format: OutputFormat,
-    output_schema: bool,
-    input_schema: bool,
-    params_json: Option<&str>,
-) -> i32 {
-    if output_schema {
-        // Schema depends on --list flag
-        if args.list {
-            crate::output::print_output_schema::<ContextListReport>();
-        } else {
-            crate::output::print_output_schema::<ContextReport>();
-        }
-        return 0;
-    }
-    if input_schema {
-        print_input_schema();
-        return 0;
-    }
-    // Override args with --params-json if provided
-    let args = match params_json {
-        Some(json) => match serde_json::from_str(json) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                eprintln!("error: invalid --params-json: {}", e);
-                return 1;
-            }
-        },
-        None => args,
-    };
-    let root = args
-        .root
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let target = root.join(&args.target);
-
-    // Determine the directory to collect context for
-    let target_dir = if target.is_file() {
-        target.parent().unwrap_or(&root).to_path_buf()
-    } else {
-        target.clone()
-    };
-
-    // Canonicalize paths for comparison
-    let root = match root.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("Failed to resolve root: {}", e);
-            return 1;
-        }
-    };
-    let target_dir = match target_dir.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("Failed to resolve target: {}", e);
-            return 1;
-        }
-    };
-
-    // Collect context files from root to target
-    let files = collect_context_files(&root, &target_dir);
-
-    if args.list {
-        let paths: Vec<String> = files
-            .iter()
-            .map(|f| f.to_str().unwrap_or("").to_string())
-            .collect();
-        let report = ContextListReport { paths };
-        report.print(&format);
-        return 0;
-    }
-
-    let entries: Vec<ContextEntry> = files
-        .iter()
-        .map(|file| {
-            let rel_path = file.strip_prefix(&root).unwrap_or(file);
-            let content = fs::read_to_string(file).unwrap_or_default();
-            ContextEntry {
-                path: rel_path.display().to_string(),
-                content,
-            }
-        })
-        .collect();
-    let report = ContextReport { entries };
-    report.print(&format);
-
-    0
 }
 
 /// Collect context files from root to target directory.

@@ -3,16 +3,13 @@ use clap::{ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
 use normalize::commands;
-use normalize::commands::aliases::AliasesArgs;
 use normalize::commands::analyze::AnalyzeArgs;
 use normalize::commands::analyze::AnalyzeCommand;
-use normalize::commands::context::ContextArgs;
 use normalize::commands::edit::EditArgs;
 use normalize::commands::generate::GenerateArgs;
 use normalize::commands::history::HistoryArgs;
 use normalize::commands::rules::RulesAction;
 use normalize::commands::sessions::SessionsArgs;
-use normalize::commands::text_search::TextSearchArgs;
 use normalize::commands::tools::ToolsAction;
 use normalize::commands::translate::TranslateArgs;
 use normalize::commands::view::ViewArgs;
@@ -84,9 +81,6 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
-    /// Initialize normalize in current directory
-    Init(commands::init::InitArgs),
-
     /// Manage the global normalize daemon
     Daemon {
         #[command(subcommand)]
@@ -108,16 +102,6 @@ enum Commands {
 
     /// Analyze codebase (health, complexity, security, duplicates, docs)
     Analyze(AnalyzeArgs),
-
-    /// List filter aliases (used by --exclude/--only)
-    Aliases(AliasesArgs),
-
-    /// Show directory context (hierarchical .context.md files)
-    Context(ContextArgs),
-
-    /// Search for text patterns in files (fast ripgrep-based search)
-    #[command(name = "text-search")]
-    TextSearch(TextSearchArgs),
 
     /// Analyze Claude Code and other agent session logs
     Sessions(SessionsArgs),
@@ -292,9 +276,6 @@ fn main() {
         Commands::Facts { action, root } => {
             commands::facts::cmd_facts(action, root.as_deref(), &format)
         }
-        Commands::Init(args) => {
-            commands::init::run(args, cli.input_schema, cli.params_json.as_deref())
-        }
         Commands::Daemon { action } => commands::daemon::cmd_daemon(action, &format),
         Commands::Update { check } => commands::update::cmd_update(check, &format),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(
@@ -305,27 +286,6 @@ fn main() {
             cli.params_json.as_deref(),
         ),
         Commands::Analyze(args) => commands::analyze::run(
-            args,
-            format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
-        Commands::Aliases(args) => commands::aliases::run(
-            args,
-            format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
-        Commands::Context(args) => commands::context::run(
-            args,
-            format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
-        Commands::TextSearch(args) => commands::text_search::run(
             args,
             format,
             cli.output_schema,
@@ -368,7 +328,7 @@ fn main() {
 }
 
 /// Commands migrated to server-less `#[cli]`.
-const SERVER_LESS_COMMANDS: &[&str] = &["grep"];
+const SERVER_LESS_COMMANDS: &[&str] = &["grep", "aliases", "context", "init"];
 
 /// Try dispatching through server-less for migrated commands.
 /// Returns true if the command was handled, false to fall through to legacy.

@@ -29,16 +29,16 @@ Options:
       --redo                Redo the last undone edit
       --force               Force undo even if files were modified externally
       --goto <REF>          Jump to a specific shadow commit (restores file state from that point)
-      --file <PATH>         Undo changes only for specific file(s) (used with --undo)
-      --cross-checkpoint    Allow undo to cross git commit boundaries (checkpoints)
-  -y, --yes                 Confirm destructive operations (delete) without prompting
-  -i, --case-insensitive    Case-insensitive symbol matching
       --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --batch <FILE>        Apply batch edits from JSON file (or - for stdin)
+      --file <PATH>         Undo changes only for specific file(s) (used with --undo)
       --json                Output as JSON
+      --cross-checkpoint    Allow undo to cross git commit boundaries (checkpoints)
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
+  -y, --yes                 Confirm destructive operations (delete) without prompting
+  -i, --case-insensitive    Case-insensitive symbol matching
       --pretty              Human-friendly output with colors and formatting
+      --batch <FILE>        Apply batch edits from JSON file (or - for stdin)
       --compact             Compact output without colors (overrides TTY detection)
       --output-schema       Output JSON schema for the command's return type
       --input-schema        Output JSON schema for the command's input arguments

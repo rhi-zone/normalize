@@ -18,6 +18,8 @@
 //! `--compact` globals + config) and calls `format_pretty()` or `format_text()`.
 
 use crate::commands;
+use crate::commands::aliases::{AliasesReport, detect_project_languages};
+use crate::commands::context::{ContextListReport, ContextReport, collect_context_files};
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
 use crate::text_search::{self, GrepResult};
@@ -63,16 +65,37 @@ impl NormalizeService {
         self.pretty.set(is_pretty);
     }
 
-    /// Display bridge for OutputFormatter types.
-    ///
-    /// Only called for text output — server-less handles JSON/JSONL/JQ before this.
-    fn display_output(&self, value: &GrepResult) -> String {
+    /// Display bridge for GrepResult.
+    fn display_grep(&self, value: &GrepResult) -> String {
         if self.pretty.get() {
             value.format_pretty()
         } else {
             value.format_text()
         }
     }
+
+    /// Display bridge for ContextOutput (dispatches to inner type).
+    fn display_context(&self, value: &ContextOutput) -> String {
+        match value {
+            ContextOutput::List(r) => r.format_text(),
+            ContextOutput::Full(r) => r.format_text(),
+        }
+    }
+}
+
+/// Wrapper enum for context command's two output types.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum ContextOutput {
+    List(ContextListReport),
+    Full(ContextReport),
+}
+
+/// Init command result.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct InitResult {
+    pub success: bool,
+    pub message: String,
 }
 
 #[cli(
@@ -84,7 +107,7 @@ impl NormalizeService {
 )]
 impl NormalizeService {
     /// Search for text patterns in files (fast ripgrep-based search)
-    #[cli(display_with = "display_output")]
+    #[cli(display_with = "display_grep")]
     #[allow(clippy::too_many_arguments)]
     pub fn grep(
         &self,
@@ -121,6 +144,91 @@ impl NormalizeService {
             Err(e) => Err(format!("Error: {}", e)),
         }
     }
+
+    /// List filter aliases (used by --exclude/--only)
+    pub fn aliases(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<AliasesReport, String> {
+        let root_path = root
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+        let config = NormalizeConfig::load(&root_path);
+        let languages = detect_project_languages(&root_path);
+
+        Ok(AliasesReport::build(&config, &languages))
+    }
+
+    /// Show directory context (hierarchical .context.md files)
+    #[cli(display_with = "display_context")]
+    pub fn context(
+        &self,
+        #[param(positional, help = "Target path to collect context for")] target: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Show only file paths, not content")] list: bool,
+    ) -> Result<ContextOutput, String> {
+        let root_path = root
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let target_str = target.as_deref().unwrap_or(".");
+        let target = root_path.join(target_str);
+
+        let target_dir = if target.is_file() {
+            target.parent().unwrap_or(&root_path).to_path_buf()
+        } else {
+            target.clone()
+        };
+
+        let root_canon = root_path
+            .canonicalize()
+            .map_err(|e| format!("Failed to resolve root: {}", e))?;
+        let target_canon = target_dir
+            .canonicalize()
+            .map_err(|e| format!("Failed to resolve target: {}", e))?;
+
+        let files = collect_context_files(&root_canon, &target_canon);
+
+        if list {
+            let paths: Vec<String> = files
+                .iter()
+                .map(|f| f.to_str().unwrap_or("").to_string())
+                .collect();
+            Ok(ContextOutput::List(ContextListReport::new(paths)))
+        } else {
+            let entries = files
+                .iter()
+                .map(|file| {
+                    let rel_path = file.strip_prefix(&root_canon).unwrap_or(file);
+                    let content = std::fs::read_to_string(file).unwrap_or_default();
+                    (rel_path.display().to_string(), content)
+                })
+                .collect();
+            Ok(ContextOutput::Full(ContextReport::new(entries)))
+        }
+    }
+
+    /// Initialize normalize in current directory
+    pub fn init(
+        &self,
+        #[param(help = "Index the codebase after initialization")] index: bool,
+    ) -> Result<InitResult, String> {
+        let root = std::env::current_dir()
+            .map_err(|e| format!("Failed to get current directory: {}", e))?;
+        let exit_code = commands::init::cmd_init(&root, index);
+        if exit_code == 0 {
+            Ok(InitResult {
+                success: true,
+                message: "Initialization complete.".to_string(),
+            })
+        } else {
+            Err("Initialization failed.".to_string())
+        }
+    }
 }
 
 /// Display impl bridges to OutputFormatter::format_text() for contexts outside
@@ -128,5 +236,26 @@ impl NormalizeService {
 impl std::fmt::Display for GrepResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text().trim_end())
+    }
+}
+
+impl std::fmt::Display for AliasesReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text().trim_end())
+    }
+}
+
+impl std::fmt::Display for ContextOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContextOutput::List(r) => write!(f, "{}", r.format_text().trim_end()),
+            ContextOutput::Full(r) => write!(f, "{}", r.format_text().trim_end()),
+        }
+    }
+}
+
+impl std::fmt::Display for InitResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
     }
 }

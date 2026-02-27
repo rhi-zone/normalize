@@ -1,8 +1,7 @@
 //! Aliases command - list filter aliases used by --exclude/--only.
 
-use clap::Args;
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::config::NormalizeConfig;
 use crate::filter::{AliasStatus, list_aliases};
@@ -22,6 +21,32 @@ pub struct AliasesReport {
     aliases: Vec<AliasItem>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     detected_languages: Vec<String>,
+}
+
+impl AliasesReport {
+    /// Build an aliases report from config and detected languages.
+    pub fn build(config: &NormalizeConfig, languages: &[String]) -> Self {
+        let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
+        let aliases_list = list_aliases(&config.aliases, &lang_refs);
+        let alias_items: Vec<AliasItem> = aliases_list
+            .iter()
+            .map(|a| AliasItem {
+                name: a.name.clone(),
+                patterns: a.patterns.clone(),
+                status: match a.status {
+                    AliasStatus::Builtin => "builtin",
+                    AliasStatus::Custom => "custom",
+                    AliasStatus::Disabled => "disabled",
+                    AliasStatus::Overridden => "overridden",
+                }
+                .to_string(),
+            })
+            .collect();
+        Self {
+            aliases: alias_items,
+            detected_languages: languages.to_vec(),
+        }
+    }
 }
 
 impl OutputFormatter for AliasesReport {
@@ -67,91 +92,6 @@ impl OutputFormatter for AliasesReport {
 
         lines.join("\n")
     }
-}
-
-/// Aliases command arguments
-#[derive(Args, serde::Deserialize, schemars::JsonSchema)]
-pub struct AliasesArgs {
-    /// Root directory (defaults to current directory)
-    #[arg(short, long)]
-    pub root: Option<PathBuf>,
-}
-
-/// Print JSON schema for the command's input arguments.
-pub fn print_input_schema() {
-    let schema = schemars::schema_for!(AliasesArgs);
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&schema).unwrap_or_default()
-    );
-}
-
-/// Run the aliases command
-pub fn run(
-    args: AliasesArgs,
-    format: crate::output::OutputFormat,
-    output_schema: bool,
-    input_schema: bool,
-    params_json: Option<&str>,
-) -> i32 {
-    if output_schema {
-        crate::output::print_output_schema::<AliasesReport>();
-        return 0;
-    }
-    if input_schema {
-        print_input_schema();
-        return 0;
-    }
-    // Override args with --params-json if provided
-    let args = match params_json {
-        Some(json) => match serde_json::from_str(json) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                eprintln!("error: invalid --params-json: {}", e);
-                return 1;
-            }
-        },
-        None => args,
-    };
-    let root = args
-        .root
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    cmd_aliases(&root, format)
-}
-
-/// List available filter aliases.
-fn cmd_aliases(root: &Path, format: crate::output::OutputFormat) -> i32 {
-    let config = NormalizeConfig::load(root);
-
-    // Detect languages in the project
-    let languages = detect_project_languages(root);
-    let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
-
-    let aliases_list = list_aliases(&config.aliases, &lang_refs);
-
-    let alias_items: Vec<AliasItem> = aliases_list
-        .iter()
-        .map(|a| AliasItem {
-            name: a.name.clone(),
-            patterns: a.patterns.clone(),
-            status: match a.status {
-                AliasStatus::Builtin => "builtin",
-                AliasStatus::Custom => "custom",
-                AliasStatus::Disabled => "disabled",
-                AliasStatus::Overridden => "overridden",
-            }
-            .to_string(),
-        })
-        .collect();
-
-    let report = AliasesReport {
-        aliases: alias_items,
-        detected_languages: languages,
-    };
-
-    report.print(&format);
-
-    0
 }
 
 /// Detect programming languages in the project.
