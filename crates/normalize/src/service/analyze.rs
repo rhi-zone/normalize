@@ -730,7 +730,7 @@ impl AnalyzeService {
         Ok(
             crate::commands::analyze::duplicates::build_duplicate_functions_report(
                 DuplicateFunctionsConfig {
-                    root: &root_path,
+                    roots: std::slice::from_ref(&root_path),
                     elide_identifiers, // true by default in existing CLI; server-less bool flags default false
                     elide_literals,
                     show_source,
@@ -811,7 +811,7 @@ impl AnalyzeService {
         Ok(
             crate::commands::analyze::duplicates::build_similar_functions_report(
                 SimilarFunctionsConfig {
-                    root: &root_path,
+                    roots: std::slice::from_ref(&root_path),
                     min_lines: min_lines.unwrap_or(10),
                     similarity: similarity.unwrap_or(0.85),
                     elide_identifiers, // true by default in existing CLI; server-less bool flags default false

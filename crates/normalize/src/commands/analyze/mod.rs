@@ -722,7 +722,7 @@ pub fn run(
             } else {
                 let result = duplicates::cmd_duplicate_functions_with_count(
                     duplicates::DuplicateFunctionsConfig {
-                        root: &effective_root,
+                        roots: std::slice::from_ref(&effective_root),
                         elide_identifiers,
                         elide_literals,
                         show_source,
@@ -768,7 +768,7 @@ pub fn run(
             allow,
             reason,
         }) => duplicates::cmd_similar_functions(duplicates::SimilarFunctionsConfig {
-            root: &effective_root,
+            roots: std::slice::from_ref(&effective_root),
             min_lines,
             similarity,
             elide_identifiers,
@@ -1129,7 +1129,7 @@ fn run_all_passes(
     }
     let dup_result =
         duplicates::cmd_duplicate_functions_with_count(duplicates::DuplicateFunctionsConfig {
-            root,
+            roots: &[root.to_path_buf()],
             elide_identifiers: true,
             elide_literals: false,
             show_source: false,
