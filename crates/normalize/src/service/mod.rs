@@ -28,6 +28,7 @@ pub mod package;
 pub mod rules;
 pub mod serve;
 pub mod sessions;
+pub mod syntax;
 pub mod tools;
 
 use crate::commands;
@@ -52,8 +53,8 @@ pub struct NormalizeService {
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
     package: package::PackageService,
-    rules: rules::RulesService,
     serve: serve::ServeService,
+    syntax: syntax::SyntaxService,
     sessions: sessions::SessionsService,
     tools: tools::ToolsService,
 }
@@ -77,8 +78,8 @@ impl NormalizeService {
             grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
-            rules: rules::RulesService::new(&pretty),
             serve: serve::ServeService,
+            syntax: syntax::SyntaxService::new(&pretty),
             sessions: sessions::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
             pretty,
@@ -486,9 +487,9 @@ impl NormalizeService {
         &self.facts
     }
 
-    /// Manage and run analysis rules (syntax + fact)
-    pub fn rules(&self) -> &rules::RulesService {
-        &self.rules
+    /// AST inspection and syntax rules
+    pub fn syntax(&self) -> &syntax::SyntaxService {
+        &self.syntax
     }
 
     /// Package management: info, list, tree, outdated

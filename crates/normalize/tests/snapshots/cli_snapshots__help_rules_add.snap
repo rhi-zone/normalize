@@ -2,21 +2,4 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rules\", \"add\"])"
 ---
-Add a rule from a URL
 
-Usage: normalize rules add [OPTIONS] [url]
-
-Arguments:
-  [url]  URL to download the rule from
-
-Options:
-      --global                     Install to global rules instead of project
-      --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Human-friendly output with colors and formatting
-      --compact                    Compact output without colors (overrides TTY detection)
-      --json                       Output machine-readable JSON
-      --jq <jq>                    Filter output through jq expression
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
-  -h, --help                       Print help

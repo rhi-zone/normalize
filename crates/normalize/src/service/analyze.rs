@@ -18,7 +18,6 @@ use crate::commands::analyze::duplicates::{
 use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
-use crate::commands::analyze::query::MatchResult;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::stale_docs::StaleDocsReport;
@@ -67,20 +66,12 @@ impl AnalyzeService {
         r.format_text()
     }
 
-    fn display_ast(&self, v: &serde_json::Value) -> String {
-        serde_json::to_string_pretty(v).unwrap_or_default()
-    }
-
     fn display_call_graph(&self, entries: &[CallEntry]) -> String {
         entries
             .iter()
             .map(|e| format!("  {}:{}:{}", e.file, e.line, e.symbol))
             .collect::<Vec<_>>()
             .join("\n")
-    }
-
-    fn display_query(&self, results: &[MatchResult]) -> String {
-        format!("{} matches", results.len())
     }
 
     fn display_trace(&self, text: &str) -> String {
@@ -244,23 +235,6 @@ impl AnalyzeService {
     }
 
     /// Show AST structure for a file
-    #[cli(display_with = "display_ast")]
-    pub fn ast(
-        &self,
-        #[param(positional, help = "File to inspect")] file: String,
-        #[param(short = 'l', help = "Show node at specific line")] at_line: Option<usize>,
-        #[param(help = "Output as S-expression")] sexp: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<serde_json::Value, String> {
-        let _root_path = Self::root_path(root);
-        let file_path = PathBuf::from(&file);
-        let (json, _text) =
-            crate::commands::analyze::ast::build_ast_output(&file_path, at_line, sexp)?;
-        Ok(json)
-    }
-
     /// Show callers and/or callees of a symbol
     #[cli(display_with = "display_call_graph")]
     pub fn call_graph(
@@ -285,30 +259,6 @@ impl AnalyzeService {
             show_callees,
             case_insensitive,
         ))
-    }
-
-    /// Run tree-sitter or ast-grep queries against the codebase
-    #[cli(display_with = "display_query")]
-    pub fn query(
-        &self,
-        #[param(positional, help = "Query pattern (S-expression or ast-grep)")] pattern: String,
-        #[param(short = 'p', help = "Path to search (defaults to root)")] path: Option<String>,
-        #[param(help = "Show full source for matches")] show_source: bool,
-        #[param(short = 'c', help = "Number of context lines")] context_lines: Option<usize>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<Vec<MatchResult>, String> {
-        let root_path = Self::root_path(root);
-        let search_path = path.map(PathBuf::from);
-        crate::commands::analyze::query::run_query_service(
-            &pattern,
-            search_path.as_deref(),
-            show_source,
-            context_lines.unwrap_or(5),
-            &root_path,
-            None,
-        )
     }
 
     /// Trace value provenance for a symbol

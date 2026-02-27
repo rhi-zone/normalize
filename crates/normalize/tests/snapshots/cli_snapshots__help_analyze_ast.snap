@@ -2,23 +2,4 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"ast\"])"
 ---
-Show AST structure for a file
 
-Usage: normalize analyze ast [OPTIONS] [file]
-
-Arguments:
-  [file]  File to inspect
-
-Options:
-      --jsonl                      Output one JSON object per line (for arrays)
-  -l, --at-line <at-line>          Show node at specific line
-      --pretty                     Human-friendly output with colors and formatting
-      --compact                    Compact output without colors (overrides TTY detection)
-      --json                       Output machine-readable JSON
-      --sexp                       Output as S-expression
-      --jq <jq>                    Filter output through jq expression
-  -r, --root <root>                Root directory (defaults to current directory)
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
-  -h, --help                       Print help

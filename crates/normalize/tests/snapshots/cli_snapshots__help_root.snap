@@ -18,7 +18,7 @@ Commands:
   grammars   Manage tree-sitter grammars for parsing
   generate   Generate code from API spec
   facts      Extract and query code facts (symbols, imports, calls)
-  rules      Manage and run analysis rules (syntax + fact)
+  syntax     AST inspection and syntax rules
   package    Package management: info, list, tree, outdated
   sessions   Analyze agent session logs (Claude Code, Codex, Gemini)
   tools      External ecosystem tools (linters, formatters, test runners)

@@ -10,9 +10,8 @@ Commands:
   check-refs           Check for broken documentation references
   stale-docs           Check for stale documentation
   check-examples       Check for missing example references in documentation
-  ast                  Show AST structure for a file
-  call-graph           Show callers and/or callees of a symbol
-  query                Run tree-sitter or ast-grep queries against the codebase
+  call-graph           Show AST structure for a file
+                       Show callers and/or callees of a symbol
   trace                Trace value provenance for a symbol
   architecture         Show architecture analysis (coupling, cycles, hubs)
   health               Run health analysis (file counts, complexity stats, large file warnings)
