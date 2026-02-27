@@ -2,45 +2,29 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\"])"
 ---
-Edit a node in the codebase tree (structural code modification)
+Structural editing of code symbols
 
-Usage: normalize edit [OPTIONS] [TARGET] [COMMAND]
+Usage: normalize edit [OPTIONS] [COMMAND]
 
 Commands:
-  delete   Delete the target symbol
-  replace  Replace target with new content
-  swap     Swap target with another symbol
-  insert   Insert content relative to target
-  move     Move target to a new location
-  copy     Copy target to a new location
+  delete   Delete a symbol
+  replace  Replace a symbol with new content
+  swap     Swap two symbols
+  insert   Insert content relative to a symbol
+  undo     Undo the last N edits
+  redo     Redo the last undone edit
+  goto     Jump to a specific shadow commit
+  batch    Apply batch edits from JSON file
   help     Print this message or the help of the given subcommand(s)
 
-Arguments:
-  [TARGET]  Target to edit (path like src/main.py/Foo/bar)
-
 Options:
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-      --dry-run             Dry run - show what would be changed without applying
-      --exclude <EXCLUDE>   Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
-      --only <ONLY>         Only include files matching patterns or aliases
-      --multiple            Allow glob patterns to match multiple symbols
-  -m, --message <MESSAGE>   Message describing the edit (for shadow git history) [aliases: --reason]
-      --undo [<N>]          Undo the last N edits (default: 1)
-      --redo                Redo the last undone edit
-      --force               Force undo even if files were modified externally
-      --goto <REF>          Jump to a specific shadow commit (restores file state from that point)
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --file <PATH>         Undo changes only for specific file(s) (used with --undo)
-      --json                Output as JSON
-      --cross-checkpoint    Allow undo to cross git commit boundaries (checkpoints)
-      --jsonl               Output as JSON Lines (one object per line)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-  -y, --yes                 Confirm destructive operations (delete) without prompting
-  -i, --case-insensitive    Case-insensitive symbol matching
-      --pretty              Human-friendly output with colors and formatting
-      --batch <FILE>        Apply batch edits from JSON file (or - for stdin)
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+  -V, --version                    Print version

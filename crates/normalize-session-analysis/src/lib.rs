@@ -1264,6 +1264,12 @@ impl OutputFormatter for SessionAnalysis {
     }
 }
 
+impl std::fmt::Display for SessionAnalysis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", OutputFormatter::format_text(self))
+    }
+}
+
 /// Format token count with K/M suffix.
 fn format_tokens(tokens: u64) -> String {
     if tokens >= 1_000_000 {

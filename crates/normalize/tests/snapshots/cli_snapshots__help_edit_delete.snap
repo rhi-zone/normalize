@@ -2,24 +2,28 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\", \"delete\"])"
 ---
-Delete the target symbol
+Delete a symbol
 
-Usage: normalize edit delete [OPTIONS]
+Usage: normalize edit delete [OPTIONS] [target]
+
+Arguments:
+  [target]  Target to edit (path/Symbol)
 
 Options:
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-      --dry-run             Dry run - show what would be changed without applying
-      --exclude <EXCLUDE>   Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
-      --only <ONLY>         Only include files matching patterns or aliases
-      --multiple            Allow glob patterns to match multiple symbols
-  -m, --message <MESSAGE>   Message describing the edit (for shadow git history) [aliases: --reason]
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-      --jsonl               Output as JSON Lines (one object per line)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --pretty              Human-friendly output with colors and formatting
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help
+      --dry-run                    Dry run - show what would change
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+  -y, --yes                        Skip confirmation
+      --exclude <exclude>          Exclude files matching patterns
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --only <only>                Only include files matching patterns
+      --multiple                   Allow glob patterns to match multiple symbols
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+  -m, --message <message>          Message for shadow history
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -i, --case-insensitive           Case-insensitive matching
+  -r, --root <root>                Root directory
+  -h, --help                       Print help

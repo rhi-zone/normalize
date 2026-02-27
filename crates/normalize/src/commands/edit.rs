@@ -177,6 +177,33 @@ pub enum Position {
     Append,
 }
 
+impl std::str::FromStr for Position {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "before" => Ok(Position::Before),
+            "after" => Ok(Position::After),
+            "prepend" => Ok(Position::Prepend),
+            "append" => Ok(Position::Append),
+            _ => Err(format!(
+                "Unknown position: {} (expected: before, after, prepend, append)",
+                s
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Position::Before => write!(f, "before"),
+            Position::After => write!(f, "after"),
+            Position::Prepend => write!(f, "prepend"),
+            Position::Append => write!(f, "append"),
+        }
+    }
+}
+
 /// Internal representation of operations (for output)
 #[derive(Clone, Copy)]
 pub enum Operation {
@@ -1361,5 +1388,150 @@ pub fn cmd_batch_edit(
             }
             1
         }
+    }
+}
+
+// ── Service-callable functions ────────────────────────────────────────
+
+/// Structured result for edit operations.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct EditResult {
+    pub success: bool,
+    pub operation: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+impl std::fmt::Display for EditResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(ref msg) = self.message {
+            write!(f, "{}", msg)
+        } else if self.success {
+            write!(f, "{} completed", self.operation)
+        } else {
+            write!(f, "{} failed", self.operation)
+        }
+    }
+}
+
+/// Service-callable: perform an edit operation.
+#[allow(clippy::too_many_arguments)]
+pub fn cmd_edit_service(
+    target: &str,
+    action: EditAction,
+    root: Option<&str>,
+    dry_run: bool,
+    yes: bool,
+    exclude: &[String],
+    only: &[String],
+    multiple: bool,
+    message: Option<&str>,
+    case_insensitive: bool,
+) -> Result<EditResult, String> {
+    let root_path = root.map(Path::new);
+    let op_name = match &action {
+        EditAction::Delete => "delete",
+        EditAction::Replace { .. } => "replace",
+        EditAction::Swap { .. } => "swap",
+        EditAction::Insert { .. } => "insert",
+        EditAction::Move { .. } => "move",
+        EditAction::Copy { .. } => "copy",
+    };
+    let code = cmd_edit(
+        target,
+        action,
+        root_path,
+        dry_run,
+        yes,
+        false,
+        exclude,
+        only,
+        multiple,
+        message,
+        case_insensitive,
+    );
+    if code == 0 {
+        Ok(EditResult {
+            success: true,
+            operation: op_name.to_string(),
+            target: Some(target.to_string()),
+            message: if dry_run {
+                Some(format!("Dry run: {} on {}", op_name, target))
+            } else {
+                None
+            },
+        })
+    } else {
+        Err(format!("{} failed on {}", op_name, target))
+    }
+}
+
+/// Service-callable: undo/redo/goto.
+#[allow(clippy::too_many_arguments)]
+pub fn cmd_undo_redo_service(
+    root: Option<&str>,
+    undo: Option<usize>,
+    redo: bool,
+    goto: Option<&str>,
+    file_filter: Option<&str>,
+    cross_checkpoint: bool,
+    dry_run: bool,
+    force: bool,
+) -> Result<EditResult, String> {
+    let root_path = root.map(Path::new);
+    let op = if goto.is_some() {
+        "goto"
+    } else if redo {
+        "redo"
+    } else {
+        "undo"
+    };
+    let code = cmd_undo_redo(
+        root_path,
+        undo,
+        redo,
+        goto,
+        file_filter,
+        cross_checkpoint,
+        dry_run,
+        force,
+        false,
+    );
+    if code == 0 {
+        Ok(EditResult {
+            success: true,
+            operation: op.to_string(),
+            target: goto.map(|s| s.to_string()),
+            message: None,
+        })
+    } else {
+        Err(format!("{} failed", op))
+    }
+}
+
+/// Service-callable: batch edit.
+pub fn cmd_batch_edit_service(
+    batch_file: &str,
+    root: Option<&str>,
+    dry_run: bool,
+    message: Option<&str>,
+) -> Result<EditResult, String> {
+    let root_path = root.map(Path::new);
+    let code = cmd_batch_edit(batch_file, root_path, dry_run, message, false);
+    if code == 0 {
+        Ok(EditResult {
+            success: true,
+            operation: "batch".to_string(),
+            target: Some(batch_file.to_string()),
+            message: if dry_run {
+                Some("Dry run complete".to_string())
+            } else {
+                None
+            },
+        })
+    } else {
+        Err("Batch edit failed".to_string())
     }
 }

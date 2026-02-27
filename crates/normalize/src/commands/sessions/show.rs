@@ -975,3 +975,55 @@ fn cmd_sessions_ngrams(session: &Session, n: usize, case_insensitive: bool) -> i
 
     0
 }
+
+// ── Service-callable functions ────────────────────────────────────────
+
+/// Build a show report (data only, no printing).
+pub fn build_show_report(
+    session_id: &str,
+    project: Option<&Path>,
+    format_name: Option<&str>,
+    full: bool,
+    exact: bool,
+) -> Result<SessionShowReport, String> {
+    let paths = if exact {
+        resolve_session_paths_literal(session_id, project, format_name)
+    } else {
+        resolve_session_paths(session_id, project, format_name)
+    };
+
+    if paths.is_empty() {
+        return Err(format!("No sessions found matching: {}", session_id));
+    }
+
+    let session = parse_session_for_show(&paths[0], format_name)?;
+    Ok(SessionShowReport::new(session).full(full))
+}
+
+/// Analyze a session (data only, no printing).
+pub fn build_analyze_report(
+    session_id: &str,
+    project: Option<&Path>,
+    format_name: Option<&str>,
+    exact: bool,
+) -> Result<crate::sessions::SessionAnalysis, String> {
+    use crate::sessions::analyze_session;
+
+    let paths = if exact {
+        resolve_session_paths_literal(session_id, project, format_name)
+    } else {
+        resolve_session_paths(session_id, project, format_name)
+    };
+
+    if paths.is_empty() {
+        return Err(format!("No sessions found matching: {}", session_id));
+    }
+
+    if paths.len() > 1 {
+        super::analyze::aggregate_sessions(&paths, format_name)
+            .ok_or_else(|| "No sessions could be analyzed".to_string())
+    } else {
+        let session = parse_session_for_show(&paths[0], format_name)?;
+        Ok(analyze_session(&session))
+    }
+}

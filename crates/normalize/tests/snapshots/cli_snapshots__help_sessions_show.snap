@@ -2,32 +2,25 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\", \"show\"])"
 ---
-Show a specific session
+Show a specific session (summary or full conversation)
 
-Usage: normalize sessions show [OPTIONS] <SESSION>
+Usage: normalize sessions show [OPTIONS] [session]
 
 Arguments:
-  <SESSION>  Session ID or path
+  [session]  Session ID or path
 
 Options:
-      --exact               Require exact/prefix match (disable fuzzy fallback)
-      --jq <JQ>             Apply jq filter to each JSONL line
-  -a, --analyze             Run full analysis instead of summary
-      --full                Show full conversation log (default is summary)
-      --filter <FILTER>     Filter messages by role/type: user, assistant, system, tool_use, tool_result, thinking
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-      --format <FORMAT>     Force specific format: claude, codex, gemini, normalize
-      --grep <GREP>         Search for pattern in filtered messages (requires --filter or shows all matching)
-      --errors-only         Show only error tool results (implies --filter tool_result)
-  -l, --limit <LIMIT>       Limit number of sessions [default: 20]
-      --ngrams <NGRAMS>     Extract common word sequences (ngrams) of length N (2-4)
-      --case-insensitive    Case-insensitive ngram matching
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-      --jsonl               Output as JSON Lines (one object per line)
-      --pretty              Human-friendly output with colors and formatting
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help
+      --analyze                    Run full analysis instead of summary
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --full                       Show full conversation log
+      --json                       Output machine-readable JSON
+      --exact                      Require exact/prefix match (disable fuzzy)
+      --jq <jq>                    Filter output through jq expression
+      --format <format>            Force specific format: claude, codex, gemini, normalize
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+  -r, --root <root>                Root directory (defaults to current directory)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

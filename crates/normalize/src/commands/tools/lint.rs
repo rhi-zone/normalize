@@ -299,6 +299,154 @@ pub fn cmd_lint_list(root: Option<&Path>, format: &OutputFormat) -> i32 {
     0
 }
 
+/// Build lint list report (data only, no printing).
+pub fn build_lint_list(root: Option<&Path>) -> LintListResult {
+    let root = root.unwrap_or_else(|| Path::new("."));
+    let registry = registry_with_custom(root);
+
+    let detected = registry.detect(root);
+    let tools: Vec<ToolListItem> = detected
+        .par_iter()
+        .map(|(t, _)| {
+            let info = t.info();
+            let version = t.version();
+            ToolListItem {
+                name: info.name.to_string(),
+                category: info.category.as_str().to_string(),
+                available: version.is_some(),
+                version,
+                extensions: info.extensions.join(", "),
+                website: info.website.to_string(),
+            }
+        })
+        .collect();
+
+    LintListResult { tools }
+}
+
+/// Lint run result with structured diagnostics.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct LintRunResult {
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub diagnostics: Vec<LintDiagnostic>,
+}
+
+/// A lint diagnostic for service output.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct LintDiagnostic {
+    pub tool: String,
+    pub severity: String,
+    pub rule_id: String,
+    pub message: String,
+    pub file: String,
+    pub line: usize,
+    pub column: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub help_url: Option<String>,
+}
+
+impl std::fmt::Display for LintRunResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for diag in &self.diagnostics {
+            writeln!(
+                f,
+                "{}:{}:{}: {} [{}] {}",
+                diag.file, diag.line, diag.column, diag.severity, diag.rule_id, diag.message
+            )?;
+        }
+        if self.error_count > 0 || self.warning_count > 0 {
+            writeln!(f)?;
+            write!(
+                f,
+                "Found {} error(s) and {} warning(s)",
+                self.error_count, self.warning_count
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// Run lints and return structured results (data only).
+pub fn build_lint_run(
+    target: Option<&str>,
+    root: Option<&Path>,
+    fix: bool,
+    tools: Option<&str>,
+    category: Option<&str>,
+) -> Result<LintRunResult, String> {
+    let root = root.unwrap_or_else(|| Path::new("."));
+    let registry = registry_with_custom(root);
+
+    let category_filter: Option<ToolCategory> = category.and_then(|c| match c {
+        "lint" | "linter" => Some(ToolCategory::Linter),
+        "fmt" | "format" | "formatter" => Some(ToolCategory::Formatter),
+        "type" | "typecheck" | "type-checker" => Some(ToolCategory::TypeChecker),
+        _ => None,
+    });
+
+    let tools_to_run: Vec<&dyn normalize_tools::Tool> = if let Some(tool_names) = tools {
+        let names: Vec<&str> = tool_names.split(',').map(|s| s.trim()).collect();
+        registry
+            .tools()
+            .iter()
+            .filter(|t| names.contains(&t.info().name))
+            .map(|t| t.as_ref())
+            .collect()
+    } else {
+        let detected = registry.detect(root);
+        detected
+            .into_iter()
+            .filter(|(t, _)| {
+                if let Some(cat) = category_filter {
+                    t.info().category == cat
+                } else {
+                    true
+                }
+            })
+            .map(|(t, _)| t)
+            .collect()
+    };
+
+    if tools_to_run.is_empty() {
+        return Ok(LintRunResult {
+            error_count: 0,
+            warning_count: 0,
+            diagnostics: vec![],
+        });
+    }
+
+    let paths: Vec<&Path> = target.map(|t| vec![Path::new(t)]).unwrap_or_default();
+    let (all_results, _) = run_tools(&tools_to_run, &paths, fix, false, root);
+
+    let mut diagnostics = Vec::new();
+    let mut error_count = 0;
+    let mut warning_count = 0;
+
+    for result in &all_results {
+        error_count += result.error_count();
+        warning_count += result.warning_count();
+        for diag in &result.diagnostics {
+            diagnostics.push(LintDiagnostic {
+                tool: diag.tool.clone(),
+                severity: diag.severity.as_str().to_string(),
+                rule_id: diag.rule_id.clone(),
+                message: diag.message.clone(),
+                file: diag.location.file.display().to_string(),
+                line: diag.location.line,
+                column: diag.location.column,
+                help_url: diag.help_url.clone(),
+            });
+        }
+    }
+
+    Ok(LintRunResult {
+        error_count,
+        warning_count,
+        diagnostics,
+    })
+}
+
 /// Watch mode for linters - re-run on file changes.
 pub fn cmd_lint_watch(
     target: Option<&str>,

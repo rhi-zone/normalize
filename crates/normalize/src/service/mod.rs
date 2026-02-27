@@ -18,11 +18,15 @@
 //! `--compact` globals + config) and calls `format_pretty()` or `format_text()`.
 
 pub mod daemon;
+pub mod edit;
 pub mod facts;
 pub mod generate;
 pub mod grammars;
+pub mod history;
 pub mod package;
 pub mod rules;
+pub mod sessions;
+pub mod tools;
 
 use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
@@ -40,11 +44,15 @@ pub struct NormalizeService {
     /// Whether pretty output is active (resolved per-command from globals + config).
     pretty: Cell<bool>,
     daemon: daemon::DaemonService,
+    edit: edit::EditService,
     facts: facts::FactsService,
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
+    history: history::HistoryService,
     package: package::PackageService,
     rules: rules::RulesService,
+    sessions: sessions::SessionsService,
+    tools: tools::ToolsService,
 }
 
 impl Default for NormalizeService {
@@ -58,11 +66,15 @@ impl NormalizeService {
         let pretty = Cell::new(false);
         Self {
             daemon: daemon::DaemonService,
+            edit: edit::EditService,
             facts: facts::FactsService::new(&pretty),
             grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
+            history: history::HistoryService,
             package: package::PackageService::new(&pretty),
             rules: rules::RulesService::new(&pretty),
+            sessions: sessions::SessionsService::new(&pretty),
+            tools: tools::ToolsService::new(),
             pretty,
         }
     }
@@ -368,6 +380,26 @@ impl NormalizeService {
     /// Package management: info, list, tree, outdated
     pub fn package(&self) -> &package::PackageService {
         &self.package
+    }
+
+    /// View shadow git edit history
+    pub fn history(&self) -> &history::HistoryService {
+        &self.history
+    }
+
+    /// Analyze agent session logs (Claude Code, Codex, Gemini)
+    pub fn sessions(&self) -> &sessions::SessionsService {
+        &self.sessions
+    }
+
+    /// External ecosystem tools (linters, formatters, test runners)
+    pub fn tools(&self) -> &tools::ToolsService {
+        &self.tools
+    }
+
+    /// Structural editing of code symbols
+    pub fn edit(&self) -> &edit::EditService {
+        &self.edit
     }
 }
 

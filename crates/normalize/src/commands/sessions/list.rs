@@ -31,6 +31,94 @@ impl OutputFormatter for SessionListReport {
     }
 }
 
+/// Build a session list report (data only, no printing).
+#[allow(clippy::too_many_arguments)]
+pub fn build_session_list(
+    project: Option<&Path>,
+    limit: usize,
+    format_name: Option<&str>,
+    grep: Option<&str>,
+    days: Option<u32>,
+    since: Option<&str>,
+    until: Option<&str>,
+    project_filter: Option<&Path>,
+    all_projects: bool,
+) -> Result<SessionListReport, String> {
+    use super::stats::{list_all_project_sessions, parse_date};
+    use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
+    use std::time::{Duration, SystemTime};
+
+    let registry = FormatRegistry::new();
+    let format: &dyn LogFormat = match format_name {
+        Some(name) => registry
+            .get(name)
+            .ok_or_else(|| format!("Unknown format: {}", name))?,
+        None => registry.get("claude").unwrap(),
+    };
+
+    let grep_re = grep
+        .map(|p| regex::Regex::new(p).map_err(|_| format!("Invalid grep pattern: {}", p)))
+        .transpose()?;
+
+    let mut sessions: Vec<SessionFile> = if all_projects {
+        list_all_project_sessions(format)
+    } else {
+        let proj = project_filter.or(project);
+        format.list_sessions(proj)
+    };
+
+    // Date filtering
+    let now = SystemTime::now();
+    if let Some(d) = days {
+        let since_time = now - Duration::from_secs(d as u64 * 86400);
+        sessions.retain(|s| s.mtime >= since_time);
+    }
+    if let Some(s) = since {
+        if let Some(since_time) = parse_date(s) {
+            sessions.retain(|s| s.mtime >= since_time);
+        } else {
+            return Err(format!("Invalid date format: {} (use YYYY-MM-DD)", s));
+        }
+    }
+    if let Some(u) = until {
+        if let Some(until_time) = parse_date(u) {
+            let until_time = until_time + Duration::from_secs(86400);
+            sessions.retain(|s| s.mtime <= until_time);
+        } else {
+            return Err(format!("Invalid date format: {} (use YYYY-MM-DD)", u));
+        }
+    }
+
+    if let Some(ref re) = grep_re {
+        sessions.retain(|s| super::session_matches_grep(&s.path, re));
+    }
+
+    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    if limit > 0 {
+        sessions.truncate(limit);
+    }
+
+    let items: Vec<SessionListItem> = sessions
+        .iter()
+        .map(|s| {
+            let id = s
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            let age_seconds = s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
+            SessionListItem {
+                id,
+                path: s.path.clone(),
+                age_seconds,
+            }
+        })
+        .collect();
+
+    Ok(SessionListReport { sessions: items })
+}
+
 /// List available sessions for a format.
 pub fn cmd_sessions_list(
     project: Option<&Path>,

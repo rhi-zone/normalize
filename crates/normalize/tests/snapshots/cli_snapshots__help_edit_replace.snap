@@ -2,27 +2,4 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\", \"replace\"])"
 ---
-Replace target with new content
 
-Usage: normalize edit replace [OPTIONS] <CONTENT>
-
-Arguments:
-  <CONTENT>  New content to replace with
-
-Options:
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-      --dry-run             Dry run - show what would be changed without applying
-      --exclude <EXCLUDE>   Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
-      --only <ONLY>         Only include files matching patterns or aliases
-      --multiple            Allow glob patterns to match multiple symbols
-  -m, --message <MESSAGE>   Message describing the edit (for shadow git history) [aliases: --reason]
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-      --jsonl               Output as JSON Lines (one object per line)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --pretty              Human-friendly output with colors and formatting
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help

@@ -150,6 +150,89 @@ fn format_time(time: std::time::SystemTime) -> String {
     )
 }
 
+/// Plan content for viewing a single plan.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct PlanContent {
+    pub name: String,
+    pub title: String,
+    pub content: String,
+}
+
+impl std::fmt::Display for PlanContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.content)
+    }
+}
+
+/// Build plan list report (data only).
+pub fn build_plans_list(limit: usize) -> Result<PlansListReport, String> {
+    let dir = plans_dir().ok_or_else(|| "Could not find home directory".to_string())?;
+    if !dir.exists() {
+        return Ok(PlansListReport { plans: vec![] });
+    }
+
+    let plans = list_plans(limit);
+    let items: Vec<PlanListItem> = plans
+        .iter()
+        .map(|p| PlanListItem {
+            name: p.name.clone(),
+            title: p.title.clone(),
+            modified: format_time(p.modified),
+            size: p.size,
+        })
+        .collect();
+
+    Ok(PlansListReport { plans: items })
+}
+
+/// Read a single plan's content (data only).
+pub fn build_plan_content(plan_name: &str) -> Result<PlanContent, String> {
+    let dir = plans_dir().ok_or_else(|| "Could not find home directory".to_string())?;
+    let plan_path = dir.join(format!("{}.md", plan_name));
+
+    if plan_path.exists() {
+        let content =
+            fs::read_to_string(&plan_path).map_err(|e| format!("Error reading plan: {}", e))?;
+        let title = extract_title(&content);
+        return Ok(PlanContent {
+            name: plan_name.to_string(),
+            title,
+            content,
+        });
+    }
+
+    // Try fuzzy match
+    let plans = list_plans(100);
+    let matches: Vec<_> = plans
+        .iter()
+        .filter(|p| {
+            p.name.contains(plan_name) || p.title.to_lowercase().contains(&plan_name.to_lowercase())
+        })
+        .collect();
+
+    if matches.is_empty() {
+        return Err(format!("Plan not found: {}", plan_name));
+    }
+    if matches.len() > 1 {
+        let names: Vec<_> = matches.iter().map(|m| m.name.as_str()).collect();
+        return Err(format!(
+            "Multiple matches for '{}': {}",
+            plan_name,
+            names.join(", ")
+        ));
+    }
+
+    let plan_path = dir.join(format!("{}.md", matches[0].name));
+    let content =
+        fs::read_to_string(&plan_path).map_err(|e| format!("Error reading plan: {}", e))?;
+    let title = extract_title(&content);
+    Ok(PlanContent {
+        name: matches[0].name.clone(),
+        title,
+        content,
+    })
+}
+
 /// Main command handler
 pub fn cmd_plans(name: Option<&str>, limit: usize, format: &crate::output::OutputFormat) -> i32 {
     let json = format.is_json();

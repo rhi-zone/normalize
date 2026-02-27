@@ -341,6 +341,10 @@ const SERVER_LESS_COMMANDS: &[&str] = &[
     "facts",
     "rules",
     "package",
+    "history",
+    "sessions",
+    "tools",
+    "edit",
 ];
 
 /// Try dispatching through server-less for migrated commands.

@@ -211,6 +211,79 @@ pub fn cmd_sessions_stats(
     cmd_sessions_analyze_multi(&paths, format_name, output_format)
 }
 
+/// Build stats analysis (data only, no printing).
+#[allow(clippy::too_many_arguments)]
+pub fn build_stats_data(
+    root: Option<&Path>,
+    limit: usize,
+    format_name: Option<&str>,
+    grep: Option<&str>,
+    days: Option<u32>,
+    since: Option<&str>,
+    until: Option<&str>,
+    project_filter: Option<&Path>,
+    all_projects: bool,
+) -> Result<crate::sessions::SessionAnalysis, String> {
+    let registry = FormatRegistry::new();
+    let format: &dyn LogFormat = match format_name {
+        Some(name) => registry
+            .get(name)
+            .ok_or_else(|| format!("Unknown format: {}", name))?,
+        None => registry.get("claude").unwrap(),
+    };
+
+    let grep_re = grep
+        .map(|p| regex::Regex::new(p).map_err(|_| format!("Invalid grep pattern: {}", p)))
+        .transpose()?;
+
+    let mut sessions: Vec<SessionFile> = if all_projects {
+        list_all_project_sessions(format)
+    } else {
+        let project = project_filter.or(root);
+        format.list_sessions(project)
+    };
+
+    let now = SystemTime::now();
+    let since_time = if let Some(d) = days {
+        Some(now - Duration::from_secs(d as u64 * 86400))
+    } else if let Some(s) = since {
+        Some(parse_date(s).ok_or_else(|| format!("Invalid date format: {} (use YYYY-MM-DD)", s))?)
+    } else {
+        None
+    };
+    let until_time = if let Some(u) = until {
+        Some(
+            parse_date(u).ok_or_else(|| format!("Invalid date format: {} (use YYYY-MM-DD)", u))?
+                + Duration::from_secs(86400),
+        )
+    } else {
+        None
+    };
+
+    if let Some(since) = since_time {
+        sessions.retain(|s| s.mtime >= since);
+    }
+    if let Some(until) = until_time {
+        sessions.retain(|s| s.mtime <= until);
+    }
+    if let Some(ref re) = grep_re {
+        sessions.retain(|s| session_matches_grep(&s.path, re));
+    }
+
+    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    if limit > 0 {
+        sessions.truncate(limit);
+    }
+
+    if sessions.is_empty() {
+        return Err("No sessions found".to_string());
+    }
+
+    let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
+    aggregate_sessions(&paths, format_name)
+        .ok_or_else(|| "No sessions could be analyzed".to_string())
+}
+
 /// List sessions from all projects in ~/.claude/projects/
 pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFile> {
     let home = match std::env::var("HOME") {

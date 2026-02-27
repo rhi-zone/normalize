@@ -2,27 +2,26 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\", \"list\"])"
 ---
-List sessions
+List available sessions
 
 Usage: normalize sessions list [OPTIONS]
 
 Options:
-      --grep <GREP>         Filter sessions by grep pattern (searches prompt/commands)
-      --days <DAYS>         Filter sessions from the last N days
-      --since <SINCE>       Filter sessions since date (YYYY-MM-DD)
-      --until <UNTIL>       Filter sessions until date (YYYY-MM-DD)
-      --project <PROJECT>   Filter by specific project path
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-      --all-projects        Show sessions from all projects (not just current)
-      --format <FORMAT>     Force specific format: claude, codex, gemini, normalize
-  -l, --limit <LIMIT>       Limit number of sessions [default: 20]
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-      --jsonl               Output as JSON Lines (one object per line)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --pretty              Human-friendly output with colors and formatting
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help
+      --grep <grep>                Filter sessions by grep pattern
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --days <days>                Filter sessions from the last N days
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --since <since>              Filter sessions since date (YYYY-MM-DD)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --until <until>              Filter sessions until date (YYYY-MM-DD)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --project <project>          Filter by specific project path
+      --all-projects               Show sessions from all projects
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --format <format>            Force specific format: claude, codex, gemini, normalize
+  -n, --limit <limit>              Maximum number of sessions
+  -r, --root <root>                Root directory (defaults to current directory)
+  -h, --help                       Print help
