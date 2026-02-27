@@ -4,21 +4,38 @@ expression: "snapshot_help(&[])"
 ---
 Fast code intelligence CLI
 
-Usage: normalize [OPTIONS] <COMMAND>
+Usage: normalize [OPTIONS] [COMMAND]
 
 Commands:
-  analyze  Analyze codebase (health, complexity, security, duplicates, docs)
-  serve    Start a normalize server (MCP, HTTP, LSP)
-  help     Print this message or the help of the given subcommand(s)
+  view       View a node in the codebase tree (directory, file, or symbol)
+  grep       Search for text patterns in files (fast ripgrep-based search)
+  aliases    List filter aliases (used by --exclude/--only)
+  context    Show directory context (hierarchical .context.md files)
+  init       Initialize normalize in current directory
+  update     Check for and install updates
+  translate  Translate code between programming languages
+  daemon     Manage the global normalize daemon
+  grammars   Manage tree-sitter grammars for parsing
+  generate   Generate code from API spec
+  facts      Extract and query code facts (symbols, imports, calls)
+  rules      Manage and run analysis rules (syntax + fact)
+  package    Package management: info, list, tree, outdated
+  history    View shadow git edit history
+  sessions   Analyze agent session logs (Claude Code, Codex, Gemini)
+  tools      External ecosystem tools (linters, formatters, test runners)
+  edit       Structural editing of code symbols
+  analyze    Analyze codebase (health, complexity, security, duplicates, docs)
+  serve      Start a normalize server (MCP, HTTP, LSP)
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-      --jsonl               Output as JSON Lines (one object per line)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --pretty              Human-friendly output with colors and formatting
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --jsonl                      Output one JSON object per line (for arrays)
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+  -V, --version                    Print version

@@ -4,29 +4,23 @@ expression: "snapshot_help(&[\"analyze\", \"complexity\"])"
 ---
 Run complexity analysis
 
-Usage: normalize analyze complexity [OPTIONS] [TARGET]
+Usage: normalize analyze complexity [OPTIONS] [target]
 
 Arguments:
-  [TARGET]  Target file or directory
+  [target]  Target file or directory
 
 Options:
-  -t, --threshold <THRESHOLD>  Only show functions above this threshold
-  -l, --limit <LIMIT>          Maximum number of functions to show (0 = no limit) [default: 10]
-      --kind <KIND>            Filter by symbol kind: function, method
-      --repos <DIR>            Run command across all git repos under DIR (1 level deep)
-      --json                   Output as JSON
-      --sarif                  Output in SARIF format for IDE integration
-      --allow <SYMBOL>         Add function to .normalize/complexity-allow
-      --jsonl                  Output as JSON Lines (one object per line)
-      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
-      --reason <REASON>        Reason for allowing
-      --pretty                 Human-friendly output with colors and formatting
-      --compact                Compact output without colors (overrides TTY detection)
-      --output-schema          Output JSON schema for the command's return type
-      --input-schema           Output JSON schema for the command's input arguments
-      --params-json <JSON>     Pass command arguments as JSON (overrides CLI args)
-  -r, --root <ROOT>            Root directory (defaults to current directory)
-      --exclude <PATTERN>      Exclude paths matching pattern or @alias
-      --only <PATTERN>         Include only paths matching pattern or @alias
-      --diff [<BASE>]          Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
-  -h, --help                   Print help
+      --jsonl                      Output one JSON object per line (for arrays)
+  -r, --root <root>                Root directory (defaults to current directory)
+      --json                       Output machine-readable JSON
+  -t, --threshold <threshold>      Only show functions above this threshold
+      --jq <jq>                    Filter output through jq expression
+  -l, --limit <limit>              Maximum number of functions to show (0=no limit)
+      --exclude <exclude>          Exclude paths matching pattern
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --only <only>                Include only paths matching pattern
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help

@@ -1,0 +1,27 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 317
+expression: "snapshot_help(&[\"analyze\", \"duplicate-functions\"])"
+---
+Detect duplicate functions (code clones)
+
+Usage: normalize analyze duplicate-functions [OPTIONS]
+
+Options:
+      --elide-identifiers          Elide identifier names when comparing
+      --jsonl                      Output one JSON object per line (for arrays)
+      --elide-literals             Elide literal values when comparing
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --show-source                Show source code for detected duplicates
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --min-lines <min-lines>      Minimum lines for a function to be considered
+      --include-trait-impls        Include groups where all functions share the same name
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help

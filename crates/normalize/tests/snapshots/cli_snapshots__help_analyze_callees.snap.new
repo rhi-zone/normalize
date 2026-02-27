@@ -1,0 +1,24 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 277
+expression: "snapshot_help(&[\"analyze\", \"callees\"])"
+---
+Show what functions a symbol calls
+
+Usage: normalize analyze callees [OPTIONS] [symbol]
+
+Arguments:
+  [symbol]  Symbol to find callees for
+
+Options:
+  -i, --case-insensitive           Case-insensitive symbol matching
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+  -r, --root <root>                Root directory (defaults to current directory)
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

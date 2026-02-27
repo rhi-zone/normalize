@@ -789,6 +789,212 @@ fn trace_returns(
     returns
 }
 
+/// Build trace output as a String without printing (for service layer).
+pub fn build_trace_text(
+    symbol: &str,
+    target: Option<&str>,
+    root: &std::path::Path,
+    max_depth: usize,
+    recursive: bool,
+    case_insensitive: bool,
+) -> Result<String, String> {
+    let rt =
+        tokio::runtime::Runtime::new().map_err(|e| format!("Failed to create runtime: {}", e))?;
+    let mut output = Vec::new();
+    let exit_code = rt.block_on(cmd_trace_text_async(
+        symbol,
+        target,
+        root,
+        max_depth,
+        recursive,
+        case_insensitive,
+        &mut output,
+    ));
+    if exit_code != 0 {
+        return Err(format!("Trace failed with exit code {}", exit_code));
+    }
+    Ok(output.join("\n"))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn cmd_trace_text_async(
+    symbol: &str,
+    target: Option<&str>,
+    root: &std::path::Path,
+    max_depth: usize,
+    recursive: bool,
+    _case_insensitive: bool,
+    output: &mut Vec<String>,
+) -> i32 {
+    use crate::path_resolve::resolve_unified;
+
+    let (file_path, symbol_name) = if let Some(unified) = resolve_unified(symbol, root) {
+        if unified.symbol_path.is_empty() {
+            return 1;
+        }
+        (Some(unified.file_path), unified.symbol_path.join("."))
+    } else if let Some(t) = target {
+        (Some(t.to_string()), symbol.to_string())
+    } else {
+        (None, symbol.to_string())
+    };
+
+    let symbol_matches = if let Some(mut idx) = index::open_if_enabled(root).await {
+        let _ = idx.incremental_refresh().await;
+        match idx.find_symbols(&symbol_name, None, false, 10).await {
+            Ok(matches) if !matches.is_empty() => matches,
+            _ => fallback_parse_symbol(&symbol_name, file_path.as_deref(), root),
+        }
+    } else {
+        fallback_parse_symbol(&symbol_name, file_path.as_deref(), root)
+    };
+
+    if symbol_matches.is_empty() {
+        return 1;
+    }
+
+    let sym = &symbol_matches[0];
+    let full_path = root.join(&sym.file);
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(_) => return 1,
+    };
+
+    let lang = match normalize_languages::support_for_path(&full_path) {
+        Some(l) => l,
+        None => return 1,
+    };
+    let tree = match parsers::parse_with_grammar(lang.grammar_name(), &content) {
+        Some(t) => t,
+        None => return 1,
+    };
+
+    let source_bytes = content.as_bytes();
+    let start_line = sym.start_line;
+    let end_line = sym.end_line;
+
+    let extractor = crate::extract::Extractor::new();
+    let extract_result = extractor.extract(&full_path, &content);
+    let mut signature_map: HashMap<String, FunctionInfo> = HashMap::new();
+    fn collect_sigs(sym: &normalize_languages::Symbol, map: &mut HashMap<String, FunctionInfo>) {
+        if !sym.signature.is_empty() {
+            map.insert(
+                sym.name.clone(),
+                FunctionInfo {
+                    signature: sym.signature.clone(),
+                    start_line: sym.start_line,
+                    end_line: sym.end_line,
+                },
+            );
+        }
+        for child in &sym.children {
+            collect_sigs(child, map);
+        }
+    }
+    for s in &extract_result.symbols {
+        collect_sigs(s, &mut signature_map);
+    }
+
+    let trace_results = trace_assignments(
+        &tree.root_node(),
+        source_bytes,
+        start_line,
+        end_line,
+        max_depth,
+        &signature_map,
+    );
+
+    output.push(format!("# Trace: {} ({}:{})", symbol, sym.file, start_line));
+    output.push(String::new());
+
+    if trace_results.is_empty() {
+        output.push("No assignments found in this symbol.".to_string());
+    } else {
+        for t in &trace_results {
+            let flows = if t.is_terminal {
+                " (terminal)".to_string()
+            } else if t.flows_from.is_empty() {
+                String::new()
+            } else {
+                format!(" ← {}", t.flows_from.join(", "))
+            };
+
+            let calls_info = if t.calls.is_empty() {
+                String::new()
+            } else {
+                let call_strs: Vec<String> = t
+                    .calls
+                    .iter()
+                    .map(|c| {
+                        let mut s = c.name.clone();
+                        if let Some(ref sig) = c.signature {
+                            s = format!("{}({})", s, sig);
+                        }
+                        if let Some(line) = c.defined_at {
+                            s = format!("{} @L{}", s, line);
+                        }
+                        s
+                    })
+                    .collect();
+                format!(" [calls: {}]", call_strs.join(", "))
+            };
+
+            let branch_info = t
+                .branch_context
+                .as_ref()
+                .map(|b| format!(" ({})", b))
+                .unwrap_or_default();
+
+            output.push(format!(
+                "  L{}: {} = {}{}{}{}",
+                t.line, t.variable, t.source, flows, calls_info, branch_info
+            ));
+
+            if recursive {
+                let mut seen_funcs: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
+                for call in &t.calls {
+                    if seen_funcs.contains(&call.name) {
+                        continue;
+                    }
+
+                    let (returns, ext_file): (Vec<ReturnTrace>, Option<String>) =
+                        if let (Some(start), Some(end)) = (call.defined_at, call.defined_end) {
+                            let returns =
+                                trace_returns(&tree.root_node(), source_bytes, start, end);
+                            (returns, None)
+                        } else if let Some(cross) = trace_cross_file_returns(&call.name, root) {
+                            (cross.returns, Some(cross.file))
+                        } else {
+                            continue;
+                        };
+
+                    if returns.is_empty() {
+                        continue;
+                    }
+
+                    seen_funcs.insert(call.name.clone());
+                    let file_suffix = ext_file
+                        .as_ref()
+                        .map(|f| format!(" ({})", f))
+                        .unwrap_or_default();
+                    output.push(format!("    {} returns:{}", call.name, file_suffix));
+                    for ret in &returns {
+                        let branch_info = ret
+                            .branch_context
+                            .as_ref()
+                            .map(|b| format!(" ({})", b))
+                            .unwrap_or_default();
+                        output.push(format!("      L{}: {}{}", ret.line, ret.value, branch_info));
+                    }
+                }
+            }
+        }
+    }
+
+    0
+}
+
 /// Look up a function in the index and trace its returns (cross-file).
 fn trace_cross_file_returns(call_name: &str, root: &std::path::Path) -> Option<CrossFileReturns> {
     let rt = tokio::runtime::Runtime::new().ok()?;

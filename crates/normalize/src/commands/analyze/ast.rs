@@ -195,7 +195,7 @@ fn print_node_at_line(source: &str, root: tree_sitter::Node, line: usize, _inden
     }
 }
 
-fn node_to_json(node: tree_sitter::Node, source: &str) -> serde_json::Value {
+pub fn node_to_json(node: tree_sitter::Node, source: &str) -> serde_json::Value {
     let mut obj = serde_json::json!({
         "kind": node.kind(),
         "start": {
@@ -220,4 +220,170 @@ fn node_to_json(node: tree_sitter::Node, source: &str) -> serde_json::Value {
     }
 
     obj
+}
+
+fn tree_to_string(source: &str, node: tree_sitter::Node, indent: usize, buf: &mut String) {
+    let prefix = "  ".repeat(indent);
+    let kind = node.kind();
+    let start = node.start_position();
+    let end = node.end_position();
+
+    let field_info = if let Some(parent) = node.parent() {
+        let mut cursor = parent.walk();
+        let mut result = String::new();
+        for (i, child) in parent.children(&mut cursor).enumerate() {
+            if child.id() == node.id() {
+                if let Some(field) = parent.field_name_for_child(i as u32) {
+                    result = format!("{}: ", field);
+                }
+                break;
+            }
+        }
+        result
+    } else {
+        String::new()
+    };
+
+    if node.child_count() == 0 {
+        let text = node.utf8_text(source.as_bytes()).unwrap_or("");
+        let text_preview = if text.len() > 40 {
+            format!("{}...", &text[..40])
+        } else {
+            text.to_string()
+        };
+        buf.push_str(&format!(
+            "{}{}({}) {:?} [L{}:{}]\n",
+            prefix,
+            field_info,
+            kind,
+            text_preview,
+            start.row + 1,
+            start.column + 1
+        ));
+    } else {
+        buf.push_str(&format!(
+            "{}{}({}) [L{}-L{}]\n",
+            prefix,
+            field_info,
+            kind,
+            start.row + 1,
+            end.row + 1
+        ));
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            tree_to_string(source, child, indent + 1, buf);
+        }
+    }
+}
+
+fn node_at_line_to_string(source: &str, root: tree_sitter::Node, line: usize, buf: &mut String) {
+    let target_row = line.saturating_sub(1);
+
+    fn find_deepest_at_line<'a>(
+        node: tree_sitter::Node<'a>,
+        row: usize,
+    ) -> Option<tree_sitter::Node<'a>> {
+        if node.start_position().row <= row && node.end_position().row >= row {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if let Some(deeper) = find_deepest_at_line(child, row) {
+                    return Some(deeper);
+                }
+            }
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    if let Some(node) = find_deepest_at_line(root, target_row) {
+        buf.push_str(&format!("Line {} is inside:\n\n", line));
+
+        let mut current = Some(node);
+        let mut depth = 0;
+        let mut ancestors = Vec::new();
+
+        while let Some(n) = current {
+            ancestors.push(n);
+            current = n.parent();
+        }
+
+        ancestors.reverse();
+
+        for ancestor in &ancestors {
+            let prefix = "  ".repeat(depth);
+            let kind = ancestor.kind();
+            let start = ancestor.start_position();
+            let end = ancestor.end_position();
+
+            if ancestor.child_count() == 0 {
+                let text = ancestor.utf8_text(source.as_bytes()).unwrap_or("");
+                buf.push_str(&format!(
+                    "{}{} {:?} (L{}:{}-L{}:{})\n",
+                    prefix,
+                    kind,
+                    text,
+                    start.row + 1,
+                    start.column + 1,
+                    end.row + 1,
+                    end.column + 1
+                ));
+            } else {
+                buf.push_str(&format!(
+                    "{}{} (L{}:{}-L{}:{})\n",
+                    prefix,
+                    kind,
+                    start.row + 1,
+                    start.column + 1,
+                    end.row + 1,
+                    end.column + 1
+                ));
+            }
+            depth += 1;
+        }
+    } else {
+        buf.push_str(&format!("No node found at line {}\n", line));
+    }
+}
+
+/// Build AST output as (json_value, text_string).
+pub fn build_ast_output(
+    file: &std::path::Path,
+    at_line: Option<usize>,
+    sexp: bool,
+) -> Result<(serde_json::Value, String), String> {
+    use crate::parsers::grammar_loader;
+    use normalize_languages::support_for_path;
+
+    let content = std::fs::read_to_string(file)
+        .map_err(|e| format!("Failed to read {}: {}", file.display(), e))?;
+
+    let lang =
+        support_for_path(file).ok_or_else(|| format!("Unknown file type: {}", file.display()))?;
+
+    let loader = grammar_loader();
+    let grammar = loader
+        .get(lang.grammar_name())
+        .ok_or_else(|| format!("Failed to load grammar for {}", lang.name()))?;
+
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&grammar).unwrap();
+    let tree = parser
+        .parse(&content, None)
+        .ok_or_else(|| "Failed to parse file".to_string())?;
+
+    let root = tree.root_node();
+
+    let json_value = node_to_json(root, &content);
+
+    let mut text = String::new();
+    if let Some(line) = at_line {
+        node_at_line_to_string(&content, root, line, &mut text);
+    } else if sexp {
+        text = root.to_sexp();
+    } else {
+        tree_to_string(&content, root, 0, &mut text);
+    }
+
+    Ok((json_value, text))
 }

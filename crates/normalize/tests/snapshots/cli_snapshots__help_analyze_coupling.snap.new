@@ -1,0 +1,23 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 287
+expression: "snapshot_help(&[\"analyze\", \"coupling\"])"
+---
+Find files that frequently change together (temporal coupling)
+
+Usage: normalize analyze coupling [OPTIONS]
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --min-commits <min-commits>  Minimum number of shared commits to report a pair
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+  -l, --limit <limit>              Maximum number of pairs to show
+      --jq <jq>                    Filter output through jq expression
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

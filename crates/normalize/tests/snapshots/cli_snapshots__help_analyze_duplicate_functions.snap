@@ -7,24 +7,20 @@ Detect duplicate functions (code clones)
 Usage: normalize analyze duplicate-functions [OPTIONS]
 
 Options:
-      --elide-identifiers      Elide identifier names when comparing (default: true)
-      --elide-literals         Elide literal values when comparing
-      --repos <DIR>            Run command across all git repos under DIR (1 level deep)
-      --show-source            Show source code for detected duplicates
-      --json                   Output as JSON
-      --min-lines <MIN_LINES>  Minimum lines for a function to be considered [default: 1]
-      --include-trait-impls    Include groups where all functions share the same name (likely trait implementations). By default these are suppressed as intentionally parallel, not copy-paste
-      --jsonl                  Output as JSON Lines (one object per line)
-      --allow <LOCATION>       Allow a duplicate function group (add to .normalize/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
-      --jq <EXPR>              Filter JSON output with jq expression (implies --json)
-      --pretty                 Human-friendly output with colors and formatting
-      --reason <REASON>        Reason for allowing
-      --compact                Compact output without colors (overrides TTY detection)
-      --output-schema          Output JSON schema for the command's return type
-      --input-schema           Output JSON schema for the command's input arguments
-      --params-json <JSON>     Pass command arguments as JSON (overrides CLI args)
-  -r, --root <ROOT>            Root directory (defaults to current directory)
-      --exclude <PATTERN>      Exclude paths matching pattern or @alias
-      --only <PATTERN>         Include only paths matching pattern or @alias
-      --diff [<BASE>]          Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
-  -h, --help                   Print help
+      --elide-identifiers          Elide identifier names when comparing
+      --jsonl                      Output one JSON object per line (for arrays)
+      --elide-literals             Elide literal values when comparing
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --show-source                Show source code for detected duplicates
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --min-lines <min-lines>      Minimum lines for a function to be considered
+      --include-trait-impls        Include groups where all functions share the same name
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help

@@ -2476,6 +2476,887 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
     if empty { 0 } else { 1 }
 }
 
+/// Build duplicate functions report without printing (for service layer).
+pub fn build_duplicate_functions_report(
+    cfg: DuplicateFunctionsConfig<'_>,
+) -> DuplicateFunctionsReport {
+    let DuplicateFunctionsConfig {
+        root,
+        elide_identifiers,
+        elide_literals,
+        show_source,
+        min_lines,
+        include_trait_impls,
+        format: _format,
+        filter,
+    } = cfg;
+    let extractor = Extractor::new();
+
+    let allowlist = load_duplicate_functions_allowlist(root);
+
+    let mut hash_groups: HashMap<u64, Vec<DuplicateFunctionLocation>> = HashMap::new();
+    let mut files_scanned = 0;
+    let mut functions_hashed = 0;
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && super::is_source_file(path)
+    }) {
+        let path = entry.path();
+
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+
+        let result = extractor.extract(path, &content);
+
+        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+            let kind = sym.kind.as_str();
+            if kind != "function" && kind != "method" {
+                continue;
+            }
+
+            if let Some(node) = find_function_node(&tree, sym.start_line) {
+                let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+                if line_count < min_lines {
+                    continue;
+                }
+
+                let hash = compute_function_hash(
+                    &node,
+                    content.as_bytes(),
+                    elide_identifiers,
+                    elide_literals,
+                );
+                functions_hashed += 1;
+
+                let rel_path = path
+                    .strip_prefix(root)
+                    .unwrap_or(path)
+                    .display()
+                    .to_string();
+
+                hash_groups
+                    .entry(hash)
+                    .or_default()
+                    .push(DuplicateFunctionLocation {
+                        file: rel_path,
+                        symbol: sym.name.clone(),
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                    });
+            }
+        }
+    }
+
+    let mut groups: Vec<DuplicateFunctionGroup> = hash_groups
+        .into_iter()
+        .filter(|(_, locs)| locs.len() >= 2)
+        .filter(|(_, locs)| {
+            locs.iter()
+                .any(|loc| !allowlist.contains(&format!("{}:{}", loc.file, loc.symbol)))
+        })
+        .map(|(hash, locations)| {
+            let line_count = locations
+                .first()
+                .map(|l| l.end_line - l.start_line + 1)
+                .unwrap_or(0);
+            DuplicateFunctionGroup {
+                hash,
+                locations,
+                line_count,
+            }
+        })
+        .collect();
+
+    let suppressed_same_name = if include_trait_impls {
+        0
+    } else {
+        let before = groups.len();
+        groups.retain(|g| {
+            let names: std::collections::HashSet<&str> =
+                g.locations.iter().map(|l| l.symbol.as_str()).collect();
+            names.len() > 1
+        });
+        before - groups.len()
+    };
+
+    groups.sort_by(|a, b| {
+        b.line_count
+            .cmp(&a.line_count)
+            .then_with(|| b.locations.len().cmp(&a.locations.len()))
+    });
+
+    let total_duplicates: usize = groups.iter().map(|g| g.locations.len()).sum();
+    let duplicated_lines: usize = groups
+        .iter()
+        .map(|g| g.line_count * g.locations.len())
+        .sum();
+
+    DuplicateFunctionsReport {
+        files_scanned,
+        functions_hashed,
+        total_duplicates,
+        duplicated_lines,
+        elide_identifiers,
+        elide_literals,
+        groups,
+        suppressed_same_name,
+        root: root.to_path_buf(),
+        show_source,
+    }
+}
+
+/// Build duplicate blocks report without printing (for service layer).
+pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> DuplicateBlocksReport {
+    let DuplicateBlocksConfig {
+        root,
+        min_lines,
+        elide_identifiers,
+        elide_literals,
+        skip_functions,
+        show_source,
+        allow: _allow,
+        reason: _reason,
+        format: _format,
+        filter,
+    } = cfg;
+    let extractor = Extractor::new();
+    let mut hash_groups: HashMap<u64, Vec<DuplicateBlockLocation>> = HashMap::new();
+    let mut file_extractions: HashMap<String, normalize_facts::extract::ExtractResult> =
+        HashMap::new();
+    let mut files_scanned = 0usize;
+    let mut blocks_hashed = 0usize;
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && super::is_source_file(path)
+    }) {
+        let path = entry.path();
+
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        file_extractions.insert(rel_path.clone(), extractor.extract(path, &content));
+
+        let before = hash_groups.values().map(|v| v.len()).sum::<usize>();
+        collect_block_hashes(
+            &tree.root_node(),
+            content.as_bytes(),
+            &rel_path,
+            min_lines,
+            elide_identifiers,
+            elide_literals,
+            skip_functions,
+            &mut hash_groups,
+        );
+        let after = hash_groups.values().map(|v| v.len()).sum::<usize>();
+        blocks_hashed += after - before;
+    }
+
+    let groups_raw: Vec<DuplicateBlockGroup> = hash_groups
+        .into_iter()
+        .filter(|(_, locs)| locs.len() >= 2)
+        .map(|(hash, locations)| {
+            let line_count = locations
+                .first()
+                .map(|l| l.end_line.saturating_sub(l.start_line) + 1)
+                .unwrap_or(0);
+            DuplicateBlockGroup {
+                hash,
+                locations,
+                line_count,
+            }
+        })
+        .collect();
+
+    let groups = suppress_contained_blocks(groups_raw);
+
+    let allow_key = |loc: &DuplicateBlockLocation| {
+        let func = file_extractions
+            .get(&loc.file)
+            .and_then(|r| containing_function(r, loc.start_line));
+        block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
+    };
+
+    let allowlist = load_block_allowlist(root, "duplicate-blocks-allow");
+    let loc_allowed = |loc: &DuplicateBlockLocation| {
+        allowlist.contains(&allow_key(loc))
+            || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
+    };
+    let groups: Vec<DuplicateBlockGroup> = groups
+        .into_iter()
+        .filter(|g| !g.locations.iter().all(&loc_allowed))
+        .collect();
+
+    DuplicateBlocksReport {
+        files_scanned,
+        blocks_hashed,
+        groups,
+        show_source,
+        root: root.to_path_buf(),
+    }
+}
+
+/// Build similar functions report without printing (for service layer).
+pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> SimilarFunctionsReport {
+    let SimilarFunctionsConfig {
+        root,
+        min_lines,
+        similarity,
+        elide_identifiers,
+        elide_literals,
+        skeleton,
+        show_source,
+        include_trait_impls,
+        allow: _allow,
+        reason: _reason,
+        format: _format,
+        filter,
+    } = cfg;
+
+    let extractor = Extractor::new();
+    let mut all_fns: Vec<(String, String, usize, usize, [u64; MINHASH_N])> = Vec::new();
+    let mut files_scanned = 0usize;
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && super::is_source_file(path)
+    }) {
+        let path = entry.path();
+
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        let result = extractor.extract(path, &content);
+
+        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+            let kind = sym.kind.as_str();
+            if kind != "function" && kind != "method" {
+                continue;
+            }
+
+            let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+            if line_count < min_lines {
+                continue;
+            }
+
+            if let Some(node) = find_function_node(&tree, sym.start_line) {
+                let mut tokens = Vec::new();
+                serialize_subtree_tokens(
+                    &node,
+                    content.as_bytes(),
+                    elide_identifiers,
+                    elide_literals,
+                    skeleton,
+                    &mut tokens,
+                );
+                let min_tokens = if skeleton { SHINGLE_K * 4 } else { SHINGLE_K };
+                if tokens.len() < min_tokens {
+                    continue;
+                }
+                if skeleton {
+                    let unique = tokens
+                        .iter()
+                        .collect::<std::collections::HashSet<_>>()
+                        .len();
+                    if (unique as f64 / tokens.len() as f64) < 0.3 {
+                        continue;
+                    }
+                }
+                let sig = compute_minhash(&tokens);
+                all_fns.push((
+                    rel_path.clone(),
+                    sym.name.clone(),
+                    sym.start_line,
+                    sym.end_line,
+                    sig,
+                ));
+            }
+        }
+    }
+
+    let functions_analyzed = all_fns.len();
+
+    let mut band_buckets: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (idx, (_, _, _, _, sig)) in all_fns.iter().enumerate() {
+        for band in 0..LSH_BANDS {
+            let bh = lsh_band_hash(sig, band);
+            let key = bh.wrapping_add((band as u64).wrapping_mul(0x9e3779b97f4a7c15));
+            band_buckets.entry(key).or_default().push(idx);
+        }
+    }
+
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
+    let mut candidates: Vec<(usize, usize)> = Vec::new();
+    for bucket in band_buckets.values() {
+        if bucket.len() < 2 {
+            continue;
+        }
+        for i in 0..bucket.len() {
+            for j in i + 1..bucket.len() {
+                let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
+                if seen.insert((a, b)) {
+                    candidates.push((a, b));
+                }
+            }
+        }
+    }
+
+    let mut pairs: Vec<SimilarFunctionPair> = candidates
+        .into_iter()
+        .filter_map(|(i, j)| {
+            let (file_a, sym_a, start_a, end_a, sig_a) = &all_fns[i];
+            let (file_b, sym_b, start_b, end_b, sig_b) = &all_fns[j];
+
+            if file_a == file_b && start_a == start_b && end_a == end_b {
+                return None;
+            }
+
+            if !skeleton {
+                let len_a = end_a.saturating_sub(*start_a) + 1;
+                let len_b = end_b.saturating_sub(*start_b) + 1;
+                let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
+                if ratio < 0.5 {
+                    return None;
+                }
+            } else {
+                let len_a = end_a.saturating_sub(*start_a) + 1;
+                let len_b = end_b.saturating_sub(*start_b) + 1;
+                let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
+                if ratio < 0.2 {
+                    return None;
+                }
+            }
+
+            let sim = jaccard_estimate(sig_a, sig_b);
+            if sim >= 1.0 || sim < similarity {
+                return None;
+            }
+
+            let line_count = end_a
+                .saturating_sub(*start_a)
+                .max(end_b.saturating_sub(*start_b))
+                + 1;
+
+            Some(SimilarFunctionPair {
+                file_a: file_a.clone(),
+                symbol_a: sym_a.clone(),
+                start_line_a: *start_a,
+                end_line_a: *end_a,
+                file_b: file_b.clone(),
+                symbol_b: sym_b.clone(),
+                start_line_b: *start_b,
+                end_line_b: *end_b,
+                similarity: sim,
+                line_count,
+            })
+        })
+        .collect();
+
+    if !include_trait_impls {
+        pairs.retain(|p| p.symbol_a != p.symbol_b);
+    }
+
+    pairs.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.line_count.cmp(&a.line_count))
+    });
+
+    let fn_allow_key = |file: &str, symbol: &str, start: usize, end: usize| {
+        format!("{}:{}:{}-{}", file, symbol, start, end)
+    };
+
+    let allowlist = load_block_allowlist(root, "similar-functions-allow");
+    let pairs: Vec<SimilarFunctionPair> = pairs
+        .into_iter()
+        .filter(|p| {
+            !(allowlist.contains(&fn_allow_key(
+                &p.file_a,
+                &p.symbol_a,
+                p.start_line_a,
+                p.end_line_a,
+            )) && allowlist.contains(&fn_allow_key(
+                &p.file_b,
+                &p.symbol_b,
+                p.start_line_b,
+                p.end_line_b,
+            )))
+        })
+        .collect();
+
+    SimilarFunctionsReport {
+        files_scanned,
+        functions_analyzed,
+        threshold: similarity,
+        pairs,
+        show_source,
+        root: root.to_path_buf(),
+    }
+}
+
+/// Build similar blocks report without printing (for service layer).
+pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> SimilarBlocksReport {
+    let SimilarBlocksConfig {
+        root,
+        min_lines,
+        similarity,
+        elide_identifiers,
+        elide_literals,
+        skeleton,
+        show_source,
+        include_trait_impls,
+        allow: _allow,
+        reason: _reason,
+        format: _format,
+        filter,
+    } = cfg;
+    let extractor = Extractor::new();
+    let mut all_blocks: Vec<(DuplicateBlockLocation, [u64; MINHASH_N])> = Vec::new();
+    let mut file_extractions: HashMap<String, normalize_facts::extract::ExtractResult> =
+        HashMap::new();
+    let mut files_scanned = 0usize;
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && super::is_source_file(path)
+    }) {
+        let path = entry.path();
+
+        if let Some(f) = filter {
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            if !f.matches(rel_path) {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        file_extractions.insert(rel_path.clone(), extractor.extract(path, &content));
+
+        collect_block_signatures(
+            &tree.root_node(),
+            content.as_bytes(),
+            &rel_path,
+            min_lines,
+            elide_identifiers,
+            elide_literals,
+            skeleton,
+            &mut all_blocks,
+        );
+    }
+
+    let blocks_analyzed = all_blocks.len();
+
+    let mut band_buckets: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (idx, (_, sig)) in all_blocks.iter().enumerate() {
+        for band in 0..LSH_BANDS {
+            let bh = lsh_band_hash(sig, band);
+            let key = bh.wrapping_add((band as u64).wrapping_mul(0x9e3779b97f4a7c15));
+            band_buckets.entry(key).or_default().push(idx);
+        }
+    }
+
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
+    let mut candidates: Vec<(usize, usize)> = Vec::new();
+    for bucket in band_buckets.values() {
+        if bucket.len() < 2 {
+            continue;
+        }
+        for i in 0..bucket.len() {
+            for j in i + 1..bucket.len() {
+                let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
+                if seen.insert((a, b)) {
+                    candidates.push((a, b));
+                }
+            }
+        }
+    }
+
+    let mut pairs: Vec<SimilarBlockPair> = candidates
+        .into_iter()
+        .filter_map(|(i, j)| {
+            let (loc_a, sig_a) = &all_blocks[i];
+            let (loc_b, sig_b) = &all_blocks[j];
+
+            if loc_a.file == loc_b.file
+                && loc_a.start_line == loc_b.start_line
+                && loc_a.end_line == loc_b.end_line
+            {
+                return None;
+            }
+
+            if loc_a.file == loc_b.file {
+                let a_contains_b =
+                    loc_a.start_line <= loc_b.start_line && loc_b.end_line <= loc_a.end_line;
+                let b_contains_a =
+                    loc_b.start_line <= loc_a.start_line && loc_a.end_line <= loc_b.end_line;
+                if a_contains_b || b_contains_a {
+                    return None;
+                }
+            }
+
+            {
+                let len_a = loc_a.end_line.saturating_sub(loc_a.start_line) + 1;
+                let len_b = loc_b.end_line.saturating_sub(loc_b.start_line) + 1;
+                let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
+                let min_ratio = if skeleton { 0.2 } else { 0.5 };
+                if ratio < min_ratio {
+                    return None;
+                }
+            }
+
+            let sim = jaccard_estimate(sig_a, sig_b);
+            if sim >= 1.0 || sim < similarity {
+                return None;
+            }
+
+            let line_count = loc_a
+                .end_line
+                .saturating_sub(loc_a.start_line)
+                .max(loc_b.end_line.saturating_sub(loc_b.start_line))
+                + 1;
+
+            Some(SimilarBlockPair {
+                location_a: loc_a.clone(),
+                location_b: loc_b.clone(),
+                similarity: sim,
+                line_count,
+            })
+        })
+        .collect();
+
+    pairs.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.line_count.cmp(&a.line_count))
+    });
+
+    let pairs = suppress_overlapping_pairs(pairs);
+
+    let pairs = if include_trait_impls {
+        pairs
+    } else {
+        pairs
+            .into_iter()
+            .filter(|p| {
+                let fn_a = file_extractions
+                    .get(&p.location_a.file)
+                    .and_then(|r| containing_function(r, p.location_a.start_line));
+                let fn_b = file_extractions
+                    .get(&p.location_b.file)
+                    .and_then(|r| containing_function(r, p.location_b.start_line));
+                !(fn_a.is_some() && fn_a == fn_b)
+            })
+            .collect()
+    };
+
+    let pair_allow_key = |loc: &DuplicateBlockLocation| {
+        let func = file_extractions
+            .get(&loc.file)
+            .and_then(|r| containing_function(r, loc.start_line));
+        block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
+    };
+
+    let allowlist = load_block_allowlist(root, "similar-blocks-allow");
+    let loc_in_allowlist = |loc: &DuplicateBlockLocation| {
+        allowlist.contains(&pair_allow_key(loc))
+            || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
+    };
+    let pairs: Vec<SimilarBlockPair> = pairs
+        .into_iter()
+        .filter(|p| !(loc_in_allowlist(&p.location_a) && loc_in_allowlist(&p.location_b)))
+        .collect();
+
+    SimilarBlocksReport {
+        files_scanned,
+        blocks_analyzed,
+        threshold: similarity,
+        pairs,
+        show_source,
+        root: root.to_path_buf(),
+    }
+}
+
+/// Build duplicate types report without printing (for service layer).
+pub fn build_duplicate_types_report(
+    root: &Path,
+    config_root: &Path,
+    min_overlap_percent: usize,
+) -> DuplicateTypesReport {
+    use regex::Regex;
+
+    let extractor = Extractor::new();
+
+    let allowlist_path = config_root.join(".normalize/duplicate-types-allow");
+    let allowed_pairs: HashSet<(String, String)> = std::fs::read_to_string(&allowlist_path)
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
+        .filter_map(|l| {
+            let parts: Vec<&str> = l.split_whitespace().collect();
+            if parts.len() == 2 {
+                let (a, b) = if parts[0] < parts[1] {
+                    (parts[0].to_string(), parts[1].to_string())
+                } else {
+                    (parts[1].to_string(), parts[0].to_string())
+                };
+                Some((a, b))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let mut types: Vec<TypeInfo> = Vec::new();
+    let mut files_scanned = 0;
+    let field_re = Regex::new(r"(?m)^\s*(?:pub\s+)?(\w+)\s*:\s*\S").unwrap();
+
+    let files: Vec<PathBuf> = if root.is_file() {
+        vec![root.to_path_buf()]
+    } else {
+        ignore::WalkBuilder::new(root)
+            .hidden(true)
+            .git_ignore(true)
+            .git_global(true)
+            .git_exclude(true)
+            .build()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let path = e.path();
+                path.is_file() && super::is_source_file(path)
+            })
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    };
+
+    for path in &files {
+        let path = path.as_path();
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        files_scanned += 1;
+        let result = extractor.extract(path, &content);
+        let lines: Vec<&str> = content.lines().collect();
+        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+            let kind = sym.kind.as_str();
+            if !matches!(kind, "struct" | "class" | "interface" | "type") {
+                continue;
+            }
+            let start = sym.start_line.saturating_sub(1);
+            let end = sym.end_line.min(lines.len());
+            let source: String = lines[start..end].join("\n");
+            let fields: Vec<String> = field_re
+                .captures_iter(&source)
+                .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+                .collect();
+            if fields.len() < 2 {
+                continue;
+            }
+            let rel_path = if root.is_file() {
+                path.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| path.display().to_string())
+            } else {
+                path.strip_prefix(root)
+                    .unwrap_or(path)
+                    .display()
+                    .to_string()
+            };
+            types.push(TypeInfo {
+                file: rel_path,
+                name: sym.name.clone(),
+                start_line: sym.start_line,
+                fields,
+            });
+        }
+    }
+
+    let n = types.len() as f64;
+    let mut field_df: HashMap<&str, usize> = HashMap::new();
+    for t in &types {
+        for f in t.fields.iter() {
+            *field_df.entry(f.as_str()).or_insert(0) += 1;
+        }
+    }
+    let idf = |field: &str| -> f64 {
+        let df = field_df.get(field).copied().unwrap_or(1) as f64;
+        (1.0 + n / df).ln()
+    };
+
+    let mut duplicates: Vec<DuplicatePair> = Vec::new();
+    for i in 0..types.len() {
+        for j in (i + 1)..types.len() {
+            let t1 = &types[i];
+            let t2 = &types[j];
+            if t1.name == t2.name {
+                continue;
+            }
+            let pair_key = if t1.name < t2.name {
+                (t1.name.clone(), t2.name.clone())
+            } else {
+                (t2.name.clone(), t1.name.clone())
+            };
+            if allowed_pairs.contains(&pair_key) {
+                continue;
+            }
+            let set1: HashSet<_> = t1.fields.iter().collect();
+            let set2: HashSet<_> = t2.fields.iter().collect();
+            let common: Vec<String> = set1.intersection(&set2).map(|s| (*s).clone()).collect();
+            if common.len() < 3 {
+                continue;
+            }
+            let weighted_common: f64 = common.iter().map(|f| idf(f)).sum();
+            let weighted_union: f64 = set1.union(&set2).map(|f| idf(f.as_str())).sum();
+            let overlap_percent = if weighted_union > 0.0 {
+                (weighted_common / weighted_union * 100.0) as usize
+            } else {
+                0
+            };
+            if overlap_percent >= min_overlap_percent {
+                duplicates.push(DuplicatePair {
+                    type1: t1.clone(),
+                    type2: t2.clone(),
+                    overlap_percent,
+                    common_fields: common,
+                });
+            }
+        }
+    }
+    duplicates.sort_by(|a, b| b.overlap_percent.cmp(&a.overlap_percent));
+
+    DuplicateTypesReport {
+        files_scanned,
+        types_analyzed: types.len(),
+        min_overlap_percent,
+        duplicates,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

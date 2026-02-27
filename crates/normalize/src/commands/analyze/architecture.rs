@@ -572,7 +572,7 @@ async fn find_symbol_hotspots(
     Ok(hotspots)
 }
 
-async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, libsql::Error> {
+pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, libsql::Error> {
     let graph = build_import_graph(idx).await?;
     let conn = idx.connection();
 

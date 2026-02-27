@@ -46,6 +46,122 @@ impl OutputFormatter for CheckExamplesReport {
     }
 }
 
+/// Build a CheckExamplesReport without printing (for service layer).
+pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
+    use regex::Regex;
+    use std::collections::HashSet;
+
+    let marker_start_re = Regex::new(r"//\s*\[example:\s*([^\]]+)\]").unwrap();
+    let ref_re = Regex::new(r"\{\{example:\s*([^}]+)\}\}").unwrap();
+
+    let mut defined_examples: HashSet<String> = HashSet::new();
+
+    for entry in walkdir::WalkDir::new(root)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let path = e.path();
+            path.is_file()
+                && !path
+                    .components()
+                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        })
+    {
+        let path = entry.path();
+        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+
+        if !matches!(
+            ext,
+            "rs" | "py" | "js" | "ts" | "tsx" | "jsx" | "go" | "java" | "c" | "cpp" | "rb"
+        ) {
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        for cap in marker_start_re.captures_iter(&content) {
+            let name = cap[1].trim();
+            let key = format!("{}#{}", rel_path, name);
+            defined_examples.insert(key);
+        }
+    }
+
+    let mut missing: Vec<MissingExample> = Vec::new();
+    let mut refs_found = 0;
+
+    for entry in walkdir::WalkDir::new(root)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path().extension().and_then(|s| s.to_str()) == Some("md")
+                && !e
+                    .path()
+                    .components()
+                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        })
+    {
+        let path = entry.path();
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let rel_path = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+
+        let mut in_code_block = false;
+        for (line_num, line) in content.lines().enumerate() {
+            if line.trim().starts_with("```") {
+                in_code_block = !in_code_block;
+                continue;
+            }
+            if in_code_block {
+                continue;
+            }
+
+            for cap in ref_re.captures_iter(line) {
+                let match_start = cap.get(0).unwrap().start();
+                let match_end = cap.get(0).unwrap().end();
+                let before = &line[..match_start];
+                let after = &line[match_end..];
+
+                if before.chars().filter(|&c| c == '`').count() % 2 == 1 && after.contains('`') {
+                    continue;
+                }
+
+                refs_found += 1;
+                let reference = cap[1].trim();
+
+                if !defined_examples.contains(reference) {
+                    missing.push(MissingExample {
+                        doc_file: rel_path.clone(),
+                        line: line_num + 1,
+                        reference: reference.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    CheckExamplesReport {
+        defined_examples: defined_examples.len(),
+        references_found: refs_found,
+        missing,
+    }
+}
+
 /// Check that all example references have matching markers
 pub fn cmd_check_examples(root: &Path, format: &crate::output::OutputFormat) -> i32 {
     let json = format.is_json();

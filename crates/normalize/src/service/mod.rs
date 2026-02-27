@@ -17,6 +17,7 @@
 //! `display_output` reads `self.pretty` (set by the method from `--pretty`/
 //! `--compact` globals + config) and calls `format_pretty()` or `format_text()`.
 
+pub mod analyze;
 pub mod daemon;
 pub mod edit;
 pub mod facts;
@@ -25,6 +26,7 @@ pub mod grammars;
 pub mod history;
 pub mod package;
 pub mod rules;
+pub mod serve;
 pub mod sessions;
 pub mod tools;
 
@@ -43,6 +45,7 @@ use std::path::PathBuf;
 pub struct NormalizeService {
     /// Whether pretty output is active (resolved per-command from globals + config).
     pretty: Cell<bool>,
+    analyze: analyze::AnalyzeService,
     daemon: daemon::DaemonService,
     edit: edit::EditService,
     facts: facts::FactsService,
@@ -51,6 +54,7 @@ pub struct NormalizeService {
     history: history::HistoryService,
     package: package::PackageService,
     rules: rules::RulesService,
+    serve: serve::ServeService,
     sessions: sessions::SessionsService,
     tools: tools::ToolsService,
 }
@@ -65,6 +69,7 @@ impl NormalizeService {
     pub fn new() -> Self {
         let pretty = Cell::new(false);
         Self {
+            analyze: analyze::AnalyzeService::new(&pretty),
             daemon: daemon::DaemonService,
             edit: edit::EditService,
             facts: facts::FactsService::new(&pretty),
@@ -73,6 +78,7 @@ impl NormalizeService {
             history: history::HistoryService,
             package: package::PackageService::new(&pretty),
             rules: rules::RulesService::new(&pretty),
+            serve: serve::ServeService,
             sessions: sessions::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
             pretty,
@@ -505,6 +511,16 @@ impl NormalizeService {
     /// Structural editing of code symbols
     pub fn edit(&self) -> &edit::EditService {
         &self.edit
+    }
+
+    /// Analyze codebase (health, complexity, security, duplicates, docs)
+    pub fn analyze(&self) -> &analyze::AnalyzeService {
+        &self.analyze
+    }
+
+    /// Start a normalize server (MCP, HTTP, LSP)
+    pub fn serve(&self) -> &serve::ServeService {
+        &self.serve
     }
 }
 

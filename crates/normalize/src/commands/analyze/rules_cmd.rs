@@ -8,6 +8,90 @@ use normalize_syntax_rules::{
 };
 use std::path::Path;
 
+/// Summary of a single rule (for listing).
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+pub struct RuleSummary {
+    pub id: String,
+    pub severity: String,
+    pub message: String,
+    pub builtin: bool,
+}
+
+/// A single finding produced by running rules.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+pub struct RuleFinding {
+    pub rule_id: String,
+    pub severity: String,
+    pub message: String,
+    pub file: String,
+    pub line: usize,
+    pub column: usize,
+    pub matched_text: String,
+}
+
+/// Combined output of rules list + findings (for service layer).
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+pub struct RulesOutput {
+    pub rules: Vec<RuleSummary>,
+    pub findings: Vec<RuleFinding>,
+}
+
+/// Build rules output without printing (for service layer).
+pub fn build_rules_output(
+    root: &std::path::Path,
+    filter_rule: Option<&str>,
+    list_only: bool,
+    config: &normalize_syntax_rules::RulesConfig,
+    debug: &normalize_syntax_rules::DebugFlags,
+) -> Result<RulesOutput, String> {
+    let rules = load_all_rules(root, config);
+
+    let rule_summaries: Vec<RuleSummary> = rules
+        .iter()
+        .map(|r| RuleSummary {
+            id: r.id.clone(),
+            severity: r.severity.to_string(),
+            message: r.message.clone(),
+            builtin: r.builtin,
+        })
+        .collect();
+
+    if list_only {
+        return Ok(RulesOutput {
+            rules: rule_summaries,
+            findings: Vec::new(),
+        });
+    }
+
+    if rules.is_empty() {
+        return Ok(RulesOutput {
+            rules: Vec::new(),
+            findings: Vec::new(),
+        });
+    }
+
+    let loader = grammar_loader();
+    let findings = run_rules(&rules, root, &loader, filter_rule, None, None, debug);
+
+    let finding_items: Vec<RuleFinding> = findings
+        .iter()
+        .map(|f| RuleFinding {
+            rule_id: f.rule_id.clone(),
+            severity: f.severity.to_string(),
+            message: f.message.clone(),
+            file: f.file.to_string_lossy().to_string(),
+            line: f.start_line,
+            column: f.start_col,
+            matched_text: f.matched_text.clone(),
+        })
+        .collect();
+
+    Ok(RulesOutput {
+        rules: rule_summaries,
+        findings: finding_items,
+    })
+}
+
 /// Run the rules command.
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_rules(

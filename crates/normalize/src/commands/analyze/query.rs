@@ -273,16 +273,17 @@ fn structural_preview(text: &str, grammar: &str) -> (String, usize) {
 }
 
 /// Match result from either pattern type.
-struct MatchResult {
-    file: PathBuf,
-    grammar: String,
-    kind: String,
-    text: String,
-    start_row: usize,
-    start_col: usize,
-    end_row: usize,
-    end_col: usize,
-    captures: HashMap<String, String>,
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+pub struct MatchResult {
+    pub file: PathBuf,
+    pub grammar: String,
+    pub kind: String,
+    pub text: String,
+    pub start_row: usize,
+    pub start_col: usize,
+    pub end_row: usize,
+    pub end_col: usize,
+    pub captures: HashMap<String, String>,
 }
 
 /// Run query against a single file using tree-sitter S-expression.
@@ -422,6 +423,70 @@ fn collect_files_recursive(dir: &Path, filter: Option<&Filter>, files: &mut Vec<
             }
         }
     }
+}
+
+/// Run a query and return results without printing (for service layer).
+pub fn run_query_service(
+    pattern: &str,
+    path: Option<&std::path::Path>,
+    _show_source: bool,
+    _context_lines: usize,
+    root: &std::path::Path,
+    filter: Option<&crate::filter::Filter>,
+) -> Result<Vec<MatchResult>, String> {
+    let is_sexp = is_sexp_pattern(pattern);
+    let loader = grammar_loader();
+
+    // If path is provided use it, otherwise use root
+    let search_path = path.unwrap_or(root);
+    let files = collect_files(Some(search_path), filter);
+
+    if files.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut by_grammar: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for file in files {
+        if let Some(lang) = support_for_path(&file) {
+            by_grammar
+                .entry(lang.grammar_name().to_string())
+                .or_default()
+                .push(file);
+        }
+    }
+
+    let mut all_results = Vec::new();
+
+    for (grammar_name, files) in by_grammar {
+        let Some(grammar) = loader.get(&grammar_name) else {
+            continue;
+        };
+
+        for file in files {
+            let content = match std::fs::read_to_string(&file) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let results = if is_sexp {
+                run_sexp_query(&file, &content, pattern, &grammar, &grammar_name)
+            } else {
+                run_astgrep_query(&file, &content, pattern, &grammar, &grammar_name)
+            };
+
+            match results {
+                Ok(r) => all_results.extend(r),
+                Err(e) => {
+                    if e.contains("Invalid query") || e.contains("Pattern error") {
+                        return Err(e);
+                    }
+                    // Skip per-file errors silently
+                }
+            }
+        }
+    }
+
+    Ok(all_results)
 }
 
 /// Test a query against files.

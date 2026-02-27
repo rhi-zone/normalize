@@ -1,0 +1,25 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 237
+expression: "snapshot_help(&[\"analyze\", \"health\"])"
+---
+Run health analysis (file counts, complexity stats, large file warnings)
+
+Usage: normalize analyze health [OPTIONS] [target]
+
+Arguments:
+  [target]  Target file or directory
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --only <only>                Include only paths matching pattern
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

@@ -60,6 +60,115 @@ impl OutputFormatter for StaleDocsReport {
     }
 }
 
+/// Build a StaleDocsReport without printing (for service layer).
+pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
+    use regex::Regex;
+
+    let covers_re = Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap();
+
+    let md_files: Vec<_> = walkdir::WalkDir::new(root)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path().extension().and_then(|s| s.to_str()) == Some("md")
+                && !e
+                    .path()
+                    .components()
+                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    if md_files.is_empty() {
+        return StaleDocsReport {
+            stale_docs: Vec::new(),
+            files_checked: 0,
+            files_with_covers: 0,
+        };
+    }
+
+    let mut stale_docs: Vec<StaleDoc> = Vec::new();
+    let mut files_with_covers = 0;
+
+    for md_file in &md_files {
+        let content = match std::fs::read_to_string(md_file) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let covers: Vec<String> = covers_re
+            .captures_iter(&content)
+            .map(|cap| cap[1].to_string())
+            .collect();
+
+        if covers.is_empty() {
+            continue;
+        }
+
+        files_with_covers += 1;
+
+        let rel_path = md_file
+            .strip_prefix(root)
+            .unwrap_or(md_file)
+            .display()
+            .to_string();
+
+        let doc_modified = std::fs::metadata(md_file)
+            .and_then(|m| m.modified())
+            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
+            .unwrap_or(0);
+
+        let mut stale_covers: Vec<StaleCover> = Vec::new();
+
+        for cover_pattern in covers {
+            for pattern in cover_pattern.split(',').map(|s| s.trim()) {
+                if pattern.is_empty() {
+                    continue;
+                }
+
+                let matching = find_covered_files(root, pattern);
+
+                if matching.is_empty() {
+                    continue;
+                }
+
+                let code_modified = matching
+                    .iter()
+                    .filter_map(|f| {
+                        std::fs::metadata(root.join(f))
+                            .and_then(|m| m.modified())
+                            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
+                            .ok()
+                    })
+                    .max()
+                    .unwrap_or(0);
+
+                if code_modified > doc_modified {
+                    stale_covers.push(StaleCover {
+                        pattern: pattern.to_string(),
+                        code_modified,
+                        matching_files: matching,
+                    });
+                }
+            }
+        }
+
+        if !stale_covers.is_empty() {
+            stale_docs.push(StaleDoc {
+                doc_path: rel_path,
+                doc_modified,
+                stale_covers,
+            });
+        }
+    }
+
+    StaleDocsReport {
+        stale_docs,
+        files_checked: md_files.len(),
+        files_with_covers,
+    }
+}
+
 /// Find docs with stale code coverage
 pub fn cmd_stale_docs(root: &Path, format: &crate::output::OutputFormat) -> i32 {
     let json = format.is_json();

@@ -150,6 +150,98 @@ async fn cmd_call_graph_async(
     0
 }
 
+/// A single entry in the call graph result.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+pub struct CallEntry {
+    pub file: String,
+    pub symbol: String,
+    pub line: usize,
+    pub direction: String, // "caller" or "callee"
+}
+
+/// Build the call graph results without printing (for service layer).
+pub async fn build_call_graph(
+    root: &std::path::Path,
+    target: &str,
+    show_callers: bool,
+    show_callees: bool,
+    case_insensitive: bool,
+) -> Result<Vec<CallEntry>, String> {
+    let (symbol, file_hint) = if let Some((sym, file)) = parse_file_symbol_string(target) {
+        (sym, Some(file))
+    } else {
+        (target.to_string(), None)
+    };
+
+    let idx = index::open_if_enabled(root).await.ok_or_else(|| {
+        "Indexing disabled or failed. Run: normalize index rebuild --call-graph".to_string()
+    })?;
+
+    let stats = idx.call_graph_stats().await.unwrap_or_default();
+    if stats.calls == 0 {
+        return Err("Call graph not indexed. Run: normalize reindex --call-graph".to_string());
+    }
+
+    let _ = case_insensitive; // Index methods already have case-insensitive fallbacks
+
+    let mut results: Vec<CallEntry> = Vec::new();
+
+    if show_callers {
+        match idx.find_callers(&symbol).await {
+            Ok(callers) => {
+                for (file, sym, line) in callers {
+                    results.push(CallEntry {
+                        file,
+                        symbol: sym,
+                        line,
+                        direction: "caller".to_string(),
+                    });
+                }
+            }
+            Err(e) => {
+                eprintln!("Error finding callers: {}", e);
+            }
+        }
+    }
+
+    if show_callees {
+        let file_path = if let Some(f) = &file_hint {
+            let matches = path_resolve::resolve(f, root);
+            matches
+                .iter()
+                .find(|m| m.kind == "file")
+                .map(|m| m.path.clone())
+        } else {
+            idx.find_symbol(&symbol)
+                .await
+                .ok()
+                .and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
+        };
+
+        if let Some(file_path) = file_path {
+            match idx.find_callees(&file_path, &symbol).await {
+                Ok(callees) => {
+                    for (name, line) in callees {
+                        results.push(CallEntry {
+                            file: file_path.clone(),
+                            symbol: name,
+                            line,
+                            direction: "callee".to_string(),
+                        });
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error finding callees: {}", e);
+                }
+            }
+        }
+    }
+
+    results.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
+
+    Ok(results)
+}
+
 /// Try various separators to parse file:symbol format
 fn parse_file_symbol_string(s: &str) -> Option<(String, String)> {
     // Try various separators: #, ::, :

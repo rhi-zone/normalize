@@ -7,19 +7,16 @@ Find files that frequently change together (temporal coupling)
 Usage: normalize analyze coupling [OPTIONS]
 
 Options:
-      --min-commits <MIN_COMMITS>  Minimum number of shared commits to report a pair [default: 3]
-      --limit <LIMIT>              Maximum number of pairs to show [default: 20]
-      --repos <DIR>                Run command across all git repos under DIR (1 level deep)
-      --json                       Output as JSON
-      --jsonl                      Output as JSON Lines (one object per line)
-      --jq <EXPR>                  Filter JSON output with jq expression (implies --json)
-      --pretty                     Human-friendly output with colors and formatting
-      --compact                    Compact output without colors (overrides TTY detection)
-      --output-schema              Output JSON schema for the command's return type
-      --input-schema               Output JSON schema for the command's input arguments
-      --params-json <JSON>         Pass command arguments as JSON (overrides CLI args)
-  -r, --root <ROOT>                Root directory (defaults to current directory)
-      --exclude <PATTERN>          Exclude paths matching pattern or @alias
-      --only <PATTERN>             Include only paths matching pattern or @alias
-      --diff [<BASE>]              Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
+      --jsonl                      Output one JSON object per line (for arrays)
+      --min-commits <min-commits>  Minimum number of shared commits to report a pair
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+  -l, --limit <limit>              Maximum number of pairs to show
+      --jq <jq>                    Filter output through jq expression
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help

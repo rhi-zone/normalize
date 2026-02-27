@@ -2,31 +2,27 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"similar-blocks\"])"
 ---
-Detect similar (fuzzy-matching) code blocks via MinHash LSH
+Detect similar code blocks via MinHash LSH
 
 Usage: normalize analyze similar-blocks [OPTIONS]
 
 Options:
-      --elide-identifiers        
-      --elide-literals           
-      --repos <DIR>              Run command across all git repos under DIR (1 level deep)
-      --show-source              
-      --json                     Output as JSON
-      --min-lines <MIN_LINES>    Minimum lines for a block to be considered [default: 10] [default: 10]
-      --jsonl                    Output as JSON Lines (one object per line)
-      --similarity <SIMILARITY>  Minimum similarity threshold (0.0–1.0) [default: 0.85] [default: 0.85]
-      --jq <EXPR>                Filter JSON output with jq expression (implies --json)
-      --skeleton                 Skeleton mode: replace block/body subtrees with a placeholder, matching on control-flow structure regardless of body content or size
-      --include-trait-impls      Include pairs where both blocks are inside same-name functions (likely trait implementations). By default these are suppressed as intentionally parallel, not copy-paste
-      --pretty                   Human-friendly output with colors and formatting
-      --allow <LOCATION>         Allow a similar block pair (add to .normalize/similar-blocks-allow) Accepts file:func:start-end or file:start-end
-      --compact                  Compact output without colors (overrides TTY detection)
-      --output-schema            Output JSON schema for the command's return type
-      --reason <REASON>          Reason for allowing
-      --input-schema             Output JSON schema for the command's input arguments
-      --params-json <JSON>       Pass command arguments as JSON (overrides CLI args)
-  -r, --root <ROOT>              Root directory (defaults to current directory)
-      --exclude <PATTERN>        Exclude paths matching pattern or @alias
-      --only <PATTERN>           Include only paths matching pattern or @alias
-      --diff [<BASE>]            Analyze only files changed since base ref (e.g., main, HEAD~1) If no BASE given, defaults to origin's default branch
-  -h, --help                     Print help
+      --elide-identifiers          Elide identifier names when comparing
+      --jsonl                      Output one JSON object per line (for arrays)
+      --elide-literals             Elide literal values when comparing
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --show-source                Show source code for matches
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --min-lines <min-lines>      Minimum lines for a block to be considered
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --similarity <similarity>    Minimum similarity threshold (0.0-1.0)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --skeleton                   Match on control-flow structure
+      --include-trait-impls        Include pairs where both blocks are inside same-name functions
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help

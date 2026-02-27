@@ -7,16 +7,15 @@ Start HTTP server (REST API)
 Usage: normalize serve http [OPTIONS]
 
 Options:
-  -p, --port <PORT>         Port to listen on [default: 8080]
-      --openapi             Output OpenAPI spec and exit (don't start server)
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-      --jsonl               Output as JSON Lines (one object per line)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --pretty              Human-friendly output with colors and formatting
-      --compact             Compact output without colors (overrides TTY detection)
-      --output-schema       Output JSON schema for the command's return type
-      --input-schema        Output JSON schema for the command's input arguments
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-  -h, --help                Print help
+      --jsonl                      Output one JSON object per line (for arrays)
+  -p, --port <port>                Port to listen on [default: 8080]
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+      --openapi                    Output OpenAPI spec and exit (don't start server)
+      --jq <jq>                    Filter output through jq expression
+  -r, --root <root>                Root directory (defaults to current directory)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

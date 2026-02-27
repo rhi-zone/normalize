@@ -1,0 +1,27 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 267
+expression: "snapshot_help(&[\"analyze\", \"trace\"])"
+---
+Trace value provenance for a symbol
+
+Usage: normalize analyze trace [OPTIONS] [symbol]
+
+Arguments:
+  [symbol]  Symbol to trace (file/symbol or symbol name)
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+  -t, --target <target>            Target file containing the symbol
+      --compact                    Global flag: compact
+  -d, --max-depth <max-depth>      Maximum depth
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --recursive                  Recursively trace called functions
+  -i, --case-insensitive           Case-insensitive matching
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+  -r, --root <root>                Root directory (defaults to current directory)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

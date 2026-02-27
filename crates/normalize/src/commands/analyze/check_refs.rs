@@ -48,6 +48,104 @@ impl OutputFormatter for CheckRefsReport {
     }
 }
 
+/// Build a CheckRefsReport without printing (for service layer).
+pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, String> {
+    use regex::Regex;
+
+    // Open index to get known symbols
+    let idx = match index::open_if_enabled(root).await {
+        Some(i) => i,
+        None => {
+            return Err(
+                "Indexing disabled or failed. Run: normalize index rebuild --call-graph"
+                    .to_string(),
+            );
+        }
+    };
+
+    // Get all symbol names from index
+    let all_symbols = idx.all_symbol_names().await.unwrap_or_default();
+
+    if all_symbols.is_empty() {
+        return Err("No symbols indexed. Run: normalize index rebuild --call-graph".to_string());
+    }
+
+    // Find markdown files
+    let md_files: Vec<_> = walkdir::WalkDir::new(root)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path().extension().and_then(|s| s.to_str()) == Some("md")
+                && !e
+                    .path()
+                    .components()
+                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    if md_files.is_empty() {
+        return Ok(CheckRefsReport {
+            broken_refs: Vec::new(),
+            files_checked: 0,
+            symbols_indexed: all_symbols.len(),
+        });
+    }
+
+    // Regex for code references: `identifier` or `Module::method` or `Module.method`
+    let code_ref_re =
+        Regex::new(r"`([A-Z][a-zA-Z0-9_]*(?:[:\.][a-zA-Z_][a-zA-Z0-9_]*)*)`").unwrap();
+
+    let mut broken_refs: Vec<BrokenRef> = Vec::new();
+
+    for md_file in &md_files {
+        let content = match std::fs::read_to_string(md_file) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let rel_path = md_file
+            .strip_prefix(root)
+            .unwrap_or(md_file)
+            .display()
+            .to_string();
+
+        for (line_num, line) in content.lines().enumerate() {
+            for cap in code_ref_re.captures_iter(line) {
+                let reference = &cap[1];
+
+                // Extract symbol name (last part after :: or .)
+                let symbol_name = reference.rsplit([':', '.']).next().unwrap_or(reference);
+
+                // Skip common non-symbol patterns
+                if is_common_non_symbol(symbol_name) {
+                    continue;
+                }
+
+                // Check if symbol exists
+                if !all_symbols.contains(symbol_name) {
+                    // Also check the full reference
+                    let full_name = reference.replace("::", ".").replace(".", "::");
+                    if !all_symbols.contains(&full_name) && !all_symbols.contains(reference) {
+                        broken_refs.push(BrokenRef {
+                            file: rel_path.clone(),
+                            line: line_num + 1,
+                            reference: reference.to_string(),
+                            context: line.trim().to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(CheckRefsReport {
+        broken_refs,
+        files_checked: md_files.len(),
+        symbols_indexed: all_symbols.len(),
+    })
+}
+
 /// Check documentation references for broken links
 pub fn cmd_check_refs(root: &Path, format: &crate::output::OutputFormat) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();

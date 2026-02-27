@@ -1,0 +1,53 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 72
+expression: "snapshot_help(&[\"analyze\"])"
+---
+Analyze codebase (health, complexity, security, duplicates, docs)
+
+Usage: normalize analyze [OPTIONS] [COMMAND]
+
+Commands:
+  check-refs           Check for broken documentation references
+  stale-docs           Check for stale documentation
+  check-examples       Check for missing example references in documentation
+  ast                  Show AST structure for a file
+  call-graph           Show callers and/or callees of a symbol
+  query                Run tree-sitter or ast-grep queries against the codebase
+  trace                Trace value provenance for a symbol
+  rules                Run syntax rules and report findings
+  architecture         Show architecture analysis (coupling, cycles, hubs)
+  health               Run health analysis (file counts, complexity stats, large file warnings)
+  all                  Run all analysis passes
+  security             Run security analysis
+  complexity           Run complexity analysis
+  length               Run function length analysis
+  docs                 Analyze documentation coverage
+  files                Show longest files in codebase
+  hotspots             Show git history hotspots (frequently changed files)
+  coupling             Find files that frequently change together (temporal coupling)
+  ownership            Show per-file ownership concentration from git blame
+  contributors         Analyze contributors across repos
+  activity             Analyze cross-repo activity over time
+  repo-coupling        Analyze cross-repo coupling
+  duplicate-functions  Detect duplicate functions (code clones)
+  duplicate-blocks     Detect duplicate code blocks
+  similar-functions    Detect similar functions via MinHash LSH
+  similar-blocks       Detect similar code blocks via MinHash LSH
+  duplicate-types      Detect duplicate type definitions
+  test-gaps            Find public functions with no direct test caller
+  callers              Show callers of a symbol
+  callees              Show what functions a symbol calls
+  help                 Print this message or the help of the given subcommand(s)
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+  -V, --version                    Print version

@@ -1,0 +1,28 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 362
+expression: "snapshot_help(&[\"analyze\", \"test-gaps\"])"
+---
+Find public functions with no direct test caller
+
+Usage: normalize analyze test-gaps [OPTIONS] [target]
+
+Arguments:
+  [target]  Target file or directory
+
+Options:
+      --all                        Show all functions including tested
+      --jsonl                      Output one JSON object per line (for arrays)
+      --json                       Output machine-readable JSON
+      --min-risk <min-risk>        Only show functions above this risk threshold
+      --jq <jq>                    Filter output through jq expression
+  -l, --limit <limit>              Maximum number of functions to show (0=no limit)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --only <only>                Include only paths matching pattern
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help

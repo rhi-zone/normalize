@@ -1,0 +1,22 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 436
+expression: "snapshot_help(&[\"serve\", \"http\"])"
+---
+Start HTTP server (REST API)
+
+Usage: normalize serve http [OPTIONS]
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+  -p, --port <port>                Port to listen on [default: 8080]
+      --pretty                     Global flag: pretty
+      --compact                    Global flag: compact
+      --json                       Output machine-readable JSON
+      --openapi                    Output OpenAPI spec and exit (don't start server)
+      --jq <jq>                    Filter output through jq expression
+  -r, --root <root>                Root directory (defaults to current directory)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
