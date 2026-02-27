@@ -158,10 +158,11 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
   - Done: `facts`, `rules`, `package` (Batch 2)
   - Done: `history`, `sessions`, `tools`, `edit` (Batch 3)
   - Done: `view` — extracted `build_view_service()` + `build_view_*_service()` per mode, `ViewResult` wrapper for text+JSON, service method with `display_view`.
-  - Deferred: `analyze` — 29 subcommands, deep config/allowlist/filter integration. Many subcommands already return `OutputFormatter` types; extract `build_*` functions and wire to `AnalyzeService`.
-  - Deferred: `serve` — long-running servers (MCP, HTTP, LSP), no structured return type
-- [ ] Final cleanup (after view/analyze migrated): delete `Commands` enum, `Cli` struct, `HELP_STYLES`, `help_color_choice()`, remove clap from normalize crate deps. `Commands` now has only 3 entries (View, Analyze, Serve).
-- [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
+  - Done: `analyze` — AnalyzeService with ~28 subcommands, build_* helpers extracted
+  - Done: `serve` — ServeService with mcp/http/lsp subcommands
+- [x] Final cleanup: deleted `Commands` enum, `Cli` struct, legacy clap dispatch. main.rs is now ~50 lines.
+- [ ] Restore `--repos` multi-repo support lost in migration (regression): add `repos: Option<String>` param to `analyze hotspots`, `analyze ownership`, `analyze coupling`; when set, discover repos and run `MultiRepoReport::run`. See docs/architecture-decisions.md for return type design (extend single-repo reports with optional `.repos` field, not a wrapper type).
+- [ ] Fix server-less global flag descriptions: `--pretty` shows "Global flag: pretty", `--compact` shows "Global flag: compact" — needs proper help text (pass to server-less agent)
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 
 ### CLI Cleanup

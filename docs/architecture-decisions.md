@@ -377,3 +377,28 @@ All rules (builtin and user) compile to dylibs via `abi_stable`:
 - Builtins ship pre-compiled, users compile theirs with `normalize facts compile`
 - Rule packs can be shared and version-controlled independently
 - Hot-swappable without recompiling the main binary
+
+## Multi-Repo Report Shape
+
+**Decision**: Extend single-repo report types with an optional `repos` field rather than returning a separate `MultiRepoReport<T>` wrapper type.
+
+### Context
+
+`normalize analyze hotspots/ownership/coupling` support `--repos DIR` to run across all git repos under a directory. This required a design decision on return type shape.
+
+### Options considered
+
+1. **Separate commands** (`hotspots-multi`) — clean types but duplicates the command surface
+2. **Untagged union** — `HotspotsOutput::Single(T) | HotspotsOutput::Multi(MultiRepoReport<T>)` — one command but callers must handle two shapes
+3. **Always wrap in `MultiRepoReport<T>`** — consistent outer shape but forces single-repo callers to unwrap an array
+4. **Extend single-repo report** — add `repos: Option<Vec<RepoResult>>` alongside existing top-level fields ✓
+
+### Why option 4
+
+- **Stable top-level shape**: `--jq .files` works identically with or without `--repos`. Options 2 and 3 break this.
+- **Semantic correctness**: `MultiRepoReport<T>` means "here are N repos" — a different concept from "a hotspots report that optionally aggregates multiple repos"
+- **Caller simplicity**: No conditional unwrapping based on whether `--repos` was passed
+
+### Invariant
+
+The top-level fields of a report are always present and always mean the same thing. `--repos` adds a `.repos` field alongside them with per-repo breakdowns.
