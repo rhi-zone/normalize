@@ -1,6 +1,6 @@
 //! File skeleton viewing for view command.
 
-use super::report::{ViewFileContentReport, ViewOutput};
+use super::report::{ViewFileContentReport, ViewOutput, ViewResult};
 use super::symbol::find_symbol_signature;
 use crate::output::OutputFormatter;
 use crate::skeleton::ExtractResultExt;
@@ -333,4 +333,121 @@ pub fn cmd_view_file(
         }
     }
     0
+}
+
+/// Build file skeleton view for the service layer.
+#[allow(clippy::too_many_arguments)]
+pub fn build_view_file_service(
+    file_path: &str,
+    root: &Path,
+    depth: i32,
+    show_deps: bool,
+    types_only: bool,
+    show_tests: bool,
+    docstring_mode: DocstringDisplay,
+    context: bool,
+    use_colors: bool,
+) -> Result<ViewResult, String> {
+    let full_path = root.join(file_path);
+    let content = std::fs::read_to_string(&full_path)
+        .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
+
+    if !(0..=2).contains(&depth) {
+        // Full content view
+        let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+        let output_text = if use_colors {
+            if let Some(ref g) = grammar {
+                tree::highlight_source(&content, g, true)
+            } else {
+                content.clone()
+            }
+        } else {
+            content.clone()
+        };
+        return Ok(ViewResult {
+            output: ViewOutput::FileContent(ViewFileContentReport {
+                path: file_path.to_string(),
+                content: content.clone(),
+            }),
+            text: output_text,
+        });
+    }
+
+    let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+
+    let extractor = skeleton::SkeletonExtractor::new();
+    let skeleton_result = extractor.extract(&full_path, &content);
+
+    let skeleton_result = if types_only {
+        skeleton_result.filter_types()
+    } else if !show_tests {
+        skeleton_result.filter_tests()
+    } else {
+        skeleton_result
+    };
+
+    let deps_result = if show_deps || context {
+        let deps_extractor = deps::DepsExtractor::new();
+        Some(deps_extractor.extract(&full_path, &content))
+    } else {
+        None
+    };
+
+    let view_node = skeleton_result.to_view_node(grammar.as_deref());
+
+    let mut text = format!("# {}\n", file_path);
+    text.push_str(&format!("Lines: {}\n", content.lines().count()));
+
+    if let Some(ref deps) = deps_result {
+        let show = show_deps || context;
+        if show && !deps.imports.is_empty() {
+            text.push_str("\n## Imports\n");
+            for imp in &deps.imports {
+                if imp.names.is_empty() {
+                    text.push_str(&format!("  import {}\n", imp.module));
+                } else {
+                    text.push_str(&format!(
+                        "  from {} import {}\n",
+                        imp.module,
+                        imp.names.join(", ")
+                    ));
+                }
+            }
+        }
+
+        if show && !deps.exports.is_empty() {
+            text.push_str("\n## Exports\n");
+            for exp in &deps.exports {
+                text.push_str(&format!("  {}\n", exp.name));
+            }
+        }
+    }
+
+    if depth >= 1 && (!show_deps || context) {
+        let format_options = FormatOptions {
+            docstrings: if context {
+                DocstringDisplay::None
+            } else {
+                docstring_mode
+            },
+            line_numbers: true,
+            skip_root: true,
+            max_depth: None,
+            minimal: !use_colors,
+            use_colors,
+        };
+        let lines = tree::format_view_node(&view_node, &format_options);
+        if !lines.is_empty() {
+            text.push_str("\n## Symbols\n");
+            for line in lines {
+                text.push_str(&line);
+                text.push('\n');
+            }
+        }
+    }
+
+    Ok(ViewResult {
+        output: ViewOutput::File { node: view_node },
+        text,
+    })
 }

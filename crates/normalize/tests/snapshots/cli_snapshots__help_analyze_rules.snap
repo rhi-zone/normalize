@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 357
 expression: "snapshot_help(&[\"analyze\", \"rules\"])"
 ---
 Run syntax rules from .normalize/rules/*.scm
@@ -15,9 +14,9 @@ Options:
       --list                List available rules without running them
       --fix                 Auto-fix issues that have fixes available
       --repos <DIR>         Run command across all git repos under DIR (1 level deep)
+      --json                Output as JSON
       --sarif               Output in SARIF format for IDE integration
       --debug <DEBUG>       Enable debug output (comma-delimited: timing, all)
-      --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
       --pretty              Human-friendly output with colors and formatting

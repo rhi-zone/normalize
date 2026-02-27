@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 242
 expression: "snapshot_help(&[\"analyze\", \"complexity\"])"
 ---
 Run complexity analysis
@@ -15,12 +14,12 @@ Options:
   -l, --limit <LIMIT>          Maximum number of functions to show (0 = no limit) [default: 10]
       --kind <KIND>            Filter by symbol kind: function, method
       --repos <DIR>            Run command across all git repos under DIR (1 level deep)
+      --json                   Output as JSON
       --sarif                  Output in SARIF format for IDE integration
       --allow <SYMBOL>         Add function to .normalize/complexity-allow
-      --json                   Output as JSON
       --jsonl                  Output as JSON Lines (one object per line)
-      --reason <REASON>        Reason for allowing
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+      --reason <REASON>        Reason for allowing
       --pretty                 Human-friendly output with colors and formatting
       --compact                Compact output without colors (overrides TTY detection)
       --output-schema          Output JSON schema for the command's return type

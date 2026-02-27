@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 26
 expression: "snapshot_help(&[])"
 ---
 Fast code intelligence CLI
@@ -8,7 +7,6 @@ Fast code intelligence CLI
 Usage: normalize [OPTIONS] <COMMAND>
 
 Commands:
-  view     View a node in the codebase tree (directory, file, or symbol)
   analyze  Analyze codebase (health, complexity, security, duplicates, docs)
   serve    Start a normalize server (MCP, HTTP, LSP)
   help     Print this message or the help of the given subcommand(s)

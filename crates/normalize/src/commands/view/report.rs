@@ -4,7 +4,7 @@
 //! enabling `--output-schema` support and consistent JSON serialization.
 
 use crate::output::OutputFormatter;
-use crate::tree::ViewNode;
+use crate::tree::{FormatOptions, ViewNode};
 use serde::Serialize;
 
 /// Unified output type for the view command.
@@ -184,4 +184,74 @@ impl OutputFormatter for ViewOutput {
             | ViewOutput::FileContent(_) => serde_json::to_string_pretty(self).unwrap_or_default(),
         }
     }
+}
+
+/// Combined result for service-layer view operations.
+///
+/// Wraps ViewOutput (structured JSON data) alongside pre-rendered text output.
+/// Serializes as ViewOutput for JSON consumers; `text` is used for terminal display.
+pub struct ViewResult {
+    /// Structured output for JSON serialization.
+    pub output: ViewOutput,
+    /// Pre-rendered text output (plain or with ANSI colors).
+    pub text: String,
+}
+
+impl Serialize for ViewResult {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.output.serialize(serializer)
+    }
+}
+
+impl schemars::JsonSchema for ViewResult {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        ViewOutput::schema_name()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        ViewOutput::json_schema(generator)
+    }
+}
+
+impl OutputFormatter for ViewResult {
+    fn format_text(&self) -> String {
+        self.text.clone()
+    }
+}
+
+impl std::fmt::Display for ViewResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
+
+/// Helper: count directories and files in a ViewNode tree.
+pub fn count_dir_file_nodes(node: &ViewNode) -> (usize, usize) {
+    use crate::tree::ViewNodeKind;
+    let mut dirs = 0usize;
+    let mut files = 0usize;
+    for child in &node.children {
+        match child.kind {
+            ViewNodeKind::Directory => {
+                dirs += 1;
+                let (sub_dirs, sub_files) = count_dir_file_nodes(child);
+                dirs += sub_dirs;
+                files += sub_files;
+            }
+            ViewNodeKind::File => files += 1,
+            ViewNodeKind::Symbol(_) => {}
+        }
+    }
+    (dirs, files)
+}
+
+/// Render a ViewNode to text using the given options.
+pub fn render_view_node(node: &ViewNode, minimal: bool, use_colors: bool) -> String {
+    use crate::tree;
+    let options = FormatOptions {
+        minimal,
+        use_colors,
+        ..Default::default()
+    };
+    tree::format_view_node(node, &options).join("\n")
 }

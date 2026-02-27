@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use normalize::commands;
 use normalize::commands::analyze::AnalyzeArgs;
 use normalize::commands::analyze::AnalyzeCommand;
-use normalize::commands::view::ViewArgs;
 use normalize::output::OutputFormatter;
 use normalize::serve::{self, ServeArgs};
 
@@ -55,9 +54,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// View a node in the codebase tree (directory, file, or symbol)
-    View(ViewArgs),
-
     /// Analyze codebase (health, complexity, security, duplicates, docs)
     Analyze(AnalyzeArgs),
 
@@ -171,13 +167,6 @@ fn main() {
     }
 
     let exit_code = match cli.command {
-        Commands::View(args) => commands::view::run(
-            args,
-            format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
         Commands::Analyze(args) => commands::analyze::run(
             args,
             format,
@@ -193,6 +182,7 @@ fn main() {
 
 /// Commands migrated to server-less `#[cli]`.
 const SERVER_LESS_COMMANDS: &[&str] = &[
+    "view",
     "grep",
     "aliases",
     "context",

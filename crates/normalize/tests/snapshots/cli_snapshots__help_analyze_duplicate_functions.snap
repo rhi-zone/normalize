@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 317
 expression: "snapshot_help(&[\"analyze\", \"duplicate-functions\"])"
 ---
 Detect duplicate functions (code clones)
@@ -10,16 +9,16 @@ Usage: normalize analyze duplicate-functions [OPTIONS]
 Options:
       --elide-identifiers      Elide identifier names when comparing (default: true)
       --elide-literals         Elide literal values when comparing
-      --show-source            Show source code for detected duplicates
-      --min-lines <MIN_LINES>  Minimum lines for a function to be considered [default: 1]
       --repos <DIR>            Run command across all git repos under DIR (1 level deep)
-      --include-trait-impls    Include groups where all functions share the same name (likely trait implementations). By default these are suppressed as intentionally parallel, not copy-paste
+      --show-source            Show source code for detected duplicates
       --json                   Output as JSON
-      --allow <LOCATION>       Allow a duplicate function group (add to .normalize/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
+      --min-lines <MIN_LINES>  Minimum lines for a function to be considered [default: 1]
+      --include-trait-impls    Include groups where all functions share the same name (likely trait implementations). By default these are suppressed as intentionally parallel, not copy-paste
       --jsonl                  Output as JSON Lines (one object per line)
+      --allow <LOCATION>       Allow a duplicate function group (add to .normalize/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)
-      --reason <REASON>        Reason for allowing
       --pretty                 Human-friendly output with colors and formatting
+      --reason <REASON>        Reason for allowing
       --compact                Compact output without colors (overrides TTY detection)
       --output-schema          Output JSON schema for the command's return type
       --input-schema           Output JSON schema for the command's input arguments

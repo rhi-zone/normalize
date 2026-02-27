@@ -13,8 +13,8 @@ Options:
       --target <TARGET>        Target file to search in
       --max-depth <MAX_DEPTH>  Maximum trace depth [default: 10]
       --recursive              Trace into called functions (show what they return)
-  -i, --case-insensitive       Case-insensitive symbol matching
       --repos <DIR>            Run command across all git repos under DIR (1 level deep)
+  -i, --case-insensitive       Case-insensitive symbol matching
       --json                   Output as JSON
       --jsonl                  Output as JSON Lines (one object per line)
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)

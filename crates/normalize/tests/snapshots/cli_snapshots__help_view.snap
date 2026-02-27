@@ -1,43 +1,41 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 32
 expression: "snapshot_help(&[\"view\"])"
 ---
 View a node in the codebase tree (directory, file, or symbol)
 
-Usage: normalize view [OPTIONS] [TARGET]
+Usage: normalize view [OPTIONS] [target]
 
 Arguments:
-  [TARGET]  Target: path, path/Symbol, Parent/method, file:line, or SymbolName
+  [target]  Target: path, path/Symbol, Parent/method, file:line, or SymbolName
 
 Options:
-  -r, --root <ROOT>         Root directory (defaults to current directory)
-  -d, --depth <DEPTH>       Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
-  -n, --line-numbers        Show line numbers
-      --deps                Show dependencies (imports/exports)
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
-      --json                Output as JSON
-  -k, --kind <KIND>         Filter by symbol kind: class, function, method
-      --jsonl               Output as JSON Lines (one object per line)
-      --types-only          Show only type definitions (class, struct, enum, interface, type alias)
-      --jq <EXPR>           Filter JSON output with jq expression (implies --json)
-      --tests               Include test functions and test modules (hidden by default)
-      --pretty              Human-friendly output with colors and formatting
-      --raw                 Disable smart display (no collapsing single-child dirs)
-      --compact             Compact output without colors (overrides TTY detection)
-      --focus[=<MODULE>]    Focus view: show target at high detail, imports at signature level
-      --output-schema       Output JSON schema for the command's return type
-      --resolve-imports     Resolve imports: inline signatures of specific imported symbols
-      --full                Show full source code
-      --input-schema        Output JSON schema for the command's input arguments
-      --docs                Show full docstrings
-      --params-json <JSON>  Pass command arguments as JSON (overrides CLI args)
-      --no-docs             Hide all docstrings (overrides --docs)
-      --no-parent           Hide parent/ancestor context (shown by default for nested symbols)
-      --context             Context view: skeleton + imports combined
-      --dir-context         Prepend directory context (.context.md files from hierarchy)
-      --exclude <PATTERN>   Exclude paths matching pattern or @alias
-      --only <PATTERN>      Include only paths matching pattern or @alias
-  -i, --case-insensitive    Case-insensitive symbol matching
-      --history [<N>]       Show git history for symbol (last N changes)
-  -h, --help                Print help
+      --pretty                     Global flag: pretty
+  -r, --root <root>                Root directory (defaults to current directory)
+      --compact                    Global flag: compact
+  -d, --depth <depth>              Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
+      --jsonl                      Output one JSON object per line (for arrays)
+  -n, --line-numbers               Show line numbers
+      --deps                       Show dependencies (imports/exports)
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+  -k, --kind <kind>                Filter by symbol kind: class, function, method
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --types-only                 Show only type definitions
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --tests                      Include test functions and test modules
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --raw                        Disable smart display (no collapsing single-child dirs)
+      --focus <focus>              Focus view on module
+      --resolve-imports            Inline signatures of specific imported symbols
+      --full                       Show full source code
+      --docs                       Show full docstrings
+      --no-docs                    Hide all docstrings
+      --no-parent                  Hide parent/ancestor context
+      --context                    Context view: skeleton + imports combined
+      --dir-context                Prepend directory context (.context.md files)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+  -i, --case-insensitive           Case-insensitive symbol matching
+      --history <history>          Show git history for symbol (last N changes)
+  -h, --help                       Print help

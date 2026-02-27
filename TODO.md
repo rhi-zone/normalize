@@ -157,7 +157,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
   - Done: `update`, `translate`, `daemon`, `grammars`, `generate` (Batch 1)
   - Done: `facts`, `rules`, `package` (Batch 2)
   - Done: `history`, `sessions`, `tools`, `edit` (Batch 3)
-  - Deferred: `view` — `cmd_view` has 19 params, prints directly via 10+ code paths. Needs refactor: extract `build_view()` → `ViewOutput` for each mode.
+  - Done: `view` — extracted `build_view_service()` + `build_view_*_service()` per mode, `ViewResult` wrapper for text+JSON, service method with `display_view`.
   - Deferred: `analyze` — 29 subcommands, deep config/allowlist/filter integration. Many subcommands already return `OutputFormatter` types; extract `build_*` functions and wire to `AnalyzeService`.
   - Deferred: `serve` — long-running servers (MCP, HTTP, LSP), no structured return type
 - [ ] Final cleanup (after view/analyze migrated): delete `Commands` enum, `Cli` struct, `HELP_STYLES`, `help_color_choice()`, remove clap from normalize crate deps. `Commands` now has only 3 entries (View, Analyze, Serve).

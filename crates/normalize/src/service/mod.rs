@@ -87,6 +87,7 @@ impl NormalizeService {
         let config = NormalizeConfig::load(&std::env::current_dir().unwrap_or_default());
         match param {
             "limit" => Some(config.text_search.limit().to_string()),
+            "depth" => Some(config.view.depth().to_string()),
             _ => None,
         }
     }
@@ -125,6 +126,11 @@ impl NormalizeService {
         } else {
             value.code.clone()
         }
+    }
+
+    /// Display bridge for ViewResult.
+    fn display_view(&self, value: &crate::commands::view::report::ViewResult) -> String {
+        value.text.clone()
     }
 }
 
@@ -198,6 +204,105 @@ impl std::fmt::Display for TranslateResult {
     global = [pretty, compact]
 )]
 impl NormalizeService {
+    /// View a node in the codebase tree (directory, file, or symbol)
+    #[cli(display_with = "display_view")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn view(
+        &self,
+        #[param(
+            positional,
+            help = "Target: path, path/Symbol, Parent/method, file:line, or SymbolName"
+        )]
+        target: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(
+            short = 'd',
+            help = "Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)"
+        )]
+        depth: i32,
+        #[param(short = 'n', help = "Show line numbers")] line_numbers: bool,
+        #[param(help = "Show dependencies (imports/exports)")] deps: bool,
+        #[param(short = 'k', help = "Filter by symbol kind: class, function, method")] kind: Option<
+            String,
+        >,
+        #[param(help = "Show only type definitions")] types_only: bool,
+        #[param(help = "Include test functions and test modules")] tests: bool,
+        #[param(help = "Disable smart display (no collapsing single-child dirs)")] raw: bool,
+        #[param(help = "Focus view on module")] focus: Option<String>,
+        #[param(help = "Inline signatures of specific imported symbols")] resolve_imports: bool,
+        #[param(help = "Show full source code")] full: bool,
+        #[param(help = "Show full docstrings")] docs: bool,
+        #[param(help = "Hide all docstrings")] no_docs: bool,
+        #[param(help = "Hide parent/ancestor context")] no_parent: bool,
+        #[param(help = "Context view: skeleton + imports combined")] context: bool,
+        #[param(help = "Prepend directory context (.context.md files)")] dir_context: bool,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
+        #[param(help = "Show git history for symbol (last N changes)")] history: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<crate::commands::view::report::ViewResult, String> {
+        let root_path = root
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+        self.resolve_format(pretty, compact, &root_path);
+
+        let config = NormalizeConfig::load(&root_path);
+
+        let docstring_mode = if no_docs {
+            crate::tree::DocstringDisplay::None
+        } else if docs || config.view.show_docs() {
+            crate::tree::DocstringDisplay::Full
+        } else {
+            crate::tree::DocstringDisplay::Summary
+        };
+
+        // Handle --dir-context: prepend directory context to text output
+        let prefix = if dir_context {
+            let target_path = target
+                .as_ref()
+                .map(|t| root_path.join(t))
+                .unwrap_or_else(|| root_path.clone());
+            crate::commands::context::get_merged_context(&root_path, &target_path)
+                .map(|ctx| format!("{}\n\n---\n\n", ctx))
+        } else {
+            None
+        };
+
+        let mut result = crate::commands::view::build_view_service(
+            target.as_deref(),
+            &root_path,
+            depth,
+            line_numbers,
+            deps,
+            kind.as_deref(),
+            types_only,
+            tests,
+            raw,
+            focus.as_deref(),
+            resolve_imports,
+            full,
+            docstring_mode,
+            context,
+            !no_parent,
+            &exclude,
+            &only,
+            case_insensitive,
+            history,
+            self.pretty.get(),
+        )?;
+
+        if let Some(prefix_text) = prefix {
+            result.text = format!("{}{}", prefix_text, result.text);
+        }
+
+        Ok(result)
+    }
+
     /// Search for text patterns in files (fast ripgrep-based search)
     #[cli(display_with = "display_grep")]
     #[allow(clippy::too_many_arguments)]

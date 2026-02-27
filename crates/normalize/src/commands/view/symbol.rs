@@ -1,6 +1,6 @@
 //! Symbol lookup and rendering for view command.
 
-use super::report::{ViewGlobMatch, ViewGlobReport, ViewOutput, ViewSymbolReport};
+use super::report::{ViewGlobMatch, ViewGlobReport, ViewOutput, ViewResult, ViewSymbolReport};
 use crate::output::OutputFormatter;
 use crate::skeleton::SymbolExt;
 use crate::tree::{DocstringDisplay, FormatOptions};
@@ -372,6 +372,71 @@ fn print_smart_imports(
     if has_imports {
         println!();
     }
+}
+
+/// Build smart imports as a String (for service layer).
+fn format_smart_imports_str(
+    source: &str,
+    grammar: &str,
+    full_path: &Path,
+    content: &str,
+    imports: &[normalize_languages::Import],
+) -> String {
+    let used_ids = extract_identifiers(source, grammar);
+    let lang = support_for_path(full_path);
+    let lines: Vec<&str> = content.lines().collect();
+    let mut seen_imports = HashSet::new();
+    let mut result = String::new();
+    let mut has_imports = false;
+
+    for import in imports {
+        let used_names: Vec<&str> = import
+            .names
+            .iter()
+            .filter(|n| used_ids.contains(*n))
+            .map(|s| s.as_str())
+            .collect();
+
+        let module_used = used_ids.contains(&import.module)
+            || import
+                .module
+                .rsplit("::")
+                .next()
+                .map(|last| used_ids.contains(last))
+                .unwrap_or(false);
+
+        if used_names.is_empty() && !module_used && !import.is_wildcard {
+            continue;
+        }
+
+        let import_text = if used_names.len() == import.names.len() || import.names.is_empty() {
+            if import.line > 0 && import.line <= lines.len() {
+                lines[import.line - 1].trim().to_string()
+            } else if let Some(l) = lang {
+                l.format_import(import, None)
+            } else {
+                import.format_summary()
+            }
+        } else if let Some(l) = lang {
+            l.format_import(import, Some(&used_names))
+        } else {
+            import.format_summary()
+        };
+
+        if seen_imports.insert(import_text.clone()) {
+            if !has_imports {
+                result.push('\n');
+                has_imports = true;
+            }
+            result.push_str(&import_text);
+            result.push('\n');
+        }
+    }
+
+    if has_imports {
+        result.push('\n');
+    }
+    result
 }
 
 /// View a symbol within a file
@@ -984,4 +1049,386 @@ pub fn cmd_view_symbol_glob(
     }
 
     0
+}
+
+// ─── Service-layer build functions ──────────────────────────────────────────
+
+/// Build symbol-at-line view for the service layer.
+#[allow(clippy::too_many_arguments)]
+pub fn build_view_symbol_at_line_service(
+    file_path: &str,
+    line: usize,
+    root: &Path,
+    depth: i32,
+    docstring_mode: crate::tree::DocstringDisplay,
+    show_parent: bool,
+    _context: bool,
+    use_colors: bool,
+) -> Result<ViewResult, String> {
+    let matches = crate::path_resolve::resolve_unified_all(file_path, root);
+    let resolved = match matches.len() {
+        0 => return Err(format!("File not found: {}", file_path)),
+        1 => matches.into_iter().next().unwrap(),
+        _ => {
+            return Err(format!(
+                "Multiple matches for '{}' - be more specific",
+                file_path
+            ));
+        }
+    };
+
+    if resolved.is_directory {
+        return Err(format!(
+            "Cannot use line number with directory: {}",
+            file_path
+        ));
+    }
+
+    let full_path = root.join(&resolved.file_path);
+    let content = std::fs::read_to_string(&full_path)
+        .map_err(|e| format!("Error reading {}: {}", resolved.file_path, e))?;
+
+    let extractor = skeleton::SkeletonExtractor::new();
+    let skeleton_result = extractor.extract(&full_path, &content);
+
+    fn find_at_line<'a>(
+        symbols: &'a [skeleton::SkeletonSymbol],
+        line: usize,
+        parent: Option<&'a skeleton::SkeletonSymbol>,
+    ) -> Option<(
+        &'a skeleton::SkeletonSymbol,
+        Vec<&'a skeleton::SkeletonSymbol>,
+    )> {
+        for sym in symbols {
+            if let Some((child, mut ancestors)) = find_at_line(&sym.children, line, Some(sym)) {
+                if let Some(p) = parent {
+                    ancestors.insert(0, p);
+                }
+                return Some((child, ancestors));
+            }
+            if line >= sym.start_line && line <= sym.end_line {
+                let mut ancestors = Vec::new();
+                if let Some(p) = parent {
+                    ancestors.push(p);
+                }
+                return Some((sym, ancestors));
+            }
+        }
+        None
+    }
+
+    let Some((sym, ancestors)) = find_at_line(&skeleton_result.symbols, line, None) else {
+        return Err(format!(
+            "No symbol found at line {} in {}",
+            line, resolved.file_path
+        ));
+    };
+
+    let mut symbol_path_parts: Vec<String> = ancestors.iter().map(|a| a.name.clone()).collect();
+    symbol_path_parts.push(sym.name.clone());
+    let full_symbol_path = format!("{}/{}", resolved.file_path, symbol_path_parts.join("/"));
+
+    let grammar =
+        normalize_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+    let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
+
+    let mut text = String::new();
+    if depth >= 0 {
+        text.push_str(&format!(
+            "# {} ({}, L{}-{})\n",
+            full_symbol_path,
+            sym.kind.as_str(),
+            sym.start_line,
+            sym.end_line
+        ));
+    }
+
+    if show_parent {
+        for ancestor in &ancestors {
+            text.push_str(&ancestor.signature);
+            text.push('\n');
+        }
+        if !ancestors.is_empty() {
+            text.push('\n');
+        }
+    }
+
+    let format_options = crate::tree::FormatOptions {
+        docstrings: docstring_mode,
+        line_numbers: true,
+        skip_root: false,
+        max_depth: None,
+        minimal: !use_colors,
+        use_colors,
+    };
+    let lines = crate::tree::format_view_node(&view_node, &format_options);
+    for l in lines {
+        text.push_str(&l);
+        text.push('\n');
+    }
+
+    Ok(ViewResult {
+        output: ViewOutput::SymbolAtLine { node: view_node },
+        text,
+    })
+}
+
+/// Build symbol view for the service layer.
+#[allow(clippy::too_many_arguments)]
+pub fn build_view_symbol_service(
+    file_path: &str,
+    symbol_path: &[String],
+    root: &Path,
+    depth: i32,
+    _full: bool,
+    docstring_mode: crate::tree::DocstringDisplay,
+    show_parent: bool,
+    _context: bool,
+    use_colors: bool,
+    case_insensitive: bool,
+) -> Result<ViewResult, String> {
+    let full_path = root.join(file_path);
+    let content = std::fs::read_to_string(&full_path)
+        .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
+
+    let mut parser = symbols::SymbolParser::new();
+    let symbol_name = symbol_path.last().unwrap();
+
+    let grammar =
+        normalize_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+
+    let deps_extractor = crate::deps::DepsExtractor::new();
+    let deps_result = deps_extractor.extract(&full_path, &content);
+
+    // Try fast path for single-element paths
+    let source_opt = if symbol_path.len() == 1 {
+        parser.extract_symbol_source(&full_path, &content, symbol_name)
+    } else {
+        None
+    };
+
+    if let Some(source) = source_opt {
+        let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
+
+        let imports: Vec<String> = deps_result
+            .imports
+            .iter()
+            .map(|i| i.format_summary())
+            .collect();
+
+        let mut text = String::new();
+        if depth >= 0 {
+            if let Some(sym) = parser.find_symbol(&full_path, &content, symbol_name) {
+                text.push_str(&format!(
+                    "# {} (L{}-{})\n",
+                    full_symbol_path, sym.start_line, sym.end_line
+                ));
+            } else {
+                text.push_str(&format!("# {}\n", full_symbol_path));
+            }
+        }
+
+        if !deps_result.imports.is_empty()
+            && let Some(ref g) = grammar
+        {
+            let smart =
+                format_smart_imports_str(&source, g, &full_path, &content, &deps_result.imports);
+            text.push_str(&smart);
+        }
+
+        if show_parent {
+            let extractor = skeleton::SkeletonExtractor::new();
+            let sr = extractor.extract(&full_path, &content);
+            let result = find_symbol_with_parent(&sr.symbols, symbol_name, case_insensitive);
+            let ancestors: Vec<(String, usize)> = result
+                .ancestors
+                .into_iter()
+                .map(|a| (a.symbol.signature.clone(), a.sibling_count))
+                .collect();
+            for (signature, _) in &ancestors {
+                text.push_str(signature);
+                text.push('\n');
+            }
+            if !ancestors.is_empty() {
+                text.push('\n');
+            }
+        }
+
+        let highlighted = if let Some(ref g) = grammar {
+            crate::tree::highlight_source(&source, g, use_colors)
+        } else {
+            source.clone()
+        };
+        text.push_str(&highlighted);
+        if !highlighted.ends_with('\n') {
+            text.push('\n');
+        }
+
+        return Ok(ViewResult {
+            output: ViewOutput::Symbol(ViewSymbolReport {
+                path: full_symbol_path,
+                file: file_path.to_string(),
+                symbol: symbol_name.to_string(),
+                imports: Some(imports),
+                source: Some(source),
+                start_line: None,
+                end_line: None,
+            }),
+            text,
+        });
+    }
+
+    // Skeleton extraction path
+    let extractor = skeleton::SkeletonExtractor::new();
+    let skeleton_result = extractor.extract(&full_path, &content);
+
+    let found_sym = if symbol_path.len() > 1 {
+        find_symbol_by_path(&skeleton_result.symbols, symbol_path, case_insensitive)
+    } else {
+        find_symbol_ci(&skeleton_result.symbols, symbol_name, case_insensitive)
+    };
+
+    if let Some(sym) = found_sym {
+        let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
+
+        if sym.start_line > 0 && sym.end_line > 0 {
+            let lines: Vec<&str> = content.lines().collect();
+            let start = sym.start_line - 1;
+            let end = std::cmp::min(sym.end_line, lines.len());
+            let source: String = lines[start..end].join("\n");
+
+            let mut text = String::new();
+            if depth >= 0 {
+                text.push_str(&format!(
+                    "# {} (L{}-{})\n",
+                    full_symbol_path, sym.start_line, sym.end_line
+                ));
+            }
+
+            if show_parent
+                && symbol_path.len() > 1
+                && let Some(parent_sym) =
+                    find_symbol_ci(&skeleton_result.symbols, &symbol_path[0], case_insensitive)
+            {
+                text.push('\n');
+                text.push_str(&parent_sym.signature);
+                text.push_str("\n\n");
+            }
+
+            let highlighted = if let Some(ref g) = grammar {
+                crate::tree::highlight_source(&source, g, use_colors)
+            } else {
+                source.clone()
+            };
+            text.push_str(&highlighted);
+            if !highlighted.ends_with('\n') {
+                text.push('\n');
+            }
+
+            return Ok(ViewResult {
+                output: ViewOutput::Symbol(ViewSymbolReport {
+                    path: full_symbol_path,
+                    file: file_path.to_string(),
+                    symbol: symbol_name.to_string(),
+                    imports: None,
+                    source: Some(source),
+                    start_line: Some(sym.start_line),
+                    end_line: Some(sym.end_line),
+                }),
+                text,
+            });
+        }
+
+        // Fallback: show skeleton node
+        let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
+        let mut text = format!(
+            "# {} ({}, L{}-{})\n",
+            full_symbol_path,
+            sym.kind.as_str(),
+            sym.start_line,
+            sym.end_line
+        );
+        let format_options = crate::tree::FormatOptions {
+            docstrings: docstring_mode,
+            line_numbers: true,
+            skip_root: false,
+            max_depth: None,
+            minimal: !use_colors,
+            use_colors,
+        };
+        for l in crate::tree::format_view_node(&view_node, &format_options) {
+            text.push_str(&l);
+            text.push('\n');
+        }
+        return Ok(ViewResult {
+            output: ViewOutput::SymbolAtLine { node: view_node },
+            text,
+        });
+    }
+
+    Err(format!(
+        "Symbol '{}' not found in {}",
+        symbol_name, file_path
+    ))
+}
+
+/// Build glob-matched symbols view for the service layer.
+pub fn build_view_symbol_glob_service(
+    file_path: &str,
+    pattern: &str,
+    root: &Path,
+) -> Result<ViewResult, String> {
+    let full_path = root.join(file_path);
+    let content = std::fs::read_to_string(&full_path)
+        .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
+
+    let matches = crate::path_resolve::resolve_symbol_glob(&full_path, &content, pattern);
+
+    if matches.is_empty() {
+        return Err(format!("No symbols match pattern: {}", pattern));
+    }
+
+    let mut text = format!(
+        "# {}/{} ({} matches)\n\n",
+        file_path,
+        pattern,
+        matches.len()
+    );
+    let lines: Vec<&str> = content.lines().collect();
+
+    for m in &matches {
+        text.push_str(&format!(
+            "## {} ({}, L{}-{})\n",
+            m.path,
+            m.symbol.kind.as_str(),
+            m.symbol.start_line,
+            m.symbol.end_line
+        ));
+        for i in m.symbol.start_line..=m.symbol.end_line {
+            if i > 0 && i <= lines.len() {
+                text.push_str(lines[i - 1]);
+                text.push('\n');
+            }
+        }
+        text.push('\n');
+    }
+
+    Ok(ViewResult {
+        output: ViewOutput::GlobMatches(ViewGlobReport {
+            file: file_path.to_string(),
+            pattern: pattern.to_string(),
+            count: matches.len(),
+            matches: matches
+                .iter()
+                .map(|m| ViewGlobMatch {
+                    path: format!("{}/{}", file_path, m.path),
+                    name: m.symbol.name.clone(),
+                    kind: m.symbol.kind.as_str().to_string(),
+                    start_line: m.symbol.start_line,
+                    end_line: m.symbol.end_line,
+                })
+                .collect(),
+        }),
+        text,
+    })
 }

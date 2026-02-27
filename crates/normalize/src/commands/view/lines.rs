@@ -1,6 +1,6 @@
 //! Line range viewing for view command.
 
-use super::report::{ViewLineRangeReport, ViewOutput};
+use super::report::{ViewLineRangeReport, ViewOutput, ViewResult};
 use crate::output::OutputFormatter;
 use crate::tree::DocstringDisplay;
 use crate::{parsers, path_resolve, tree};
@@ -137,6 +137,101 @@ pub fn cmd_view_line_range(
     }
 
     0
+}
+
+/// Build a line range view for the service layer.
+pub fn build_view_line_range_service(
+    file_path: &str,
+    start: usize,
+    end: usize,
+    root: &std::path::Path,
+    docstring_mode: crate::tree::DocstringDisplay,
+    use_colors: bool,
+) -> Result<ViewResult, String> {
+    let matches = crate::path_resolve::resolve_unified_all(file_path, root);
+    let resolved = match matches.len() {
+        0 => return Err(format!("File not found: {}", file_path)),
+        1 => matches.into_iter().next().unwrap(),
+        _ => {
+            return Err(format!(
+                "Multiple matches for '{}' - be more specific",
+                file_path
+            ));
+        }
+    };
+
+    if resolved.is_directory {
+        return Err(format!(
+            "Cannot use line range with directory: {}",
+            file_path
+        ));
+    }
+
+    let full_path = root.join(&resolved.file_path);
+    let display_path = resolved.file_path.clone();
+
+    let content =
+        std::fs::read_to_string(&full_path).map_err(|e| format!("Failed to read file: {}", e))?;
+
+    let lines: Vec<&str> = content.lines().collect();
+    let total_lines = lines.len();
+
+    if start > total_lines {
+        return Err(format!(
+            "Line {} is past end of file ({} lines)",
+            start, total_lines
+        ));
+    }
+
+    let actual_start = start.min(total_lines);
+    let actual_end = end.min(total_lines);
+    let range_start = actual_start.saturating_sub(1);
+    let range_end = actual_end.min(lines.len());
+
+    let grammar =
+        normalize_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+    let source: String = if docstring_mode != crate::tree::DocstringDisplay::Full {
+        if let Some(ref g) = grammar {
+            let doc_lines = find_doc_comment_lines(&content, g, actual_start, actual_end);
+            lines[range_start..range_end]
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !doc_lines.contains(&(actual_start + i)))
+                .map(|(_, line)| *line)
+                .collect::<Vec<_>>()
+                .join("\n")
+        } else {
+            lines[range_start..range_end].join("\n")
+        }
+    } else {
+        lines[range_start..range_end].join("\n")
+    };
+
+    let output_text = if use_colors {
+        if let Some(ref g) = grammar {
+            crate::tree::highlight_source(&source, g, true)
+        } else {
+            source.clone()
+        }
+    } else {
+        source.clone()
+    };
+
+    let mut text = format!("# {}:{}-{}\n\n", display_path, actual_start, actual_end);
+    text.push_str(&output_text);
+    if !output_text.ends_with('\n') {
+        text.push('\n');
+    }
+
+    Ok(ViewResult {
+        output: ViewOutput::LineRange(ViewLineRangeReport {
+            file: display_path,
+            start: actual_start,
+            end: actual_end,
+            content: source,
+        }),
+        text,
+    })
 }
 
 /// Find line numbers that contain doc comments within a range.
