@@ -150,19 +150,15 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 - [x] Wire `OutputFormatter`: `display_with` bridges to `format_pretty()`/`format_text()` via `Cell<bool>` for pretty/compact globals. server-less handles JSON/JSONL/JQ before `display_with`.
 - [x] Wire `defaults` hook to `NormalizeConfig` loading (config file merge)
 - [x] Migrate one simple command (text-search → `grep`) as proof of concept
-- [ ] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method (keeping legacy text-search alongside grep during migration)
+- [x] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method
+- [x] Remove legacy `text-search` command (fully replaced by `grep`)
+- [x] Migrate `aliases`, `context`, `init` to server-less (Phase 3)
 - [ ] Migrate remaining commands, deleting `cmd_*` functions and manual Args structs
+  - Deferred: `update` (complex: GitHub API, binary download, self-replacement)
+  - Deferred: `translate` (custom ValueEnum enums, stdin input, raw code output)
+  - Next: Phase 4 mount-point commands (grammars, daemon, generate)
 - [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
-
-**Known limitations (scaffold):**
-- ~~`--pretty`/`--compact` not wired~~ → resolved via `display_with` + `Cell<bool>` globals
-- ~~`pattern` is `--pattern` flag~~ → resolved via `#[param(positional)]`
-- ~~`--exclude`/`--only` take comma-separated string~~ → resolved via `Vec<String>` (repeated flags + comma delimiter)
-- ~~Schema output simpler~~ → resolved via `jsonschema` feature (schemars)
-
-**Also:**
-- [x] Rename `text-search` command to `grep` (via server-less migration — legacy `text-search` kept as alias during transition)
 
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
