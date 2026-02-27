@@ -5,13 +5,6 @@ use std::path::{Path, PathBuf};
 use normalize::commands;
 use normalize::commands::analyze::AnalyzeArgs;
 use normalize::commands::analyze::AnalyzeCommand;
-use normalize::commands::edit::EditArgs;
-use normalize::commands::generate::GenerateArgs;
-use normalize::commands::history::HistoryArgs;
-use normalize::commands::rules::RulesAction;
-use normalize::commands::sessions::SessionsArgs;
-use normalize::commands::tools::ToolsAction;
-use normalize::commands::translate::TranslateArgs;
 use normalize::commands::view::ViewArgs;
 use normalize::output::OutputFormatter;
 use normalize::serve::{self, ServeArgs};
@@ -65,89 +58,11 @@ enum Commands {
     /// View a node in the codebase tree (directory, file, or symbol)
     View(ViewArgs),
 
-    /// Edit a node in the codebase tree (structural code modification)
-    Edit(EditArgs),
-
-    /// View shadow git edit history
-    History(HistoryArgs),
-
-    /// Manage code facts (file index, symbols, calls, imports)
-    Facts {
-        #[command(subcommand)]
-        action: commands::facts::FactsAction,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
-
-    /// Manage the global normalize daemon
-    Daemon {
-        #[command(subcommand)]
-        action: commands::daemon::DaemonAction,
-    },
-
-    /// Check for and install updates
-    Update {
-        /// Check for updates without installing
-        #[arg(short, long)]
-        check: bool,
-    },
-
-    /// Manage tree-sitter grammars for parsing
-    Grammars {
-        #[command(subcommand)]
-        action: commands::grammars::GrammarAction,
-    },
-
     /// Analyze codebase (health, complexity, security, duplicates, docs)
     Analyze(AnalyzeArgs),
 
-    /// Analyze Claude Code and other agent session logs
-    Sessions(SessionsArgs),
-
-    /// Package management: info, list, tree, outdated
-    Package {
-        #[command(subcommand)]
-        action: commands::package::PackageAction,
-
-        /// Force specific ecosystem (cargo, npm, python)
-        #[arg(short, long, global = true)]
-        ecosystem: Option<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
-
-    /// External ecosystem tools (linters, formatters, test runners)
-    Tools {
-        #[command(subcommand)]
-        action: ToolsAction,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
-
     /// Start a normalize server (MCP, HTTP, LSP)
     Serve(ServeArgs),
-
-    /// Generate code from API spec
-    Generate(GenerateArgs),
-
-    /// Manage and run analysis rules (syntax + fact)
-    Rules {
-        #[command(subcommand)]
-        action: RulesAction,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
-
-    /// Translate code between programming languages
-    Translate(TranslateArgs),
 }
 
 /// Help output styling.
@@ -263,28 +178,6 @@ fn main() {
             cli.input_schema,
             cli.params_json.as_deref(),
         ),
-        Commands::Edit(args) => {
-            commands::edit::run(args, &format, cli.input_schema, cli.params_json.as_deref())
-        }
-        Commands::History(args) => commands::history::run(
-            args,
-            format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
-        Commands::Facts { action, root } => {
-            commands::facts::cmd_facts(action, root.as_deref(), &format)
-        }
-        Commands::Daemon { action } => commands::daemon::cmd_daemon(action, &format),
-        Commands::Update { check } => commands::update::cmd_update(check, &format),
-        Commands::Grammars { action } => commands::grammars::cmd_grammars(
-            action,
-            &format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
         Commands::Analyze(args) => commands::analyze::run(
             args,
             format,
@@ -292,36 +185,7 @@ fn main() {
             cli.input_schema,
             cli.params_json.as_deref(),
         ),
-        Commands::Sessions(args) => commands::sessions::run(
-            args,
-            &format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
-        Commands::Package {
-            action,
-            ecosystem,
-            root,
-        } => commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), format),
-        Commands::Tools { action, root } => commands::tools::run(
-            action,
-            root.as_deref(),
-            format,
-            cli.output_schema,
-            cli.input_schema,
-            cli.params_json.as_deref(),
-        ),
         Commands::Serve(args) => serve::run(args, &format),
-        Commands::Generate(args) => {
-            commands::generate::run(args, cli.input_schema, cli.params_json.as_deref())
-        }
-        Commands::Rules { action, root } => {
-            commands::rules::cmd_rules(action, root.as_deref(), &format)
-        }
-        Commands::Translate(args) => {
-            commands::translate::run(args, cli.input_schema, cli.params_json.as_deref())
-        }
     };
 
     std::process::exit(exit_code);

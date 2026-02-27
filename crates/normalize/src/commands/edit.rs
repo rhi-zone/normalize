@@ -1,166 +1,36 @@
 //! Edit command for normalize CLI.
 
-use clap::Args;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::config::NormalizeConfig;
 use crate::edit::EditorExt;
 use crate::shadow::{EditInfo, Shadow};
 use crate::{daemon, edit, path_resolve};
 
-/// Edit command arguments
-#[derive(Args, serde::Deserialize, schemars::JsonSchema)]
-pub struct EditArgs {
-    /// Target to edit (path like src/main.py/Foo/bar)
-    pub target: Option<String>,
-
-    /// Edit action to perform
-    #[command(subcommand)]
-    pub action: Option<EditAction>,
-
-    /// Root directory (defaults to current directory)
-    #[arg(short, long, global = true)]
-    pub root: Option<PathBuf>,
-
-    /// Dry run - show what would be changed without applying
-    #[arg(long, global = true)]
-    #[serde(default)]
-    pub dry_run: bool,
-
-    /// Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
-    #[arg(long, value_delimiter = ',', global = true)]
-    #[serde(default)]
-    pub exclude: Vec<String>,
-
-    /// Only include files matching patterns or aliases
-    #[arg(long, value_delimiter = ',', global = true)]
-    #[serde(default)]
-    pub only: Vec<String>,
-
-    /// Allow glob patterns to match multiple symbols
-    #[arg(long, global = true)]
-    #[serde(default)]
-    pub multiple: bool,
-
-    /// Message describing the edit (for shadow git history)
-    #[arg(short, long, global = true, visible_alias = "reason")]
-    pub message: Option<String>,
-
-    /// Undo the last N edits (default: 1)
-    #[arg(long, value_name = "N", num_args = 0..=1, default_missing_value = "1")]
-    pub undo: Option<usize>,
-
-    /// Redo the last undone edit
-    #[arg(long)]
-    #[serde(default)]
-    pub redo: bool,
-
-    /// Force undo even if files were modified externally
-    #[arg(long)]
-    #[serde(default)]
-    pub force: bool,
-
-    /// Jump to a specific shadow commit (restores file state from that point)
-    #[arg(long, value_name = "REF")]
-    pub goto: Option<String>,
-
-    /// Undo changes only for specific file(s) (used with --undo)
-    #[arg(long = "file", value_name = "PATH")]
-    pub undo_file: Option<String>,
-
-    /// Allow undo to cross git commit boundaries (checkpoints)
-    #[arg(long)]
-    #[serde(default)]
-    pub cross_checkpoint: bool,
-
-    /// Confirm destructive operations (delete) without prompting
-    #[arg(short = 'y', long)]
-    #[serde(default)]
-    pub yes: bool,
-
-    /// Case-insensitive symbol matching
-    #[arg(short = 'i', long)]
-    #[serde(default)]
-    pub case_insensitive: bool,
-
-    /// Apply batch edits from JSON file (or - for stdin)
-    #[arg(long, value_name = "FILE")]
-    pub batch: Option<String>,
+struct EditOutput {
+    file: String,
+    symbol: Option<String>,
+    operation: String,
+    dry_run: bool,
+    new_content: Option<String>,
 }
 
-/// Print JSON schema for the command's input arguments.
-pub fn print_input_schema() {
-    let schema = schemars::schema_for!(EditArgs);
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&schema).unwrap_or_default()
-    );
+struct UndoOutput {
+    operation: String,
+    dry_run: bool,
+    changes: Vec<UndoChange>,
 }
 
-/// Run the edit command
-pub fn run(
-    args: EditArgs,
-    format: &crate::output::OutputFormat,
-    input_schema: bool,
-    params_json: Option<&str>,
-) -> i32 {
-    let json = format.is_json();
-    if input_schema {
-        print_input_schema();
-        return 0;
-    }
-    // Override args with --params-json if provided
-    let args = match params_json {
-        Some(json_str) => match serde_json::from_str(json_str) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                eprintln!("error: invalid --params-json: {}", e);
-                return 1;
-            }
-        },
-        None => args,
-    };
-    // Handle undo/redo/goto operations
-    if args.undo.is_some() || args.redo || args.goto.is_some() {
-        cmd_undo_redo(
-            args.root.as_deref(),
-            args.undo,
-            args.redo,
-            args.goto.as_deref(),
-            args.undo_file.as_deref(),
-            args.cross_checkpoint,
-            args.dry_run,
-            args.force,
-            json,
-        )
-    } else if let Some(batch_file) = args.batch {
-        // Batch edit mode
-        cmd_batch_edit(
-            &batch_file,
-            args.root.as_deref(),
-            args.dry_run,
-            args.message.as_deref(),
-            json,
-        )
-    } else {
-        // Regular edit requires target and action
-        let target = args.target.expect("Target is required for edit operations");
-        let action = args.action.expect("Action is required for edit operations");
+struct UndoChange {
+    description: String,
+    commit: String,
+    files: Vec<String>,
+    conflicts: Vec<String>,
+}
 
-        cmd_edit(
-            &target,
-            action,
-            args.root.as_deref(),
-            args.dry_run,
-            args.yes,
-            json,
-            &args.exclude,
-            &args.only,
-            args.multiple,
-            args.message.as_deref(),
-            args.case_insensitive,
-        )
-    }
+struct BatchOutput {
+    dry_run: bool,
+    files_modified: Vec<String>,
 }
 
 /// Position for insert/move/copy operations
@@ -283,91 +153,63 @@ pub enum EditAction {
     },
 }
 
-/// Perform structural edits on a file
+/// Perform structural edits on a file.
 #[allow(clippy::too_many_arguments)]
-pub fn cmd_edit(
+fn cmd_edit(
     target: &str,
     action: EditAction,
     root: Option<&Path>,
     dry_run: bool,
     yes: bool,
-    json: bool,
     exclude: &[String],
     only: &[String],
     multiple: bool,
     message: Option<&str>,
     case_insensitive: bool,
-) -> i32 {
+) -> Result<EditOutput, String> {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Load config for shadow git setting
     let config = NormalizeConfig::load(&root);
     let shadow_enabled = config.shadow.enabled();
 
-    // Check for delete confirmation if warn_on_delete is enabled
     if matches!(action, EditAction::Delete)
         && !yes
         && !dry_run
         && config.shadow.warn_on_delete.unwrap_or(true)
     {
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "error": "Delete requires confirmation",
-                    "hint": "Use --yes or -y to confirm deletion, or set [shadow] warn_on_delete = false"
-                })
-            );
-        } else {
-            eprintln!("Delete requires confirmation. Use --yes or -y to confirm.");
-            eprintln!("To disable this warning: set [shadow] warn_on_delete = false in config");
-        }
-        return 1;
+        return Err(
+            "Delete requires confirmation. Use --yes or -y to confirm.\n\
+             To disable this warning: set [shadow] warn_on_delete = false in config"
+                .to_string(),
+        );
     }
 
-    // Ensure daemon is running if configured (will pick up edits)
     daemon::maybe_start_daemon(&root);
 
-    // Resolve the target path
-    let unified = match path_resolve::resolve_unified(target, &root) {
-        Some(u) => u,
-        None => {
-            eprintln!("No matches for: {}", target);
-            return 1;
-        }
-    };
+    let unified = path_resolve::resolve_unified(target, &root)
+        .ok_or_else(|| format!("No matches for: {}", target))?;
 
-    // We need a file path (cannot edit directories)
     if unified.is_directory {
-        eprintln!("Cannot edit a directory: {}", target);
-        return 1;
+        return Err(format!("Cannot edit a directory: {}", target));
     }
 
-    // Apply filter if specified
-    if let Some(filter) = super::build_filter(&root, exclude, only)
-        && !filter.matches(Path::new(&unified.file_path))
+    if super::build_filter(&root, exclude, only)
+        .is_some_and(|f| !f.matches(Path::new(&unified.file_path)))
     {
-        eprintln!(
+        return Err(format!(
             "Target '{}' excluded by filter (resolved to {})",
             target, unified.file_path
-        );
-        return 1;
+        ));
     }
 
     let file_path = root.join(&unified.file_path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Error reading file: {}", e);
-            return 1;
-        }
-    };
+    let content =
+        std::fs::read_to_string(&file_path).map_err(|e| format!("Error reading file: {}", e))?;
 
     let editor = edit::Editor::new();
 
-    // Handle file-level operations (prepend/append without a symbol)
     if unified.symbol_path.is_empty() {
         return handle_file_level(
             &action,
@@ -376,17 +218,14 @@ pub fn cmd_edit(
             &file_path,
             &unified.file_path,
             dry_run,
-            json,
             &root,
             shadow_enabled,
             message,
         );
     }
 
-    // Symbol-level operations
     let symbol_pattern = unified.symbol_path.join("/");
 
-    // Check if this is a glob pattern (contains *, ?, or [)
     if edit::Editor::is_glob_pattern(&symbol_pattern) {
         return handle_glob_edit(
             &symbol_pattern,
@@ -396,7 +235,6 @@ pub fn cmd_edit(
             &file_path,
             &unified.file_path,
             dry_run,
-            json,
             multiple,
             &root,
             shadow_enabled,
@@ -405,15 +243,10 @@ pub fn cmd_edit(
         );
     }
 
-    // Exact symbol match
     let symbol_name = unified.symbol_path.last().unwrap();
-    let loc = match editor.find_symbol(&file_path, &content, symbol_name, case_insensitive) {
-        Some(l) => l,
-        None => {
-            eprintln!("Symbol not found: {}", symbol_name);
-            return 1;
-        }
-    };
+    let loc = editor
+        .find_symbol(&file_path, &content, symbol_name, case_insensitive)
+        .ok_or_else(|| format!("Symbol not found: {}", symbol_name))?;
 
     let (operation, new_content) = match action {
         EditAction::Delete => (Operation::Delete, editor.delete_symbol(&content, &loc)),
@@ -426,14 +259,9 @@ pub fn cmd_edit(
         ),
 
         EditAction::Swap { ref other } => {
-            let other_loc = match editor.find_symbol(&file_path, &content, other, case_insensitive)
-            {
-                Some(l) => l,
-                None => {
-                    eprintln!("Other symbol not found: {}", other);
-                    return 1;
-                }
-            };
+            let other_loc = editor
+                .find_symbol(&file_path, &content, other, case_insensitive)
+                .ok_or_else(|| format!("Other symbol not found: {}", other))?;
             let (first_loc, second_loc) = if loc.start_byte < other_loc.start_byte {
                 (&loc, &other_loc)
             } else {
@@ -455,13 +283,9 @@ pub fn cmd_edit(
                 Position::Before => editor.insert_before(&content, &loc, insert_content),
                 Position::After => editor.insert_after(&content, &loc, insert_content),
                 Position::Prepend | Position::Append => {
-                    let body = match editor.find_container_body(&file_path, &content, symbol_name) {
-                        Some(b) => b,
-                        None => {
-                            eprintln!("Error: '{}' is not a container", symbol_name);
-                            return 1;
-                        }
-                    };
+                    let body = editor
+                        .find_container_body(&file_path, &content, symbol_name)
+                        .ok_or_else(|| format!("Error: '{}' is not a container", symbol_name))?;
                     if matches!(at, Position::Prepend) {
                         editor.prepend_to_container(&content, &body, insert_content)
                     } else {
@@ -478,8 +302,7 @@ pub fn cmd_edit(
         } => {
             let source_content = content[loc.start_byte..loc.end_byte].to_string();
             let without_source = editor.delete_symbol(&content, &loc);
-
-            match insert_single_at_destination(
+            let result = insert_single_at_destination(
                 &editor,
                 &file_path,
                 &without_source,
@@ -487,13 +310,8 @@ pub fn cmd_edit(
                 destination,
                 at,
                 case_insensitive,
-            ) {
-                Ok(result) => (Operation::Move(at), result),
-                Err(e) => {
-                    eprintln!("{}", e);
-                    return 1;
-                }
-            }
+            )?;
+            (Operation::Move(at), result)
         }
 
         EditAction::Copy {
@@ -501,8 +319,7 @@ pub fn cmd_edit(
             at,
         } => {
             let source_content = &content[loc.start_byte..loc.end_byte];
-
-            match insert_single_at_destination(
+            let result = insert_single_at_destination(
                 &editor,
                 &file_path,
                 &content,
@@ -510,22 +327,16 @@ pub fn cmd_edit(
                 destination,
                 at,
                 case_insensitive,
-            ) {
-                Ok(result) => (Operation::Copy(at), result),
-                Err(e) => {
-                    eprintln!("{}", e);
-                    return 1;
-                }
-            }
+            )?;
+            (Operation::Copy(at), result)
         }
     };
 
-    output_result(
+    apply_edit(
         dry_run,
-        json,
         &unified.file_path,
         Some(symbol_name),
-        operation,
+        &operation.to_string(),
         &new_content,
         &file_path,
         &root,
@@ -534,7 +345,7 @@ pub fn cmd_edit(
     )
 }
 
-/// Handle file-level operations (prepend/append to file without symbol target)
+/// Handle file-level operations (prepend/append to file without symbol target).
 #[allow(clippy::too_many_arguments)]
 fn handle_file_level(
     action: &EditAction,
@@ -543,11 +354,10 @@ fn handle_file_level(
     file_path: &Path,
     rel_path: &str,
     dry_run: bool,
-    json: bool,
     root: &Path,
     shadow_enabled: bool,
     message: Option<&str>,
-) -> i32 {
+) -> Result<EditOutput, String> {
     let (operation, new_content) = match action {
         EditAction::Insert {
             content: insert_content,
@@ -564,22 +374,19 @@ fn handle_file_level(
             editor.append_to_file(content, insert_content),
         ),
         _ => {
-            eprintln!(
-                "Error: This operation requires a symbol target. Use a path like 'src/foo.py/MyClass'"
+            return Err(
+                "This operation requires a symbol target. Use a path like 'src/foo.py/MyClass'\n\
+                 Hint: Only 'insert --at prepend' and 'insert --at append' work on files directly"
+                    .to_string(),
             );
-            eprintln!(
-                "Hint: Only 'insert --at prepend' and 'insert --at append' work on files directly"
-            );
-            return 1;
         }
     };
 
-    output_result(
+    apply_edit(
         dry_run,
-        json,
         rel_path,
         None,
-        operation,
+        &operation.to_string(),
         &new_content,
         file_path,
         root,
@@ -588,44 +395,30 @@ fn handle_file_level(
     )
 }
 
-/// Output result (dry-run or actual write)
+/// Apply an edit (or return a dry-run preview) and return structured output.
+/// Does not print anything — callers are responsible for display.
 #[allow(clippy::too_many_arguments)]
-fn output_result(
+fn apply_edit(
     dry_run: bool,
-    json: bool,
     rel_path: &str,
     symbol: Option<&str>,
-    operation: Operation,
+    operation_name: &str,
     new_content: &str,
     file_path: &Path,
     root: &Path,
     shadow_enabled: bool,
     message: Option<&str>,
-) -> i32 {
+) -> Result<EditOutput, String> {
     if dry_run {
-        if json {
-            let mut obj = serde_json::json!({
-                "dry_run": true,
-                "file": rel_path,
-                "operation": operation.to_string(),
-                "new_content": new_content
-            });
-            if let Some(s) = symbol {
-                obj["symbol"] = serde_json::json!(s);
-            }
-            println!("{}", obj);
-        } else {
-            if let Some(s) = symbol {
-                println!("--- Dry run: {} on {} ---", operation, s);
-            } else {
-                println!("--- Dry run: {} ---", rel_path);
-            }
-            println!("{}", new_content);
-        }
-        return 0;
+        return Ok(EditOutput {
+            file: rel_path.to_string(),
+            symbol: symbol.map(|s| s.to_string()),
+            operation: operation_name.to_string(),
+            dry_run: true,
+            new_content: Some(new_content.to_string()),
+        });
     }
 
-    // Shadow git: capture before state
     let shadow = if shadow_enabled {
         let s = Shadow::new(root);
         if let Err(e) = s.before_edit(&[file_path]) {
@@ -636,19 +429,15 @@ fn output_result(
         None
     };
 
-    if let Err(e) = std::fs::write(file_path, new_content) {
-        eprintln!("Error writing file: {}", e);
-        return 1;
-    }
+    std::fs::write(file_path, new_content).map_err(|e| format!("Error writing file: {}", e))?;
 
-    // Shadow git: capture after state and commit
     if let Some(ref s) = shadow {
         let target = match symbol {
             Some(sym) => format!("{}/{}", rel_path, sym),
             None => rel_path.to_string(),
         };
         let info = EditInfo {
-            operation: operation.to_string(),
+            operation: operation_name.to_string(),
             target,
             files: vec![file_path.to_path_buf()],
             message: message.map(String::from),
@@ -659,23 +448,13 @@ fn output_result(
         }
     }
 
-    if json {
-        let mut obj = serde_json::json!({
-            "success": true,
-            "file": rel_path,
-            "operation": operation.to_string()
-        });
-        if let Some(s) = symbol {
-            obj["symbol"] = serde_json::json!(s);
-        }
-        println!("{}", obj);
-    } else if let Some(s) = symbol {
-        println!("{}: {} in {}", operation, s, rel_path);
-    } else {
-        println!("{}: {}", operation, rel_path);
-    }
-
-    0
+    Ok(EditOutput {
+        file: rel_path.to_string(),
+        symbol: symbol.map(|s| s.to_string()),
+        operation: operation_name.to_string(),
+        dry_run: false,
+        new_content: None,
+    })
 }
 
 /// Insert content at a destination symbol or container.
@@ -793,40 +572,35 @@ fn handle_glob_edit(
     action: EditAction,
     editor: &edit::Editor,
     content: &str,
-    file_path: &std::path::PathBuf,
+    file_path: &Path,
     rel_path: &str,
     dry_run: bool,
-    json: bool,
     multiple: bool,
     root: &Path,
     shadow_enabled: bool,
     message: Option<&str>,
     case_insensitive: bool,
-) -> i32 {
+) -> Result<EditOutput, String> {
     let matches = editor.find_symbols_matching(file_path, content, pattern);
 
     if matches.is_empty() {
-        eprintln!("No symbols match pattern: {}", pattern);
-        return 1;
+        return Err(format!("No symbols match pattern: {}", pattern));
     }
 
     let count = matches.len();
 
-    // Require --multiple flag when matching more than one symbol
     if count > 1 && !multiple {
-        eprintln!(
-            "Error: Pattern '{}' matches {} symbols. Use --multiple to confirm.",
-            pattern, count
-        );
-        for m in &matches {
-            eprintln!("  - {} ({})", m.name, m.kind);
-        }
-        return 1;
+        let names: Vec<&str> = matches.iter().map(|m| m.name.as_str()).collect();
+        return Err(format!(
+            "Pattern '{}' matches {} symbols. Use --multiple to confirm.\nMatched: {}",
+            pattern,
+            count,
+            names.join(", ")
+        ));
     }
-    let names: Vec<&str> = matches.iter().map(|m| m.name.as_str()).collect();
+    let names: Vec<String> = matches.iter().map(|m| m.name.clone()).collect();
 
-    // Matches are sorted in reverse order (highest byte offset first)
-    // This ensures we can apply changes from end to start without offset shifts
+    // Matches are sorted in reverse order (highest byte offset first) for safe deletion
     let (operation, new_content) = match action {
         EditAction::Delete => {
             let mut result = content.to_string();
@@ -856,19 +630,13 @@ fn handle_glob_edit(
                     Position::Before => editor.insert_before(&result, loc, insert_content),
                     Position::After => editor.insert_after(&result, loc, insert_content),
                     Position::Prepend | Position::Append => {
-                        // For prepend/append, each match must be a container
-                        match editor.find_container_body(file_path, &result, &loc.name) {
-                            Some(body) => {
-                                if matches!(at, Position::Prepend) {
-                                    editor.prepend_to_container(&result, &body, insert_content)
-                                } else {
-                                    editor.append_to_container(&result, &body, insert_content)
-                                }
-                            }
-                            None => {
-                                eprintln!("Error: '{}' is not a container", loc.name);
-                                return 1;
-                            }
+                        let body = editor
+                            .find_container_body(file_path, &result, &loc.name)
+                            .ok_or_else(|| format!("'{}' is not a container", loc.name))?;
+                        if matches!(at, Position::Prepend) {
+                            editor.prepend_to_container(&result, &body, insert_content)
+                        } else {
+                            editor.append_to_container(&result, &body, insert_content)
                         }
                     }
                 };
@@ -880,13 +648,11 @@ fn handle_glob_edit(
             ref destination,
             at,
         } => {
-            // Delete all sources first (matches in reverse byte order for safe deletion)
             let mut result = content.to_string();
             for loc in &matches {
                 result = editor.delete_symbol(&result, loc);
             }
-
-            match insert_at_destination(
+            let new_content = insert_at_destination(
                 editor,
                 file_path,
                 &result,
@@ -895,129 +661,51 @@ fn handle_glob_edit(
                 destination,
                 at,
                 case_insensitive,
-            ) {
-                Ok(new_content) => (position_op_name("move", at), new_content),
-                Err(e) => {
-                    eprintln!("{}", e);
-                    return 1;
-                }
-            }
+            )?;
+            (position_op_name("move", at), new_content)
         }
 
         EditAction::Copy {
             ref destination,
             at,
-        } => match insert_at_destination(
-            editor,
-            file_path,
-            content,
-            content,
-            &matches,
-            destination,
-            at,
-            case_insensitive,
-        ) {
-            Ok(new_content) => (position_op_name("copy", at), new_content),
-            Err(e) => {
-                eprintln!("{}", e);
-                return 1;
-            }
-        },
+        } => {
+            let new_content = insert_at_destination(
+                editor,
+                file_path,
+                content,
+                content,
+                &matches,
+                destination,
+                at,
+                case_insensitive,
+            )?;
+            (position_op_name("copy", at), new_content)
+        }
 
         EditAction::Swap { .. } => {
-            eprintln!("Error: 'swap' is not supported with glob patterns (ambiguous pairing)");
-            eprintln!("Matched {} symbols: {}", count, names.join(", "));
-            return 1;
+            return Err(format!(
+                "'swap' is not supported with glob patterns (ambiguous pairing). Matched: {}",
+                names.join(", ")
+            ));
         }
     };
 
-    if dry_run {
-        if json {
-            let obj = serde_json::json!({
-                "dry_run": true,
-                "file": rel_path,
-                "operation": operation,
-                "pattern": pattern,
-                "matched_count": count,
-                "matched_symbols": names,
-                "new_content": new_content
-            });
-            println!("{}", obj);
-        } else {
-            println!(
-                "--- Dry run: {} {} symbols matching '{}' ---",
-                operation, count, pattern
-            );
-            for m in &matches {
-                println!("  - {} ({})", m.name, m.kind);
-            }
-            println!("{}", new_content);
-        }
-        return 0;
-    }
-
-    // Shadow git: capture before state
-    let shadow = if shadow_enabled {
-        let s = Shadow::new(root);
-        if let Err(e) = s.before_edit(&[file_path.as_path()]) {
-            eprintln!("warning: shadow git: {}", e);
-        }
-        Some(s)
-    } else {
-        None
-    };
-
-    if let Err(e) = std::fs::write(file_path, &new_content) {
-        eprintln!("Error writing file: {}", e);
-        return 1;
-    }
-
-    // Shadow git: capture after state and commit
-    if let Some(ref s) = shadow {
-        let target = format!("{}/{}", rel_path, pattern);
-        let info = EditInfo {
-            operation: operation.to_string(),
-            target,
-            files: vec![file_path.clone()],
-            message: message.map(String::from),
-            workflow: None,
-        };
-        if let Err(e) = s.after_edit(&info) {
-            eprintln!("warning: shadow git: {}", e);
-        }
-    }
-
-    if json {
-        let obj = serde_json::json!({
-            "success": true,
-            "file": rel_path,
-            "operation": operation,
-            "pattern": pattern,
-            "count": count,
-            "symbols": names
-        });
-        println!("{}", obj);
-    } else {
-        println!(
-            "{} {} symbols matching '{}':",
-            if operation == "delete" {
-                "Deleted"
-            } else {
-                "Replaced"
-            },
-            count,
-            pattern
-        );
-        for m in &matches {
-            println!("  - {} ({})", m.name, m.kind);
-        }
-    }
-    0
+    apply_edit(
+        dry_run,
+        rel_path,
+        Some(pattern),
+        operation,
+        &new_content,
+        file_path,
+        root,
+        shadow_enabled,
+        message,
+    )
 }
 
 /// Handle undo/redo/goto operations on shadow git history.
 #[allow(clippy::too_many_arguments)]
-pub fn cmd_undo_redo(
+fn cmd_undo_redo(
     root: Option<&Path>,
     undo: Option<usize>,
     redo: bool,
@@ -1026,8 +714,7 @@ pub fn cmd_undo_redo(
     cross_checkpoint: bool,
     dry_run: bool,
     force: bool,
-    json: bool,
-) -> i32 {
+) -> Result<UndoOutput, String> {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -1035,223 +722,106 @@ pub fn cmd_undo_redo(
     let shadow = Shadow::new(&root);
 
     if !shadow.exists() {
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "error": "No shadow history exists"
-                })
-            );
-        } else {
-            eprintln!("No shadow history exists. Make an edit first with `normalize edit`.");
-        }
-        return 1;
+        return Err(
+            "No shadow history exists. Make an edit first with `normalize edit`.".to_string(),
+        );
     }
 
-    // Handle goto first (takes precedence)
     if let Some(ref_str) = goto {
-        match shadow.goto(ref_str, dry_run, force) {
-            Ok(result) => {
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "operation": if dry_run { "goto_preview" } else { "goto" },
-                            "target": ref_str,
-                            "description": result.description,
-                            "files": result.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
-                            "commit": result.undone_commit
-                        })
-                    );
-                } else {
-                    if dry_run {
-                        println!("Would restore state from: {}", result.description);
-                    } else {
-                        println!("Restored state from: {}", result.description);
-                    }
-                    for file in &result.files {
-                        println!("  {}", file.display());
-                    }
-                }
-                return 0;
-            }
-            Err(e) => {
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "error": e.to_string()
-                        })
-                    );
-                } else {
-                    eprintln!("{}", e);
-                }
-                return 1;
-            }
-        }
+        let result = shadow
+            .goto(ref_str, dry_run, force)
+            .map_err(|e| e.to_string())?;
+        return Ok(UndoOutput {
+            operation: if dry_run {
+                "goto_preview".to_string()
+            } else {
+                "goto".to_string()
+            },
+            dry_run,
+            changes: vec![UndoChange {
+                description: result.description,
+                commit: result.undone_commit,
+                files: result
+                    .files
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect(),
+                conflicts: vec![],
+            }],
+        });
     }
 
     if redo {
-        match shadow.redo() {
-            Ok(result) => {
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "operation": "redo",
-                            "description": result.description,
-                            "files": result.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
-                            "commit": result.undone_commit
-                        })
-                    );
-                } else {
-                    println!("Redone: {}", result.description);
-                    for file in &result.files {
-                        println!("  {}", file.display());
-                    }
-                }
-                0
-            }
-            Err(e) => {
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "error": e.to_string()
-                        })
-                    );
-                } else {
-                    eprintln!("{}", e);
-                }
-                1
-            }
-        }
-    } else if let Some(count) = undo {
-        let count = if count == 0 { 1 } else { count };
-        match shadow.undo(count, file_filter, cross_checkpoint, dry_run, force) {
-            Ok(results) => {
-                // Collect all conflicts across results
-                let all_conflicts: Vec<_> =
-                    results.iter().flat_map(|r| r.conflicts.clone()).collect();
-
-                if json {
-                    let items: Vec<_> = results
-                        .iter()
-                        .map(|r| {
-                            let mut obj = serde_json::json!({
-                                "description": r.description,
-                                "files": r.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
-                                "commit": r.undone_commit
-                            });
-                            if !r.conflicts.is_empty() {
-                                obj["conflicts"] = serde_json::json!(r.conflicts);
-                            }
-                            obj
-                        })
-                        .collect();
-                    let mut output = serde_json::json!({
-                        "operation": if dry_run { "undo_preview" } else { "undo" },
-                        "count": results.len(),
-                        "undone": items
-                    });
-                    if !all_conflicts.is_empty() {
-                        output["has_conflicts"] = serde_json::json!(true);
-                    }
-                    println!("{}", output);
-                } else {
-                    if dry_run {
-                        println!(
-                            "Would undo {} edit{}:",
-                            results.len(),
-                            if results.len() == 1 { "" } else { "s" }
-                        );
-                    } else {
-                        println!(
-                            "Undone {} edit{}:",
-                            results.len(),
-                            if results.len() == 1 { "" } else { "s" }
-                        );
-                    }
-                    for result in &results {
-                        println!("  {} ({})", result.description, result.undone_commit);
-                        for file in &result.files {
-                            println!("    {}", file.display());
-                        }
-                        if !result.conflicts.is_empty() {
-                            println!("    ⚠ Conflicts (modified externally):");
-                            for conflict in &result.conflicts {
-                                println!("      {}", conflict);
-                            }
-                        }
-                    }
-                    if !all_conflicts.is_empty() && dry_run {
-                        println!(
-                            "\n⚠ Warning: {} file(s) modified externally. Use --force to override.",
-                            all_conflicts.len()
-                        );
-                    }
-                }
-                0
-            }
-            Err(e) => {
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "error": e.to_string()
-                        })
-                    );
-                } else {
-                    eprintln!("{}", e);
-                }
-                1
-            }
-        }
-    } else {
-        eprintln!("No undo or redo operation specified");
-        1
+        let result = shadow.redo().map_err(|e| e.to_string())?;
+        return Ok(UndoOutput {
+            operation: "redo".to_string(),
+            dry_run: false,
+            changes: vec![UndoChange {
+                description: result.description,
+                commit: result.undone_commit,
+                files: result
+                    .files
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect(),
+                conflicts: vec![],
+            }],
+        });
     }
+
+    if let Some(count) = undo {
+        let count = if count == 0 { 1 } else { count };
+        let results = shadow
+            .undo(count, file_filter, cross_checkpoint, dry_run, force)
+            .map_err(|e| e.to_string())?;
+        let changes = results
+            .into_iter()
+            .map(|r| UndoChange {
+                description: r.description,
+                commit: r.undone_commit,
+                files: r.files.iter().map(|p| p.display().to_string()).collect(),
+                conflicts: r.conflicts,
+            })
+            .collect();
+        return Ok(UndoOutput {
+            operation: if dry_run {
+                "undo_preview".to_string()
+            } else {
+                "undo".to_string()
+            },
+            dry_run,
+            changes,
+        });
+    }
+
+    Err("No undo or redo operation specified".to_string())
 }
 
 /// Apply batch edits from a JSON file
-pub fn cmd_batch_edit(
+fn cmd_batch_edit(
     batch_file: &str,
     root: Option<&Path>,
     dry_run: bool,
     message: Option<&str>,
-    json: bool,
-) -> i32 {
+) -> Result<BatchOutput, String> {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Read JSON from file or stdin
     let json_content = if batch_file == "-" {
         use std::io::Read;
         let mut buf = String::new();
-        if std::io::stdin().read_to_string(&mut buf).is_err() {
-            eprintln!("Failed to read from stdin");
-            return 1;
-        }
+        std::io::stdin()
+            .read_to_string(&mut buf)
+            .map_err(|_| "Failed to read from stdin".to_string())?;
         buf
     } else {
-        match std::fs::read_to_string(batch_file) {
-            Ok(content) => content,
-            Err(e) => {
-                eprintln!("Failed to read {}: {}", batch_file, e);
-                return 1;
-            }
-        }
+        std::fs::read_to_string(batch_file)
+            .map_err(|e| format!("Failed to read {}: {}", batch_file, e))?
     };
 
-    // Parse batch edits
-    let batch = match edit::BatchEdit::from_json(&json_content) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("Failed to parse batch edits: {}", e);
-            return 1;
-        }
-    };
+    let batch = edit::BatchEdit::from_json(&json_content)
+        .map_err(|e| format!("Failed to parse batch edits: {}", e))?;
 
     let batch = if let Some(msg) = message {
         batch.with_message(msg)
@@ -1260,163 +830,155 @@ pub fn cmd_batch_edit(
     };
 
     if dry_run {
-        // For dry run, preview edits and show diff
-        match batch.preview(&root) {
-            Ok(preview) => {
-                if json {
-                    let files: Vec<_> = preview
-                        .files
-                        .iter()
-                        .map(|f| {
-                            serde_json::json!({
-                                "path": f.path.display().to_string(),
-                                "edits": f.edit_count,
-                                "original": f.original,
-                                "modified": f.modified,
-                            })
-                        })
-                        .collect();
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "dry_run": true,
-                            "total_edits": preview.total_edits,
-                            "files": files,
-                        })
-                    );
-                } else {
-                    println!(
-                        "Dry run: {} edit(s) across {} file(s)\n",
-                        preview.total_edits,
-                        preview.files.len()
-                    );
-                    for file in &preview.files {
-                        println!("--- {}", file.path.display());
-                        println!(
-                            "+++ {} (after {} edit(s))",
-                            file.path.display(),
-                            file.edit_count
-                        );
-                        // Simple diff: show unified diff using similar crate or manual
-                        for (i, (old, new)) in
-                            file.original.lines().zip(file.modified.lines()).enumerate()
-                        {
-                            if old != new {
-                                println!("@@ -{} +{} @@", i + 1, i + 1);
-                                println!("-{}", old);
-                                println!("+{}", new);
-                            }
-                        }
-                        // Handle length differences
-                        let orig_lines: Vec<_> = file.original.lines().collect();
-                        let mod_lines: Vec<_> = file.modified.lines().collect();
-                        if mod_lines.len() > orig_lines.len() {
-                            println!("@@ -{} +{} @@", orig_lines.len() + 1, orig_lines.len() + 1);
-                            for line in &mod_lines[orig_lines.len()..] {
-                                println!("+{}", line);
-                            }
-                        } else if orig_lines.len() > mod_lines.len() {
-                            println!("@@ -{} +{} @@", mod_lines.len() + 1, mod_lines.len() + 1);
-                            for line in &orig_lines[mod_lines.len()..] {
-                                println!("-{}", line);
-                            }
-                        }
-                        println!();
-                    }
-                }
-                return 0;
-            }
-            Err(e) => {
-                eprintln!("Dry run failed: {}", e);
-                return 1;
-            }
+        let preview = batch
+            .preview(&root)
+            .map_err(|e| format!("Dry run failed: {}", e))?;
+        let files_modified = preview
+            .files
+            .iter()
+            .map(|f| f.path.display().to_string())
+            .collect();
+        return Ok(BatchOutput {
+            dry_run: true,
+            files_modified,
+        });
+    }
+
+    let result = batch
+        .apply(&root)
+        .map_err(|e| format!("Batch edit failed: {}", e))?;
+
+    let config = NormalizeConfig::load(&root);
+    if config.shadow.enabled() {
+        let shadow = Shadow::new(&root);
+        if shadow.exists() {
+            let file_refs: Vec<&Path> = result.files_modified.iter().map(|p| p.as_path()).collect();
+            let _ = shadow.before_edit(&file_refs);
+            let edit_info = EditInfo {
+                operation: "batch".to_string(),
+                target: format!("{} files", result.files_modified.len()),
+                files: result.files_modified.clone(),
+                message: message.map(|s| s.to_string()),
+                workflow: None,
+            };
+            let _ = shadow.after_edit(&edit_info);
         }
     }
 
-    // Apply the batch
-    match batch.apply(&root) {
-        Ok(result) => {
-            // Create shadow snapshot for batch edit
-            let config = NormalizeConfig::load(&root);
-            if config.shadow.enabled() {
-                let shadow = Shadow::new(&root);
-                if shadow.exists() {
-                    // Convert PathBufs to Path refs for before_edit
-                    let file_refs: Vec<&Path> =
-                        result.files_modified.iter().map(|p| p.as_path()).collect();
-                    let _ = shadow.before_edit(&file_refs);
-
-                    let edit_info = EditInfo {
-                        operation: "batch".to_string(),
-                        target: format!("{} files", result.files_modified.len()),
-                        files: result.files_modified.clone(),
-                        message: message.map(|s| s.to_string()),
-                        workflow: None,
-                    };
-                    let _ = shadow.after_edit(&edit_info);
-                }
-            }
-
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "success": true,
-                        "files_modified": result.files_modified.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>(),
-                        "edits_applied": result.edits_applied
-                    })
-                );
-            } else {
-                println!(
-                    "Applied {} edit(s) to {} file(s)",
-                    result.edits_applied,
-                    result.files_modified.len()
-                );
-            }
-            0
-        }
-        Err(e) => {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "error": e
-                    })
-                );
-            } else {
-                eprintln!("Batch edit failed: {}", e);
-            }
-            1
-        }
-    }
+    Ok(BatchOutput {
+        dry_run: false,
+        files_modified: result
+            .files_modified
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect(),
+    })
 }
 
 // ── Service-callable functions ────────────────────────────────────────
 
-/// Structured result for edit operations.
+/// A single undo/redo/goto change entry, for JSON output.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct EditChange {
+    pub description: String,
+    pub commit: String,
+    pub files: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub conflicts: Vec<String>,
+}
+
+/// Structured result for all edit operations (delete, replace, undo, batch, etc.).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct EditResult {
     pub success: bool,
     pub operation: String,
+    /// Relative path of the edited file (structural edits).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub target: Option<String>,
+    pub file: Option<String>,
+    /// Symbol that was edited (structural edits).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
+    pub symbol: Option<String>,
+    /// Whether this was a dry run (no files changed).
+    pub dry_run: bool,
+    /// New file content, present only on dry-run structural edits.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_content: Option<String>,
+    /// Undo/redo/goto changes.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub changes: Vec<EditChange>,
+    /// Files modified (batch edits).
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub files: Vec<String>,
 }
 
 impl std::fmt::Display for EditResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(ref msg) = self.message {
-            write!(f, "{}", msg)
-        } else if self.success {
-            write!(f, "{} completed", self.operation)
-        } else {
-            write!(f, "{} failed", self.operation)
+        if self.dry_run {
+            if let Some(ref content) = self.new_content {
+                if let Some(ref sym) = self.symbol {
+                    writeln!(f, "--- Dry run: {} on {} ---", self.operation, sym)?;
+                } else if let Some(ref file) = self.file {
+                    writeln!(f, "--- Dry run: {} on {} ---", self.operation, file)?;
+                }
+                write!(f, "{}", content)?;
+                return Ok(());
+            }
+            // undo/goto dry run
+            for change in &self.changes {
+                writeln!(
+                    f,
+                    "Would {}: {} ({})",
+                    self.operation, change.description, change.commit
+                )?;
+                for file in &change.files {
+                    writeln!(f, "  {}", file)?;
+                }
+            }
+            return Ok(());
+        }
+        // Actual edit
+        if !self.changes.is_empty() {
+            // undo/redo/goto
+            let verb = match self.operation.as_str() {
+                "redo" => "Redone",
+                "goto" | "goto_preview" => "Restored",
+                _ => "Undone",
+            };
+            writeln!(
+                f,
+                "{} {} edit{}:",
+                verb,
+                self.changes.len(),
+                if self.changes.len() == 1 { "" } else { "s" }
+            )?;
+            for change in &self.changes {
+                writeln!(f, "  {} ({})", change.description, change.commit)?;
+                for file in &change.files {
+                    writeln!(f, "    {}", file)?;
+                }
+                if !change.conflicts.is_empty() {
+                    writeln!(f, "    Conflicts (modified externally):")?;
+                    for conflict in &change.conflicts {
+                        writeln!(f, "      {}", conflict)?;
+                    }
+                }
+            }
+            return Ok(());
+        }
+        if !self.files.is_empty() {
+            // batch
+            return write!(f, "Applied edits to {} file(s)", self.files.len());
+        }
+        // structural edit
+        match (&self.symbol, &self.file) {
+            (Some(sym), Some(file)) => write!(f, "{}: {} in {}", self.operation, sym, file),
+            (None, Some(file)) => write!(f, "{}: {}", self.operation, file),
+            _ => write!(f, "{} completed", self.operation),
         }
     }
 }
 
-/// Service-callable: perform an edit operation.
+/// Service-callable: perform a structural edit operation.
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_edit_service(
     target: &str,
@@ -1431,41 +993,28 @@ pub fn cmd_edit_service(
     case_insensitive: bool,
 ) -> Result<EditResult, String> {
     let root_path = root.map(Path::new);
-    let op_name = match &action {
-        EditAction::Delete => "delete",
-        EditAction::Replace { .. } => "replace",
-        EditAction::Swap { .. } => "swap",
-        EditAction::Insert { .. } => "insert",
-        EditAction::Move { .. } => "move",
-        EditAction::Copy { .. } => "copy",
-    };
-    let code = cmd_edit(
+    cmd_edit(
         target,
         action,
         root_path,
         dry_run,
         yes,
-        false,
         exclude,
         only,
         multiple,
         message,
         case_insensitive,
-    );
-    if code == 0 {
-        Ok(EditResult {
-            success: true,
-            operation: op_name.to_string(),
-            target: Some(target.to_string()),
-            message: if dry_run {
-                Some(format!("Dry run: {} on {}", op_name, target))
-            } else {
-                None
-            },
-        })
-    } else {
-        Err(format!("{} failed on {}", op_name, target))
-    }
+    )
+    .map(|out| EditResult {
+        success: true,
+        operation: out.operation,
+        file: Some(out.file),
+        symbol: out.symbol,
+        dry_run: out.dry_run,
+        new_content: out.new_content,
+        changes: vec![],
+        files: vec![],
+    })
 }
 
 /// Service-callable: undo/redo/goto.
@@ -1481,14 +1030,7 @@ pub fn cmd_undo_redo_service(
     force: bool,
 ) -> Result<EditResult, String> {
     let root_path = root.map(Path::new);
-    let op = if goto.is_some() {
-        "goto"
-    } else if redo {
-        "redo"
-    } else {
-        "undo"
-    };
-    let code = cmd_undo_redo(
+    cmd_undo_redo(
         root_path,
         undo,
         redo,
@@ -1497,18 +1039,26 @@ pub fn cmd_undo_redo_service(
         cross_checkpoint,
         dry_run,
         force,
-        false,
-    );
-    if code == 0 {
-        Ok(EditResult {
-            success: true,
-            operation: op.to_string(),
-            target: goto.map(|s| s.to_string()),
-            message: None,
-        })
-    } else {
-        Err(format!("{} failed", op))
-    }
+    )
+    .map(|out| EditResult {
+        success: true,
+        operation: out.operation,
+        file: None,
+        symbol: None,
+        dry_run: out.dry_run,
+        new_content: None,
+        changes: out
+            .changes
+            .into_iter()
+            .map(|c| EditChange {
+                description: c.description,
+                commit: c.commit,
+                files: c.files,
+                conflicts: c.conflicts,
+            })
+            .collect(),
+        files: vec![],
+    })
 }
 
 /// Service-callable: batch edit.
@@ -1519,19 +1069,14 @@ pub fn cmd_batch_edit_service(
     message: Option<&str>,
 ) -> Result<EditResult, String> {
     let root_path = root.map(Path::new);
-    let code = cmd_batch_edit(batch_file, root_path, dry_run, message, false);
-    if code == 0 {
-        Ok(EditResult {
-            success: true,
-            operation: "batch".to_string(),
-            target: Some(batch_file.to_string()),
-            message: if dry_run {
-                Some("Dry run complete".to_string())
-            } else {
-                None
-            },
-        })
-    } else {
-        Err("Batch edit failed".to_string())
-    }
+    cmd_batch_edit(batch_file, root_path, dry_run, message).map(|out| EditResult {
+        success: true,
+        operation: "batch".to_string(),
+        file: None,
+        symbol: None,
+        dry_run: out.dry_run,
+        new_content: None,
+        changes: vec![],
+        files: out.files_modified,
+    })
 }

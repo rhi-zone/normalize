@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 362
 expression: "snapshot_help(&[\"analyze\", \"test-gaps\"])"
 ---
 Find public functions with no direct test caller
@@ -13,12 +14,12 @@ Options:
       --all                 Show all functions (including tested), sorted by test calls ascending
       --min-risk <N>        Only show functions above this risk threshold
   -l, --limit <LIMIT>       Maximum number of functions to show (0 = no limit) [default: 20]
+      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --sarif               Output in SARIF format for IDE integration
       --allow <SYMBOL>      Add function to .normalize/test-gaps-allow
-      --reason <REASON>     Reason for allowing
-      --repos <DIR>         Run command across all git repos under DIR (1 level deep)
       --json                Output as JSON
       --jsonl               Output as JSON Lines (one object per line)
+      --reason <REASON>     Reason for allowing
       --jq <EXPR>           Filter JSON output with jq expression (implies --json)
       --pretty              Human-friendly output with colors and formatting
       --compact             Compact output without colors (overrides TTY detection)

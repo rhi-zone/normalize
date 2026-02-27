@@ -153,15 +153,14 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 - [x] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method
 - [x] Remove legacy `text-search` command (fully replaced by `grep`)
 - [x] Migrate `aliases`, `context`, `init` to server-less (Phase 3)
-- [ ] Migrate remaining commands, deleting `cmd_*` functions and manual Args structs
+- [x] Migrate remaining commands, deleting `cmd_*` functions and manual Args structs
   - Done: `update`, `translate`, `daemon`, `grammars`, `generate` (Batch 1)
   - Done: `facts`, `rules`, `package` (Batch 2)
-  - Done: `history`, `sessions`, `tools`, `edit` (Batch 3 — partial)
-  - Tech debt: `edit` service wraps legacy `cmd_edit` (exit-code based, prints directly). Needs refactor to return structured `EditResult` with actual edit details.
+  - Done: `history`, `sessions`, `tools`, `edit` (Batch 3)
   - Deferred: `view` — `cmd_view` has 19 params, prints directly via 10+ code paths. Needs refactor: extract `build_view()` → `ViewOutput` for each mode.
   - Deferred: `analyze` — 29 subcommands, deep config/allowlist/filter integration. Many subcommands already return `OutputFormatter` types; extract `build_*` functions and wire to `AnalyzeService`.
   - Deferred: `serve` — long-running servers (MCP, HTTP, LSP), no structured return type
-- [ ] Final cleanup (after all commands migrated): delete `Commands` enum, `Cli` struct, `HELP_STYLES`, `help_color_choice()`, legacy Args structs, `run()`/`cmd_*()` wrappers for migrated commands, remove clap from normalize crate deps
+- [ ] Final cleanup (after view/analyze migrated): delete `Commands` enum, `Cli` struct, `HELP_STYLES`, `help_color_choice()`, remove clap from normalize crate deps. `Commands` now has only 3 entries (View, Analyze, Serve).
 - [ ] Centralize multi-repo dispatch logic (currently hardcoded in main.rs for specific analyze subcommands)
 - [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
 

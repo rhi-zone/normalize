@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 317
 expression: "snapshot_help(&[\"analyze\", \"duplicate-functions\"])"
 ---
 Detect duplicate functions (code clones)
@@ -11,13 +12,13 @@ Options:
       --elide-literals         Elide literal values when comparing
       --show-source            Show source code for detected duplicates
       --min-lines <MIN_LINES>  Minimum lines for a function to be considered [default: 1]
-      --include-trait-impls    Include groups where all functions share the same name (likely trait implementations). By default these are suppressed as intentionally parallel, not copy-paste
-      --allow <LOCATION>       Allow a duplicate function group (add to .normalize/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
-      --reason <REASON>        Reason for allowing
       --repos <DIR>            Run command across all git repos under DIR (1 level deep)
+      --include-trait-impls    Include groups where all functions share the same name (likely trait implementations). By default these are suppressed as intentionally parallel, not copy-paste
       --json                   Output as JSON
+      --allow <LOCATION>       Allow a duplicate function group (add to .normalize/duplicate-functions-allow) Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
       --jsonl                  Output as JSON Lines (one object per line)
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+      --reason <REASON>        Reason for allowing
       --pretty                 Human-friendly output with colors and formatting
       --compact                Compact output without colors (overrides TTY detection)
       --output-schema          Output JSON schema for the command's return type

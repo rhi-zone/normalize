@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 327
 expression: "snapshot_help(&[\"analyze\", \"duplicate-blocks\"])"
 ---
 Detect duplicate code blocks (subtree-level clone detection)
@@ -11,13 +12,13 @@ Options:
       --elide-literals         
       --show-source            
       --min-lines <MIN_LINES>  Minimum lines for a block to be considered [default: 5] [default: 5]
-      --skip-functions         Skip function/method nodes (avoid overlap with duplicate-functions)
-      --allow <LOCATION>       Allow a duplicate block group (add to .normalize/duplicate-blocks-allow) Accepts file:func:start-end or file:start-end
-      --reason <REASON>        Reason for allowing
       --repos <DIR>            Run command across all git repos under DIR (1 level deep)
       --json                   Output as JSON
+      --skip-functions         Skip function/method nodes (avoid overlap with duplicate-functions)
+      --allow <LOCATION>       Allow a duplicate block group (add to .normalize/duplicate-blocks-allow) Accepts file:func:start-end or file:start-end
       --jsonl                  Output as JSON Lines (one object per line)
       --jq <EXPR>              Filter JSON output with jq expression (implies --json)
+      --reason <REASON>        Reason for allowing
       --pretty                 Human-friendly output with colors and formatting
       --compact                Compact output without colors (overrides TTY detection)
       --output-schema          Output JSON schema for the command's return type
