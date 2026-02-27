@@ -718,6 +718,7 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Scan across all git repos under DIR (1 level deep)")] repos: Option<String>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
@@ -725,13 +726,18 @@ impl AnalyzeService {
     ) -> Result<DuplicateFunctionsReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
+        let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+            discover_repos(&repos_dir)?
+        } else {
+            vec![root_path.clone()]
+        };
         let filter = Self::build_filter(&root_path, &exclude, &only);
         let dummy_format = crate::output::OutputFormat::default();
         Ok(
             crate::commands::analyze::duplicates::build_duplicate_functions_report(
                 DuplicateFunctionsConfig {
-                    roots: std::slice::from_ref(&root_path),
-                    elide_identifiers, // true by default in existing CLI; server-less bool flags default false
+                    roots: &roots,
+                    elide_identifiers,
                     elide_literals,
                     show_source,
                     min_lines: min_lines.unwrap_or(1),
@@ -799,6 +805,7 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Scan across all git repos under DIR (1 level deep)")] repos: Option<String>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
@@ -806,15 +813,20 @@ impl AnalyzeService {
     ) -> Result<SimilarFunctionsReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
+        let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+            discover_repos(&repos_dir)?
+        } else {
+            vec![root_path.clone()]
+        };
         let filter = Self::build_filter(&root_path, &exclude, &only);
         let dummy_format = crate::output::OutputFormat::default();
         Ok(
             crate::commands::analyze::duplicates::build_similar_functions_report(
                 SimilarFunctionsConfig {
-                    roots: std::slice::from_ref(&root_path),
+                    roots: &roots,
                     min_lines: min_lines.unwrap_or(10),
                     similarity: similarity.unwrap_or(0.85),
-                    elide_identifiers, // true by default in existing CLI; server-less bool flags default false
+                    elide_identifiers,
                     elide_literals,
                     skeleton,
                     show_source,

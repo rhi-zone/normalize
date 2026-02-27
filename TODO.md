@@ -31,11 +31,11 @@ Current `analyze hotspots` is file-level churn only (`commits × √churn`). Enh
 Analyze across multiple repositories — activity trends, shared patterns, inter-repo dependencies. Operates on a directory of sibling repos or a configured workspace.
 
 **Analysis:**
-- [ ] **Activity over time**: per-repo commit volume, author focus, churn over configurable time windows. "Which repos are active? Which are stagnating? Where is energy going?"
+- [x] **Activity over time**: per-repo commit volume, author focus, churn over configurable time windows. → `analyze activity --repos-dir`
 - [x] **Inter-repo dependency graph**: which repos import/depend on which (via package manifests: Cargo.toml deps, package.json, go.mod). Visualize the cross-repo architecture. → `analyze repo-coupling`
-- [ ] **Cross-repo duplicates**: find shared code across repos that should be a library. Extend `duplicate-functions`/`similar-functions` to work across repo boundaries.
+- [x] **Cross-repo duplicates**: `duplicate-functions --repos` and `similar-functions --repos` scan across all repos, prefix paths with repo name.
 - [ ] **Cross-repo hotspots**: aggregate churn/complexity/coupling across repos. Which repo has the most tech debt?
-- [ ] **Cross-repo ownership**: who works on what across the org. Author overlap between repos.
+- [x] **Cross-repo ownership**: who works on what across the org. → `analyze contributors --repos-dir`, `analyze ownership --repos`
 
 **Commands:**
 - [ ] **Run commands across repos**: `normalize --repos ~/git/org/ tools lint`, `normalize --repos ~/git/org/ analyze hotspots`. Discover projects, run in parallel, aggregate output.
