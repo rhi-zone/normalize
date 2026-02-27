@@ -114,7 +114,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] `--output-schema` wired up for: aliases, text-search, analyze, grammars, sessions, tools, context, history
 - [x] `--input-schema` + `--params-json` wired up for: aliases, text-search, analyze, sessions, view, history, context, edit, init, generate, translate, grammars, tools
 - [x] `--jsonl` + `--jq` combination (apply jq filter, then emit results as jsonl)
-- [ ] Wire up `--output-schema` for: view (10+ implicit modes — needs dedicated refactor pass)
+- [x] Wire up `--output-schema` for: view (10+ implicit modes — needs dedicated refactor pass)
 
 ### CLI Internal Consolidation
 Eliminate the `cmd_*` middle layer. Commands should be library functions that return `Result<T>`, with CLI plumbing auto-generated.
