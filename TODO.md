@@ -163,7 +163,20 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 - [x] Final cleanup: deleted `Commands` enum, `Cli` struct, legacy clap dispatch. main.rs is now ~50 lines.
 - [x] Restore `--repos` multi-repo support: added `--repos` param to `analyze hotspots`, `analyze ownership`, `analyze coupling`. Report types extended with optional `.repos` field (see docs/architecture-decisions.md).
 - [x] Fix server-less global flag descriptions: updated server-less + added help text via `global = [pretty = "...", compact = "..."]` syntax.
-- [ ] Audit whether any of the 19 top-level subcommands should be merged or nested differently
+- [ ] Audit top-level command levels — findings:
+  - `history` is at the wrong level: shadow edit history is a feature of `edit`, not a
+    standalone concept. Should be `normalize edit history [list|diff|status|tree|prune]`.
+  - `analyze rules` is redundant with top-level `normalize rules run`. The analyze service
+    has a `rules` subcommand that runs syntax rules, but `normalize rules run` already does
+    this. Should be removed from AnalyzeService.
+  - `context` is borderline: it's a view of `.context.md` files for a path, which is
+    closely related to `view`. `normalize view --dir-context` already prepends context to
+    view output; `context` shows context alone. Could be `normalize view context [path]`
+    but semantics differ slightly (content-only vs prepend). Low priority.
+  - `aliases` is a cross-cutting utility (lists filter aliases for --exclude/--only used
+    by view, grep, analyze). Too small for top-level but has no clear parent. Low priority.
+  - `facts rules` (Datalog rules on extracted facts) vs `normalize rules` (syntax + fact
+    rule management) are genuinely distinct — naming is confusing but nesting is correct.
 
 ### CLI Cleanup
 - [x] Move `normalize plans` to `normalize sessions plans`: groups tool-specific data under sessions
