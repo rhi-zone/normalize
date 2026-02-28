@@ -284,7 +284,8 @@ impl Language for ObjC {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // ObjC has no body field; @interface/@implementation span the whole node
+        Some(*node)
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -293,11 +294,48 @@ impl Language for ObjC {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // Structure: "@interface Foo : Bar\n  methods\n@end"
+        // Content starts after the first newline, ends before @end child
+        let start = body_node.start_byte();
+        let end = body_node.end_byte();
+        let bytes = content.as_bytes();
+
+        // Skip past the header line (first \n)
+        let mut content_start = start;
+        while content_start < end && bytes[content_start] != b'\n' {
+            content_start += 1;
+        }
+        if content_start < end {
+            content_start += 1; // skip the \n
+        }
+
+        // Find @end child — content ends just before it
+        let mut content_end = end;
+        let mut c = body_node.walk();
+        for child in body_node.children(&mut c) {
+            if child.kind() == "@end" {
+                content_end = child.start_byte();
+                // trim trailing whitespace before @end
+                while content_end > content_start
+                    && matches!(bytes[content_end - 1], b' ' | b'\t' | b'\n')
+                {
+                    content_end -= 1;
+                }
+                break;
+            }
+        }
+
+        let is_empty = content[content_start..content_end].trim().is_empty();
+        Some(ContainerBody {
+            content_start,
+            content_end,
+            inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
