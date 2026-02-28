@@ -471,6 +471,7 @@ fn cmd_sessions_list_filtered(
         until,
         project,
         all_projects,
+        output_format.is_pretty(),
     ) {
         Ok(report) => {
             if report.is_empty() {

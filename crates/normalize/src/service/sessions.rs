@@ -23,7 +23,11 @@ impl SessionsService {
 
 impl std::fmt::Display for SessionListReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
+        if self.use_pretty() {
+            write!(f, "{}", self.format_pretty())
+        } else {
+            write!(f, "{}", self.format_text())
+        }
     }
 }
 
@@ -96,6 +100,8 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        pretty: bool,
+        compact: bool,
     ) -> Result<SessionListReport, String> {
         let limit = limit.unwrap_or(20);
         let root_path = root.as_deref().map(std::path::Path::new);
@@ -110,6 +116,7 @@ impl SessionsService {
             until.as_deref(),
             project_path,
             all_projects,
+            !compact && pretty,
         )
     }
 
