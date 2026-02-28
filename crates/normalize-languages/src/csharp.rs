@@ -16,7 +16,7 @@ impl Language for CSharp {
         &["cs"]
     }
     fn grammar_name(&self) -> &'static str {
-        "c_sharp"
+        "c-sharp"
     }
 
     fn has_symbols(&self) -> bool {
