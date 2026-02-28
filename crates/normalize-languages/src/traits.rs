@@ -7,6 +7,19 @@ pub use normalize_facts_core::{
     Export, Import, Symbol, SymbolKind, Visibility, VisibilityMechanism,
 };
 
+/// Location of a container's body (for prepend/append editing operations)
+#[derive(Debug)]
+pub struct ContainerBody {
+    /// Byte offset where body content starts (after opening delimiter/heading)
+    pub content_start: usize,
+    /// Byte offset where body content ends (before closing delimiter)
+    pub content_end: usize,
+    /// Indentation string for new content inserted into the body
+    pub inner_indent: String,
+    /// True if the body has no meaningful content (empty, only pass/braces)
+    pub is_empty: bool,
+}
+
 /// Embedded content block (e.g., JS in Vue, CSS in HTML)
 #[derive(Debug, Clone)]
 pub struct EmbeddedBlock {
@@ -197,6 +210,16 @@ pub trait Language: Send + Sync {
 
     /// Detect if first child of body is a docstring
     fn body_has_docstring(&self, body: &Node, content: &str) -> bool;
+
+    /// Analyze a container body node and return the editable byte range.
+    /// `body_node` is the node returned by `container_body`.
+    /// Returns None if this language doesn't support container body editing.
+    fn analyze_container_body(
+        &self,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
+    ) -> Option<ContainerBody>;
 
     // === Helpers ===
 

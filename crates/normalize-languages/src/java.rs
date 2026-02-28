@@ -1,6 +1,8 @@
 //! Java language support.
 
-use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
+use crate::{
+    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+};
 use tree_sitter::Node;
 
 /// Java language support.
@@ -314,6 +316,15 @@ impl Language for Java {
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
         false
+    }
+
+    fn analyze_container_body(
+        &self,
+        _body_node: &Node,
+        _content: &str,
+        _inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        None
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

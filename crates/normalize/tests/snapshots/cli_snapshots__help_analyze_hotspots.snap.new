@@ -1,0 +1,23 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 282
+expression: "snapshot_help(&[\"analyze\", \"hotspots\"])"
+---
+Show git history hotspots (frequently changed files)
+
+Usage: normalize analyze hotspots [OPTIONS]
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
+      --recency                    Weight recent changes higher
+      --compact                    Compact output without colors (overrides TTY detection)
+      --json                       Output machine-readable JSON
+  -r, --root <root>                Root directory (defaults to current directory)
+      --jq <jq>                    Filter output through jq expression
+      --repos <repos>              Run across all git repos under DIR
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

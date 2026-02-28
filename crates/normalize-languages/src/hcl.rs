@@ -1,6 +1,8 @@
 //! HCL (HashiCorp Configuration Language) support.
 
-use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
+use crate::{
+    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+};
 use tree_sitter::Node;
 
 /// HCL language support (Terraform, Packer, etc.).
@@ -229,6 +231,15 @@ impl Language for Hcl {
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
         false
     }
+    fn analyze_container_body(
+        &self,
+        _body_node: &Node,
+        _content: &str,
+        _inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        None
+    }
+
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
     }

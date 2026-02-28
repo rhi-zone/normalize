@@ -1,0 +1,31 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 332
+expression: "snapshot_help(&[\"analyze\", \"similar-functions\"])"
+---
+Detect similar functions via MinHash LSH
+
+Usage: normalize analyze similar-functions [OPTIONS]
+
+Options:
+      --elide-identifiers          Elide identifier names when comparing
+      --jsonl                      Output one JSON object per line (for arrays)
+      --elide-literals             Elide literal values when comparing
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --show-source                Show source code for matches
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --min-lines <min-lines>      Minimum lines for a function to be considered
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --similarity <similarity>    Minimum similarity threshold (0.0-1.0)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --skeleton                   Match on control-flow structure
+      --include-trait-impls        Include pairs where both functions share the same name
+  -r, --root <root>                Root directory (defaults to current directory)
+      --repos <repos>              Scan across all git repos under DIR
+      --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help

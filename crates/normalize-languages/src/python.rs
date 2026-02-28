@@ -1,6 +1,8 @@
 //! Python language support.
 
-use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
+use crate::{
+    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -445,6 +447,75 @@ impl Language for Python {
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
+    }
+
+    fn analyze_container_body(
+        &self,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        let mut cursor = body_node.walk();
+        let children: Vec<_> = body_node.children(&mut cursor).collect();
+
+        if children.is_empty() {
+            return Some(ContainerBody {
+                content_start: body_node.start_byte(),
+                content_end: body_node.end_byte(),
+                inner_indent: inner_indent.to_string(),
+                is_empty: true,
+            });
+        }
+
+        let mut first_real_idx = 0;
+        for (i, child) in children.iter().enumerate() {
+            let is_docstring = if child.kind() == "expression_statement" {
+                let mut child_cursor = child.walk();
+                child
+                    .children(&mut child_cursor)
+                    .next()
+                    .map(|fc| fc.kind() == "string")
+                    .unwrap_or(false)
+            } else {
+                child.kind() == "string"
+            };
+            if is_docstring && i == 0 {
+                first_real_idx = i + 1;
+                continue;
+            }
+            break;
+        }
+
+        let is_empty = children.iter().skip(first_real_idx).all(|c| {
+            c.kind() == "pass_statement"
+                || c.kind() == "string"
+                || (c.kind() == "expression_statement"
+                    && c.child(0).map(|fc| fc.kind() == "string").unwrap_or(false))
+        });
+
+        let content_start = if first_real_idx < children.len() {
+            let child_start = children[first_real_idx].start_byte();
+            content[..child_start]
+                .rfind('\n')
+                .map(|i| i + 1)
+                .unwrap_or(child_start)
+        } else if !children.is_empty() {
+            let last_end = children.last().unwrap().end_byte();
+            if last_end < content.len() && content.as_bytes()[last_end] == b'\n' {
+                last_end + 1
+            } else {
+                last_end
+            }
+        } else {
+            body_node.start_byte()
+        };
+
+        Some(ContainerBody {
+            content_start,
+            content_end: body_node.end_byte(),
+            inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

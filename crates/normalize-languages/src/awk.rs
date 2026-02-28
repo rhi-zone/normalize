@@ -1,7 +1,7 @@
 //! AWK language support.
 
 use crate::{
-    Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
     simple_function_symbol,
 };
 use tree_sitter::Node;
@@ -178,6 +178,15 @@ impl Language for Awk {
     }
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
         false
+    }
+
+    fn analyze_container_body(
+        &self,
+        _body_node: &Node,
+        _content: &str,
+        _inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        None
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

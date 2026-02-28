@@ -3,6 +3,8 @@ use normalize_languages::{Language, support_for_path};
 use normalize_view::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use std::path::Path;
 
+pub use normalize_languages::ContainerBody;
+
 /// Result of finding a symbol in a file
 #[derive(Debug)]
 #[allow(dead_code)] // Fields used by Debug trait and for edit operations
@@ -14,19 +16,6 @@ pub struct SymbolLocation {
     pub start_line: usize,
     pub end_line: usize,
     pub indent: String,
-}
-
-/// Location of a container's body (for prepend/append operations)
-#[derive(Debug)]
-pub struct ContainerBody {
-    /// Byte offset where body content starts (after opening, any docstring)
-    pub content_start: usize,
-    /// Byte offset where body content ends (before closing brace/dedent)
-    pub content_end: usize,
-    /// Indentation for items inside this container
-    pub inner_indent: String,
-    /// Whether the body is currently empty (or just has a docstring/pass)
-    pub is_empty: bool,
 }
 
 /// Convert a 1-based line number to byte offset in content.
@@ -292,234 +281,7 @@ impl Editor {
         let grammar = support.grammar_name();
         let tree = parse_with_grammar(grammar, content)?;
         let root = tree.root_node();
-        self.find_container_body_with_trait(root, content, name, grammar, support)
-    }
-
-    fn find_container_body_with_trait(
-        &self,
-        node: tree_sitter::Node,
-        content: &str,
-        name: &str,
-        grammar: &str,
-        support: &dyn Language,
-    ) -> Option<ContainerBody> {
-        let kind = node.kind();
-
-        if support.container_kinds().contains(&kind)
-            && let Some(container_name) = support.node_name(&node, content)
-            && container_name == name
-            && let Some(body_node) = support.container_body(&node)
-        {
-            let start_byte = node.start_byte();
-            let line_start = content[..start_byte]
-                .rfind('\n')
-                .map(|i| i + 1)
-                .unwrap_or(0);
-            let container_indent: String = content[line_start..start_byte]
-                .chars()
-                .take_while(|c| c.is_whitespace())
-                .collect();
-            let inner_indent = format!("{}    ", container_indent);
-
-            return match grammar {
-                "python" => self.analyze_python_class_body(&body_node, content, &inner_indent),
-                "rust" => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
-                "markdown" => self.analyze_markdown_section_body(&body_node, content),
-                _ => None,
-            };
-        }
-
-        // Recurse into children
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(body) =
-                self.find_container_body_with_trait(child, content, name, grammar, support)
-            {
-                return Some(body);
-            }
-        }
-
-        None
-    }
-
-    fn analyze_python_class_body(
-        &self,
-        body_node: &tree_sitter::Node,
-        content: &str,
-        inner_indent: &str,
-    ) -> Option<ContainerBody> {
-        // Python class body is a "block" node
-        // Children can include: docstring (expression_statement with string), pass, methods, etc.
-        let mut cursor = body_node.walk();
-        let children: Vec<_> = body_node.children(&mut cursor).collect();
-
-        if children.is_empty() {
-            // Empty body - insert at start
-            return Some(ContainerBody {
-                content_start: body_node.start_byte(),
-                content_end: body_node.end_byte(),
-                inner_indent: inner_indent.to_string(),
-                is_empty: true,
-            });
-        }
-
-        // Find first "real" content (skip docstrings)
-        // Handle both grammar versions:
-        // - Old: expression_statement > string
-        // - New (arborium): string directly
-        let mut first_real_idx = 0;
-        for (i, child) in children.iter().enumerate() {
-            let is_docstring = if child.kind() == "expression_statement" {
-                // Could be a docstring - check if it's a string
-                let mut child_cursor = child.walk();
-                let first_child = child.children(&mut child_cursor).next();
-                first_child.map(|fc| fc.kind() == "string").unwrap_or(false)
-            } else if child.kind() == "string" {
-                // Arborium-style: direct string node
-                true
-            } else {
-                false
-            };
-
-            if is_docstring && i == 0 {
-                first_real_idx = i + 1;
-                continue;
-            }
-            break;
-        }
-
-        // Check if body is effectively empty (just docstring and/or pass)
-        let is_empty = children.iter().skip(first_real_idx).all(|c| {
-            if c.kind() == "pass_statement" {
-                return true;
-            }
-            // Handle both grammar versions for docstrings
-            if c.kind() == "string" {
-                return true;
-            }
-            if c.kind() == "expression_statement" {
-                // Check if it's a string (docstring)
-                if let Some(first_child) = c.child(0) {
-                    return first_child.kind() == "string";
-                }
-            }
-            false
-        });
-
-        // For prepend: insert after docstring (if any), at start of first_real_idx position
-        // For append: insert at end of body
-        let content_start = if first_real_idx < children.len() {
-            // Find the line start of the first real child
-            let child_start = children[first_real_idx].start_byte();
-            content[..child_start]
-                .rfind('\n')
-                .map(|i| i + 1)
-                .unwrap_or(child_start)
-        } else if !children.is_empty() {
-            // Only docstring exists - insert after it
-            let last = children.last().unwrap();
-            // Find end of last child's line
-            let last_end = last.end_byte();
-            if last_end < content.len() && content.as_bytes()[last_end] == b'\n' {
-                last_end + 1
-            } else {
-                last_end
-            }
-        } else {
-            body_node.start_byte()
-        };
-
-        let content_end = body_node.end_byte();
-
-        Some(ContainerBody {
-            content_start,
-            content_end,
-            inner_indent: inner_indent.to_string(),
-            is_empty,
-        })
-    }
-
-    fn analyze_rust_impl_body(
-        &self,
-        body_node: &tree_sitter::Node,
-        content: &str,
-        inner_indent: &str,
-    ) -> Option<ContainerBody> {
-        // Rust impl body is a "declaration_list" node: { ... }
-        // We need to insert after the opening { and before the closing }
-        let body_start = body_node.start_byte();
-        let body_end = body_node.end_byte();
-
-        // Find the opening brace
-        let mut content_start = body_start;
-        for (i, byte) in content[body_start..body_end].bytes().enumerate() {
-            if byte == b'{' {
-                content_start = body_start + i + 1;
-                // Skip whitespace/newline after brace
-                while content_start < body_end {
-                    let b = content.as_bytes()[content_start];
-                    if b == b'\n' {
-                        content_start += 1;
-                        break;
-                    } else if b.is_ascii_whitespace() {
-                        content_start += 1;
-                    } else {
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-
-        // Find the closing brace
-        let mut content_end = body_end;
-        for (i, byte) in content[body_start..body_end].bytes().rev().enumerate() {
-            if byte == b'}' {
-                content_end = body_end - i - 1;
-                // Go back to include the newline before the brace
-                while content_end > content_start && content.as_bytes()[content_end - 1] == b' ' {
-                    content_end -= 1;
-                }
-                break;
-            }
-        }
-
-        // Check if body is empty
-        let body_content = content[content_start..content_end].trim();
-        let is_empty = body_content.is_empty();
-
-        Some(ContainerBody {
-            content_start,
-            content_end,
-            inner_indent: inner_indent.to_string(),
-            is_empty,
-        })
-    }
-
-    fn analyze_markdown_section_body(
-        &self,
-        section_node: &tree_sitter::Node,
-        _content: &str,
-    ) -> Option<ContainerBody> {
-        // Skip the first child (atx_heading); body is everything after it.
-        let mut cursor = section_node.walk();
-        let children: Vec<_> = section_node.children(&mut cursor).collect();
-        let content_children = children.iter().skip(1); // skip heading
-
-        let content_start = content_children
-            .clone()
-            .next()
-            .map(|n| n.start_byte())
-            .unwrap_or(section_node.end_byte());
-        let content_end = section_node.end_byte();
-        let is_empty = content_start >= content_end;
-
-        Some(ContainerBody {
-            content_start,
-            content_end,
-            inner_indent: String::new(),
-            is_empty,
-        })
+        find_container_body_in_node(root, content, name, support)
     }
 
     /// Prepend content inside a container (class/impl body)
@@ -609,6 +371,43 @@ impl Editor {
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
+
+fn find_container_body_in_node(
+    node: tree_sitter::Node,
+    content: &str,
+    name: &str,
+    support: &dyn Language,
+) -> Option<ContainerBody> {
+    let kind = node.kind();
+
+    if support.container_kinds().contains(&kind)
+        && let Some(container_name) = support.node_name(&node, content)
+        && container_name == name
+        && let Some(body_node) = support.container_body(&node)
+    {
+        let start_byte = node.start_byte();
+        let line_start = content[..start_byte]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let container_indent: String = content[line_start..start_byte]
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .collect();
+        let inner_indent = format!("{}    ", container_indent);
+
+        return support.analyze_container_body(&body_node, content, &inner_indent);
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if let Some(body) = find_container_body_in_node(child, content, name, support) {
+            return Some(body);
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]

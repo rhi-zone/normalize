@@ -1,6 +1,8 @@
 //! Markdown language support.
 
-use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
+use crate::{
+    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+};
 use tree_sitter::Node;
 
 /// Markdown language support.
@@ -156,6 +158,30 @@ impl Language for Markdown {
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
         false
     }
+
+    fn analyze_container_body(
+        &self,
+        section_node: &Node,
+        _content: &str,
+        _inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        // Skip the first child (atx_heading); body is everything after it.
+        let mut cursor = section_node.walk();
+        let mut children = section_node.children(&mut cursor);
+        children.next(); // skip heading
+        let content_start = children
+            .next()
+            .map(|n| n.start_byte())
+            .unwrap_or(section_node.end_byte());
+        let content_end = section_node.end_byte();
+        Some(ContainerBody {
+            content_start,
+            content_end,
+            inner_indent: String::new(),
+            is_empty: content_start >= content_end,
+        })
+    }
+
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         // section → atx_heading → inline
         let heading = node.child(0).filter(|c| c.kind() == "atx_heading")?;

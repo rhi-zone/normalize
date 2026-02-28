@@ -247,8 +247,8 @@ pub use registry::{
     support_for_path, supported_languages, validate_unused_kinds_audit,
 };
 pub use traits::{
-    EmbeddedBlock, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-    simple_function_symbol, simple_symbol,
+    ContainerBody, EmbeddedBlock, Export, Import, Language, Symbol, SymbolKind, Visibility,
+    VisibilityMechanism, simple_function_symbol, simple_symbol,
 };
 
 // Re-export language structs (feature-gated)
