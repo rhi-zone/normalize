@@ -21,9 +21,10 @@ impl Language for Markdown {
         true
     }
 
-    // Markdown is documentation, not code - no functions/types/control flow
+    // Markdown sections are modeled as `section` nodes in the grammar,
+    // each containing an atx_heading as the first child followed by content blocks.
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["atx_heading", "setext_heading"]
+        &["section"]
     }
     fn function_kinds(&self) -> &'static [&'static str] {
         &[]
@@ -67,11 +68,13 @@ impl Language for Markdown {
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // Extract heading text
-        let mut cursor = node.walk();
-        let text = node
+        // `node` is a `section` node; its first child is `atx_heading`.
+        let heading = node.child(0).filter(|c| c.kind() == "atx_heading")?;
+
+        let mut cursor = heading.walk();
+        let text = heading
             .children(&mut cursor)
-            .find(|c| c.kind() == "heading_content" || c.kind() == "inline")
+            .find(|c| c.kind() == "inline")
             .map(|c| content[c.byte_range()].trim().to_string())
             .unwrap_or_default();
 
@@ -79,9 +82,8 @@ impl Language for Markdown {
             return None;
         }
 
-        // Determine heading level from marker node
-        let mut cursor2 = node.walk();
-        let level = node
+        let mut cursor2 = heading.walk();
+        let level = heading
             .children(&mut cursor2)
             .find_map(|c| match c.kind() {
                 "atx_h1_marker" => Some(1),
@@ -146,14 +148,22 @@ impl Language for Markdown {
         None
     }
 
-    fn container_body<'a>(&self, _node: &'a Node<'a>) -> Option<Node<'a>> {
-        None
+    fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
+        // The section node itself contains the heading + content as children.
+        // Returning it here lets collect_symbols recurse into child sections.
+        Some(*node)
     }
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
         false
     }
-    fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
-        None
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // section → atx_heading → inline
+        let heading = node.child(0).filter(|c| c.kind() == "atx_heading")?;
+        let mut cursor = heading.walk();
+        let inline = heading
+            .children(&mut cursor)
+            .find(|c| c.kind() == "inline")?;
+        Some(content[inline.byte_range()].trim())
     }
 }
 
@@ -170,6 +180,7 @@ mod tests {
             "fenced_code_block", "fenced_code_block_delimiter",
             "html_block", "indented_code_block", "link_reference_definition",
         ];
+        // Note: section and atx_heading are now used via container_kinds/extract_container.
 
         validate_unused_kinds_audit(&Markdown, documented_unused)
             .expect("Markdown unused node kinds audit failed");

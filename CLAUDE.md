@@ -37,6 +37,10 @@ Behavioral rules for Claude Code in this repository.
 
 **If citing CLAUDE.md after failing:** The file failed its purpose. Adjust it to actually prevent the failure.
 
+**If the user corrects you at all, or you guessed at anything:** CLAUDE.md is probably missing something. Update it before proceeding.
+
+**Language trait implementations must be honest about what the grammar provides.** Don't implement `container_kinds`, `container_body`, etc. based on what you *wish* the grammar modeled. If the tree-sitter grammar doesn't model a concept (e.g. markdown sections), return empty/None and handle it at a higher level — don't claim support you can't deliver. tree-sitter grammars are CSTs (concrete syntax trees), not ASTs — semantic structure (like "section = heading + content") must be derived, not assumed.
+
 ## From Session Analysis
 
 Patterns from `docs/log-analysis.md` correction analysis:

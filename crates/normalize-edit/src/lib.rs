@@ -1,5 +1,5 @@
 use normalize_languages::parsers::parse_with_grammar;
-use normalize_languages::{Language, SymbolKind, support_for_path};
+use normalize_languages::{Language, support_for_path};
 use normalize_view::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use std::path::Path;
 
@@ -288,56 +288,11 @@ impl Editor {
         content: &str,
         name: &str,
     ) -> Option<ContainerBody> {
-        // Try skeleton-based lookup first (handles markdown sections)
-        if let Some(body) = self.find_container_body_via_skeleton(path, content, name) {
-            return Some(body);
-        }
-
-        // Fall back to AST-based lookup for languages with explicit body nodes
         let support = support_for_path(path)?;
         let grammar = support.grammar_name();
         let tree = parse_with_grammar(grammar, content)?;
         let root = tree.root_node();
         self.find_container_body_with_trait(root, content, name, grammar, support)
-    }
-
-    /// Find container body using skeleton (for markdown sections)
-    fn find_container_body_via_skeleton(
-        &self,
-        path: &Path,
-        content: &str,
-        name: &str,
-    ) -> Option<ContainerBody> {
-        let extractor = SkeletonExtractor::new();
-        let result = extractor.extract(path, content);
-
-        fn search_symbols(
-            symbols: &[SkeletonSymbol],
-            name: &str,
-            content: &str,
-        ) -> Option<ContainerBody> {
-            for sym in symbols {
-                if sym.name == name && sym.kind == SymbolKind::Heading {
-                    // For markdown: body starts after heading line, ends at section end
-                    let content_start = line_to_byte(content, sym.start_line + 1);
-                    let content_end = line_to_byte(content, sym.end_line + 1);
-
-                    return Some(ContainerBody {
-                        content_start,
-                        content_end,
-                        inner_indent: String::new(),
-                        is_empty: content_start >= content_end,
-                    });
-                }
-                // Search children
-                if let Some(body) = search_symbols(&sym.children, name, content) {
-                    return Some(body);
-                }
-            }
-            None
-        }
-
-        search_symbols(&result.symbols, name, content)
     }
 
     fn find_container_body_with_trait(
@@ -350,37 +305,28 @@ impl Editor {
     ) -> Option<ContainerBody> {
         let kind = node.kind();
 
-        // Only check container types
-        if support.container_kinds().contains(&kind) {
-            // Get the name of this container
-            let name_node = node
-                .child_by_field_name("name")
-                .or_else(|| node.child_by_field_name("type"))?; // impl blocks use "type"
-            let container_name = &content[name_node.byte_range()];
+        if support.container_kinds().contains(&kind)
+            && let Some(container_name) = support.node_name(&node, content)
+            && container_name == name
+            && let Some(body_node) = support.container_body(&node)
+        {
+            let start_byte = node.start_byte();
+            let line_start = content[..start_byte]
+                .rfind('\n')
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            let container_indent: String = content[line_start..start_byte]
+                .chars()
+                .take_while(|c| c.is_whitespace())
+                .collect();
+            let inner_indent = format!("{}    ", container_indent);
 
-            if container_name == name {
-                // Get the body node using trait method
-                let body_node = support.container_body(&node)?;
-
-                // Calculate inner indentation
-                let start_byte = node.start_byte();
-                let line_start = content[..start_byte]
-                    .rfind('\n')
-                    .map(|i| i + 1)
-                    .unwrap_or(0);
-                let container_indent: String = content[line_start..start_byte]
-                    .chars()
-                    .take_while(|c| c.is_whitespace())
-                    .collect();
-                let inner_indent = format!("{}    ", container_indent);
-
-                // Use language-specific body analysis
-                return match grammar {
-                    "python" => self.analyze_python_class_body(&body_node, content, &inner_indent),
-                    "rust" => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
-                    _ => None,
-                };
-            }
+            return match grammar {
+                "python" => self.analyze_python_class_body(&body_node, content, &inner_indent),
+                "rust" => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
+                "markdown" => self.analyze_markdown_section_body(&body_node, content),
+                _ => None,
+            };
         }
 
         // Recurse into children
@@ -546,6 +492,32 @@ impl Editor {
             content_start,
             content_end,
             inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
+    }
+
+    fn analyze_markdown_section_body(
+        &self,
+        section_node: &tree_sitter::Node,
+        _content: &str,
+    ) -> Option<ContainerBody> {
+        // Skip the first child (atx_heading); body is everything after it.
+        let mut cursor = section_node.walk();
+        let children: Vec<_> = section_node.children(&mut cursor).collect();
+        let content_children = children.iter().skip(1); // skip heading
+
+        let content_start = content_children
+            .clone()
+            .next()
+            .map(|n| n.start_byte())
+            .unwrap_or(section_node.end_byte());
+        let content_end = section_node.end_byte();
+        let is_empty = content_start >= content_end;
+
+        Some(ContainerBody {
+            content_start,
+            content_end,
+            inner_indent: String::new(),
             is_empty,
         })
     }

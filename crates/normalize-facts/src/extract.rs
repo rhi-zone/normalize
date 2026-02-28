@@ -289,11 +289,6 @@ impl Extractor {
             Self::merge_rust_impl_blocks(&mut symbols);
         }
 
-        // Post-process for Markdown: fix section ranges
-        if support.grammar_name() == "markdown" {
-            Self::fix_markdown_section_ranges(&mut symbols, content);
-        }
-
         // Post-process for TypeScript/JavaScript: mark interface implementations
         if support.grammar_name() == "typescript" || support.grammar_name() == "javascript" {
             Self::mark_interface_implementations(&mut symbols, resolver, current_file);
@@ -583,63 +578,6 @@ impl Extractor {
             current_file,
             &mut cross_file_cache,
         );
-    }
-
-    /// Fix markdown section ranges and build hierarchy.
-    fn fix_markdown_section_ranges(symbols: &mut Vec<Symbol>, content: &str) {
-        if symbols.is_empty() {
-            return;
-        }
-
-        let total_lines = content.lines().count();
-
-        // Extract heading level from signature (e.g., "## Foo" -> 2)
-        fn heading_level(sym: &Symbol) -> usize {
-            sym.signature.chars().take_while(|&c| c == '#').count()
-        }
-
-        // First pass: fix end_line for each heading
-        for i in 0..symbols.len() {
-            let current_level = heading_level(&symbols[i]);
-            let next_start = symbols[i + 1..]
-                .iter()
-                .find(|s| heading_level(s) <= current_level)
-                .map(|s| s.start_line.saturating_sub(1))
-                .unwrap_or(total_lines);
-            symbols[i].end_line = next_start;
-        }
-
-        // Second pass: build hierarchy
-        let flat: Vec<Symbol> = std::mem::take(symbols);
-        let mut stack: Vec<(usize, Symbol)> = Vec::new();
-
-        for sym in flat {
-            let level = heading_level(&sym);
-
-            // Pop symbols that are same or lower level (higher number = lower in hierarchy)
-            while let Some((parent_level, _)) = stack.last() {
-                if *parent_level >= level {
-                    let (_, completed) = stack.pop().unwrap();
-                    if let Some((_, parent)) = stack.last_mut() {
-                        parent.children.push(completed);
-                    } else {
-                        symbols.push(completed);
-                    }
-                } else {
-                    break;
-                }
-            }
-            stack.push((level, sym));
-        }
-
-        // Flush remaining stack
-        while let Some((_, completed)) = stack.pop() {
-            if let Some((_, parent)) = stack.last_mut() {
-                parent.children.push(completed);
-            } else {
-                symbols.push(completed);
-            }
-        }
     }
 }
 

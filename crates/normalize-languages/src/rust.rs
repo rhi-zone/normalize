@@ -453,7 +453,10 @@ impl Language for Rust {
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        let name_node = node.child_by_field_name("name")?;
+        // impl_item uses "type" field; trait_item and mod_item use "name"
+        let name_node = node
+            .child_by_field_name("name")
+            .or_else(|| node.child_by_field_name("type"))?;
         Some(&content[name_node.byte_range()])
     }
 }
