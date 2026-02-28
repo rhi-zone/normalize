@@ -239,11 +239,12 @@ impl Language for GraphQL {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // fields_definition: "{ field1: Type\n  field2: Type\n }"
+        crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
