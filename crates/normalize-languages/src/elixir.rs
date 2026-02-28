@@ -305,11 +305,11 @@ impl Language for Elixir {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        crate::body::analyze_do_end_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

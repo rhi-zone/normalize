@@ -107,6 +107,8 @@ Do not:
 - Ask permission when philosophy is clear - just do it
 - Return tuples - use structs with named fields
 - Use trait defaults in `Language` - explicit impl required (but `LocalDeps` uses defaults by design)
+- Put shared implementation helpers in the trait - helpers belong in a free function or a separate module, not as trait methods; trait methods are the interface, not the implementation
+- Write stub implementations - every trait method must be fully implemented; `None`/empty is only correct when the concept genuinely doesn't exist in that language
 - String-match AST properties - use tree-sitter structure
 - Replace content when editing lists - extend, don't replace
 - Cut corners with fallbacks - implement properly for each case

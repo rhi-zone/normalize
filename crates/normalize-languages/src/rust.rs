@@ -460,47 +460,7 @@ impl Language for Rust {
         content: &str,
         inner_indent: &str,
     ) -> Option<ContainerBody> {
-        let body_start = body_node.start_byte();
-        let body_end = body_node.end_byte();
-
-        let mut content_start = body_start;
-        for (i, byte) in content[body_start..body_end].bytes().enumerate() {
-            if byte == b'{' {
-                content_start = body_start + i + 1;
-                while content_start < body_end {
-                    let b = content.as_bytes()[content_start];
-                    if b == b'\n' {
-                        content_start += 1;
-                        break;
-                    } else if b.is_ascii_whitespace() {
-                        content_start += 1;
-                    } else {
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-
-        let mut content_end = body_end;
-        for (i, byte) in content[body_start..body_end].bytes().rev().enumerate() {
-            if byte == b'}' {
-                content_end = body_end - i - 1;
-                while content_end > content_start && content.as_bytes()[content_end - 1] == b' ' {
-                    content_end -= 1;
-                }
-                break;
-            }
-        }
-
-        let is_empty = content[content_start..content_end].trim().is_empty();
-
-        Some(ContainerBody {
-            content_start,
-            content_end,
-            inner_indent: inner_indent.to_string(),
-            is_empty,
-        })
+        crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

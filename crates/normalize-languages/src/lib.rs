@@ -35,6 +35,7 @@
 //! ```
 
 pub mod ast_grep;
+mod body;
 mod component;
 pub mod ecmascript;
 pub mod external_packages;

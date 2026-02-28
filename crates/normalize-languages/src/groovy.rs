@@ -270,11 +270,11 @@ impl Language for Groovy {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

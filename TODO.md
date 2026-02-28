@@ -47,6 +47,47 @@ Analyze across multiple repositories — activity trends, shared patterns, inter
 - Incremental: cache per-repo results, only re-analyze changed repos
 
 ## Remaining Work
+
+### `analyze_container_body` — remaining languages
+
+`normalize edit` prepend/append is not yet implemented for these languages (all have non-empty `container_kinds`). Each needs a real `analyze_container_body` implementation:
+
+**Needs grammar investigation to determine delimiter style:**
+- `haskell` — `where` field; skip `where` keyword, no closing keyword
+- `ocaml` — `struct...end` / `sig...end` style; body node includes keywords
+- `agda` — `declarations` field; `where`-style, no closing keyword
+- `idris` — body field; various keyword delimiters
+- `lean` — body field; `where`/`end` style
+- `ada` — body field; `is...end` style
+- `elm` — body field; entire file or `type` declarations
+- `tlaplus` — body field; `====` module notation
+
+**Likely end-terminated (verify grammar, then use `analyze_end_body`):**
+- `lean`, `ada`, `elm` — no braces, content before `end`
+
+**Likely brace-delimited (verify grammar, then use `analyze_brace_body`):**
+- `kdl` — `children` field; `{ ... }` blocks
+- `ron` — body field; RON uses `{...}` for maps, `(...)` for structs — handle both
+- `verilog`, `vhdl` — hardware modules; likely `begin...end` or `( ... )`
+- `capnp` — struct/interface definitions
+
+**Config/markup formats — verify whether edit makes sense, may legitimately stay None:**
+- `nginx` ✓ done
+- `asciidoc`, `cmake`, `devicetree`, `diff`, `dockerfile`, `graphql`, `ini`, `json`, `nix`
+- `postscript`, `prolog`, `sql`, `toml`, `xml`, `yaml`
+
+**Lisp/dynamic (no traditional delimiter):**
+- `clojure`, `commonlisp`, `elisp`, `scheme` — list nodes; content_start/end within the s-expression
+
+**Special:**
+- `svelte` — `raw_text` child; content inside `<script>`/`<style>` tags
+- `vue` — body field; tag-based containers
+- `vim` — `container_body` returns `None` (fix first); augroup/function bodies
+- `objc` — `@interface...@end` / `@implementation...@end`; keyword-delimited
+- `matlab` — `classdef...end` / `properties...end`; keyword-delimited
+- `erlang` — `container_kinds` only contains `module_attribute` (not a real container); reconsider
+
+
 - ~~`normalize view` symbol not found: trigram suggestions~~ ✓ done (threshold 0.5, min-length 4)
 - Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
   - Requires language-specific namespace semantics - low priority
