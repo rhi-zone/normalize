@@ -67,6 +67,13 @@ impl Default for NormalizeService {
     }
 }
 
+/// Resolve pretty mode from CLI flags and config (TTY auto-detection).
+/// Used by all sub-services that receive raw `pretty`/`compact` global flags.
+pub(crate) fn resolve_pretty(root: &std::path::Path, pretty: bool, compact: bool) -> bool {
+    let config = NormalizeConfig::load(root);
+    !compact && (pretty || config.pretty.enabled())
+}
+
 impl NormalizeService {
     pub fn new() -> Self {
         let pretty = Cell::new(false);
@@ -104,9 +111,7 @@ impl NormalizeService {
 
     /// Resolve pretty/compact state from globals and config, store in `self.pretty`.
     fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
-        let config = NormalizeConfig::load(root);
-        let is_pretty = !compact && (pretty || config.pretty.enabled());
-        self.pretty.set(is_pretty);
+        self.pretty.set(resolve_pretty(root, pretty, compact));
     }
 
     /// Generic display bridge that respects pretty/compact state.

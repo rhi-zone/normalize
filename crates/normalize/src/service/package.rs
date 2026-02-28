@@ -1,7 +1,9 @@
 //! Package management service for server-less CLI.
 
+use super::resolve_pretty;
 use server_less::cli;
 use std::cell::Cell;
+use std::path::Path;
 
 /// Package management sub-service.
 pub struct PackageService {
@@ -38,6 +40,11 @@ impl std::fmt::Display for PackageResult {
     }
 }
 
+fn pretty_for(root: Option<&str>, pretty: bool, compact: bool) -> bool {
+    let root = root.map(Path::new).unwrap_or(Path::new("."));
+    resolve_pretty(root, pretty, compact)
+}
+
 #[cli(
     name = "package",
     about = "Package management: info, list, tree, outdated"
@@ -61,7 +68,7 @@ impl PackageService {
             Some(&package),
             ecosystem.as_deref(),
             root.as_deref(),
-            !compact && pretty,
+            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -81,7 +88,7 @@ impl PackageService {
             None,
             ecosystem.as_deref(),
             root.as_deref(),
-            !compact && pretty,
+            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -101,7 +108,7 @@ impl PackageService {
             None,
             ecosystem.as_deref(),
             root.as_deref(),
-            !compact && pretty,
+            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -122,7 +129,7 @@ impl PackageService {
             Some(&package),
             ecosystem.as_deref(),
             root.as_deref(),
-            !compact && pretty,
+            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -142,7 +149,7 @@ impl PackageService {
             None,
             ecosystem.as_deref(),
             root.as_deref(),
-            !compact && pretty,
+            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -162,7 +169,7 @@ impl PackageService {
             None,
             ecosystem.as_deref(),
             root.as_deref(),
-            !compact && pretty,
+            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 }

@@ -1,5 +1,6 @@
 //! Sessions management service for server-less CLI.
 
+use super::resolve_pretty;
 use crate::commands::sessions::{
     PlanContent, PlansListReport, SessionListReport, SessionShowReport,
 };
@@ -107,8 +108,7 @@ impl SessionsService {
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        let config = crate::config::NormalizeConfig::load(resolved_root);
-        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        let is_pretty = resolve_pretty(resolved_root, pretty, compact);
         crate::commands::sessions::build_session_list(
             root_path,
             limit,

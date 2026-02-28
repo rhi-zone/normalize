@@ -1,7 +1,9 @@
 //! Rules management service for server-less CLI.
 
+use super::resolve_pretty;
 use server_less::cli;
 use std::cell::Cell;
+use std::path::Path;
 
 /// Rules management sub-service.
 pub struct RulesService {
@@ -69,7 +71,11 @@ impl RulesService {
             enabled,
             disabled,
             no_desc,
-            !compact && pretty,
+            resolve_pretty(
+                root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
+                pretty,
+                compact,
+            ),
         )
     }
 
@@ -146,7 +152,15 @@ impl RulesService {
         pretty: bool,
         compact: bool,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_show_service(root.as_deref(), &id, !compact && pretty)
+        crate::commands::rules::cmd_show_service(
+            root.as_deref(),
+            &id,
+            resolve_pretty(
+                root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
+                pretty,
+                compact,
+            ),
+        )
     }
 
     /// List all tags and the rules they group
@@ -164,7 +178,11 @@ impl RulesService {
             root.as_deref(),
             show_rules,
             tag.as_deref(),
-            !compact && pretty,
+            resolve_pretty(
+                root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
+                pretty,
+                compact,
+            ),
         )
     }
 
