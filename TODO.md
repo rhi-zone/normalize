@@ -50,42 +50,36 @@ Analyze across multiple repositories — activity trends, shared patterns, inter
 
 ### `analyze_container_body` — remaining languages
 
-`normalize edit` prepend/append is not yet implemented for these languages (all have non-empty `container_kinds`). Each needs a real `analyze_container_body` implementation:
+`normalize edit` prepend/append is not yet implemented for these languages.
 
-**Needs grammar investigation to determine delimiter style:**
-- `haskell` — `where` field; skip `where` keyword, no closing keyword
-- `ocaml` — `struct...end` / `sig...end` style; body node includes keywords
-- `agda` — `declarations` field; `where`-style, no closing keyword
-- `idris` — body field; various keyword delimiters
-- `lean` — body field; `where`/`end` style
-- `ada` — body field; `is...end` style
-- `elm` — body field; entire file or `type` declarations
-- `tlaplus` — body field; `====` module notation
+**Grammar-verified, needs `container_body` fix first (field doesn't exist):**
+- `kdl` — `children` field doesn't exist on `node`; find correct field for child nodes
+- `ada` — `body` field doesn't exist on `package_body`; check correct field name
+- `idris` — `body` field doesn't exist on `data`; find correct field for constructors
+- `matlab` — `body` field doesn't exist on `class_definition`; find correct field
+- `objc` — grammar not in this build; verify field structure before implementing
+- `svelte` — `container_body` uses `raw_text` child (not a named field); verify byte range
+- `vue` — `body` field may not exist for tag-based elements
 
-**Likely end-terminated (verify grammar, then use `analyze_end_body`):**
-- `lean`, `ada`, `elm` — no braces, content before `end`
+**Ready to implement (grammar verified, use `analyze_end_body`):**
+- `agda` — `declarations` field, no surrounding keywords in node
+- `elm` — `body` field, no surrounding keywords (verify which container_kinds are meaningful)
+- `tlaplus` — `body` field; verify if content is raw declarations
 
-**Likely brace-delimited (verify grammar, then use `analyze_brace_body`):**
-- `kdl` — `children` field; `{ ... }` blocks
+**Needs investigation:**
+- `verilog`, `vhdl` — hardware modules; `begin...end` or different pattern
 - `ron` — body field; RON uses `{...}` for maps, `(...)` for structs — handle both
-- `verilog`, `vhdl` — hardware modules; likely `begin...end` or `( ... )`
-- `capnp` — struct/interface definitions
 
 **Config/markup formats — verify whether edit makes sense, may legitimately stay None:**
-- `nginx` ✓ done
 - `asciidoc`, `cmake`, `devicetree`, `diff`, `dockerfile`, `graphql`, `ini`, `json`, `nix`
 - `postscript`, `prolog`, `sql`, `toml`, `xml`, `yaml`
 
 **Lisp/dynamic (no traditional delimiter):**
 - `clojure`, `commonlisp`, `elisp`, `scheme` — list nodes; content_start/end within the s-expression
 
-**Special:**
-- `svelte` — `raw_text` child; content inside `<script>`/`<style>` tags
-- `vue` — body field; tag-based containers
-- `vim` — `container_body` returns `None` (fix first); augroup/function bodies
-- `objc` — `@interface...@end` / `@implementation...@end`; keyword-delimited
-- `matlab` — `classdef...end` / `properties...end`; keyword-delimited
-- `erlang` — `container_kinds` only contains `module_attribute` (not a real container); reconsider
+**Confirmed no-op (container_body returns None correctly):**
+- `vim` — `container_body` returns `None`; function/augroup don't expose a body field
+- `erlang` — `container_kinds` only has `module_attribute` (-module(name).); not a real container
 
 
 - ~~`normalize view` symbol not found: trigram suggestions~~ ✓ done (threshold 0.5, min-length 4)

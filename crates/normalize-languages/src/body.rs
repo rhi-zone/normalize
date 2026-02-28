@@ -92,8 +92,23 @@ pub(crate) fn analyze_end_body(
 /// Analyze an Elixir-style `do ... end` block.
 ///
 /// Expects `body_node` to be a `do_block` spanning from `do` to `end`
-/// (exclusive of the trailing newline).
+/// (exclusive of the trailing newline). A thin wrapper around
+/// [`analyze_keyword_end_body`].
 pub(crate) fn analyze_do_end_body(
+    body_node: &Node,
+    content: &str,
+    inner_indent: &str,
+) -> Option<ContainerBody> {
+    analyze_keyword_end_body(body_node, content, inner_indent)
+}
+
+/// Analyze a body node that opens with an arbitrary keyword on the first line
+/// and closes with `end` (e.g., OCaml `struct...end`, `sig...end`; Elixir
+/// `do...end`).
+///
+/// Skips the entire first line (the opening keyword line) for `content_start`,
+/// and strips the trailing `end` for `content_end`.
+pub(crate) fn analyze_keyword_end_body(
     body_node: &Node,
     content: &str,
     inner_indent: &str,
@@ -102,17 +117,13 @@ pub(crate) fn analyze_do_end_body(
     let body_end = body_node.end_byte();
     let bytes = content.as_bytes();
 
-    // Skip past "do" keyword and the following newline
+    // Skip past the first line (opening keyword: "do", "struct", "sig", etc.)
     let mut content_start = body_start;
-    if bytes.get(body_start..body_start.saturating_add(2)) == Some(b"do") {
-        content_start = body_start + 2;
-        // Skip any space between "do" and newline
-        while content_start < body_end && bytes[content_start] != b'\n' {
-            content_start += 1;
-        }
-        if content_start < body_end && bytes[content_start] == b'\n' {
-            content_start += 1;
-        }
+    while content_start < body_end && bytes[content_start] != b'\n' {
+        content_start += 1;
+    }
+    if content_start < body_end && bytes[content_start] == b'\n' {
+        content_start += 1;
     }
 
     // Strip "end" from the tail: body_end - 3 should be the start of "end"
