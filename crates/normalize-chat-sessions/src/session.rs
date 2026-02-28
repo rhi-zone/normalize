@@ -67,6 +67,9 @@ pub enum Role {
     User,
     Assistant,
     System,
+    /// Tool result message (content returned to the model after a tool call).
+    /// Structurally sent as a "user" role in some formats, but semantically distinct.
+    Tool,
 }
 
 /// A content block within a message.
@@ -181,6 +184,7 @@ impl std::fmt::Display for Role {
             Role::User => write!(f, "user"),
             Role::Assistant => write!(f, "assistant"),
             Role::System => write!(f, "system"),
+            Role::Tool => write!(f, "tool"),
         }
     }
 }

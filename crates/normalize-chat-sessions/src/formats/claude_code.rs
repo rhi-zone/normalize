@@ -109,19 +109,32 @@ impl LogFormat for ClaudeCodeFormat {
 
             match entry_type {
                 "user" => {
-                    // Flush previous turn if we have messages
-                    if !current_turn.messages.is_empty() {
-                        // Attach token usage from the last request
-                        if let Some(req_id) = &last_request_id
-                            && let Some(usage) = request_tokens.remove(req_id)
-                        {
-                            current_turn.token_usage = Some(usage);
-                        }
-                        session.turns.push(std::mem::take(&mut current_turn));
-                    }
-
                     let message = parse_message(&entry, Role::User);
-                    current_turn.messages.push(message);
+                    // Tool result messages are structurally "user" in Claude Code's format
+                    // but semantically they are tool responses, not human input.
+                    let is_tool_result = !message.content.is_empty()
+                        && message
+                            .content
+                            .iter()
+                            .all(|b| matches!(b, ContentBlock::ToolResult { .. }));
+
+                    if is_tool_result {
+                        // Tool results belong to the current turn, not a new one
+                        let mut tool_msg = message;
+                        tool_msg.role = Role::Tool;
+                        current_turn.messages.push(tool_msg);
+                    } else {
+                        // Flush previous turn if we have messages
+                        if !current_turn.messages.is_empty() {
+                            if let Some(req_id) = &last_request_id
+                                && let Some(usage) = request_tokens.remove(req_id)
+                            {
+                                current_turn.token_usage = Some(usage);
+                            }
+                            session.turns.push(std::mem::take(&mut current_turn));
+                        }
+                        current_turn.messages.push(message);
+                    }
                 }
                 "assistant" => {
                     let request_id = entry

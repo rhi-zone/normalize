@@ -16,7 +16,7 @@ struct SessionListItem {
     /// Decoded project name (last path component) from the session's parent directory.
     project: Option<String>,
     first_message: Option<String>,
-    turns: usize,
+    user_messages: usize,
     tool_calls: usize,
     duration_seconds: Option<u64>,
 }
@@ -57,7 +57,7 @@ impl OutputFormatter for SessionListReport {
         let legend = if multi {
             "# id  age  duration  turns  tools  project  title".to_string()
         } else {
-            "# id  age  duration  turns  tools  title".to_string()
+            "# id  age  duration  user  tools  title".to_string()
         };
         lines.push(legend);
 
@@ -67,7 +67,7 @@ impl OutputFormatter for SessionListReport {
                 .duration_seconds
                 .map(format_duration)
                 .unwrap_or_else(|| "-".to_string());
-            let counts = format!("{}tr {}tc", item.turns, item.tool_calls);
+            let counts = format!("{}u {}tc", item.user_messages, item.tool_calls);
             let title = item
                 .first_message
                 .as_deref()
@@ -112,7 +112,7 @@ impl OutputFormatter for SessionListReport {
                 Cyan.paint(duration).to_string(),
                 format!(
                     "{}  {}",
-                    Yellow.paint(format!("{} turns", item.turns)),
+                    Yellow.paint(format!("{} user", item.user_messages)),
                     Yellow.paint(format!("{} tools", item.tool_calls))
                 ),
             ];
@@ -189,7 +189,7 @@ fn extract_session_stats(
             })
         });
 
-    let turns = session.turns.len();
+    let user_messages = session.messages_by_role(Role::User);
     let tool_calls = session.tool_uses().count();
 
     // Duration from first to last message timestamp
@@ -211,7 +211,7 @@ fn extract_session_stats(
         None
     };
 
-    (first_message, turns, tool_calls, duration_seconds)
+    (first_message, user_messages, tool_calls, duration_seconds)
 }
 
 /// Parse two RFC 3339 timestamps and return the difference in seconds.
@@ -301,7 +301,7 @@ pub fn build_session_list(
                 .to_string();
             let age_seconds = s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
             let project = project_from_path(&s.path);
-            let (first_message, turns, tool_calls, duration_seconds) =
+            let (first_message, user_messages, tool_calls, duration_seconds) =
                 extract_session_stats(format, &s.path);
             SessionListItem {
                 id,
@@ -309,7 +309,7 @@ pub fn build_session_list(
                 age_seconds,
                 project,
                 first_message,
-                turns,
+                user_messages,
                 tool_calls,
                 duration_seconds,
             }

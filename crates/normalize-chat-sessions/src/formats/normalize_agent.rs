@@ -271,7 +271,7 @@ impl LogFormat for NormalizeAgentFormat {
 
                     // Add tool result
                     current_turn.messages.push(Message {
-                        role: Role::User,
+                        role: Role::Tool,
                         content: vec![ContentBlock::ToolResult {
                             tool_use_id: tool_id,
                             content: if success {

@@ -207,6 +207,7 @@ impl SessionShowReport {
                         Role::User => Blue,
                         Role::Assistant => Green,
                         Role::System => Yellow,
+                        Role::Tool => Yellow,
                     };
                     let header = format!(
                         "=== Turn {} | {} ===",
@@ -353,7 +354,7 @@ impl TurnSummary {
                         }
                     }
                 }
-                Role::System => {}
+                Role::System | Role::Tool => {}
             }
         }
 
@@ -797,6 +798,7 @@ fn cmd_sessions_filter(
                 Role::User => "user",
                 Role::Assistant => "assistant",
                 Role::System => "system",
+                Role::Tool => "tool",
             };
 
             // Filter by content block type
@@ -893,6 +895,7 @@ fn format_role_and_type(role: &Role, block: &ContentBlock) -> String {
         Role::User => "user",
         Role::Assistant => "assistant",
         Role::System => "system",
+        Role::Tool => "tool",
     };
 
     let type_str = match block {
