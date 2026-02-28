@@ -1172,7 +1172,3 @@ git push --tags
 - Test `normalize update` against real release
 - view: directory output shows dir name as first line (tree style) - intentional?
 
-## Sub-service pretty mode resolution
-- Sub-services (package, rules) use `\!compact && pretty` but don't apply `config.pretty.enabled()` (TTY detection).
-- Fixed for sessions list. Fix package.rs and rules.rs too.
-- Root cause: sub-services bypass NormalizeService::resolve_format. Architecturally should share the parent's Cell<bool>.
