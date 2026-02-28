@@ -48,25 +48,6 @@ Analyze across multiple repositories — activity trends, shared patterns, inter
 
 ## Remaining Work
 
-### `analyze_container_body` — remaining languages
-
-`normalize edit` prepend/append is not yet implemented for these languages.
-
-**Needs investigation (grammar not in this build or untested):**
-- `objc` — grammar not in this build; verify field structure before implementing
-
-**Config/markup formats — legitimately None (no "body" concept):**
-- `asciidoc`, `cmake`, `devicetree`, `diff`, `dockerfile`, `graphql`, `ini`, `json`, `nix`
-- `postscript`, `prolog`, `sql`, `toml`, `xml`, `yaml`
-- `elm` — container_kinds are module header/type defs, not bodies you'd prepend/append to
-
-**Lisp/dynamic (no traditional delimiter):**
-- `clojure`, `commonlisp`, `elisp`, `scheme` — list nodes; content_start/end within the s-expression
-
-**Confirmed no-op (container_body returns None correctly):**
-- `vim` — `container_body` returns `None`; function/augroup don't expose a body field
-- `erlang` — `container_kinds` only has `module_attribute` (-module(name).); not a real container
-
 
 - ~~`normalize view` symbol not found: trigram suggestions~~ ✓ done (threshold 0.5, min-length 4)
 - Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
