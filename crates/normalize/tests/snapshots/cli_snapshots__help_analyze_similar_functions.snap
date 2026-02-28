@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 332
 expression: "snapshot_help(&[\"analyze\", \"similar-functions\"])"
 ---
 Detect similar functions via MinHash LSH
@@ -22,6 +21,8 @@ Options:
       --skeleton                   Match on control-flow structure
       --include-trait-impls        Include pairs where both functions share the same name
   -r, --root <root>                Root directory (defaults to current directory)
+      --repos <repos>              Scan across all git repos under DIR
+      --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
       --pretty                     Enable pretty

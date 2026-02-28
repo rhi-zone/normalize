@@ -18,6 +18,7 @@ Options:
       --exclude <exclude>          Exclude paths matching pattern
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --repos <repos>              Run across all git repos under DIR (1 level deep)
+      --repos <repos>              Run across all git repos under DIR
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
   -h, --help                       Print help

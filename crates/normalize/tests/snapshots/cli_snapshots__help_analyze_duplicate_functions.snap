@@ -1,9 +1,7 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 317
 expression: "snapshot_help(&[\"analyze\", \"duplicate-functions\"])"
 ---
-Detect duplicate functions (code clones)
 
 Usage: normalize analyze duplicate-functions [OPTIONS]
 
@@ -20,6 +18,8 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory (defaults to current directory)
+      --repos <repos>              Scan across all git repos under DIR
+      --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
       --pretty                     Enable pretty

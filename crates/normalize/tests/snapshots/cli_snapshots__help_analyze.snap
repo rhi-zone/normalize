@@ -27,7 +27,9 @@ Commands:
   contributors         Analyze contributors across repos
   activity             Analyze cross-repo activity over time
   repo-coupling        Analyze cross-repo coupling
-  duplicate-functions  Detect duplicate functions (code clones)
+  cross-repo-health    Detect duplicate functions (code clones)
+                       Rank repos by tech debt (churn + complexity + coupling)
+  duplicate-functions  
   duplicate-blocks     Detect duplicate code blocks
   similar-functions    Detect similar functions via MinHash LSH
   similar-blocks       Detect similar code blocks via MinHash LSH
