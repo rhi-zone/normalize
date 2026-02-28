@@ -106,6 +106,9 @@ impl SessionsService {
         let limit = limit.unwrap_or(20);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        let config = crate::config::NormalizeConfig::load(resolved_root);
+        let is_pretty = !compact && (pretty || config.pretty.enabled());
         crate::commands::sessions::build_session_list(
             root_path,
             limit,
@@ -116,7 +119,7 @@ impl SessionsService {
             until.as_deref(),
             project_path,
             all_projects,
-            !compact && pretty,
+            is_pretty,
         )
     }
 
