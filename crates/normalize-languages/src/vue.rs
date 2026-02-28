@@ -150,7 +150,10 @@ impl Language for Vue {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // Vue script/style/template elements contain a raw_text child
+        let mut c = node.walk();
+        node.children(&mut c)
+            .find(|&child| child.kind() == "raw_text")
     }
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
         false
@@ -158,11 +161,12 @@ impl Language for Vue {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // raw_text node from script/style/template element — content after leading newline
+        crate::body::analyze_end_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

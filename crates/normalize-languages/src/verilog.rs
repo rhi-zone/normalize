@@ -201,7 +201,8 @@ impl Language for Verilog {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // Verilog module_declaration has no dedicated body field; use node itself
+        Some(*node)
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -210,11 +211,48 @@ impl Language for Verilog {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // module foo(...); ... endmodule
+        // Content starts after the port-list semicolon, ends before endmodule.
+        let end = body_node.end_byte();
+        let bytes = content.as_bytes();
+
+        let mut c = body_node.walk();
+        let mut content_start = body_node.start_byte();
+        for child in body_node.children(&mut c) {
+            if child.kind() == ";" {
+                content_start = child.end_byte();
+                if content_start < end && bytes[content_start] == b'\n' {
+                    content_start += 1;
+                }
+                break;
+            }
+        }
+
+        let mut c2 = body_node.walk();
+        let mut content_end = end;
+        for child in body_node.children(&mut c2) {
+            if child.kind() == "endmodule" {
+                content_end = child.start_byte();
+                while content_end > content_start
+                    && matches!(bytes[content_end - 1], b' ' | b'\t' | b'\n')
+                {
+                    content_end -= 1;
+                }
+                break;
+            }
+        }
+
+        let is_empty = content[content_start..content_end].trim().is_empty();
+        Some(ContainerBody {
+            content_start,
+            content_end,
+            inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

@@ -185,7 +185,8 @@ impl Language for TlaPlus {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // TLA+ module has no dedicated body field; use the module node itself
+        Some(*node)
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -194,11 +195,41 @@ impl Language for TlaPlus {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // TLA+ module: ---- MODULE Foo ----\n...body...\n====
+        // Skip the first line (---- MODULE Foo ----), strip ==== from the tail.
+        let start = body_node.start_byte();
+        let end = body_node.end_byte();
+        let bytes = content.as_bytes();
+
+        let mut content_start = start;
+        while content_start < end && bytes[content_start] != b'\n' {
+            content_start += 1;
+        }
+        if content_start < end {
+            content_start += 1; // skip \n
+        }
+
+        let mut content_end = end;
+        if end >= 4 && bytes.get(end - 4..end) == Some(b"====") {
+            content_end = end - 4;
+            while content_end > content_start
+                && matches!(bytes[content_end - 1], b' ' | b'\t' | b'\n')
+            {
+                content_end -= 1;
+            }
+        }
+
+        let is_empty = content[content_start..content_end].trim().is_empty();
+        Some(ContainerBody {
+            content_start,
+            content_end,
+            inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

@@ -283,11 +283,12 @@ impl Language for Svelte {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // raw_text node from script/style element — content after leading newline
+        crate::body::analyze_end_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

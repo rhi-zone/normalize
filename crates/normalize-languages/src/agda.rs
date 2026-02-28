@@ -236,7 +236,8 @@ impl Language for Agda {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("declarations")
+        // Agda has no dedicated body field; use the container node itself
+        Some(*node)
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -245,11 +246,33 @@ impl Language for Agda {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // Agda: module/record body comes after the `where` keyword
+        let end = body_node.end_byte();
+        let bytes = content.as_bytes();
+
+        let mut content_start = body_node.start_byte();
+        let mut c = body_node.walk();
+        for child in body_node.children(&mut c) {
+            if child.kind() == "where" {
+                content_start = child.end_byte();
+                if content_start < end && bytes[content_start] == b'\n' {
+                    content_start += 1;
+                }
+                break;
+            }
+        }
+
+        let is_empty = content[content_start..end].trim().is_empty();
+        Some(ContainerBody {
+            content_start,
+            content_end: end,
+            inner_indent: inner_indent.to_string(),
+            is_empty,
+        })
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

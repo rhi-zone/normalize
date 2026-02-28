@@ -52,27 +52,13 @@ Analyze across multiple repositories — activity trends, shared patterns, inter
 
 `normalize edit` prepend/append is not yet implemented for these languages.
 
-**Grammar-verified, needs `container_body` fix first (field doesn't exist):**
-- `kdl` — `children` field doesn't exist on `node`; find correct field for child nodes
-- `ada` — `body` field doesn't exist on `package_body`; check correct field name
-- `idris` — `body` field doesn't exist on `data`; find correct field for constructors
-- `matlab` — `body` field doesn't exist on `class_definition`; find correct field
+**Needs investigation (grammar not in this build or untested):**
 - `objc` — grammar not in this build; verify field structure before implementing
-- `svelte` — `container_body` uses `raw_text` child (not a named field); verify byte range
-- `vue` — `body` field may not exist for tag-based elements
 
-**Ready to implement (grammar verified, use `analyze_end_body`):**
-- `agda` — `declarations` field, no surrounding keywords in node
-- `elm` — `body` field, no surrounding keywords (verify which container_kinds are meaningful)
-- `tlaplus` — `body` field; verify if content is raw declarations
-
-**Needs investigation:**
-- `verilog`, `vhdl` — hardware modules; `begin...end` or different pattern
-- `ron` — body field; RON uses `{...}` for maps, `(...)` for structs — handle both
-
-**Config/markup formats — verify whether edit makes sense, may legitimately stay None:**
+**Config/markup formats — legitimately None (no "body" concept):**
 - `asciidoc`, `cmake`, `devicetree`, `diff`, `dockerfile`, `graphql`, `ini`, `json`, `nix`
 - `postscript`, `prolog`, `sql`, `toml`, `xml`, `yaml`
+- `elm` — container_kinds are module header/type defs, not bodies you'd prepend/append to
 
 **Lisp/dynamic (no traditional delimiter):**
 - `clojure`, `commonlisp`, `elisp`, `scheme` — list nodes; content_start/end within the s-expression

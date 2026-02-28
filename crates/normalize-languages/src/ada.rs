@@ -266,8 +266,8 @@ impl Language for Ada {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("declarations")
-            .or_else(|| node.child_by_field_name("statements"))
+        // Ada has no dedicated body field; use the container node itself
+        Some(*node)
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -276,11 +276,12 @@ impl Language for Ada {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // Ada: "package Foo is ... end Foo;" — find `is` child, then `end`
+        crate::body::analyze_is_begin_end_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

@@ -225,7 +225,8 @@ impl Language for Vhdl {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // VHDL entity/architecture/package have no dedicated body field; use node itself
+        Some(*node)
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -234,11 +235,13 @@ impl Language for Vhdl {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // entity/package: `is ... end`; architecture: `is ... begin ... end`
+        // analyze_is_begin_end_body handles both: uses `begin` over `is` when present.
+        crate::body::analyze_is_begin_end_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

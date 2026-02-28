@@ -148,7 +148,14 @@ impl Language for Kdl {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("children")
+        // KDL: node → node_no_terminator → children field (node_children: "{ ... }")
+        let mut c = node.walk();
+        for child in node.children(&mut c) {
+            if child.kind() == "node_no_terminator" {
+                return child.child_by_field_name("children");
+            }
+        }
+        None
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -157,11 +164,12 @@ impl Language for Kdl {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // node_children is "{ ... }" — use brace body analysis
+        crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

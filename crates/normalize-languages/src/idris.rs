@@ -196,7 +196,14 @@ impl Language for Idris {
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
+        // Idris: data → data_body, record → record_body, interface → interface_body
+        let mut c = node.walk();
+        for child in node.children(&mut c) {
+            if matches!(child.kind(), "data_body" | "record_body" | "interface_body") {
+                return Some(child);
+            }
+        }
+        None
     }
 
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
@@ -205,11 +212,18 @@ impl Language for Idris {
 
     fn analyze_container_body(
         &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
+        body_node: &Node,
+        content: &str,
+        inner_indent: &str,
     ) -> Option<ContainerBody> {
-        None
+        // interface_body starts with `where\n` — skip that first line.
+        // data_body and record_body start directly with content.
+        match body_node.kind() {
+            "interface_body" => {
+                crate::body::analyze_keyword_end_body(body_node, content, inner_indent)
+            }
+            _ => crate::body::analyze_end_body(body_node, content, inner_indent),
+        }
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
