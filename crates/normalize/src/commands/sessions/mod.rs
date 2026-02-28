@@ -461,85 +461,31 @@ fn cmd_sessions_list_filtered(
     all_projects: bool,
     output_format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = output_format.is_json();
-    // For now, delegate to stats module's filtering logic but output as list
-    // TODO: Refactor to share filtering between list and stats
-    use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
-    use std::time::{Duration, SystemTime};
-
-    let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
-        Some(name) => match registry.get(name) {
-            Some(f) => f,
-            None => {
-                eprintln!("Unknown format: {}", name);
-                return 1;
+    match list::build_session_list(
+        root,
+        limit,
+        format_name,
+        grep,
+        days,
+        since,
+        until,
+        project,
+        all_projects,
+    ) {
+        Ok(report) => {
+            if report.is_empty() {
+                eprintln!("No {} sessions found", format_name.unwrap_or("Claude Code"));
+                return 0;
             }
-        },
-        None => registry.get("claude").unwrap(),
-    };
-
-    // Compile grep pattern
-    let grep_re = grep.and_then(|p| regex::Regex::new(p).ok());
-    if grep.is_some() && grep_re.is_none() {
-        eprintln!("Invalid grep pattern: {}", grep.unwrap());
-        return 1;
-    }
-
-    // Get sessions
-    let mut sessions: Vec<SessionFile> = if all_projects {
-        stats::list_all_project_sessions(format)
-    } else {
-        let proj = project.or(root);
-        format.list_sessions(proj)
-    };
-
-    // Date filtering
-    let now = SystemTime::now();
-    if let Some(d) = days {
-        let since_time = now - Duration::from_secs(d as u64 * 86400);
-        sessions.retain(|s| s.mtime >= since_time);
-    }
-    if let Some(s) = since
-        && let Some(since_time) = stats::parse_date(s)
-    {
-        sessions.retain(|s| s.mtime >= since_time);
-    }
-    if let Some(u) = until
-        && let Some(until_time) = stats::parse_date(u)
-    {
-        let until_time = until_time + Duration::from_secs(86400);
-        sessions.retain(|s| s.mtime <= until_time);
-    }
-
-    // Grep filtering
-    if let Some(ref re) = grep_re {
-        sessions.retain(|s| session_matches_grep(&s.path, re));
-    }
-
-    // Sort and limit
-    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
-    if limit > 0 {
-        sessions.truncate(limit);
-    }
-
-    // Output
-    if json {
-        let paths: Vec<_> = sessions
-            .iter()
-            .map(|s| s.path.display().to_string())
-            .collect();
-        println!("{}", serde_json::to_string_pretty(&paths).unwrap());
-    } else {
-        for s in &sessions {
-            println!("{}", s.path.display());
+            use crate::output::OutputFormatter;
+            report.print(output_format);
+            0
         }
-        if !sessions.is_empty() {
-            eprintln!("\n{} sessions", sessions.len());
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            1
         }
     }
-
-    0
 }
 
 /// Check if a session file matches a grep pattern.
