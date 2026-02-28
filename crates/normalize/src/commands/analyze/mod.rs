@@ -10,6 +10,7 @@ pub mod check_refs;
 pub mod complexity;
 pub mod contributors;
 pub mod coupling;
+pub mod cross_repo_health;
 pub mod docs;
 pub mod duplicates;
 pub mod files;

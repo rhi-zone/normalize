@@ -9,6 +9,7 @@ use crate::commands::analyze::check_examples::CheckExamplesReport;
 use crate::commands::analyze::check_refs::CheckRefsReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
+use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::docs::DocCoverageReport;
 use crate::commands::analyze::duplicates::{
     DuplicateBlocksConfig, DuplicateBlocksReport, DuplicateFunctionsConfig,
@@ -144,6 +145,14 @@ impl AnalyzeService {
 
     fn display_repo_coupling(&self, r: &RepoCouplingReport) -> String {
         r.format_text()
+    }
+
+    fn display_cross_repo_health(&self, r: &CrossRepoHealthReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_dup_functions(&self, r: &DuplicateFunctionsReport) -> String {
@@ -711,6 +720,17 @@ impl AnalyzeService {
     }
 
     /// Detect duplicate functions (code clones)
+    /// Rank repos by tech debt (churn + complexity + coupling)
+    #[cli(display_with = "display_cross_repo_health")]
+    pub fn cross_repo_health(
+        &self,
+        #[param(help = "Directory containing git repos")] repos_dir: String,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
+    ) -> Result<CrossRepoHealthReport, String> {
+        let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
+        Ok(crate::commands::analyze::cross_repo_health::analyze_cross_repo_health(&repos))
+    }
+
     #[cli(display_with = "display_dup_functions")]
     #[allow(clippy::too_many_arguments)]
     pub fn duplicate_functions(
