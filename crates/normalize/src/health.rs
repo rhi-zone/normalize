@@ -40,6 +40,9 @@ pub struct HealthReport {
     /// causing complexity analysis to be skipped for those files.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub missing_grammars: Vec<String>,
+    /// Top complexity offenders (up to 5), sorted by complexity descending.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub top_offenders: Vec<crate::analyze::complexity::FunctionComplexity>,
 }
 
 impl OutputFormatter for HealthReport {
@@ -286,6 +289,25 @@ impl OutputFormatter for HealthReport {
                     self.high_risk_functions,
                     high_ratio * 100.0
                 ));
+                // Top offenders
+                let max_c = self
+                    .top_offenders
+                    .first()
+                    .map(|f| f.complexity)
+                    .unwrap_or(1);
+                for f in &self.top_offenders {
+                    let ratio = f.complexity as f64 / max_c as f64;
+                    let loc = match (&f.file_path, f.start_line) {
+                        (Some(p), l) => format!("{}:{}", p, l),
+                        (None, l) => format!(":{}", l),
+                    };
+                    lines.push(format!(
+                        "    {}  {}  {}",
+                        Color::Yellow.paint(progress_bar(ratio, 12)),
+                        Color::Yellow.paint(format!("{:>5}", f.complexity)),
+                        Style::new().dimmed().paint(format!("{} ({})", f.name, loc)),
+                    ));
+                }
             }
         } else {
             lines.push("  No functions found".to_string());
@@ -550,6 +572,7 @@ struct ComplexityStats {
     max_complexity: usize,
     high_risk_functions: usize,
     missing_grammars: Vec<String>,
+    top_offenders: Vec<crate::analyze::complexity::FunctionComplexity>,
 }
 
 fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStats {
@@ -575,6 +598,10 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
         vec![]
     };
 
+    let mut top_offenders = report.functions.clone();
+    top_offenders.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+    top_offenders.truncate(5);
+
     ComplexityStats {
         total_functions: report.functions.len(),
         total_complexity: report.total_complexity(),
@@ -582,6 +609,7 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
         max_complexity: report.max_complexity(),
         high_risk_functions: report.high_risk_count() + report.critical_risk_count(),
         missing_grammars,
+        top_offenders,
     }
 }
 
@@ -673,6 +701,7 @@ async fn analyze_health_indexed(
         total_functions: complexity.total_functions,
         large_files,
         missing_grammars: complexity.missing_grammars,
+        top_offenders: complexity.top_offenders,
     }
 }
 
@@ -739,5 +768,6 @@ fn analyze_health_unindexed(
         total_functions: complexity.total_functions,
         large_files,
         missing_grammars: complexity.missing_grammars,
+        top_offenders: complexity.top_offenders,
     }
 }
