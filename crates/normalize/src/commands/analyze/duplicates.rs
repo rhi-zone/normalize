@@ -72,6 +72,18 @@ pub struct DuplicateFunctionsReport {
     show_source: bool,
 }
 
+impl DuplicateFunctionsReport {
+    /// Number of duplicate function groups found.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Total lines of code involved in duplicates.
+    pub fn duplicated_line_count(&self) -> usize {
+        self.duplicated_lines
+    }
+}
+
 impl OutputFormatter for DuplicateFunctionsReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();

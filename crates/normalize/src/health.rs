@@ -9,7 +9,12 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::commands::analyze::ceremony::analyze_ceremony;
 use crate::commands::analyze::complexity::analyze_codebase_complexity;
+use crate::commands::analyze::duplicates::{
+    DuplicateFunctionsConfig, build_duplicate_functions_report,
+};
+use crate::commands::analyze::test_ratio::analyze_test_ratio;
 use crate::index::FileIndex;
 
 /// Large file info for reporting
@@ -43,6 +48,18 @@ pub struct HealthReport {
     /// Top complexity offenders (up to 5), sorted by complexity descending.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub top_offenders: Vec<crate::analyze::complexity::FunctionComplexity>,
+    /// Test LOC / total LOC ratio (0.0–1.0), if computed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test_ratio: Option<f64>,
+    /// Interface-impl / total callables ratio (0.0–1.0), if computed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ceremony_ratio: Option<f64>,
+    /// Number of exact-duplicate function groups.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicate_groups: Option<usize>,
+    /// Lines of code involved in duplicates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicated_lines: Option<usize>,
 }
 
 impl OutputFormatter for HealthReport {
@@ -71,6 +88,21 @@ impl OutputFormatter for HealthReport {
             "  file sizes  {:.0}%  {}",
             breakdown.file_size * 100.0,
             breakdown.file_size_reason
+        ));
+        lines.push(format!(
+            "  test ratio  {:.0}%  {}",
+            breakdown.test_coverage * 100.0,
+            breakdown.test_coverage_reason
+        ));
+        lines.push(format!(
+            "  ceremony    {:.0}%  {}",
+            breakdown.ceremony * 100.0,
+            breakdown.ceremony_reason
+        ));
+        lines.push(format!(
+            "  duplicates  {:.0}%  {}",
+            breakdown.duplicates * 100.0,
+            breakdown.duplicates_reason
         ));
         lines.push(String::new());
 
@@ -251,6 +283,27 @@ impl OutputFormatter for HealthReport {
             breakdown.file_size * 100.0,
             Style::new().dimmed().paint(&breakdown.file_size_reason),
         ));
+        lines.push(format!(
+            "  {:<12}  {}  {:.0}%  {}",
+            Style::new().dimmed().paint("test ratio"),
+            progress_bar(breakdown.test_coverage, 12),
+            breakdown.test_coverage * 100.0,
+            Style::new().dimmed().paint(&breakdown.test_coverage_reason),
+        ));
+        lines.push(format!(
+            "  {:<12}  {}  {:.0}%  {}",
+            Style::new().dimmed().paint("ceremony"),
+            progress_bar(breakdown.ceremony, 12),
+            breakdown.ceremony * 100.0,
+            Style::new().dimmed().paint(&breakdown.ceremony_reason),
+        ));
+        lines.push(format!(
+            "  {:<12}  {}  {:.0}%  {}",
+            Style::new().dimmed().paint("duplicates"),
+            progress_bar(breakdown.duplicates, 12),
+            breakdown.duplicates * 100.0,
+            Style::new().dimmed().paint(&breakdown.duplicates_reason),
+        ));
         lines.push(String::new());
 
         // Files section
@@ -422,18 +475,30 @@ impl OutputFormatter for HealthReport {
 struct HealthScoreBreakdown {
     /// Weighted total (0–1)
     total: f64,
-    /// Avg-complexity component (0–1), weight 30%
+    /// Avg-complexity component (0–1), weight 15%
     complexity: f64,
-    /// High-risk-ratio component (0–1), weight 30%
+    /// High-risk-ratio component (0–1), weight 15%
     risk: f64,
-    /// File-size component (0–1), weight 40%
+    /// File-size component (0–1), weight 20%
     file_size: f64,
+    /// Test ratio component (0–1), weight 20%
+    test_coverage: f64,
+    /// Ceremony ratio component (0–1), weight 10%
+    ceremony: f64,
+    /// Duplicates component (0–1), weight 20%
+    duplicates: f64,
     /// Human-readable reason for the complexity score
     complexity_reason: String,
     /// Human-readable reason for the risk score
     risk_reason: String,
     /// Human-readable reason for the file-size score
     file_size_reason: String,
+    /// Human-readable reason for the test coverage score
+    test_coverage_reason: String,
+    /// Human-readable reason for the ceremony score
+    ceremony_reason: String,
+    /// Human-readable reason for the duplicates score
+    duplicates_reason: String,
 }
 
 impl HealthReport {
@@ -508,15 +573,80 @@ impl HealthReport {
             "no oversized files".to_string()
         };
 
-        let total = (complexity_score * 0.3) + (risk_score * 0.3) + (file_size_score * 0.4);
+        // Test ratio scoring (higher = better)
+        let test_ratio_val = self.test_ratio.unwrap_or(0.0);
+        let test_coverage_score = if test_ratio_val >= 0.30 {
+            1.0
+        } else if test_ratio_val >= 0.20 {
+            0.9
+        } else if test_ratio_val >= 0.10 {
+            0.7
+        } else if test_ratio_val >= 0.05 {
+            0.5
+        } else {
+            0.3
+        };
+        let test_coverage_reason = if self.test_ratio.is_some() {
+            format!("{:.0}% test LOC", test_ratio_val * 100.0)
+        } else {
+            "not computed".to_string()
+        };
+
+        // Ceremony scoring (lower = better)
+        let ceremony_val = self.ceremony_ratio.unwrap_or(0.0);
+        let ceremony_score = if ceremony_val <= 0.20 {
+            1.0
+        } else if ceremony_val <= 0.30 {
+            0.9
+        } else if ceremony_val <= 0.40 {
+            0.8
+        } else if ceremony_val <= 0.50 {
+            0.7
+        } else if ceremony_val <= 0.60 {
+            0.5
+        } else {
+            0.3
+        };
+        let ceremony_reason = if self.ceremony_ratio.is_some() {
+            format!("{:.0}% boilerplate", ceremony_val * 100.0)
+        } else {
+            "not computed".to_string()
+        };
+
+        // Duplicates scoring: 1/(1 + groups/10) — smooth decay, 0 groups → 1.0,
+        // 10 groups → 0.5, 50 groups → 0.17
+        let dup_groups = self.duplicate_groups.unwrap_or(0);
+        let duplicates_score = 1.0 / (1.0 + dup_groups as f64 / 10.0);
+        let duplicates_reason = if self.duplicate_groups.is_some() {
+            if dup_groups == 0 {
+                "no duplicates".to_string()
+            } else {
+                format!("{} duplicate groups", dup_groups)
+            }
+        } else {
+            "not computed".to_string()
+        };
+
+        let total = (complexity_score * 0.15)
+            + (risk_score * 0.15)
+            + (file_size_score * 0.20)
+            + (test_coverage_score * 0.20)
+            + (ceremony_score * 0.10)
+            + (duplicates_score * 0.20);
         HealthScoreBreakdown {
             total,
             complexity: complexity_score,
             risk: risk_score,
             file_size: file_size_score,
+            test_coverage: test_coverage_score,
+            ceremony: ceremony_score,
+            duplicates: duplicates_score,
             complexity_reason,
             risk_reason,
             file_size_reason,
+            test_coverage_reason,
+            ceremony_reason,
+            duplicates_reason,
         }
     }
 
@@ -641,11 +771,49 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
     }
 }
 
+/// Summary numbers extracted from the new analyses for health scoring.
+struct ExtraMetrics {
+    test_ratio: Option<f64>,
+    ceremony_ratio: Option<f64>,
+    duplicate_groups: Option<usize>,
+    duplicated_lines: Option<usize>,
+}
+
+fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
+    let test = analyze_test_ratio(root, 0);
+    let test_ratio = Some(test.overall_ratio);
+
+    let ceremony = analyze_ceremony(root, 0);
+    let ceremony_ratio = Some(ceremony.ceremony_ratio);
+
+    let cfg = DuplicateFunctionsConfig {
+        roots: &[root.to_path_buf()],
+        elide_identifiers: false,
+        elide_literals: false,
+        show_source: false,
+        min_lines: 4,
+        include_trait_impls: false,
+        format: &crate::output::OutputFormat::Compact,
+        filter: None,
+    };
+    let dup_report = build_duplicate_functions_report(cfg);
+    let duplicate_groups = Some(dup_report.group_count());
+    let duplicated_lines = Some(dup_report.duplicated_line_count());
+
+    ExtraMetrics {
+        test_ratio,
+        ceremony_ratio,
+        duplicate_groups,
+        duplicated_lines,
+    }
+}
+
 pub fn analyze_health(root: &Path) -> HealthReport {
     let allow_patterns = load_allow_patterns(root, "large-files-allow");
 
     // Compute complexity upfront (before entering async context to avoid nested runtime)
     let complexity = compute_complexity_stats(root, &[]);
+    let extra = compute_extra_metrics(root);
 
     // Try index first for file/line stats, fall back to filesystem walk
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -655,9 +823,10 @@ pub fn analyze_health(root: &Path) -> HealthReport {
             &mut index,
             &allow_patterns,
             complexity,
+            extra,
         ));
     }
-    analyze_health_unindexed(root, &allow_patterns, complexity)
+    analyze_health_unindexed(root, &allow_patterns, complexity, extra)
 }
 
 async fn analyze_health_indexed(
@@ -665,6 +834,7 @@ async fn analyze_health_indexed(
     index: &mut FileIndex,
     allow_patterns: &[Pattern],
     complexity: ComplexityStats,
+    extra: ExtraMetrics,
 ) -> HealthReport {
     let _ = index.incremental_refresh().await;
 
@@ -730,6 +900,10 @@ async fn analyze_health_indexed(
         large_files,
         missing_grammars: complexity.missing_grammars,
         top_offenders: complexity.top_offenders,
+        test_ratio: extra.test_ratio,
+        ceremony_ratio: extra.ceremony_ratio,
+        duplicate_groups: extra.duplicate_groups,
+        duplicated_lines: extra.duplicated_lines,
     }
 }
 
@@ -738,6 +912,7 @@ fn analyze_health_unindexed(
     root: &Path,
     allow_patterns: &[Pattern],
     complexity: ComplexityStats,
+    extra: ExtraMetrics,
 ) -> HealthReport {
     use ignore::WalkBuilder;
 
@@ -797,5 +972,9 @@ fn analyze_health_unindexed(
         large_files,
         missing_grammars: complexity.missing_grammars,
         top_offenders: complexity.top_offenders,
+        test_ratio: extra.test_ratio,
+        ceremony_ratio: extra.ceremony_ratio,
+        duplicate_groups: extra.duplicate_groups,
+        duplicated_lines: extra.duplicated_lines,
     }
 }
