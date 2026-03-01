@@ -558,15 +558,11 @@ impl FileIndex {
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
-            // Count lines for text files under 1MB (skip binary/large files)
+            // Count lines for text files (binary files will fail read_to_string and get 0)
             let lines = if is_dir {
                 0
             } else {
-                full_path
-                    .metadata()
-                    .ok()
-                    .filter(|m| m.len() < 1_000_000)
-                    .and_then(|_| std::fs::read_to_string(&full_path).ok())
+                std::fs::read_to_string(&full_path)
                     .map(|s| s.lines().count())
                     .unwrap_or(0)
             };
@@ -627,14 +623,11 @@ impl FileIndex {
                     .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                     .map(|d| d.as_secs() as i64)
                     .unwrap_or(0);
-                // Count lines for text files under 1MB (skip binary/large files)
+                // Count lines for text files (binary files will fail read_to_string and get 0)
                 let lines = if is_dir {
                     0
                 } else {
-                    path.metadata()
-                        .ok()
-                        .filter(|m| m.len() < 1_000_000)
-                        .and_then(|_| std::fs::read_to_string(path).ok())
+                    std::fs::read_to_string(path)
                         .map(|s| s.lines().count())
                         .unwrap_or(0)
                 };
