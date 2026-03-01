@@ -1161,7 +1161,7 @@ impl OutputFormatter for DuplicateBlocksReport {
         }
 
         lines.push(String::new());
-        lines.push("To suppress: normalize analyze duplicate-blocks --allow <file:start-end> --reason \"explanation\"".to_string());
+        lines.push("To suppress: normalize analyze duplicate-blocks --allow <file[:symbol]:start-end> --reason \"explanation\"".to_string());
 
         lines.join("\n")
     }
@@ -1611,7 +1611,7 @@ impl OutputFormatter for SimilarBlocksReport {
         }
 
         lines.push(String::new());
-        lines.push("To suppress: normalize analyze similar-blocks --allow <file:start-end> --reason \"explanation\"".to_string());
+        lines.push("To suppress: normalize analyze similar-blocks --allow <file[:symbol]:start-end> --reason \"explanation\"".to_string());
 
         lines.join("\n")
     }
