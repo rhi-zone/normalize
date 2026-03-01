@@ -857,69 +857,69 @@ struct ExtraMetrics {
 }
 
 fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
-    let test = analyze_test_ratio(root, 0);
-    let test_ratio = Some(test.overall_ratio);
-
-    let ceremony = analyze_ceremony(root, 0);
-    let ceremony_ratio = Some(ceremony.ceremony_ratio);
-
-    // Run the three heavy analyses in parallel
+    // Run all analyses in parallel — each is independent
     let root_buf = root.to_path_buf();
-    let ((dup_report, density), uniqueness) = rayon::join(
+    let (((dup_report, density), (test, ceremony)), uniqueness) = rayon::join(
         || {
             rayon::join(
                 || {
-                    let cfg = DuplicateFunctionsConfig {
-                        roots: std::slice::from_ref(&root_buf),
-                        elide_identifiers: false,
-                        elide_literals: false,
-                        show_source: false,
-                        min_lines: 4,
-                        include_trait_impls: false,
-                        format: &crate::output::OutputFormat::Compact,
-                        filter: None,
-                    };
-                    build_duplicate_functions_report(cfg)
+                    rayon::join(
+                        || {
+                            let cfg = DuplicateFunctionsConfig {
+                                roots: std::slice::from_ref(&root_buf),
+                                elide_identifiers: false,
+                                elide_literals: false,
+                                show_source: false,
+                                min_lines: 4,
+                                include_trait_impls: false,
+                                format: &crate::output::OutputFormat::Compact,
+                                filter: None,
+                            };
+                            build_duplicate_functions_report(cfg)
+                        },
+                        || analyze_density(root, 0, 0),
+                    )
                 },
-                || analyze_density(root, 0, 0),
+                || rayon::join(|| analyze_test_ratio(root, 0), || analyze_ceremony(root, 0)),
             )
         },
         || analyze_uniqueness(root, 0.80, 10, false, false, 0, 0, None),
     );
 
-    let duplicate_groups = Some(dup_report.group_count());
-    let duplicated_lines = Some(dup_report.duplicated_line_count());
-    let density_score =
-        Some((density.overall_compression_ratio + density.overall_token_uniqueness) / 2.0);
-    let uniqueness_ratio = Some(uniqueness.overall_uniqueness_ratio);
-
     ExtraMetrics {
-        test_ratio,
-        ceremony_ratio,
-        duplicate_groups,
-        duplicated_lines,
-        density_score,
-        uniqueness_ratio,
+        test_ratio: Some(test.overall_ratio),
+        ceremony_ratio: Some(ceremony.ceremony_ratio),
+        duplicate_groups: Some(dup_report.group_count()),
+        duplicated_lines: Some(dup_report.duplicated_line_count()),
+        density_score: Some(
+            (density.overall_compression_ratio + density.overall_token_uniqueness) / 2.0,
+        ),
+        uniqueness_ratio: Some(uniqueness.overall_uniqueness_ratio),
     }
 }
 
 pub fn analyze_health(root: &Path) -> HealthReport {
     let allow_patterns = load_allow_patterns(root, "large-files-allow");
 
-    // Compute complexity upfront (before entering async context to avoid nested runtime)
-    let complexity = compute_complexity_stats(root, &[]);
-    let extra = compute_extra_metrics(root);
+    // Compute complexity and extra metrics in parallel (before entering async context)
+    let (complexity, extra) = rayon::join(
+        || compute_complexity_stats(root, &[]),
+        || compute_extra_metrics(root),
+    );
 
     // Try index first for file/line stats, fall back to filesystem walk
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    if let Some(mut index) = rt.block_on(crate::index::open_if_enabled(root)) {
-        return rt.block_on(analyze_health_indexed(
-            root,
-            &mut index,
-            &allow_patterns,
-            complexity,
-            extra,
-        ));
+    let config = crate::config::NormalizeConfig::load(root);
+    if config.index.enabled() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        if let Ok(mut index) = rt.block_on(crate::index::open(root)) {
+            return rt.block_on(analyze_health_indexed(
+                root,
+                &mut index,
+                &allow_patterns,
+                complexity,
+                extra,
+            ));
+        }
     }
     analyze_health_unindexed(root, &allow_patterns, complexity, extra)
 }
@@ -1012,46 +1012,66 @@ fn analyze_health_unindexed(
     extra: ExtraMetrics,
 ) -> HealthReport {
     use ignore::WalkBuilder;
+    use rayon::prelude::*;
+
+    let files: Vec<std::path::PathBuf> = WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .build()
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    let total_files = files.len();
+
+    // Process files in parallel: read content, count lines, detect language
+    struct FileInfo {
+        lang: Option<String>,
+        lines: usize,
+        large: Option<LargeFile>,
+    }
+
+    let infos: Vec<FileInfo> = files
+        .par_iter()
+        .map(|path| {
+            let lang = normalize_languages::support_for_path(path).map(|l| l.name().to_string());
+            let (lines, large) = match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    let lines = content.lines().count();
+                    let large = if lang.is_some() && lines >= LARGE_THRESHOLD {
+                        let rel_path = path.strip_prefix(root).unwrap_or(path);
+                        let rel_str = rel_path.to_string_lossy();
+                        if !is_lockfile(&rel_str) && !is_allowed(&rel_str, allow_patterns) {
+                            Some(LargeFile {
+                                path: rel_str.to_string(),
+                                lines,
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    (if lang.is_some() { lines } else { 0 }, large)
+                }
+                Err(_) => (0, None),
+            };
+            FileInfo { lang, lines, large }
+        })
+        .collect();
 
     let mut files_by_language: HashMap<String, usize> = HashMap::new();
-    let mut total_files = 0;
     let mut total_lines = 0;
     let mut large_files = Vec::new();
 
-    let walker = WalkBuilder::new(root).hidden(true).git_ignore(true).build();
-
-    for entry in walker.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
+    for info in infos {
+        if let Some(lang) = info.lang {
+            *files_by_language.entry(lang).or_insert(0) += 1;
         }
-
-        total_files += 1;
-
-        if let Some(lang) = normalize_languages::support_for_path(path) {
-            *files_by_language
-                .entry(lang.name().to_string())
-                .or_insert(0) += 1;
-        }
-
-        if let Ok(content) = std::fs::read_to_string(path) {
-            let lines = content.lines().count();
-            if normalize_languages::support_for_path(path).is_some() {
-                total_lines += lines;
-            }
-
-            let rel_path = path.strip_prefix(root).unwrap_or(path);
-            let rel_str = rel_path.to_string_lossy();
-            if lines >= LARGE_THRESHOLD
-                && !is_lockfile(&rel_str)
-                && !is_allowed(&rel_str, allow_patterns)
-                && normalize_languages::support_for_path(path).is_some()
-            {
-                large_files.push(LargeFile {
-                    path: rel_str.to_string(),
-                    lines,
-                });
-            }
+        total_lines += info.lines;
+        if let Some(lf) = info.large {
+            large_files.push(lf);
         }
     }
 
