@@ -164,7 +164,11 @@ impl OutputFormatter for HealthReport {
         // Unreached grades above: colorized + dimmed, empty bar, 0%.
         // Current grade: bold color, bar filled to show progress within the tier.
         // Grades below: hidden.
-        lines.push(Style::new().bold().paint("Health Score").to_string());
+        lines.push(format!(
+            "{}  {:.0}%",
+            Style::new().bold().paint("Health Score"),
+            health_score * 100.0
+        ));
         // (label, tier_lower, tier_upper, color)
         let grade_thresholds: &[(&str, f64, f64, Color)] = &[
             ("A", 0.9, 1.0, Color::Purple),
