@@ -575,7 +575,9 @@ async fn analyze_health_indexed(
             if file.is_dir {
                 continue;
             }
-            total_lines += file.lines;
+            if normalize_languages::support_for_path(std::path::Path::new(&file.path)).is_some() {
+                total_lines += file.lines;
+            }
             if file.lines >= LARGE_THRESHOLD
                 && !is_lockfile(&file.path)
                 && !is_allowed(&file.path, allow_patterns)
@@ -636,7 +638,9 @@ fn analyze_health_unindexed(
 
         if let Ok(content) = std::fs::read_to_string(path) {
             let lines = content.lines().count();
-            total_lines += lines;
+            if normalize_languages::support_for_path(path).is_some() {
+                total_lines += lines;
+            }
 
             let rel_path = path.strip_prefix(root).unwrap_or(path);
             let rel_str = rel_path.to_string_lossy();
