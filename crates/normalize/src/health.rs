@@ -154,7 +154,8 @@ impl OutputFormatter for HealthReport {
         use nu_ansi_term::{Color, Style};
 
         let mut lines = Vec::new();
-        let health_score = self.calculate_health_score();
+        let breakdown = self.score_breakdown();
+        let health_score = breakdown.total;
         let grade = self.grade();
 
         lines.push(Style::new().bold().paint("Codebase Health").to_string());
@@ -197,6 +198,28 @@ impl OutputFormatter for HealthReport {
                 ));
             }
         }
+        // Score breakdown
+        lines.push(format!(
+            "  {:<12}  {}  {:.0}%  {}",
+            Style::new().dimmed().paint("complexity"),
+            progress_bar(breakdown.complexity, 12),
+            breakdown.complexity * 100.0,
+            Style::new().dimmed().paint(&breakdown.complexity_reason),
+        ));
+        lines.push(format!(
+            "  {:<12}  {}  {:.0}%  {}",
+            Style::new().dimmed().paint("risk"),
+            progress_bar(breakdown.risk, 12),
+            breakdown.risk * 100.0,
+            Style::new().dimmed().paint(&breakdown.risk_reason),
+        ));
+        lines.push(format!(
+            "  {:<12}  {}  {:.0}%  {}",
+            Style::new().dimmed().paint("file sizes"),
+            progress_bar(breakdown.file_size, 12),
+            breakdown.file_size * 100.0,
+            Style::new().dimmed().paint(&breakdown.file_size_reason),
+        ));
         lines.push(String::new());
 
         // Files section
@@ -346,13 +369,25 @@ impl OutputFormatter for HealthReport {
     }
 }
 
-impl HealthReport {
-    fn calculate_health_score(&self) -> f64 {
-        // Scoring based on complexity and file sizes
-        // Lower average complexity = better
-        // Lower high-risk ratio = better
-        // Fewer/smaller large files = better
+struct HealthScoreBreakdown {
+    /// Weighted total (0–1)
+    total: f64,
+    /// Avg-complexity component (0–1), weight 30%
+    complexity: f64,
+    /// High-risk-ratio component (0–1), weight 30%
+    risk: f64,
+    /// File-size component (0–1), weight 40%
+    file_size: f64,
+    /// Human-readable reason for the complexity score
+    complexity_reason: String,
+    /// Human-readable reason for the risk score
+    risk_reason: String,
+    /// Human-readable reason for the file-size score
+    file_size_reason: String,
+}
 
+impl HealthReport {
+    fn score_breakdown(&self) -> HealthScoreBreakdown {
         let complexity_score = if self.avg_complexity <= 3.0 {
             1.0
         } else if self.avg_complexity <= 5.0 {
@@ -366,13 +401,13 @@ impl HealthReport {
         } else {
             0.3
         };
+        let complexity_reason = format!("avg complexity {:.1}", self.avg_complexity);
 
         let high_risk_ratio = if self.total_functions > 0 {
             self.high_risk_functions as f64 / self.total_functions as f64
         } else {
             0.0
         };
-
         let risk_score = if high_risk_ratio <= 0.01 {
             1.0
         } else if high_risk_ratio <= 0.02 {
@@ -386,8 +421,8 @@ impl HealthReport {
         } else {
             0.3
         };
+        let risk_reason = format!("{:.0}% high-risk functions", high_risk_ratio * 100.0);
 
-        // Large file penalty: massive files are a serious problem
         let massive_count = self
             .large_files
             .iter()
@@ -398,9 +433,7 @@ impl HealthReport {
             .iter()
             .filter(|f| f.lines >= VERY_LARGE_THRESHOLD && f.lines < MASSIVE_THRESHOLD)
             .count();
-
         let file_size_score = if massive_count > 0 {
-            // Any massive file is a critical issue
             0.3_f64.max(0.5 - (massive_count as f64 * 0.1))
         } else if very_large_count > 5 {
             0.5
@@ -409,10 +442,36 @@ impl HealthReport {
         } else {
             1.0
         };
+        let file_size_reason = if massive_count > 0 {
+            format!(
+                "{} massive file{}",
+                massive_count,
+                if massive_count == 1 { "" } else { "s" }
+            )
+        } else if very_large_count > 0 {
+            format!(
+                "{} very large file{}",
+                very_large_count,
+                if very_large_count == 1 { "" } else { "s" }
+            )
+        } else {
+            "no oversized files".to_string()
+        };
 
-        // Weight: complexity 30%, risk 30%, file sizes 40%
-        // File sizes weighted higher because they're more actionable
-        (complexity_score * 0.3) + (risk_score * 0.3) + (file_size_score * 0.4)
+        let total = (complexity_score * 0.3) + (risk_score * 0.3) + (file_size_score * 0.4);
+        HealthScoreBreakdown {
+            total,
+            complexity: complexity_score,
+            risk: risk_score,
+            file_size: file_size_score,
+            complexity_reason,
+            risk_reason,
+            file_size_reason,
+        }
+    }
+
+    fn calculate_health_score(&self) -> f64 {
+        self.score_breakdown().total
     }
 
     fn grade(&self) -> &'static str {
