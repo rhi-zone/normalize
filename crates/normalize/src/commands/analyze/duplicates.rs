@@ -5,6 +5,7 @@ use crate::filter::Filter;
 use crate::output::OutputFormatter;
 use crate::parsers;
 use normalize_languages::support_for_path;
+use rayon::prelude::*;
 use serde::Serialize;
 
 /// Resolve a (potentially repo-prefixed) relative path to an absolute path.
@@ -264,72 +265,73 @@ fn detect_duplicate_function_groups(
 ) -> Vec<DuplicateFunctionGroup> {
     let extractor = Extractor::new();
 
-    let mut hash_groups: HashMap<u64, Vec<DuplicateFunctionLocation>> = HashMap::new();
-
-    let walker = ignore::WalkBuilder::new(root)
+    let files: Vec<PathBuf> = ignore::WalkBuilder::new(root)
         .hidden(true)
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
-        .build();
+        .build()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let path = e.path();
+            path.is_file() && super::is_source_file(path)
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
 
-    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-        let path = e.path();
-        path.is_file() && super::is_source_file(path)
-    }) {
-        let path = entry.path();
-        let content = match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
+    let per_file_results: Vec<Vec<(u64, DuplicateFunctionLocation)>> = files
+        .par_iter()
+        .filter_map(|path| {
+            let content = std::fs::read_to_string(path).ok()?;
+            let support = support_for_path(path)?;
+            let tree = parsers::parse_with_grammar(support.grammar_name(), &content)?;
+            let result = extractor.extract(path, &content);
+            let rel_path = path
+                .strip_prefix(root)
+                .unwrap_or(path)
+                .display()
+                .to_string();
 
-        let support = match support_for_path(path) {
-            Some(s) => s,
-            None => continue,
-        };
-
-        let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
-            Some(t) => t,
-            None => continue,
-        };
-
-        let result = extractor.extract(path, &content);
-
-        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
-            let kind = sym.kind.as_str();
-            if kind != "function" && kind != "method" {
-                continue;
-            }
-
-            if let Some(node) = find_function_node(&tree, sym.start_line) {
-                let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
-                if line_count < min_lines {
+            let mut entries = Vec::new();
+            for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+                let kind = sym.kind.as_str();
+                if kind != "function" && kind != "method" {
                     continue;
                 }
-
-                let hash = compute_function_hash(
-                    &node,
-                    content.as_bytes(),
-                    elide_identifiers,
-                    elide_literals,
-                );
-
-                let rel_path = path
-                    .strip_prefix(root)
-                    .unwrap_or(path)
-                    .display()
-                    .to_string();
-
-                hash_groups
-                    .entry(hash)
-                    .or_default()
-                    .push(DuplicateFunctionLocation {
-                        file: rel_path,
-                        symbol: sym.name.clone(),
-                        start_line: sym.start_line,
-                        end_line: sym.end_line,
-                    });
+                if let Some(node) = find_function_node(&tree, sym.start_line) {
+                    let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+                    if line_count < min_lines {
+                        continue;
+                    }
+                    let hash = compute_function_hash(
+                        &node,
+                        content.as_bytes(),
+                        elide_identifiers,
+                        elide_literals,
+                    );
+                    entries.push((
+                        hash,
+                        DuplicateFunctionLocation {
+                            file: rel_path.clone(),
+                            symbol: sym.name.clone(),
+                            start_line: sym.start_line,
+                            end_line: sym.end_line,
+                        },
+                    ));
+                }
             }
+            if entries.is_empty() {
+                None
+            } else {
+                Some(entries)
+            }
+        })
+        .collect();
+
+    let mut hash_groups: HashMap<u64, Vec<DuplicateFunctionLocation>> = HashMap::new();
+    for entries in per_file_results {
+        for (hash, loc) in entries {
+            hash_groups.entry(hash).or_default().push(loc);
         }
     }
 
@@ -496,182 +498,17 @@ pub struct DuplicateFunctionsConfig<'a> {
 pub fn cmd_duplicate_functions_with_count(
     cfg: DuplicateFunctionsConfig<'_>,
 ) -> DuplicateFunctionResult {
-    let DuplicateFunctionsConfig {
-        roots,
-        elide_identifiers,
-        elide_literals,
-        show_source,
-        min_lines,
-        include_trait_impls,
-        format,
-        filter,
-    } = cfg;
-    let json = format.is_json();
-    let extractor = Extractor::new();
-    let multi_repo = roots.len() > 1;
+    let json = cfg.format.is_json();
+    let config_root = cfg
+        .roots
+        .first()
+        .map(|p| p.as_path())
+        .unwrap_or(Path::new("."));
+    let config = crate::config::NormalizeConfig::load(config_root);
 
-    let mut hash_groups: HashMap<u64, Vec<DuplicateFunctionLocation>> = HashMap::new();
-    let mut files_scanned = 0;
-    let mut functions_hashed = 0;
-    let mut combined_allowlist: HashSet<String> = HashSet::new();
+    let report = build_duplicate_functions_report(cfg);
+    let group_count = report.group_count();
 
-    for root in roots {
-        let allowlist = load_duplicate_functions_allowlist(root);
-        let repo_name = root
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-
-        let walker = ignore::WalkBuilder::new(root)
-            .hidden(true)
-            .git_ignore(true)
-            .git_global(true)
-            .git_exclude(true)
-            .build();
-
-        for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-            let path = e.path();
-            path.is_file() && super::is_source_file(path)
-        }) {
-            let path = entry.path();
-
-            if let Some(f) = filter {
-                let rel_path = path.strip_prefix(root).unwrap_or(path);
-                if !f.matches(rel_path) {
-                    continue;
-                }
-            }
-
-            let content = match std::fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            let support = match support_for_path(path) {
-                Some(s) => s,
-                None => continue,
-            };
-
-            let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
-                Some(t) => t,
-                None => continue,
-            };
-
-            files_scanned += 1;
-
-            let result = extractor.extract(path, &content);
-
-            for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
-                let kind = sym.kind.as_str();
-                if kind != "function" && kind != "method" {
-                    continue;
-                }
-
-                if let Some(node) = find_function_node(&tree, sym.start_line) {
-                    let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
-                    if line_count < min_lines {
-                        continue;
-                    }
-
-                    let hash = compute_function_hash(
-                        &node,
-                        content.as_bytes(),
-                        elide_identifiers,
-                        elide_literals,
-                    );
-                    functions_hashed += 1;
-
-                    let root_rel = path.strip_prefix(root).unwrap_or(path);
-                    let rel_path = if multi_repo {
-                        format!("{}/{}", repo_name, root_rel.display())
-                    } else {
-                        root_rel.display().to_string()
-                    };
-
-                    hash_groups
-                        .entry(hash)
-                        .or_default()
-                        .push(DuplicateFunctionLocation {
-                            file: rel_path,
-                            symbol: sym.name.clone(),
-                            start_line: sym.start_line,
-                            end_line: sym.end_line,
-                        });
-                }
-            }
-        }
-
-        for key in allowlist {
-            if multi_repo {
-                combined_allowlist.insert(format!("{}/{}", repo_name, key));
-            } else {
-                combined_allowlist.insert(key);
-            }
-        }
-    }
-
-    let mut groups: Vec<DuplicateFunctionGroup> = hash_groups
-        .into_iter()
-        .filter(|(_, locs)| locs.len() >= 2)
-        .filter(|(_, locs)| {
-            locs.iter()
-                .any(|loc| !combined_allowlist.contains(&format!("{}:{}", loc.file, loc.symbol)))
-        })
-        .map(|(hash, locations)| {
-            let line_count = locations
-                .first()
-                .map(|l| l.end_line - l.start_line + 1)
-                .unwrap_or(0);
-            DuplicateFunctionGroup {
-                hash,
-                locations,
-                line_count,
-            }
-        })
-        .collect();
-
-    let suppressed_same_name = if include_trait_impls {
-        0
-    } else {
-        let before = groups.len();
-        groups.retain(|g| {
-            let names: std::collections::HashSet<&str> =
-                g.locations.iter().map(|l| l.symbol.as_str()).collect();
-            names.len() > 1
-        });
-        before - groups.len()
-    };
-
-    groups.sort_by(|a, b| {
-        b.line_count
-            .cmp(&a.line_count)
-            .then_with(|| b.locations.len().cmp(&a.locations.len()))
-    });
-
-    let total_duplicates: usize = groups.iter().map(|g| g.locations.len()).sum();
-    let duplicated_lines: usize = groups
-        .iter()
-        .map(|g| g.line_count * g.locations.len())
-        .sum();
-
-    let group_count = groups.len();
-
-    let report = DuplicateFunctionsReport {
-        files_scanned,
-        functions_hashed,
-        total_duplicates,
-        duplicated_lines,
-        elide_identifiers,
-        elide_literals,
-        groups,
-        suppressed_same_name,
-        roots: roots.to_vec(),
-        show_source,
-    };
-
-    let config = crate::config::NormalizeConfig::load(
-        roots.first().map(|p| p.as_path()).unwrap_or(Path::new(".")),
-    );
     let format =
         crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
     report.print(&format);
@@ -2280,95 +2117,100 @@ pub(crate) fn find_similar_function_pairs(
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
-        let walker = ignore::WalkBuilder::new(root)
+        let files: Vec<PathBuf> = ignore::WalkBuilder::new(root)
             .hidden(true)
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .build();
-
-        for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-            let path = e.path();
-            path.is_file() && super::is_source_file(path)
-        }) {
-            let path = entry.path();
-
-            if let Some(f) = filter {
-                let rel_path = path.strip_prefix(root).unwrap_or(path);
-                if !f.matches(rel_path) {
-                    continue;
+            .build()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let path = e.path();
+                path.is_file() && super::is_source_file(path)
+            })
+            .filter(|e| {
+                if let Some(f) = filter {
+                    let rel_path = e.path().strip_prefix(root).unwrap_or(e.path());
+                    f.matches(rel_path)
+                } else {
+                    true
                 }
-            }
+            })
+            .map(|e| e.path().to_path_buf())
+            .collect();
 
-            let content = match std::fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
+        #[allow(clippy::type_complexity)]
+        let per_file: Vec<Vec<(String, String, usize, usize, [u64; MINHASH_N])>> = files
+            .par_iter()
+            .filter_map(|path| {
+                let content = std::fs::read_to_string(path).ok()?;
+                let support = support_for_path(path)?;
+                let tree = crate::parsers::parse_with_grammar(support.grammar_name(), &content)?;
+                let root_rel = path.strip_prefix(root).unwrap_or(path);
+                let rel_path = if multi_repo {
+                    format!("{}/{}", repo_name, root_rel.display())
+                } else {
+                    root_rel.display().to_string()
+                };
 
-            let support = match support_for_path(path) {
-                Some(s) => s,
-                None => continue,
-            };
+                let result = extractor.extract(path, &content);
+                let mut entries = Vec::new();
 
-            let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
-                Some(t) => t,
-                None => continue,
-            };
-
-            files_scanned += 1;
-            let root_rel = path.strip_prefix(root).unwrap_or(path);
-            let rel_path = if multi_repo {
-                format!("{}/{}", repo_name, root_rel.display())
-            } else {
-                root_rel.display().to_string()
-            };
-
-            let result = extractor.extract(path, &content);
-
-            for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
-                let kind = sym.kind.as_str();
-                if kind != "function" && kind != "method" {
-                    continue;
-                }
-
-                let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
-                if line_count < min_lines {
-                    continue;
-                }
-
-                if let Some(node) = find_function_node(&tree, sym.start_line) {
-                    let mut tokens = Vec::new();
-                    serialize_subtree_tokens(
-                        &node,
-                        content.as_bytes(),
-                        elide_identifiers,
-                        elide_literals,
-                        skeleton,
-                        &mut tokens,
-                    );
-                    let min_tokens = if skeleton { SHINGLE_K * 4 } else { SHINGLE_K };
-                    if tokens.len() < min_tokens {
+                for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+                    let kind = sym.kind.as_str();
+                    if kind != "function" && kind != "method" {
                         continue;
                     }
-                    if skeleton {
-                        let unique = tokens
-                            .iter()
-                            .collect::<std::collections::HashSet<_>>()
-                            .len();
-                        if (unique as f64 / tokens.len() as f64) < 0.3 {
+
+                    let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+                    if line_count < min_lines {
+                        continue;
+                    }
+
+                    if let Some(node) = find_function_node(&tree, sym.start_line) {
+                        let mut tokens = Vec::new();
+                        serialize_subtree_tokens(
+                            &node,
+                            content.as_bytes(),
+                            elide_identifiers,
+                            elide_literals,
+                            skeleton,
+                            &mut tokens,
+                        );
+                        let min_tokens = if skeleton { SHINGLE_K * 4 } else { SHINGLE_K };
+                        if tokens.len() < min_tokens {
                             continue;
                         }
+                        if skeleton {
+                            let unique = tokens
+                                .iter()
+                                .collect::<std::collections::HashSet<_>>()
+                                .len();
+                            if (unique as f64 / tokens.len() as f64) < 0.3 {
+                                continue;
+                            }
+                        }
+                        let sig = compute_minhash(&tokens);
+                        entries.push((
+                            rel_path.clone(),
+                            sym.name.clone(),
+                            sym.start_line,
+                            sym.end_line,
+                            sig,
+                        ));
                     }
-                    let sig = compute_minhash(&tokens);
-                    all_fns.push((
-                        rel_path.clone(),
-                        sym.name.clone(),
-                        sym.start_line,
-                        sym.end_line,
-                        sig,
-                    ));
                 }
-            }
+                if entries.is_empty() {
+                    None
+                } else {
+                    Some(entries)
+                }
+            })
+            .collect();
+
+        for entries in per_file {
+            files_scanned += 1;
+            all_fns.extend(entries);
         }
     }
 
@@ -2606,8 +2448,8 @@ pub fn build_duplicate_functions_report(
     let multi_repo = roots.len() > 1;
 
     let mut hash_groups: HashMap<u64, Vec<DuplicateFunctionLocation>> = HashMap::new();
-    let mut files_scanned = 0;
-    let mut functions_hashed = 0;
+    let mut files_scanned = 0usize;
+    let mut functions_hashed = 0usize;
     let mut combined_allowlist: HashSet<String> = HashSet::new();
 
     for root in roots {
@@ -2617,82 +2459,80 @@ pub fn build_duplicate_functions_report(
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
-        let walker = ignore::WalkBuilder::new(root)
+        let files: Vec<PathBuf> = ignore::WalkBuilder::new(root)
             .hidden(true)
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .build();
-
-        for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-            let path = e.path();
-            path.is_file() && super::is_source_file(path)
-        }) {
-            let path = entry.path();
-
-            if let Some(f) = filter {
-                let rel_path = path.strip_prefix(root).unwrap_or(path);
-                if !f.matches(rel_path) {
-                    continue;
+            .build()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let path = e.path();
+                path.is_file() && super::is_source_file(path)
+            })
+            .filter(|e| {
+                if let Some(f) = filter {
+                    let rel_path = e.path().strip_prefix(root).unwrap_or(e.path());
+                    f.matches(rel_path)
+                } else {
+                    true
                 }
-            }
+            })
+            .map(|e| e.path().to_path_buf())
+            .collect();
 
-            let content = match std::fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
+        // (fn_count, Vec<(hash, location)>)
+        let per_file: Vec<(usize, Vec<(u64, DuplicateFunctionLocation)>)> = files
+            .par_iter()
+            .filter_map(|path| {
+                let content = std::fs::read_to_string(path).ok()?;
+                let support = support_for_path(path)?;
+                let tree = parsers::parse_with_grammar(support.grammar_name(), &content)?;
+                let result = extractor.extract(path, &content);
+                let root_rel = path.strip_prefix(root).unwrap_or(path);
+                let rel_path = if multi_repo {
+                    format!("{}/{}", repo_name, root_rel.display())
+                } else {
+                    root_rel.display().to_string()
+                };
 
-            let support = match support_for_path(path) {
-                Some(s) => s,
-                None => continue,
-            };
-
-            let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
-                Some(t) => t,
-                None => continue,
-            };
-
-            files_scanned += 1;
-
-            let result = extractor.extract(path, &content);
-
-            for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
-                let kind = sym.kind.as_str();
-                if kind != "function" && kind != "method" {
-                    continue;
-                }
-
-                if let Some(node) = find_function_node(&tree, sym.start_line) {
-                    let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
-                    if line_count < min_lines {
+                let mut entries = Vec::new();
+                for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+                    let kind = sym.kind.as_str();
+                    if kind != "function" && kind != "method" {
                         continue;
                     }
-
-                    let hash = compute_function_hash(
-                        &node,
-                        content.as_bytes(),
-                        elide_identifiers,
-                        elide_literals,
-                    );
-                    functions_hashed += 1;
-
-                    let root_rel = path.strip_prefix(root).unwrap_or(path);
-                    let rel_path = if multi_repo {
-                        format!("{}/{}", repo_name, root_rel.display())
-                    } else {
-                        root_rel.display().to_string()
-                    };
-
-                    hash_groups
-                        .entry(hash)
-                        .or_default()
-                        .push(DuplicateFunctionLocation {
-                            file: rel_path,
-                            symbol: sym.name.clone(),
-                            start_line: sym.start_line,
-                            end_line: sym.end_line,
-                        });
+                    if let Some(node) = find_function_node(&tree, sym.start_line) {
+                        let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+                        if line_count < min_lines {
+                            continue;
+                        }
+                        let hash = compute_function_hash(
+                            &node,
+                            content.as_bytes(),
+                            elide_identifiers,
+                            elide_literals,
+                        );
+                        entries.push((
+                            hash,
+                            DuplicateFunctionLocation {
+                                file: rel_path.clone(),
+                                symbol: sym.name.clone(),
+                                start_line: sym.start_line,
+                                end_line: sym.end_line,
+                            },
+                        ));
+                    }
                 }
+                Some((entries.len(), entries))
+            })
+            .collect();
+
+        for (fn_count, entries) in per_file {
+            files_scanned += 1;
+            functions_hashed += fn_count;
+            for (hash, loc) in entries {
+                hash_groups.entry(hash).or_default().push(loc);
             }
         }
 

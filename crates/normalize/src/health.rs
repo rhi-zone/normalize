@@ -863,25 +863,34 @@ fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
     let ceremony = analyze_ceremony(root, 0);
     let ceremony_ratio = Some(ceremony.ceremony_ratio);
 
-    let cfg = DuplicateFunctionsConfig {
-        roots: &[root.to_path_buf()],
-        elide_identifiers: false,
-        elide_literals: false,
-        show_source: false,
-        min_lines: 4,
-        include_trait_impls: false,
-        format: &crate::output::OutputFormat::Compact,
-        filter: None,
-    };
-    let dup_report = build_duplicate_functions_report(cfg);
+    // Run the three heavy analyses in parallel
+    let root_buf = root.to_path_buf();
+    let ((dup_report, density), uniqueness) = rayon::join(
+        || {
+            rayon::join(
+                || {
+                    let cfg = DuplicateFunctionsConfig {
+                        roots: std::slice::from_ref(&root_buf),
+                        elide_identifiers: false,
+                        elide_literals: false,
+                        show_source: false,
+                        min_lines: 4,
+                        include_trait_impls: false,
+                        format: &crate::output::OutputFormat::Compact,
+                        filter: None,
+                    };
+                    build_duplicate_functions_report(cfg)
+                },
+                || analyze_density(root, 0, 0),
+            )
+        },
+        || analyze_uniqueness(root, 0.80, 10, false, false, 0, 0, None),
+    );
+
     let duplicate_groups = Some(dup_report.group_count());
     let duplicated_lines = Some(dup_report.duplicated_line_count());
-
-    let density = analyze_density(root, 0, 0);
     let density_score =
         Some((density.overall_compression_ratio + density.overall_token_uniqueness) / 2.0);
-
-    let uniqueness = analyze_uniqueness(root, 0.80, 10, false, false, 0, 0, None);
     let uniqueness_ratio = Some(uniqueness.overall_uniqueness_ratio);
 
     ExtraMetrics {
