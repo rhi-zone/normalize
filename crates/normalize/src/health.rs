@@ -11,10 +11,12 @@ use std::path::Path;
 
 use crate::commands::analyze::ceremony::analyze_ceremony;
 use crate::commands::analyze::complexity::analyze_codebase_complexity;
+use crate::commands::analyze::density::analyze_density;
 use crate::commands::analyze::duplicates::{
     DuplicateFunctionsConfig, build_duplicate_functions_report,
 };
 use crate::commands::analyze::test_ratio::analyze_test_ratio;
+use crate::commands::analyze::uniqueness::analyze_uniqueness;
 use crate::index::FileIndex;
 
 /// Large file info for reporting
@@ -57,6 +59,14 @@ pub struct HealthReport {
     /// Number of exact-duplicate function groups.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duplicate_groups: Option<usize>,
+    /// Average density score (0.0–1.0): (compression_ratio + token_uniqueness) / 2.
+    /// Lower = more repetitive. Informational only — not scored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub density_score: Option<f64>,
+    /// Fraction of functions with no structural near-twin (0.0–1.0).
+    /// Higher = more unique. Contributes to health score.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uniqueness_ratio: Option<f64>,
     /// Lines of code involved in duplicates.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duplicated_lines: Option<usize>,
@@ -104,6 +114,17 @@ impl OutputFormatter for HealthReport {
             breakdown.duplicates * 100.0,
             breakdown.duplicates_reason
         ));
+        lines.push(format!(
+            "  uniqueness  {:.0}%  {}",
+            breakdown.uniqueness * 100.0,
+            breakdown.uniqueness_reason
+        ));
+        if let Some(d) = self.density_score {
+            lines.push(format!(
+                "  density     {:.3}  (compression+token avg, lower = more repetitive)",
+                d
+            ));
+        }
         lines.push(String::new());
 
         lines.push("## Files".to_string());
@@ -304,6 +325,20 @@ impl OutputFormatter for HealthReport {
             breakdown.duplicates * 100.0,
             Style::new().dimmed().paint(&breakdown.duplicates_reason),
         ));
+        lines.push(format!(
+            "  {:<12}  {}  {:.0}%  {}",
+            Style::new().dimmed().paint("uniqueness"),
+            progress_bar(breakdown.uniqueness, 12),
+            breakdown.uniqueness * 100.0,
+            Style::new().dimmed().paint(&breakdown.uniqueness_reason),
+        ));
+        if let Some(d) = self.density_score {
+            lines.push(format!(
+                "  {:<12}  {:.3}  (compression+token avg, lower = more repetitive)",
+                Style::new().dimmed().paint("density"),
+                d
+            ));
+        }
         lines.push(String::new());
 
         // Files section
@@ -483,10 +518,12 @@ struct HealthScoreBreakdown {
     file_size: f64,
     /// Test ratio component (0–1), weight 20%
     test_coverage: f64,
-    /// Ceremony ratio component (0–1), weight 10%
+    /// Ceremony ratio component (0–1), weight 5%
     ceremony: f64,
-    /// Duplicates component (0–1), weight 20%
+    /// Duplicates component (0–1), weight 15%
     duplicates: f64,
+    /// Structural uniqueness component (0–1), weight 10%
+    uniqueness: f64,
     /// Human-readable reason for the complexity score
     complexity_reason: String,
     /// Human-readable reason for the risk score
@@ -499,6 +536,8 @@ struct HealthScoreBreakdown {
     ceremony_reason: String,
     /// Human-readable reason for the duplicates score
     duplicates_reason: String,
+    /// Human-readable reason for the uniqueness score
+    uniqueness_reason: String,
 }
 
 impl HealthReport {
@@ -627,12 +666,34 @@ impl HealthReport {
             "not computed".to_string()
         };
 
+        // Uniqueness scoring (higher = more unique functions)
+        let uniqueness_val = self.uniqueness_ratio.unwrap_or(1.0);
+        let uniqueness_score = if uniqueness_val >= 0.95 {
+            1.0
+        } else if uniqueness_val >= 0.90 {
+            0.9
+        } else if uniqueness_val >= 0.80 {
+            0.7
+        } else if uniqueness_val >= 0.70 {
+            0.5
+        } else {
+            0.3
+        };
+        let uniqueness_reason = if self.uniqueness_ratio.is_some() {
+            format!("{:.0}% structurally unique", uniqueness_val * 100.0)
+        } else {
+            "not computed".to_string()
+        };
+
+        // Weights: complexity 15%, risk 15%, file_size 20%, test 20%,
+        //          ceremony 5%, duplicates 15%, uniqueness 10%  → total 100%
         let total = (complexity_score * 0.15)
             + (risk_score * 0.15)
             + (file_size_score * 0.20)
             + (test_coverage_score * 0.20)
-            + (ceremony_score * 0.10)
-            + (duplicates_score * 0.20);
+            + (ceremony_score * 0.05)
+            + (duplicates_score * 0.15)
+            + (uniqueness_score * 0.10);
         HealthScoreBreakdown {
             total,
             complexity: complexity_score,
@@ -641,12 +702,14 @@ impl HealthReport {
             test_coverage: test_coverage_score,
             ceremony: ceremony_score,
             duplicates: duplicates_score,
+            uniqueness: uniqueness_score,
             complexity_reason,
             risk_reason,
             file_size_reason,
             test_coverage_reason,
             ceremony_reason,
             duplicates_reason,
+            uniqueness_reason,
         }
     }
 
@@ -777,6 +840,8 @@ struct ExtraMetrics {
     ceremony_ratio: Option<f64>,
     duplicate_groups: Option<usize>,
     duplicated_lines: Option<usize>,
+    density_score: Option<f64>,
+    uniqueness_ratio: Option<f64>,
 }
 
 fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
@@ -800,11 +865,20 @@ fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
     let duplicate_groups = Some(dup_report.group_count());
     let duplicated_lines = Some(dup_report.duplicated_line_count());
 
+    let density = analyze_density(root, 0, 0);
+    let density_score =
+        Some((density.overall_compression_ratio + density.overall_token_uniqueness) / 2.0);
+
+    let uniqueness = analyze_uniqueness(root, 0.80, 10, false, false, 0, 0, None);
+    let uniqueness_ratio = Some(uniqueness.overall_uniqueness_ratio);
+
     ExtraMetrics {
         test_ratio,
         ceremony_ratio,
         duplicate_groups,
         duplicated_lines,
+        density_score,
+        uniqueness_ratio,
     }
 }
 
@@ -904,6 +978,8 @@ async fn analyze_health_indexed(
         ceremony_ratio: extra.ceremony_ratio,
         duplicate_groups: extra.duplicate_groups,
         duplicated_lines: extra.duplicated_lines,
+        density_score: extra.density_score,
+        uniqueness_ratio: extra.uniqueness_ratio,
     }
 }
 
@@ -976,5 +1052,7 @@ fn analyze_health_unindexed(
         ceremony_ratio: extra.ceremony_ratio,
         duplicate_groups: extra.duplicate_groups,
         duplicated_lines: extra.duplicated_lines,
+        density_score: extra.density_score,
+        uniqueness_ratio: extra.uniqueness_ratio,
     }
 }
