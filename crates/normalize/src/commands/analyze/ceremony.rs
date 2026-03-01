@@ -10,8 +10,8 @@ use std::path::Path;
 pub struct CeremonyLangStats {
     /// Total callable symbols (functions + methods)
     pub total: usize,
-    /// Count that are trait/interface implementations
-    pub trait_impl: usize,
+    /// Count that are interface/trait implementations
+    pub interface_impl: usize,
 }
 
 impl CeremonyLangStats {
@@ -19,7 +19,7 @@ impl CeremonyLangStats {
         if self.total == 0 {
             0.0
         } else {
-            self.trait_impl as f64 / self.total as f64
+            self.interface_impl as f64 / self.total as f64
         }
     }
 }
@@ -29,7 +29,7 @@ impl CeremonyLangStats {
 pub struct FileCeremony {
     pub file_path: String,
     pub total: usize,
-    pub trait_impl: usize,
+    pub interface_impl: usize,
     pub free_functions: usize,
     pub inherent_methods: usize,
     pub ceremony_ratio: f64,
@@ -40,13 +40,13 @@ pub struct FileCeremony {
 pub struct CeremonyReport {
     /// Total callable symbols across all files
     pub total_functions: usize,
-    /// Methods that implement a trait/interface
-    pub trait_impl_methods: usize,
+    /// Methods that implement an interface or trait
+    pub interface_impl_methods: usize,
     /// Free functions (not part of any impl/class)
     pub free_functions: usize,
-    /// Inherent methods (in an impl block, but not a trait impl)
+    /// Inherent/class methods (not fulfilling an interface contract)
     pub inherent_methods: usize,
-    /// Fraction of callables that are trait impl boilerplate
+    /// Fraction of callables that are interface implementation boilerplate
     pub ceremony_ratio: f64,
     /// Per-language breakdown
     pub by_language: HashMap<String, CeremonyLangStats>,
@@ -61,18 +61,18 @@ impl OutputFormatter for CeremonyReport {
         lines.push("# Ceremony Ratio".to_string());
         lines.push(String::new());
         lines.push(format!(
-            "Overall: {:.1}% ceremony ({} of {} callables are trait impl boilerplate)",
+            "Overall: {:.1}% ceremony ({} of {} callables are interface boilerplate)",
             self.ceremony_ratio * 100.0,
-            self.trait_impl_methods,
+            self.interface_impl_methods,
             self.total_functions,
         ));
         lines.push(format!(
-            "  Trait impl methods : {:>5}  ({:.1}%)",
-            self.trait_impl_methods,
+            "  Interface impl methods : {:>5}  ({:.1}%)",
+            self.interface_impl_methods,
             self.ceremony_ratio * 100.0
         ));
         lines.push(format!(
-            "  Inherent methods   : {:>5}  ({:.1}%)",
+            "  Inherent/class methods : {:>5}  ({:.1}%)",
             self.inherent_methods,
             if self.total_functions > 0 {
                 self.inherent_methods as f64 / self.total_functions as f64 * 100.0
@@ -81,7 +81,7 @@ impl OutputFormatter for CeremonyReport {
             }
         ));
         lines.push(format!(
-            "  Free functions     : {:>5}  ({:.1}%)",
+            "  Free functions         : {:>5}  ({:.1}%)",
             self.free_functions,
             if self.total_functions > 0 {
                 self.free_functions as f64 / self.total_functions as f64 * 100.0
@@ -104,7 +104,7 @@ impl OutputFormatter for CeremonyReport {
                     lines.push(format!(
                         "  {:>5.1}%  ({:>4}/{:>4})  {}",
                         stats.ceremony_ratio() * 100.0,
-                        stats.trait_impl,
+                        stats.interface_impl,
                         stats.total,
                         lang,
                     ));
@@ -119,7 +119,7 @@ impl OutputFormatter for CeremonyReport {
                 lines.push(format!(
                     "  {:>5.1}%  ({:>3}/{:>3})  {}",
                     f.ceremony_ratio * 100.0,
-                    f.trait_impl,
+                    f.interface_impl,
                     f.total,
                     f.file_path,
                 ));
@@ -140,7 +140,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
     let mut by_language: HashMap<String, CeremonyLangStats> = HashMap::new();
     let mut file_ceremonies: Vec<FileCeremony> = Vec::new();
     let mut total_functions = 0usize;
-    let mut trait_impl_methods = 0usize;
+    let mut interface_impl_methods = 0usize;
     let mut free_functions = 0usize;
     let mut inherent_methods = 0usize;
 
@@ -162,14 +162,14 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
             .filter_tests();
 
         let mut file_total = 0usize;
-        let mut file_trait_impl = 0usize;
+        let mut file_interface_impl = 0usize;
         let mut file_free = 0usize;
         let mut file_inherent = 0usize;
 
         fn walk(
             symbols: &[crate::skeleton::SkeletonSymbol],
             file_total: &mut usize,
-            file_trait_impl: &mut usize,
+            file_interface_impl: &mut usize,
             file_free: &mut usize,
             file_inherent: &mut usize,
         ) {
@@ -178,7 +178,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
                     SymbolKind::Function => {
                         *file_total += 1;
                         if sym.is_interface_impl {
-                            *file_trait_impl += 1;
+                            *file_interface_impl += 1;
                         } else {
                             *file_free += 1;
                         }
@@ -186,7 +186,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
                     SymbolKind::Method => {
                         *file_total += 1;
                         if sym.is_interface_impl {
-                            *file_trait_impl += 1;
+                            *file_interface_impl += 1;
                         } else {
                             *file_inherent += 1;
                         }
@@ -196,7 +196,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
                 walk(
                     &sym.children,
                     file_total,
-                    file_trait_impl,
+                    file_interface_impl,
                     file_free,
                     file_inherent,
                 );
@@ -206,7 +206,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
         walk(
             &skeleton.symbols,
             &mut file_total,
-            &mut file_trait_impl,
+            &mut file_interface_impl,
             &mut file_free,
             &mut file_inherent,
         );
@@ -216,7 +216,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
         }
 
         total_functions += file_total;
-        trait_impl_methods += file_trait_impl;
+        interface_impl_methods += file_interface_impl;
         free_functions += file_free;
         inherent_methods += file_inherent;
 
@@ -224,16 +224,16 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
             .entry(lang.name().to_string())
             .or_insert(CeremonyLangStats {
                 total: 0,
-                trait_impl: 0,
+                interface_impl: 0,
             });
         entry.total += file_total;
-        entry.trait_impl += file_trait_impl;
+        entry.interface_impl += file_interface_impl;
 
-        let ratio = file_trait_impl as f64 / file_total as f64;
+        let ratio = file_interface_impl as f64 / file_total as f64;
         file_ceremonies.push(FileCeremony {
             file_path: file.path.clone(),
             total: file_total,
-            trait_impl: file_trait_impl,
+            interface_impl: file_interface_impl,
             free_functions: file_free,
             inherent_methods: file_inherent,
             ceremony_ratio: ratio,
@@ -256,14 +256,14 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
         .collect();
 
     let ceremony_ratio = if total_functions > 0 {
-        trait_impl_methods as f64 / total_functions as f64
+        interface_impl_methods as f64 / total_functions as f64
     } else {
         0.0
     };
 
     CeremonyReport {
         total_functions,
-        trait_impl_methods,
+        interface_impl_methods,
         free_functions,
         inherent_methods,
         ceremony_ratio,
