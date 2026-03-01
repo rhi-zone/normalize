@@ -542,6 +542,13 @@ Not a dependency graph, but semantic understanding through:
 - "Score above 98 = work a seasoned engineer would respect" is a nice framing for what normalize's quality rules are trying to achieve
 - Not really "prior art" — more like a contemporary that's building the agent layer on top of the analysis layer normalize is building
 
+**Hands-on evaluation (normalize codebase, Mar 2026):**
+- Scanned as JavaScript — all findings were in `site/` (built docs), `editors/vscode/out/` (compiled VSCode extension), and `target/doc/` (Cargo-generated docs). Zero meaningful findings on Rust source.
+- Rust support is listed as "shallow" and that's accurate: 0 production files detected in `crates/`, 0 structural findings on any `.rs` file
+- "Orphaned" and "import analysis" detectors only understand JS import graphs — Rust's `mod`/`use`/`pub` module system is invisible
+- The LLM subjective review (`desloppify review`) would be the one genuinely useful layer for Rust, but it's just LLM code review — doable directly without desloppify
+- **The meta-insight**: desloppify's architecture requires per-language reimplementation of every detector (unused imports, complexity, coupling). Their Python detector code is exactly what normalize's `.dl` rules should replace — composable, language-agnostic, declarative. Their problem is our motivation.
+
 ## Competitive Analysis Summary
 
 ### What Competitors Do Better Than Normalize Currently:
