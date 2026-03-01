@@ -49,36 +49,77 @@ impl OutputFormatter for HealthReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
 
-        lines.push("# Codebase Health".to_string());
+        let breakdown = self.score_breakdown();
+        let grade = self.grade();
+
+        lines.push(format!(
+            "# Codebase Health  {} ({:.0}%)",
+            grade,
+            breakdown.total * 100.0
+        ));
+        lines.push(format!(
+            "  complexity  {:.0}%  {}",
+            breakdown.complexity * 100.0,
+            breakdown.complexity_reason
+        ));
+        lines.push(format!(
+            "  risk        {:.0}%  {}",
+            breakdown.risk * 100.0,
+            breakdown.risk_reason
+        ));
+        lines.push(format!(
+            "  file sizes  {:.0}%  {}",
+            breakdown.file_size * 100.0,
+            breakdown.file_size_reason
+        ));
         lines.push(String::new());
 
         lines.push("## Files".to_string());
-        lines.push(format!("  Total: {}", self.total_files));
-        // Sort by count descending
+        let human_lines = if self.total_lines >= 1_000_000 {
+            format!("{:.1}M lines", self.total_lines as f64 / 1_000_000.0)
+        } else if self.total_lines >= 1_000 {
+            format!("{:.0}K lines", self.total_lines as f64 / 1_000.0)
+        } else {
+            format!("{} lines", self.total_lines)
+        };
+        lines.push(format!("  {} files · {}", self.total_files, human_lines));
         let mut by_language: Vec<_> = self.files_by_language.iter().collect();
         by_language.sort_by(|a, b| b.1.cmp(a.1));
-        for (lang, count) in by_language {
-            if *count > 0 {
+        for (lang, count) in &by_language {
+            if **count > 0 {
                 lines.push(format!("  {}: {}", lang, count));
             }
         }
-        lines.push(format!("  Lines: {}", self.total_lines));
         lines.push(String::new());
 
         lines.push("## Complexity".to_string());
         if !self.missing_grammars.is_empty() {
             lines.push(format!(
-                "  Warning: grammar not installed for {} — complexity unavailable (run `normalize grammars install`)",
+                "  Warning: grammar not installed for {} — run `normalize grammars install`",
                 self.missing_grammars.join(", ")
             ));
+        } else if self.total_functions > 0 {
+            let high_ratio = self.high_risk_functions as f64 / self.total_functions as f64;
+            lines.push(format!(
+                "  {} functions · total {} · avg {:.1} · max {} · {:.0}% high-risk",
+                self.total_functions,
+                self.total_complexity,
+                self.avg_complexity,
+                self.max_complexity,
+                high_ratio * 100.0,
+            ));
+            for f in &self.top_offenders {
+                let loc = match (&f.file_path, f.start_line) {
+                    (Some(p), l) => format!("{}:{}", p, l),
+                    (None, l) => format!(":{}", l),
+                };
+                lines.push(format!("  {}  {} ({})", f.complexity, f.name, loc));
+            }
+        } else {
+            lines.push("  No functions found".to_string());
         }
-        lines.push(format!("  Functions: {}", self.total_functions));
-        lines.push(format!("  Total: {}", self.total_complexity));
-        lines.push(format!("  Average: {:.1}", self.avg_complexity));
-        lines.push(format!("  Maximum: {}", self.max_complexity));
-        lines.push(format!("  High risk (>10): {}", self.high_risk_functions));
 
-        // Categorize files by severity
+        // Large files — show only the worst tier present
         let massive: Vec<_> = self
             .large_files
             .iter()
@@ -98,7 +139,7 @@ impl OutputFormatter for HealthReport {
         if !massive.is_empty() {
             lines.push(String::new());
             lines.push(format!(
-                "## CRITICAL: Massive Files (>{} lines) - {}",
+                "## CRITICAL: Massive Files (>{} lines) — {}",
                 MASSIVE_THRESHOLD,
                 massive.len()
             ));
@@ -106,14 +147,12 @@ impl OutputFormatter for HealthReport {
                 lines.push(format!("  {} ({} lines)", lf.path, lf.lines));
             }
             if massive.len() > 10 {
-                lines.push(format!("  ... and {} more", massive.len() - 10));
+                lines.push(format!("  … and {} more", massive.len() - 10));
             }
-        }
-
-        if !very_large.is_empty() {
+        } else if !very_large.is_empty() {
             lines.push(String::new());
             lines.push(format!(
-                "## WARNING: Very Large Files (>{} lines) - {}",
+                "## WARNING: Very Large Files (>{} lines) — {}",
                 VERY_LARGE_THRESHOLD,
                 very_large.len()
             ));
@@ -121,14 +160,12 @@ impl OutputFormatter for HealthReport {
                 lines.push(format!("  {} ({} lines)", lf.path, lf.lines));
             }
             if very_large.len() > 5 {
-                lines.push(format!("  ... and {} more", very_large.len() - 5));
+                lines.push(format!("  … and {} more", very_large.len() - 5));
             }
-        }
-
-        if !large.is_empty() {
+        } else if !large.is_empty() {
             lines.push(String::new());
             lines.push(format!(
-                "## Large Files (>{} lines) - {}",
+                "## Large Files (>{} lines) — {}",
                 LARGE_THRESHOLD,
                 large.len()
             ));
@@ -136,18 +173,9 @@ impl OutputFormatter for HealthReport {
                 lines.push(format!("  {} ({} lines)", lf.path, lf.lines));
             }
             if large.len() > 5 {
-                lines.push(format!("  ... and {} more", large.len() - 5));
+                lines.push(format!("  … and {} more", large.len() - 5));
             }
         }
-
-        let health_score = self.calculate_health_score();
-        let grade = self.grade();
-        lines.push(String::new());
-        lines.push(format!(
-            "## Score: {} ({:.0}%)",
-            grade,
-            health_score * 100.0
-        ));
 
         lines.join("\n")
     }
