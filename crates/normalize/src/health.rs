@@ -160,32 +160,36 @@ impl OutputFormatter for HealthReport {
         lines.push(Style::new().bold().paint("Codebase Health").to_string());
         lines.push(String::new());
 
-        // Health score: show grades A–F as a ladder, dimming unreached grades above,
-        // highlighting current grade, hiding grades below ("hiding ranks below").
+        // Health score: show grades A–F as a ladder.
+        // Unreached grades above: colorized + dimmed, empty bar, 0%.
+        // Current grade: bold color, bar filled to show progress within the tier.
+        // Grades below: hidden.
         lines.push(Style::new().bold().paint("Health Score").to_string());
-        let grade_thresholds: &[(&str, f64, Color)] = &[
-            ("A", 0.9, Color::Purple),
-            ("B", 0.8, Color::Blue),
-            ("C", 0.7, Color::Green),
-            ("D", 0.6, Color::Yellow),
-            ("F", 0.0, Color::Red),
+        // (label, tier_lower, tier_upper, color)
+        let grade_thresholds: &[(&str, f64, f64, Color)] = &[
+            ("A", 0.9, 1.0, Color::Purple),
+            ("B", 0.8, 0.9, Color::Blue),
+            ("C", 0.7, 0.8, Color::Green),
+            ("D", 0.6, 0.7, Color::Yellow),
+            ("F", 0.0, 0.6, Color::Red),
         ];
-        for &(g, threshold, color) in grade_thresholds {
+        for &(g, lower, upper, color) in grade_thresholds {
             if g == grade {
-                // Current grade: colored and bold
+                let within = (health_score - lower) / (upper - lower);
                 lines.push(format!(
                     "  {}  {}  {:.0}%",
                     color.bold().paint(g),
-                    color.paint(progress_bar(health_score, 20)),
-                    health_score * 100.0
+                    color.paint(progress_bar(within, 20)),
+                    within * 100.0
                 ));
                 break; // hide grades below
             } else {
-                // Unreached grade above: dimmed bar at threshold
+                // Unreached: dimmed color, empty bar, 0%
+                let dimmed = color.dimmed();
                 lines.push(format!(
-                    "  {}  {}",
-                    Style::new().dimmed().paint(g),
-                    Style::new().dimmed().paint(progress_bar(threshold, 20)),
+                    "  {}  {}  0%",
+                    dimmed.paint(g),
+                    dimmed.paint(progress_bar(0.0, 20)),
                 ));
             }
         }
