@@ -22,6 +22,7 @@ pub mod files;
 pub mod hotspots;
 pub mod imports;
 pub mod length;
+pub mod module_health;
 pub mod ownership;
 pub mod query;
 pub mod repo_coupling;

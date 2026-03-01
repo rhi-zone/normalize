@@ -23,6 +23,7 @@ use crate::commands::analyze::duplicates::{
 use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
 use crate::commands::analyze::imports::ImportCentralityReport;
+use crate::commands::analyze::module_health::ModuleHealthReport;
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
@@ -299,6 +300,14 @@ impl AnalyzeService {
     }
 
     fn display_call_complexity(&self, r: &CallComplexityReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_module_health(&self, r: &ModuleHealthReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1287,6 +1296,35 @@ impl AnalyzeService {
                 &root_path,
                 effective_limit,
                 effective_module_limit,
+            ),
+        )
+    }
+
+    /// Score each module across test ratio, uniqueness, and density (worst first)
+    #[cli(display_with = "display_module_health")]
+    pub fn module_health(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Minimum lines for a module to be included (default: 100)")]
+        min_lines: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ModuleHealthReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(0) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(
+            crate::commands::analyze::module_health::analyze_module_health(
+                &root_path,
+                effective_limit,
+                min_lines.unwrap_or(100),
             ),
         )
     }
