@@ -259,9 +259,9 @@ pub enum AnalyzeCommand {
         #[serde(default = "default_true")]
         elide_identifiers: bool,
 
-        /// Elide literal values when comparing
-        #[arg(long)]
-        #[serde(default)]
+        /// Elide literal values when comparing (default: true; use --no-elide-literals for exact matching)
+        #[arg(long, default_value = "true")]
+        #[serde(default = "default_true")]
         elide_literals: bool,
 
         /// Show source code for detected duplicates
