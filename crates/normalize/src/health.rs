@@ -283,64 +283,72 @@ impl OutputFormatter for HealthReport {
                 ));
             }
         }
+        lines.push(String::new());
         // Score breakdown — pad label in plain text before styling so ANSI codes
         // don't confuse format!'s width measurement.
-        let dim_row = |label: &str, bar: String, pct: f64, reason: &str| {
+        // Bar color reflects the score for that dimension.
+        let score_color = |score: f64| -> Color {
+            if score >= 0.75 {
+                Color::Green
+            } else if score >= 0.50 {
+                Color::Yellow
+            } else {
+                Color::Red
+            }
+        };
+        let score_row = |label: &str, score: f64, reason: &str| {
+            let c = score_color(score);
             format!(
-                "  {}  {}  {:.0}%  {}",
+                "  {}  {}  {}  {}",
                 Style::new().dimmed().paint(format!("{:<LW$}", label)),
-                bar,
-                pct,
+                c.paint(progress_bar(score, 12)),
+                c.paint(format!("{:.0}%", score * 100.0)),
                 Style::new().dimmed().paint(reason),
             )
         };
-        lines.push(dim_row(
+        lines.push(score_row(
             "complexity",
-            progress_bar(breakdown.complexity, 12),
-            breakdown.complexity * 100.0,
+            breakdown.complexity,
             &breakdown.complexity_reason,
         ));
-        lines.push(dim_row(
-            "risk",
-            progress_bar(breakdown.risk, 12),
-            breakdown.risk * 100.0,
-            &breakdown.risk_reason,
-        ));
-        lines.push(dim_row(
+        lines.push(score_row("risk", breakdown.risk, &breakdown.risk_reason));
+        lines.push(score_row(
             "file sizes",
-            progress_bar(breakdown.file_size, 12),
-            breakdown.file_size * 100.0,
+            breakdown.file_size,
             &breakdown.file_size_reason,
         ));
-        lines.push(dim_row(
+        lines.push(score_row(
             "test ratio",
-            progress_bar(breakdown.test_coverage, 12),
-            breakdown.test_coverage * 100.0,
+            breakdown.test_coverage,
             &breakdown.test_coverage_reason,
         ));
-        lines.push(dim_row(
+        lines.push(score_row(
             "ceremony",
-            progress_bar(breakdown.ceremony, 12),
-            breakdown.ceremony * 100.0,
+            breakdown.ceremony,
             &breakdown.ceremony_reason,
         ));
-        lines.push(dim_row(
+        lines.push(score_row(
             "duplicates",
-            progress_bar(breakdown.duplicates, 12),
-            breakdown.duplicates * 100.0,
+            breakdown.duplicates,
             &breakdown.duplicates_reason,
         ));
-        lines.push(dim_row(
+        lines.push(score_row(
             "uniqueness",
-            progress_bar(breakdown.uniqueness, 12),
-            breakdown.uniqueness * 100.0,
+            breakdown.uniqueness,
             &breakdown.uniqueness_reason,
         ));
         if let Some(d) = self.density_score {
+            let d_color = if d >= 0.45 {
+                Color::Green
+            } else if d >= 0.35 {
+                Color::Yellow
+            } else {
+                Color::Red
+            };
             lines.push(format!(
-                "  {}  {:.3}  (compression+token avg, lower = more repetitive)",
+                "  {}  {}  (compression+token avg, lower = more repetitive)",
                 Style::new().dimmed().paint(format!("{:<LW$}", "density")),
-                d
+                d_color.paint(format!("{:.3}", d)),
             ));
         }
         lines.push(String::new());
