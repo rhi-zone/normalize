@@ -316,8 +316,7 @@ impl AnalyzeService {
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
-    #[cli(default)]
-    #[cli(display_with = "display_report")]
+    #[cli(default, display_with = "display_report")]
     pub fn health(
         &self,
         #[param(positional, help = "Target file or directory")] target: Option<String>,
