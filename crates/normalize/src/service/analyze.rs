@@ -60,15 +60,27 @@ impl AnalyzeService {
     }
 
     fn display_check_refs(&self, r: &CheckRefsReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_stale_docs(&self, r: &StaleDocsReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_check_examples(&self, r: &CheckExamplesReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_call_graph(&self, entries: &[CallEntry]) -> String {
@@ -100,7 +112,11 @@ impl AnalyzeService {
     }
 
     fn display_security(&self, r: &SecurityReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_complexity(&self, r: &ComplexityReport) -> String {
@@ -120,47 +136,91 @@ impl AnalyzeService {
     }
 
     fn display_doc_coverage(&self, r: &DocCoverageReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_file_length(&self, r: &FileLengthReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_size(&self, r: &SizeReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_ceremony(&self, r: &CeremonyReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_clusters(&self, r: &ClustersReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_hotspots(&self, r: &HotspotsReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_coupling(&self, r: &CouplingReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_ownership(&self, r: &OwnershipReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_contributors(&self, r: &ContributorsReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_activity(&self, r: &ActivityReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_repo_coupling(&self, r: &RepoCouplingReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_cross_repo_health(&self, r: &CrossRepoHealthReport) -> String {
@@ -180,19 +240,35 @@ impl AnalyzeService {
     }
 
     fn display_dup_blocks(&self, r: &DuplicateBlocksReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_sim_functions(&self, r: &SimilarFunctionsReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_sim_blocks(&self, r: &SimilarBlocksReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_dup_types(&self, r: &DuplicateTypesReport) -> String {
-        r.format_text()
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
     }
 
     fn display_test_gaps(&self, r: &crate::analyze::test_gaps::TestGapsReport) -> String {
