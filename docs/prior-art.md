@@ -521,6 +521,27 @@ Not a dependency graph, but semantic understanding through:
 - Library-first API design
 - LLM-optimized output (token efficiency)
 
+### Desloppify
+- **Repo**: https://github.com/peteromallet/desloppify
+- **What it is**: CLI tool + agent framework for systematically improving code quality. Combines mechanical detectors (unused code, duplication, complexity) with LLM-driven subjective review (naming, abstractions, module boundaries), then guides agents through a prioritized fix queue.
+- **Language support**: ~28 language plugins (deep support for TypeScript, Python, C#, Dart, GDScript, Go; shallow for the rest)
+- **Status**: Early 2025, active development
+
+**Key Architecture Insights:**
+- **Tier-weighted scoring**: T4 refactors worth 4x T1 fixes — penalizes both open *and* ignored issues, so the score can't be gamed by suppressing findings
+- **Persistent state**: `.desloppify/` directory stores findings schema, per-execution `LangRun` state, and live subagent logs during batch review
+- **Layered design**: `engine/detectors/` (language-agnostic) ← `languages/` plugins (language-specific). Import direction is strict: plugins import from detectors, never reversed.
+- **Subjective review guardrails**: Schema validation + feedback consistency checks prevent LLM from gaming the scoring
+- **Command boundary discipline**: Public CLI behavior preserved during refactoring; dynamic imports confined to plugin discovery zones only
+
+**Normalize Observations:**
+- Their detector logic (unused code, duplication, complexity scoring) is exactly the kind of thing normalize's `.dl` rules should express declaratively — desloppify hardcodes this in Python, we make it composable
+- Their tier-weighted scoring + prioritization queue is a good model for what `normalize facts check` output could look like
+- The LLM subjective review layer is deliberately out of scope for normalize (we're the substrate, not the agent)
+- Their ~6 "deep" vs ~22 "shallow" language split is the same tension normalize faces — worth watching how they handle it
+- "Score above 98 = work a seasoned engineer would respect" is a nice framing for what normalize's quality rules are trying to achieve
+- Not really "prior art" — more like a contemporary that's building the agent layer on top of the analysis layer normalize is building
+
 ## Competitive Analysis Summary
 
 ### What Competitors Do Better Than Normalize Currently:
