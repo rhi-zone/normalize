@@ -21,6 +21,7 @@ use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
+use crate::commands::analyze::size::SizeReport;
 use crate::commands::analyze::stale_docs::StaleDocsReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -120,6 +121,10 @@ impl AnalyzeService {
     }
 
     fn display_file_length(&self, r: &FileLengthReport) -> String {
+        r.format_text()
+    }
+
+    fn display_size(&self, r: &SizeReport) -> String {
         r.format_text()
     }
 
@@ -505,6 +510,21 @@ impl AnalyzeService {
             &root_path,
             limit.unwrap_or(20),
             &exclude,
+        ))
+    }
+
+    /// Show hierarchical LOC breakdown (ncdu-style)
+    #[cli(display_with = "display_size")]
+    pub fn size(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+    ) -> Result<SizeReport, String> {
+        let root_path = Self::root_path(root);
+        Ok(crate::commands::analyze::size::analyze_size(
+            &root_path, &exclude,
         ))
     }
 

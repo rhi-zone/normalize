@@ -23,6 +23,7 @@ pub mod report;
 pub mod rules_cmd;
 mod sarif;
 pub mod security;
+pub mod size;
 pub mod stale_docs;
 pub mod test_gaps;
 pub mod trace;
