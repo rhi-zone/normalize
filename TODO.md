@@ -238,14 +238,14 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 Tools for structural meta-analysis of codebases — not just navigating code but understanding
 its composition and compression potential.
 
-- [ ] **`normalize analyze size`** (ncdu-style): hierarchical LOC breakdown, workspace →
+- [x] **`normalize analyze size`** (ncdu-style): hierarchical LOC breakdown, workspace →
   crate → module → file, sorted by size with percentages. Fills the gap between total
   counts and flat longest-file lists. Immediate answer to "where are the lines."
 
-- [ ] **Ceremony ratio**: what fraction of functions/lines are trait impl boilerplate vs
-  novel logic? Report breakdown: trait impls vs free functions vs inherent methods vs
-  generated code. For normalize, ~98 Language impls means most code is the same shape
-  repeated — this would quantify that.
+- [x] **Ceremony ratio**: what fraction of functions are interface impl boilerplate vs
+  novel logic? `normalize analyze ceremony` — breakdown: interface impl / inherent/class /
+  free functions, per-language, top files. For normalize: 62% ceremony, dominated by
+  the ~98 Language trait impls (all 100% ceremony, as expected).
 
 - [ ] **Structural clustering**: `similar-functions` finds pairs; this groups them into
   families. "These 40 files share the same impl shape" > "A is 93% similar to B".
