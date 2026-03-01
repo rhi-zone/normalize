@@ -279,6 +279,14 @@ impl AnalyzeService {
         }
     }
 
+    fn display_budget(&self, r: &crate::commands::analyze::budget::BudgetReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
     fn display_test_ratio(
         &self,
         r: &crate::commands::analyze::test_ratio::TestRatioReport,
@@ -1106,6 +1114,30 @@ impl AnalyzeService {
                 min_overlap.unwrap_or(70),
             ),
         )
+    }
+
+    /// Show line budget breakdown by purpose (logic, test, docs, config, generated, vendored)
+    #[cli(display_with = "display_budget")]
+    pub fn budget(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<crate::commands::analyze::budget::BudgetReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(crate::commands::analyze::budget::analyze_budget(
+            &root_path,
+            effective_limit,
+        ))
     }
 
     /// Show test/impl line ratio per module (sorted by least-tested first)

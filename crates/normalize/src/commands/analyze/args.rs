@@ -489,6 +489,13 @@ pub enum AnalyzeCommand {
         reason: Option<String>,
     },
 
+    /// Show line budget breakdown by purpose (logic, test, docs, config, generated, vendored)
+    Budget {
+        /// Maximum number of modules to show (0 = no limit)
+        #[arg(short = 'l', long, default_value = "30")]
+        limit: usize,
+    },
+
     /// Show test/impl line ratio per module (sorted by least-tested first)
     TestRatio {
         /// Maximum number of modules to show (0 = no limit)

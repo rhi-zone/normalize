@@ -4,6 +4,7 @@ pub mod activity;
 pub mod architecture;
 mod args;
 pub mod ast;
+pub mod budget;
 pub mod call_graph;
 pub mod ceremony;
 pub mod check_examples;
@@ -323,6 +324,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::TestGaps { .. }) => {
             crate::output::print_output_schema::<TestGapsReport>();
+        }
+        Some(AnalyzeCommand::Budget { .. }) => {
+            crate::output::print_output_schema::<budget::BudgetReport>();
         }
         Some(AnalyzeCommand::TestRatio { .. }) => {
             crate::output::print_output_schema::<test_ratio::TestRatioReport>();
@@ -897,6 +901,13 @@ pub fn run(
                 &allowlist,
             );
 
+            report.print(&format);
+            0
+        }
+
+        Some(AnalyzeCommand::Budget { limit }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            let report = budget::analyze_budget(&effective_root, effective_limit);
             report.print(&format);
             0
         }

@@ -12,6 +12,27 @@ Behavioral rules for Claude Code in this repository.
 
 **Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. All commands work without index (graceful degradation).
 
+**CLI is generated from the service layer.** The CLI help and subcommands are NOT driven by `args.rs` / clap `#[derive(Subcommand)]` alone. The primary CLI registration happens in `service/analyze.rs` via `#[cli(...)]` proc-macro attributes on `AnalyzeService` methods. When adding a new analyze subcommand:
+1. Create the analysis module (`commands/analyze/<name>.rs`) with report struct + `OutputFormatter`
+2. Add a `display_<name>` method and a `pub fn <name>` method to `service/analyze.rs` using `#[cli(display_with = "display_<name>")]`
+3. Add the module to `commands/analyze/mod.rs`
+4. Add `assert_output_formatter::<Report>()` in `output.rs` test
+5. Optionally add to `args.rs` `AnalyzeCommand` enum + dispatch in `mod.rs::run()` (for params-json/schema support)
+
+Pattern for service methods:
+```rust
+fn display_foo(&self, r: &FooReport) -> String {
+    if self.pretty.get() { r.format_pretty() } else { r.format_text() }
+}
+
+#[cli(display_with = "display_foo")]
+pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, compact: bool) -> Result<FooReport, String> {
+    let root_path = Self::root_path(root);
+    self.resolve_format(pretty, compact, &root_path);
+    Ok(analyze_foo(&root_path, limit.unwrap_or(30)))
+}
+```
+
 **Balance agent vs tooling:** Both should progress in parallel. After significant agent work, pivot to tooling; after tooling sprint, check if agent could benefit.
 
 **Language vs LocalDeps traits:** Two separate traits, two separate crates, no cross-dependency.

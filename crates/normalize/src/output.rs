@@ -23,6 +23,7 @@ mod tests {
         use crate::commands::aliases::AliasesReport;
         use crate::commands::analyze::activity::ActivityReport;
         use crate::commands::analyze::architecture::ArchitectureReport;
+        use crate::commands::analyze::budget::BudgetReport;
         use crate::commands::analyze::ceremony::CeremonyReport;
         use crate::commands::analyze::check_examples::CheckExamplesReport;
         use crate::commands::analyze::check_refs::CheckRefsReport;
@@ -63,6 +64,7 @@ mod tests {
         assert_output_formatter::<AnalyzeReport>();
         assert_output_formatter::<AliasesReport>();
         assert_output_formatter::<ArchitectureReport>();
+        assert_output_formatter::<BudgetReport>();
         assert_output_formatter::<CeremonyReport>();
         assert_output_formatter::<CheckExamplesReport>();
         assert_output_formatter::<CheckRefsReport>();

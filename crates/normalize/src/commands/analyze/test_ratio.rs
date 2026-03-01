@@ -94,7 +94,7 @@ fn classify_file(path: &Path, content: &str) -> (usize, usize) {
 }
 
 /// Split a Rust source file into (impl_lines, test_lines) by tracking `#[cfg(test)]` mod blocks.
-fn split_rust_test_lines(content: &str) -> (usize, usize) {
+pub(crate) fn split_rust_test_lines(content: &str) -> (usize, usize) {
     let mut impl_lines = 0usize;
     let mut test_lines = 0usize;
     let mut in_test_block = false;
@@ -165,7 +165,7 @@ fn split_rust_test_lines(content: &str) -> (usize, usize) {
 }
 
 /// Check whether a file path looks like a dedicated test file.
-fn is_test_file_path(path: &str) -> bool {
+pub(crate) fn is_test_file_path(path: &str) -> bool {
     let p = path.to_lowercase();
     // Dedicated test directories
     p.starts_with("tests/")
@@ -280,7 +280,7 @@ fn ratio(impl_lines: usize, test_lines: usize) -> f64 {
 /// "crates/normalize-facts/src/lib.rs" → "crates/normalize-facts"
 /// "src/main.rs" → "src"
 /// "lib.rs" → "."
-fn module_key(path: &str) -> String {
+pub(crate) fn module_key(path: &str) -> String {
     // Split off first two components if second looks like a crate
     let parts: Vec<&str> = path.splitn(3, '/').collect();
     match parts.as_slice() {
