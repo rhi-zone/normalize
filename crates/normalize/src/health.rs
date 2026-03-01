@@ -262,13 +262,14 @@ impl OutputFormatter for HealthReport {
             ("D", 0.6, 0.7, Color::Yellow),
             ("F", 0.0, 0.6, Color::Red),
         ];
+        const LW: usize = 12; // label column width (matches breakdown labels below)
         for &(g, lower, upper, color) in grade_thresholds {
             if g == grade {
                 let within = (health_score - lower) / (upper - lower);
                 lines.push(format!(
                     "  {}  {}  {:.0}%",
-                    color.bold().paint(g),
-                    color.paint(progress_bar(within, 20)),
+                    color.bold().paint(format!("{:<LW$}", g)),
+                    color.paint(progress_bar(within, 12)),
                     within * 100.0
                 ));
                 break; // hide grades below
@@ -277,65 +278,68 @@ impl OutputFormatter for HealthReport {
                 let dimmed = color.dimmed();
                 lines.push(format!(
                     "  {}  {}  0%",
-                    dimmed.paint(g),
-                    dimmed.paint(progress_bar(0.0, 20)),
+                    dimmed.paint(format!("{:<LW$}", g)),
+                    dimmed.paint(progress_bar(0.0, 12)),
                 ));
             }
         }
-        // Score breakdown
-        lines.push(format!(
-            "  {:<12}  {}  {:.0}%  {}",
-            Style::new().dimmed().paint("complexity"),
+        // Score breakdown — pad label in plain text before styling so ANSI codes
+        // don't confuse format!'s width measurement.
+        let dim_row = |label: &str, bar: String, pct: f64, reason: &str| {
+            format!(
+                "  {}  {}  {:.0}%  {}",
+                Style::new().dimmed().paint(format!("{:<LW$}", label)),
+                bar,
+                pct,
+                Style::new().dimmed().paint(reason),
+            )
+        };
+        lines.push(dim_row(
+            "complexity",
             progress_bar(breakdown.complexity, 12),
             breakdown.complexity * 100.0,
-            Style::new().dimmed().paint(&breakdown.complexity_reason),
+            &breakdown.complexity_reason,
         ));
-        lines.push(format!(
-            "  {:<12}  {}  {:.0}%  {}",
-            Style::new().dimmed().paint("risk"),
+        lines.push(dim_row(
+            "risk",
             progress_bar(breakdown.risk, 12),
             breakdown.risk * 100.0,
-            Style::new().dimmed().paint(&breakdown.risk_reason),
+            &breakdown.risk_reason,
         ));
-        lines.push(format!(
-            "  {:<12}  {}  {:.0}%  {}",
-            Style::new().dimmed().paint("file sizes"),
+        lines.push(dim_row(
+            "file sizes",
             progress_bar(breakdown.file_size, 12),
             breakdown.file_size * 100.0,
-            Style::new().dimmed().paint(&breakdown.file_size_reason),
+            &breakdown.file_size_reason,
         ));
-        lines.push(format!(
-            "  {:<12}  {}  {:.0}%  {}",
-            Style::new().dimmed().paint("test ratio"),
+        lines.push(dim_row(
+            "test ratio",
             progress_bar(breakdown.test_coverage, 12),
             breakdown.test_coverage * 100.0,
-            Style::new().dimmed().paint(&breakdown.test_coverage_reason),
+            &breakdown.test_coverage_reason,
         ));
-        lines.push(format!(
-            "  {:<12}  {}  {:.0}%  {}",
-            Style::new().dimmed().paint("ceremony"),
+        lines.push(dim_row(
+            "ceremony",
             progress_bar(breakdown.ceremony, 12),
             breakdown.ceremony * 100.0,
-            Style::new().dimmed().paint(&breakdown.ceremony_reason),
+            &breakdown.ceremony_reason,
         ));
-        lines.push(format!(
-            "  {:<12}  {}  {:.0}%  {}",
-            Style::new().dimmed().paint("duplicates"),
+        lines.push(dim_row(
+            "duplicates",
             progress_bar(breakdown.duplicates, 12),
             breakdown.duplicates * 100.0,
-            Style::new().dimmed().paint(&breakdown.duplicates_reason),
+            &breakdown.duplicates_reason,
         ));
-        lines.push(format!(
-            "  {:<12}  {}  {:.0}%  {}",
-            Style::new().dimmed().paint("uniqueness"),
+        lines.push(dim_row(
+            "uniqueness",
             progress_bar(breakdown.uniqueness, 12),
             breakdown.uniqueness * 100.0,
-            Style::new().dimmed().paint(&breakdown.uniqueness_reason),
+            &breakdown.uniqueness_reason,
         ));
         if let Some(d) = self.density_score {
             lines.push(format!(
-                "  {:<12}  {:.3}  (compression+token avg, lower = more repetitive)",
-                Style::new().dimmed().paint("density"),
+                "  {}  {:.3}  (compression+token avg, lower = more repetitive)",
+                Style::new().dimmed().paint(format!("{:<LW$}", "density")),
                 d
             ));
         }
