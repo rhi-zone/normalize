@@ -43,6 +43,10 @@ impl LocalDeps for JavaScriptDeps {
         ecmascript::find_package_cache(project_root)
     }
 
+    fn project_manifest_filenames(&self) -> &'static [&'static str] {
+        &["package.json"]
+    }
+
     fn indexable_extensions(&self) -> &'static [&'static str] {
         &["js", "mjs", "cjs"]
     }

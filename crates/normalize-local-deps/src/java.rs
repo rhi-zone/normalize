@@ -443,6 +443,10 @@ impl LocalDeps for JavaDeps {
         "Java"
     }
 
+    fn project_manifest_filenames(&self) -> &'static [&'static str] {
+        &["pom.xml", "build.gradle", "build.gradle.kts"]
+    }
+
     fn indexable_extensions(&self) -> &'static [&'static str] {
         &["java"]
     }

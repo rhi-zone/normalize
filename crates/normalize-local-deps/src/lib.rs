@@ -114,6 +114,15 @@ pub trait LocalDeps: Send + Sync {
     /// Language name (for display purposes in indexing output).
     fn language_name(&self) -> &'static str;
 
+    /// File names that signal a project/package root for this ecosystem.
+    ///
+    /// Used to discover module boundaries when grouping files by package.
+    /// Examples: `["Cargo.toml"]`, `["package.json"]`, `["go.mod"]`.
+    /// Default: empty (no manifest-based boundary detection for this ecosystem).
+    fn project_manifest_filenames(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     /// File extensions to index when scanning packages.
     /// Required — no sensible default without knowing the language.
     fn indexable_extensions(&self) -> &'static [&'static str];

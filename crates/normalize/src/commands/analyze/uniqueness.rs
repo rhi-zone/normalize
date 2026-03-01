@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
 use crate::commands::analyze::duplicates::find_similar_function_pairs;
-use crate::commands::analyze::test_ratio::module_key;
+use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
 
 /// Per-module uniqueness breakdown.
@@ -269,6 +269,7 @@ pub fn analyze_uniqueness(
     cluster_limit: usize,
     filter: Option<&crate::filter::Filter>,
 ) -> UniquenessReport {
+    let module_dirs = discover_module_dirs(root);
     let roots = vec![root.to_path_buf()];
 
     // Find similar function pairs
@@ -355,7 +356,7 @@ pub fn analyze_uniqueness(
     // Aggregate per module
     let mut module_totals: BTreeMap<String, (usize, usize)> = BTreeMap::new(); // (total_fns, total_lines)
     for (path, fn_count, lines) in &file_fn_counts {
-        let key = module_key(path);
+        let key = module_key(path, &module_dirs);
         let entry = module_totals.entry(key).or_default();
         entry.0 += fn_count;
         entry.1 += lines;
@@ -364,7 +365,7 @@ pub fn analyze_uniqueness(
     // Count clustered functions per module
     let mut module_clustered: BTreeMap<String, (usize, usize)> = BTreeMap::new(); // (clustered_fns, clustered_lines)
     for (file, start, end) in &has_twin {
-        let key = module_key(file);
+        let key = module_key(file, &module_dirs);
         let entry = module_clustered.entry(key).or_default();
         entry.0 += 1;
         entry.1 += end.saturating_sub(*start) + 1;
@@ -430,8 +431,10 @@ pub fn analyze_uniqueness(
                 .first()
                 .map(|(file, start, end)| format!("{}:{}-{}", file, start, end))
                 .unwrap_or_default();
-            let modules_spanned: HashSet<String> =
-                members.iter().map(|(f, _, _)| module_key(f)).collect();
+            let modules_spanned: HashSet<String> = members
+                .iter()
+                .map(|(f, _, _)| module_key(f, &module_dirs))
+                .collect();
             ClusterSummary {
                 size,
                 total_lines,

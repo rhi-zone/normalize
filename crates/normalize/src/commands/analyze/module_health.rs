@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::commands::analyze::ceremony::analyze_ceremony;
 use crate::commands::analyze::density::analyze_density;
-use crate::commands::analyze::test_ratio::{analyze_test_ratio, module_key};
+use crate::commands::analyze::test_ratio::{analyze_test_ratio, discover_module_dirs, module_key};
 use crate::commands::analyze::uniqueness::analyze_uniqueness;
 use crate::output::OutputFormatter;
 
@@ -203,6 +203,7 @@ fn module_score(test: f64, uniq: f64, density: f64) -> f64 {
 
 /// Analyze per-module health by joining test-ratio, uniqueness, density, and ceremony.
 pub fn analyze_module_health(root: &Path, limit: usize, min_lines: usize) -> ModuleHealthReport {
+    let module_dirs = discover_module_dirs(root);
     // Run all analyses in parallel.
     let ((test_rep, density_rep), (uniqueness_rep, ceremony_rep)) = rayon::join(
         || {
@@ -251,7 +252,7 @@ pub fn analyze_module_health(root: &Path, limit: usize, min_lines: usize) -> Mod
     // key -> (total_callables, interface_impl)
     let mut ceremony_acc: HashMap<String, (usize, usize)> = HashMap::new();
     for f in &ceremony_rep.top_files {
-        let key = module_key(&f.file_path);
+        let key = module_key(&f.file_path, &module_dirs);
         let entry = ceremony_acc.entry(key).or_default();
         entry.0 += f.total;
         entry.1 += f.interface_impl;

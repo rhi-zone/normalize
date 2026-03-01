@@ -14,6 +14,10 @@ impl LocalDeps for KotlinDeps {
         "Kotlin"
     }
 
+    fn project_manifest_filenames(&self) -> &'static [&'static str] {
+        &["build.gradle.kts", "build.gradle", "pom.xml"]
+    }
+
     fn indexable_extensions(&self) -> &'static [&'static str] {
         &["kt", "kts"]
     }

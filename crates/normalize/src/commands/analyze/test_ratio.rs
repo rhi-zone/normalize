@@ -194,6 +194,7 @@ pub(crate) fn is_test_file_path(path: &str) -> bool {
 
 /// Analyze test/impl ratio across the codebase.
 pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
+    let module_dirs = discover_module_dirs(root);
     let all_files = crate::path_resolve::all_files(root);
 
     // Collect (relative_path, impl_lines, test_lines)
@@ -215,12 +216,10 @@ pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
         })
         .collect();
 
-    // Group by top-level module (first path component)
-    // For each group, sum impl and test lines
     use std::collections::BTreeMap;
     let mut groups: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for (path, impl_lines, test_lines) in &file_data {
-        let module = module_key(path);
+        let module = module_key(path, &module_dirs);
         let entry = groups.entry(module).or_default();
         entry.0 += impl_lines;
         entry.1 += test_lines;
@@ -275,24 +274,60 @@ fn ratio(impl_lines: usize, test_lines: usize) -> f64 {
     }
 }
 
-/// Collapse a relative path to the top-level crate/module name for grouping.
+/// Discover package/module root directories by looking for ecosystem manifest files.
 ///
-/// "crates/normalize-facts/src/lib.rs" → "crates/normalize-facts"
-/// "src/main.rs" → "src"
-/// "lib.rs" → "."
-pub(crate) fn module_key(path: &str) -> String {
-    // Split off first two components if second looks like a crate
-    let parts: Vec<&str> = path.splitn(3, '/').collect();
-    match parts.as_slice() {
-        [top, second, _rest] if *top == "crates" || *top == "packages" => {
-            format!("{}/{}", top, second)
-        }
-        [top, _rest] => top.to_string(),
-        [only] => {
-            // root-level file
-            let _ = only;
-            ".".to_string()
-        }
-        _ => ".".to_string(),
+/// Queries all registered `LocalDeps` implementations for their manifest filenames
+/// (e.g. `Cargo.toml`, `package.json`, `go.mod`) and finds every directory in `root`
+/// that contains one. Returns relative paths sorted longest-first so that a caller can
+/// find the deepest matching ancestor for any file.
+pub(crate) fn discover_module_dirs(root: &Path) -> Vec<String> {
+    use normalize_local_deps::registry::all_local_deps;
+    use std::collections::{BTreeSet, HashSet};
+
+    let manifests: HashSet<&'static str> = all_local_deps()
+        .iter()
+        .flat_map(|d| d.project_manifest_filenames().iter().copied())
+        .collect();
+
+    if manifests.is_empty() {
+        return vec![".".to_string()];
     }
+
+    let all = crate::path_resolve::all_files(root);
+    let mut dirs: BTreeSet<String> = BTreeSet::new();
+    for f in &all {
+        let p = std::path::Path::new(&f.path);
+        if let Some(name) = p.file_name().and_then(|n| n.to_str())
+            && manifests.contains(name)
+        {
+            let dir = p
+                .parent()
+                .map(|d| d.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let dir = if dir.is_empty() { ".".to_string() } else { dir };
+            dirs.insert(dir);
+        }
+    }
+    dirs.insert(".".to_string());
+
+    let mut result: Vec<String> = dirs.into_iter().collect();
+    // Longest first so the most specific (deepest) match wins.
+    result.sort_by_key(|b| std::cmp::Reverse(b.len()));
+    result
+}
+
+/// Map a relative file path to the deepest enclosing package directory.
+///
+/// `module_dirs` must be sorted longest-first (as returned by `discover_module_dirs`).
+pub(crate) fn module_key(path: &str, module_dirs: &[String]) -> String {
+    for dir in module_dirs {
+        if dir == "." {
+            continue;
+        }
+        let prefix = format!("{}/", dir);
+        if path.starts_with(&prefix) || path == dir.as_str() {
+            return dir.clone();
+        }
+    }
+    ".".to_string()
 }

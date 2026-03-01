@@ -285,6 +285,10 @@ impl LocalDeps for GoDeps {
         "Go"
     }
 
+    fn project_manifest_filenames(&self) -> &'static [&'static str] {
+        &["go.mod"]
+    }
+
     fn indexable_extensions(&self) -> &'static [&'static str] {
         &["go"]
     }

@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 use crate::analyze::complexity::ComplexityAnalyzer;
-use crate::commands::analyze::test_ratio::module_key;
+use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
 
 /// Per-function call-complexity entry.
@@ -416,6 +416,7 @@ pub fn analyze_call_complexity(
     limit: usize,
     module_limit: usize,
 ) -> CallComplexityReport {
+    let module_dirs = discover_module_dirs(root);
     let (cc_map, call_edges, total_edges, resolved_edges) = build_call_graph_from_files(root);
 
     let total_functions = cc_map.len();
@@ -452,7 +453,7 @@ pub fn analyze_call_complexity(
     // (amp_sum, max_reachable, local_sum, count)
     let mut module_acc: BTreeMap<String, (f64, usize, usize, usize)> = BTreeMap::new();
     for e in &entries {
-        let key = module_key(&e.file);
+        let key = module_key(&e.file, &module_dirs);
         let acc = module_acc.entry(key).or_default();
         acc.0 += e.amplification;
         acc.1 = acc.1.max(e.reachable_cc);

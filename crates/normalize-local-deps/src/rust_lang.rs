@@ -175,6 +175,10 @@ impl LocalDeps for RustDeps {
         "Rust"
     }
 
+    fn project_manifest_filenames(&self) -> &'static [&'static str] {
+        &["Cargo.toml"]
+    }
+
     fn indexable_extensions(&self) -> &'static [&'static str] {
         &["rs"]
     }

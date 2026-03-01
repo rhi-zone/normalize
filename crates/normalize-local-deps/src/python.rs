@@ -348,6 +348,10 @@ impl LocalDeps for PythonDeps {
         "Python"
     }
 
+    fn project_manifest_filenames(&self) -> &'static [&'static str] {
+        &["pyproject.toml", "setup.cfg", "setup.py"]
+    }
+
     fn indexable_extensions(&self) -> &'static [&'static str] {
         &["py"]
     }

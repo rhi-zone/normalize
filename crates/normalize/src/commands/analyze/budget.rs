@@ -2,7 +2,9 @@
 //!
 //! Answers "where do our lines go?" — business logic, tests, docs, config, generated, vendored.
 
-use crate::commands::analyze::test_ratio::{is_test_file_path, module_key, split_rust_test_lines};
+use crate::commands::analyze::test_ratio::{
+    discover_module_dirs, is_test_file_path, module_key, split_rust_test_lines,
+};
 use crate::output::OutputFormatter;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -402,6 +404,7 @@ fn classify_file(rel_path: &str, content: &str) -> FileClassification {
 
 /// Analyze line budget across the entire codebase.
 pub fn analyze_budget(root: &Path, module_limit: usize) -> BudgetReport {
+    let module_dirs = discover_module_dirs(root);
     let all_files = crate::path_resolve::all_files(root);
 
     let classifications: Vec<FileClassification> = all_files
@@ -466,7 +469,7 @@ pub fn analyze_budget(root: &Path, module_limit: usize) -> BudgetReport {
     // Group by module
     let mut module_data: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new(); // (logic, test, other)
     for c in &classifications {
-        let key = module_key(&c.rel_path);
+        let key = module_key(&c.rel_path, &module_dirs);
         let entry = module_data.entry(key).or_default();
         entry.0 += c.logic_lines;
         entry.1 += c.test_lines;

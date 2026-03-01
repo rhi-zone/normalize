@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 
-use crate::commands::analyze::test_ratio::module_key;
+use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
 
 /// Per-file density metrics.
@@ -263,6 +263,7 @@ fn token_uniqueness(content: &str) -> (usize, usize) {
 
 /// Analyze information density across the codebase.
 pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> DensityReport {
+    let module_dirs = discover_module_dirs(root);
     let all_files = crate::path_resolve::all_files(root);
 
     let file_metrics: Vec<FileDensity> = all_files
@@ -302,7 +303,7 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
     // Per-module aggregation
     let mut module_data: BTreeMap<String, (Vec<f64>, Vec<f64>, usize, usize)> = BTreeMap::new();
     for fd in &file_metrics {
-        let key = module_key(&fd.path);
+        let key = module_key(&fd.path, &module_dirs);
         let entry = module_data.entry(key).or_default();
         entry.0.push(fd.compression_ratio);
         entry.1.push(fd.token_uniqueness);
