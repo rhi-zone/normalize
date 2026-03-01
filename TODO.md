@@ -48,6 +48,15 @@ Analyze across multiple repositories — activity trends, shared patterns, inter
 
 ## Remaining Work
 
+### OutputFormatter audit
+Not all output types implement `OutputFormatter` — some have bare `format()` methods or print directly.
+This means `--pretty` / `--compact` / `--json` flags silently do nothing for those commands.
+
+Audit all public output types and ensure every one implements `OutputFormatter` with both
+`format_text()` (LLM-friendly, no color) and `format_pretty()` (colored, human-readable).
+Known gap: `HealthReport` (fixed), but likely others remain.
+
+
 
 - ~~`normalize view` symbol not found: trigram suggestions~~ ✓ done (threshold 0.5, min-length 4)
 - Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`

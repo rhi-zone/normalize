@@ -4,6 +4,7 @@
 //! complexity summary, and structural metrics.
 
 use glob::Pattern;
+use normalize_output::OutputFormatter;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -41,8 +42,8 @@ pub struct HealthReport {
     pub missing_grammars: Vec<String>,
 }
 
-impl HealthReport {
-    pub fn format(&self) -> String {
+impl OutputFormatter for HealthReport {
+    fn format_text(&self) -> String {
         let mut lines = Vec::new();
 
         lines.push("# Codebase Health".to_string());
@@ -148,6 +149,180 @@ impl HealthReport {
         lines.join("\n")
     }
 
+    fn format_pretty(&self) -> String {
+        use normalize_output::progress_bar;
+        use nu_ansi_term::{Color, Style};
+
+        let mut lines = Vec::new();
+        let health_score = self.calculate_health_score();
+        let grade = self.grade();
+
+        lines.push(Style::new().bold().paint("Codebase Health").to_string());
+        lines.push(String::new());
+
+        // Health score bar
+        lines.push(Style::new().bold().paint("Health Score").to_string());
+        let grade_color = if health_score >= 0.67 {
+            Color::Green
+        } else if health_score >= 0.34 {
+            Color::Yellow
+        } else {
+            Color::Red
+        };
+        lines.push(format!(
+            "  {}  {}  {:.0}%",
+            grade_color.bold().paint(grade),
+            grade_color.paint(progress_bar(health_score, 20)),
+            health_score * 100.0
+        ));
+        lines.push(String::new());
+
+        // Files section
+        lines.push(Style::new().bold().paint("Files").to_string());
+        let human_lines = if self.total_lines >= 1_000_000 {
+            format!("{:.1}M lines", self.total_lines as f64 / 1_000_000.0)
+        } else if self.total_lines >= 1_000 {
+            format!("{:.0}K lines", self.total_lines as f64 / 1_000.0)
+        } else {
+            format!("{} lines", self.total_lines)
+        };
+        lines.push(format!("  {} files · {}", self.total_files, human_lines));
+
+        // Language bars (normalized to the largest language)
+        let max_count = self.files_by_language.values().max().copied().unwrap_or(1);
+        let mut by_language: Vec<_> = self.files_by_language.iter().collect();
+        by_language.sort_by(|a, b| b.1.cmp(a.1));
+        for (lang, count) in by_language.iter().filter(|(_, c)| **c > 0) {
+            let ratio = **count as f64 / max_count as f64;
+            lines.push(format!(
+                "  {:<16} {}  {}",
+                lang,
+                progress_bar(ratio, 16),
+                count
+            ));
+        }
+        lines.push(String::new());
+
+        // Complexity section
+        lines.push(Style::new().bold().paint("Complexity").to_string());
+        if !self.missing_grammars.is_empty() {
+            lines.push(format!(
+                "  {}",
+                Color::Yellow.paint(format!(
+                    "grammar not installed for {} — run `normalize grammars install`",
+                    self.missing_grammars.join(", ")
+                ))
+            ));
+        } else if self.total_functions > 0 {
+            lines.push(format!(
+                "  {} functions · total {} · avg {:.1} · max {}",
+                self.total_functions,
+                self.total_complexity,
+                self.avg_complexity,
+                self.max_complexity
+            ));
+            let low_risk = self
+                .total_functions
+                .saturating_sub(self.high_risk_functions);
+            let low_ratio = low_risk as f64 / self.total_functions as f64;
+            let high_ratio = self.high_risk_functions as f64 / self.total_functions as f64;
+            lines.push(format!(
+                "  {:<10} {}  {} ({:.0}%)",
+                Color::Green.paint("Low"),
+                Color::Green.paint(progress_bar(low_ratio, 16)),
+                low_risk,
+                low_ratio * 100.0
+            ));
+            if self.high_risk_functions > 0 {
+                lines.push(format!(
+                    "  {:<10} {}  {} ({:.0}%)",
+                    Color::Yellow.bold().paint("High risk"),
+                    Color::Yellow.paint(progress_bar(high_ratio, 16)),
+                    self.high_risk_functions,
+                    high_ratio * 100.0
+                ));
+            }
+        } else {
+            lines.push("  No functions found".to_string());
+        }
+
+        // Large files — show only the worst tier present ("hiding ranks below")
+        let massive: Vec<_> = self
+            .large_files
+            .iter()
+            .filter(|f| f.lines >= MASSIVE_THRESHOLD)
+            .collect();
+        let very_large: Vec<_> = self
+            .large_files
+            .iter()
+            .filter(|f| f.lines >= VERY_LARGE_THRESHOLD && f.lines < MASSIVE_THRESHOLD)
+            .collect();
+        let large: Vec<_> = self
+            .large_files
+            .iter()
+            .filter(|f| f.lines >= LARGE_THRESHOLD && f.lines < VERY_LARGE_THRESHOLD)
+            .collect();
+
+        if !massive.is_empty() {
+            lines.push(String::new());
+            lines.push(
+                Color::Red
+                    .bold()
+                    .paint(format!(
+                        "CRITICAL: Massive Files (>{}  lines) — {}",
+                        MASSIVE_THRESHOLD,
+                        massive.len()
+                    ))
+                    .to_string(),
+            );
+            for lf in massive.iter().take(10) {
+                lines.push(format!("  {:<42} {} lines", lf.path, lf.lines));
+            }
+            if massive.len() > 10 {
+                lines.push(format!("  … and {} more", massive.len() - 10));
+            }
+        } else if !very_large.is_empty() {
+            lines.push(String::new());
+            lines.push(
+                Color::Yellow
+                    .bold()
+                    .paint(format!(
+                        "WARNING: Very Large Files (>{} lines) — {}",
+                        VERY_LARGE_THRESHOLD,
+                        very_large.len()
+                    ))
+                    .to_string(),
+            );
+            for lf in very_large.iter().take(5) {
+                lines.push(format!("  {:<42} {} lines", lf.path, lf.lines));
+            }
+            if very_large.len() > 5 {
+                lines.push(format!("  … and {} more", very_large.len() - 5));
+            }
+        } else if !large.is_empty() {
+            lines.push(String::new());
+            lines.push(
+                Color::Blue
+                    .paint(format!(
+                        "Large Files (>{} lines) — {}",
+                        LARGE_THRESHOLD,
+                        large.len()
+                    ))
+                    .to_string(),
+            );
+            for lf in large.iter().take(5) {
+                lines.push(format!("  {:<42} {} lines", lf.path, lf.lines));
+            }
+            if large.len() > 5 {
+                lines.push(format!("  … and {} more", large.len() - 5));
+            }
+        }
+
+        lines.join("\n")
+    }
+}
+
+impl HealthReport {
     fn calculate_health_score(&self) -> f64 {
         // Scoring based on complexity and file sizes
         // Lower average complexity = better

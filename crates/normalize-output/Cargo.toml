@@ -15,3 +15,4 @@ schemars = "1"
 jaq-core = "2"
 jaq-std = "2"
 jaq-json = { version = "1", features = ["serde_json"] }
+nu-ansi-term = "0.50"

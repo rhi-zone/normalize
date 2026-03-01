@@ -172,7 +172,7 @@ impl OutputFormatter for AnalyzeReport {
         sections.push(String::new());
 
         if let Some(ref health) = self.health {
-            sections.push(health.format());
+            sections.push(health.format_text());
             sections.push(String::new());
         }
 
@@ -284,7 +284,7 @@ impl OutputFormatter for AnalyzeReport {
         sections.push(String::new());
 
         if let Some(ref health) = self.health {
-            sections.push(health.format());
+            sections.push(health.format_pretty());
             sections.push(String::new());
         }
 

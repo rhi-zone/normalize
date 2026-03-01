@@ -302,6 +302,34 @@ pub fn print_jq_lines(lines: &[String], jsonl: bool) {
     }
 }
 
+/// Render a plain (uncolored) progress bar using block characters.
+///
+/// `ratio` is clamped to 0.0–1.0. `width` is the total character count.
+/// Callers can wrap the result in ANSI color as needed.
+pub fn progress_bar(ratio: f64, width: usize) -> String {
+    let ratio = ratio.clamp(0.0, 1.0);
+    let filled = (ratio * width as f64).round() as usize;
+    format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
+}
+
+/// Render a colored progress bar where high ratio = good (green) and low = bad (red).
+pub fn progress_bar_good(ratio: f64, width: usize) -> String {
+    use nu_ansi_term::Color;
+    let color = if ratio >= 0.67 {
+        Color::Green
+    } else if ratio >= 0.34 {
+        Color::Yellow
+    } else {
+        Color::Red
+    };
+    color.paint(progress_bar(ratio, width)).to_string()
+}
+
+/// Render a colored progress bar where high ratio = bad (red) and low = good (green).
+pub fn progress_bar_bad(ratio: f64, width: usize) -> String {
+    progress_bar_good(1.0 - ratio, width)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
