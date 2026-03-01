@@ -241,16 +241,16 @@ impl OutputFormatter for HealthReport {
             let low_ratio = low_risk as f64 / self.total_functions as f64;
             let high_ratio = self.high_risk_functions as f64 / self.total_functions as f64;
             lines.push(format!(
-                "  {:<10} {}  {} ({:.0}%)",
-                Color::Green.paint("Low"),
+                "  {}  {}  {} ({:.0}%)",
+                Color::Green.paint(format!("{:<9}", "Low")),
                 Color::Green.paint(progress_bar(low_ratio, 16)),
                 low_risk,
                 low_ratio * 100.0
             ));
             if self.high_risk_functions > 0 {
                 lines.push(format!(
-                    "  {:<10} {}  {} ({:.0}%)",
-                    Color::Yellow.bold().paint("High risk"),
+                    "  {}  {}  {} ({:.0}%)",
+                    Color::Yellow.bold().paint(format!("{:<9}", "High risk")),
                     Color::Yellow.paint(progress_bar(high_ratio, 16)),
                     self.high_risk_functions,
                     high_ratio * 100.0
@@ -277,24 +277,36 @@ impl OutputFormatter for HealthReport {
             .filter(|f| f.lines >= LARGE_THRESHOLD && f.lines < VERY_LARGE_THRESHOLD)
             .collect();
 
+        let fmt_file_rows =
+            |out: &mut Vec<String>, files: &[&LargeFile], color: Color, limit: usize| {
+                let max_lines = files.iter().map(|f| f.lines).max().unwrap_or(1);
+                for lf in files.iter().take(limit) {
+                    let ratio = lf.lines as f64 / max_lines as f64;
+                    out.push(format!(
+                        "  {:<36} {}  {}",
+                        lf.path,
+                        color.paint(progress_bar(ratio, 12)),
+                        lf.lines
+                    ));
+                }
+                if files.len() > limit {
+                    out.push(format!("  … and {} more", files.len() - limit));
+                }
+            };
+
         if !massive.is_empty() {
             lines.push(String::new());
             lines.push(
                 Color::Red
                     .bold()
                     .paint(format!(
-                        "CRITICAL: Massive Files (>{}  lines) — {}",
+                        "CRITICAL: Massive Files (>{} lines) — {}",
                         MASSIVE_THRESHOLD,
                         massive.len()
                     ))
                     .to_string(),
             );
-            for lf in massive.iter().take(10) {
-                lines.push(format!("  {:<42} {} lines", lf.path, lf.lines));
-            }
-            if massive.len() > 10 {
-                lines.push(format!("  … and {} more", massive.len() - 10));
-            }
+            fmt_file_rows(&mut lines, &massive, Color::Red, 10);
         } else if !very_large.is_empty() {
             lines.push(String::new());
             lines.push(
@@ -307,12 +319,7 @@ impl OutputFormatter for HealthReport {
                     ))
                     .to_string(),
             );
-            for lf in very_large.iter().take(5) {
-                lines.push(format!("  {:<42} {} lines", lf.path, lf.lines));
-            }
-            if very_large.len() > 5 {
-                lines.push(format!("  … and {} more", very_large.len() - 5));
-            }
+            fmt_file_rows(&mut lines, &very_large, Color::Yellow, 5);
         } else if !large.is_empty() {
             lines.push(String::new());
             lines.push(
@@ -324,12 +331,7 @@ impl OutputFormatter for HealthReport {
                     ))
                     .to_string(),
             );
-            for lf in large.iter().take(5) {
-                lines.push(format!("  {:<42} {} lines", lf.path, lf.lines));
-            }
-            if large.len() > 5 {
-                lines.push(format!("  … and {} more", large.len() - 5));
-            }
+            fmt_file_rows(&mut lines, &large, Color::Blue, 5);
         }
 
         lines.join("\n")
