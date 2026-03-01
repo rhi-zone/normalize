@@ -24,6 +24,7 @@ mod tests {
         use crate::commands::analyze::activity::ActivityReport;
         use crate::commands::analyze::architecture::ArchitectureReport;
         use crate::commands::analyze::budget::BudgetReport;
+        use crate::commands::analyze::call_complexity::CallComplexityReport;
         use crate::commands::analyze::ceremony::CeremonyReport;
         use crate::commands::analyze::check_examples::CheckExamplesReport;
         use crate::commands::analyze::check_refs::CheckRefsReport;
@@ -31,6 +32,7 @@ mod tests {
         use crate::commands::analyze::contributors::ContributorsReport;
         use crate::commands::analyze::coupling::CouplingReport;
         use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
+        use crate::commands::analyze::density::DensityReport;
         use crate::commands::analyze::docs::DocCoverageReport;
         use crate::commands::analyze::duplicates::{
             DuplicateBlocksReport, DuplicateFunctionsReport, DuplicateTypesReport,
@@ -45,6 +47,7 @@ mod tests {
         use crate::commands::analyze::size::SizeReport;
         use crate::commands::analyze::stale_docs::StaleDocsReport;
         use crate::commands::analyze::test_ratio::TestRatioReport;
+        use crate::commands::analyze::uniqueness::UniquenessReport;
         use crate::commands::context::{ContextListReport, ContextReport};
         use crate::commands::grammars::{GrammarListReport, GrammarPathsReport};
         use crate::commands::history::{
@@ -61,6 +64,9 @@ mod tests {
 
         // Compile-time checks via trait bounds
         assert_output_formatter::<ActivityReport>();
+        assert_output_formatter::<CallComplexityReport>();
+        assert_output_formatter::<DensityReport>();
+        assert_output_formatter::<UniquenessReport>();
         assert_output_formatter::<AnalyzeReport>();
         assert_output_formatter::<AliasesReport>();
         assert_output_formatter::<ArchitectureReport>();

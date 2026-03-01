@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 352
 expression: "snapshot_help(&[\"analyze\", \"query\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -39,6 +40,9 @@ Commands:
   duplicate-types      Detect duplicate type definitions
   budget               Show line budget breakdown by purpose (logic, test, docs, config, generated, vendored)
   test-ratio           Show test/impl line ratio per module (sorted by least-tested first)
+  density              Measure information density (compression ratio + token uniqueness) per module
+  uniqueness           Measure what fraction of functions have no structural near-twin per module
+  call-complexity      Compute effective (reachable) cyclomatic complexity via call-graph BFS
   imports              Rank modules by import fan-in (requires facts index)
   test-gaps            Find public functions with no direct test caller
   callers              Show callers of a symbol

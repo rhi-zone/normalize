@@ -4,6 +4,7 @@ use crate::analyze::complexity::ComplexityReport;
 use crate::analyze::function_length::LengthReport;
 use crate::commands::analyze::activity::ActivityReport;
 use crate::commands::analyze::architecture::ArchitectureReport;
+use crate::commands::analyze::call_complexity::CallComplexityReport;
 use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::ceremony::CeremonyReport;
 use crate::commands::analyze::check_examples::CheckExamplesReport;
@@ -12,6 +13,7 @@ use crate::commands::analyze::clusters::ClustersReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
+use crate::commands::analyze::density::DensityReport;
 use crate::commands::analyze::docs::DocCoverageReport;
 use crate::commands::analyze::duplicates::{
     DuplicateBlocksConfig, DuplicateBlocksReport, DuplicateFunctionsConfig,
@@ -26,6 +28,7 @@ use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::size::SizeReport;
 use crate::commands::analyze::stale_docs::StaleDocsReport;
+use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
 use std::cell::Cell;
@@ -272,6 +275,30 @@ impl AnalyzeService {
     }
 
     fn display_test_gaps(&self, r: &crate::analyze::test_gaps::TestGapsReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_density(&self, r: &DensityReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_uniqueness(&self, r: &UniquenessReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_call_complexity(&self, r: &CallComplexityReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1162,6 +1189,106 @@ impl AnalyzeService {
             &root_path,
             effective_limit,
         ))
+    }
+
+    /// Measure information density (compression ratio + token uniqueness) per module
+    #[cli(display_with = "display_density")]
+    pub fn density(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(short = 'w', help = "Number of worst files to show (default: 10)")] worst: Option<
+            usize,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DensityReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let module_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(crate::commands::analyze::density::analyze_density(
+            &root_path,
+            module_limit,
+            worst.unwrap_or(10),
+        ))
+    }
+
+    /// Measure what fraction of functions have no structural near-twin per module
+    #[cli(display_with = "display_uniqueness")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn uniqueness(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Similarity threshold 0.0–1.0 (default: 0.80)")] similarity: Option<f64>,
+        #[param(help = "Minimum function line count to include (default: 5)")] min_lines: Option<
+            usize,
+        >,
+        #[param(help = "Match on control-flow skeleton only")] skeleton: bool,
+        #[param(help = "Include groups where all functions share the same name")]
+        include_trait_impls: bool,
+        #[param(help = "Number of top clusters to show (default: 10)")] clusters: Option<usize>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<UniquenessReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let module_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let filter = Self::build_filter(&root_path, &exclude, &only);
+        Ok(crate::commands::analyze::uniqueness::analyze_uniqueness(
+            &root_path,
+            similarity.unwrap_or(0.80),
+            min_lines.unwrap_or(5),
+            skeleton,
+            include_trait_impls,
+            module_limit,
+            clusters.unwrap_or(10),
+            filter.as_ref(),
+        ))
+    }
+
+    /// Compute effective (reachable) cyclomatic complexity via call-graph BFS
+    #[cli(display_with = "display_call_complexity")]
+    pub fn call_complexity(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum functions to show per list (default: 20)")]
+        limit: Option<usize>,
+        #[param(short = 'm', help = "Maximum number of modules to show (0=no limit)")]
+        module_limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<CallComplexityReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = limit.unwrap_or(20);
+        let effective_module_limit = match module_limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(
+            crate::commands::analyze::call_complexity::analyze_call_complexity(
+                &root_path,
+                effective_limit,
+                effective_module_limit,
+            ),
+        )
     }
 
     /// Rank modules by import fan-in (requires facts index)
