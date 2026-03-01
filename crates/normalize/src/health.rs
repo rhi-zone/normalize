@@ -34,6 +34,10 @@ pub struct HealthReport {
     pub high_risk_functions: usize,
     pub total_functions: usize,
     pub large_files: Vec<LargeFile>,
+    /// Languages present in the codebase whose tree-sitter grammar is not installed,
+    /// causing complexity analysis to be skipped for those files.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub missing_grammars: Vec<String>,
 }
 
 impl HealthReport {
@@ -57,6 +61,12 @@ impl HealthReport {
         lines.push(String::new());
 
         lines.push("## Complexity".to_string());
+        if !self.missing_grammars.is_empty() {
+            lines.push(format!(
+                "  Warning: grammar not installed for {} — complexity unavailable (run `normalize grammars install`)",
+                self.missing_grammars.join(", ")
+            ));
+        }
         lines.push(format!("  Functions: {}", self.total_functions));
         lines.push(format!("  Average: {:.1}", self.avg_complexity));
         lines.push(format!("  Maximum: {}", self.max_complexity));
@@ -278,15 +288,38 @@ struct ComplexityStats {
     avg_complexity: f64,
     max_complexity: usize,
     high_risk_functions: usize,
+    missing_grammars: Vec<String>,
 }
 
 fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStats {
+    use normalize_languages::parsers::parser_for;
+    use normalize_path_resolve::all_files;
+    use std::collections::HashSet;
+
     let report = analyze_codebase_complexity(root, usize::MAX, None, None, allowlist);
+
+    // If complexity came back empty, check whether any present languages have missing grammars.
+    let missing_grammars = if report.functions.is_empty() {
+        let mut seen: HashSet<&'static str> = HashSet::new();
+        all_files(root, None)
+            .iter()
+            .filter(|f| f.kind == "file")
+            .filter_map(|f| normalize_languages::support_for_path(std::path::Path::new(&f.path)))
+            .filter(|lang| !lang.function_kinds().is_empty())
+            .filter(|lang| parser_for(lang.grammar_name()).is_none())
+            .filter(|lang| seen.insert(lang.grammar_name()))
+            .map(|lang| lang.name().to_string())
+            .collect()
+    } else {
+        vec![]
+    };
+
     ComplexityStats {
         total_functions: report.functions.len(),
         avg_complexity: report.avg_complexity(),
         max_complexity: report.max_complexity(),
         high_risk_functions: report.high_risk_count() + report.critical_risk_count(),
+        missing_grammars,
     }
 }
 
@@ -353,6 +386,7 @@ async fn analyze_health_indexed(
             if file.lines >= LARGE_THRESHOLD
                 && !is_lockfile(&file.path)
                 && !is_allowed(&file.path, allow_patterns)
+                && normalize_languages::support_for_path(std::path::Path::new(&file.path)).is_some()
             {
                 large_files.push(LargeFile {
                     path: file.path,
@@ -373,6 +407,7 @@ async fn analyze_health_indexed(
         high_risk_functions: complexity.high_risk_functions,
         total_functions: complexity.total_functions,
         large_files,
+        missing_grammars: complexity.missing_grammars,
     }
 }
 
@@ -414,6 +449,7 @@ fn analyze_health_unindexed(
             if lines >= LARGE_THRESHOLD
                 && !is_lockfile(&rel_str)
                 && !is_allowed(&rel_str, allow_patterns)
+                && normalize_languages::support_for_path(path).is_some()
             {
                 large_files.push(LargeFile {
                     path: rel_str.to_string(),
@@ -434,5 +470,6 @@ fn analyze_health_unindexed(
         high_risk_functions: complexity.high_risk_functions,
         total_functions: complexity.total_functions,
         large_files,
+        missing_grammars: complexity.missing_grammars,
     }
 }

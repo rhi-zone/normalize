@@ -225,13 +225,7 @@ pub(super) fn collect_code_files<'a>(
     all_files
         .iter()
         .filter(|f| {
-            f.kind == "file" && {
-                let ext = std::path::Path::new(&f.path)
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("");
-                matches!(ext, "py" | "rs")
-            }
+            f.kind == "file" && normalize_languages::support_for_path(Path::new(&f.path)).is_some()
         })
         .filter(|f| {
             filter
