@@ -37,6 +37,7 @@ Commands:
   similar-functions    Detect similar functions via MinHash LSH
   similar-blocks       Detect similar code blocks via MinHash LSH
   duplicate-types      Detect duplicate type definitions
+  test-ratio           Show test/impl line ratio per module (sorted by least-tested first)
   test-gaps            Find public functions with no direct test caller
   callers              Show callers of a symbol
   callees              Show what functions a symbol calls

@@ -489,6 +489,13 @@ pub enum AnalyzeCommand {
         reason: Option<String>,
     },
 
+    /// Show test/impl line ratio per module (sorted by least-tested first)
+    TestRatio {
+        /// Maximum number of modules to show (0 = no limit)
+        #[arg(short = 'l', long, default_value = "30")]
+        limit: usize,
+    },
+
     /// Run all analysis passes
     All {
         /// Target file or directory

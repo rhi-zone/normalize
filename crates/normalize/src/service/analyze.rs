@@ -202,6 +202,17 @@ impl AnalyzeService {
         }
     }
 
+    fn display_test_ratio(
+        &self,
+        r: &crate::commands::analyze::test_ratio::TestRatioReport,
+    ) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
     fn build_filter(
         root: &std::path::Path,
         exclude: &[String],
@@ -1010,6 +1021,30 @@ impl AnalyzeService {
                 min_overlap.unwrap_or(70),
             ),
         )
+    }
+
+    /// Show test/impl line ratio per module (sorted by least-tested first)
+    #[cli(display_with = "display_test_ratio")]
+    pub fn test_ratio(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<crate::commands::analyze::test_ratio::TestRatioReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(crate::commands::analyze::test_ratio::analyze_test_ratio(
+            &root_path,
+            effective_limit,
+        ))
     }
 
     /// Find public functions with no direct test caller

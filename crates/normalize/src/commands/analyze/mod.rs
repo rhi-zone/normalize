@@ -28,6 +28,7 @@ pub mod security;
 pub mod size;
 pub mod stale_docs;
 pub mod test_gaps;
+pub mod test_ratio;
 pub mod trace;
 
 use crate::config::NormalizeConfig;
@@ -321,6 +322,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::TestGaps { .. }) => {
             crate::output::print_output_schema::<TestGapsReport>();
+        }
+        Some(AnalyzeCommand::TestRatio { .. }) => {
+            crate::output::print_output_schema::<test_ratio::TestRatioReport>();
         }
         Some(AnalyzeCommand::All { .. }) => {
             crate::output::print_output_schema::<report::AnalyzeReport>();
@@ -889,6 +893,13 @@ pub fn run(
                 &allowlist,
             );
 
+            report.print(&format);
+            0
+        }
+
+        Some(AnalyzeCommand::TestRatio { limit }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            let report = test_ratio::analyze_test_ratio(&effective_root, effective_limit);
             report.print(&format);
             0
         }
