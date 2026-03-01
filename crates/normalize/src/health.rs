@@ -160,21 +160,35 @@ impl OutputFormatter for HealthReport {
         lines.push(Style::new().bold().paint("Codebase Health").to_string());
         lines.push(String::new());
 
-        // Health score bar
+        // Health score: show grades A–F as a ladder, dimming unreached grades above,
+        // highlighting current grade, hiding grades below ("hiding ranks below").
         lines.push(Style::new().bold().paint("Health Score").to_string());
-        let grade_color = if health_score >= 0.67 {
-            Color::Green
-        } else if health_score >= 0.34 {
-            Color::Yellow
-        } else {
-            Color::Red
-        };
-        lines.push(format!(
-            "  {}  {}  {:.0}%",
-            grade_color.bold().paint(grade),
-            grade_color.paint(progress_bar(health_score, 20)),
-            health_score * 100.0
-        ));
+        let grade_thresholds: &[(&str, f64, Color)] = &[
+            ("A", 0.9, Color::Green),
+            ("B", 0.8, Color::Green),
+            ("C", 0.7, Color::Yellow),
+            ("D", 0.6, Color::Yellow),
+            ("F", 0.0, Color::Red),
+        ];
+        for &(g, threshold, color) in grade_thresholds {
+            if g == grade {
+                // Current grade: colored and bold
+                lines.push(format!(
+                    "  {}  {}  {:.0}%",
+                    color.bold().paint(g),
+                    color.paint(progress_bar(health_score, 20)),
+                    health_score * 100.0
+                ));
+                break; // hide grades below
+            } else {
+                // Unreached grade above: dimmed bar at threshold
+                lines.push(format!(
+                    "  {}  {}",
+                    Style::new().dimmed().paint(g),
+                    Style::new().dimmed().paint(progress_bar(threshold, 20)),
+                ));
+            }
+        }
         lines.push(String::new());
 
         // Files section
