@@ -33,6 +33,8 @@ pub mod python;
 pub mod registry;
 #[cfg(feature = "lang-rust")]
 pub mod rust_lang;
+#[cfg(feature = "lang-scala")]
+pub mod scala;
 #[cfg(feature = "lang-typescript")]
 pub mod typescript;
 
@@ -121,6 +123,18 @@ pub trait LocalDeps: Send + Sync {
     /// Default: empty (no manifest-based boundary detection for this ecosystem).
     fn project_manifest_filenames(&self) -> &'static [&'static str] {
         &[]
+    }
+
+    /// Discover sub-project/workspace member directories from a root path.
+    ///
+    /// Called when the ecosystem uses a single workspace manifest (e.g. sbt's
+    /// `build.sbt`, npm/yarn workspaces in `package.json`) that enumerates
+    /// sub-projects rather than placing per-project manifests in each directory.
+    ///
+    /// Returns absolute paths to sub-project root directories.
+    /// Default: empty (per-directory manifest files are sufficient).
+    fn discover_workspace_members(&self, _root: &Path) -> Vec<PathBuf> {
+        Vec::new()
     }
 
     /// File extensions to index when scanning packages.

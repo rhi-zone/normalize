@@ -295,6 +295,8 @@ pub(crate) fn discover_module_dirs(root: &Path) -> Vec<String> {
 
     let all = crate::path_resolve::all_files(root);
     let mut dirs: BTreeSet<String> = BTreeSet::new();
+
+    // Manifest-file based discovery.
     for f in &all {
         let p = std::path::Path::new(&f.path);
         if let Some(name) = p.file_name().and_then(|n| n.to_str())
@@ -308,6 +310,19 @@ pub(crate) fn discover_module_dirs(root: &Path) -> Vec<String> {
             dirs.insert(dir);
         }
     }
+
+    // Workspace-member based discovery (e.g. sbt build.sbt, npm workspaces).
+    for dep in all_local_deps() {
+        for member_path in dep.discover_workspace_members(root) {
+            if let Ok(rel) = member_path.strip_prefix(root) {
+                let rel_str = rel.to_string_lossy();
+                if !rel_str.is_empty() {
+                    dirs.insert(rel_str.into_owned());
+                }
+            }
+        }
+    }
+
     dirs.insert(".".to_string());
 
     let mut result: Vec<String> = dirs.into_iter().collect();

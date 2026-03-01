@@ -32,6 +32,8 @@ fn init_builtin() {
         register(&crate::java::JavaDeps);
         #[cfg(feature = "lang-kotlin")]
         register(&crate::kotlin::KotlinDeps);
+        #[cfg(feature = "lang-scala")]
+        register(&crate::scala::ScalaDeps);
         #[cfg(feature = "lang-c")]
         register(&crate::c::CDeps);
         #[cfg(feature = "lang-cpp")]

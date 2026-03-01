@@ -11,7 +11,7 @@ default = ["langs-all"]
 
 langs-all = [
     "lang-python", "lang-javascript", "lang-typescript", "lang-rust", "lang-go",
-    "lang-java", "lang-kotlin", "lang-c", "lang-cpp",
+    "lang-java", "lang-kotlin", "lang-scala", "lang-c", "lang-cpp",
 ]
 
 lang-python = []
@@ -21,6 +21,7 @@ lang-rust = []
 lang-go = []
 lang-java = []
 lang-kotlin = ["lang-java"]
+lang-scala = ["lang-java"]
 lang-c = []
 lang-cpp = []
 
