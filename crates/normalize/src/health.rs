@@ -164,9 +164,9 @@ impl OutputFormatter for HealthReport {
         // highlighting current grade, hiding grades below ("hiding ranks below").
         lines.push(Style::new().bold().paint("Health Score").to_string());
         let grade_thresholds: &[(&str, f64, Color)] = &[
-            ("A", 0.9, Color::Green),
-            ("B", 0.8, Color::Green),
-            ("C", 0.7, Color::Yellow),
+            ("A", 0.9, Color::Purple),
+            ("B", 0.8, Color::Blue),
+            ("C", 0.7, Color::Green),
             ("D", 0.6, Color::Yellow),
             ("F", 0.0, Color::Red),
         ];
