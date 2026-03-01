@@ -8,6 +8,7 @@ use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::ceremony::CeremonyReport;
 use crate::commands::analyze::check_examples::CheckExamplesReport;
 use crate::commands::analyze::check_refs::CheckRefsReport;
+use crate::commands::analyze::clusters::ClustersReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
@@ -130,6 +131,10 @@ impl AnalyzeService {
     }
 
     fn display_ceremony(&self, r: &CeremonyReport) -> String {
+        r.format_text()
+    }
+
+    fn display_clusters(&self, r: &ClustersReport) -> String {
         r.format_text()
     }
 
@@ -546,6 +551,36 @@ impl AnalyzeService {
         Ok(crate::commands::analyze::ceremony::analyze_ceremony(
             &root_path,
             limit.unwrap_or(15),
+        ))
+    }
+
+    /// Group similar functions into structural clusters (connected components of similar-functions pairs)
+    #[cli(display_with = "display_clusters")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn clusters(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Minimum lines for a function to be considered")] min_lines: Option<usize>,
+        #[param(help = "Minimum similarity threshold (0.0–1.0)")] similarity: Option<f64>,
+        #[param(short = 'l', help = "Maximum number of clusters to show")] limit: Option<usize>,
+        #[param(help = "Match on control-flow structure only")] skeleton: bool,
+        #[param(help = "Include same-name clusters (likely interface implementations)")]
+        include_trait_impls: bool,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+    ) -> Result<ClustersReport, String> {
+        let root_path = Self::root_path(root);
+        let filter = Self::build_filter(&root_path, &exclude, &only);
+        Ok(crate::commands::analyze::clusters::build_clusters_report(
+            &root_path,
+            min_lines.unwrap_or(10),
+            similarity.unwrap_or(0.85),
+            skeleton,
+            include_trait_impls,
+            limit.unwrap_or(20),
+            filter.as_ref(),
         ))
     }
 

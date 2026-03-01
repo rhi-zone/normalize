@@ -21,6 +21,7 @@ mod tests {
         use crate::analyze::function_length::LengthReport;
         use crate::analyze::test_gaps::TestGapsReport;
         use crate::commands::aliases::AliasesReport;
+        use crate::commands::analyze::clusters::ClustersReport;
         use crate::commands::analyze::contributors::ContributorsReport;
         use crate::commands::analyze::report::AnalyzeReport;
         use crate::commands::grammars::{GrammarListReport, GrammarPathsReport};
@@ -48,5 +49,6 @@ mod tests {
         assert_output_formatter::<LintListResult>();
         assert_output_formatter::<ViewOutput>();
         assert_output_formatter::<ContributorsReport>();
+        assert_output_formatter::<ClustersReport>();
     }
 }

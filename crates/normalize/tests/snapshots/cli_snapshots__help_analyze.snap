@@ -21,6 +21,9 @@ Commands:
   length               Run function length analysis
   docs                 Analyze documentation coverage
   files                Show longest files in codebase
+  size                 Show hierarchical LOC breakdown (ncdu-style)
+  ceremony             Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+  clusters             Group similar functions into structural clusters (connected components of similar-functions pairs)
   hotspots             Show git history hotspots (frequently changed files)
   coupling             Find files that frequently change together (temporal coupling)
   ownership            Show per-file ownership concentration from git blame
@@ -41,8 +44,6 @@ Commands:
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Human-friendly output with colors and formatting
-      --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit

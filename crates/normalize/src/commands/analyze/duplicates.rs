@@ -2242,22 +2242,21 @@ pub struct SimilarFunctionsConfig<'a> {
     pub filter: Option<&'a Filter>,
 }
 
-pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
-    let SimilarFunctionsConfig {
-        roots,
-        min_lines,
-        similarity,
-        elide_identifiers,
-        elide_literals,
-        skeleton,
-        show_source,
-        include_trait_impls,
-        allow,
-        reason,
-        format,
-        filter,
-    } = cfg;
-
+/// Core pair detection: extract MinHash signatures and find similar function pairs via LSH.
+///
+/// Returns `(files_scanned, functions_analyzed, pairs)`. Pairs are sorted by similarity
+/// descending. Used by both `cmd_similar_functions` and the clustering analysis.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn find_similar_function_pairs(
+    roots: &[PathBuf],
+    min_lines: usize,
+    similarity: f64,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    skeleton: bool,
+    include_trait_impls: bool,
+    filter: Option<&crate::filter::Filter>,
+) -> (usize, usize, Vec<SimilarFunctionPair>) {
     let extractor = Extractor::new();
     let multi_repo = roots.len() > 1;
     let mut all_fns: Vec<(String, String, usize, usize, [u64; MINHASH_N])> = Vec::new();
@@ -2359,7 +2358,7 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
                 }
             }
         }
-    } // for root in roots
+    }
 
     let functions_analyzed = all_fns.len();
 
@@ -2452,6 +2451,37 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| b.line_count.cmp(&a.line_count))
     });
+
+    (files_scanned, functions_analyzed, pairs)
+}
+
+pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
+    let SimilarFunctionsConfig {
+        roots,
+        min_lines,
+        similarity,
+        elide_identifiers,
+        elide_literals,
+        skeleton,
+        show_source,
+        include_trait_impls,
+        allow,
+        reason,
+        format,
+        filter,
+    } = cfg;
+
+    let multi_repo = roots.len() > 1;
+    let (files_scanned, functions_analyzed, pairs) = find_similar_function_pairs(
+        roots,
+        min_lines,
+        similarity,
+        elide_identifiers,
+        elide_literals,
+        skeleton,
+        include_trait_impls,
+        filter,
+    );
 
     let fn_allow_key = |file: &str, symbol: &str, start: usize, end: usize| {
         format!("{}:{}:{}-{}", file, symbol, start, end)

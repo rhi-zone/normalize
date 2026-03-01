@@ -8,6 +8,7 @@ pub mod call_graph;
 pub mod ceremony;
 pub mod check_examples;
 pub mod check_refs;
+pub mod clusters;
 pub mod complexity;
 pub mod contributors;
 pub mod coupling;
@@ -311,6 +312,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::SimilarBlocks { .. }) => {
             crate::output::print_output_schema::<duplicates::SimilarBlocksReport>();
+        }
+        Some(AnalyzeCommand::Clusters { .. }) => {
+            crate::output::print_output_schema::<clusters::ClustersReport>();
         }
         Some(AnalyzeCommand::DuplicateTypes { .. }) => {
             crate::output::print_output_schema::<duplicates::DuplicateTypesReport>();
@@ -800,6 +804,25 @@ pub fn run(
             include_trait_impls,
             allow,
             reason,
+            format: &format,
+            filter: filter.as_ref(),
+        }),
+
+        Some(AnalyzeCommand::Clusters {
+            min_lines,
+            similarity,
+            elide_identifiers,
+            skeleton,
+            include_trait_impls,
+            limit,
+        }) => clusters::cmd_clusters(clusters::ClustersConfig {
+            roots: std::slice::from_ref(&effective_root),
+            min_lines,
+            similarity,
+            elide_identifiers,
+            skeleton,
+            include_trait_impls,
+            limit,
             format: &format,
             filter: filter.as_ref(),
         }),

@@ -427,6 +427,36 @@ pub enum AnalyzeCommand {
         reason: Option<String>,
     },
 
+    /// Group similar functions into structural clusters (connected components of similar-functions pairs)
+    Clusters {
+        /// Minimum lines for a function to be considered [default: 10]
+        #[arg(long, default_value = "10")]
+        min_lines: usize,
+
+        /// Minimum similarity threshold (0.0–1.0) [default: 0.85]
+        #[arg(long, default_value = "0.85")]
+        similarity: f64,
+
+        /// Elide identifier names when comparing [default: true]
+        #[arg(long, default_value = "true")]
+        #[serde(default = "default_true")]
+        elide_identifiers: bool,
+
+        /// Match on control-flow structure only (skeleton mode)
+        #[arg(long)]
+        #[serde(default)]
+        skeleton: bool,
+
+        /// Include clusters where all functions share the same name (likely interface implementations)
+        #[arg(long)]
+        #[serde(default)]
+        include_trait_impls: bool,
+
+        /// Maximum number of clusters to show [default: 20]
+        #[arg(short = 'l', long, default_value = "20")]
+        limit: usize,
+    },
+
     /// Find public functions with no direct test caller
     TestGaps {
         /// Target file or directory
