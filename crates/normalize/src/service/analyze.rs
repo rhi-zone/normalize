@@ -5,6 +5,7 @@ use crate::analyze::function_length::LengthReport;
 use crate::commands::analyze::activity::ActivityReport;
 use crate::commands::analyze::architecture::ArchitectureReport;
 use crate::commands::analyze::call_graph::CallEntry;
+use crate::commands::analyze::ceremony::CeremonyReport;
 use crate::commands::analyze::check_examples::CheckExamplesReport;
 use crate::commands::analyze::check_refs::CheckRefsReport;
 use crate::commands::analyze::contributors::ContributorsReport;
@@ -125,6 +126,10 @@ impl AnalyzeService {
     }
 
     fn display_size(&self, r: &SizeReport) -> String {
+        r.format_text()
+    }
+
+    fn display_ceremony(&self, r: &CeremonyReport) -> String {
         r.format_text()
     }
 
@@ -525,6 +530,22 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         Ok(crate::commands::analyze::size::analyze_size(
             &root_path, &exclude,
+        ))
+    }
+
+    /// Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+    #[cli(display_with = "display_ceremony")]
+    pub fn ceremony(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Number of high-ceremony files to show")] limit: Option<usize>,
+    ) -> Result<CeremonyReport, String> {
+        let root_path = Self::root_path(root);
+        Ok(crate::commands::analyze::ceremony::analyze_ceremony(
+            &root_path,
+            limit.unwrap_or(15),
         ))
     }
 

@@ -5,6 +5,7 @@ pub mod architecture;
 mod args;
 pub mod ast;
 pub mod call_graph;
+pub mod ceremony;
 pub mod check_examples;
 pub mod check_refs;
 pub mod complexity;
