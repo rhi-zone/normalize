@@ -17,6 +17,7 @@ pub mod docs;
 pub mod duplicates;
 pub mod files;
 pub mod hotspots;
+pub mod imports;
 pub mod length;
 pub mod ownership;
 pub mod query;
@@ -325,6 +326,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::TestRatio { .. }) => {
             crate::output::print_output_schema::<test_ratio::TestRatioReport>();
+        }
+        Some(AnalyzeCommand::Imports { .. }) => {
+            crate::output::print_output_schema::<imports::ImportCentralityReport>();
         }
         Some(AnalyzeCommand::All { .. }) => {
             crate::output::print_output_schema::<report::AnalyzeReport>();
@@ -902,6 +906,20 @@ pub fn run(
             let report = test_ratio::analyze_test_ratio(&effective_root, effective_limit);
             report.print(&format);
             0
+        }
+
+        Some(AnalyzeCommand::Imports { limit, internal }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            match imports::analyze_import_centrality(&effective_root, effective_limit, internal) {
+                Ok(report) => {
+                    report.print(&format);
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                    1
+                }
+            }
         }
 
         Some(AnalyzeCommand::All { target }) => {

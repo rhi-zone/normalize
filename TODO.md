@@ -251,17 +251,17 @@ its composition and compression potential.
   families. "These 40 files share the same impl shape" > "A is 93% similar to B".
   Shows repetition topology, not just pairwise similarity.
 
-- [ ] **Import centrality**: rank modules by fan-in (how many other modules import them).
+- [x] **Import centrality**: rank modules by fan-in (how many other modules import them).
   Most-imported = load-bearing and essential. Least-imported = leaf utilities or dead weight.
-  Proxy for "what's actually necessary."
+  Proxy for "what's actually necessary." → `normalize analyze imports [--internal]`
 
-- [ ] **Test/impl ratio per module**: ratio of test lines to production lines per crate/module.
+- [x] **Test/impl ratio per module**: ratio of test lines to production lines per crate/module.
   Different from test-gaps (which flags missing tests). Shows distribution — some modules
   80% tests, some 0%.
 
-- [ ] **Churn × complexity**: combine hotspots (git churn) with complexity scores. High churn
-  AND high complexity = real danger zone, likely source of incidental complexity. Currently
-  these are separate commands.
+- [x] **Churn × complexity**: combine hotspots (git churn) with complexity scores. High churn
+  AND high complexity = real danger zone, likely source of incidental complexity. Already
+  baked into `normalize analyze hotspots` (score = commits × √churn × log₂(1+complexity)).
 
 ### Lint / Analysis Architecture
 

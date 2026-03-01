@@ -20,6 +20,7 @@ use crate::commands::analyze::duplicates::{
 };
 use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
+use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
@@ -206,6 +207,14 @@ impl AnalyzeService {
         &self,
         r: &crate::commands::analyze::test_ratio::TestRatioReport,
     ) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_imports(&self, r: &ImportCentralityReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1045,6 +1054,32 @@ impl AnalyzeService {
             &root_path,
             effective_limit,
         ))
+    }
+
+    /// Rank modules by import fan-in (requires facts index)
+    #[cli(display_with = "display_imports")]
+    pub fn imports(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Show only internal (crate-local) modules")] internal: bool,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ImportCentralityReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        crate::commands::analyze::imports::analyze_import_centrality(
+            &root_path,
+            effective_limit,
+            internal,
+        )
     }
 
     /// Find public functions with no direct test caller
