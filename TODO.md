@@ -758,6 +758,7 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
   - Remaining improvements:
     - Per-subcommand excludes in config: `[analyze.similar-blocks] exclude = [...]` so language-file exclusion doesn't affect `analyze rules`, `analyze complexity`, etc. (currently the global `[analyze] exclude` is too coarse)
     - "Parallel impl directory" heuristic: if >N pairs originate from the same directory pair, fold them into a single suppressed note (e.g., "48 pairs suppressed within normalize-languages/ — likely parallel Language trait implementations")
+    - **`duplicate-blocks` should elide literals by default** (opt-out with `--no-elide-literals`): structurally-identical blocks that differ only in string/number literals are real duplication. Verified false negative: the three score-breakdown rows in `health.rs` (`format_pretty`) are identical structure with different field names/labels — caught by `--elide-literals` but missed by default. `similar-blocks` has no `--elide-literals` at all (add it).
     - `similar-blocks` / `similar-functions`: cross-file same-containing-function suppression covers same-method-name in different files; doesn't cover same-body-pattern across different method names (the Language impl case)
     - Consider min-lines bump for `similar-blocks` (currently 10) — the 19-line Symbol constructor is below many useful thresholds; maybe 15-20 default would further cut noise without missing real clones
 - Syntax-based linting: see `docs/design/syntax-linting.md`
