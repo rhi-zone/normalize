@@ -81,7 +81,7 @@ grep-searcher = "0.1"
 libloading = "0.8"
 
 # Service framework
-server-less = { git = "https://github.com/rhi-zone/server-less", default-features = false, features = ["cli", "jsonschema"] }
+server-less = { version = "0.2.0", default-features = false, features = ["cli", "jsonschema"] }
 
 # Minimize debug build size (full debug info adds ~2GB)
 [profile.dev]

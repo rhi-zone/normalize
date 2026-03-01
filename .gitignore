@@ -46,6 +46,10 @@ pnpm-debug.log*
 # macOS-specific files
 .DS_Store
 
+# Desloppify
+.desloppify/
+scorecard.png
+
 # jetbrains setting folder
 .idea/
 
