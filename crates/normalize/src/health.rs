@@ -29,6 +29,7 @@ pub struct HealthReport {
     pub total_files: usize,
     pub files_by_language: HashMap<String, usize>,
     pub total_lines: usize,
+    pub total_complexity: usize,
     pub avg_complexity: f64,
     pub max_complexity: usize,
     pub high_risk_functions: usize,
@@ -68,6 +69,7 @@ impl HealthReport {
             ));
         }
         lines.push(format!("  Functions: {}", self.total_functions));
+        lines.push(format!("  Total: {}", self.total_complexity));
         lines.push(format!("  Average: {:.1}", self.avg_complexity));
         lines.push(format!("  Maximum: {}", self.max_complexity));
         lines.push(format!("  High risk (>10): {}", self.high_risk_functions));
@@ -285,6 +287,7 @@ fn is_allowed(path: &str, patterns: &[Pattern]) -> bool {
 
 struct ComplexityStats {
     total_functions: usize,
+    total_complexity: usize,
     avg_complexity: f64,
     max_complexity: usize,
     high_risk_functions: usize,
@@ -316,6 +319,7 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
 
     ComplexityStats {
         total_functions: report.functions.len(),
+        total_complexity: report.total_complexity(),
         avg_complexity: report.avg_complexity(),
         max_complexity: report.max_complexity(),
         high_risk_functions: report.high_risk_count() + report.critical_risk_count(),
@@ -402,6 +406,7 @@ async fn analyze_health_indexed(
         total_files,
         files_by_language,
         total_lines,
+        total_complexity: complexity.total_complexity,
         avg_complexity: complexity.avg_complexity,
         max_complexity: complexity.max_complexity,
         high_risk_functions: complexity.high_risk_functions,
@@ -465,6 +470,7 @@ fn analyze_health_unindexed(
         total_files,
         files_by_language,
         total_lines,
+        total_complexity: complexity.total_complexity,
         avg_complexity: complexity.avg_complexity,
         max_complexity: complexity.max_complexity,
         high_risk_functions: complexity.high_risk_functions,

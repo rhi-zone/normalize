@@ -105,6 +105,10 @@ impl FunctionComplexity {
 pub type ComplexityReport = super::FileReport<FunctionComplexity>;
 
 impl ComplexityReport {
+    pub fn total_complexity(&self) -> usize {
+        self.functions.iter().map(|f| f.complexity).sum()
+    }
+
     pub fn avg_complexity(&self) -> f64 {
         if self.functions.is_empty() {
             0.0
