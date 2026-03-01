@@ -129,6 +129,9 @@ impl OutputFormatter for DuplicateFunctionsReport {
             if self.groups.len() > 20 {
                 lines.push(format!("... and {} more groups", self.groups.len() - 20));
             }
+
+            lines.push(String::new());
+            lines.push("To suppress: normalize analyze duplicate-functions --allow <file:symbol> --reason \"explanation\"".to_string());
         }
 
         lines.join("\n")
@@ -207,6 +210,9 @@ impl OutputFormatter for DuplicateTypesReport {
             if self.duplicates.len() > 20 {
                 lines.push(format!("... and {} more pairs", self.duplicates.len() - 20));
             }
+
+            lines.push(String::new());
+            lines.push("To suppress: normalize analyze duplicate-types --allow TypeName1 TypeName2 --reason \"explanation\"".to_string());
         }
 
         lines.join("\n")
@@ -1154,6 +1160,9 @@ impl OutputFormatter for DuplicateBlocksReport {
             lines.push(format!("... and {} more groups", self.groups.len() - 30));
         }
 
+        lines.push(String::new());
+        lines.push("To suppress: normalize analyze duplicate-blocks --allow <file:start-end> --reason \"explanation\"".to_string());
+
         lines.join("\n")
     }
 }
@@ -1600,6 +1609,9 @@ impl OutputFormatter for SimilarBlocksReport {
         if self.pairs.len() > 30 {
             lines.push(format!("... and {} more pairs", self.pairs.len() - 30));
         }
+
+        lines.push(String::new());
+        lines.push("To suppress: normalize analyze similar-blocks --allow <file:start-end> --reason \"explanation\"".to_string());
 
         lines.join("\n")
     }
@@ -2207,6 +2219,9 @@ impl OutputFormatter for SimilarFunctionsReport {
         if self.pairs.len() > 30 {
             lines.push(format!("... and {} more pairs", self.pairs.len() - 30));
         }
+
+        lines.push(String::new());
+        lines.push("To suppress: normalize analyze similar-functions --allow <file:symbol:start-end> --reason \"explanation\"".to_string());
 
         lines.join("\n")
     }
