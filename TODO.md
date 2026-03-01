@@ -233,6 +233,36 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 
 ## Backlog
 
+### Analysis: Understanding "Why Is This 100kloc?"
+
+Tools for structural meta-analysis of codebases — not just navigating code but understanding
+its composition and compression potential.
+
+- [ ] **`normalize analyze size`** (ncdu-style): hierarchical LOC breakdown, workspace →
+  crate → module → file, sorted by size with percentages. Fills the gap between total
+  counts and flat longest-file lists. Immediate answer to "where are the lines."
+
+- [ ] **Ceremony ratio**: what fraction of functions/lines are trait impl boilerplate vs
+  novel logic? Report breakdown: trait impls vs free functions vs inherent methods vs
+  generated code. For normalize, ~98 Language impls means most code is the same shape
+  repeated — this would quantify that.
+
+- [ ] **Structural clustering**: `similar-functions` finds pairs; this groups them into
+  families. "These 40 files share the same impl shape" > "A is 93% similar to B".
+  Shows repetition topology, not just pairwise similarity.
+
+- [ ] **Import centrality**: rank modules by fan-in (how many other modules import them).
+  Most-imported = load-bearing and essential. Least-imported = leaf utilities or dead weight.
+  Proxy for "what's actually necessary."
+
+- [ ] **Test/impl ratio per module**: ratio of test lines to production lines per crate/module.
+  Different from test-gaps (which flags missing tests). Shows distribution — some modules
+  80% tests, some 0%.
+
+- [ ] **Churn × complexity**: combine hotspots (git churn) with complexity scores. High churn
+  AND high complexity = real danger zone, likely source of incidental complexity. Currently
+  these are separate commands.
+
 ### Lint / Analysis Architecture
 
 See `docs/lint-architecture.md` for full design discussion.
