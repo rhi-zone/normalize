@@ -26,9 +26,14 @@ Every crate should be usable both as a library and as a standalone CLI tool. Lib
 - `features = ["cli"]`: adds clap, binary target, CLI entry point
 - Binary target → `required-features = ["cli"]`
 
-**Top-level `normalize` crate additionally:**
-- `service/` module + `#[cli(...)]` annotations → `cfg(feature = "cli")`
-- `server-less` dependency → optional, enabled by `cli`
+**Top-level `normalize` crate — DONE:**
+- [x] `service/` module gated behind `cfg(feature = "cli")`
+- [x] `clap` + `server-less` dependencies optional, enabled by `cli`
+- [x] clap derives (`ValueEnum`, `Subcommand`, `Args`) via `cfg_attr`
+- [x] `#[arg(...)]` helper attributes gated with `cfg_attr`
+- [x] Service-callable functions gated behind `cfg(feature = "cli")`
+- [x] Binary target has `required-features = ["cli"]`
+- [x] `cargo check -p normalize --no-default-features` compiles clean
 
 **Sub-crates that should get standalone CLIs:**
 - `normalize-facts` — `normalize-facts index`, `normalize-facts check`
