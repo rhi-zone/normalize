@@ -17,24 +17,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-### Evaluate server-less ROI
-
-server-less proc macro generates CLI routing + automatic `--json`/`--jq`/`--schema` from service methods. Benefits: no boilerplate dispatch code, consistent flags for free. Costs: proc macro compile time, abstraction to learn, tight coupling between service layer and CLI.
-
-**Questions to answer:**
-- How much compile time does server-less add? Measure with/without.
-- Could the same `--json`/`--schema` behavior be achieved with a simpler trait + wrapper?
-- Is the proc macro worth maintaining long-term, or would explicit dispatch (now much smaller post-cleanup) be clearer?
-
 ### Feature-gate CLI behind `cli` feature
 
-Library consumers don't need server-less, clap, or the service layer. Gate behind `features = ["cli"]`:
+Library consumers shouldn't have to pull in clap, server-less, or the service layer. The `normalize` crate exposes analysis functions, session parsing, etc. — none of that requires CLI machinery.
+
+Gate behind `features = ["cli"]` (default for binary, opt-out for lib consumers):
 - `service/` module + `#[cli(...)]` annotations → `cfg(feature = "cli")`
 - `clap` dependency → optional, enabled by `cli`
 - `server-less` dependency → optional, enabled by `cli`
 - Binary target → `required-features = ["cli"]`
-
-This reduces compile time for anyone using normalize as a library crate.
 
 ### Type relationship extraction (facts index) — HIGH PRIORITY
 
