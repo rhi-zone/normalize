@@ -156,7 +156,7 @@ fn truncate_message(s: &str) -> String {
 /// Decode the project name from a session's parent directory name.
 /// Claude encodes project paths by replacing '/' with '-' and prepending '-'.
 /// Returns the last path component as a short project name.
-fn project_from_path(path: &Path) -> Option<String> {
+pub(crate) fn project_from_path(path: &Path) -> Option<String> {
     let dir_name = path.parent()?.file_name()?.to_str()?;
     // Strip leading dash, split on dash, take the last non-empty segment
     let stripped = dir_name.trim_start_matches('-');

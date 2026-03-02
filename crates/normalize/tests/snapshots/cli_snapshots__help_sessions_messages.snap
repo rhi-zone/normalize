@@ -1,0 +1,31 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 383
+expression: "snapshot_help(&[\"sessions\", \"messages\"])"
+---
+Extract all messages across sessions into a flat, queryable form
+
+Usage: normalize sessions messages [OPTIONS]
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --role <role>                Filter by role: user (default), assistant, all
+      --grep <grep>                Filter messages by content pattern
+      --json                       Output machine-readable JSON
+      --days <days>                Filter sessions from the last N days
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --since <since>              Filter sessions since date (YYYY-MM-DD)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --until <until>              Filter sessions until date (YYYY-MM-DD)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --project <project>          Filter by specific project path
+      --all-projects               Show sessions from all projects
+      --format <format>            Force specific format: claude, codex, gemini, normalize
+  -n, --limit <limit>              Maximum number of sessions
+      --max-chars <max-chars>      Truncate message text to N chars (default: 200)
+      --no-truncate                Don't truncate message text
+  -r, --root <root>                Root directory (defaults to current directory)
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help

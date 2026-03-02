@@ -2,6 +2,7 @@
 
 pub mod analyze;
 pub mod list;
+pub mod messages;
 pub mod plans;
 #[cfg(feature = "sessions-web")]
 mod serve;
@@ -9,6 +10,7 @@ pub mod show;
 pub mod stats;
 
 pub use list::{SessionListReport, build_session_list, cmd_sessions_list};
+pub use messages::{MessagesReport, build_messages_report};
 pub use plans::{PlanContent, PlansListReport, build_plan_content, build_plans_list};
 #[cfg(feature = "sessions-web")]
 pub use serve::cmd_sessions_serve;
@@ -281,6 +283,47 @@ pub enum SessionsCommand {
         group_by: Vec<String>,
     },
 
+    /// Extract all messages across sessions into a flat, queryable form
+    Messages {
+        /// Filter by role: user (default), assistant, all
+        #[arg(long)]
+        role: Option<String>,
+
+        /// Filter sessions by grep pattern
+        #[arg(long)]
+        grep: Option<String>,
+
+        /// Filter sessions from the last N days
+        #[arg(long)]
+        days: Option<u32>,
+
+        /// Filter sessions since date (YYYY-MM-DD)
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Filter sessions until date (YYYY-MM-DD)
+        #[arg(long)]
+        until: Option<String>,
+
+        /// Filter by specific project path
+        #[arg(long)]
+        project: Option<PathBuf>,
+
+        /// Show sessions from all projects (not just current)
+        #[arg(long)]
+        #[serde(default)]
+        all_projects: bool,
+
+        /// Truncate message text to N chars (default: 200)
+        #[arg(long)]
+        max_chars: Option<usize>,
+
+        /// Don't truncate message text
+        #[arg(long)]
+        #[serde(default)]
+        no_truncate: bool,
+    },
+
     /// Start web server for viewing sessions
     #[cfg(feature = "sessions-web")]
     Serve {
@@ -409,6 +452,31 @@ pub fn run(
             rt.block_on(cmd_sessions_serve(args.root.as_deref(), port))
         }
 
+        Some(SessionsCommand::Messages {
+            role,
+            grep,
+            days,
+            since,
+            until,
+            project,
+            all_projects,
+            max_chars,
+            no_truncate,
+        }) => cmd_sessions_messages(
+            args.root.as_deref(),
+            args.limit,
+            args.format.as_deref(),
+            role.as_deref(),
+            grep.as_deref(),
+            days,
+            since.as_deref(),
+            until.as_deref(),
+            project.as_deref(),
+            all_projects,
+            max_chars,
+            no_truncate,
+        ),
+
         Some(SessionsCommand::Plans { name }) => plans::cmd_plans(name.as_deref(), args.limit),
 
         // Default: list sessions
@@ -451,6 +519,49 @@ fn cmd_sessions_list_filtered(
                 eprintln!("No {} sessions found", format_name.unwrap_or("Claude Code"));
                 return 0;
             }
+            use crate::output::OutputFormatter;
+            println!("{}", report.format_text());
+            0
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            1
+        }
+    }
+}
+
+/// Extract messages from sessions with filtering.
+#[allow(clippy::too_many_arguments)]
+fn cmd_sessions_messages(
+    root: Option<&Path>,
+    limit: usize,
+    format_name: Option<&str>,
+    role: Option<&str>,
+    grep: Option<&str>,
+    days: Option<u32>,
+    since: Option<&str>,
+    until: Option<&str>,
+    project: Option<&Path>,
+    all_projects: bool,
+    max_chars: Option<usize>,
+    no_truncate: bool,
+) -> i32 {
+    match messages::build_messages_report(
+        root,
+        limit,
+        format_name,
+        role,
+        grep,
+        days,
+        since,
+        until,
+        project,
+        all_projects,
+        max_chars,
+        no_truncate,
+        false,
+    ) {
+        Ok(report) => {
             use crate::output::OutputFormatter;
             println!("{}", report.format_text());
             0

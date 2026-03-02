@@ -33,6 +33,8 @@ pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, comp
 }
 ```
 
+**Output formats come from server-less for free.** Any report struct that derives `Serialize` + `schemars::JsonSchema` automatically gets `--json`, `--jsonl`, `--jq`, and `--schema` via the server-less proc macro. **You never implement JSON output.** The implementation work for a new command is `format_text()` and `format_pretty()` on the report struct — that's the `OutputFormatter` trait. Don't manually handle `--json` flags or write `serde_json::to_string` in command code.
+
 **Balance agent vs tooling:** Both should progress in parallel. After significant agent work, pivot to tooling; after tooling sprint, check if agent could benefit.
 
 **Language vs LocalDeps traits:** Two separate traits, two separate crates, no cross-dependency.

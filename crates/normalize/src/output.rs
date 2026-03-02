@@ -63,6 +63,7 @@ mod tests {
         };
         use crate::commands::sessions::SessionShowReport;
         use crate::commands::sessions::list::SessionListReport;
+        use crate::commands::sessions::messages::MessagesReport;
         use crate::commands::sessions::plans::PlansListReport;
         use crate::commands::tools::lint::LintListResult;
         use crate::commands::view::report::ViewOutput;
@@ -113,6 +114,7 @@ mod tests {
         assert_output_formatter::<PlansListReport>();
         assert_output_formatter::<RepoCouplingReport>();
         assert_output_formatter::<SecurityReport>();
+        assert_output_formatter::<MessagesReport>();
         assert_output_formatter::<SessionAnalysis>();
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();

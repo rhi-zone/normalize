@@ -2,7 +2,7 @@
 
 use super::resolve_pretty;
 use crate::commands::sessions::{
-    PlanContent, PlansListReport, SessionListReport, SessionShowReport,
+    MessagesReport, PlanContent, PlansListReport, SessionListReport, SessionShowReport,
 };
 use crate::output::OutputFormatter;
 use crate::sessions::SessionAnalysis;
@@ -41,6 +41,16 @@ impl std::fmt::Display for SessionShowReport {
 impl std::fmt::Display for PlansListReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text())
+    }
+}
+
+impl std::fmt::Display for MessagesReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.pretty {
+            write!(f, "{}", self.format_pretty())
+        } else {
+            write!(f, "{}", self.format_text())
+        }
     }
 }
 
@@ -188,6 +198,51 @@ impl SessionsService {
             until.as_deref(),
             project.as_deref().map(std::path::Path::new),
             all_projects,
+        )
+    }
+
+    /// Extract all messages across sessions into a flat, queryable form
+    #[allow(clippy::too_many_arguments)]
+    pub fn messages(
+        &self,
+        #[param(help = "Filter by role: user (default), assistant, all")] role: Option<String>,
+        #[param(help = "Filter messages by content pattern")] grep: Option<String>,
+        #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
+        #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
+        #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(help = "Show sessions from all projects")] all_projects: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Maximum number of sessions")] limit: Option<usize>,
+        #[param(help = "Truncate message text to N chars (default: 200)")] max_chars: Option<usize>,
+        #[param(help = "Don't truncate message text")] no_truncate: bool,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<MessagesReport, String> {
+        let limit = limit.unwrap_or(20);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        let is_pretty = resolve_pretty(resolved_root, pretty, compact);
+        crate::commands::sessions::build_messages_report(
+            root_path,
+            limit,
+            format.as_deref(),
+            role.as_deref(),
+            grep.as_deref(),
+            days,
+            since.as_deref(),
+            until.as_deref(),
+            project_path,
+            all_projects,
+            max_chars,
+            no_truncate,
+            is_pretty,
         )
     }
 

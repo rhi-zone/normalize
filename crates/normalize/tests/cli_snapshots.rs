@@ -379,6 +379,11 @@ fn test_help_sessions_stats() {
 }
 
 #[test]
+fn test_help_sessions_messages() {
+    insta::assert_snapshot!(snapshot_help(&["sessions", "messages"]));
+}
+
+#[test]
 fn test_help_sessions_plans() {
     insta::assert_snapshot!(snapshot_help(&["sessions", "plans"]));
 }
