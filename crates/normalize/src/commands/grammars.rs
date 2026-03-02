@@ -64,7 +64,6 @@ impl OutputFormatter for GrammarPathsReport {
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum GrammarAction {
     /// List installed grammars
     List,
@@ -72,11 +71,9 @@ pub enum GrammarAction {
     /// Install grammars from GitHub release
     Install {
         /// Specific version to install (default: latest)
-        #[cfg_attr(feature = "cli", arg(long))]
         version: Option<String>,
 
         /// Force reinstall even if grammars exist
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         force: bool,
     },

@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 
 /// What to extract during indexing (files are always indexed).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum FactsContent {
     /// Skip content extraction (files only)
@@ -63,12 +62,10 @@ fn default_limit() -> usize {
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum FactsAction {
     /// Rebuild the file index
     Rebuild {
         /// What to extract: symbols, calls, imports (default: all)
-        #[cfg_attr(feature = "cli", arg(long, value_delimiter = ',', default_values_t = vec![FactsContent::Symbols, FactsContent::Calls, FactsContent::Imports]))]
         #[serde(default = "default_include")]
         include: Vec<FactsContent>,
     },
@@ -76,7 +73,6 @@ pub enum FactsAction {
     /// Show index statistics (DB size vs codebase size)
     Stats {
         /// Show storage usage for index and caches
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         storage: bool,
     },
@@ -87,7 +83,6 @@ pub enum FactsAction {
         prefix: Option<String>,
 
         /// Maximum number of files to show
-        #[cfg_attr(feature = "cli", arg(short, long, default_value = "100"))]
         #[serde(default = "default_limit")]
         limit: usize,
     },
@@ -95,12 +90,10 @@ pub enum FactsAction {
     /// Index external packages (stdlib, site-packages) into global cache
     Packages {
         /// Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available.
-        #[cfg_attr(feature = "cli", arg(long, value_delimiter = ','))]
         #[serde(default)]
         only: Vec<String>,
 
         /// Clear existing index before re-indexing
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         clear: bool,
     },
@@ -108,15 +101,12 @@ pub enum FactsAction {
     /// Run compiled rule packs (dylibs) against extracted facts
     Rules {
         /// Specific rule to run (runs all if not specified)
-        #[cfg_attr(feature = "cli", arg(long))]
         rule: Option<String>,
 
         /// Path to a specific rule pack dylib
-        #[cfg_attr(feature = "cli", arg(long))]
         pack: Option<PathBuf>,
 
         /// List available rules instead of running them
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         list: bool,
     },
@@ -127,7 +117,6 @@ pub enum FactsAction {
         rules_file: Option<PathBuf>,
 
         /// List available rules instead of running them
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         list: bool,
     },

@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 
 /// Rule type filter for list/run commands.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum RuleType {
     #[default]
@@ -41,36 +40,29 @@ impl std::str::FromStr for RuleType {
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum RulesAction {
     /// List all rules (syntax + fact, builtin + user)
     List {
         /// Show source URLs for imported rules
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         sources: bool,
 
         /// Filter by rule type
-        #[cfg_attr(feature = "cli", arg(long, default_value = "all"))]
         #[serde(default)]
         r#type: RuleType,
 
         /// Filter by tag (e.g. "debug-print", "security")
-        #[cfg_attr(feature = "cli", arg(long))]
         tag: Option<String>,
 
         /// Filter to enabled rules only
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         enabled: bool,
 
         /// Filter to disabled rules only
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         disabled: bool,
 
         /// Hide the description line (compact one-line-per-rule output)
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         no_desc: bool,
     },
@@ -78,20 +70,16 @@ pub enum RulesAction {
     /// Run rules against the codebase
     Run {
         /// Specific rule ID to run
-        #[cfg_attr(feature = "cli", arg(long))]
         rule: Option<String>,
 
         /// Filter by tag (e.g. "debug-print", "security")
-        #[cfg_attr(feature = "cli", arg(long))]
         tag: Option<String>,
 
         /// Apply auto-fixes (syntax rules only)
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         fix: bool,
 
         /// Output in SARIF format
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         sarif: bool,
 
@@ -99,12 +87,10 @@ pub enum RulesAction {
         target: Option<String>,
 
         /// Filter by rule type
-        #[cfg_attr(feature = "cli", arg(long, default_value = "all"))]
         #[serde(default)]
         r#type: RuleType,
 
         /// Debug flags (comma-separated)
-        #[cfg_attr(feature = "cli", arg(long, value_delimiter = ','))]
         #[serde(default)]
         debug: Vec<String>,
     },
@@ -115,7 +101,6 @@ pub enum RulesAction {
         id_or_tag: String,
 
         /// Preview changes without writing
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         dry_run: bool,
     },
@@ -126,7 +111,6 @@ pub enum RulesAction {
         id_or_tag: String,
 
         /// Preview changes without writing
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         dry_run: bool,
     },
@@ -140,12 +124,10 @@ pub enum RulesAction {
     /// List all tags and the rules they group
     Tags {
         /// Expand each tag to show its member rules
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         show_rules: bool,
 
         /// Show only this specific tag
-        #[cfg_attr(feature = "cli", arg(long))]
         tag: Option<String>,
     },
 
@@ -155,7 +137,6 @@ pub enum RulesAction {
         url: String,
 
         /// Install to global rules (~/.config/normalize/rules/) instead of project
-        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         global: bool,
     },

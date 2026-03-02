@@ -8,7 +8,6 @@ use nu_ansi_term::Color::Yellow;
 use std::path::Path;
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum PackageAction {
     /// Query package info from registry
     Info {

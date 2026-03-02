@@ -35,7 +35,6 @@ struct BatchOutput {
 
 /// Position for insert/move/copy operations
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum Position {
     /// Before the destination (sibling)
@@ -110,7 +109,6 @@ impl std::fmt::Display for Operation {
 
 /// Edit action to perform (CLI)
 #[derive(serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum EditAction {
     /// Delete the target symbol
     Delete,
@@ -132,7 +130,6 @@ pub enum EditAction {
         /// Content to insert
         content: String,
         /// Where to insert: before, after, prepend, append
-        #[cfg_attr(feature = "cli", arg(long))]
         at: Position,
     },
 
@@ -141,7 +138,6 @@ pub enum EditAction {
         /// Destination symbol or container
         destination: String,
         /// Where to place: before, after, prepend, append
-        #[cfg_attr(feature = "cli", arg(long))]
         at: Position,
     },
 
@@ -150,7 +146,6 @@ pub enum EditAction {
         /// Destination symbol or container
         destination: String,
         /// Where to place: before, after, prepend, append
-        #[cfg_attr(feature = "cli", arg(long))]
         at: Position,
     },
 }

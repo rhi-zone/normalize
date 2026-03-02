@@ -31,7 +31,6 @@ fn default_path() -> PathBuf {
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum DaemonAction {
     /// Show daemon status
     Status,
@@ -48,7 +47,6 @@ pub enum DaemonAction {
     /// Add a root to watch
     Add {
         /// Path to the project root
-        #[cfg_attr(feature = "cli", arg(default_value = "."))]
         #[serde(default = "default_path")]
         path: PathBuf,
     },
@@ -56,7 +54,6 @@ pub enum DaemonAction {
     /// Remove a root from watching
     Remove {
         /// Path to the project root
-        #[cfg_attr(feature = "cli", arg(default_value = "."))]
         #[serde(default = "default_path")]
         path: PathBuf,
     },

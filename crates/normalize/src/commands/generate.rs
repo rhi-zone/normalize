@@ -3,7 +3,6 @@
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum InputFormat {
     /// Auto-detect from file content
@@ -41,7 +40,6 @@ impl std::str::FromStr for InputFormat {
 }
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum Backend {
     /// TypeScript interfaces/types

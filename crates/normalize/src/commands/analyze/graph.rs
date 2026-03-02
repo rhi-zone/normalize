@@ -18,7 +18,6 @@ use std::path::Path;
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum GraphTarget {
     /// Nodes are files, edges are imports

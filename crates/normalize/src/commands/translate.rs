@@ -1,7 +1,6 @@
 //! Translate command - convert code between programming languages.
 
 #[derive(Clone, Copy, serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum SourceLanguage {
     /// TypeScript/JavaScript
@@ -13,7 +12,6 @@ pub enum SourceLanguage {
 }
 
 #[derive(Clone, Copy, serde::Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum TargetLanguage {
     /// TypeScript
