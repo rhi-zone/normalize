@@ -25,6 +25,7 @@ use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
 use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
+use crate::commands::analyze::layering::LayeringReport;
 use crate::commands::analyze::module_health::ModuleHealthReport;
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
@@ -304,6 +305,14 @@ impl AnalyzeService {
     }
 
     fn display_surface(&self, r: &SurfaceReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_layering(&self, r: &LayeringReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1471,6 +1480,27 @@ impl AnalyzeService {
             n => n,
         };
         crate::commands::analyze::surface::analyze_surface_sync(&root_path, effective_limit)
+    }
+
+    /// Per-module import layering compliance — are imports flowing downward? (requires facts index)
+    #[cli(display_with = "display_layering")]
+    pub fn layering(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<LayeringReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        crate::commands::analyze::layering::analyze_layering_sync(&root_path, effective_limit)
     }
 
     /// Find public functions with no direct test caller

@@ -523,6 +523,13 @@ pub enum AnalyzeCommand {
         limit: usize,
     },
 
+    /// Per-module import layering compliance — are imports flowing downward? (requires facts index)
+    Layering {
+        /// Maximum number of modules to show (0 = no limit)
+        #[arg(short = 'l', long, default_value = "30")]
+        limit: usize,
+    },
+
     /// Rank modules by import fan-in (requires facts index)
     Imports {
         /// Maximum number of modules to show (0 = no limit)

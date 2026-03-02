@@ -45,7 +45,7 @@ pub struct DepthMapReport {
 
 /// Compute depth for a single node via DFS + memoization.
 /// depth(M) = max(1 + depth(importer) for importer in importers_by_file[M]), base 0.
-fn compute_depth(
+pub(crate) fn compute_depth(
     node: &str,
     importers_by_file: &HashMap<String, HashSet<String>>,
     memo: &mut HashMap<String, usize>,

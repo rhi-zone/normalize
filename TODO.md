@@ -329,9 +329,10 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
   Combine with fan-in: wide interface AND high fan-in = most constrained module.
   → Done: `analyze surface` — public/private counts, public ratio, fan-in, constraint score.
 
-- [ ] **Abstraction layering**: are imports flowing downward (good) or upward/sideways
+- [x] **Abstraction layering**: are imports flowing downward (good) or upward/sideways
   (coupling)? `analyze architecture` has layer-deps but doesn't score the direction.
   Want: per-module "layering compliance" — fraction of imports that go downward.
+  → Done: `analyze layering` — per-module compliance, per-layer summary, depth-based ranking.
 
 **Change impact:**
 

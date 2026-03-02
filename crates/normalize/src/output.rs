@@ -43,6 +43,7 @@ mod tests {
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::impact::ImpactReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
+        use crate::commands::analyze::layering::LayeringReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
         use crate::commands::analyze::ownership::OwnershipReport;
         use crate::commands::analyze::repo_coupling::RepoCouplingReport;
@@ -119,6 +120,7 @@ mod tests {
         assert_output_formatter::<StaleDocsReport>();
         assert_output_formatter::<SummaryReport>();
         assert_output_formatter::<SurfaceReport>();
+        assert_output_formatter::<LayeringReport>();
         assert_output_formatter::<TestGapsReport>();
         assert_output_formatter::<TestRatioReport>();
         assert_output_formatter::<ViewOutput>();

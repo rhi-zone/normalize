@@ -23,6 +23,7 @@ pub mod files;
 pub mod hotspots;
 pub mod impact;
 pub mod imports;
+pub mod layering;
 pub mod length;
 pub mod module_health;
 pub mod ownership;
@@ -356,6 +357,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::Surface { .. }) => {
             print_schema::<surface::SurfaceReport>();
+        }
+        Some(AnalyzeCommand::Layering { .. }) => {
+            print_schema::<layering::LayeringReport>();
         }
         Some(AnalyzeCommand::Imports { .. }) => {
             print_schema::<imports::ImportCentralityReport>();
@@ -943,6 +947,20 @@ pub fn run(
         Some(AnalyzeCommand::Surface { limit }) => {
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             match surface::analyze_surface_sync(&effective_root, effective_limit) {
+                Ok(report) => {
+                    println!("{}", report.format_text());
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                    1
+                }
+            }
+        }
+
+        Some(AnalyzeCommand::Layering { limit }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            match layering::analyze_layering_sync(&effective_root, effective_limit) {
                 Ok(report) => {
                     println!("{}", report.format_text());
                     0

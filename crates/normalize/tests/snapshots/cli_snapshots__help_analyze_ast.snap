@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 347
 expression: "snapshot_help(&[\"analyze\", \"ast\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -49,6 +48,7 @@ Commands:
   imports              Rank modules by import fan-in (requires facts index)
   depth-map            Per-module dependency depth + ripple risk (requires facts index)
   surface              Per-module public symbol count, public ratio, and constraint score (requires facts index)
+  layering             Per-module import layering compliance — are imports flowing downward? (requires facts index)
   test-gaps            Find public functions with no direct test caller
   callers              Show callers of a symbol
   callees              Show what functions a symbol calls

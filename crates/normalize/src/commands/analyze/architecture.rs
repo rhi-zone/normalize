@@ -767,7 +767,7 @@ fn longest_path_from(
 
 /// Extract the layer (top-level directory) from a file path.
 /// Returns the first significant directory component.
-fn extract_layer(path: &str) -> String {
+pub(crate) fn extract_layer(path: &str) -> String {
     // Skip common prefixes like "crates/normalize/" to get to meaningful layer
     let path = path
         .strip_prefix("crates/normalize/src/")
