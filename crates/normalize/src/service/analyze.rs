@@ -12,6 +12,7 @@ use crate::commands::analyze::check_refs::CheckRefsReport;
 use crate::commands::analyze::clusters::ClustersReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
+use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::density::DensityReport;
 use crate::commands::analyze::depth_map::DepthMapReport;
@@ -202,6 +203,14 @@ impl AnalyzeService {
     }
 
     fn display_coupling(&self, r: &CouplingReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_coupling_clusters(&self, r: &CouplingClustersReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -913,6 +922,34 @@ impl AnalyzeService {
             });
         }
         crate::commands::analyze::coupling::analyze_coupling(&root_path, min, lim, &exclude)
+    }
+
+    /// Group files into change-clusters based on temporal coupling
+    #[cli(display_with = "display_coupling_clusters")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn coupling_clusters(
+        &self,
+        #[param(help = "Minimum shared commits for an edge (default: 3)")] min_commits: Option<
+            usize,
+        >,
+        #[param(short = 'l', help = "Maximum number of clusters to show")] limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<CouplingClustersReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::coupling_clusters::analyze_coupling_clusters(
+            &root_path,
+            min_commits.unwrap_or(3),
+            limit.unwrap_or(20),
+            &exclude,
+            &only,
+        )
     }
 
     /// Show per-file ownership concentration from git blame

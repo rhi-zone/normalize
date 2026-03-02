@@ -340,9 +340,10 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
   what's affected? Transitive reverse-dependency closure + estimated blast radius.
   Combines import graph with test coverage to show untested impact paths.
 
-- [ ] **Change coupling clusters**: beyond pairwise `analyze coupling`, group files into
-  change-sets that always move together. "These 12 files are effectively one module
-  spread across 4 directories." Uses temporal coupling + import graph.
+- [x] **Change coupling clusters**: `normalize analyze coupling-clusters` — groups files into
+  connected components of temporal coupling. Union-find on co-change edges from `analyze coupling`.
+  Shows cluster size, internal edges, cohesion, shared commits. Supports `--min-commits`,
+  `--limit`, `--exclude`, `--only`.
 
 **Distillation / compression:**
 

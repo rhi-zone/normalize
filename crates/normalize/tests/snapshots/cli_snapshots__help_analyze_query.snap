@@ -27,6 +27,7 @@ Commands:
   clusters             Group similar functions into structural clusters (connected components of similar-functions pairs)
   hotspots             Show git history hotspots (frequently changed files)
   coupling             Find files that frequently change together (temporal coupling)
+  coupling-clusters    Group files into change-clusters based on temporal coupling
   ownership            Show per-file ownership concentration from git blame
   contributors         Analyze contributors across repos
   activity             Analyze cross-repo activity over time
