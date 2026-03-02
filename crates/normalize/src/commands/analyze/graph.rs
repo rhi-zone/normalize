@@ -25,6 +25,8 @@ pub struct GraphStats {
     pub diamond_count: usize,
     pub bridge_count: usize,
     pub transitive_edge_count: usize,
+    pub max_chain_depth: usize,
+    pub chain_count: usize,
 }
 
 /// A strongly connected component (circular-dependency cluster).
@@ -52,6 +54,15 @@ pub struct BridgeEdge {
     pub to: String,
 }
 
+/// A deep import chain (longest dependency path).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ImportChain {
+    /// Modules in the chain from start to end
+    pub modules: Vec<String>,
+    /// Length of the chain (number of edges, not nodes)
+    pub depth: usize,
+}
+
 /// A transitive (redundant) import: A→C is redundant because A→B→C.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct TransitiveEdge {
@@ -67,6 +78,7 @@ pub struct GraphReport {
     pub sccs: Vec<Scc>,
     pub diamonds: Vec<Diamond>,
     pub bridges: Vec<BridgeEdge>,
+    pub longest_chains: Vec<ImportChain>,
     pub transitive_edges: Vec<TransitiveEdge>,
 }
 
@@ -486,6 +498,76 @@ fn count_transitive_edges(imports: &HashMap<String, HashSet<String>>) -> usize {
     count
 }
 
+/// Find the longest import chains (dependency paths) in the graph.
+/// Uses DFS to find the longest path from each node, avoiding cycles.
+fn find_longest_chains(graph: &HashMap<String, HashSet<String>>, limit: usize) -> Vec<ImportChain> {
+    let mut longest_paths: Vec<ImportChain> = Vec::new();
+    let mut memo: HashMap<String, Vec<String>> = HashMap::new();
+
+    for start in graph.keys() {
+        let mut visited: HashSet<String> = HashSet::new();
+        let path = longest_path_from(start, graph, &mut visited, &mut memo);
+        if path.len() > 3 {
+            longest_paths.push(ImportChain {
+                depth: path.len() - 1,
+                modules: path,
+            });
+        }
+    }
+
+    longest_paths.sort_by(|a, b| b.depth.cmp(&a.depth));
+
+    // Deduplicate — if a shorter chain is a suffix of a longer one, skip it
+    let mut unique_chains: Vec<ImportChain> = Vec::new();
+    for chain in longest_paths {
+        let dominated = unique_chains.iter().any(|existing| {
+            existing.modules.len() > chain.modules.len()
+                && existing.modules.ends_with(&chain.modules)
+        });
+        if !dominated {
+            unique_chains.push(chain);
+        }
+        if unique_chains.len() >= limit {
+            break;
+        }
+    }
+
+    unique_chains
+}
+
+/// Find the longest path from a node using DFS with memoization.
+fn longest_path_from(
+    node: &str,
+    graph: &HashMap<String, HashSet<String>>,
+    visited: &mut HashSet<String>,
+    memo: &mut HashMap<String, Vec<String>>,
+) -> Vec<String> {
+    if let Some(cached) = memo.get(node) {
+        return cached.clone();
+    }
+
+    visited.insert(node.to_string());
+
+    let mut longest: Vec<String> = vec![node.to_string()];
+
+    if let Some(neighbors) = graph.get(node) {
+        for neighbor in neighbors {
+            if !visited.contains(neighbor) {
+                let sub_path = longest_path_from(neighbor, graph, visited, memo);
+                if sub_path.len() + 1 > longest.len() {
+                    let mut new_path = vec![node.to_string()];
+                    new_path.extend(sub_path);
+                    longest = new_path;
+                }
+            }
+        }
+    }
+
+    visited.remove(node);
+    memo.insert(node.to_string(), longest.clone());
+    longest
+}
+
 // ---------------------------------------------------------------------------
 // Main analysis
 // ---------------------------------------------------------------------------
@@ -528,6 +610,17 @@ pub async fn analyze_graph(idx: &FileIndex, limit: usize) -> Result<GraphReport,
     let bridges = find_bridges(imports);
     let bridge_count = bridges.len();
 
+    let mut longest_chains = find_longest_chains(
+        imports,
+        if limit == usize::MAX {
+            usize::MAX
+        } else {
+            limit
+        },
+    );
+    let max_chain_depth = longest_chains.first().map(|c| c.depth).unwrap_or(0);
+    let chain_count = longest_chains.len();
+
     let transitive_edge_count = count_transitive_edges(imports);
     let mut transitive_edges = find_transitive_edges(
         imports,
@@ -541,6 +634,7 @@ pub async fn analyze_graph(idx: &FileIndex, limit: usize) -> Result<GraphReport,
     // Apply limits
     sccs.truncate(limit);
     diamonds.truncate(limit);
+    longest_chains.truncate(limit);
     transitive_edges.truncate(limit);
 
     let stats = GraphStats {
@@ -554,6 +648,8 @@ pub async fn analyze_graph(idx: &FileIndex, limit: usize) -> Result<GraphReport,
         diamond_count,
         bridge_count,
         transitive_edge_count,
+        max_chain_depth,
+        chain_count,
     };
 
     Ok(GraphReport {
@@ -561,6 +657,7 @@ pub async fn analyze_graph(idx: &FileIndex, limit: usize) -> Result<GraphReport,
         sccs,
         diamonds,
         bridges,
+        longest_chains,
         transitive_edges,
     })
 }
@@ -607,6 +704,12 @@ impl OutputFormatter for GraphReport {
             "  {} circular-dependency clusters, {} diamonds, {} bridges, {} transitive edges",
             s.nontrivial_scc_count, s.diamond_count, s.bridge_count, s.transitive_edge_count
         ));
+        if s.max_chain_depth > 0 {
+            out.push(format!(
+                "  max chain depth {}, {} deep chains (depth > 2)",
+                s.max_chain_depth, s.chain_count
+            ));
+        }
         out.push(String::new());
 
         if s.nodes == 0 {
@@ -662,6 +765,25 @@ impl OutputFormatter for GraphReport {
                     "  {} → {}",
                     truncate_path(&b.from, 40),
                     truncate_path(&b.to, 40),
+                ));
+            }
+            out.push(String::new());
+        }
+
+        // Longest chains
+        if !self.longest_chains.is_empty() {
+            out.push(format!(
+                "## Deep import chains ({}, max depth {})",
+                self.longest_chains.len(),
+                self.stats.max_chain_depth
+            ));
+            for chain in &self.longest_chains {
+                let short_modules: Vec<String> =
+                    chain.modules.iter().map(|m| truncate_path(m, 30)).collect();
+                out.push(format!(
+                    "  [depth {}] {}",
+                    chain.depth,
+                    short_modules.join(" → ")
                 ));
             }
             out.push(String::new());
@@ -733,6 +855,19 @@ impl OutputFormatter for GraphReport {
             bridge_color, s.bridge_count,
             trans_color, s.transitive_edge_count,
         ));
+        if s.max_chain_depth > 0 {
+            let depth_color = if s.max_chain_depth >= 5 {
+                "\x1b[1;31m"
+            } else if s.max_chain_depth >= 3 {
+                "\x1b[33m"
+            } else {
+                "\x1b[32m"
+            };
+            out.push(format!(
+                "  max chain depth {}{}\x1b[0m, {} deep chains (depth > 2)",
+                depth_color, s.max_chain_depth, s.chain_count
+            ));
+        }
         out.push(String::new());
 
         if s.nodes == 0 {
@@ -788,6 +923,33 @@ impl OutputFormatter for GraphReport {
                     "  {} \x1b[1;33m→\x1b[0m {}",
                     truncate_path(&b.from, 40),
                     truncate_path(&b.to, 40),
+                ));
+            }
+            out.push(String::new());
+        }
+
+        // Longest chains
+        if !self.longest_chains.is_empty() {
+            out.push(format!(
+                "\x1b[1m## Deep import chains ({}, max depth {})\x1b[0m",
+                self.longest_chains.len(),
+                self.stats.max_chain_depth
+            ));
+            for chain in &self.longest_chains {
+                let short_modules: Vec<String> =
+                    chain.modules.iter().map(|m| truncate_path(m, 30)).collect();
+                let depth_color = if chain.depth >= 5 {
+                    "\x1b[1;31m"
+                } else if chain.depth >= 3 {
+                    "\x1b[33m"
+                } else {
+                    "\x1b[32m"
+                };
+                out.push(format!(
+                    "  {}[depth {}]\x1b[0m {}",
+                    depth_color,
+                    chain.depth,
+                    short_modules.join(" \x1b[2m→\x1b[0m ")
                 ));
             }
             out.push(String::new());

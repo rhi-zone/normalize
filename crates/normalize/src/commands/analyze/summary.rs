@@ -19,7 +19,6 @@ pub struct Concern {
 #[derive(Debug, Default, Serialize, schemars::JsonSchema)]
 pub struct ArchStats {
     pub hubs: usize,
-    pub max_chain_depth: usize,
 }
 
 /// Single-page codebase overview.
@@ -36,12 +35,6 @@ pub struct SummaryReport {
 fn extract_arch_stats(report: &ArchitectureReport) -> ArchStats {
     ArchStats {
         hubs: report.hub_modules.len(),
-        max_chain_depth: report
-            .deep_chains
-            .iter()
-            .map(|c| c.depth)
-            .max()
-            .unwrap_or(0),
     }
 }
 
@@ -211,13 +204,10 @@ impl OutputFormatter for SummaryReport {
         }
 
         // Architecture
-        if self.arch.hubs > 0 || self.arch.max_chain_depth > 0 {
+        if self.arch.hubs > 0 {
             out.push(String::new());
             out.push("## Architecture".to_string());
-            out.push(format!(
-                "  {} hub modules · max chain depth {}",
-                self.arch.hubs, self.arch.max_chain_depth,
-            ));
+            out.push(format!("  {} hub modules", self.arch.hubs));
         }
 
         out.join("\n")
@@ -341,13 +331,10 @@ impl OutputFormatter for SummaryReport {
         }
 
         // Architecture
-        if self.arch.hubs > 0 || self.arch.max_chain_depth > 0 {
+        if self.arch.hubs > 0 {
             out.push(String::new());
             out.push(Style::new().bold().paint("Architecture").to_string());
-            out.push(format!(
-                "  {} hub modules · max chain depth {}",
-                self.arch.hubs, self.arch.max_chain_depth,
-            ));
+            out.push(format!("  {} hub modules", self.arch.hubs));
         }
 
         out.join("\n")

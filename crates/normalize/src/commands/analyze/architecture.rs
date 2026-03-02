@@ -62,16 +62,6 @@ pub struct HubModule {
     pub hub_score: usize,
 }
 
-/// A deep import chain (longest dependency path)
-/// Long chains can indicate layering issues or overly deep hierarchies.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct ImportChain {
-    /// Modules in the chain from start to end
-    pub modules: Vec<String>,
-    /// Length of the chain (number of edges, not nodes)
-    pub depth: usize,
-}
-
 /// Import flow between directory layers.
 /// Shows which directories import from which, helping identify layer violations.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -89,7 +79,6 @@ pub struct LayerFlow {
 pub struct ArchitectureReport {
     pub cross_imports: Vec<CrossImport>,
     pub hub_modules: Vec<HubModule>,
-    pub deep_chains: Vec<ImportChain>,
     pub layer_flows: Vec<LayerFlow>,
     pub coupling_hotspots: Vec<ModuleCoupling>,
     pub orphan_modules: Vec<OrphanModule>,
@@ -131,21 +120,6 @@ impl OutputFormatter for ArchitectureReport {
                 lines.push(format!(
                     "  {:<50} {:>6} {:>7} {:>10}",
                     display_path, h.fan_in, h.fan_out, h.hub_score
-                ));
-            }
-            lines.push(String::new());
-        }
-
-        // Deep import chains
-        if !self.deep_chains.is_empty() {
-            lines.push("## Deep Import Chains".to_string());
-            for chain in &self.deep_chains {
-                let short_modules: Vec<String> =
-                    chain.modules.iter().map(|m| truncate_path(m, 30)).collect();
-                lines.push(format!(
-                    "  [depth {}] {}",
-                    chain.depth,
-                    short_modules.join(" → ")
                 ));
             }
             lines.push(String::new());
@@ -566,7 +540,6 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
     let (coupling, hub_modules) =
         compute_coupling_and_hubs(&graph.imports_by_file, &graph.importers_by_file, &all_files);
     let cross_imports = detect_cross_imports(&graph.imports_by_file);
-    let deep_chains = find_longest_chains(&graph.imports_by_file);
     let layer_flows = compute_layer_flows(&graph.imports_by_file);
     let orphans = find_orphan_modules(conn, &graph.importers_by_file).await?;
     let symbol_hotspots = find_symbol_hotspots(conn).await?;
@@ -586,7 +559,6 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
     Ok(ArchitectureReport {
         cross_imports,
         hub_modules,
-        deep_chains,
         layer_flows,
         coupling_hotspots: coupling,
         orphan_modules: orphans,
@@ -596,80 +568,6 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
         total_imports,
         resolved_imports,
     })
-}
-
-/// Find the longest import chains (dependency paths) in the graph.
-/// Uses DFS to find the longest path from each node, avoiding cycles.
-fn find_longest_chains(graph: &HashMap<String, HashSet<String>>) -> Vec<ImportChain> {
-    let mut longest_paths: Vec<ImportChain> = Vec::new();
-    let mut memo: HashMap<String, Vec<String>> = HashMap::new();
-
-    // Find longest path starting from each node
-    for start in graph.keys() {
-        let mut visited: HashSet<String> = HashSet::new();
-        let path = longest_path_from(start, graph, &mut visited, &mut memo);
-        if path.len() > 3 {
-            // Only report chains with depth > 2 (3+ nodes)
-            longest_paths.push(ImportChain {
-                depth: path.len() - 1,
-                modules: path,
-            });
-        }
-    }
-
-    // Sort by depth descending, deduplicate by first node, take top 5
-    longest_paths.sort_by(|a, b| b.depth.cmp(&a.depth));
-
-    // Deduplicate - if a shorter chain is a suffix of a longer one, skip it
-    let mut unique_chains: Vec<ImportChain> = Vec::new();
-    for chain in longest_paths {
-        let dominated = unique_chains.iter().any(|existing| {
-            // Check if chain is a suffix of existing
-            existing.modules.len() > chain.modules.len()
-                && existing.modules.ends_with(&chain.modules)
-        });
-        if !dominated {
-            unique_chains.push(chain);
-        }
-        if unique_chains.len() >= 5 {
-            break;
-        }
-    }
-
-    unique_chains
-}
-
-/// Find the longest path from a node using DFS with memoization.
-fn longest_path_from(
-    node: &str,
-    graph: &HashMap<String, HashSet<String>>,
-    visited: &mut HashSet<String>,
-    memo: &mut HashMap<String, Vec<String>>,
-) -> Vec<String> {
-    if let Some(cached) = memo.get(node) {
-        return cached.clone();
-    }
-
-    visited.insert(node.to_string());
-
-    let mut longest: Vec<String> = vec![node.to_string()];
-
-    if let Some(neighbors) = graph.get(node) {
-        for neighbor in neighbors {
-            if !visited.contains(neighbor) {
-                let sub_path = longest_path_from(neighbor, graph, visited, memo);
-                if sub_path.len() + 1 > longest.len() {
-                    let mut new_path = vec![node.to_string()];
-                    new_path.extend(sub_path);
-                    longest = new_path;
-                }
-            }
-        }
-    }
-
-    visited.remove(node);
-    memo.insert(node.to_string(), longest.clone());
-    longest
 }
 
 /// Extract the layer (top-level directory) from a file path.
