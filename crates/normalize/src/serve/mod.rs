@@ -64,7 +64,7 @@ pub enum ServeProtocol {
 }
 
 /// Run the serve command
-pub fn run(args: ServeArgs, _format: &crate::output::OutputFormat) -> i32 {
+pub fn run(args: ServeArgs) -> i32 {
     use crate::config::NormalizeConfig;
 
     let root = args.root.clone().unwrap_or_else(|| PathBuf::from("."));

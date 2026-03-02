@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 /// Run impact analysis CLI command.
-pub fn cmd_impact(root: &Path, target: &str, json: bool) -> i32 {
+pub fn cmd_impact(root: &Path, target: &str, _json: bool) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let idx = match rt.block_on(crate::index::ensure_ready(root)) {
         Ok(i) => i,
@@ -25,10 +25,7 @@ pub fn cmd_impact(root: &Path, target: &str, json: bool) -> i32 {
         }
     };
 
-    let config = crate::config::NormalizeConfig::load(root);
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    println!("{}", report.format_text());
     0
 }
 

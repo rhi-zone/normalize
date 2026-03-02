@@ -59,15 +59,10 @@ impl OutputFormatter for FileLengthReport {
 }
 
 /// Run file length analysis
-pub fn cmd_files(
-    root: &Path,
-    limit: usize,
-    exclude: &[String],
-    format: &crate::output::OutputFormat,
-) -> i32 {
+pub fn cmd_files(root: &Path, limit: usize, exclude: &[String]) -> i32 {
     let report = analyze_files(root, limit, exclude);
 
-    report.print(format);
+    println!("{}", report.format_text());
 
     0
 }

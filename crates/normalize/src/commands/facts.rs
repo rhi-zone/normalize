@@ -1,7 +1,6 @@
 //! Facts management commands (file index, symbols, calls, imports).
 
 use crate::index;
-use crate::output::OutputFormat;
 use crate::paths::get_normalize_dir;
 use crate::rules;
 use crate::skeleton;
@@ -136,8 +135,8 @@ pub enum FactsAction {
 }
 
 /// Run an index management action
-pub fn cmd_facts(action: FactsAction, root: Option<&Path>, format: &OutputFormat) -> i32 {
-    let json = format.is_json();
+pub fn cmd_facts(action: FactsAction, root: Option<&Path>) -> i32 {
+    let json = false;
     let rt = tokio::runtime::Runtime::new().unwrap();
     match action {
         FactsAction::Rebuild { include } => rt.block_on(cmd_rebuild(root, &include)),

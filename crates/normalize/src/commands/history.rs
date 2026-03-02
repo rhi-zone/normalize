@@ -162,24 +162,13 @@ pub fn print_input_schema() {
 }
 
 /// Determine which output schema to print based on the args mode.
-fn print_history_output_schema(args: &HistoryArgs) {
-    if args.diff.is_some() {
-        crate::output::print_output_schema::<HistoryDiffReport>();
-    } else if args.status {
-        crate::output::print_output_schema::<HistoryStatusReport>();
-    } else if args.all {
-        crate::output::print_output_schema::<HistoryTreeReport>();
-    } else if args.prune.is_some() {
-        crate::output::print_output_schema::<HistoryPruneReport>();
-    } else {
-        crate::output::print_output_schema::<HistoryListReport>();
-    }
+fn print_history_output_schema(_args: &HistoryArgs) {
+    // Output schema printing removed
 }
 
 /// Run history command.
 pub fn run(
     args: HistoryArgs,
-    format: crate::output::OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
@@ -215,28 +204,28 @@ pub fn run(
             checkpoint: None,
             edits: vec![],
         };
-        report.print(&format);
+        println!("{}", report.format_text());
         return 0;
     }
 
     // Handle --diff
     if let Some(ref commit_ref) = args.diff {
-        return cmd_diff(&shadow, commit_ref, &format);
+        return cmd_diff(&shadow, commit_ref);
     }
 
     // Handle --status
     if args.status {
-        return cmd_status(&shadow, &format);
+        return cmd_status(&shadow);
     }
 
     // Handle --all (tree view)
     if args.all {
-        return cmd_tree(&shadow, args.limit, &format);
+        return cmd_tree(&shadow, args.limit);
     }
 
     // Handle --prune
     if let Some(keep) = args.prune {
-        return cmd_prune(&shadow, keep, &format);
+        return cmd_prune(&shadow, keep);
     }
 
     // Regular history listing
@@ -249,7 +238,7 @@ pub fn run(
         checkpoint,
         edits: entries,
     };
-    report.print(&format);
+    println!("{}", report.format_text());
 
     0
 }
@@ -352,14 +341,14 @@ pub fn cmd_prune_service(root: Option<&str>, keep: usize) -> Result<HistoryPrune
 }
 
 /// Show diff for a specific commit.
-fn cmd_diff(shadow: &Shadow, commit_ref: &str, format: &crate::output::OutputFormat) -> i32 {
+fn cmd_diff(shadow: &Shadow, commit_ref: &str) -> i32 {
     match shadow.diff(commit_ref) {
         Some(diff) => {
             let report = HistoryDiffReport {
                 commit_ref: commit_ref.to_string(),
                 diff,
             };
-            report.print(format);
+            println!("{}", report.format_text());
             0
         }
         None => {
@@ -370,7 +359,7 @@ fn cmd_diff(shadow: &Shadow, commit_ref: &str, format: &crate::output::OutputFor
 }
 
 /// Show status of shadow edits since last real git commit.
-fn cmd_status(shadow: &Shadow, format: &crate::output::OutputFormat) -> i32 {
+fn cmd_status(shadow: &Shadow) -> i32 {
     let entries = shadow.history(None, 100);
     let checkpoint = shadow.checkpoint();
 
@@ -389,18 +378,18 @@ fn cmd_status(shadow: &Shadow, format: &crate::output::OutputFormat) -> i32 {
         edits_since_checkpoint: count,
         checkpoint,
     };
-    report.print(format);
+    println!("{}", report.format_text());
 
     0
 }
 
 /// Show full tree structure of shadow history (all branches).
-fn cmd_tree(shadow: &Shadow, limit: usize, format: &crate::output::OutputFormat) -> i32 {
+fn cmd_tree(shadow: &Shadow, limit: usize) -> i32 {
     match shadow.tree(limit) {
         Some(tree_output) => {
             let lines: Vec<String> = tree_output.lines().map(|l| l.to_string()).collect();
             let report = HistoryTreeReport { tree: lines };
-            report.print(format);
+            println!("{}", report.format_text());
             0
         }
         None => {
@@ -411,14 +400,14 @@ fn cmd_tree(shadow: &Shadow, limit: usize, format: &crate::output::OutputFormat)
 }
 
 /// Prune shadow history, keeping only the last N commits.
-fn cmd_prune(shadow: &Shadow, keep: usize, format: &crate::output::OutputFormat) -> i32 {
+fn cmd_prune(shadow: &Shadow, keep: usize) -> i32 {
     match shadow.prune(keep) {
         Ok(pruned_count) => {
             let report = HistoryPruneReport {
                 pruned: pruned_count,
                 kept: keep,
             };
-            report.print(format);
+            println!("{}", report.format_text());
             0
         }
         Err(e) => {

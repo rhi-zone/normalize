@@ -297,27 +297,8 @@ pub enum SessionsCommand {
 }
 
 /// Print JSON schema for the sessions subcommand's output type.
-fn print_sessions_schema(command: &Option<SessionsCommand>) -> i32 {
-    use crate::sessions::SessionAnalysis;
-    match command {
-        Some(SessionsCommand::List { .. }) | None => {
-            crate::output::print_output_schema::<list::SessionListReport>();
-        }
-        Some(SessionsCommand::Show { analyze: true, .. }) | Some(SessionsCommand::Stats { .. }) => {
-            crate::output::print_output_schema::<SessionAnalysis>();
-        }
-        Some(SessionsCommand::Show { .. }) => {
-            crate::output::print_output_schema::<show::SessionShowReport>();
-        }
-        Some(SessionsCommand::Plans { .. }) => {
-            crate::output::print_output_schema::<plans::PlansListReport>();
-        }
-        #[cfg(feature = "sessions-web")]
-        Some(SessionsCommand::Serve { .. }) => {
-            eprintln!("Serve subcommand does not have a structured output schema");
-            return 1;
-        }
-    }
+fn print_sessions_schema(_command: &Option<SessionsCommand>) -> i32 {
+    // Output schema printing removed
     0
 }
 
@@ -333,7 +314,6 @@ pub fn print_input_schema() {
 /// Run the sessions command
 pub fn run(
     args: SessionsArgs,
-    output_format: &crate::output::OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
@@ -374,7 +354,6 @@ pub fn run(
             until.as_deref(),
             project.as_deref(),
             all_projects,
-            output_format,
         ),
 
         Some(SessionsCommand::Show {
@@ -395,7 +374,6 @@ pub fn run(
             args.format.as_deref(),
             analyze,
             full,
-            output_format,
             filter.as_deref(),
             grep.as_deref(),
             errors_only,
@@ -423,7 +401,6 @@ pub fn run(
             project.as_deref(),
             all_projects,
             &group_by,
-            output_format,
         ),
 
         #[cfg(feature = "sessions-web")]
@@ -432,9 +409,7 @@ pub fn run(
             rt.block_on(cmd_sessions_serve(args.root.as_deref(), port))
         }
 
-        Some(SessionsCommand::Plans { name }) => {
-            plans::cmd_plans(name.as_deref(), args.limit, output_format)
-        }
+        Some(SessionsCommand::Plans { name }) => plans::cmd_plans(name.as_deref(), args.limit),
 
         // Default: list sessions
         None => cmd_sessions_list(
@@ -442,7 +417,6 @@ pub fn run(
             args.limit,
             args.format.as_deref(),
             None,
-            output_format,
         ),
     }
 }
@@ -459,7 +433,6 @@ fn cmd_sessions_list_filtered(
     until: Option<&str>,
     project: Option<&Path>,
     all_projects: bool,
-    output_format: &crate::output::OutputFormat,
 ) -> i32 {
     match list::build_session_list(
         root,
@@ -471,7 +444,7 @@ fn cmd_sessions_list_filtered(
         until,
         project,
         all_projects,
-        output_format.is_pretty(),
+        false,
     ) {
         Ok(report) => {
             if report.is_empty() {
@@ -479,7 +452,7 @@ fn cmd_sessions_list_filtered(
                 return 0;
             }
             use crate::output::OutputFormatter;
-            report.print(output_format);
+            println!("{}", report.format_text());
             0
         }
         Err(e) => {

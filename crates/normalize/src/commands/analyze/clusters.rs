@@ -140,7 +140,6 @@ pub struct ClustersConfig<'a> {
     pub skeleton: bool,
     pub include_trait_impls: bool,
     pub limit: usize,
-    pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
 
@@ -321,7 +320,6 @@ pub fn cmd_clusters(cfg: ClustersConfig<'_>) -> i32 {
         skeleton,
         include_trait_impls,
         limit,
-        format,
         filter,
     } = cfg;
 
@@ -336,6 +334,6 @@ pub fn cmd_clusters(cfg: ClustersConfig<'_>) -> i32 {
         filter,
     );
 
-    report.print(format);
+    println!("{}", report.format_text());
     0
 }

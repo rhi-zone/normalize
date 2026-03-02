@@ -3756,9 +3756,6 @@ dependencies = [
 name = "normalize-output"
 version = "0.1.0"
 dependencies = [
- "jaq-core",
- "jaq-json",
- "jaq-std",
  "normalize-core",
  "normalize-derive",
  "nu-ansi-term",

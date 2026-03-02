@@ -273,7 +273,7 @@ fn truncate_path(path: &str, max_len: usize) -> String {
 }
 
 /// Run architecture analysis
-pub fn cmd_architecture(root: &Path, json: bool) -> i32 {
+pub fn cmd_architecture(root: &Path, _json: bool) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let idx = match rt.block_on(crate::index::ensure_ready(root)) {
         Ok(i) => i,
@@ -291,10 +291,7 @@ pub fn cmd_architecture(root: &Path, json: bool) -> i32 {
         }
     };
 
-    let config = crate::config::NormalizeConfig::load(root);
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    println!("{}", report.format_text());
     0
 }
 

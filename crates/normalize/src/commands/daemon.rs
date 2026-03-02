@@ -66,8 +66,8 @@ pub enum DaemonAction {
 }
 
 /// Run a daemon management action
-pub fn cmd_daemon(action: DaemonAction, format: &crate::output::OutputFormat) -> i32 {
-    let json = format.is_json();
+pub fn cmd_daemon(action: DaemonAction) -> i32 {
+    let json = false;
     let client = DaemonClient::new();
 
     match action {

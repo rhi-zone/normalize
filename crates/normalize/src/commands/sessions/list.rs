@@ -328,7 +328,6 @@ pub fn cmd_sessions_list(
     limit: usize,
     format_name: Option<&str>,
     grep: Option<&str>,
-    output_format: &crate::output::OutputFormat,
 ) -> i32 {
     match build_session_list(
         project,
@@ -340,14 +339,15 @@ pub fn cmd_sessions_list(
         None,
         None,
         false,
-        output_format.is_pretty(),
+        false,
     ) {
         Ok(report) => {
             if report.sessions.is_empty() {
                 eprintln!("No {} sessions found", format_name.unwrap_or("Claude Code"));
                 return 0;
             }
-            report.print(output_format);
+            use crate::output::OutputFormatter;
+            println!("{}", report.format_text());
             0
         }
         Err(e) => {

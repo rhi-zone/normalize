@@ -102,17 +102,12 @@ impl OutputFormatter for DocCoverageReport {
 }
 
 /// Run documentation coverage analysis
-pub fn cmd_docs(
-    root: &Path,
-    limit: usize,
-    format: &crate::output::OutputFormat,
-    filter: Option<&Filter>,
-) -> i32 {
+pub fn cmd_docs(root: &Path, limit: usize, filter: Option<&Filter>) -> i32 {
     let config = crate::config::NormalizeConfig::load(root);
     let exclude_interface_impls = config.analyze.exclude_interface_impls();
     let report = analyze_docs(root, limit, exclude_interface_impls, filter);
 
-    report.print(format);
+    println!("{}", report.format_text());
 
     0
 }

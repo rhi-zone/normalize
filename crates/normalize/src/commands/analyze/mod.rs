@@ -263,96 +263,105 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
     use crate::analyze::complexity::ComplexityReport;
     use crate::analyze::function_length::LengthReport;
     use crate::analyze::test_gaps::TestGapsReport;
+
+    fn print_schema<T: schemars::JsonSchema>() {
+        let schema = schemars::schema_for!(T);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&schema).unwrap_or_default()
+        );
+    }
+
     match command {
         Some(AnalyzeCommand::Health { .. }) | None => {
-            crate::output::print_output_schema::<report::AnalyzeReport>();
+            print_schema::<report::AnalyzeReport>();
         }
         Some(AnalyzeCommand::Complexity { .. }) => {
-            crate::output::print_output_schema::<ComplexityReport>();
+            print_schema::<ComplexityReport>();
         }
         Some(AnalyzeCommand::Length { .. }) => {
-            crate::output::print_output_schema::<LengthReport>();
+            print_schema::<LengthReport>();
         }
         Some(AnalyzeCommand::Security { .. }) => {
-            crate::output::print_output_schema::<report::SecurityReport>();
+            print_schema::<report::SecurityReport>();
         }
         Some(AnalyzeCommand::Docs { .. }) => {
-            crate::output::print_output_schema::<docs::DocCoverageReport>();
+            print_schema::<docs::DocCoverageReport>();
         }
         Some(AnalyzeCommand::Files { .. }) => {
-            crate::output::print_output_schema::<files::FileLengthReport>();
+            print_schema::<files::FileLengthReport>();
         }
         Some(AnalyzeCommand::Hotspots { .. }) => {
-            crate::output::print_output_schema::<hotspots::HotspotsReport>();
+            print_schema::<hotspots::HotspotsReport>();
         }
         Some(AnalyzeCommand::Coupling { .. }) => {
-            crate::output::print_output_schema::<coupling::CouplingReport>();
+            print_schema::<coupling::CouplingReport>();
         }
         Some(AnalyzeCommand::Ownership { .. }) => {
-            crate::output::print_output_schema::<ownership::OwnershipReport>();
+            print_schema::<ownership::OwnershipReport>();
         }
         Some(AnalyzeCommand::Architecture) => {
-            crate::output::print_output_schema::<architecture::ArchitectureReport>();
+            print_schema::<architecture::ArchitectureReport>();
         }
         Some(AnalyzeCommand::Impact { .. }) => {
-            crate::output::print_output_schema::<impact::ImpactReport>();
+            print_schema::<impact::ImpactReport>();
         }
         Some(AnalyzeCommand::Activity { .. }) => {
-            crate::output::print_output_schema::<activity::ActivityReport>();
+            print_schema::<activity::ActivityReport>();
         }
         Some(AnalyzeCommand::Contributors) => {
-            crate::output::print_output_schema::<contributors::ContributorsReport>();
+            print_schema::<contributors::ContributorsReport>();
         }
         Some(AnalyzeCommand::RepoCoupling { .. }) => {
-            crate::output::print_output_schema::<repo_coupling::RepoCouplingReport>();
+            print_schema::<repo_coupling::RepoCouplingReport>();
         }
         Some(AnalyzeCommand::CheckRefs) => {
-            crate::output::print_output_schema::<check_refs::CheckRefsReport>();
+            print_schema::<check_refs::CheckRefsReport>();
         }
         Some(AnalyzeCommand::StaleDocs) => {
-            crate::output::print_output_schema::<stale_docs::StaleDocsReport>();
+            print_schema::<stale_docs::StaleDocsReport>();
         }
         Some(AnalyzeCommand::CheckExamples) => {
-            crate::output::print_output_schema::<check_examples::CheckExamplesReport>();
+            print_schema::<check_examples::CheckExamplesReport>();
         }
         Some(AnalyzeCommand::DuplicateFunctions { .. }) => {
-            crate::output::print_output_schema::<duplicates::DuplicateFunctionsReport>();
+            print_schema::<duplicates::DuplicateFunctionsReport>();
         }
         Some(AnalyzeCommand::DuplicateBlocks { .. }) => {
-            crate::output::print_output_schema::<duplicates::DuplicateBlocksReport>();
+            print_schema::<duplicates::DuplicateBlocksReport>();
         }
         Some(AnalyzeCommand::SimilarFunctions { .. }) => {
-            crate::output::print_output_schema::<duplicates::SimilarFunctionsReport>();
+            print_schema::<duplicates::SimilarFunctionsReport>();
         }
         Some(AnalyzeCommand::SimilarBlocks { .. }) => {
-            crate::output::print_output_schema::<duplicates::SimilarBlocksReport>();
+            print_schema::<duplicates::SimilarBlocksReport>();
         }
         Some(AnalyzeCommand::Clusters { .. }) => {
-            crate::output::print_output_schema::<clusters::ClustersReport>();
+            print_schema::<clusters::ClustersReport>();
         }
         Some(AnalyzeCommand::DuplicateTypes { .. }) => {
-            crate::output::print_output_schema::<duplicates::DuplicateTypesReport>();
+            print_schema::<duplicates::DuplicateTypesReport>();
         }
         Some(AnalyzeCommand::TestGaps { .. }) => {
-            crate::output::print_output_schema::<TestGapsReport>();
+            print_schema::<TestGapsReport>();
         }
         Some(AnalyzeCommand::Budget { .. }) => {
-            crate::output::print_output_schema::<budget::BudgetReport>();
+            print_schema::<budget::BudgetReport>();
         }
         Some(AnalyzeCommand::TestRatio { .. }) => {
-            crate::output::print_output_schema::<test_ratio::TestRatioReport>();
+            print_schema::<test_ratio::TestRatioReport>();
         }
         Some(AnalyzeCommand::DepthMap { .. }) => {
-            crate::output::print_output_schema::<depth_map::DepthMapReport>();
+            print_schema::<depth_map::DepthMapReport>();
         }
         Some(AnalyzeCommand::Surface { .. }) => {
-            crate::output::print_output_schema::<surface::SurfaceReport>();
+            print_schema::<surface::SurfaceReport>();
         }
         Some(AnalyzeCommand::Imports { .. }) => {
-            crate::output::print_output_schema::<imports::ImportCentralityReport>();
+            print_schema::<imports::ImportCentralityReport>();
         }
         Some(AnalyzeCommand::All { .. }) => {
-            crate::output::print_output_schema::<report::AnalyzeReport>();
+            print_schema::<report::AnalyzeReport>();
         }
         // These don't have structured output
         Some(AnalyzeCommand::Trace { .. })
@@ -428,7 +437,6 @@ fn resolve_diff_and_filter(
 /// Run analyze command with args.
 pub fn run(
     args: AnalyzeArgs,
-    format: crate::output::OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
@@ -458,7 +466,7 @@ pub fn run(
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = NormalizeConfig::load(&effective_root);
-    let json = format.is_json();
+    let json = false;
 
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&effective_root);
@@ -491,7 +499,7 @@ pub fn run(
                 None,
                 filter.as_ref(),
             );
-            print_report(&report, &format)
+            print_report(&report)
         }
 
         Some(AnalyzeCommand::Architecture) => architecture::cmd_architecture(&effective_root, json),
@@ -555,7 +563,7 @@ pub fn run(
                 // Note: kind filter not applicable to complexity (no kind field)
                 let _ = kind;
 
-                report.print(&format);
+                println!("{}", report.format_text());
                 0
             }
         }
@@ -603,7 +611,7 @@ pub fn run(
                     &allowlist,
                 );
 
-                report.print(&format);
+                println!("{}", report.format_text());
                 0
             }
         }
@@ -620,11 +628,11 @@ pub fn run(
                 None,
                 filter.as_ref(),
             );
-            print_report(&report, &format)
+            print_report(&report)
         }
 
         Some(AnalyzeCommand::Docs { limit }) => {
-            docs::cmd_docs(&effective_root, limit, &format, filter.as_ref())
+            docs::cmd_docs(&effective_root, limit, filter.as_ref())
         }
 
         Some(AnalyzeCommand::Files {
@@ -641,7 +649,7 @@ pub fn run(
                 )
             } else {
                 let excludes = load_allow_file(&effective_root, "large-files-allow");
-                files::cmd_files(&effective_root, limit, &excludes, &format)
+                files::cmd_files(&effective_root, limit, &excludes)
             }
         }
 
@@ -658,32 +666,17 @@ pub fn run(
             max_depth,
             recursive,
             case_insensitive,
-            &format,
         ),
 
         Some(AnalyzeCommand::Callers {
             symbol,
             case_insensitive,
-        }) => call_graph::cmd_call_graph(
-            &effective_root,
-            &symbol,
-            true,
-            false,
-            case_insensitive,
-            &format,
-        ),
+        }) => call_graph::cmd_call_graph(&effective_root, &symbol, true, false, case_insensitive),
 
         Some(AnalyzeCommand::Callees {
             symbol,
             case_insensitive,
-        }) => call_graph::cmd_call_graph(
-            &effective_root,
-            &symbol,
-            false,
-            true,
-            case_insensitive,
-            &format,
-        ),
+        }) => call_graph::cmd_call_graph(&effective_root, &symbol, false, true, case_insensitive),
 
         Some(AnalyzeCommand::Hotspots {
             allow,
@@ -700,16 +693,16 @@ pub fn run(
             } else {
                 let mut excludes = config.analyze.hotspots_exclude.clone();
                 excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
-                hotspots::cmd_hotspots(&effective_root, &excludes, recency, &format)
+                hotspots::cmd_hotspots(&effective_root, &excludes, recency)
             }
         }
 
         Some(AnalyzeCommand::Coupling { min_commits, limit }) => {
-            coupling::cmd_coupling(&effective_root, min_commits, limit, &args.exclude, &format)
+            coupling::cmd_coupling(&effective_root, min_commits, limit, &args.exclude)
         }
 
         Some(AnalyzeCommand::Ownership { limit }) => {
-            ownership::cmd_ownership(&effective_root, limit, &args.exclude, &format)
+            ownership::cmd_ownership(&effective_root, limit, &args.exclude)
         }
 
         Some(AnalyzeCommand::Activity { .. }) => {
@@ -727,13 +720,11 @@ pub fn run(
             1
         }
 
-        Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, &format),
+        Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root),
 
-        Some(AnalyzeCommand::StaleDocs) => stale_docs::cmd_stale_docs(&effective_root, &format),
+        Some(AnalyzeCommand::StaleDocs) => stale_docs::cmd_stale_docs(&effective_root),
 
-        Some(AnalyzeCommand::CheckExamples) => {
-            check_examples::cmd_check_examples(&effective_root, &format)
-        }
+        Some(AnalyzeCommand::CheckExamples) => check_examples::cmd_check_examples(&effective_root),
 
         Some(AnalyzeCommand::DuplicateFunctions {
             elide_identifiers,
@@ -762,7 +753,6 @@ pub fn run(
                         show_source,
                         min_lines,
                         include_trait_impls,
-                        format: &format,
                         filter: filter.as_ref(),
                     },
                 );
@@ -787,7 +777,6 @@ pub fn run(
             show_source,
             allow,
             reason,
-            format: &format,
             filter: filter.as_ref(),
         }),
 
@@ -812,7 +801,6 @@ pub fn run(
             include_trait_impls,
             allow,
             reason,
-            format: &format,
             filter: filter.as_ref(),
         }),
 
@@ -837,7 +825,6 @@ pub fn run(
             include_trait_impls,
             allow,
             reason,
-            format: &format,
             filter: filter.as_ref(),
         }),
 
@@ -856,7 +843,6 @@ pub fn run(
             skeleton,
             include_trait_impls,
             limit,
-            format: &format,
             filter: filter.as_ref(),
         }),
 
@@ -882,7 +868,7 @@ pub fn run(
                 let scan_root = target
                     .map(PathBuf::from)
                     .unwrap_or_else(|| effective_root.clone());
-                duplicates::cmd_duplicate_types(&scan_root, &effective_root, min_overlap, &format)
+                duplicates::cmd_duplicate_types(&scan_root, &effective_root, min_overlap)
             }
         }
 
@@ -922,21 +908,21 @@ pub fn run(
                 &allowlist,
             );
 
-            report.print(&format);
+            println!("{}", report.format_text());
             0
         }
 
         Some(AnalyzeCommand::Budget { limit }) => {
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             let report = budget::analyze_budget(&effective_root, effective_limit);
-            report.print(&format);
+            println!("{}", report.format_text());
             0
         }
 
         Some(AnalyzeCommand::TestRatio { limit }) => {
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             let report = test_ratio::analyze_test_ratio(&effective_root, effective_limit);
-            report.print(&format);
+            println!("{}", report.format_text());
             0
         }
 
@@ -944,7 +930,7 @@ pub fn run(
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             match depth_map::analyze_depth_map_sync(&effective_root, effective_limit) {
                 Ok(report) => {
-                    report.print(&format);
+                    println!("{}", report.format_text());
                     0
                 }
                 Err(e) => {
@@ -958,7 +944,7 @@ pub fn run(
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             match surface::analyze_surface_sync(&effective_root, effective_limit) {
                 Ok(report) => {
-                    report.print(&format);
+                    println!("{}", report.format_text());
                     0
                 }
                 Err(e) => {
@@ -972,7 +958,7 @@ pub fn run(
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             match imports::analyze_import_centrality(&effective_root, effective_limit, internal) {
                 Ok(report) => {
-                    report.print(&format);
+                    println!("{}", report.format_text());
                     0
                 }
                 Err(e) => {
@@ -989,11 +975,10 @@ pub fn run(
                 &effective_root,
                 &weights,
                 filter.as_ref(),
-                &format,
             )
         }
 
-        Some(AnalyzeCommand::Ast { file, at, sexp }) => ast::cmd_ast(&file, at, sexp, &format),
+        Some(AnalyzeCommand::Ast { file, at, sexp }) => ast::cmd_ast(&file, at, sexp),
 
         Some(AnalyzeCommand::Query {
             pattern,
@@ -1008,7 +993,6 @@ pub fn run(
                 filter.as_ref(),
                 show_source,
                 context_lines,
-                &format,
             )
         }
 
@@ -1032,7 +1016,6 @@ pub fn run(
                 None,
                 list,
                 fix,
-                &format,
                 sarif,
                 &config.analyze.rules,
                 &debug_flags,
@@ -1052,7 +1035,7 @@ pub fn run(
                 None,
                 filter.as_ref(),
             );
-            print_report(&report, &format)
+            print_report(&report)
         }
     }
 }
@@ -1194,8 +1177,8 @@ fn get_diff_files(root: &Path, base: &str) -> Result<Vec<String>, String> {
 }
 
 /// Print analysis report in appropriate format
-fn print_report(report: &report::AnalyzeReport, format: &crate::output::OutputFormat) -> i32 {
-    report.print(format);
+fn print_report(report: &report::AnalyzeReport) -> i32 {
+    println!("{}", report.format_text());
     0
 }
 
@@ -1205,9 +1188,8 @@ fn run_all_passes(
     root: &Path,
     weights: &AnalyzeWeights,
     filter: Option<&Filter>,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     let mut exit_code = 0;
     let mut scores: Vec<(f64, f64)> = Vec::new();
 
@@ -1230,7 +1212,7 @@ fn run_all_passes(
         scores.push((security_report.score(), weights.security()));
     }
 
-    report.print(format);
+    println!("{}", report.format_text());
 
     // 2. Duplicate functions
     if !json {
@@ -1244,7 +1226,6 @@ fn run_all_passes(
             show_source: false,
             min_lines: 1,
             include_trait_impls: false,
-            format,
             filter,
         });
 
@@ -1263,7 +1244,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: duplicate-types...");
     }
-    let dup_types_result = duplicates::cmd_duplicate_types(root, root, 70, format);
+    let dup_types_result = duplicates::cmd_duplicate_types(root, root, 70);
     if dup_types_result != 0 {
         exit_code = dup_types_result;
     }
@@ -1272,7 +1253,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: docs...");
     }
-    let docs_result = docs::cmd_docs(root, 10, format, filter);
+    let docs_result = docs::cmd_docs(root, 10, filter);
     if docs_result != 0 {
         exit_code = docs_result;
     }
@@ -1282,7 +1263,7 @@ fn run_all_passes(
         eprintln!("Running: files...");
     }
     let excludes = load_allow_file(root, "large-files-allow");
-    let files_result = files::cmd_files(root, 20, &excludes, format);
+    let files_result = files::cmd_files(root, 20, &excludes);
     if files_result != 0 {
         exit_code = files_result;
     }
@@ -1294,7 +1275,7 @@ fn run_all_passes(
     let config = NormalizeConfig::load(root);
     let mut hotspot_excludes = config.analyze.hotspots_exclude.clone();
     hotspot_excludes.extend(load_allow_file(root, "hotspots-allow"));
-    let hotspots_result = hotspots::cmd_hotspots(root, &hotspot_excludes, false, format);
+    let hotspots_result = hotspots::cmd_hotspots(root, &hotspot_excludes, false);
     if hotspots_result != 0 {
         exit_code = hotspots_result;
     }
@@ -1303,7 +1284,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: check-refs...");
     }
-    let refs_result = check_refs::cmd_check_refs(root, format);
+    let refs_result = check_refs::cmd_check_refs(root);
     if refs_result != 0 {
         exit_code = refs_result;
     }
@@ -1312,7 +1293,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: stale-docs...");
     }
-    let stale_result = stale_docs::cmd_stale_docs(root, format);
+    let stale_result = stale_docs::cmd_stale_docs(root);
     if stale_result != 0 {
         exit_code = stale_result;
     }
@@ -1321,7 +1302,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: check-examples...");
     }
-    let examples_result = check_examples::cmd_check_examples(root, format);
+    let examples_result = check_examples::cmd_check_examples(root);
     if examples_result != 0 {
         exit_code = examples_result;
     }

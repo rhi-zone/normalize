@@ -164,7 +164,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 
 **Steps (normalize side):**
 - [x] Add `server-less` dependency with `cli` feature
-- [x] Wire `OutputFormatter`: `display_with` bridges to `format_pretty()`/`format_text()` via `Cell<bool>` for pretty/compact globals. server-less handles JSON/JSONL/JQ before `display_with`.
+- [x] Wire `OutputFormatter`: `display_with` bridges to `format_pretty()`/`format_text()` via `Cell<bool>` for pretty/compact globals. server-less handles JSON/JSONL/JQ before `display_with` (see `server-less-macros/src/cli.rs:996-1006` in 0.2.1-alpha.1).
 - [x] Wire `defaults` hook to `NormalizeConfig` loading (config file merge)
 - [x] Migrate one simple command (text-search → `grep`) as proof of concept
 - [x] Delete `cmd_text_search`, `TextSearchArgs`, `text_search::run()` — replaced by `#[cli]` on method

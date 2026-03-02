@@ -139,13 +139,12 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
 }
 
 /// Check documentation references for broken links
-pub fn cmd_check_refs(root: &Path, format: &crate::output::OutputFormat) -> i32 {
+pub fn cmd_check_refs(root: &Path) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(cmd_check_refs_async(root, format))
+    rt.block_on(cmd_check_refs_async(root))
 }
 
-async fn cmd_check_refs_async(root: &Path, format: &crate::output::OutputFormat) -> i32 {
-    let json = format.is_json();
+async fn cmd_check_refs_async(root: &Path) -> i32 {
     use regex::Regex;
 
     // Open index to get known symbols
@@ -185,10 +184,7 @@ async fn cmd_check_refs_async(root: &Path, format: &crate::output::OutputFormat)
             files_checked: 0,
             symbols_indexed: all_symbols.len(),
         };
-        let config = crate::config::NormalizeConfig::load(root);
-        let format =
-            crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-        report.print(&format);
+        println!("{}", report.format_text());
         return 0;
     }
 
@@ -244,10 +240,7 @@ async fn cmd_check_refs_async(root: &Path, format: &crate::output::OutputFormat)
         files_checked: md_files.len(),
         symbols_indexed: all_symbols.len(),
     };
-    let config = crate::config::NormalizeConfig::load(root);
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    println!("{}", report.format_text());
 
     if broken_refs.is_empty() { 0 } else { 1 }
 }

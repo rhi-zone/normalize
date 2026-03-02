@@ -163,8 +163,7 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
 }
 
 /// Check that all example references have matching markers
-pub fn cmd_check_examples(root: &Path, format: &crate::output::OutputFormat) -> i32 {
-    let json = format.is_json();
+pub fn cmd_check_examples(root: &Path) -> i32 {
     use regex::Regex;
     use std::collections::HashSet;
 
@@ -289,10 +288,7 @@ pub fn cmd_check_examples(root: &Path, format: &crate::output::OutputFormat) -> 
         references_found: refs_found,
         missing,
     };
-    let config = crate::config::NormalizeConfig::load(root);
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    println!("{}", report.format_text());
 
     if report.missing.is_empty() { 0 } else { 1 }
 }

@@ -491,27 +491,16 @@ pub struct DuplicateFunctionsConfig<'a> {
     pub show_source: bool,
     pub min_lines: usize,
     pub include_trait_impls: bool,
-    pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
 
 pub fn cmd_duplicate_functions_with_count(
     cfg: DuplicateFunctionsConfig<'_>,
 ) -> DuplicateFunctionResult {
-    let json = cfg.format.is_json();
-    let config_root = cfg
-        .roots
-        .first()
-        .map(|p| p.as_path())
-        .unwrap_or(Path::new("."));
-    let config = crate::config::NormalizeConfig::load(config_root);
-
     let report = build_duplicate_functions_report(cfg);
     let group_count = report.group_count();
 
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    println!("{}", report.format_text());
 
     let exit_code = if group_count == 0 { 0 } else { 1 };
     DuplicateFunctionResult {
@@ -521,13 +510,7 @@ pub fn cmd_duplicate_functions_with_count(
 }
 
 /// Detect duplicate type definitions (structs with similar fields)
-pub fn cmd_duplicate_types(
-    root: &Path,
-    config_root: &Path,
-    min_overlap_percent: usize,
-    format: &crate::output::OutputFormat,
-) -> i32 {
-    let json = format.is_json();
+pub fn cmd_duplicate_types(root: &Path, config_root: &Path, min_overlap_percent: usize) -> i32 {
     use regex::Regex;
 
     let extractor = Extractor::new();
@@ -712,10 +695,7 @@ pub fn cmd_duplicate_types(
         duplicates,
     };
 
-    let config = crate::config::NormalizeConfig::load(root);
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    println!("{}", report.format_text());
 
     if report.duplicates.is_empty() { 0 } else { 1 }
 }
@@ -1216,7 +1196,6 @@ pub struct DuplicateBlocksConfig<'a> {
     pub show_source: bool,
     pub allow: Option<String>,
     pub reason: Option<String>,
-    pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
 
@@ -1230,7 +1209,6 @@ pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
         show_source,
         allow,
         reason,
-        format,
         filter,
     } = cfg;
     let extractor = Extractor::new();
@@ -1369,7 +1347,7 @@ pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
         root: root.to_path_buf(),
     };
 
-    report.print(format);
+    println!("{}", report.format_text());
     if report.groups.is_empty() { 0 } else { 1 }
 }
 
@@ -1723,7 +1701,6 @@ pub struct SimilarBlocksConfig<'a> {
     pub include_trait_impls: bool,
     pub allow: Option<String>,
     pub reason: Option<String>,
-    pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
 
@@ -1739,7 +1716,6 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
         include_trait_impls,
         allow,
         reason,
-        format,
         filter,
     } = cfg;
     let extractor = Extractor::new();
@@ -1973,7 +1949,7 @@ pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
         root: root.to_path_buf(),
     };
 
-    report.print(format);
+    println!("{}", report.format_text());
     if empty { 0 } else { 1 }
 }
 
@@ -2087,7 +2063,6 @@ pub struct SimilarFunctionsConfig<'a> {
     pub include_trait_impls: bool,
     pub allow: Option<String>,
     pub reason: Option<String>,
-    pub format: &'a crate::output::OutputFormat,
     pub filter: Option<&'a Filter>,
 }
 
@@ -2361,7 +2336,6 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
         include_trait_impls,
         allow,
         reason,
-        format,
         filter,
     } = cfg;
 
@@ -2469,7 +2443,7 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
         roots: roots.to_vec(),
     };
 
-    report.print(format);
+    println!("{}", report.format_text());
     if empty { 0 } else { 1 }
 }
 
@@ -2484,7 +2458,6 @@ pub fn build_duplicate_functions_report(
         show_source,
         min_lines,
         include_trait_impls,
-        format: _format,
         filter,
     } = cfg;
     let extractor = Extractor::new();
@@ -2657,7 +2630,6 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         show_source,
         allow: _allow,
         reason: _reason,
-        format: _format,
         filter,
     } = cfg;
     let extractor = Extractor::new();
@@ -2783,7 +2755,6 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Simila
         include_trait_impls,
         allow: _allow,
         reason: _reason,
-        format: _format,
         filter,
     } = cfg;
 
@@ -2865,7 +2836,6 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> SimilarBlock
         include_trait_impls,
         allow: _allow,
         reason: _reason,
-        format: _format,
         filter,
     } = cfg;
     let extractor = Extractor::new();

@@ -173,7 +173,6 @@ pub fn print_input_schema() {
 /// Run view command with args.
 pub fn run(
     args: ViewArgs,
-    format: crate::output::OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
@@ -183,7 +182,6 @@ pub fn run(
         return 0;
     }
     if output_schema {
-        crate::output::print_output_schema::<report::ViewOutput>();
         return 0;
     }
     // Override args with --params-json if provided
@@ -210,12 +208,11 @@ pub fn run(
             &effective_root,
             limit,
             args.case_insensitive,
-            &format,
         );
     }
 
     // Handle --dir-context: prepend directory context before main output
-    if args.dir_context && !format.is_json() {
+    if args.dir_context {
         let target_path = args
             .target
             .as_ref()
@@ -253,7 +250,6 @@ pub fn run(
         docstring_mode,
         args.context,
         !args.no_parent,
-        &format,
         &args.exclude,
         &args.only,
         args.case_insensitive,
@@ -278,12 +274,11 @@ pub fn cmd_view(
     docstring_mode: DocstringDisplay,
     context: bool,
     show_parent: bool,
-    format: &crate::output::OutputFormat,
     exclude: &[String],
     only: &[String],
     case_insensitive: bool,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -297,7 +292,7 @@ pub fn cmd_view(
     // If kind filter is specified without target (or with "."), list matching symbols
     if let Some(kind) = kind_filter {
         let scope = target.unwrap_or(".");
-        return tree::cmd_view_filtered(&root, scope, kind, format);
+        return tree::cmd_view_filtered(&root, scope, kind);
     }
 
     // --focus requires a file target
@@ -310,20 +305,13 @@ pub fn cmd_view(
 
     // Handle "." as current directory
     if target == "." {
-        return tree::cmd_view_directory(&root, &root, depth, raw, format, filter.as_ref());
+        return tree::cmd_view_directory(&root, &root, depth, raw, filter.as_ref());
     }
 
     // Handle line targets: file.rs:30 (symbol at line) or file.rs:30-55 (range)
     if let Some((file_path, line, end_opt)) = lines::parse_line_target(target) {
         if let Some(end) = end_opt {
-            return lines::cmd_view_line_range(
-                &file_path,
-                line,
-                end,
-                &root,
-                docstring_mode,
-                format,
-            );
+            return lines::cmd_view_line_range(&file_path, line, end, &root, docstring_mode);
         } else {
             return symbol::cmd_view_symbol_at_line(
                 &file_path,
@@ -333,7 +321,6 @@ pub fn cmd_view(
                 docstring_mode,
                 show_parent,
                 context,
-                format,
             );
         }
     }
@@ -404,7 +391,6 @@ pub fn cmd_view(
                 docstring_mode,
                 show_parent,
                 context,
-                format,
                 case_insensitive,
             );
         }
@@ -435,7 +421,7 @@ pub fn cmd_view(
                             })
                             .collect(),
                     });
-                report.print(format);
+                println!("{}", report.format_text());
             } else {
                 eprintln!("Multiple matches for '{}' - be more specific:", target);
                 for m in &matches {
@@ -463,7 +449,6 @@ pub fn cmd_view(
             &root,
             depth,
             raw,
-            format,
             filter.as_ref(),
         )
     } else if unified.symbol_path.is_empty() {
@@ -480,7 +465,6 @@ pub fn cmd_view(
             resolve_imports,
             docstring_mode,
             context,
-            format,
         )
     } else {
         // Check if symbol path contains glob patterns
@@ -493,7 +477,6 @@ pub fn cmd_view(
                 depth,
                 full,
                 docstring_mode,
-                format,
                 case_insensitive,
             );
         }
@@ -507,7 +490,6 @@ pub fn cmd_view(
             docstring_mode,
             show_parent,
             context,
-            format,
             case_insensitive,
         )
     }

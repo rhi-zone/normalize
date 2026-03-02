@@ -1,6 +1,5 @@
 //! Package registry queries.
 
-use crate::output::OutputFormat;
 use clap::Subcommand;
 use normalize_ecosystems::{
     AuditResult, PackageError, PackageInfo, VulnerabilitySeverity, all_ecosystems,
@@ -31,20 +30,15 @@ pub enum PackageAction {
     Audit,
 }
 
-pub fn cmd_package(
-    action: PackageAction,
-    ecosystem: Option<&str>,
-    root: Option<&Path>,
-    format: OutputFormat,
-) -> i32 {
+pub fn cmd_package(action: PackageAction, ecosystem: Option<&str>, root: Option<&Path>) -> i32 {
     let project_root = root.unwrap_or(Path::new("."));
-    let use_colors = format.use_colors();
+    let use_colors = false;
 
     // Get ecosystem either by name or by detection
     if let Some(name) = ecosystem {
         // Explicit ecosystem specified
         match find_ecosystem_by_name(name) {
-            Some(eco) => run_for_ecosystem(eco, &action, project_root, &format, use_colors),
+            Some(eco) => run_for_ecosystem(eco, &action, project_root, use_colors),
             None => {
                 eprintln!("error: unknown ecosystem '{}'", name);
                 eprintln!("available: {}", available_ecosystems().join(", "));
@@ -65,23 +59,17 @@ pub fn cmd_package(
         // For info/outdated, use first ecosystem only
         match &action {
             PackageAction::List | PackageAction::Tree => {
-                if format.is_json() && ecosystems.len() > 1 {
-                    // Collect all results into a JSON array
-                    run_all_ecosystems_json(&ecosystems, &action, project_root, &format)
-                } else {
-                    let mut exit_code = 0;
-                    for (i, eco) in ecosystems.iter().enumerate() {
-                        if i > 0 {
-                            println!(); // Separator between ecosystems
-                        }
-                        let result =
-                            run_for_ecosystem(*eco, &action, project_root, &format, use_colors);
-                        if result != 0 {
-                            exit_code = result;
-                        }
+                let mut exit_code = 0;
+                for (i, eco) in ecosystems.iter().enumerate() {
+                    if i > 0 {
+                        println!(); // Separator between ecosystems
                     }
-                    exit_code
+                    let result = run_for_ecosystem(*eco, &action, project_root, use_colors);
+                    if result != 0 {
+                        exit_code = result;
+                    }
                 }
+                exit_code
             }
             _ => {
                 if ecosystems.len() > 1 {
@@ -89,97 +77,32 @@ pub fn cmd_package(
                     eprintln!("note: multiple ecosystems detected: {}", names.join(", "));
                     eprintln!("hint: use --ecosystem to specify which one");
                 }
-                run_for_ecosystem(ecosystems[0], &action, project_root, &format, use_colors)
+                run_for_ecosystem(ecosystems[0], &action, project_root, use_colors)
             }
         }
     }
-}
-
-fn run_all_ecosystems_json(
-    ecosystems: &[&dyn normalize_ecosystems::Ecosystem],
-    action: &PackageAction,
-    project_root: &Path,
-    format: &OutputFormat,
-) -> i32 {
-    let mut results = serde_json::Map::new();
-
-    for eco in ecosystems {
-        match action {
-            PackageAction::List => match eco.list_dependencies(project_root) {
-                Ok(deps) => {
-                    results.insert(
-                        eco.name().to_string(),
-                        serde_json::json!({
-                            "dependencies": deps.iter().map(|d| serde_json::json!({
-                                "name": d.name,
-                                "version_req": d.version_req,
-                                "optional": d.optional,
-                            })).collect::<Vec<_>>()
-                        }),
-                    );
-                }
-                Err(e) => {
-                    results.insert(
-                        eco.name().to_string(),
-                        serde_json::json!({
-                            "error": e.to_string()
-                        }),
-                    );
-                }
-            },
-            PackageAction::Tree => match eco.dependency_tree(project_root) {
-                Ok(tree) => {
-                    results.insert(
-                        eco.name().to_string(),
-                        serde_json::json!({
-                            "tree": tree
-                        }),
-                    );
-                }
-                Err(e) => {
-                    results.insert(
-                        eco.name().to_string(),
-                        serde_json::json!({
-                            "error": e.to_string()
-                        }),
-                    );
-                }
-            },
-            _ => {}
-        }
-    }
-
-    let value = serde_json::Value::Object(results);
-    print_json_value(&value, format);
-    0
 }
 
 fn run_for_ecosystem(
     eco: &dyn normalize_ecosystems::Ecosystem,
     action: &PackageAction,
     project_root: &Path,
-    format: &OutputFormat,
     use_colors: bool,
 ) -> i32 {
     match action {
-        PackageAction::Info { package } => cmd_info(eco, package, project_root, format),
-        PackageAction::List => cmd_list(eco, project_root, format, use_colors),
-        PackageAction::Tree => cmd_tree(eco, project_root, format, use_colors),
-        PackageAction::Why { package } => cmd_why(eco, package, project_root, format, use_colors),
-        PackageAction::Outdated => cmd_outdated(eco, project_root, format, use_colors),
-        PackageAction::Audit => cmd_audit(eco, project_root, format),
+        PackageAction::Info { package } => cmd_info(eco, package, project_root),
+        PackageAction::List => cmd_list(eco, project_root, use_colors),
+        PackageAction::Tree => cmd_tree(eco, project_root, use_colors),
+        PackageAction::Why { package } => cmd_why(eco, package, project_root, use_colors),
+        PackageAction::Outdated => cmd_outdated(eco, project_root, use_colors),
+        PackageAction::Audit => cmd_audit(eco, project_root),
     }
 }
 
-fn cmd_info(
-    eco: &dyn normalize_ecosystems::Ecosystem,
-    package: &str,
-    project_root: &Path,
-    format: &OutputFormat,
-) -> i32 {
+fn cmd_info(eco: &dyn normalize_ecosystems::Ecosystem, package: &str, project_root: &Path) -> i32 {
     match eco.query(package, project_root) {
         Ok(info) => {
-            print_package_info(&info, eco.name(), format);
+            print_human(&info, eco.name());
             0
         }
         Err(e) => {
@@ -207,34 +130,21 @@ fn cmd_info(
 fn cmd_list(
     eco: &dyn normalize_ecosystems::Ecosystem,
     project_root: &Path,
-    format: &OutputFormat,
     use_colors: bool,
 ) -> i32 {
     match eco.list_dependencies(project_root) {
         Ok(deps) => {
-            if format.is_json() {
-                let value = serde_json::json!({
-                    "ecosystem": eco.name(),
-                    "dependencies": deps.iter().map(|d| serde_json::json!({
-                        "name": d.name,
-                        "version_req": d.version_req,
-                        "optional": d.optional,
-                    })).collect::<Vec<_>>()
-                });
-                print_json_value(&value, format);
-            } else {
-                println!("{} dependencies ({})", deps.len(), eco.name());
-                println!();
-                for dep in &deps {
-                    let version = dep.version_req.as_deref().unwrap_or("*");
-                    let version_display = if use_colors {
-                        Yellow.paint(version).to_string()
-                    } else {
-                        version.to_string()
-                    };
-                    let optional = if dep.optional { " (optional)" } else { "" };
-                    println!("  {} {}{}", dep.name, version_display, optional);
-                }
+            println!("{} dependencies ({})", deps.len(), eco.name());
+            println!();
+            for dep in &deps {
+                let version = dep.version_req.as_deref().unwrap_or("*");
+                let version_display = if use_colors {
+                    Yellow.paint(version).to_string()
+                } else {
+                    version.to_string()
+                };
+                let optional = if dep.optional { " (optional)" } else { "" };
+                println!("  {} {}{}", dep.name, version_display, optional);
             }
             0
         }
@@ -248,20 +158,11 @@ fn cmd_list(
 fn cmd_tree(
     eco: &dyn normalize_ecosystems::Ecosystem,
     project_root: &Path,
-    format: &OutputFormat,
     use_colors: bool,
 ) -> i32 {
     match eco.dependency_tree(project_root) {
         Ok(tree) => {
-            if format.is_json() {
-                let value = serde_json::json!({
-                    "ecosystem": eco.name(),
-                    "tree": tree,
-                });
-                print_json_value(&value, format);
-            } else {
-                print_tree(&tree, use_colors);
-            }
+            print_tree(&tree, use_colors);
             0
         }
         Err(e) => {
@@ -298,7 +199,6 @@ fn cmd_why(
     eco: &dyn normalize_ecosystems::Ecosystem,
     package: &str,
     project_root: &Path,
-    format: &OutputFormat,
     use_colors: bool,
 ) -> i32 {
     match eco.dependency_tree(project_root) {
@@ -306,52 +206,27 @@ fn cmd_why(
             let paths = find_dependency_paths(&tree, package);
 
             if paths.is_empty() {
-                if format.is_json() {
-                    let value = serde_json::json!({
-                        "package": package,
-                        "found": false,
-                        "paths": []
-                    });
-                    print_json_value(&value, format);
-                } else {
-                    println!("Package '{}' not found in dependency tree", package);
-                }
+                println!("Package '{}' not found in dependency tree", package);
                 return 1;
             }
 
-            if format.is_json() {
-                let value = serde_json::json!({
-                    "package": package,
-                    "found": true,
-                    "paths": paths.iter().map(|path| {
-                        path.iter().map(|(name, version)| {
-                            serde_json::json!({
-                                "name": name,
-                                "version": version
-                            })
-                        }).collect::<Vec<_>>()
-                    }).collect::<Vec<_>>()
-                });
-                print_json_value(&value, format);
-            } else {
-                println!("'{}' is required by {} path(s):", package, paths.len());
-                println!();
-                for (i, path) in paths.iter().enumerate() {
-                    if i > 0 {
-                        println!();
-                    }
-                    for (j, (name, version)) in path.iter().enumerate() {
-                        let indent = "  ".repeat(j);
-                        if version.is_empty() {
-                            println!("{}{}", indent, name);
+            println!("'{}' is required by {} path(s):", package, paths.len());
+            println!();
+            for (i, path) in paths.iter().enumerate() {
+                if i > 0 {
+                    println!();
+                }
+                for (j, (name, version)) in path.iter().enumerate() {
+                    let indent = "  ".repeat(j);
+                    if version.is_empty() {
+                        println!("{}{}", indent, name);
+                    } else {
+                        let version_display = if use_colors {
+                            Yellow.paint(format!("v{}", version)).to_string()
                         } else {
-                            let version_display = if use_colors {
-                                Yellow.paint(format!("v{}", version)).to_string()
-                            } else {
-                                format!("v{}", version)
-                            };
-                            println!("{}{} {}", indent, name, version_display);
-                        }
+                            format!("v{}", version)
+                        };
+                        println!("{}{} {}", indent, name, version_display);
                     }
                 }
             }
@@ -402,7 +277,6 @@ fn find_paths_recursive(
 fn cmd_outdated(
     eco: &dyn normalize_ecosystems::Ecosystem,
     project_root: &Path,
-    format: &OutputFormat,
     use_colors: bool,
 ) -> i32 {
     // Get declared dependencies
@@ -453,13 +327,7 @@ fn cmd_outdated(
         }
     }
 
-    if format.is_json() {
-        let value = serde_json::json!({
-            "outdated": outdated,
-            "errors": errors.iter().map(|(n, e)| serde_json::json!({"name": n, "error": e})).collect::<Vec<_>>()
-        });
-        print_json_value(&value, format);
-    } else if outdated.is_empty() && errors.is_empty() {
+    if outdated.is_empty() && errors.is_empty() {
         println!("All packages are up to date");
     } else {
         if !outdated.is_empty() {
@@ -490,19 +358,10 @@ fn cmd_outdated(
     0
 }
 
-fn cmd_audit(
-    eco: &dyn normalize_ecosystems::Ecosystem,
-    project_root: &Path,
-    format: &OutputFormat,
-) -> i32 {
+fn cmd_audit(eco: &dyn normalize_ecosystems::Ecosystem, project_root: &Path) -> i32 {
     match eco.audit(project_root) {
         Ok(result) => {
-            if format.is_json() {
-                let value = serde_json::to_value(&result).unwrap_or_default();
-                print_json_value(&value, format);
-            } else {
-                print_audit_human(&result, eco.name());
-            }
+            print_audit_human(&result, eco.name());
             if result.vulnerabilities.iter().any(|v| {
                 matches!(
                     v.severity,
@@ -597,7 +456,7 @@ pub fn cmd_package_service(
     package: Option<&str>,
     ecosystem: Option<&str>,
     root: Option<&str>,
-    use_colors: bool,
+    _use_colors: bool,
 ) -> Result<crate::service::package::PackageResult, String> {
     let package_action = match action {
         "info" => {
@@ -619,14 +478,8 @@ pub fn cmd_package_service(
         _ => return Err(format!("unknown package action: {}", action)),
     };
 
-    let format = if use_colors {
-        OutputFormat::Pretty { colors: true }
-    } else {
-        OutputFormat::Compact
-    };
-
     let root_path = root.map(std::path::Path::new);
-    let exit_code = cmd_package(package_action, ecosystem, root_path, format);
+    let exit_code = cmd_package(package_action, ecosystem, root_path);
     if exit_code == 0 {
         Ok(crate::service::package::PackageResult {
             success: true,
@@ -635,45 +488,6 @@ pub fn cmd_package_service(
         })
     } else {
         Err("Command failed".to_string())
-    }
-}
-
-/// Print a JSON value, applying jq filter if specified.
-fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
-    match format {
-        OutputFormat::Compact | OutputFormat::Pretty { .. } => {
-            unreachable!("print_json_value called with non-JSON format")
-        }
-        OutputFormat::Json => println!("{}", value),
-        OutputFormat::JsonLines => {
-            // For arrays, emit each element per line; otherwise single line
-            if let serde_json::Value::Array(arr) = value {
-                for item in arr {
-                    println!("{}", serde_json::to_string(item).unwrap_or_default());
-                }
-            } else {
-                println!("{}", serde_json::to_string(value).unwrap_or_default());
-            }
-        }
-        OutputFormat::Jq { filter, jsonl } => match crate::output::apply_jq(value, filter) {
-            Ok(results) => {
-                crate::output::print_jq_lines(&results, *jsonl);
-            }
-            Err(e) => {
-                eprintln!("jq error: {}", e);
-            }
-        },
-    }
-}
-
-/// Print package info in the specified format.
-fn print_package_info(info: &PackageInfo, ecosystem: &str, format: &OutputFormat) {
-    match format {
-        OutputFormat::Compact | OutputFormat::Pretty { .. } => print_human(info, ecosystem),
-        OutputFormat::Json | OutputFormat::JsonLines | OutputFormat::Jq { .. } => {
-            let value = serde_json::to_value(info).unwrap_or_default();
-            print_json_value(&value, format);
-        }
     }
 }
 

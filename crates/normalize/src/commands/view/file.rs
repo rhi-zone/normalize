@@ -156,11 +156,10 @@ pub fn cmd_view_file(
     resolve_imports: bool,
     docstring_mode: DocstringDisplay,
     context: bool,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
-    let pretty = format.is_pretty();
-    let use_colors = format.use_colors();
+    let json = false;
+    let pretty = false;
+    let use_colors = false;
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
@@ -178,7 +177,7 @@ pub fn cmd_view_file(
                 content: content.clone(),
                 grammar: None,
             });
-            report.print(format);
+            println!("{}", report.format_text());
         } else {
             let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
             let output = if pretty {
@@ -224,7 +223,7 @@ pub fn cmd_view_file(
             exports: vec![],
             node: view_node,
         });
-        report.print(format);
+        println!("{}", report.format_text());
     } else {
         println!("# {}", file_path);
         println!("Lines: {}", content.lines().count());

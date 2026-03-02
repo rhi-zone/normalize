@@ -101,12 +101,11 @@ pub fn cmd_rules(
     filter_ids: Option<&std::collections::HashSet<String>>,
     list_only: bool,
     fix: bool,
-    format: &crate::output::OutputFormat,
     sarif: bool,
     config: &RulesConfig,
     debug: &DebugFlags,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     // Load rules from all sources (builtins + user global + project)
     let rules = load_all_rules(root, config);
 

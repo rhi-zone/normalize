@@ -170,8 +170,7 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
 }
 
 /// Find docs with stale code coverage
-pub fn cmd_stale_docs(root: &Path, format: &crate::output::OutputFormat) -> i32 {
-    let json = format.is_json();
+pub fn cmd_stale_docs(root: &Path) -> i32 {
     use regex::Regex;
 
     // Find markdown files with <!-- covers: ... --> declarations
@@ -196,10 +195,7 @@ pub fn cmd_stale_docs(root: &Path, format: &crate::output::OutputFormat) -> i32 
             files_checked: 0,
             files_with_covers: 0,
         };
-        let config = crate::config::NormalizeConfig::load(root);
-        let format =
-            crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-        report.print(&format);
+        println!("{}", report.format_text());
         return 0;
     }
 
@@ -288,10 +284,7 @@ pub fn cmd_stale_docs(root: &Path, format: &crate::output::OutputFormat) -> i32 
         files_checked: md_files.len(),
         files_with_covers,
     };
-    let config = crate::config::NormalizeConfig::load(root);
-    let format =
-        crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-    report.print(&format);
+    println!("{}", report.format_text());
 
     if report.stale_docs.is_empty() { 0 } else { 1 }
 }

@@ -23,7 +23,6 @@ pub fn cmd_view_symbol_direct(
     docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
-    format: &crate::output::OutputFormat,
     case_insensitive: bool,
 ) -> i32 {
     let symbol_path: Vec<String> = match parent_name {
@@ -39,7 +38,6 @@ pub fn cmd_view_symbol_direct(
         docstring_mode,
         show_parent,
         context,
-        format,
         case_insensitive,
     )
 }
@@ -54,11 +52,10 @@ pub fn cmd_view_symbol_at_line(
     docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
-    let pretty = format.is_pretty();
-    let use_colors = format.use_colors();
+    let json = false;
+    let pretty = false;
+    let use_colors = false;
     let matches = path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => {
@@ -139,7 +136,7 @@ pub fn cmd_view_symbol_at_line(
             node: view_node,
             parent_signatures,
         });
-        report.print(format);
+        println!("{}", report.format_text());
     } else {
         if depth >= 0 {
             println!(
@@ -457,12 +454,11 @@ pub fn cmd_view_symbol(
     docstring_mode: DocstringDisplay,
     show_parent: bool,
     context: bool,
-    format: &crate::output::OutputFormat,
     case_insensitive: bool,
 ) -> i32 {
-    let json = format.is_json();
-    let pretty = format.is_pretty();
-    let use_colors = format.use_colors();
+    let json = false;
+    let pretty = false;
+    let use_colors = false;
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
@@ -507,7 +503,7 @@ pub fn cmd_view_symbol(
                 grammar: grammar.clone(),
                 parent_signatures: vec![],
             });
-            report.print(format);
+            println!("{}", report.format_text());
         } else {
             if depth >= 0 {
                 if let Some(sym) = parser.find_symbol(&full_path, &content, symbol_name) {
@@ -618,7 +614,7 @@ pub fn cmd_view_symbol(
                         grammar: grammar.clone(),
                         parent_signatures: vec![],
                     });
-                    report.print(format);
+                    println!("{}", report.format_text());
                 } else {
                     if depth >= 0 {
                         println!(
@@ -668,7 +664,7 @@ pub fn cmd_view_symbol(
                     node: view_node,
                     parent_signatures: vec![],
                 });
-                report.print(format);
+                println!("{}", report.format_text());
             } else {
                 println!(
                     "# {} ({}, L{}-{})",
@@ -998,10 +994,9 @@ pub fn cmd_view_symbol_glob(
     _depth: i32,
     _full: bool,
     _docstring_mode: DocstringDisplay,
-    format: &crate::output::OutputFormat,
     _case_insensitive: bool,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     let full_path = root.join(file_path);
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
@@ -1041,7 +1036,7 @@ pub fn cmd_view_symbol_glob(
                 })
                 .collect(),
         });
-        report.print(format);
+        println!("{}", report.format_text());
         return 0;
     }
 

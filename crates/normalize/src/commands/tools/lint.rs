@@ -1,6 +1,6 @@
 //! Lint command - run linters, formatters, and type checkers.
 
-use crate::output::{OutputFormat, OutputFormatter};
+use crate::output::OutputFormatter;
 use normalize_tools::{SarifReport, ToolCategory, ToolRegistry, registry_with_custom};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use nu_ansi_term::Color::{Blue, Red, Yellow};
@@ -120,11 +120,10 @@ pub fn cmd_lint_run(
     tools: Option<&str>,
     category: Option<&str>,
     sarif: bool,
-    format: crate::output::OutputFormat,
 ) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
-    let use_colors = format.use_colors();
-    let json = format.is_json();
+    let use_colors = false;
+    let json = false;
     // Load built-in tools + custom tools from .normalize/tools.toml
     let registry = registry_with_custom(root);
 
@@ -269,7 +268,7 @@ pub fn cmd_lint_run(
 }
 
 /// List available linting tools.
-pub fn cmd_lint_list(root: Option<&Path>, format: &OutputFormat) -> i32 {
+pub fn cmd_lint_list(root: Option<&Path>) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
     let registry = registry_with_custom(root);
 
@@ -294,7 +293,7 @@ pub fn cmd_lint_list(root: Option<&Path>, format: &OutputFormat) -> i32 {
         .collect();
 
     let result = LintListResult { tools };
-    result.print(format);
+    println!("{}", result.format_text());
 
     0
 }
@@ -454,9 +453,8 @@ pub fn cmd_lint_watch(
     fix: bool,
     tools: Option<&str>,
     category: Option<&str>,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     let root = root.unwrap_or_else(|| Path::new("."));
 
     // Initial run

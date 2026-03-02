@@ -229,11 +229,10 @@ pub fn cmd_coupling(
     min_commits: usize,
     limit: usize,
     exclude_patterns: &[String],
-    format: &crate::output::OutputFormat,
 ) -> i32 {
     match analyze_coupling(root, min_commits, limit, exclude_patterns) {
         Ok(report) => {
-            report.print(format);
+            println!("{}", report.format_text());
             0
         }
         Err(e) => {

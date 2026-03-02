@@ -1,6 +1,5 @@
 //! Unified rule management - list, run, add, update, remove rules (syntax + fact).
 
-use crate::output::OutputFormat;
 use clap::Subcommand;
 use normalize_facts_rules_interpret as interpret;
 use normalize_syntax_rules::{self, DebugFlags};
@@ -206,13 +205,13 @@ impl RulesLock {
 }
 
 /// Run the rules command
-pub fn cmd_rules(action: RulesAction, root: Option<&Path>, format: &OutputFormat) -> i32 {
+pub fn cmd_rules(action: RulesAction, root: Option<&Path>) -> i32 {
     let effective_root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
-    let json = format.is_json();
-    let use_colors = format.use_colors();
+    let json = false;
+    let use_colors = false;
 
     match action {
         RulesAction::List {
@@ -289,7 +288,6 @@ pub fn cmd_run_syntax(
     filter_rule: Option<&str>,
     list_only: bool,
     fix: bool,
-    format: &OutputFormat,
     sarif: bool,
     config: &normalize_syntax_rules::RulesConfig,
     debug: &DebugFlags,
@@ -301,7 +299,6 @@ pub fn cmd_run_syntax(
         None,
         list_only,
         fix,
-        format,
         sarif,
         config,
         debug,
@@ -1123,11 +1120,6 @@ fn cmd_run(
     // Run syntax rules
     if matches!(type_filter, RuleType::All | RuleType::Syntax) {
         let debug_flags = DebugFlags::from_args(debug);
-        let format = if json {
-            OutputFormat::Json
-        } else {
-            OutputFormat::default()
-        };
         let code = crate::commands::analyze::rules_cmd::cmd_rules(
             root,
             filter_rule,
@@ -1135,7 +1127,6 @@ fn cmd_run(
             filter_ids.as_ref(),
             false,
             fix,
-            &format,
             sarif,
             &config.analyze.rules,
             &debug_flags,

@@ -39,11 +39,10 @@ pub fn cmd_view_line_range(
     end: usize,
     root: &Path,
     docstring_mode: DocstringDisplay,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
-    let pretty = format.is_pretty();
-    let use_colors = format.use_colors();
+    let json = false;
+    let pretty = false;
+    let use_colors = false;
     let matches = path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => {
@@ -116,7 +115,7 @@ pub fn cmd_view_line_range(
             content: source.clone(),
             grammar: None,
         });
-        report.print(format);
+        println!("{}", report.format_text());
         return 0;
     }
 

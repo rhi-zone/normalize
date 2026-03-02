@@ -15,7 +15,6 @@ pub fn cmd_trace(
     max_depth: usize,
     recursive: bool,
     case_insensitive: bool,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(cmd_trace_async(
@@ -25,7 +24,6 @@ pub fn cmd_trace(
         max_depth,
         recursive,
         case_insensitive,
-        format,
     ))
 }
 
@@ -37,10 +35,9 @@ async fn cmd_trace_async(
     max_depth: usize,
     recursive: bool,
     _case_insensitive: bool, // Index find_symbols uses LOWER() by default
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
-    let pretty = format.is_pretty();
+    let json = false;
+    let pretty = false;
     // Parse the symbol argument as a unified path (file/symbol)
     let (file_path, symbol_name) = if let Some(unified) = resolve_unified(symbol, root) {
         if unified.symbol_path.is_empty() {

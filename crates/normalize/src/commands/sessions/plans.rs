@@ -234,8 +234,8 @@ pub fn build_plan_content(plan_name: &str) -> Result<PlanContent, String> {
 }
 
 /// Main command handler
-pub fn cmd_plans(name: Option<&str>, limit: usize, format: &crate::output::OutputFormat) -> i32 {
-    let json = format.is_json();
+pub fn cmd_plans(name: Option<&str>, limit: usize) -> i32 {
+    let json = false;
     let Some(dir) = plans_dir() else {
         eprintln!("Could not find home directory");
         return 1;
@@ -342,10 +342,8 @@ pub fn cmd_plans(name: Option<&str>, limit: usize, format: &crate::output::Outpu
             .collect();
 
         let report = PlansListReport { plans: items };
-        let config = crate::config::NormalizeConfig::default();
-        let format =
-            crate::output::OutputFormat::from_cli(json, false, None, false, false, &config.pretty);
-        report.print(&format);
+        use crate::output::OutputFormatter;
+        println!("{}", report.format_text());
         0
     }
 }

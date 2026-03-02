@@ -5,13 +5,8 @@ use normalize_languages::support_for_path;
 use std::path::Path;
 
 /// Show AST for a file.
-pub fn cmd_ast(
-    file: &Path,
-    at_line: Option<usize>,
-    sexp: bool,
-    format: &crate::output::OutputFormat,
-) -> i32 {
-    let json = format.is_json();
+pub fn cmd_ast(file: &Path, at_line: Option<usize>, sexp: bool) -> i32 {
+    let json = false;
     // Read file
     let content = match std::fs::read_to_string(file) {
         Ok(c) => c,

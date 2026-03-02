@@ -5,7 +5,6 @@
 //! - ast-grep pattern: `$FN($ARGS)` (more human-friendly)
 
 use crate::filter::Filter;
-use crate::output::OutputFormat;
 use crate::parsers::grammar_loader;
 use crate::tree::highlight_source;
 use normalize_languages::ast_grep::DynLang;
@@ -498,7 +497,6 @@ pub fn cmd_query(
     filter: Option<&Filter>,
     show_source: bool,
     context_lines: usize,
-    format: &OutputFormat,
 ) -> i32 {
     let is_sexp = is_sexp_pattern(pattern);
     let loader = grammar_loader();
@@ -559,47 +557,8 @@ pub fn cmd_query(
     }
 
     // Output results
-    if format.is_json() {
-        let results: Vec<_> = all_results
-            .iter()
-            .map(|r| {
-                serde_json::json!({
-                    "file": r.file.display().to_string(),
-                    "kind": r.kind,
-                    "text": r.text,
-                    "start": { "row": r.start_row, "column": r.start_col },
-                    "end": { "row": r.end_row, "column": r.end_col },
-                    "captures": r.captures,
-                })
-            })
-            .collect();
-
-        let json_value = serde_json::Value::Array(results.clone());
-
-        match format {
-            OutputFormat::Jq { filter, jsonl } => {
-                match crate::output::apply_jq(&json_value, filter) {
-                    Ok(lines) => {
-                        crate::output::print_jq_lines(&lines, *jsonl);
-                    }
-                    Err(e) => {
-                        eprintln!("jq error: {}", e);
-                        return 1;
-                    }
-                }
-            }
-            OutputFormat::JsonLines => {
-                // Emit each result on its own line
-                for item in results {
-                    println!("{}", serde_json::to_string(&item).unwrap_or_default());
-                }
-            }
-            _ => {
-                println!("{}", serde_json::to_string_pretty(&json_value).unwrap());
-            }
-        }
-    } else {
-        let use_colors = format.use_colors();
+    {
+        let use_colors = false;
 
         // Header
         if use_colors {
@@ -702,7 +661,7 @@ pub fn cmd_query(
     }
 
     // Report errors at the end
-    if !errors.is_empty() && !format.is_json() {
+    if !errors.is_empty() {
         eprintln!();
         eprintln!("Errors ({}):", errors.len());
         for e in errors.iter().take(5) {

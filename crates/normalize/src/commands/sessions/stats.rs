@@ -4,7 +4,6 @@ use super::{
     analyze::{aggregate_sessions, cmd_sessions_analyze_multi},
     session_matches_grep,
 };
-use crate::output::OutputFormat;
 use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -61,9 +60,8 @@ pub fn cmd_sessions_stats(
     project_filter: Option<&Path>,
     all_projects: bool,
     group_by: &[String],
-    output_format: &OutputFormat,
 ) -> i32 {
-    let json = output_format.is_json();
+    let json = false;
     let registry = FormatRegistry::new();
 
     // Get format (default to claude for backwards compatibility)
@@ -197,18 +195,12 @@ pub fn cmd_sessions_stats(
 
     // Group and analyze
     if group_project || group_day {
-        return cmd_sessions_stats_grouped(
-            &sessions,
-            group_project,
-            group_day,
-            format_name,
-            output_format,
-        );
+        return cmd_sessions_stats_grouped(&sessions, group_project, group_day, format_name);
     }
 
     // No grouping — analyze all together
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
-    cmd_sessions_analyze_multi(&paths, format_name, output_format)
+    cmd_sessions_analyze_multi(&paths, format_name)
 }
 
 /// Build stats analysis (data only, no printing).
@@ -423,9 +415,8 @@ fn cmd_sessions_stats_grouped(
     by_project: bool,
     by_day: bool,
     format_name: Option<&str>,
-    output_format: &OutputFormat,
 ) -> i32 {
-    let json = output_format.is_json();
+    let json = false;
 
     // Group sessions
     let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
@@ -462,7 +453,7 @@ fn cmd_sessions_stats_grouped(
     for (key, paths) in sorted {
         println!("=== {} ({} sessions) ===\n", key, paths.len());
 
-        let result = cmd_sessions_analyze_multi(&paths, format_name, output_format);
+        let result = cmd_sessions_analyze_multi(&paths, format_name);
         if result != 0 {
             eprintln!("Failed to analyze sessions for {}", key);
             return result;

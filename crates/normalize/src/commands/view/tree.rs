@@ -21,12 +21,11 @@ pub fn cmd_view_directory(
     _root: &Path,
     depth: i32,
     raw: bool,
-    format: &crate::output::OutputFormat,
     filter: Option<&Filter>,
 ) -> i32 {
-    let json = format.is_json();
-    let pretty = format.is_pretty();
-    let use_colors = format.use_colors();
+    let json = false;
+    let pretty = false;
+    let use_colors = false;
     let effective_depth = if depth < 0 {
         None
     } else {
@@ -72,7 +71,7 @@ pub fn cmd_view_directory(
 
     if json {
         let report = ViewOutput::Directory { node: view_node };
-        report.print(format);
+        println!("{}", report.format_text());
     } else {
         let format_options = FormatOptions {
             minimal: !pretty,
@@ -154,13 +153,8 @@ fn filter_view_node(mut node: ViewNode, filter: &Filter) -> ViewNode {
 }
 
 /// List symbols matching a kind filter within a scope
-pub fn cmd_view_filtered(
-    root: &Path,
-    scope: &str,
-    kind: &str,
-    format: &crate::output::OutputFormat,
-) -> i32 {
-    let json = format.is_json();
+pub fn cmd_view_filtered(root: &Path, scope: &str, kind: &str) -> i32 {
+    let json = false;
     let kind_lower = kind.to_lowercase();
     let kind_filter = match kind_lower.as_str() {
         "class" | "classes" => Some("class"),
@@ -248,7 +242,7 @@ pub fn cmd_view_filtered(
                 })
                 .collect(),
         });
-        report.print(format);
+        println!("{}", report.format_text());
     } else {
         for (file, name, kind, line, parent) in &all_symbols {
             let parent_str = parent

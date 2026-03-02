@@ -2,7 +2,7 @@
 
 use super::analyze::{cmd_sessions_analyze, cmd_sessions_analyze_multi, cmd_sessions_jq};
 use super::{resolve_session_paths, resolve_session_paths_literal};
-use crate::output::{OutputFormat, OutputFormatter};
+use crate::output::OutputFormatter;
 use normalize_chat_sessions::{ContentBlock, Role, Session};
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -678,7 +678,6 @@ pub fn cmd_sessions_show(
     format: Option<&str>,
     analyze: bool,
     full: bool,
-    output_format: &OutputFormat,
     filter: Option<&str>,
     grep_pattern: Option<&str>,
     errors_only: bool,
@@ -700,12 +699,12 @@ pub fn cmd_sessions_show(
 
     // If --analyze with multiple sessions, aggregate
     if analyze && paths.len() > 1 {
-        return cmd_sessions_analyze_multi(&paths, format, output_format);
+        return cmd_sessions_analyze_multi(&paths, format);
     }
 
     // If --analyze with single session
     if analyze {
-        return cmd_sessions_analyze(&paths[0], format, output_format);
+        return cmd_sessions_analyze(&paths[0], format);
     }
 
     // If --jq with multiple sessions, apply to all
@@ -763,7 +762,7 @@ pub fn cmd_sessions_show(
     };
 
     let report = SessionShowReport::new(session).full(full);
-    report.print(output_format);
+    println!("{}", report.format_text());
     0
 }
 

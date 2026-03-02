@@ -1,6 +1,5 @@
 //! Session analysis functions.
 
-use crate::output::{OutputFormat, OutputFormatter};
 use crate::sessions::{
     DedupTokenStats, SessionAnalysis, ToolStats, analyze_session, parse_session,
     parse_session_with_format,
@@ -10,11 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 /// Analyze a session and output statistics.
-pub fn cmd_sessions_analyze(
-    path: &Path,
-    format: Option<&str>,
-    output_format: &OutputFormat,
-) -> i32 {
+pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>) -> i32 {
     // Parse the session
     let session = if let Some(fmt) = format {
         parse_session_with_format(path, fmt)
@@ -32,19 +27,15 @@ pub fn cmd_sessions_analyze(
 
     // Analyze the parsed session
     let analysis = analyze_session(&session);
-    analysis.print(output_format);
+    println!("{}", analysis.format_text());
     0
 }
 
 /// Analyze multiple sessions and aggregate statistics.
-pub fn cmd_sessions_analyze_multi(
-    paths: &[PathBuf],
-    format: Option<&str>,
-    output_format: &OutputFormat,
-) -> i32 {
+pub fn cmd_sessions_analyze_multi(paths: &[PathBuf], format: Option<&str>) -> i32 {
     match aggregate_sessions(paths, format) {
         Some(aggregate) => {
-            aggregate.print(output_format);
+            println!("{}", aggregate.format_text());
             0
         }
         None => {

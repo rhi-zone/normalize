@@ -3,8 +3,6 @@
 use clap::Subcommand;
 use std::path::Path;
 
-use crate::output::OutputFormat;
-
 pub mod lint;
 pub mod test;
 
@@ -76,22 +74,9 @@ pub enum TestSubAction {
 }
 
 /// Print JSON schema for the tools subcommand's output type.
-fn print_tools_schema(action: &ToolsAction) -> i32 {
-    match action {
-        ToolsAction::Lint { action: sub, .. } => {
-            if matches!(sub, Some(LintSubAction::List)) {
-                crate::output::print_output_schema::<lint::LintListResult>();
-                0
-            } else {
-                eprintln!("Lint run subcommand does not have a structured output schema");
-                1
-            }
-        }
-        ToolsAction::Test { .. } => {
-            eprintln!("Test subcommand does not have a structured output schema");
-            1
-        }
-    }
+fn print_tools_schema(_action: &ToolsAction) -> i32 {
+    // Output schema printing removed
+    0
 }
 
 /// Print JSON schema for the command's input arguments.
@@ -106,7 +91,6 @@ pub fn print_input_schema() {
 pub fn run(
     action: ToolsAction,
     root: Option<&Path>,
-    format: OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
@@ -141,7 +125,7 @@ pub fn run(
         } => {
             let is_list = matches!(sub_action, Some(LintSubAction::List));
             if is_list {
-                lint::cmd_lint_list(root, &format)
+                lint::cmd_lint_list(root)
             } else if watch {
                 lint::cmd_lint_watch(
                     target.as_deref(),
@@ -149,7 +133,6 @@ pub fn run(
                     fix,
                     tools.as_deref(),
                     category.as_deref(),
-                    &format,
                 )
             } else {
                 lint::cmd_lint_run(
@@ -159,7 +142,6 @@ pub fn run(
                     tools.as_deref(),
                     category.as_deref(),
                     sarif,
-                    format,
                 )
             }
         }

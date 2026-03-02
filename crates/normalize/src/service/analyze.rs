@@ -1032,7 +1032,6 @@ impl AnalyzeService {
             vec![root_path.clone()]
         };
         let filter = Self::build_filter(&root_path, &exclude, &only);
-        let dummy_format = crate::output::OutputFormat::default();
         Ok(
             crate::commands::analyze::duplicates::build_duplicate_functions_report(
                 DuplicateFunctionsConfig {
@@ -1042,7 +1041,6 @@ impl AnalyzeService {
                     show_source,
                     min_lines: min_lines.unwrap_or(1),
                     include_trait_impls,
-                    format: &dummy_format,
                     filter: filter.as_ref(),
                 },
             ),
@@ -1070,7 +1068,6 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         let filter = Self::build_filter(&root_path, &exclude, &only);
-        let dummy_format = crate::output::OutputFormat::default();
         Ok(
             crate::commands::analyze::duplicates::build_duplicate_blocks_report(
                 DuplicateBlocksConfig {
@@ -1082,7 +1079,6 @@ impl AnalyzeService {
                     show_source,
                     allow: None,
                     reason: None,
-                    format: &dummy_format,
                     filter: filter.as_ref(),
                 },
             ),
@@ -1120,7 +1116,6 @@ impl AnalyzeService {
             vec![root_path.clone()]
         };
         let filter = Self::build_filter(&root_path, &exclude, &only);
-        let dummy_format = crate::output::OutputFormat::default();
         Ok(
             crate::commands::analyze::duplicates::build_similar_functions_report(
                 SimilarFunctionsConfig {
@@ -1134,7 +1129,6 @@ impl AnalyzeService {
                     include_trait_impls,
                     allow: None,
                     reason: None,
-                    format: &dummy_format,
                     filter: filter.as_ref(),
                 },
             ),
@@ -1165,7 +1159,6 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         let filter = Self::build_filter(&root_path, &exclude, &only);
-        let dummy_format = crate::output::OutputFormat::default();
         Ok(
             crate::commands::analyze::duplicates::build_similar_blocks_report(
                 SimilarBlocksConfig {
@@ -1179,7 +1172,6 @@ impl AnalyzeService {
                     include_trait_impls,
                     allow: None,
                     reason: None,
-                    format: &dummy_format,
                     filter: filter.as_ref(),
                 },
             ),

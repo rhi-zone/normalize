@@ -9,13 +9,7 @@ use std::path::Path;
 use std::process::Command;
 
 /// Show git history for a symbol.
-pub fn cmd_history(
-    target: Option<&str>,
-    root: &Path,
-    limit: usize,
-    case_insensitive: bool,
-    format: &crate::output::OutputFormat,
-) -> i32 {
+pub fn cmd_history(target: Option<&str>, root: &Path, limit: usize, case_insensitive: bool) -> i32 {
     let Some(target) = target else {
         eprintln!("--history requires a target (file/symbol path)");
         return 1;
@@ -76,7 +70,7 @@ pub fn cmd_history(
     };
 
     // Run git log for changes to these lines
-    show_line_history(root, &file_path, start_line, end_line, limit, format)
+    show_line_history(root, &file_path, start_line, end_line, limit)
 }
 
 /// Find symbol by path (parent/child).
@@ -121,9 +115,8 @@ fn show_line_history(
     start_line: usize,
     end_line: usize,
     limit: usize,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     // Use git log -L to show history for line range
     let line_range = format!("{},{}:{}", start_line, end_line, file_path);
 
@@ -178,7 +171,7 @@ fn show_line_history(
             lines: format!("{}-{}", start_line, end_line),
             commits,
         });
-        report.print(format);
+        println!("{}", report.format_text());
     } else {
         println!("History for {} (L{}-L{}):", file_path, start_line, end_line);
         println!();

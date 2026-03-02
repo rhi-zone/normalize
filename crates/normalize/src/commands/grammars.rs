@@ -97,12 +97,11 @@ pub fn print_input_schema() {
 /// Run the grammars command
 pub fn cmd_grammars(
     action: GrammarAction,
-    format: &crate::output::OutputFormat,
     output_schema: bool,
     input_schema: bool,
     params_json: Option<&str>,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     if input_schema {
         print_input_schema();
         return 0;
@@ -119,32 +118,20 @@ pub fn cmd_grammars(
         None => action,
     };
     if output_schema {
-        match action {
-            GrammarAction::List => {
-                crate::output::print_output_schema::<GrammarListReport>();
-            }
-            GrammarAction::Paths => {
-                crate::output::print_output_schema::<GrammarPathsReport>();
-            }
-            GrammarAction::Install { .. } => {
-                eprintln!("Install subcommand does not have a structured output schema");
-                return 1;
-            }
-        }
         return 0;
     }
     match action {
-        GrammarAction::List => cmd_list(format),
+        GrammarAction::List => cmd_list(),
         GrammarAction::Install { version, force } => cmd_install(version, force, json),
-        GrammarAction::Paths => cmd_paths(format),
+        GrammarAction::Paths => cmd_paths(),
     }
 }
 
-fn cmd_list(format: &crate::output::OutputFormat) -> i32 {
+fn cmd_list() -> i32 {
     let grammars = parsers::available_external_grammars();
 
     let report = GrammarListReport::new(grammars);
-    report.print(format);
+    println!("{}", report.format_text());
 
     0
 }
@@ -179,7 +166,7 @@ pub fn build_paths_report() -> GrammarPathsReport {
     GrammarPathsReport { paths }
 }
 
-fn cmd_paths(format: &crate::output::OutputFormat) -> i32 {
+fn cmd_paths() -> i32 {
     let mut raw_paths = Vec::new();
 
     // Environment variable
@@ -206,7 +193,7 @@ fn cmd_paths(format: &crate::output::OutputFormat) -> i32 {
         .collect();
 
     let report = GrammarPathsReport { paths };
-    report.print(format);
+    println!("{}", report.format_text());
 
     0
 }

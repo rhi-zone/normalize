@@ -11,7 +11,6 @@ pub fn cmd_call_graph(
     show_callers: bool,
     show_callees: bool,
     case_insensitive: bool,
-    format: &crate::output::OutputFormat,
 ) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(cmd_call_graph_async(
@@ -20,7 +19,6 @@ pub fn cmd_call_graph(
         show_callers,
         show_callees,
         case_insensitive,
-        format,
     ))
 }
 
@@ -30,9 +28,8 @@ async fn cmd_call_graph_async(
     show_callers: bool,
     show_callees: bool,
     _case_insensitive: bool, // Index methods already have case-insensitive fallbacks
-    format: &crate::output::OutputFormat,
 ) -> i32 {
-    let json = format.is_json();
+    let json = false;
     // Try to parse target as file:symbol or just symbol
     let (symbol, file_hint) = if let Some((sym, file)) = parse_file_symbol_string(target) {
         (sym, Some(file))

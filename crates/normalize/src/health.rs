@@ -872,7 +872,6 @@ fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
                                 show_source: false,
                                 min_lines: 4,
                                 include_trait_impls: false,
-                                format: &crate::output::OutputFormat::Compact,
                                 filter: None,
                             };
                             build_duplicate_functions_report(cfg)

@@ -128,8 +128,8 @@ pub fn cmd_update_service(check_only: bool) -> Result<crate::service::UpdateResu
 }
 
 /// Run the update command
-pub fn cmd_update(check_only: bool, format: &crate::output::OutputFormat) -> i32 {
-    let json = format.is_json();
+pub fn cmd_update(check_only: bool) -> i32 {
+    let json = false;
     const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
     const GITHUB_REPO: &str = "rhi-zone/normalize";
 
