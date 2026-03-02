@@ -309,9 +309,11 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
 
 **Index auto-build with smart invalidation:**
 
-- [ ] Commands that require the facts index (`impact`, `architecture`, `imports`) should
+- [x] Commands that require the facts index (`impact`, `architecture`, `imports`) should
   auto-build it if missing or stale, rather than requiring `normalize facts` first.
   Smart invalidation: compare file mtimes against last index time, only re-index changed files.
+  → `index::ensure_ready()` — auto-builds if empty, incremental refresh if stale.
+  Also wrapped all index writes in SQLite transactions (was doing individual inserts).
 
 **Structural understanding:**
 

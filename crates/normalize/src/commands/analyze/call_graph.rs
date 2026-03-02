@@ -40,11 +40,11 @@ async fn cmd_call_graph_async(
         (target.to_string(), None)
     };
 
-    // Try index first
-    let idx = match index::open_if_enabled(root).await {
-        Some(i) => i,
-        None => {
-            eprintln!("Indexing disabled or failed. Run: normalize index rebuild --call-graph");
+    // Open index, auto-building if needed
+    let idx = match index::ensure_ready(root).await {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("{}", e);
             return 1;
         }
     };
@@ -173,9 +173,7 @@ pub async fn build_call_graph(
         (target.to_string(), None)
     };
 
-    let idx = index::open_if_enabled(root).await.ok_or_else(|| {
-        "Indexing disabled or failed. Run: normalize index rebuild --call-graph".to_string()
-    })?;
+    let idx = index::ensure_ready(root).await?;
 
     let stats = idx.call_graph_stats().await.unwrap_or_default();
     if stats.calls == 0 {

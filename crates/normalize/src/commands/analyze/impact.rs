@@ -9,11 +9,10 @@ use std::path::Path;
 /// Run impact analysis CLI command.
 pub fn cmd_impact(root: &Path, target: &str, json: bool) -> i32 {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let idx = match rt.block_on(crate::index::open_if_enabled(root)) {
-        Some(i) => i,
-        None => {
-            eprintln!("Impact analysis requires the facts index. Run `normalize facts` first.");
-            eprintln!("Or enable indexing: `normalize config set index.enabled true`");
+    let idx = match rt.block_on(crate::index::ensure_ready(root)) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("{}", e);
             return 1;
         }
     };

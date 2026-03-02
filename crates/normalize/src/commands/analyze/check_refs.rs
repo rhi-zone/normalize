@@ -53,15 +53,7 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
     use regex::Regex;
 
     // Open index to get known symbols
-    let idx = match index::open_if_enabled(root).await {
-        Some(i) => i,
-        None => {
-            return Err(
-                "Indexing disabled or failed. Run: normalize index rebuild --call-graph"
-                    .to_string(),
-            );
-        }
-    };
+    let idx = index::ensure_ready(root).await?;
 
     // Get all symbol names from index
     let all_symbols = idx.all_symbol_names().await.unwrap_or_default();
@@ -157,10 +149,10 @@ async fn cmd_check_refs_async(root: &Path, format: &crate::output::OutputFormat)
     use regex::Regex;
 
     // Open index to get known symbols
-    let idx = match index::open_if_enabled(root).await {
-        Some(i) => i,
-        None => {
-            eprintln!("Indexing disabled or failed. Run: normalize index rebuild --call-graph");
+    let idx = match index::ensure_ready(root).await {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("{}", e);
             return 1;
         }
     };

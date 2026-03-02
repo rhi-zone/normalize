@@ -479,9 +479,7 @@ impl AnalyzeService {
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| format!("Failed to create runtime: {}", e))?;
         rt.block_on(async {
-            let idx = crate::index::open_if_enabled(&root_path)
-                .await
-                .ok_or_else(|| "Indexing disabled or failed.".to_string())?;
+            let idx = crate::index::ensure_ready(&root_path).await?;
             crate::commands::analyze::architecture::analyze_architecture(&idx)
                 .await
                 .map_err(|e| format!("Architecture analysis failed: {}", e))
@@ -504,12 +502,7 @@ impl AnalyzeService {
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| format!("Failed to create runtime: {}", e))?;
         rt.block_on(async {
-            let idx = crate::index::open_if_enabled(&root_path)
-                .await
-                .ok_or_else(|| {
-                    "Impact analysis requires the facts index. Run `normalize facts` first."
-                        .to_string()
-                })?;
+            let idx = crate::index::ensure_ready(&root_path).await?;
             crate::commands::analyze::impact::analyze_impact(&idx, &target)
                 .await
                 .map_err(|e| format!("Impact analysis failed: {}", e))

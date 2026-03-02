@@ -540,6 +540,8 @@ impl FileIndex {
             return Ok(0);
         }
 
+        self.conn.execute("BEGIN", ()).await?;
+
         // Delete removed files
         for path in &changed.deleted {
             self.conn
@@ -585,6 +587,8 @@ impl FileIndex {
             )
             .await?;
 
+        self.conn.execute("COMMIT", ()).await?;
+
         Ok(total_changes)
     }
 
@@ -601,6 +605,8 @@ impl FileIndex {
             .git_global(true)
             .git_exclude(true)
             .build();
+
+        self.conn.execute("BEGIN", ()).await?;
 
         // Clear existing files
         self.conn.execute("DELETE FROM files", ()).await?;
@@ -653,6 +659,8 @@ impl FileIndex {
                 params![now.to_string()],
             )
             .await?;
+
+        self.conn.execute("COMMIT", ()).await?;
 
         Ok(count)
     }
@@ -1541,6 +1549,8 @@ impl FileIndex {
             })
             .collect();
 
+        self.conn.execute("BEGIN", ()).await?;
+
         // Clear existing data
         self.conn.execute("DELETE FROM symbols", ()).await?;
         self.conn.execute("DELETE FROM calls", ()).await?;
@@ -1602,6 +1612,8 @@ impl FileIndex {
             }
         }
 
+        self.conn.execute("COMMIT", ()).await?;
+
         Ok(CallGraphStats {
             symbols: symbol_count,
             calls: call_count,
@@ -1633,6 +1645,8 @@ impl FileIndex {
         if changed_files.is_empty() && deleted_source_files.is_empty() {
             return Ok(CallGraphStats::default());
         }
+
+        self.conn.execute("BEGIN", ()).await?;
 
         // Remove data for deleted/modified files
         for path in deleted_source_files.iter().chain(changed_files.iter()) {
@@ -1719,6 +1733,8 @@ impl FileIndex {
                 import_count += 1;
             }
         }
+
+        self.conn.execute("COMMIT", ()).await?;
 
         Ok(CallGraphStats {
             symbols: symbol_count,

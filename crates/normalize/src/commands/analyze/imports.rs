@@ -107,12 +107,7 @@ pub fn analyze_import_centrality(
         .map_err(|e| format!("Failed to create async runtime: {}", e))?;
 
     rt.block_on(async {
-        let idx = crate::index::open(root).await.map_err(|e| {
-            format!(
-                "Failed to open index: {}. Run `normalize facts rebuild` first.",
-                e
-            )
-        })?;
+        let idx = crate::index::ensure_ready(root).await?;
 
         let raw = idx
             .all_imports()
