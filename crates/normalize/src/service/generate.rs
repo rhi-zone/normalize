@@ -77,12 +77,12 @@ impl GenerateService {
             help = "Input schema file (JSON Schema or OpenAPI), use - for stdin"
         )]
         input: String,
-        #[param(short = 'b', help = "Output backend")] backend: String,
+        #[param(short = 'b', help = "Output backend")] backend: Backend,
         #[param(
             short = 'f',
             help = "Input format (auto, json-schema, openapi, typescript)"
         )]
-        format: Option<String>,
+        format: Option<InputFormat>,
         #[param(short = 'o', help = "Output file (stdout if not specified)")] output: Option<
             String,
         >,
@@ -91,12 +91,7 @@ impl GenerateService {
         #[param(help = "Make types readonly/frozen")] readonly: bool,
         #[param(help = "Package name (for Go)")] package: Option<String>,
     ) -> Result<GenerateResult, String> {
-        let input_format: InputFormat = format
-            .as_deref()
-            .unwrap_or("auto")
-            .parse()
-            .map_err(|e: String| e)?;
-        let backend: Backend = backend.parse().map_err(|e: String| e)?;
+        let input_format = format.unwrap_or(InputFormat::Auto);
         let export = export.unwrap_or(true);
         let package = package.unwrap_or_else(|| "types".to_string());
 

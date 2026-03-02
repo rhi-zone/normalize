@@ -4,10 +4,51 @@ use super::list::project_from_path;
 use super::stats::{list_all_project_sessions, parse_date};
 use crate::output::OutputFormatter;
 use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::path::Path;
+use std::str::FromStr;
 use std::time::{Duration, SystemTime};
+
+/// Filter for message roles.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum RoleFilter {
+    /// Show only user messages (default)
+    #[default]
+    User,
+    /// Show only assistant messages
+    Assistant,
+    /// Show all messages
+    All,
+}
+
+impl FromStr for RoleFilter {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "user" => Ok(RoleFilter::User),
+            "assistant" | "asst" => Ok(RoleFilter::Assistant),
+            "all" => Ok(RoleFilter::All),
+            _ => Err(format!(
+                "invalid role '{}': expected 'user', 'assistant', or 'all'",
+                s
+            )),
+        }
+    }
+}
+
+impl fmt::Display for RoleFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RoleFilter::User => write!(f, "user"),
+            RoleFilter::Assistant => write!(f, "assistant"),
+            RoleFilter::All => write!(f, "all"),
+        }
+    }
+}
 
 /// A single message extracted from a session.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -132,7 +173,7 @@ pub fn build_messages_report(
     root: Option<&Path>,
     limit: usize,
     format_name: Option<&str>,
-    role: Option<&str>,
+    role: RoleFilter,
     grep: Option<&str>,
     days: Option<u32>,
     since: Option<&str>,
@@ -193,7 +234,7 @@ pub fn build_messages_report(
         return Err("No sessions found".to_string());
     }
 
-    let role_filter = role.unwrap_or("user");
+    let role_filter = role;
     let max_text_len = if no_truncate {
         usize::MAX
     } else {
@@ -226,8 +267,18 @@ pub fn build_messages_report(
             for msg in &turn.messages {
                 // Role filter
                 let role_str = msg.role.to_string();
-                if role_filter != "all" && role_str != role_filter {
-                    continue;
+                match role_filter {
+                    RoleFilter::All => {}
+                    RoleFilter::User => {
+                        if role_str != "user" {
+                            continue;
+                        }
+                    }
+                    RoleFilter::Assistant => {
+                        if role_str != "assistant" {
+                            continue;
+                        }
+                    }
                 }
 
                 // Extract text from content blocks

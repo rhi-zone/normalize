@@ -34,7 +34,9 @@ struct BatchOutput {
 }
 
 /// Position for insert/move/copy operations
-#[derive(Clone, Copy, clap::ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, clap::ValueEnum, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Position {
     /// Before the destination (sibling)

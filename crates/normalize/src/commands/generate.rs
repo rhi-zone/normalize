@@ -88,7 +88,7 @@ pub enum GenerateTarget {
     },
 }
 
-#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, ValueEnum, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum InputFormat {
     /// Auto-detect from file content
@@ -125,7 +125,7 @@ impl std::str::FromStr for InputFormat {
     }
 }
 
-#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, ValueEnum, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Backend {
     /// TypeScript interfaces/types

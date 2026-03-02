@@ -1,9 +1,53 @@
 //! Cross-repo activity over time — commit volume, author focus, and churn trends
 
 use crate::output::OutputFormatter;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
+use std::fmt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
+
+/// Window granularity for activity analysis.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum WindowGranularity {
+    #[default]
+    Month,
+    Week,
+}
+
+impl FromStr for WindowGranularity {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "month" => Ok(WindowGranularity::Month),
+            "week" => Ok(WindowGranularity::Week),
+            _ => Err(format!(
+                "invalid window granularity '{}': expected 'month' or 'week'",
+                s
+            )),
+        }
+    }
+}
+
+impl fmt::Display for WindowGranularity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WindowGranularity::Month => write!(f, "month"),
+            WindowGranularity::Week => write!(f, "week"),
+        }
+    }
+}
+
+impl WindowGranularity {
+    fn as_str(&self) -> &'static str {
+        match self {
+            WindowGranularity::Month => "month",
+            WindowGranularity::Week => "week",
+        }
+    }
+}
 
 /// Trend direction based on recent vs older window comparison.
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
@@ -178,7 +222,7 @@ fn sparkline(values: &[usize]) -> String {
 /// Analyze activity across repos.
 pub fn analyze_activity(
     repos: &[PathBuf],
-    window_size: &str,
+    window_size: WindowGranularity,
     window_count: usize,
 ) -> Result<ActivityReport, String> {
     use rayon::prelude::*;
@@ -196,12 +240,14 @@ pub fn analyze_activity(
         return Err("No analyzable repositories found".to_string());
     }
 
+    let ws = window_size.as_str();
+
     // Determine window labels (most recent N windows)
-    let all_windows = generate_window_labels(window_size, window_count);
+    let all_windows = generate_window_labels(ws, window_count);
 
     let repos_activity: Vec<RepoActivity> = repo_data
         .into_iter()
-        .map(|rd| build_repo_activity(rd, window_size, &all_windows))
+        .map(|rd| build_repo_activity(rd, ws, &all_windows))
         .collect();
 
     Ok(ActivityReport {

@@ -254,7 +254,7 @@ impl NormalizeService {
         #[param(short = 'n', help = "Show line numbers")] line_numbers: bool,
         #[param(help = "Show dependencies (imports/exports)")] deps: bool,
         #[param(short = 'k', help = "Filter by symbol kind: class, function, method")] kind: Option<
-            String,
+            crate::commands::view::tree::SymbolKindFilter,
         >,
         #[param(help = "Show only type definitions")] types_only: bool,
         #[param(help = "Include test functions and test modules")] tests: bool,
@@ -309,7 +309,7 @@ impl NormalizeService {
             depth,
             line_numbers,
             deps,
-            kind.as_deref(),
+            kind.as_ref(),
             types_only,
             tests,
             raw,

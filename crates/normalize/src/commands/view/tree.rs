@@ -6,7 +6,56 @@ use crate::filter::Filter;
 use crate::output::OutputFormatter;
 use crate::tree::{FormatOptions, ViewNode, ViewNodeKind};
 use crate::{path_resolve, symbols, tree};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::Path;
+use std::str::FromStr;
+
+/// Filter for symbol kinds in view command.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SymbolKindFilter {
+    Class,
+    Function,
+    Method,
+}
+
+impl FromStr for SymbolKindFilter {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "class" | "classes" => Ok(SymbolKindFilter::Class),
+            "function" | "functions" | "func" | "fn" => Ok(SymbolKindFilter::Function),
+            "method" | "methods" => Ok(SymbolKindFilter::Method),
+            _ => Err(format!(
+                "invalid symbol kind '{}': expected 'class', 'function', or 'method'",
+                s
+            )),
+        }
+    }
+}
+
+impl fmt::Display for SymbolKindFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SymbolKindFilter::Class => write!(f, "class"),
+            SymbolKindFilter::Function => write!(f, "function"),
+            SymbolKindFilter::Method => write!(f, "method"),
+        }
+    }
+}
+
+impl SymbolKindFilter {
+    /// Returns the canonical string used for matching against symbol kinds.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SymbolKindFilter::Class => "class",
+            SymbolKindFilter::Function => "function",
+            SymbolKindFilter::Method => "method",
+        }
+    }
+}
 
 /// Counts of files and directories in a tree.
 struct NodeCounts {
@@ -155,19 +204,15 @@ fn filter_view_node(mut node: ViewNode, filter: &Filter) -> ViewNode {
 /// List symbols matching a kind filter within a scope
 pub fn cmd_view_filtered(root: &Path, scope: &str, kind: &str) -> i32 {
     let json = false;
-    let kind_lower = kind.to_lowercase();
-    let kind_filter = match kind_lower.as_str() {
-        "class" | "classes" => Some("class"),
-        "function" | "functions" | "func" | "fn" => Some("function"),
-        "method" | "methods" => Some("method"),
+    let kind_filter: Option<SymbolKindFilter> = match kind.to_lowercase().as_str() {
         "all" | "*" => None,
-        _ => {
-            eprintln!(
-                "Unknown type: {}. Valid types: class, function, method",
-                kind
-            );
-            return 1;
-        }
+        other => match other.parse::<SymbolKindFilter>() {
+            Ok(f) => Some(f),
+            Err(e) => {
+                eprintln!("{}", e);
+                return 1;
+            }
+        },
     };
 
     let files_to_search: Vec<std::path::PathBuf> = if scope == "." {
@@ -203,8 +248,8 @@ pub fn cmd_view_filtered(root: &Path, scope: &str, kind: &str) -> i32 {
         let syms = parser.parse_file(&file_path, &content);
         for sym in syms {
             let sym_kind = sym.kind.as_str();
-            if let Some(filter) = kind_filter
-                && sym_kind != filter
+            if let Some(ref filter) = kind_filter
+                && sym_kind != filter.as_str()
             {
                 continue;
             }
@@ -261,21 +306,9 @@ pub fn cmd_view_filtered(root: &Path, scope: &str, kind: &str) -> i32 {
 pub fn build_view_filtered_service(
     root: &Path,
     scope: &str,
-    kind: &str,
+    kind: &SymbolKindFilter,
 ) -> Result<ViewOutput, String> {
-    let kind_lower = kind.to_lowercase();
-    let kind_filter: Option<&str> = match kind_lower.as_str() {
-        "class" | "classes" => Some("class"),
-        "function" | "functions" | "func" | "fn" => Some("function"),
-        "method" | "methods" => Some("method"),
-        "all" | "*" => None,
-        _ => {
-            return Err(format!(
-                "Unknown type: {}. Valid types: class, function, method",
-                kind
-            ));
-        }
-    };
+    let kind_filter = kind;
 
     let files_to_search: Vec<std::path::PathBuf> = if scope == "." {
         path_resolve::all_files(root)
@@ -310,9 +343,7 @@ pub fn build_view_filtered_service(
         let syms = parser.parse_file(&file_path, &content);
         for sym in syms {
             let sym_kind = sym.kind.as_str();
-            if let Some(kf) = kind_filter
-                && sym_kind != kf
-            {
+            if sym_kind != kind_filter.as_str() {
                 continue;
             }
             all_symbols.push((

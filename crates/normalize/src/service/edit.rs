@@ -100,7 +100,7 @@ impl EditService {
         &self,
         #[param(positional, help = "Target symbol")] target: String,
         #[param(positional, help = "Content to insert")] content: String,
-        #[param(help = "Position: before, after, prepend, append")] at: String,
+        #[param(help = "Position: before, after, prepend, append")] at: Position,
         #[param(help = "Dry run - show what would change")] dry_run: bool,
         #[param(help = "Exclude files matching patterns")] exclude: Vec<String>,
         #[param(help = "Only include files matching patterns")] only: Vec<String>,
@@ -108,13 +108,9 @@ impl EditService {
         #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
     ) -> Result<EditResult, String> {
-        let position: Position = at.parse()?;
         crate::commands::edit::cmd_edit_service(
             &target,
-            EditAction::Insert {
-                content,
-                at: position,
-            },
+            EditAction::Insert { content, at },
             root.as_deref(),
             dry_run,
             false,

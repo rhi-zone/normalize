@@ -546,11 +546,16 @@ fn cmd_sessions_messages(
     max_chars: Option<usize>,
     no_truncate: bool,
 ) -> i32 {
+    let role_filter = role
+        .map(|r| r.parse::<messages::RoleFilter>())
+        .transpose()
+        .unwrap_or(None)
+        .unwrap_or_default();
     match messages::build_messages_report(
         root,
         limit,
         format_name,
-        role,
+        role_filter,
         grep,
         days,
         since,

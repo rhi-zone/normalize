@@ -506,7 +506,7 @@ pub fn build_view_service(
     depth: i32,
     _line_numbers: bool,
     _show_deps: bool,
-    kind_filter: Option<&str>,
+    kind_filter: Option<&tree::SymbolKindFilter>,
     types_only: bool,
     show_tests: bool,
     raw: bool,

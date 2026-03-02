@@ -923,14 +923,16 @@ impl AnalyzeService {
     pub fn activity(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
-        #[param(help = "Window granularity: month (default) or week")] window: Option<String>,
+        #[param(help = "Window granularity: month (default) or week")] window: Option<
+            crate::commands::analyze::activity::WindowGranularity,
+        >,
         #[param(help = "Number of windows to show")] windows: Option<usize>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<ActivityReport, String> {
         let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
         crate::commands::analyze::activity::analyze_activity(
             &repos,
-            window.as_deref().unwrap_or("month"),
+            window.unwrap_or_default(),
             windows.unwrap_or(12),
         )
     }

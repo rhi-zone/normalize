@@ -220,7 +220,7 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
   - Kept: normalize-chat-sessions parser (format still valid for reading old logs)
 
 ### CLI Type Safety
-- [ ] Audit all `Option<String>` CLI params that should be enums — e.g. `--scope functions|blocks` is better as a typed enum with `FromStr` than a raw string. server-less calls `.parse()` so enums work automatically.
+- [x] Audit all `Option<String>` CLI params that should be enums — promoted `WindowGranularity`, `RoleFilter`, `SymbolKindFilter` (new enums) + `Position`, `Backend`, `InputFormat` (existing enums to service boundary). Remaining `format` params (sessions) are intentionally dynamic (runtime plugin registry).
 
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom

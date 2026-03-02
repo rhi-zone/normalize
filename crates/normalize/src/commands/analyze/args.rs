@@ -1,5 +1,6 @@
 //! Analyze command arguments with subcommands
 
+use super::activity;
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
@@ -164,9 +165,9 @@ pub enum AnalyzeCommand {
 
     /// Analyze cross-repo activity over time: commit volume, trends, author focus (requires --repos)
     Activity {
-        /// Window granularity: "month" (default) or "week"
+        /// Window granularity: month (default) or week
         #[arg(long, default_value = "month")]
-        window: String,
+        window: activity::WindowGranularity,
 
         /// Number of windows to show (default: 12)
         #[arg(long, default_value = "12")]
