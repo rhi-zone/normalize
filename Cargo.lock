@@ -4780,9 +4780,9 @@ dependencies = [
 
 [[package]]
 name = "server-less"
-version = "0.2.1-alpha.1"
+version = "0.2.1-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16dd5e70cefa8b6116b4907ab51386e3e0c8e9d14f8454e3207deadad7a6052b"
+checksum = "4cdb6afa6eaee6c06553952d891ffece58fa63deea4988d757fa499a46c8f991"
 dependencies = [
  "clap",
  "serde",
