@@ -2239,36 +2239,48 @@ pub(crate) fn find_similar_function_pairs(
 
     let functions_analyzed = all_fns.len();
 
-    // LSH bucketing.
-    let mut band_buckets: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (idx, (_, _, _, _, sig)) in all_fns.iter().enumerate() {
-        for band in 0..LSH_BANDS {
-            let bh = lsh_band_hash(sig, band);
-            let key = bh.wrapping_add((band as u64).wrapping_mul(0x9e3779b97f4a7c15));
-            band_buckets.entry(key).or_default().push(idx);
-        }
-    }
+    // LSH bucketing + candidate generation (parallelized per band).
+    // Each band independently collects candidate pairs, then we merge and deduplicate.
+    let band_candidates: Vec<Vec<(usize, usize)>> = (0..LSH_BANDS)
+        .into_par_iter()
+        .map(|band| {
+            // Build buckets for this band only.
+            let mut buckets: HashMap<u64, Vec<usize>> = HashMap::new();
+            for (idx, (_, _, _, _, sig)) in all_fns.iter().enumerate() {
+                let bh = lsh_band_hash(sig, band);
+                buckets.entry(bh).or_default().push(idx);
+            }
+            // Generate candidate pairs from buckets.
+            let mut pairs = Vec::new();
+            for bucket in buckets.values() {
+                if bucket.len() < 2 {
+                    continue;
+                }
+                for i in 0..bucket.len() {
+                    for j in i + 1..bucket.len() {
+                        let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
+                        pairs.push((a, b));
+                    }
+                }
+            }
+            pairs
+        })
+        .collect();
 
-    // Collect candidate pairs.
+    // Merge and deduplicate candidates across bands.
     let mut seen: HashSet<(usize, usize)> = HashSet::new();
     let mut candidates: Vec<(usize, usize)> = Vec::new();
-    for bucket in band_buckets.values() {
-        if bucket.len() < 2 {
-            continue;
-        }
-        for i in 0..bucket.len() {
-            for j in i + 1..bucket.len() {
-                let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
-                if seen.insert((a, b)) {
-                    candidates.push((a, b));
-                }
+    for band_pairs in band_candidates {
+        for pair in band_pairs {
+            if seen.insert(pair) {
+                candidates.push(pair);
             }
         }
     }
 
-    // Score and filter.
+    // Score and filter (parallel — can be 90K+ candidates).
     let mut pairs: Vec<SimilarFunctionPair> = candidates
-        .into_iter()
+        .into_par_iter()
         .filter_map(|(i, j)| {
             let (file_a, sym_a, start_a, end_a, sig_a) = &all_fns[i];
             let (file_b, sym_b, start_b, end_b, sig_b) = &all_fns[j];
