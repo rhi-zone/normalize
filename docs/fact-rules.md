@@ -24,8 +24,8 @@ Run it:
 ```bash
 normalize facts check                          # Run all .dl rules (auto-discovers)
 normalize facts check my-rules.dl              # Run a specific file
-normalize rules run --type fact                # Via unified rules command
-normalize rules list --type fact               # List fact rules
+normalize syntax rules run --type fact                # Via unified rules command
+normalize syntax rules list --type fact               # List fact rules
 ```
 
 ## Rule File Format
@@ -381,7 +381,7 @@ The default. Rules are `.dl` text files run through the built-in Datalog interpr
 ```bash
 normalize facts check              # Auto-discover .dl files
 normalize facts check rules.dl     # Run specific file
-normalize rules run --type fact    # Via unified command
+normalize syntax rules run --type fact    # Via unified command
 ```
 
 Advantages: no compilation, easy to write and share, supports all Datalog features (recursion, aggregation, negation, stratification).
@@ -410,4 +410,4 @@ Fact rules are loaded in this order (later rules override earlier ones by `id`):
 
 - [Writing Syntax Rules](syntax-rules.md) — tree-sitter query-based rules for AST patterns
 - [CLI: facts](cli/facts.md) — `normalize facts` command reference
-- [CLI: rules](cli/rules.md) — `normalize rules` unified command reference
+- [CLI: rules](cli/rules.md) — `normalize syntax rules` unified command reference

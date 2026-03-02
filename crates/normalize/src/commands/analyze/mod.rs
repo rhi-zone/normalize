@@ -487,6 +487,14 @@ fn dispatch_command(
 ) -> i32 {
     match args.command {
         Some(AnalyzeCommand::Health { target }) => {
+            // Validate target path exists (catches typos routed here)
+            if let Some(ref t) = target {
+                let candidate = effective_root.join(t);
+                if !candidate.exists() && !t.contains('*') && !t.contains('?') && !t.contains('[') {
+                    eprintln!("error: path not found: {t}");
+                    return 1;
+                }
+            }
             let report = report::analyze(
                 target.as_deref(),
                 &effective_root,

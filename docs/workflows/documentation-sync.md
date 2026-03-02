@@ -56,7 +56,7 @@ Keeping documentation in sync with code: preventing stale docs, broken examples.
 | Phase | Tools |
 |-------|-------|
 | Detect | `normalize analyze check-refs`, `normalize analyze stale-docs` |
-| Locate | `text-search`, `view` |
+| Locate | `grep`, `view` |
 | Update | `edit`, write tools |
 | Verify | `normalize analyze check-examples`, manual testing |
 
@@ -130,7 +130,7 @@ Turn 1: Find stale references
   → docs/examples.md uses old function name
 
 Turn 2: Find all occurrences
-  $(text-search "get_user" path:docs)
+  $(grep "get_user" path:docs)
   → docs/api.md:45
   → docs/api.md:102
   → docs/examples.md:23

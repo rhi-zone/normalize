@@ -57,7 +57,7 @@ Improving code without changing behavior: restructuring, renaming, simplifying.
 
 | Phase | Tools |
 |-------|-------|
-| Understand | `view`, `analyze callers/callees`, `text-search` |
+| Understand | `view`, `analyze callers/callees`, `grep` |
 | Plan | Document target state |
 | Execute | `edit`, IDE refactoring |
 | Verify | Test suite, `normalize analyze` |

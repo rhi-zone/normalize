@@ -43,5 +43,5 @@ generated = []  # Disable @generated
 ```bash
 normalize view . --exclude @tests
 normalize analyze --only @config
-normalize text-search "TODO" --exclude @generated
+normalize grep "TODO" --exclude @generated
 ```

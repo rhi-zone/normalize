@@ -63,7 +63,7 @@ Reviewing code changes: PR review, commit review, pre-merge checks.
 | Understand | `gh pr view`, linked issues, `view` for context |
 | Examine | `--diff` flag, `view` changed files |
 | Verify | `run` tests, `analyze` (lint, complexity) |
-| Cross-cutting | `analyze security`, `text-search` for related code |
+| Cross-cutting | `analyze security`, `grep` for related code |
 | Respond | PR comments, structured feedback |
 
 ## Review Checklist
@@ -131,7 +131,7 @@ Turn 3: Examine cache logic
   Issue: No TTL on cache entries
 
 Turn 4: Check for cache invalidation
-  $(text-search "cache" --only "src/users.rs")
+  $(grep "cache" --only "src/users.rs")
   → No invalidation on user update
 
 Turn 5: Verify tests

@@ -139,5 +139,5 @@ severity = "error"
 ## See Also
 
 - [Fact Rules Writing Guide](../fact-rules.md) — How to write `.dl` rules
-- [rules](rules.md) — Unified `normalize rules` command
+- [rules](rules.md) — Unified `normalize syntax rules` command
 - [commands](commands.md) — All CLI commands

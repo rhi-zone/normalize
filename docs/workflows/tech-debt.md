@@ -141,7 +141,7 @@ Turn 1: Run quality analysis
   → 45% test coverage
 
 Turn 2: Find TODO/FIXME markers
-  $(text-search "TODO|FIXME|HACK|XXX" --only "*.rs")
+  $(grep "TODO|FIXME|HACK|XXX" --only "*.rs")
   → 23 TODO markers
   → 8 FIXME markers
   → 4 HACK markers

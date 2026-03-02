@@ -231,7 +231,7 @@ This is a conscious tradeoff: defaults optimize for breadth (works for everyone)
 Note: With only 3 primitives, tool selection ambiguity is eliminated. This applies to path and symbol resolution, not tool choice.
 
 **Suggest obvious corrections**: When something seems wrong, suggest the likely fix. Not "here's what you could do" (overwhelming) but "did you mean X?" (helpful).
-- Symbol not found → "Did you mean: `normalize text-search 'foo' file.rs`"
+- Symbol not found → "Did you mean: `normalize grep 'foo' file.rs`"
 - File not found → suggest fuzzy matches or similar names
 - Operation failed → suggest the recovery action
 

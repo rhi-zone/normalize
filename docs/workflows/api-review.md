@@ -55,7 +55,7 @@ Evaluating whether an API is well-designed: consistent, ergonomic, evolvable.
 | Phase | Tools |
 |-------|-------|
 | Survey | `view --types-only`, `analyze` |
-| Analyze | `view`, `text-search` for patterns |
+| Analyze | `view`, `grep` for patterns |
 | Compare | `view` reference APIs, docs |
 | Recommend | Document findings |
 
@@ -110,7 +110,7 @@ Turn 1: Survey the surface
   → builder pattern with 12 methods
 
 Turn 2: Check naming consistency
-  $(text-search "fn with_" path:src/config)
+  $(grep "fn with_" path:src/config)
   → with_timeout, with_retries, withMaxConnections
   Issue: Inconsistent casing (withMaxConnections)
 

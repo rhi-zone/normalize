@@ -35,9 +35,9 @@ Accurate answer with supporting evidence (file:line references).
 | Phase | Tools |
 |-------|-------|
 | Term extraction | LLM reasoning |
-| Search | `text-search`, `view --types-only` |
+| Search | `grep`, `view --types-only` |
 | Drill down | `view path/Symbol`, `analyze callers` |
-| Widen | `analyze callees`, `text-search` for usages |
+| Widen | `analyze callees`, `grep` for usages |
 | Validate | LLM reasoning against original question |
 
 ## Validation
@@ -62,7 +62,7 @@ Accurate answer with supporting evidence (file:line references).
 
 ```
 Turn 1: Search for key terms
-  $(text-search "highlight" --only "*.rs")
+  $(grep "highlight" --only "*.rs")
   → crates/normalize/src/highlight.rs, crates/normalize/src/commands/view/mod.rs
 
 Turn 2: View high-level structure

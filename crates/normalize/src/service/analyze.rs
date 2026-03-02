@@ -544,6 +544,13 @@ impl AnalyzeService {
         compact: bool,
     ) -> Result<AnalyzeReport, String> {
         let root_path = Self::root_path(root);
+        // Validate target path exists (catches typos and unknown subcommands routed here via #[cli(default)])
+        if let Some(ref t) = target {
+            let candidate = root_path.join(t);
+            if !candidate.exists() && !t.contains('*') && !t.contains('?') && !t.contains('[') {
+                return Err(format!("path not found: {t}"));
+            }
+        }
         self.resolve_format(pretty, compact, &root_path);
         let filter = Self::build_filter(&root_path, &exclude, &only);
         Ok(crate::commands::analyze::report::analyze(

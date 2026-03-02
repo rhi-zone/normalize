@@ -39,10 +39,10 @@ The LLM has access to:
 
 | RLM Concept | Normalize Equivalent | Notes |
 |-------------|-----------------|-------|
-| Prompt as environment variable | Files on disk | Queryable via `view`, `text-search` |
+| Prompt as environment variable | Files on disk | Queryable via `view`, `grep` |
 | Python REPL for state | Agent ephemeral context | `$(keep)` for persistence |
 | `llm_query(chunk)` | `$(view path/Symbol)` | Targeted retrieval |
-| Regex filtering | `text-search`, `grep` | Pre-filter before LLM |
+| Regex filtering | `grep` | Pre-filter before LLM |
 | Recursive sub-calls | Task tool / sub-agents | Spawn specialized agents |
 | `FINAL()` output tag | `$(answer ...)` | Signal completion |
 | Chunking strategies | `--types-only`, depth limits | Control granularity |
@@ -51,7 +51,7 @@ The LLM has access to:
 
 1. **Dynamic context over append-only** - RLM confirms "context rot" in full-ingestion. Normalize's reshapeable context avoids this.
 
-2. **Search as primitive** - "Search capability enables long-context handling" - justifies `text-search`, `view` as core tools.
+2. **Search as primitive** - "Search capability enables long-context handling" - justifies `grep`, `view` as core tools.
 
 3. **Selective viewing** - 3x cheaper than summarization. Justifies `--types-only`, symbol-specific views.
 

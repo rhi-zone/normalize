@@ -620,7 +620,7 @@ This chicken-and-egg problem causes agents to guess, miss relevant context, and 
 
 | Problem | Article's Critique | Normalize Agent |
 |---------|-------------------|------------|
-| Tunnel vision | ripgrep misses semantic context | $(text-search) has same limitation |
+| Tunnel vision | ripgrep misses semantic context | $(grep) has same limitation |
 | Context loss | Tool loop forgets previous context | Ephemeral model discards outputs each turn |
 | Sequential inefficiency | Each tool call adds latency | Multi-turn design maximizes round-trips |
 | Discovery failure | Agent can't find what it doesn't know to look for | Same problem |
@@ -638,7 +638,7 @@ The index knows:
 Instead of LLM-driven discovery:
 ```
 LLM: "I need to find Provider"
-  → $(text-search "Provider")
+  → $(grep "Provider")
   → misses semantic context
   → loops
 ```

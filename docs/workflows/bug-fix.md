@@ -58,7 +58,7 @@ Bug report with reproduction steps or error message.
 | Phase | Tools |
 |-------|-------|
 | Reproduce | `run` (tests), manual execution |
-| Locate | `text-search` (error messages), `analyze trace` |
+| Locate | `grep` (error messages), `analyze trace` |
 | Understand | `view`, `analyze callers/callees` |
 | Fix | `edit` |
 | Test | `edit` (add test), `run` (tests) |
@@ -92,12 +92,12 @@ Turn 1: Reproduce
   → thread 'main' panicked at 'index out of bounds'
 
 Turn 2: Locate via stack trace
-  $(text-search "index out of bounds" --only "*.rs")
+  $(grep "index out of bounds" --only "*.rs")
   → No direct match, search for view command
   $(view crates/normalize/src/commands/view/mod.rs --types-only)
 
 Turn 3: Find the crash site
-  $(text-search "lines\[" path:crates/normalize/src/commands/view)
+  $(grep "lines\[" path:crates/normalize/src/commands/view)
   → view/mod.rs:142: let first_line = lines[0];
 
 Turn 4: Understand

@@ -53,7 +53,7 @@ Understanding what depends on what: "What uses X?", "What does X depend on?"
 | Phase | Tools |
 |-------|-------|
 | Identify | Define scope |
-| Trace | `analyze callers`, `analyze callees`, `text-search` |
+| Trace | `analyze callers`, `analyze callees`, `grep` |
 | Analyze | `analyze trace`, `view` dependency files |
 | Document | Write findings |
 
@@ -65,10 +65,10 @@ Understanding what depends on what: "What uses X?", "What does X depend on?"
 normalize analyze callers function_name
 
 # Find all references to a type
-normalize text-search "TypeName" --only "*.rs"
+normalize grep "TypeName" --only "*.rs"
 
 # Find all imports of a module
-normalize text-search "use crate::module" --only "*.rs"
+normalize grep "use crate::module" --only "*.rs"
 ```
 
 ### What X Uses (Forward Dependencies)
@@ -130,11 +130,11 @@ Turn 1: Find direct callers
   → UserMigration, UserSeeder
 
 Turn 2: Check type references
-  $(text-search "UserService" --only "*.rs")
+  $(grep "UserService" --only "*.rs")
   → Also used in: dependency injection config, tests
 
 Turn 3: Check for trait implementations
-  $(text-search "impl.*for UserService" --only "*.rs")
+  $(grep "impl.*for UserService" --only "*.rs")
   → Implements: Service, Cacheable
 
 Turn 4: Trace transitive dependencies

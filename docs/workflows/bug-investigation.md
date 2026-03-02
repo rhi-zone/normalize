@@ -53,9 +53,9 @@ Understanding why something is broken: "Why is X happening?", "What's causing Y?
 | Phase | Tools |
 |-------|-------|
 | Reproduce | Test runners, manual execution |
-| Isolate | `git bisect`, `text-search`, `view` |
+| Isolate | `git bisect`, `grep`, `view` |
 | Trace | `analyze trace`, `analyze callers/callees` |
-| Understand | `view`, `text-search` for patterns |
+| Understand | `view`, `grep` for patterns |
 
 ## Investigation Techniques
 
@@ -110,7 +110,7 @@ Turn 1: Understand the report
   → "Wrong profile" could be stale or different user
 
 Turn 2: Search for profile loading
-  $(text-search "load.*profile" --only "*.rs")
+  $(grep "load.*profile" --only "*.rs")
   → src/users/profile.rs:load_profile()
   → src/cache/user_cache.rs:get_cached_profile()
 
@@ -120,7 +120,7 @@ Turn 3: Check caching logic
   → No invalidation on profile update
 
 Turn 4: Check cache invalidation
-  $(text-search "invalidate" path:src/cache)
+  $(grep "invalidate" path:src/cache)
   → No invalidation for user_cache
 
 Turn 5: Trace update flow

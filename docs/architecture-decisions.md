@@ -122,25 +122,20 @@ Once you need conditionals (`if is_dirty() then commit() end`), you're fighting 
 # enabled = true  # Set to false to disable indexing entirely
 ```
 
-## Command Naming: `text-search` Not `grep`
+## Command Naming: `grep` (Reversed from `text-search`)
 
-**Decision**: Use `normalize text-search` for text pattern matching instead of `normalize grep`.
+**Decision**: Use `normalize grep` for text pattern matching.
 
-### Why Not `grep`?
+**History**: Originally named `text-search` to avoid AI agents confusing `normalize grep` with unix grep syntax (positional file args, BRE/ERE regex). This was reversed because:
 
-1. **AI agent confusion**: LLMs like Claude (especially Opus 4.5) conflate `normalize grep` with unix grep syntax. They constantly try `normalize grep pattern file` (unix style) instead of `normalize text-search pattern` (our style).
+1. **`text-search` didn't help** — agents confused `text-search` just as much as `grep` (wrong syntax, wrong regex dialect). The rename didn't solve the problem it was designed to solve.
+2. **`grep` is universally understood** — the name instantly communicates "regex text search" to both humans and AI agents
+3. **`text-search` caused its own confusion** — agents would sometimes try `normalize search` or `normalize find` instead
+4. **Consistency** — short, unix-inspired names (`grep`, `view`, `edit`) fit the CLI's style better than compound names
 
-2. **Mental model conflict**: Unix grep has 50+ years of muscle memory. Our command uses ripgrep internally but has different semantics (no positional file args, `--only` instead of file patterns). Fighting the unix grep mental model wastes tokens and causes errors.
+### Note on regex syntax
 
-3. **Semantic expectations**: In the AI era, "search" and "find" imply semantic/vector search. `text-search` explicitly signals regex-based text matching.
-
-### Why Not `search` or `find`?
-
-Those names should be reserved for future semantic search features (embeddings, vector similarity). `text-search` is explicit about the mechanism.
-
-### Config Section
-
-The config section is `[text-search]` to match the command name.
+`normalize grep` uses **ripgrep regex**, not unix grep regex. `|` for alternation (not `\|`). Use `(a|b)` grouping. No BRE/ERE distinction. This is documented in CLAUDE.md to prevent agent confusion.
 
 ## Local Model Memory Budget
 

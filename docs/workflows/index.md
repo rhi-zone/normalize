@@ -62,7 +62,7 @@ What must be true before starting? Index built, tests passing, etc.
 How to break this into steps? Sequential, parallel, recursive?
 
 ## Tools Used
-Which normalize primitives? view, edit, text-search, analyze, etc.
+Which normalize primitives? view, edit, grep, analyze, etc.
 
 ## Validation
 How to verify success? Tests pass, lint clean, human approval?

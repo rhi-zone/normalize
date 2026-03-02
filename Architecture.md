@@ -84,17 +84,16 @@ crates/
 └── xtask/                         # Build automation (publish=false)
 ```
 
-## CLI Commands (19)
+## CLI Commands (18)
 
 | Command | Description |
 |---------|-------------|
 | `view` | View directory/file/symbol structure |
-| `edit` | Structural code modifications |
-| `history` | Shadow git edit history |
-| `analyze` | Codebase analysis (21 subcommands) |
-| `text-search` | Fast ripgrep-based text search |
-| `facts` | Manage code facts (symbols, imports, calls) |
-| `rules` | Manage and run analysis rules |
+| `grep` | Fast ripgrep-based text search |
+| `edit` | Structural code modifications (+ undo, redo, history) |
+| `analyze` | Codebase analysis (40 subcommands) |
+| `syntax` | AST inspection and syntax rules (ast, query, rules) |
+| `facts` | Extract and query code facts (symbols, imports, calls) |
 | `init` | Initialize normalize in a directory |
 | `daemon` | Background process management |
 | `grammars` | Tree-sitter grammar management |

@@ -17,6 +17,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+### `AnalyzeCommand::Rules/Ast/Query` dead code in clap path
+
+`AnalyzeCommand::Rules`, `AnalyzeCommand::Ast`, `AnalyzeCommand::Query` variants still exist in args.rs but are unreachable via clap (only reachable via server-less proc macro). These are dead code in the CLI path — either remove them or document why they exist.
+
 ### Type relationship extraction (facts index) — HIGH PRIORITY
 
 Currently `analyze graph --on types` works but only uses shallow symbol-level relationships (impl/extends). Deeper type edges are needed for meaningful structural analysis.
@@ -96,7 +100,7 @@ All `display_*` functions in `AnalyzeService` now respect `--pretty` (were previ
   - Zero user interruption (user can edit while agent tests in background)
 
 ### Configuration System
-Sections: `[daemon]`, `[index]`, `[aliases]`, `[view]`, `[analyze]`, `[text-search]`, `[pretty]`, `[serve]`
+Sections: `[daemon]`, `[index]`, `[aliases]`, `[view]`, `[analyze]`, `[grep]`, `[pretty]`, `[serve]`
 
 Adding a new section (3 places):
 1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module

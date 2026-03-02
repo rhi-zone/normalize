@@ -56,12 +56,12 @@ normalize analyze [subcommand] [options]
 
 ## Search & Sessions
 
-### text-search
+### grep
 
 Regex search using ripgrep.
 
 ```
-normalize text-search <pattern> [options]
+normalize grep <pattern> [options]
 ```
 
 - `-i` — case-insensitive

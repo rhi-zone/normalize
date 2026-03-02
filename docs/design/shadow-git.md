@@ -56,16 +56,16 @@ normalize edit --goto <ref>        # Jump to specific commit
 
 ### History (read-only)
 ```bash
-normalize history                  # Show recent normalize edits
-normalize history src/foo.rs       # Show edits for specific file
-normalize history --all            # Show full tree structure
-normalize history --json           # Machine-readable output (for LLM/scripting)
-normalize history --status         # Uncommitted shadow edits since last git commit
-normalize history --diff <ref>     # Show what a commit changed
-normalize history --diff 2         # Diff for commit 2
+normalize edit history                  # Show recent normalize edits
+normalize edit history src/foo.rs       # Show edits for specific file
+normalize edit history --all            # Show full tree structure
+normalize edit history --json           # Machine-readable output (for LLM/scripting)
+normalize edit history --status         # Uncommitted shadow edits since last git commit
+normalize edit history --diff <ref>     # Show what a commit changed
+normalize edit history --diff 2         # Diff for commit 2
 ```
 
-JSON output example (`normalize history --json`):
+JSON output example (`normalize edit history --json`):
 ```json
 {
   "head": 3,
@@ -95,9 +95,9 @@ JSON output example (`normalize history --json`):
 }
 ```
 
-Flat structure for script/CI use. Tree structure (branches) visible via `normalize history --all` text output; reconstruct from edit order if needed programmatically.
+Flat structure for script/CI use. Tree structure (branches) visible via `normalize edit history --all` text output; reconstruct from edit order if needed programmatically.
 
-Note: `normalize history` is the primary interface for shadow git. Mutations (`--undo`, `--redo`, `--goto`) work on both `normalize history` and `normalize edit` for convenience.
+Note: `normalize edit history` is the primary interface for viewing shadow git. Mutations are subcommands: `normalize edit undo`, `normalize edit redo`, `normalize edit goto`.
 
 Undo output includes:
 - Files changed
@@ -275,9 +275,9 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] Create `.normalize/shadow/` git repo on first `normalize edit`
 - [ ] Commit file state before each edit
 - [ ] `--message`/`--reason` flag for edit descriptions
-- [ ] `normalize history` command (list recent edits)
-- [ ] `normalize history --json` for machine-readable output
-- [ ] `normalize history --diff <ref>` to view changes
+- [ ] `normalize edit history` command (list recent edits)
+- [ ] `normalize edit history --json` for machine-readable output
+- [ ] `normalize edit history --diff <ref>` to view changes
 
 ### Phase 2: Undo/Redo + Git Integration
 - [x] `normalize edit --undo` applies reverse patch, moves HEAD backward
@@ -287,15 +287,15 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [x] `normalize edit --redo` moves HEAD forward
 - [x] `normalize edit --goto <ref>` jumps to arbitrary commit
 - [x] Conflict detection and `--force` for external modifications
-- [x] `normalize history --all` shows full tree structure
-- [x] `normalize history <file>` filters to commits affecting that file
-- [x] `normalize history --status` shows uncommitted shadow edits
+- [x] `normalize edit history --all` shows full tree structure
+- [x] `normalize edit history <file>` filters to commits affecting that file
+- [x] `normalize edit history --status` shows uncommitted shadow edits
 - [x] Checkpoint integration: record real git HEAD, respect commit boundaries
   - `--undo` refuses to cross git commit boundaries by default
   - `--cross-checkpoint` allows undoing past real git commits
 
 ### Phase 3: Security + Polish
-- [x] `normalize history --prune N` for removing old commits (keep last N)
+- [x] `normalize edit history --prune N` for removing old commits (keep last N)
 - [x] `warn_on_delete` confirmation in config (requires --yes/-y)
 
 ## Risks
@@ -320,7 +320,7 @@ delete: old_fn in src/foo.rs
 $ normalize edit src/foo.rs/helper rename new_helper
 rename: helper -> new_helper in src/foo.rs
 
-$ normalize history
+$ normalize edit history
   2. [HEAD] rename: helper -> new_helper in src/foo.rs
   1. delete: old_fn in src/foo.rs "Cleanup"
 
@@ -335,7 +335,7 @@ $ normalize edit src/foo.rs/new_fn insert "fn new_fn() {}"
 insert: new_fn in src/foo.rs
 (created branch from initial state)
 
-$ normalize history --all
+$ normalize edit history --all
   * 3. [HEAD] insert: new_fn in src/foo.rs
   |
   | 2. rename: helper -> new_helper in src/foo.rs
@@ -365,7 +365,7 @@ $ normalize edit --undo
 error: Cannot undo past checkpoint (git commit abc123).
 hint: Use --undo --cross-checkpoint to undo past real git commits.
 
-$ normalize history --status
+$ normalize edit history --status
 Shadow edits since last commit: 0
 Last checkpoint: abc123 "Remove bar"
 ```

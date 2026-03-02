@@ -57,7 +57,7 @@ Updating code to new versions or patterns: framework upgrades, API changes, patt
 
 | Phase | Tools |
 |-------|-------|
-| Assess | `view`, `text-search`, changelogs |
+| Assess | `view`, `grep`, changelogs |
 | Plan | Document, `analyze` impact |
 | Execute | `edit`, codemods, refactoring tools |
 | Verify | Tests, `normalize analyze`, monitoring |
@@ -142,9 +142,9 @@ Costs: Running two systems
 
 ```
 Turn 1: Assess scope
-  $(text-search "react-router-dom" path:package.json)
+  $(grep "react-router-dom" path:package.json)
   → Currently on v5.3.0
-  $(text-search "<Route" path:src)
+  $(grep "<Route" path:src)
   → 45 route definitions across 12 files
 
 Turn 2: Read migration guide
@@ -165,17 +165,17 @@ Turn 4: Execute - update dependencies
   → Compile errors expected
 
 Turn 5: Execute - fix Switch → Routes
-  $(text-search "<Switch" path:src)
+  $(grep "<Switch" path:src)
   → 8 occurrences
   $(edit src/App.tsx)
   → Replace <Switch> with <Routes>
 
 Turn 6: Execute - fix render prop
-  $(text-search "render=" path:src)
+  $(grep "render=" path:src)
   → Convert render={...} to element={...}
 
 Turn 7: Execute - fix useHistory
-  $(text-search "useHistory" path:src)
+  $(grep "useHistory" path:src)
   → Replace with useNavigate, update API calls
 
 Turn 8: Verify

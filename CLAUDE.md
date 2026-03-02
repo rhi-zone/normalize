@@ -52,6 +52,8 @@ pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, comp
 - Key insights → this file
 - Friction with normalize → TODO.md (we dogfood, friction = improvement opportunity)
 
+**Keep docs in sync with code.** When renaming a command, adding a subcommand, or changing CLI structure: update `docs/cli/`, `README.md`, `LLMS.md`, `Architecture.md`, and `docs/cli-design.md` in the same commit. Stale docs compound — 200 commits of drift = a full day of cleanup.
+
 **Triggers:** User corrects you, 2+ failed attempts, "aha" moment, framework quirk discovered → document before proceeding.
 
 **Don't say these (edit first):** "Fair point", "Should have", "That should go in X" → edit the file BEFORE responding.
