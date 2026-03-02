@@ -17,6 +17,23 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+### Type relationship extraction (facts index) — HIGH PRIORITY
+
+The facts index extracts symbols, imports, and calls — but no type-to-type relationships. This blocks `analyze graph --on types` and limits structural analysis to modules and functions.
+
+**Needed edges:**
+- **Field types**: struct A has a field of type B → A depends on B
+- **Signature types**: fn takes A / returns B → caller's type depends on A, B
+- **Inheritance/impl**: A implements trait B / extends class C → A depends on B/C
+- **Type aliases**: `type Foo = Bar` → Foo depends on Bar
+- **Generic bounds**: `T: SomeTrait` → depends on SomeTrait
+
+**Implementation:**
+- New `type_refs` table: `(file, source_type, target_type, kind, line)` where kind ∈ {field, param, return, impl, alias, bound}
+- Extract via `Language` trait method (new required method or `LocalDeps` extension — TBD)
+- Start with Rust + TypeScript/Python (richest type systems in the current grammar set)
+- Once extracted, `analyze graph --on types` falls out naturally (same algorithms, different adjacency list)
+
 ### Git Analysis Enhancements (`analyze hotspots`)
 
 Current `analyze hotspots` is file-level churn only (`commits × √churn`). Enhance with:

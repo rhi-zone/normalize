@@ -23,7 +23,7 @@ use crate::commands::analyze::duplicates::{
 };
 use crate::commands::analyze::duplicates_views::{DuplicateScope, DuplicatesOutput};
 use crate::commands::analyze::files::FileLengthReport;
-use crate::commands::analyze::graph::GraphReport;
+use crate::commands::analyze::graph::{GraphReport, GraphTarget};
 use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::layering::LayeringReport;
@@ -1387,7 +1387,7 @@ impl AnalyzeService {
         crate::commands::analyze::depth_map::analyze_depth_map_sync(&root_path, effective_limit)
     }
 
-    /// Graph-theoretic properties of the module dependency graph
+    /// Graph-theoretic properties of the dependency graph
     #[cli(display_with = "display_graph")]
     pub fn graph(
         &self,
@@ -1395,6 +1395,7 @@ impl AnalyzeService {
             String,
         >,
         #[param(short = 'l', help = "Max examples per section (0=no limit)")] limit: Option<usize>,
+        #[param(help = "Graph nodes: modules (default) or symbols")] on: Option<GraphTarget>,
         pretty: bool,
         compact: bool,
     ) -> Result<GraphReport, String> {
@@ -1404,7 +1405,8 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        crate::commands::analyze::graph::analyze_graph_sync(&root_path, effective_limit)
+        let target = on.unwrap_or(GraphTarget::Modules);
+        crate::commands::analyze::graph::analyze_graph_sync(&root_path, effective_limit, target)
     }
 
     /// Per-module public symbol count, public ratio, and constraint score

@@ -1,14 +1,61 @@
-//! Graph-theoretic metrics on the module dependency graph.
+//! Graph-theoretic metrics on the dependency graph.
 //!
-//! Computes structural properties that existing commands don't cover:
-//! strongly connected components (Tarjan's), diamond dependencies,
-//! bridge edges, transitive (redundant) imports, and overall graph density.
+//! Operates on either the module graph (file→file via imports) or the symbol
+//! graph (function→function via calls). Use `--on modules` (default) or
+//! `--on symbols` to choose.
+//!
+//! Computes structural properties: strongly connected components (Tarjan's),
+//! diamond dependencies, bridge edges, transitive (redundant) edges,
+//! deep chains, and overall graph density.
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
+
+/// What the graph nodes represent.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    clap::ValueEnum,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum GraphTarget {
+    /// Nodes are files, edges are imports
+    Modules,
+    /// Nodes are functions (file:symbol), edges are calls
+    Symbols,
+}
+
+impl std::str::FromStr for GraphTarget {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "modules" => Ok(Self::Modules),
+            "symbols" => Ok(Self::Symbols),
+            _ => Err(format!(
+                "unknown graph target '{}', expected 'modules' or 'symbols'",
+                s
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for GraphTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Modules => write!(f, "modules"),
+            Self::Symbols => write!(f, "symbols"),
+        }
+    }
+}
 
 /// Overall graph statistics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -74,6 +121,7 @@ pub struct TransitiveEdge {
 /// Full graph analysis report.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct GraphReport {
+    pub target: GraphTarget,
     pub stats: GraphStats,
     pub sccs: Vec<Scc>,
     pub diamonds: Vec<Diamond>,
@@ -569,15 +617,77 @@ fn longest_path_from(
 }
 
 // ---------------------------------------------------------------------------
+// Graph construction
+// ---------------------------------------------------------------------------
+
+/// Build the symbol-level call graph: nodes are "file:symbol", edges are calls.
+async fn build_call_graph(
+    idx: &FileIndex,
+) -> Result<HashMap<String, HashSet<String>>, libsql::Error> {
+    let conn = idx.connection();
+    let stmt = conn
+        .prepare("SELECT caller_file, caller_symbol, callee_name FROM calls")
+        .await?;
+    let mut rows = stmt.query(()).await?;
+
+    // First pass: collect raw edges and build a callee_name → set of "file:symbol" lookup
+    let mut raw_edges: Vec<(String, String, String)> = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let caller_file: String = row.get(0)?;
+        let caller_symbol: String = row.get(1)?;
+        let callee_name: String = row.get(2)?;
+        raw_edges.push((caller_file, caller_symbol, callee_name));
+    }
+
+    // Build callee resolution: name → [(file, symbol)]
+    let stmt = conn.prepare("SELECT file, name FROM symbols").await?;
+    let mut rows = stmt.query(()).await?;
+    let mut symbol_locations: HashMap<String, Vec<String>> = HashMap::new();
+    while let Some(row) = rows.next().await? {
+        let file: String = row.get(0)?;
+        let name: String = row.get(1)?;
+        let key = format!("{}:{}", file, name);
+        symbol_locations.entry(name).or_default().push(key);
+    }
+
+    // Build adjacency list
+    let mut graph: HashMap<String, HashSet<String>> = HashMap::new();
+    for (caller_file, caller_symbol, callee_name) in &raw_edges {
+        let caller_key = format!("{}:{}", caller_file, caller_symbol);
+        if let Some(targets) = symbol_locations.get(callee_name) {
+            for target in targets {
+                if target != &caller_key {
+                    graph
+                        .entry(caller_key.clone())
+                        .or_default()
+                        .insert(target.clone());
+                }
+            }
+        }
+    }
+
+    Ok(graph)
+}
+
+// ---------------------------------------------------------------------------
 // Main analysis
 // ---------------------------------------------------------------------------
 
-/// Analyze graph-theoretic properties of the module dependency graph.
-pub async fn analyze_graph(idx: &FileIndex, limit: usize) -> Result<GraphReport, libsql::Error> {
-    use super::architecture::build_import_graph;
-
-    let graph = build_import_graph(idx).await?;
-    let imports = &graph.imports_by_file;
+/// Analyze graph-theoretic properties of the dependency graph.
+pub async fn analyze_graph(
+    idx: &FileIndex,
+    limit: usize,
+    target: GraphTarget,
+) -> Result<GraphReport, libsql::Error> {
+    let adj = match target {
+        GraphTarget::Modules => {
+            use super::architecture::build_import_graph;
+            let graph = build_import_graph(idx).await?;
+            graph.imports_by_file
+        }
+        GraphTarget::Symbols => build_call_graph(idx).await?,
+    };
+    let imports = &adj;
 
     let nodes = all_nodes(imports);
     let node_count = nodes.len();
@@ -653,6 +763,7 @@ pub async fn analyze_graph(idx: &FileIndex, limit: usize) -> Result<GraphReport,
     };
 
     Ok(GraphReport {
+        target,
         stats,
         sccs,
         diamonds,
@@ -663,13 +774,17 @@ pub async fn analyze_graph(idx: &FileIndex, limit: usize) -> Result<GraphReport,
 }
 
 /// CLI entry point (sync wrapper).
-pub fn analyze_graph_sync(root: &Path, limit: usize) -> Result<GraphReport, String> {
+pub fn analyze_graph_sync(
+    root: &Path,
+    limit: usize,
+    target: GraphTarget,
+) -> Result<GraphReport, String> {
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| format!("Failed to create async runtime: {}", e))?;
 
     rt.block_on(async {
         let idx = crate::index::ensure_ready(root).await?;
-        analyze_graph(&idx, limit)
+        analyze_graph(&idx, limit, target)
             .await
             .map_err(|e| format!("Graph analysis failed: {}", e))
     })
@@ -692,9 +807,13 @@ impl OutputFormatter for GraphReport {
         let mut out = Vec::new();
         let s = &self.stats;
 
+        let label = match self.target {
+            GraphTarget::Modules => "Module graph",
+            GraphTarget::Symbols => "Symbol graph",
+        };
         out.push(format!(
-            "# Graph — {} nodes, {} edges, density {:.3}",
-            s.nodes, s.edges, s.density
+            "# {} — {} nodes, {} edges, density {:.3}",
+            label, s.nodes, s.edges, s.density
         ));
         out.push(format!(
             "  {} weakly connected components (largest: {})",
@@ -713,7 +832,7 @@ impl OutputFormatter for GraphReport {
         out.push(String::new());
 
         if s.nodes == 0 {
-            out.push("No import data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No data found. Run `normalize facts rebuild` first.".to_string());
             return out.join("\n");
         }
 
@@ -818,9 +937,13 @@ impl OutputFormatter for GraphReport {
         let mut out = Vec::new();
         let s = &self.stats;
 
+        let label = match self.target {
+            GraphTarget::Modules => "Module graph",
+            GraphTarget::Symbols => "Symbol graph",
+        };
         out.push(format!(
-            "\x1b[1;36m# Graph\x1b[0m — \x1b[1m{}\x1b[0m nodes, \x1b[1m{}\x1b[0m edges, density \x1b[33m{:.3}\x1b[0m",
-            s.nodes, s.edges, s.density
+            "\x1b[1;36m# {}\x1b[0m — \x1b[1m{}\x1b[0m nodes, \x1b[1m{}\x1b[0m edges, density \x1b[33m{:.3}\x1b[0m",
+            label, s.nodes, s.edges, s.density
         ));
         out.push(format!(
             "  \x1b[32m{}\x1b[0m weakly connected components (largest: \x1b[1m{}\x1b[0m)",
@@ -871,7 +994,7 @@ impl OutputFormatter for GraphReport {
         out.push(String::new());
 
         if s.nodes == 0 {
-            out.push("No import data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No data found. Run `normalize facts rebuild` first.".to_string());
             return out.join("\n");
         }
 

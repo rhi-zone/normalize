@@ -242,11 +242,15 @@ pub enum AnalyzeCommand {
         limit: usize,
     },
 
-    /// Graph-theoretic properties of the module dependency graph (requires facts index)
+    /// Graph-theoretic properties of the dependency graph (requires facts index)
     Graph {
         /// Maximum examples per section (0 = no limit)
         #[arg(short = 'l', long, default_value = "10")]
         limit: usize,
+
+        /// What the graph nodes represent: modules (default) or symbols
+        #[arg(long, default_value = "modules")]
+        on: super::graph::GraphTarget,
     },
 
     /// What-if impact analysis: reverse-dependency closure + blast radius (requires facts index)

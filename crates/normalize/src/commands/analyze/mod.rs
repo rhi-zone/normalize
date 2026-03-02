@@ -503,9 +503,9 @@ fn dispatch_command(
 
         Some(AnalyzeCommand::Architecture) => architecture::cmd_architecture(&effective_root, json),
 
-        Some(AnalyzeCommand::Graph { limit }) => {
+        Some(AnalyzeCommand::Graph { limit, on }) => {
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
-            match graph::analyze_graph_sync(&effective_root, effective_limit) {
+            match graph::analyze_graph_sync(&effective_root, effective_limit, on) {
                 Ok(report) => {
                     println!("{}", report.format_text());
                     0
