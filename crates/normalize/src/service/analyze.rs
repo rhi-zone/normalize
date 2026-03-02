@@ -28,6 +28,7 @@ use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::layering::LayeringReport;
 use crate::commands::analyze::module_health::ModuleHealthReport;
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
+use crate::commands::analyze::provenance::ProvenanceReport;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::size::SizeReport;
@@ -313,6 +314,14 @@ impl AnalyzeService {
     }
 
     fn display_layering(&self, r: &LayeringReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_provenance(&self, r: &ProvenanceReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1501,6 +1510,40 @@ impl AnalyzeService {
             n => n,
         };
         crate::commands::analyze::layering::analyze_layering_sync(&root_path, effective_limit)
+    }
+
+    /// Provenance graph: git blame → session mapping + code relations
+    #[cli(display_with = "display_provenance")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn provenance(
+        &self,
+        #[param(positional, help = "Target file or directory scope")] target: Option<String>,
+        #[param(help = "Include call graph edges (requires facts index)")] calls: bool,
+        #[param(help = "Include co-change edges (from git history)")] coupling: bool,
+        #[param(help = "Override session directory")] sessions: Option<String>,
+        #[param(short = 'l', help = "Maximum number of files (0=no limit)")] limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ProvenanceReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(50) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let opts = crate::commands::analyze::provenance::ProvenanceOptions {
+            target,
+            include_calls: calls,
+            include_coupling: coupling,
+            sessions_path: sessions,
+            limit: effective_limit,
+        };
+        Ok(crate::commands::analyze::provenance::analyze_provenance(
+            &root_path, &opts,
+        ))
     }
 
     /// Find public functions with no direct test caller

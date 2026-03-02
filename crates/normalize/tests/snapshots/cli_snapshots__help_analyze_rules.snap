@@ -49,6 +49,7 @@ Commands:
   depth-map            Per-module dependency depth + ripple risk (requires facts index)
   surface              Per-module public symbol count, public ratio, and constraint score (requires facts index)
   layering             Per-module import layering compliance — are imports flowing downward? (requires facts index)
+  provenance           Provenance graph: git blame → session mapping + code relations
   test-gaps            Find public functions with no direct test caller
   callers              Show callers of a symbol
   callees              Show what functions a symbol calls

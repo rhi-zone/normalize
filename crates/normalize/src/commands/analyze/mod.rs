@@ -27,6 +27,7 @@ pub mod layering;
 pub mod length;
 pub mod module_health;
 pub mod ownership;
+pub mod provenance;
 pub mod query;
 pub mod repo_coupling;
 pub mod report;
@@ -363,6 +364,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::Imports { .. }) => {
             print_schema::<imports::ImportCentralityReport>();
+        }
+        Some(AnalyzeCommand::Provenance { .. }) => {
+            print_schema::<provenance::ProvenanceReport>();
         }
         Some(AnalyzeCommand::All { .. }) => {
             print_schema::<report::AnalyzeReport>();
@@ -984,6 +988,26 @@ pub fn run(
                     1
                 }
             }
+        }
+
+        Some(AnalyzeCommand::Provenance {
+            target,
+            calls,
+            coupling,
+            sessions,
+            limit,
+        }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            let opts = provenance::ProvenanceOptions {
+                target,
+                include_calls: calls,
+                include_coupling: coupling,
+                sessions_path: sessions.map(|p| p.to_string_lossy().into_owned()),
+                limit: effective_limit,
+            };
+            let report = provenance::analyze_provenance(&effective_root, &opts);
+            println!("{}", report.format_text());
+            0
         }
 
         Some(AnalyzeCommand::All { target }) => {

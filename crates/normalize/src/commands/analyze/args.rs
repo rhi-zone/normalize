@@ -542,6 +542,30 @@ pub enum AnalyzeCommand {
         internal: bool,
     },
 
+    /// Provenance graph: git blame → session mapping + code relations
+    Provenance {
+        /// Target file or directory scope
+        target: Option<String>,
+
+        /// Include call graph edges (requires facts index)
+        #[arg(long)]
+        #[serde(default)]
+        calls: bool,
+
+        /// Include co-change edges (from git history)
+        #[arg(long)]
+        #[serde(default)]
+        coupling: bool,
+
+        /// Override session directory
+        #[arg(long)]
+        sessions: Option<PathBuf>,
+
+        /// Maximum number of files (0 = no limit)
+        #[arg(short = 'l', long, default_value = "50")]
+        limit: usize,
+    },
+
     /// Run all analysis passes
     All {
         /// Target file or directory
