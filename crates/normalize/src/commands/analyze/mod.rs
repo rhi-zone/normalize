@@ -270,7 +270,6 @@ pub fn print_input_schema() {
 fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
     use crate::analyze::complexity::ComplexityReport;
     use crate::analyze::function_length::LengthReport;
-    use crate::analyze::test_gaps::TestGapsReport;
 
     fn print_schema<T: schemars::JsonSchema>() {
         let schema = schemars::schema_for!(T);
@@ -298,12 +297,6 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::Files { .. }) => {
             print_schema::<files::FileLengthReport>();
-        }
-        Some(AnalyzeCommand::Hotspots { .. }) => {
-            print_schema::<hotspots::HotspotsReport>();
-        }
-        Some(AnalyzeCommand::Coupling { .. }) => {
-            print_schema::<coupling::CouplingReport>();
         }
         Some(AnalyzeCommand::Ownership { .. }) => {
             print_schema::<ownership::OwnershipReport>();
@@ -349,15 +342,6 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::DuplicateTypes { .. }) => {
             print_schema::<duplicates::DuplicateTypesReport>();
-        }
-        Some(AnalyzeCommand::TestGaps { .. }) => {
-            print_schema::<TestGapsReport>();
-        }
-        Some(AnalyzeCommand::Budget { .. }) => {
-            print_schema::<budget::BudgetReport>();
-        }
-        Some(AnalyzeCommand::TestRatio { .. }) => {
-            print_schema::<test_ratio::TestRatioReport>();
         }
         Some(AnalyzeCommand::DepthMap { .. }) => {
             print_schema::<depth_map::DepthMapReport>();
@@ -702,29 +686,6 @@ fn dispatch_command(
             case_insensitive,
         }) => call_graph::cmd_call_graph(&effective_root, &symbol, false, true, case_insensitive),
 
-        Some(AnalyzeCommand::Hotspots {
-            allow,
-            reason,
-            recency,
-        }) => {
-            if let Some(pattern) = allow {
-                append_to_allow_file(
-                    &effective_root,
-                    "hotspots-allow",
-                    &pattern,
-                    reason.as_deref(),
-                )
-            } else {
-                let mut excludes = config.analyze.hotspots_exclude.clone();
-                excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
-                hotspots::cmd_hotspots(&effective_root, &excludes, recency)
-            }
-        }
-
-        Some(AnalyzeCommand::Coupling { min_commits, limit }) => {
-            coupling::cmd_coupling(&effective_root, min_commits, limit, &args.exclude)
-        }
-
         Some(AnalyzeCommand::Ownership { limit }) => {
             ownership::cmd_ownership(&effective_root, limit, &args.exclude)
         }
@@ -894,60 +855,6 @@ fn dispatch_command(
                     .unwrap_or_else(|| effective_root.clone());
                 duplicates::cmd_duplicate_types(&scan_root, &effective_root, min_overlap)
             }
-        }
-
-        Some(AnalyzeCommand::TestGaps {
-            target,
-            all,
-            min_risk,
-            limit,
-            sarif,
-            allow,
-            reason,
-        }) => {
-            if let Some(pattern) = &allow {
-                return append_to_allow_file(
-                    &effective_root,
-                    "test-gaps-allow",
-                    pattern,
-                    reason.as_deref(),
-                );
-            }
-
-            if sarif {
-                eprintln!("SARIF output for test-gaps not yet implemented");
-                return 1;
-            }
-
-            let allowlist = load_allow_file(&effective_root, "test-gaps-allow");
-            let effective_limit = if limit == 0 { usize::MAX } else { limit };
-
-            let report = test_gaps::analyze_test_gaps(
-                &effective_root,
-                target.as_deref(),
-                all,
-                min_risk,
-                effective_limit,
-                filter.as_ref(),
-                &allowlist,
-            );
-
-            println!("{}", report.format_text());
-            0
-        }
-
-        Some(AnalyzeCommand::Budget { limit }) => {
-            let effective_limit = if limit == 0 { usize::MAX } else { limit };
-            let report = budget::analyze_budget(&effective_root, effective_limit);
-            println!("{}", report.format_text());
-            0
-        }
-
-        Some(AnalyzeCommand::TestRatio { limit }) => {
-            let effective_limit = if limit == 0 { usize::MAX } else { limit };
-            let report = test_ratio::analyze_test_ratio(&effective_root, effective_limit);
-            println!("{}", report.format_text());
-            0
         }
 
         Some(AnalyzeCommand::DepthMap { limit }) => {

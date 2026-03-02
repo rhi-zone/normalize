@@ -8,14 +8,6 @@ fn default_true() -> bool {
     true
 }
 
-fn default_min_coupling() -> usize {
-    3
-}
-
-fn default_coupling_limit() -> usize {
-    20
-}
-
 fn default_ownership_limit() -> usize {
     20
 }
@@ -179,35 +171,6 @@ pub enum AnalyzeCommand {
         #[arg(short = 'i', long)]
         #[serde(default)]
         case_insensitive: bool,
-    },
-
-    /// Show git history hotspots (frequently changed files)
-    Hotspots {
-        /// Add pattern to .normalize/hotspots-allow
-        #[arg(long, value_name = "PATTERN")]
-        allow: Option<String>,
-
-        /// Reason for allowing
-        #[arg(long)]
-        reason: Option<String>,
-
-        /// Weight recent changes higher (exponential decay, 180-day half-life)
-        #[arg(long)]
-        #[serde(default)]
-        recency: bool,
-    },
-
-    /// Find files that frequently change together (temporal coupling)
-    Coupling {
-        /// Minimum number of shared commits to report a pair
-        #[arg(long, default_value = "3")]
-        #[serde(default = "default_min_coupling")]
-        min_commits: usize,
-
-        /// Maximum number of pairs to show
-        #[arg(long, default_value = "20")]
-        #[serde(default = "default_coupling_limit")]
-        limit: usize,
     },
 
     /// Show per-file ownership concentration from git blame
@@ -454,52 +417,6 @@ pub enum AnalyzeCommand {
 
         /// Maximum number of clusters to show [default: 20]
         #[arg(short = 'l', long, default_value = "20")]
-        limit: usize,
-    },
-
-    /// Find public functions with no direct test caller
-    TestGaps {
-        /// Target file or directory
-        target: Option<String>,
-
-        /// Show all functions (including tested), sorted by test calls ascending
-        #[arg(long)]
-        #[serde(default)]
-        all: bool,
-
-        /// Only show functions above this risk threshold
-        #[arg(long, value_name = "N")]
-        min_risk: Option<f64>,
-
-        /// Maximum number of functions to show (0 = no limit)
-        #[arg(short = 'l', long, default_value = "20")]
-        limit: usize,
-
-        /// Output in SARIF format for IDE integration
-        #[arg(long)]
-        #[serde(default)]
-        sarif: bool,
-
-        /// Add function to .normalize/test-gaps-allow
-        #[arg(long, value_name = "SYMBOL")]
-        allow: Option<String>,
-
-        /// Reason for allowing
-        #[arg(long)]
-        reason: Option<String>,
-    },
-
-    /// Show line budget breakdown by purpose (logic, test, docs, config, generated, vendored)
-    Budget {
-        /// Maximum number of modules to show (0 = no limit)
-        #[arg(short = 'l', long, default_value = "30")]
-        limit: usize,
-    },
-
-    /// Show test/impl line ratio per module (sorted by least-tested first)
-    TestRatio {
-        /// Maximum number of modules to show (0 = no limit)
-        #[arg(short = 'l', long, default_value = "30")]
         limit: usize,
     },
 

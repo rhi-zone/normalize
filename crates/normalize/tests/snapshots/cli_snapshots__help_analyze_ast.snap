@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 347
 expression: "snapshot_help(&[\"analyze\", \"ast\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -25,9 +26,6 @@ Commands:
   size                 Show hierarchical LOC breakdown (ncdu-style)
   ceremony             Show ceremony ratio: fraction of callables that are trait/interface boilerplate
   clusters             Group similar functions into structural clusters (connected components of similar-functions pairs)
-  hotspots             Show git history hotspots (frequently changed files)
-  coupling             Find files that frequently change together (temporal coupling)
-  coupling-clusters    Group files into change-clusters based on temporal coupling
   churn                Temporal churn analysis: coupling pairs, change-clusters, or hotspots
                        
                        Default: coupling pairs (files that change together).
@@ -44,13 +42,11 @@ Commands:
   similar-functions    Detect similar functions via MinHash LSH
   similar-blocks       Detect similar code blocks via MinHash LSH
   duplicate-types      Detect duplicate type definitions
-  budget               Show line budget breakdown by purpose (logic, test, docs, config, generated, vendored)
   coverage             Test coverage analysis: ratio, gaps, or budget view
                        
                        Default: test-ratio (test/impl line ratio per module).
                        Use --gaps to find untested public functions.
                        Use --budget for line budget breakdown by purpose.
-  test-ratio           Show test/impl line ratio per module (sorted by least-tested first)
   density              Measure information density (compression ratio + token uniqueness) per module
   uniqueness           Measure what fraction of functions have no structural near-twin per module
   call-complexity      Compute effective (reachable) cyclomatic complexity via call-graph BFS
@@ -61,7 +57,6 @@ Commands:
   surface              Per-module public symbol count, public ratio, and constraint score
   layering             Per-module import layering compliance — are imports flowing downward?
   provenance           Provenance graph: git blame → session mapping + code relations
-  test-gaps            Find public functions with no direct test caller
   callers              Show callers of a symbol
   callees              Show what functions a symbol calls
   skeleton-diff        Show structural changes between a base ref and HEAD

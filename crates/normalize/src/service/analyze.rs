@@ -11,8 +11,6 @@ use crate::commands::analyze::check_examples::CheckExamplesReport;
 use crate::commands::analyze::check_refs::CheckRefsReport;
 use crate::commands::analyze::clusters::ClustersReport;
 use crate::commands::analyze::contributors::ContributorsReport;
-use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
-use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
 use crate::commands::analyze::coupling_views::CouplingOutput;
 use crate::commands::analyze::coverage::CoverageOutput;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
@@ -25,7 +23,6 @@ use crate::commands::analyze::duplicates::{
     SimilarFunctionsConfig, SimilarFunctionsReport,
 };
 use crate::commands::analyze::files::FileLengthReport;
-use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
 use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::layering::LayeringReport;
@@ -199,30 +196,6 @@ impl AnalyzeService {
         }
     }
 
-    fn display_hotspots(&self, r: &HotspotsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_coupling(&self, r: &CouplingReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_coupling_clusters(&self, r: &CouplingClustersReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
     fn display_ownership(&self, r: &OwnershipReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
@@ -303,14 +276,6 @@ impl AnalyzeService {
         }
     }
 
-    fn display_test_gaps(&self, r: &crate::analyze::test_gaps::TestGapsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
     fn display_depth_map(&self, r: &DepthMapReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
@@ -376,25 +341,6 @@ impl AnalyzeService {
     }
 
     fn display_summary(&self, r: &SummaryReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_budget(&self, r: &crate::commands::analyze::budget::BudgetReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_test_ratio(
-        &self,
-        r: &crate::commands::analyze::test_ratio::TestRatioReport,
-    ) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -860,170 +806,6 @@ impl AnalyzeService {
         ))
     }
 
-    /// Show git history hotspots (frequently changed files)
-    #[cli(display_with = "display_hotspots")]
-    pub fn hotspots(
-        &self,
-        #[param(help = "Weight recent changes higher")] recency: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
-        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-    ) -> Result<HotspotsReport, String> {
-        let root_path = Self::root_path(root);
-        if let Some(repos_dir) = repos {
-            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
-            let entries: Vec<HotspotsRepoEntry> = repo_paths
-                .into_iter()
-                .map(|repo_path| {
-                    let name = repo_path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-                    let config = crate::config::NormalizeConfig::load(&repo_path);
-                    let mut excludes = config.analyze.hotspots_exclude.clone();
-                    excludes.extend(crate::commands::analyze::load_allow_file(
-                        &repo_path,
-                        "hotspots-allow",
-                    ));
-                    match crate::commands::analyze::hotspots::analyze_hotspots(
-                        &repo_path, &excludes, recency,
-                    ) {
-                        Ok(r) => HotspotsRepoEntry {
-                            name,
-                            error: None,
-                            hotspots: r.hotspots,
-                            has_complexity: r.has_complexity,
-                            recency_weighted: r.recency_weighted,
-                        },
-                        Err(e) => HotspotsRepoEntry {
-                            name,
-                            error: Some(e),
-                            hotspots: vec![],
-                            has_complexity: false,
-                            recency_weighted: recency,
-                        },
-                    }
-                })
-                .collect();
-            return Ok(HotspotsReport {
-                hotspots: vec![],
-                has_complexity: false,
-                recency_weighted: recency,
-                repos: Some(entries),
-            });
-        }
-        let config = crate::config::NormalizeConfig::load(&root_path);
-        let mut excludes = config.analyze.hotspots_exclude.clone();
-        excludes.extend(crate::commands::analyze::load_allow_file(
-            &root_path,
-            "hotspots-allow",
-        ));
-        crate::commands::analyze::hotspots::analyze_hotspots(&root_path, &excludes, recency)
-    }
-
-    /// Find files that frequently change together (temporal coupling)
-    #[cli(display_with = "display_coupling")]
-    pub fn coupling(
-        &self,
-        #[param(help = "Minimum number of shared commits to report a pair")] min_commits: Option<
-            usize,
-        >,
-        #[param(short = 'l', help = "Maximum number of pairs to show (0=no limit)")] limit: Option<
-            usize,
-        >,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
-        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-    ) -> Result<CouplingReport, String> {
-        let root_path = Self::root_path(root);
-        let min = min_commits.unwrap_or(3);
-        let lim = limit.unwrap_or(20);
-        if let Some(repos_dir) = repos {
-            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
-            let entries: Vec<CouplingRepoEntry> = repo_paths
-                .into_iter()
-                .map(|repo_path| {
-                    let name = repo_path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-                    match crate::commands::analyze::coupling::analyze_coupling(
-                        &repo_path, min, lim, &exclude,
-                    ) {
-                        Ok(r) => CouplingRepoEntry {
-                            name,
-                            error: None,
-                            pairs: r.pairs,
-                        },
-                        Err(e) => CouplingRepoEntry {
-                            name,
-                            error: Some(e),
-                            pairs: vec![],
-                        },
-                    }
-                })
-                .collect();
-            return Ok(CouplingReport {
-                pairs: vec![],
-                repos: Some(entries),
-            });
-        }
-        crate::commands::analyze::coupling::analyze_coupling(&root_path, min, lim, &exclude)
-    }
-
-    /// Group files into change-clusters based on temporal coupling
-    #[cli(display_with = "display_coupling_clusters")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn coupling_clusters(
-        &self,
-        #[param(
-            help = "Minimum shared commits for an edge (default: auto — 5% of total commits, min 3)"
-        )]
-        min_commits: Option<usize>,
-        #[param(short = 'l', help = "Maximum number of clusters to show (0=no limit)")]
-        limit: Option<usize>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<CouplingClustersReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let effective_min = min_commits.unwrap_or_else(|| {
-            // Adaptive default: 5% of total commits (min 3, max 50)
-            let total = std::process::Command::new("git")
-                .args(["rev-list", "--count", "HEAD"])
-                .current_dir(&root_path)
-                .output()
-                .ok()
-                .and_then(|o| {
-                    String::from_utf8_lossy(&o.stdout)
-                        .trim()
-                        .parse::<usize>()
-                        .ok()
-                })
-                .unwrap_or(60); // fallback assumes ~60 commits
-            (total / 20).clamp(3, 50)
-        });
-        crate::commands::analyze::coupling_clusters::analyze_coupling_clusters(
-            &root_path,
-            effective_min,
-            limit.unwrap_or(20),
-            &exclude,
-            &only,
-        )
-    }
-
     /// Temporal churn analysis: coupling pairs, change-clusters, or hotspots
     ///
     /// Default: coupling pairs (files that change together).
@@ -1405,30 +1187,6 @@ impl AnalyzeService {
         )
     }
 
-    /// Show line budget breakdown by purpose (logic, test, docs, config, generated, vendored)
-    #[cli(display_with = "display_budget")]
-    pub fn budget(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
-        limit: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<crate::commands::analyze::budget::BudgetReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let effective_limit = match limit.unwrap_or(30) {
-            0 => usize::MAX,
-            n => n,
-        };
-        Ok(crate::commands::analyze::budget::analyze_budget(
-            &root_path,
-            effective_limit,
-        ))
-    }
-
     /// Test coverage analysis: ratio, gaps, or budget view
     ///
     /// Default: test-ratio (test/impl line ratio per module).
@@ -1497,30 +1255,6 @@ impl AnalyzeService {
                 ),
             ))
         }
-    }
-
-    /// Show test/impl line ratio per module (sorted by least-tested first)
-    #[cli(display_with = "display_test_ratio")]
-    pub fn test_ratio(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
-        limit: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<crate::commands::analyze::test_ratio::TestRatioReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let effective_limit = match limit.unwrap_or(30) {
-            0 => usize::MAX,
-            n => n,
-        };
-        Ok(crate::commands::analyze::test_ratio::analyze_test_ratio(
-            &root_path,
-            effective_limit,
-        ))
     }
 
     /// Measure information density (compression ratio + token uniqueness) per module
@@ -1799,43 +1533,6 @@ impl AnalyzeService {
         };
         Ok(crate::commands::analyze::provenance::analyze_provenance(
             &root_path, &opts,
-        ))
-    }
-
-    /// Find public functions with no direct test caller
-    #[cli(display_with = "display_test_gaps")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn test_gaps(
-        &self,
-        #[param(positional, help = "Target file or directory")] target: Option<String>,
-        #[param(help = "Show all functions including tested")] all: bool,
-        #[param(help = "Only show functions above this risk threshold")] min_risk: Option<f64>,
-        #[param(short = 'l', help = "Maximum number of functions to show (0=no limit)")]
-        limit: Option<usize>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<crate::analyze::test_gaps::TestGapsReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
-        let allowlist = crate::commands::analyze::load_allow_file(&root_path, "test-gaps-allow");
-        let effective_limit = match limit.unwrap_or(20) {
-            0 => usize::MAX,
-            n => n,
-        };
-        Ok(crate::commands::analyze::test_gaps::analyze_test_gaps(
-            &root_path,
-            target.as_deref(),
-            all,
-            min_risk,
-            effective_limit,
-            filter.as_ref(),
-            &allowlist,
         ))
     }
 

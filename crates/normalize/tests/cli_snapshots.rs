@@ -278,16 +278,6 @@ fn test_help_analyze_callees() {
 }
 
 #[test]
-fn test_help_analyze_hotspots() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "hotspots"]));
-}
-
-#[test]
-fn test_help_analyze_coupling() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "coupling"]));
-}
-
-#[test]
 fn test_help_analyze_ownership() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "ownership"]));
 }
@@ -355,11 +345,6 @@ fn test_help_analyze_query() {
 #[test]
 fn test_help_analyze_rules() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "rules"]));
-}
-
-#[test]
-fn test_help_analyze_test_gaps() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "test-gaps"]));
 }
 
 // sessions subcommands
