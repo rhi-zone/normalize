@@ -354,10 +354,9 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
 - [x] **Skeleton diff**: `normalize analyze skeleton-diff <base>` — show what structurally
   changed between commits. Symbol-level diff: added/removed/changed functions, structs, etc.
 
-- [ ] **Pattern catalog**: auto-detect recurring code patterns (not just duplicates but
-  design patterns, idioms, anti-patterns). "This codebase uses 4 distinct error-handling
-  patterns" or "37 functions follow the parse-validate-transform shape." Requires
-  clustering at a higher abstraction level than current minhash (which is token-level).
+- [x] **Pattern catalog**: `normalize analyze patterns` — auto-detect recurring structural
+  code patterns via MinHash+LSH on control-flow skeletons. Clusters functions by shape
+  (control flow + calls + assignments) rather than token-level similarity.
 
 **Cross-time analysis:**
 

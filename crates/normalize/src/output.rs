@@ -47,6 +47,7 @@ mod tests {
         use crate::commands::analyze::layering::LayeringReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
         use crate::commands::analyze::ownership::OwnershipReport;
+        use crate::commands::analyze::patterns::PatternsReport;
         use crate::commands::analyze::provenance::ProvenanceReport;
         use crate::commands::analyze::repo_coupling::RepoCouplingReport;
         use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
@@ -114,6 +115,7 @@ mod tests {
         assert_output_formatter::<ModuleHealthReport>();
         assert_output_formatter::<LintListResult>();
         assert_output_formatter::<OwnershipReport>();
+        assert_output_formatter::<PatternsReport>();
         assert_output_formatter::<ProvenanceReport>();
         assert_output_formatter::<PlansListReport>();
         assert_output_formatter::<RepoCouplingReport>();

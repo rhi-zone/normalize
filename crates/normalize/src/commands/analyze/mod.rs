@@ -28,6 +28,7 @@ pub mod layering;
 pub mod length;
 pub mod module_health;
 pub mod ownership;
+pub mod patterns;
 pub mod provenance;
 pub mod query;
 pub mod repo_coupling;

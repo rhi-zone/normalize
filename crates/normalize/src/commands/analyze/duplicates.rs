@@ -773,7 +773,9 @@ pub fn cmd_allow_duplicate_type(
 }
 
 /// Flatten nested symbols into a flat list
-fn flatten_symbols(sym: &normalize_languages::Symbol) -> Vec<&normalize_languages::Symbol> {
+pub(crate) fn flatten_symbols(
+    sym: &normalize_languages::Symbol,
+) -> Vec<&normalize_languages::Symbol> {
     let mut result = vec![sym];
     for child in &sym.children {
         result.extend(flatten_symbols(child));
@@ -782,7 +784,7 @@ fn flatten_symbols(sym: &normalize_languages::Symbol) -> Vec<&normalize_language
 }
 
 /// Find a function node at a given line
-fn find_function_node(
+pub(crate) fn find_function_node(
     tree: &tree_sitter::Tree,
     target_line: usize,
 ) -> Option<tree_sitter::Node<'_>> {
@@ -1353,10 +1355,10 @@ pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
 
 // ── Fuzzy / partial clone detection (MinHash LSH) ─────────────────────────────
 
-const MINHASH_N: usize = 128;
-const SHINGLE_K: usize = 3;
-const LSH_BANDS: usize = 32; // 32 bands × 4 rows → good recall at ≥0.7 similarity
-const LSH_ROWS: usize = 4; // MINHASH_N / LSH_BANDS
+pub(crate) const MINHASH_N: usize = 128;
+pub(crate) const SHINGLE_K: usize = 3;
+pub(crate) const LSH_BANDS: usize = 32; // 32 bands × 4 rows → good recall at ≥0.7 similarity
+pub(crate) const LSH_ROWS: usize = 4; // MINHASH_N / LSH_BANDS
 
 /// A pair of similar (but not necessarily identical) blocks.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -1522,14 +1524,14 @@ fn serialize_subtree_tokens(
 
 /// Simple universal hash for MinHash: mixes x with a per-function seed.
 #[inline]
-fn minhash_hash(x: u64, seed: u64) -> u64 {
+pub(crate) fn minhash_hash(x: u64, seed: u64) -> u64 {
     let a = 6364136223846793005u64.wrapping_add(seed.wrapping_mul(2654435761));
     let b = 1442695040888963407u64.wrapping_add(seed.wrapping_mul(1013904223));
     a.wrapping_mul(x).wrapping_add(b)
 }
 
 /// Compute a MinHash signature over k-shingles of the token sequence.
-fn compute_minhash(tokens: &[u64]) -> [u64; MINHASH_N] {
+pub(crate) fn compute_minhash(tokens: &[u64]) -> [u64; MINHASH_N] {
     let mut sig = [u64::MAX; MINHASH_N];
     if tokens.len() < SHINGLE_K {
         return sig;
@@ -1552,13 +1554,13 @@ fn compute_minhash(tokens: &[u64]) -> [u64; MINHASH_N] {
 }
 
 /// Estimate Jaccard similarity from two MinHash signatures.
-fn jaccard_estimate(a: &[u64; MINHASH_N], b: &[u64; MINHASH_N]) -> f64 {
+pub(crate) fn jaccard_estimate(a: &[u64; MINHASH_N], b: &[u64; MINHASH_N]) -> f64 {
     let matches = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
     matches as f64 / MINHASH_N as f64
 }
 
 /// Hash one LSH band of a signature.
-fn lsh_band_hash(sig: &[u64; MINHASH_N], band: usize) -> u64 {
+pub(crate) fn lsh_band_hash(sig: &[u64; MINHASH_N], band: usize) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     let start = band * LSH_ROWS;
     let mut h = DefaultHasher::new();

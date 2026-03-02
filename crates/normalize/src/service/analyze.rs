@@ -29,6 +29,7 @@ use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::layering::LayeringReport;
 use crate::commands::analyze::module_health::ModuleHealthReport;
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
+use crate::commands::analyze::patterns::PatternsReport;
 use crate::commands::analyze::provenance::ProvenanceReport;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
@@ -416,6 +417,14 @@ impl AnalyzeService {
     }
 
     fn display_trend(&self, r: &TrendReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_patterns(&self, r: &PatternsReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1718,5 +1727,35 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_trend(&root_path, snapshots.unwrap_or(6))
+    }
+
+    /// Auto-detect recurring structural code patterns
+    #[cli(display_with = "display_patterns")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn patterns(
+        &self,
+        #[param(short = 's', help = "Minimum structural similarity (default: 0.5)")]
+        similarity: Option<f64>,
+        #[param(short = 'n', help = "Minimum cluster size to report (default: 3)")]
+        min_members: Option<usize>,
+        #[param(help = "Max patterns to show (default: 20)")] limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<PatternsReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::patterns::analyze_patterns(
+            &root_path,
+            similarity.unwrap_or(0.5),
+            min_members.unwrap_or(3),
+            limit.unwrap_or(20),
+            &exclude,
+            &only,
+        )
     }
 }
