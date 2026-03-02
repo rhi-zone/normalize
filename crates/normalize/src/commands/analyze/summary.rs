@@ -18,7 +18,6 @@ pub struct Concern {
 /// Architecture stats extracted from `ArchitectureReport` (or defaults if index unavailable).
 #[derive(Debug, Default, Serialize, schemars::JsonSchema)]
 pub struct ArchStats {
-    pub cycles: usize,
     pub hubs: usize,
     pub max_chain_depth: usize,
 }
@@ -36,7 +35,6 @@ pub struct SummaryReport {
 
 fn extract_arch_stats(report: &ArchitectureReport) -> ArchStats {
     ArchStats {
-        cycles: report.cycles.len(),
         hubs: report.hub_modules.len(),
         max_chain_depth: report
             .deep_chains
@@ -213,12 +211,12 @@ impl OutputFormatter for SummaryReport {
         }
 
         // Architecture
-        if self.arch.cycles > 0 || self.arch.hubs > 0 || self.arch.max_chain_depth > 0 {
+        if self.arch.hubs > 0 || self.arch.max_chain_depth > 0 {
             out.push(String::new());
             out.push("## Architecture".to_string());
             out.push(format!(
-                "  {} circular dependencies · {} hub modules · max chain depth {}",
-                self.arch.cycles, self.arch.hubs, self.arch.max_chain_depth,
+                "  {} hub modules · max chain depth {}",
+                self.arch.hubs, self.arch.max_chain_depth,
             ));
         }
 
@@ -343,12 +341,12 @@ impl OutputFormatter for SummaryReport {
         }
 
         // Architecture
-        if self.arch.cycles > 0 || self.arch.hubs > 0 || self.arch.max_chain_depth > 0 {
+        if self.arch.hubs > 0 || self.arch.max_chain_depth > 0 {
             out.push(String::new());
             out.push(Style::new().bold().paint("Architecture").to_string());
             out.push(format!(
-                "  {} circular dependencies · {} hub modules · max chain depth {}",
-                self.arch.cycles, self.arch.hubs, self.arch.max_chain_depth,
+                "  {} hub modules · max chain depth {}",
+                self.arch.hubs, self.arch.max_chain_depth,
             ));
         }
 

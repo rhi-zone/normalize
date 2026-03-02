@@ -1,6 +1,7 @@
-//! Architecture analysis: coupling, cycles, and structural insights
+//! Architecture analysis: coupling and structural insights
 //!
 //! Provides insights by default - no configuration needed.
+//! Cycle detection lives in `graph.rs` (Tarjan SCC) — use `analyze graph`.
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
@@ -8,13 +9,6 @@ use normalize_languages::is_programming_language;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-
-/// A circular dependency cycle
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct Cycle {
-    /// Modules involved in the cycle
-    pub modules: Vec<String>,
-}
 
 /// Coupling metrics for a module (file)
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -93,7 +87,6 @@ pub struct LayerFlow {
 /// Full architecture analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ArchitectureReport {
-    pub cycles: Vec<Cycle>,
     pub cross_imports: Vec<CrossImport>,
     pub hub_modules: Vec<HubModule>,
     pub deep_chains: Vec<ImportChain>,
@@ -110,18 +103,6 @@ pub struct ArchitectureReport {
 impl OutputFormatter for ArchitectureReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
-
-        // Circular Dependencies
-        lines.push("## Circular Dependencies".to_string());
-        if self.cycles.is_empty() {
-            lines.push("  None detected ✓".to_string());
-        } else {
-            for cycle in &self.cycles {
-                let path = cycle.modules.join(" → ");
-                lines.push(format!("  {} → {}", path, cycle.modules[0]));
-            }
-        }
-        lines.push(String::new());
 
         // Cross-imports (bidirectional coupling)
         lines.push("## Cross-Imports (bidirectional coupling)".to_string());
@@ -244,7 +225,6 @@ impl OutputFormatter for ArchitectureReport {
             "  Imports: {} total, {} resolved to local files",
             self.total_imports, self.resolved_imports
         ));
-        lines.push(format!("  Circular dependencies: {}", self.cycles.len()));
         lines.push(format!("  Cross-imports: {}", self.cross_imports.len()));
         lines.push(format!("  Orphan modules: {}", self.orphan_modules.len()));
 
@@ -586,7 +566,6 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
     let (coupling, hub_modules) =
         compute_coupling_and_hubs(&graph.imports_by_file, &graph.importers_by_file, &all_files);
     let cross_imports = detect_cross_imports(&graph.imports_by_file);
-    let cycles = find_cycles(&graph.imports_by_file);
     let deep_chains = find_longest_chains(&graph.imports_by_file);
     let layer_flows = compute_layer_flows(&graph.imports_by_file);
     let orphans = find_orphan_modules(conn, &graph.importers_by_file).await?;
@@ -605,7 +584,6 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
     };
 
     Ok(ArchitectureReport {
-        cycles,
         cross_imports,
         hub_modules,
         deep_chains,
@@ -618,77 +596,6 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
         total_imports,
         resolved_imports,
     })
-}
-
-/// Find cycles in the import graph using DFS
-fn find_cycles(graph: &HashMap<String, HashSet<String>>) -> Vec<Cycle> {
-    let mut cycles = Vec::new();
-    let mut visited: HashSet<String> = HashSet::new();
-    let mut rec_stack: HashSet<String> = HashSet::new();
-    let mut path: Vec<String> = Vec::new();
-
-    for node in graph.keys() {
-        if !visited.contains(node) {
-            find_cycles_dfs(
-                node,
-                graph,
-                &mut visited,
-                &mut rec_stack,
-                &mut path,
-                &mut cycles,
-            );
-        }
-    }
-
-    // Deduplicate cycles (same cycle can be found starting from different nodes)
-    let mut unique_cycles: Vec<Cycle> = Vec::new();
-    let mut seen_cycle_sets: HashSet<Vec<String>> = HashSet::new();
-
-    for cycle in cycles {
-        let mut sorted = cycle.modules.clone();
-        sorted.sort();
-        if !seen_cycle_sets.contains(&sorted) {
-            seen_cycle_sets.insert(sorted);
-            unique_cycles.push(cycle);
-        }
-    }
-
-    unique_cycles.truncate(10); // Limit to 10 cycles
-    unique_cycles
-}
-
-fn find_cycles_dfs(
-    node: &str,
-    graph: &HashMap<String, HashSet<String>>,
-    visited: &mut HashSet<String>,
-    rec_stack: &mut HashSet<String>,
-    path: &mut Vec<String>,
-    cycles: &mut Vec<Cycle>,
-) {
-    visited.insert(node.to_string());
-    rec_stack.insert(node.to_string());
-    path.push(node.to_string());
-
-    if let Some(neighbors) = graph.get(node) {
-        for neighbor in neighbors {
-            if !visited.contains(neighbor) {
-                find_cycles_dfs(neighbor, graph, visited, rec_stack, path, cycles);
-            } else if rec_stack.contains(neighbor) {
-                // Found a cycle - extract it from path
-                if let Some(pos) = path.iter().position(|x| x == neighbor) {
-                    let cycle_path: Vec<String> = path[pos..].to_vec();
-                    if cycle_path.len() > 1 {
-                        cycles.push(Cycle {
-                            modules: cycle_path,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    path.pop();
-    rec_stack.remove(node);
 }
 
 /// Find the longest import chains (dependency paths) in the graph.
