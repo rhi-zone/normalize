@@ -1218,16 +1218,16 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
    - Compare error rates: which repos have fragile tooling?
    - Implementation: `normalize sessions stats --by-repo` with repo detection
 
-7. **Message filtering subcommand** (NEW REQUEST)
-   - Filter session messages by type: user, assistant, system, tool_use, tool_result
-   - Keyword search within message text: `normalize sessions show <id> --filter user --grep "test"`
-   - Use cases:
-     - Extract all user prompts: `normalize sessions show <id> --filter user`
-     - Find tool errors: `normalize sessions show <id> --filter tool_result --errors-only`
-     - Search assistant reasoning: `normalize sessions show <id> --filter assistant --grep "because"`
-   - Output modes: full messages, excerpts, counts
-   - Implementation: new `normalize sessions show <id> --filter <type> [--grep PATTERN]`
-   - Combine with existing jq: `normalize sessions show <id> --filter tool_use --jq '.name'`
+7. **Message filtering** (PARTIALLY DONE)
+   - ✅ `normalize sessions messages` — cross-session extraction with `--role`, `--grep`, date filters
+   - `--role` is only one filter axis; evolve toward a composable filter system:
+     - `--has-tool <name>` — messages in turns that used a specific tool
+     - `--min-chars <N>` / `--max-chars <N>` — filter by message length (not just truncation)
+     - `--errors-only` — turns with tool errors
+     - `--turn-range <start>-<end>` — positional filtering within sessions
+     - `--exclude-interrupted` — skip `[Request interrupted by user]` noise
+   - Per-session variant: `normalize sessions show <id> --filter user --grep "test"`
+   - Combine with jq: `normalize sessions messages --json --jq '.messages[] | select(.char_count > 500)'`
 
 **Other Session Analysis Backlog**:
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
