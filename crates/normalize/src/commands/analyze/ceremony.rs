@@ -1,6 +1,7 @@
 //! Ceremony ratio analysis: fraction of callable code that is trait/interface boilerplate.
 
 use crate::output::OutputFormatter;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -137,6 +138,90 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
 
     let all_files = path_resolve::all_files(root);
 
+    // Per-file ceremony extraction (parallel)
+    let per_file: Vec<(String, String, usize, usize, usize, usize)> = all_files
+        .par_iter()
+        .filter(|f| f.kind == "file")
+        .filter_map(|file| {
+            let path = root.join(&file.path);
+            let lang = match normalize_languages::support_for_path(&path) {
+                Some(l) if l.has_symbols() => l,
+                _ => return None,
+            };
+
+            let content = std::fs::read_to_string(&path).ok()?;
+
+            let skeleton_extractor = crate::skeleton::SkeletonExtractor::new();
+            let skeleton = skeleton_extractor
+                .extract_with_resolver(&path, &content, None)
+                .filter_tests();
+
+            let mut file_total = 0usize;
+            let mut file_interface_impl = 0usize;
+            let mut file_free = 0usize;
+            let mut file_inherent = 0usize;
+
+            fn walk(
+                symbols: &[crate::skeleton::SkeletonSymbol],
+                file_total: &mut usize,
+                file_interface_impl: &mut usize,
+                file_free: &mut usize,
+                file_inherent: &mut usize,
+            ) {
+                for sym in symbols {
+                    match sym.kind {
+                        SymbolKind::Function => {
+                            *file_total += 1;
+                            if sym.is_interface_impl {
+                                *file_interface_impl += 1;
+                            } else {
+                                *file_free += 1;
+                            }
+                        }
+                        SymbolKind::Method => {
+                            *file_total += 1;
+                            if sym.is_interface_impl {
+                                *file_interface_impl += 1;
+                            } else {
+                                *file_inherent += 1;
+                            }
+                        }
+                        _ => {}
+                    }
+                    walk(
+                        &sym.children,
+                        file_total,
+                        file_interface_impl,
+                        file_free,
+                        file_inherent,
+                    );
+                }
+            }
+
+            walk(
+                &skeleton.symbols,
+                &mut file_total,
+                &mut file_interface_impl,
+                &mut file_free,
+                &mut file_inherent,
+            );
+
+            if file_total == 0 {
+                return None;
+            }
+
+            Some((
+                file.path.clone(),
+                lang.name().to_string(),
+                file_total,
+                file_interface_impl,
+                file_free,
+                file_inherent,
+            ))
+        })
+        .collect();
+
+    // Aggregate results
     let mut by_language: HashMap<String, CeremonyLangStats> = HashMap::new();
     let mut file_ceremonies: Vec<FileCeremony> = Vec::new();
     let mut total_functions = 0usize;
@@ -144,94 +229,24 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
     let mut free_functions = 0usize;
     let mut inherent_methods = 0usize;
 
-    for file in all_files.iter().filter(|f| f.kind == "file") {
-        let path = root.join(&file.path);
-        let lang = match normalize_languages::support_for_path(&path) {
-            Some(l) if l.has_symbols() => l,
-            _ => continue,
-        };
-
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let skeleton_extractor = crate::skeleton::SkeletonExtractor::new();
-        let skeleton = skeleton_extractor
-            .extract_with_resolver(&path, &content, None)
-            .filter_tests();
-
-        let mut file_total = 0usize;
-        let mut file_interface_impl = 0usize;
-        let mut file_free = 0usize;
-        let mut file_inherent = 0usize;
-
-        fn walk(
-            symbols: &[crate::skeleton::SkeletonSymbol],
-            file_total: &mut usize,
-            file_interface_impl: &mut usize,
-            file_free: &mut usize,
-            file_inherent: &mut usize,
-        ) {
-            for sym in symbols {
-                match sym.kind {
-                    SymbolKind::Function => {
-                        *file_total += 1;
-                        if sym.is_interface_impl {
-                            *file_interface_impl += 1;
-                        } else {
-                            *file_free += 1;
-                        }
-                    }
-                    SymbolKind::Method => {
-                        *file_total += 1;
-                        if sym.is_interface_impl {
-                            *file_interface_impl += 1;
-                        } else {
-                            *file_inherent += 1;
-                        }
-                    }
-                    _ => {}
-                }
-                walk(
-                    &sym.children,
-                    file_total,
-                    file_interface_impl,
-                    file_free,
-                    file_inherent,
-                );
-            }
-        }
-
-        walk(
-            &skeleton.symbols,
-            &mut file_total,
-            &mut file_interface_impl,
-            &mut file_free,
-            &mut file_inherent,
-        );
-
-        if file_total == 0 {
-            continue;
-        }
-
+    for (file_path, lang_name, file_total, file_interface_impl, file_free, file_inherent) in
+        per_file
+    {
         total_functions += file_total;
         interface_impl_methods += file_interface_impl;
         free_functions += file_free;
         inherent_methods += file_inherent;
 
-        let entry = by_language
-            .entry(lang.name().to_string())
-            .or_insert(CeremonyLangStats {
-                total: 0,
-                interface_impl: 0,
-            });
+        let entry = by_language.entry(lang_name).or_insert(CeremonyLangStats {
+            total: 0,
+            interface_impl: 0,
+        });
         entry.total += file_total;
         entry.interface_impl += file_interface_impl;
 
         let ratio = file_interface_impl as f64 / file_total as f64;
         file_ceremonies.push(FileCeremony {
-            file_path: file.path.clone(),
+            file_path,
             total: file_total,
             interface_impl: file_interface_impl,
             free_functions: file_free,
