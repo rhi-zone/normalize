@@ -6,8 +6,28 @@
 use crate::health::analyze_health;
 use crate::output::OutputFormatter;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::Path;
 use std::process::Command;
+
+/// Direction of a metric's change over time.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum TrendDirection {
+    Improving,
+    Stable,
+    Degrading,
+}
+
+impl fmt::Display for TrendDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TrendDirection::Improving => write!(f, "improving"),
+            TrendDirection::Stable => write!(f, "stable"),
+            TrendDirection::Degrading => write!(f, "degrading"),
+        }
+    }
+}
 
 /// A single point-in-time health snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -34,7 +54,7 @@ pub struct MetricDelta {
     pub last: f64,
     pub change: f64,
     pub change_pct: f64,
-    pub direction: String,
+    pub direction: TrendDirection,
 }
 
 /// Full trend report across historical snapshots.
@@ -277,13 +297,12 @@ fn make_delta(name: &str, first: f64, last: f64, higher_is_better: bool) -> Metr
     };
 
     let direction = if change.abs() < 1e-9 {
-        "stable"
+        TrendDirection::Stable
     } else if (change > 0.0) == higher_is_better {
-        "improving"
+        TrendDirection::Improving
     } else {
-        "degrading"
-    }
-    .to_string();
+        TrendDirection::Degrading
+    };
 
     MetricDelta {
         name: name.to_string(),
@@ -428,17 +447,19 @@ impl OutputFormatter for TrendReport {
                 let first_str = format_metric_value(&d.name, d.first);
                 let last_str = format_metric_value(&d.name, d.last);
                 let sign = if d.change_pct >= 0.0 { "+" } else { "" };
-                let dir_colored = match d.direction.as_str() {
-                    "improving" => "\x1b[32mimproving\x1b[0m",
-                    "degrading" => "\x1b[31mdegrading\x1b[0m",
-                    _ => "stable",
+                let dir_colored = match d.direction {
+                    TrendDirection::Improving => "\x1b[32mimproving\x1b[0m",
+                    TrendDirection::Degrading => "\x1b[31mdegrading\x1b[0m",
+                    TrendDirection::Stable => "stable",
                 };
-                let change_colored = if d.direction == "improving" {
-                    format!("\x1b[32m{sign}{:.0}%\x1b[0m", d.change_pct)
-                } else if d.direction == "degrading" {
-                    format!("\x1b[31m{sign}{:.0}%\x1b[0m", d.change_pct)
-                } else {
-                    format!("{sign}{:.0}%", d.change_pct)
+                let change_colored = match d.direction {
+                    TrendDirection::Improving => {
+                        format!("\x1b[32m{sign}{:.0}%\x1b[0m", d.change_pct)
+                    }
+                    TrendDirection::Degrading => {
+                        format!("\x1b[31m{sign}{:.0}%\x1b[0m", d.change_pct)
+                    }
+                    TrendDirection::Stable => format!("{sign}{:.0}%", d.change_pct),
                 };
                 lines.push(format!(
                     "  {:<18} {} → {}  {}  {}",

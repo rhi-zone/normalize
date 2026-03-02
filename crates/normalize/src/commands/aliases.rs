@@ -12,7 +12,7 @@ use crate::output::OutputFormatter;
 struct AliasItem {
     name: String,
     patterns: Vec<String>,
-    status: String,
+    status: AliasStatus,
 }
 
 /// Aliases report
@@ -33,13 +33,7 @@ impl AliasesReport {
             .map(|a| AliasItem {
                 name: a.name.clone(),
                 patterns: a.patterns.clone(),
-                status: match a.status {
-                    AliasStatus::Builtin => "builtin",
-                    AliasStatus::Custom => "custom",
-                    AliasStatus::Disabled => "disabled",
-                    AliasStatus::Overridden => "overridden",
-                }
-                .to_string(),
+                status: a.status.clone(),
             })
             .collect();
         Self {
@@ -54,12 +48,11 @@ impl OutputFormatter for AliasesReport {
         let mut lines = vec!["Aliases:".to_string()];
 
         for alias in &self.aliases {
-            let status_suffix = match alias.status.as_str() {
-                "builtin" => "",
-                "custom" => "  (custom)",
-                "disabled" => "  (disabled)",
-                "overridden" => "  (overridden)",
-                _ => "",
+            let status_suffix = match alias.status {
+                AliasStatus::Builtin => "",
+                AliasStatus::Custom => "  (custom)",
+                AliasStatus::Disabled => "  (disabled)",
+                AliasStatus::Overridden => "  (overridden)",
             };
 
             if alias.patterns.is_empty() {

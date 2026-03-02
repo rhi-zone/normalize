@@ -145,7 +145,9 @@ impl AliasConfig {
 // ============================================================================
 
 /// Status of an alias (for display purposes).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "config", derive(schemars::JsonSchema))]
+#[serde(rename_all = "lowercase")]
 pub enum AliasStatus {
     /// Built-in alias, unmodified
     Builtin,
@@ -155,6 +157,17 @@ pub enum AliasStatus {
     Disabled,
     /// Built-in alias overridden with new patterns in config
     Overridden,
+}
+
+impl std::fmt::Display for AliasStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AliasStatus::Builtin => write!(f, "builtin"),
+            AliasStatus::Custom => write!(f, "custom"),
+            AliasStatus::Disabled => write!(f, "disabled"),
+            AliasStatus::Overridden => write!(f, "overridden"),
+        }
+    }
 }
 
 /// Resolved alias information for display.

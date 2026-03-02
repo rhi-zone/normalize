@@ -9,7 +9,7 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 /// Rule type filter for list/run commands.
-#[derive(Clone, Debug, Default, clap::ValueEnum, Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Debug, Default, clap::ValueEnum, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum RuleType {
     #[default]
@@ -1626,7 +1626,7 @@ fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
 pub fn cmd_list_service(
     root: Option<&str>,
     sources: bool,
-    type_str: &str,
+    rule_type: RuleType,
     tag: Option<&str>,
     enabled: bool,
     disabled: bool,
@@ -1637,7 +1637,6 @@ pub fn cmd_list_service(
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
-    let rule_type: RuleType = type_str.parse().unwrap_or_default();
     let exit_code = cmd_list(
         &effective_root,
         ListFilters {
@@ -1664,14 +1663,13 @@ pub fn cmd_run_service(
     fix: bool,
     sarif: bool,
     target: Option<&str>,
-    type_str: &str,
+    rule_type: RuleType,
     debug: &[String],
 ) -> Result<RuleResult, String> {
     let effective_root = root
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
-    let rule_type: RuleType = type_str.parse().unwrap_or_default();
     let target_root = target
         .map(PathBuf::from)
         .unwrap_or_else(|| effective_root.clone());

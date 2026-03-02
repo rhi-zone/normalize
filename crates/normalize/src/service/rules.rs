@@ -51,7 +51,7 @@ impl RulesService {
         &self,
         #[param(help = "Show source URLs for imported rules")] sources: bool,
         #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
-            String,
+            crate::commands::rules::RuleType,
         >,
         #[param(help = "Filter by tag")] tag: Option<String>,
         #[param(help = "Filter to enabled rules only")] enabled: bool,
@@ -66,7 +66,7 @@ impl RulesService {
         crate::commands::rules::cmd_list_service(
             root.as_deref(),
             sources,
-            r#type.as_deref().unwrap_or("all"),
+            r#type.unwrap_or_default(),
             tag.as_deref(),
             enabled,
             disabled,
@@ -89,7 +89,7 @@ impl RulesService {
         #[param(help = "Output in SARIF format")] sarif: bool,
         #[param(positional, help = "Target directory or file")] target: Option<String>,
         #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
-            String,
+            crate::commands::rules::RuleType,
         >,
         #[param(help = "Debug flags (comma-separated)")] debug: Vec<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -103,7 +103,7 @@ impl RulesService {
             fix,
             sarif,
             target.as_deref(),
-            r#type.as_deref().unwrap_or("all"),
+            r#type.unwrap_or_default(),
             &debug,
         )
     }
