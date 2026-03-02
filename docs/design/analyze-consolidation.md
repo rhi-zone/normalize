@@ -140,17 +140,129 @@ normalize analyze churn --hotspots           # was: hotspots
 ```
 All three are temporal co-change analyses from git history.
 
-### Phase 3 — Evaluate further consolidation (future)
+### Phase 3 — Concept graph decomposition
 
-Candidates that need more design work:
+Instead of asking "which commands can merge?", ask: "what are the underlying concepts, and which generalize?"
 
-- **`duplicates`**: 7 commands (duplicate-functions, duplicate-blocks, duplicate-types, similar-functions, similar-blocks, clusters, patterns). All use MinHash/LSH + union-find but differ in granularity, threshold, and output shape. May collapse to `duplicates --scope functions|blocks|types --mode exact|similar|cluster|patterns`.
+#### Entities (nodes in the concept graph)
 
-- **`deps`**: 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact). Split between file-level metrics (imports, depth-map, surface, layering) and symbol-level graph traversals (call-graph, callers, callees, trace, impact). Forcing all under one command risks a god-command. May split into `deps` (file-level) + `graph` (symbol-level).
+```
+symbol (function, type, trait)
+file
+module (directory)
+commit
+author
+repo
+```
 
-- **`docs`**: 4 commands (docs, check-refs, stale-docs, check-examples). Small family, low urgency.
+#### Properties (computed per entity)
 
-- **Cross-cutting `--trend` and `--diff`**: Any metric that produces a score could be trended over time (`--trend -n 5`) or diffed against a ref (`--diff main`). This replaces `trend` and `skeleton-diff` as standalone commands but requires infrastructure to run any analysis at an arbitrary commit.
+```
+complexity(symbol)        → cyclomatic count
+lines(symbol|file)        → line count
+is_test(symbol|file)      → bool
+is_public(symbol)         → bool
+has_doc(symbol)           → bool
+is_boilerplate(symbol)    → trait impl / interface
+hash(symbol|block)        → exact content hash
+minhash(symbol|block)     → similarity signature
+skeleton(symbol)          → control-flow shape
+compression_ratio(module) → information density
+```
+
+#### Relations (edges)
+
+```
+contains(file, symbol)
+contains(module, file)
+calls(symbol, symbol)
+imports(file, file)
+changed_in(file, commit)
+authored_by(commit, author)
+similar_to(symbol, symbol, score)
+duplicate_of(symbol, symbol)
+tests(symbol, symbol)
+```
+
+#### Derived metrics (compositions)
+
+```
+churn(file)       = count(changed_in(file, _))
+coupling(f1, f2)  = |commits(f1) ∩ commits(f2)|
+hotspot(file)     = churn(file) × avg_complexity(file)
+ownership(file)   = concentration(authors(blame(file)))
+fan_in(module)    = count(imports(_, module))
+depth(module)     = max_path(import_dag, module)
+test_ratio(mod)   = lines(tests_in(mod)) / lines(impl_in(mod))
+uniqueness(mod)   = 1 - fraction_with_similar_to(mod)
+```
+
+#### Four extensible patterns
+
+All 44 commands decompose into 4 extensible patterns + specific features + composites:
+
+**1. `rank <metric>` — score entities, show worst-first (open set)**
+
+New metrics plug in naturally. Today this covers ~15 commands:
+complexity, length, files, size, density, uniqueness, ceremony, ownership, imports, depth-map, surface, layering, docs.
+
+All share the same shape: compute a scalar per entity, sort, show top N. The metric and entity scope differ but the machinery is identical.
+
+**2. `similar` — find structurally alike code units (open set)**
+
+Today: duplicate-functions, duplicate-blocks, duplicate-types, similar-functions, similar-blocks, clusters, patterns. All 7 ask "which code units look alike?" Parameters are scope (function/block/type), method (exact/fuzzy/skeleton), and grouping (pairs/groups/clusters).
+
+Could become: `similar --scope functions|blocks|types --mode exact|fuzzy|skeleton [--cluster]`
+
+**3. `graph <symbol>` — walk relations from a starting point (open set)**
+
+Today: call-graph, callers, callees, trace, impact. All walk the call/dependency graph from a symbol. Direction (up/down/both) and depth (direct/transitive) differ.
+
+Could become: `graph <symbol> [--callers|--callees|--both] [--transitive] [--impact]`
+
+**4. `check` — find violations / scan for problems (→ subsumes into rules engine)**
+
+Today: docs, check-refs, stale-docs, check-examples, security. All scan files for violations of some predicate. Many could eventually become tree-sitter rules rather than hardcoded commands. The `rules` engine already does this for user-defined patterns.
+
+#### Specific features (closed set — don't generalize)
+
+- `churn` — temporal analysis from git history (already unified, 3 views)
+- `coverage` — test coverage analysis (already unified, 3 views)
+- `skeleton-diff` — structural comparison vs a ref
+- `provenance` — blame → session mapping
+- `architecture` — composite coupling+cycles+hubs report
+
+#### Composites (presentation, not concepts)
+
+- `health`, `module-health`, `cross-repo-health`, `summary`, `all`, `trend`
+- These run other concepts and aggregate. They're dashboards.
+- Cross-repo variants (`cross-repo-health`, `activity`, `contributors`, `repo-coupling`) are the same concepts applied at a wider scope.
+
+#### Extensibility verdict
+
+| Pattern | Open/Closed | Generalizes? | Priority |
+|---------|-------------|-------------|----------|
+| `rank <metric>` | Open — new metrics frequently | Yes, highest leverage | High |
+| `similar` | Open — new scopes/methods | Yes, 7 → 1 | High |
+| `graph` | Open — new relation types | Yes, 5 → 1 | Medium |
+| `check` | Open — → rules engine | Already happening | Low (already have `rules`) |
+| `churn` | Closed | Done | — |
+| `coverage` | Closed | Done | — |
+| Composites | Closed | Not worth merging (param divergence) | — |
+
+#### What this means for the CLI
+
+The target isn't "merge commands with compatible params." It's:
+
+1. **`rank`**: Register metrics as a pluggable catalog. `normalize analyze rank complexity`, `normalize analyze rank density`, etc. Or keep short names (`complexity`, `density`) but backed by a shared `rank` infrastructure that gives all of them `--trend`, `--diff`, cross-repo support for free.
+
+2. **`similar`**: One command with scope + mode flags. Delete 7 commands, add 1.
+
+3. **`graph`**: One command with direction + depth flags. Delete 5 commands, add 1.
+
+4. **`check`**: Migrate hardcoded checks to the rules engine over time. No command-level change needed.
+
+This would take 44 → ~20 commands, and more importantly, make the *extension model* obvious: adding a new metric is "register a scorer", not "add a command + args + dispatch + snapshot test."
 
 ## Implementation Strategy
 
@@ -166,11 +278,13 @@ Each merge follows this pattern:
 
 | Phase | Commands | Reduction |
 |-------|----------|-----------|
-| Current | 49 | — |
+| Start | 49 | — |
 | After Phase 2 (coverage + churn merged, old deleted) | 43 | -6 |
-| After Phase 3 (est.) | ~30 | ~-13 more |
+| After `similar` consolidation | 37 | -6 |
+| After `graph` consolidation | 33 | -4 |
+| After `check` → rules migration | ~30 | ~-3 |
 
-The goal isn't minimizing count for its own sake — it's making the mental model learnable. Fewer commands with clear names is better than 49 flat names, but don't force merges where parameter signatures diverge.
+The goal isn't minimizing count for its own sake — it's making the mental model learnable and the extension model obvious.
 
 ## Implementation Progress
 
