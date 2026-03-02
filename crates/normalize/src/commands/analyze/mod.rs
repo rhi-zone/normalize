@@ -32,6 +32,7 @@ mod sarif;
 pub mod security;
 pub mod size;
 pub mod stale_docs;
+pub mod summary;
 pub mod test_gaps;
 pub mod test_ratio;
 pub mod trace;

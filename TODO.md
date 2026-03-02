@@ -334,10 +334,9 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
 
 **Distillation / compression:**
 
-- [ ] **Codebase summary**: `normalize analyze summary` — single-page overview of a repo
-  for someone who has never seen it. Auto-generated from: size breakdown, top modules by
-  fan-in, key abstractions (most-used types/traits), test coverage, language mix, entry
-  points. The "README that writes itself."
+- [x] **Codebase summary**: `normalize analyze summary` — single-page overview of a repo
+  for someone who has never seen it. Auto-generated from: health grade, budget composition,
+  module health, architecture stats, and top concerns. Supports `--compact`, `--pretty`, `--json`.
 
 - [ ] **Skeleton diff**: `normalize diff --skeleton <commit>` — show what structurally
   changed between commits. Not line-level diffs but: "3 functions added to module X,

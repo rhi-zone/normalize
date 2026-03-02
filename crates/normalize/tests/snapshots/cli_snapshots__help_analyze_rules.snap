@@ -44,6 +44,7 @@ Commands:
   uniqueness           Measure what fraction of functions have no structural near-twin per module
   call-complexity      Compute effective (reachable) cyclomatic complexity via call-graph BFS
   module-health        Score each module across test ratio, uniqueness, and density (worst first)
+  summary              Auto-generated single-page codebase overview
   imports              Rank modules by import fan-in (requires facts index)
   test-gaps            Find public functions with no direct test caller
   callers              Show callers of a symbol

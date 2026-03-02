@@ -519,41 +519,41 @@ impl OutputFormatter for HealthReport {
     }
 }
 
-struct HealthScoreBreakdown {
+pub struct HealthScoreBreakdown {
     /// Weighted total (0–1)
-    total: f64,
+    pub total: f64,
     /// Avg-complexity component (0–1), weight 15%
-    complexity: f64,
+    pub complexity: f64,
     /// High-risk-ratio component (0–1), weight 15%
-    risk: f64,
+    pub risk: f64,
     /// File-size component (0–1), weight 20%
-    file_size: f64,
+    pub file_size: f64,
     /// Test ratio component (0–1), weight 20%
-    test_coverage: f64,
+    pub test_coverage: f64,
     /// Ceremony ratio component (0–1), weight 5%
-    ceremony: f64,
+    pub ceremony: f64,
     /// Duplicates component (0–1), weight 15%
-    duplicates: f64,
+    pub duplicates: f64,
     /// Structural uniqueness component (0–1), weight 10%
-    uniqueness: f64,
+    pub uniqueness: f64,
     /// Human-readable reason for the complexity score
-    complexity_reason: String,
+    pub complexity_reason: String,
     /// Human-readable reason for the risk score
-    risk_reason: String,
+    pub risk_reason: String,
     /// Human-readable reason for the file-size score
-    file_size_reason: String,
+    pub file_size_reason: String,
     /// Human-readable reason for the test coverage score
-    test_coverage_reason: String,
+    pub test_coverage_reason: String,
     /// Human-readable reason for the ceremony score
-    ceremony_reason: String,
+    pub ceremony_reason: String,
     /// Human-readable reason for the duplicates score
-    duplicates_reason: String,
+    pub duplicates_reason: String,
     /// Human-readable reason for the uniqueness score
-    uniqueness_reason: String,
+    pub uniqueness_reason: String,
 }
 
 impl HealthReport {
-    fn score_breakdown(&self) -> HealthScoreBreakdown {
+    pub fn score_breakdown(&self) -> HealthScoreBreakdown {
         let complexity_score = if self.avg_complexity <= 3.0 {
             1.0
         } else if self.avg_complexity <= 5.0 {
@@ -725,11 +725,11 @@ impl HealthReport {
         }
     }
 
-    fn calculate_health_score(&self) -> f64 {
+    pub fn calculate_health_score(&self) -> f64 {
         self.score_breakdown().total
     }
 
-    fn grade(&self) -> &'static str {
+    pub fn grade(&self) -> &'static str {
         let score = self.calculate_health_score();
         if score >= 0.9 {
             "A"

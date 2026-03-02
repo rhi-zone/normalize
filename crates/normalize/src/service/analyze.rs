@@ -29,6 +29,7 @@ use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::size::SizeReport;
 use crate::commands::analyze::stale_docs::StaleDocsReport;
+use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -308,6 +309,14 @@ impl AnalyzeService {
     }
 
     fn display_module_health(&self, r: &ModuleHealthReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_summary(&self, r: &SummaryReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1327,6 +1336,33 @@ impl AnalyzeService {
                 min_lines.unwrap_or(100),
             ),
         )
+    }
+
+    /// Auto-generated single-page codebase overview
+    #[cli(display_with = "display_summary")]
+    pub fn summary(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(
+            short = 'l',
+            help = "Maximum number of worst modules to show in concerns (0=no limit)"
+        )]
+        limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<SummaryReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(5) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(crate::commands::analyze::summary::analyze_summary(
+            &root_path,
+            effective_limit,
+        ))
     }
 
     /// Rank modules by import fan-in (requires facts index)
