@@ -2,7 +2,7 @@ use crate::symbols::SymbolParser;
 use ignore::WalkBuilder;
 use libsql::{Connection, Database, params};
 pub use normalize_facts_core::IndexedFile;
-use normalize_facts_core::{FlatImport, FlatSymbol};
+use normalize_facts_core::{FlatImport, FlatSymbol, TypeRef};
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
@@ -31,10 +31,12 @@ struct ParsedFileData {
     imports: Vec<FlatImport>,
     /// (type_name, method_name) for interface/class method signatures
     type_methods: Vec<(String, String)>,
+    /// Type-to-type references (field types, param types, extends, etc.)
+    type_refs: Vec<TypeRef>,
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -309,6 +311,34 @@ impl FileIndex {
         )
         .await?;
 
+        // Type references (type-to-type dependencies)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS type_refs (
+                file TEXT NOT NULL,
+                source_symbol TEXT NOT NULL,
+                target_type TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                line INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_type_refs_file ON type_refs(file)",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_type_refs_source ON type_refs(source_symbol)",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_type_refs_target ON type_refs(target_type)",
+            (),
+        )
+        .await?;
+
         // Migrate existing tables: add columns that may be missing from older schemas.
         // SQLite errors on duplicate ADD COLUMN, so we ignore failures.
         conn.execute(
@@ -344,6 +374,7 @@ impl FileIndex {
             conn.execute("DELETE FROM symbols", ()).await.ok();
             conn.execute("DELETE FROM imports", ()).await.ok();
             conn.execute("DELETE FROM type_methods", ()).await.ok();
+            conn.execute("DELETE FROM type_refs", ()).await.ok();
             conn.execute("DELETE FROM symbol_attributes", ()).await.ok();
             conn.execute("DELETE FROM symbol_implements", ()).await.ok();
             conn.execute(
@@ -1539,12 +1570,16 @@ impl FileIndex {
                     }
                 }
 
+                // Extract type references using tree-sitter queries
+                let type_refs = parser.find_type_refs(&full_path, &content);
+
                 Some(ParsedFileData {
                     file_path: file_path.clone(),
                     symbols: sym_data,
                     calls: call_data,
                     imports,
                     type_methods,
+                    type_refs,
                 })
             })
             .collect();
@@ -1556,6 +1591,7 @@ impl FileIndex {
         self.conn.execute("DELETE FROM calls", ()).await?;
         self.conn.execute("DELETE FROM imports", ()).await?;
         self.conn.execute("DELETE FROM type_methods", ()).await?;
+        self.conn.execute("DELETE FROM type_refs", ()).await?;
         self.conn
             .execute("DELETE FROM symbol_attributes", ())
             .await?;
@@ -1608,6 +1644,13 @@ impl FileIndex {
                 self.conn.execute(
                     "INSERT OR IGNORE INTO type_methods (file, type_name, method_name) VALUES (?1, ?2, ?3)",
                     params![data.file_path.clone(), type_name.clone(), method_name.clone()],
+                ).await?;
+            }
+
+            for tr in &data.type_refs {
+                self.conn.execute(
+                    "INSERT INTO type_refs (file, source_symbol, target_type, kind, line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![data.file_path.clone(), tr.source_symbol.clone(), tr.target_type.clone(), tr.kind.as_str(), tr.line as i64],
                 ).await?;
             }
         }
@@ -1674,6 +1717,12 @@ impl FileIndex {
                     params![path.clone()],
                 )
                 .await?;
+            self.conn
+                .execute(
+                    "DELETE FROM type_refs WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
         }
 
         let mut parser = SymbolParser::new();
@@ -1731,6 +1780,15 @@ impl FileIndex {
                     params![file_path.clone(), imp.module, imp.name, imp.alias, imp.line as i64],
                 ).await?;
                 import_count += 1;
+            }
+
+            // Extract type references
+            let type_refs = parser.find_type_refs(&full_path, &content);
+            for tr in type_refs {
+                self.conn.execute(
+                    "INSERT INTO type_refs (file, source_symbol, target_type, kind, line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![file_path.clone(), tr.source_symbol, tr.target_type, tr.kind.as_str(), tr.line as i64],
+                ).await?;
             }
         }
 

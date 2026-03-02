@@ -32,6 +32,8 @@ pub enum GraphTarget {
     Modules,
     /// Nodes are functions (file:symbol), edges are calls
     Symbols,
+    /// Nodes are types, edges are type references (fields, params, inheritance, etc.)
+    Types,
 }
 
 impl std::str::FromStr for GraphTarget {
@@ -40,8 +42,9 @@ impl std::str::FromStr for GraphTarget {
         match s {
             "modules" => Ok(Self::Modules),
             "symbols" => Ok(Self::Symbols),
+            "types" => Ok(Self::Types),
             _ => Err(format!(
-                "unknown graph target '{}', expected 'modules' or 'symbols'",
+                "unknown graph target '{}', expected 'modules', 'symbols', or 'types'",
                 s
             )),
         }
@@ -53,6 +56,7 @@ impl std::fmt::Display for GraphTarget {
         match self {
             Self::Modules => write!(f, "modules"),
             Self::Symbols => write!(f, "symbols"),
+            Self::Types => write!(f, "types"),
         }
     }
 }
@@ -669,6 +673,28 @@ async fn build_call_graph(
     Ok(graph)
 }
 
+/// Build the type-level dependency graph: nodes are type names, edges are type references.
+async fn build_type_graph(
+    idx: &FileIndex,
+) -> Result<HashMap<String, HashSet<String>>, libsql::Error> {
+    let conn = idx.connection();
+    let stmt = conn
+        .prepare("SELECT source_symbol, target_type FROM type_refs")
+        .await?;
+    let mut rows = stmt.query(()).await?;
+
+    let mut graph: HashMap<String, HashSet<String>> = HashMap::new();
+    while let Some(row) = rows.next().await? {
+        let source: String = row.get(0)?;
+        let target: String = row.get(1)?;
+        if source != target {
+            graph.entry(source).or_default().insert(target);
+        }
+    }
+
+    Ok(graph)
+}
+
 // ---------------------------------------------------------------------------
 // Main analysis
 // ---------------------------------------------------------------------------
@@ -686,6 +712,7 @@ pub async fn analyze_graph(
             graph.imports_by_file
         }
         GraphTarget::Symbols => build_call_graph(idx).await?,
+        GraphTarget::Types => build_type_graph(idx).await?,
     };
     let imports = &adj;
 
@@ -810,6 +837,7 @@ impl OutputFormatter for GraphReport {
         let label = match self.target {
             GraphTarget::Modules => "Module graph",
             GraphTarget::Symbols => "Symbol graph",
+            GraphTarget::Types => "Type graph",
         };
         out.push(format!(
             "# {} — {} nodes, {} edges, density {:.3}",
@@ -940,6 +968,7 @@ impl OutputFormatter for GraphReport {
         let label = match self.target {
             GraphTarget::Modules => "Module graph",
             GraphTarget::Symbols => "Symbol graph",
+            GraphTarget::Types => "Type graph",
         };
         out.push(format!(
             "\x1b[1;36m# {}\x1b[0m — \x1b[1m{}\x1b[0m nodes, \x1b[1m{}\x1b[0m edges, density \x1b[33m{:.3}\x1b[0m",
