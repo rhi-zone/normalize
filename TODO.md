@@ -17,19 +17,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-### Remove dead clap dispatch path in `commands/analyze/`
-
-The entire clap-based dispatch in `commands/analyze/mod.rs` is dead code. `main()` calls `service.cli_run()` (server-less proc macro), which routes directly to `service/analyze.rs` methods → `commands/analyze/*.rs` module functions. The clap path (`AnalyzeArgs`, `AnalyzeCommand` enum, `run()`, `dispatch_command()`) is never called.
-
-**Dead code to remove:**
-- `commands/analyze/args.rs` — entire file (`AnalyzeArgs`, `AnalyzeCommand` enum)
-- `commands/analyze/mod.rs` functions: `run()`, `dispatch_command()`, `run_all_passes()`, `print_report()`, `print_subcommand_schema()`, `print_input_schema()`, `resolve_diff_and_filter()`, `detect_default_remote()`, `detect_default_branch()`, `get_diff_files()`
-- ~600 lines total
-
-**Keep:** `load_allow_file()`, `append_to_allow_file()`, `is_generated_file()` — used by `service/analyze.rs`.
-
-**Check other commands** for the same pattern — if server-less handles all routing, other clap dispatch paths may also be dead.
-
 ### Type relationship extraction (facts index) — HIGH PRIORITY
 
 Currently `analyze graph --on types` works but only uses shallow symbol-level relationships (impl/extends). Deeper type edges are needed for meaningful structural analysis.
