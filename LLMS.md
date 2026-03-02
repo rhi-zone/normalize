@@ -23,7 +23,7 @@ normalize view src/main.rs
 | `normalize view src/` | Code structure (symbols, hierarchy) | Understanding architecture |
 | `normalize view --deps FILE` | Import/export analysis | Before modifying a file |
 | `normalize analyze complexity` | Cyclomatic complexity report | Checking code quality |
-| `normalize text-search "pattern"` | Search code | Finding usage, definitions |
+| `normalize grep "pattern"` | Search code | Finding usage, definitions |
 | `normalize package audit` | Security vulnerability scan | Checking dependencies |
 
 ## Output Modes
@@ -75,8 +75,8 @@ normalize package why tokio     # Why is this included?
 
 **Finding code:**
 ```bash
-normalize text-search "TODO"           # Search for patterns
-normalize text-search "fn main" -i     # Case insensitive
+normalize grep "TODO"                  # Search for patterns
+normalize grep "fn main" -i           # Case insensitive
 ```
 
 ## Key Commands
@@ -98,9 +98,10 @@ normalize view -d 2                # Depth 2 (nested symbols)
 normalize analyze health           # Health metrics
 normalize analyze complexity       # Cyclomatic complexity
 normalize analyze security         # Security scan
-normalize analyze hotspots         # High-churn files
-normalize analyze callers symbol   # What calls this?
-normalize analyze callees symbol   # What does this call?
+normalize analyze churn --hotspots # High-churn files
+normalize analyze call-graph symbol --callers  # What calls this?
+normalize analyze call-graph symbol --callees  # What does this call?
+normalize analyze graph            # Dependency graph analysis
 normalize analyze all              # Run all analysis passes
 ```
 
@@ -113,17 +114,17 @@ normalize tools lint --list        # Available tools
 normalize tools test               # Run native test runners
 ```
 
-### text-search - Search
+### grep - Search
 
 ```bash
-normalize text-search "pattern"            # Full codebase search
-normalize text-search "TODO" --only "*.rs"
+normalize grep "pattern"            # Full codebase search
+normalize grep "TODO" --only "*.rs"
 ```
 
 ## Key Insights
 
 - `normalize view` is the primary navigation command - works on dirs, files, and symbols
-- `normalize analyze` is the primary analysis command with subcommands: health, complexity, security, hotspots, callers, callees, etc.
-- `normalize text-search` for text search, `normalize view` for structural navigation
+- `normalize analyze` is the primary analysis command with 40 subcommands: health, complexity, security, churn, graph, duplicates, etc.
+- `normalize grep` for text search, `normalize view` for structural navigation
 - Use `--json` when you need to parse output programmatically
 - The facts DB (`.normalize/facts.db`) caches symbols for fast lookups

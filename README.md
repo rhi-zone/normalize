@@ -33,7 +33,7 @@ normalize view src/main.rs/main
 normalize analyze health
 
 # Search for text patterns
-normalize text-search "TODO"
+normalize grep "TODO"
 
 # Run linters
 normalize tools lint
@@ -65,9 +65,10 @@ normalize analyze health             # Codebase metrics and health score
 normalize analyze complexity         # Cyclomatic complexity report
 normalize analyze length             # Function length analysis
 normalize analyze security           # Security vulnerability scan
-normalize analyze hotspots           # Git history analysis (churn + complexity)
-normalize analyze duplicate-functions # Detect code clones
+normalize analyze churn --hotspots   # Git history analysis (churn + complexity)
+normalize analyze duplicates         # Detect code clones
 normalize analyze duplicate-types    # Detect duplicate type definitions
+normalize analyze graph              # Dependency graph analysis
 normalize analyze docs               # Documentation coverage
 normalize analyze all                # Run all analysis passes
 ```
@@ -89,15 +90,15 @@ normalize tools test                 # Run native test runners
 
 Supported tools: ruff, clippy, rustfmt, oxlint, biome, prettier, tsc, mypy, pyright, eslint, gofmt, go-vet, deno-check, and more.
 
-### text-search - Search Code
+### grep - Search Code
 
 Fast ripgrep-based search:
 
 ```bash
-normalize text-search "pattern"            # Search all files
-normalize text-search "TODO" --only "*.rs" # Filter by extension
-normalize text-search "fn main" -i         # Case insensitive
-normalize text-search "error" --limit 50   # Limit results
+normalize grep "pattern"            # Search all files
+normalize grep "TODO" --only "*.rs" # Filter by extension
+normalize grep "fn main" -i         # Case insensitive
+normalize grep "error" --limit 50   # Limit results
 ```
 
 ### package - Package Management
@@ -133,19 +134,19 @@ Edit code by targeting symbols structurally:
 normalize edit src/main.rs/old_fn delete       # Delete a symbol
 normalize edit src/main.rs/Foo replace < new.rs # Replace symbol content
 normalize edit src/main.rs/bar insert --after   # Insert after symbol
-normalize edit --undo                           # Undo last edit
-normalize edit --dry-run src/main.rs/Foo delete # Preview without applying
+normalize edit undo                             # Undo last edit
+normalize edit delete --dry-run src/main.rs/Foo # Preview without applying
 ```
 
-### history - Shadow Git Edit History
+### edit history - Shadow Git Edit History
 
 View the history of structural edits:
 
 ```bash
-normalize history                    # Recent edit history
-normalize history src/main.rs        # History for a specific file
-normalize history --diff <ref>       # Show diff for a commit
-normalize history --status           # Uncommitted shadow edits
+normalize edit history               # Recent edit history
+normalize edit undo                  # Undo last edit
+normalize edit redo                  # Redo last undone edit
+normalize edit goto <ref>            # Jump to a shadow commit
 ```
 
 ### context - Directory Context
@@ -158,15 +159,16 @@ normalize context src/               # Context for specific path
 normalize context --list             # Show file paths only
 ```
 
-### rules - Analysis Rules
+### syntax rules - Analysis Rules
 
 Manage and run syntax + fact rules:
 
 ```bash
-normalize rules list                 # List all rules
-normalize rules run                  # Run all rules
-normalize rules add <url>            # Add a rule from URL
-normalize rules run --type syntax    # Run only syntax rules
+normalize syntax rules list          # List all rules
+normalize syntax rules run           # Run all rules
+normalize syntax rules add <url>     # Add a rule from URL
+normalize syntax rules enable <id>   # Enable a rule
+normalize syntax rules tags          # List rule tags
 ```
 
 ### translate - Code Translation

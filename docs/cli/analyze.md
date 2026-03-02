@@ -55,6 +55,7 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 | `surface` | Per-module public symbol count, public ratio, and constraint score |
 | `layering` | Per-module import layering compliance |
 | `architecture` | Codebase architecture: coupling, cycles, dependencies |
+| `graph` | Graph-theoretic properties of the dependency graph (`--on modules\|symbols\|types`) |
 | `call-graph` | Show callers and/or callees of a symbol (`--callers`, `--callees`) |
 | `trace` | Trace value provenance for a symbol |
 | `impact` | What-if impact analysis: reverse-dependency closure + blast radius |
@@ -78,13 +79,6 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 | `activity` | Cross-repo activity over time |
 | `contributors` | Analyze contributors across repos |
 | `repo-coupling` | Analyze cross-repo coupling |
-
-### Rule Engine
-| Subcommand | Description |
-|------------|-------------|
-| `rules` | Run syntax rules from .normalize/rules/*.scm |
-| `ast` | Show AST for a file (for authoring rules) |
-| `query` | Test a tree-sitter query against a file |
 
 ## Examples
 
@@ -124,11 +118,13 @@ normalize analyze trace parse_config
 normalize analyze call-graph handle_request --callers
 normalize analyze call-graph handle_request --callees
 
-# Syntax rules
-normalize analyze rules              # Run all rules
-normalize analyze rules --list       # List available rules
-normalize analyze rules --fix        # Auto-fix issues
-normalize analyze rules --sarif      # SARIF output for IDEs
+# Dependency graph analysis
+normalize analyze graph                              # Module-level graph
+normalize analyze graph --on symbols                 # Symbol-level graph
+normalize analyze graph --on types                   # Type dependency graph
+
+# Impact analysis
+normalize analyze impact src/main.rs
 ```
 
 ## Options
@@ -187,13 +183,6 @@ normalize analyze rules --sarif      # SARIF output for IDEs
 - `--target <FILE>` - Target file to search in
 - `--max-depth <N>` - Maximum trace depth (default: 10)
 - `--recursive` - Trace into called functions
-
-**rules:**
-- `--rule <ID>` - Run only this specific rule
-- `--list` - List available rules without running
-- `--fix` - Auto-fix issues that have fixes available
-- `--sarif` - Output in SARIF format for IDE integration
-- `--debug <FLAGS>` - Debug output (timing, all)
 
 ## Allow Files
 

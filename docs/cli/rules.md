@@ -1,6 +1,8 @@
-# normalize rules
+# normalize syntax rules
 
 Manage and run analysis rules (syntax + fact). This is the unified entry point for all rule types — tree-sitter syntax rules (`.scm`) and Datalog fact rules (`.dl`).
+
+**Command path:** `normalize syntax rules <subcommand>`
 
 ## Subcommands
 
@@ -8,6 +10,10 @@ Manage and run analysis rules (syntax + fact). This is the unified entry point f
 |------------|-------------|
 | `list` | List all rules (syntax + fact, builtin + user) |
 | `run` | Run rules against the codebase |
+| `enable` | Enable a rule or all rules matching a tag |
+| `disable` | Disable a rule or all rules matching a tag |
+| `show` | Show full documentation for a rule |
+| `tags` | List all tags and the rules they group |
 | `add` | Add a rule from a URL |
 | `update` | Update imported rules from their sources |
 | `remove` | Remove an imported rule |
@@ -17,11 +23,11 @@ Manage and run analysis rules (syntax + fact). This is the unified entry point f
 List installed rules:
 
 ```bash
-normalize rules list                # All rules
-normalize rules list --type syntax  # Syntax rules only
-normalize rules list --type fact    # Fact rules only
-normalize rules list --sources      # Show source URLs
-normalize rules list --json
+normalize syntax rules list                # All rules
+normalize syntax rules list --type syntax  # Syntax rules only
+normalize syntax rules list --type fact    # Fact rules only
+normalize syntax rules list --sources      # Show source URLs
+normalize syntax rules list --json
 ```
 
 Options:
@@ -33,13 +39,13 @@ Options:
 Run rules against the codebase:
 
 ```bash
-normalize rules run                         # Run all rules
-normalize rules run --type syntax           # Syntax rules only
-normalize rules run --type fact             # Fact rules only
-normalize rules run --rule rust/unwrap-in-impl  # Specific rule
-normalize rules run --fix                   # Apply auto-fixes (syntax only)
-normalize rules run --sarif                 # SARIF output
-normalize rules run src/                    # Target specific path
+normalize syntax rules run                         # Run all rules
+normalize syntax rules run --type syntax           # Syntax rules only
+normalize syntax rules run --type fact             # Fact rules only
+normalize syntax rules run --rule rust/unwrap-in-impl  # Specific rule
+normalize syntax rules run --fix                   # Apply auto-fixes (syntax only)
+normalize syntax rules run --sarif                 # SARIF output
+normalize syntax rules run src/                    # Target specific path
 ```
 
 Arguments:
@@ -57,9 +63,9 @@ Options:
 Add a rule from a URL. Supports both `.scm` (syntax) and `.dl` (fact) files:
 
 ```bash
-normalize rules add https://example.com/rules/no-console-log.scm
-normalize rules add https://example.com/rules/circular-deps.dl
-normalize rules add https://example.com/rules/security.scm --global
+normalize syntax rules add https://example.com/rules/no-console-log.scm
+normalize syntax rules add https://example.com/rules/circular-deps.dl
+normalize syntax rules add https://example.com/rules/security.scm --global
 ```
 
 Options:
@@ -95,13 +101,47 @@ import_count(file, c) <-- import(file, _, _), agg c = count() in import(file, _,
 warning("too-many-imports", file) <-- import_count(file, c), if c > 20;
 ```
 
+### enable
+
+Enable a rule or all rules matching a tag:
+
+```bash
+normalize syntax rules enable rust/unwrap-in-impl    # Enable specific rule
+normalize syntax rules enable --tag security          # Enable all rules tagged "security"
+```
+
+### disable
+
+Disable a rule or all rules matching a tag:
+
+```bash
+normalize syntax rules disable rust/unwrap-in-impl   # Disable specific rule
+normalize syntax rules disable --tag style            # Disable all rules tagged "style"
+```
+
+### show
+
+Show full documentation for a rule:
+
+```bash
+normalize syntax rules show rust/unwrap-in-impl
+```
+
+### tags
+
+List all tags and the rules they group:
+
+```bash
+normalize syntax rules tags
+```
+
 ### update
 
 Update imported rules from their source URLs:
 
 ```bash
-normalize rules update              # Update all imported rules
-normalize rules update no-console-log  # Update specific rule
+normalize syntax rules update              # Update all imported rules
+normalize syntax rules update no-console-log  # Update specific rule
 ```
 
 Only rules with tracked sources (added via URL) will be updated. Local rules are skipped.
@@ -111,7 +151,7 @@ Only rules with tracked sources (added via URL) will be updated. Local rules are
 Remove an imported rule:
 
 ```bash
-normalize rules remove no-console-log
+normalize syntax rules remove no-console-log
 ```
 
 This removes both the rule file and its entry in the lock file.

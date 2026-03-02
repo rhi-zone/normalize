@@ -2,35 +2,34 @@
 
 ## Command Structure
 
-Normalize has 19 top-level commands organized by domain:
+Normalize has 18 top-level commands organized by domain:
 
 ### Core Operations
 | Command | Description |
 |---------|-------------|
 | `view` | View directory/file/symbol structure |
-| `edit` | Structural code modifications |
-| `history` | Shadow git edit history |
-| `analyze` | Codebase analysis (21 subcommands) |
-| `text-search` | Fast ripgrep-based text search |
+| `grep` | Fast ripgrep-based text search |
+| `edit` | Structural code modifications (delete, replace, swap, insert, undo, redo, history) |
+| `analyze` | Codebase analysis (40 subcommands) |
+| `syntax` | AST inspection and syntax rules (ast, query, rules) |
 
 ### Infrastructure
 | Command | Description |
 |---------|-------------|
-| `facts` | Manage code facts (file index, symbols, calls, imports) |
-| `rules` | Manage and run analysis rules (syntax + fact) |
+| `facts` | Extract and query code facts (symbols, imports, calls) |
 | `daemon` | Background process management |
 | `grammars` | Tree-sitter grammar management |
 | `init` | Initialize normalize in a directory |
-| `update` | Self-update |
+| `update` | Check for and install updates |
 
 ### Ecosystem Integration
 | Command | Description |
 |---------|-------------|
 | `sessions` | Agent session logs (Claude Code, Codex, Gemini, Normalize) |
-| `package` | Package management (info, list, tree, why, outdated, audit) |
+| `package` | Package management (info, list, tree, outdated) |
 | `tools` | External tool orchestration (lint, test) |
 | `serve` | Server protocols (mcp, http, lsp) |
-| `generate` | Code generation (client, types, cli-snapshot) |
+| `generate` | Code generation from API spec |
 | `translate` | Translate code between programming languages |
 
 ### Utility
@@ -49,8 +48,8 @@ Normalize has 19 top-level commands organized by domain:
 - Not: `list-sessions`, `list-grammars`, `list-packages`
 
 ### Subcommands for related operations
-- `analyze` has 21 subcommands because they're all "analysis"
-- Better than 21 top-level commands
+- `analyze` has 40 subcommands because they're all "analysis"
+- Better than 40 top-level commands
 
 ### `list` as subcommand, not flag
 - Consistent: `grammars list`, `daemon list`, `package list`

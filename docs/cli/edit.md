@@ -10,18 +10,21 @@ Same as `normalize view`:
 - `file/Parent/Child` - Nested symbol
 - `@alias` - Edit alias target
 
-## Operations
+## Subcommands
 
-| Operation | Description |
+| Subcommand | Description |
 |-----------|-------------|
 | `delete` | Delete target symbol |
-| `replace <content>` | Replace target with new content |
-| `swap <other>` | Swap target with another symbol |
-| `insert <content> --at <pos>` | Insert content relative to target |
-| `move <dest> --at <pos>` | Move target to new location |
-| `copy <dest> --at <pos>` | Copy target to new location |
+| `replace` | Replace target with new content |
+| `swap` | Swap two symbols |
+| `insert` | Insert content relative to target |
+| `undo` | Undo the last N edits |
+| `redo` | Redo the last undone edit |
+| `goto` | Jump to a specific shadow commit |
+| `batch` | Apply batch edits from JSON file |
+| `history` | View shadow git edit history |
 
-Position (`--at`): `before`, `after`, `prepend`, `append`
+Position (`--at` for insert): `before`, `after`, `prepend`, `append`
 
 ## Examples
 
@@ -38,11 +41,20 @@ normalize edit src/lib.rs/foo swap bar
 # Insert before a symbol
 normalize edit src/lib.rs/Config insert "/// Documentation" --at before
 
-# Move function into a class
-normalize edit src/api.rs/helper move MyClass --at append
+# Undo last edit
+normalize edit undo
 
-# Copy function after another
-normalize edit src/lib.rs/original copy target --at after
+# Undo last 3 edits
+normalize edit undo 3
+
+# Redo last undone edit
+normalize edit redo
+
+# View edit history
+normalize edit history
+
+# Apply batch edits from JSON
+normalize edit batch edits.json
 ```
 
 ## Glob Patterns
@@ -58,12 +70,6 @@ normalize edit "file.py/foo*" replace "pass" --multiple
 
 # Insert comment before all matching symbols
 normalize edit "file.py/deprecated_*" insert "# DEPRECATED" --at before --multiple
-
-# Move all matching symbols into a container
-normalize edit "file.py/helper_*" move HelperClass --at append --multiple
-
-# Copy all matching symbols after a target
-normalize edit "file.py/util_*" copy utilities --at after --multiple
 ```
 
 The `--multiple` flag is required when a pattern matches more than one symbol (safety measure).
@@ -97,15 +103,22 @@ For bulk swapping, use multiple individual swap commands or a script.
 - `-i, --case-insensitive` - Case-insensitive symbol matching
 
 ### Undo/Redo (Shadow Git)
-- `--undo [<N>]` - Undo the last N edits (default: 1)
-- `--redo` - Redo the last undone edit
-- `--goto <REF>` - Jump to a specific shadow commit
+
+These are subcommands, not flags:
+
+- `normalize edit undo [<N>]` - Undo the last N edits (default: 1)
+- `normalize edit redo` - Redo the last undone edit
+- `normalize edit goto <REF>` - Jump to a specific shadow commit
+- `normalize edit history` - View shadow git edit history
+
+Undo options:
 - `--file <PATH>` - Undo changes only for specific file(s)
 - `--cross-checkpoint` - Allow undo across git commit boundaries
 - `--force` - Force undo even if files were modified externally
 
 ### Batch
-- `--batch <FILE>` - Apply batch edits from JSON file (or `-` for stdin)
+
+- `normalize edit batch <FILE>` - Apply batch edits from JSON file (or `-` for stdin)
 
 ### Output
 - `--json` - Output results as JSON

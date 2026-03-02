@@ -82,10 +82,10 @@ Patterns from `docs/log-analysis.md` correction analysis:
 ./target/debug/normalize view [path[/symbol]] [--types-only]
 ./target/debug/normalize view path:start-end
 ./target/debug/normalize analyze [--complexity] [path]
-./target/debug/normalize text-search <pattern> [--only <glob>]
+./target/debug/normalize grep <pattern> [--only <glob>]
 ```
 
-**text-search uses ripgrep regex, not grep regex.** `|` for alternation (not `\|`). Use `(a|b)` grouping. No BRE/ERE distinction. This has caused silent broken searches repeatedly.
+**`grep` uses ripgrep regex, not unix grep regex.** `|` for alternation (not `\|`). Use `(a|b)` grouping. No BRE/ERE distinction. This has caused silent broken searches repeatedly.
 
 When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exact line content needed by Edit.
 

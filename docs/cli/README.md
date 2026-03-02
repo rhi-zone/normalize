@@ -14,13 +14,14 @@ Normalize provides a unified CLI for code intelligence. Three core primitives: *
 ### Search
 | Command | Purpose |
 |---------|---------|
-| [text-search](text-search.md) | Fast ripgrep-based text search |
+| [grep](grep.md) | Fast ripgrep-based text search |
 
-### Facts & Rules
+### Facts, Syntax & Rules
 | Command | Purpose |
 |---------|---------|
 | [facts](facts.md) | Manage code facts (symbols, imports, calls) |
-| [rules](rules.md) | Manage and run analysis rules (syntax + fact) |
+| syntax | AST inspection and syntax rules (ast, query, rules) |
+| [rules](rules.md) | Manage and run analysis rules (`syntax rules`) |
 | [init](init.md) | Initialize normalize in a project |
 | [daemon](daemon.md) | Background daemon for faster operations |
 
@@ -45,7 +46,6 @@ Normalize provides a unified CLI for code intelligence. Three core primitives: *
 | [aliases](aliases.md) | Manage filter aliases |
 | [serve](serve.md) | Start MCP/HTTP/LSP server |
 | context | Show directory context (.context.md files) |
-| history | Shadow git edit history |
 
 ## Global Options
 
@@ -61,4 +61,4 @@ All commands support:
 1. **Index-optional**: All commands work without an index (graceful degradation via filesystem)
 2. **Unified interface**: `normalize view` handles dirs, files, symbols, line ranges
 3. **Composable output**: JSON output + jq for scripting
-4. **Replace builtin tools**: normalize view/text-search replaces Read/Grep for code-aware operations
+4. **Replace builtin tools**: normalize view/grep replaces Read/Grep for code-aware operations
