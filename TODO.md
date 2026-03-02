@@ -219,6 +219,9 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
   - Updated: shadow-git.md, log-analysis.md, workflows/README.md, security-audit.md, dogfooding.md, langgraph-evaluation.md, prior-art.md
   - Kept: normalize-chat-sessions parser (format still valid for reading old logs)
 
+### CLI Type Safety
+- [ ] Audit all `Option<String>` CLI params that should be enums — e.g. `--scope functions|blocks` is better as a typed enum with `FromStr` than a raw string. server-less calls `.parse()` so enums work automatically.
+
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration

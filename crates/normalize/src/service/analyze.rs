@@ -18,10 +18,10 @@ use crate::commands::analyze::density::DensityReport;
 use crate::commands::analyze::depth_map::DepthMapReport;
 use crate::commands::analyze::docs::DocCoverageReport;
 use crate::commands::analyze::duplicates::{
-    DuplicateBlocksConfig, DuplicateBlocksReport, DuplicateFunctionsConfig,
-    DuplicateFunctionsReport, DuplicateTypesReport, SimilarBlocksConfig, SimilarBlocksReport,
-    SimilarFunctionsConfig, SimilarFunctionsReport,
+    DuplicateBlocksConfig, DuplicateFunctionsConfig, DuplicateTypesReport, SimilarBlocksConfig,
+    SimilarFunctionsConfig,
 };
+use crate::commands::analyze::duplicates_views::{DuplicateScope, DuplicatesOutput};
 use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
@@ -236,31 +236,7 @@ impl AnalyzeService {
         }
     }
 
-    fn display_dup_functions(&self, r: &DuplicateFunctionsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_dup_blocks(&self, r: &DuplicateBlocksReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_sim_functions(&self, r: &SimilarFunctionsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_sim_blocks(&self, r: &SimilarBlocksReport) -> String {
+    fn display_duplicates(&self, r: &DuplicatesOutput) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -990,178 +966,118 @@ impl AnalyzeService {
         Ok(crate::commands::analyze::cross_repo_health::analyze_cross_repo_health(&repos))
     }
 
-    #[cli(display_with = "display_dup_functions")]
+    /// Detect duplicate/similar code (functions or blocks)
+    #[cli(display_with = "display_duplicates")]
     #[allow(clippy::too_many_arguments)]
-    pub fn duplicate_functions(
+    pub fn duplicates(
         &self,
-        #[param(help = "Elide identifier names when comparing")] elide_identifiers: bool,
-        #[param(help = "Elide literal values when comparing")] elide_literals: bool,
-        #[param(help = "Show source code for detected duplicates")] show_source: bool,
-        #[param(help = "Minimum lines for a function to be considered")] min_lines: Option<usize>,
-        #[param(help = "Include groups where all functions share the same name")]
-        include_trait_impls: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Scan across all git repos under DIR")] repos: Option<String>,
-        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<DuplicateFunctionsReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
-            discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
-        } else {
-            vec![root_path.clone()]
-        };
-        let filter = Self::build_filter(&root_path, &exclude, &only);
-        Ok(
-            crate::commands::analyze::duplicates::build_duplicate_functions_report(
-                DuplicateFunctionsConfig {
-                    roots: &roots,
-                    elide_identifiers,
-                    elide_literals,
-                    show_source,
-                    min_lines: min_lines.unwrap_or(1),
-                    include_trait_impls,
-                    filter: filter.as_ref(),
-                },
-            ),
-        )
-    }
-
-    /// Detect duplicate code blocks
-    #[cli(display_with = "display_dup_blocks")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn duplicate_blocks(
-        &self,
-        #[param(help = "Elide identifier names when comparing")] elide_identifiers: bool,
-        #[param(help = "Elide literal values when comparing")] elide_literals: bool,
-        #[param(help = "Show source code for detected duplicates")] show_source: bool,
-        #[param(help = "Minimum lines for a block to be considered")] min_lines: Option<usize>,
-        #[param(help = "Skip function/method nodes")] skip_functions: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<DuplicateBlocksReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
-        Ok(
-            crate::commands::analyze::duplicates::build_duplicate_blocks_report(
-                DuplicateBlocksConfig {
-                    root: &root_path,
-                    min_lines: min_lines.unwrap_or(5),
-                    elide_identifiers, // true by default in existing CLI; server-less bool flags default false
-                    elide_literals,
-                    skip_functions,
-                    show_source,
-                    allow: None,
-                    reason: None,
-                    filter: filter.as_ref(),
-                },
-            ),
-        )
-    }
-
-    /// Detect similar functions via MinHash LSH
-    #[cli(display_with = "display_sim_functions")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn similar_functions(
-        &self,
+        #[param(help = "Scope: functions (default) or blocks")] scope: Option<DuplicateScope>,
+        #[param(help = "Use fuzzy MinHash matching instead of exact hash")] similar: bool,
         #[param(help = "Elide identifier names when comparing")] elide_identifiers: bool,
         #[param(help = "Elide literal values when comparing")] elide_literals: bool,
         #[param(help = "Show source code for matches")] show_source: bool,
-        #[param(help = "Minimum lines for a function to be considered")] min_lines: Option<usize>,
-        #[param(help = "Minimum similarity threshold (0.0-1.0)")] similarity: Option<f64>,
-        #[param(help = "Match on control-flow structure")] skeleton: bool,
-        #[param(help = "Include pairs where both functions share the same name")]
+        #[param(help = "Minimum lines to be considered")] min_lines: Option<usize>,
+        #[param(help = "Include groups where all items share the same name")]
         include_trait_impls: bool,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Scan across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+        #[param(help = "Minimum similarity threshold (0.0-1.0, similar mode only)")]
+        similarity: Option<f64>,
+        #[param(help = "Match on control-flow structure (similar mode only)")] skeleton: bool,
+        #[param(help = "Scan across all git repos under DIR (functions scope only)")] repos: Option<
+            String,
+        >,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<SimilarFunctionsReport, String> {
+        #[param(help = "Skip function/method nodes (blocks scope only)")] skip_functions: bool,
+    ) -> Result<DuplicatesOutput, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
-            discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
-        } else {
-            vec![root_path.clone()]
-        };
+        let scope = scope.unwrap_or(DuplicateScope::Functions);
         let filter = Self::build_filter(&root_path, &exclude, &only);
-        Ok(
-            crate::commands::analyze::duplicates::build_similar_functions_report(
-                SimilarFunctionsConfig {
-                    roots: &roots,
-                    min_lines: min_lines.unwrap_or(10),
-                    similarity: similarity.unwrap_or(0.85),
-                    elide_identifiers,
-                    elide_literals,
-                    skeleton,
-                    show_source,
-                    include_trait_impls,
-                    allow: None,
-                    reason: None,
-                    filter: filter.as_ref(),
-                },
-            ),
-        )
-    }
 
-    /// Detect similar code blocks via MinHash LSH
-    #[cli(display_with = "display_sim_blocks")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn similar_blocks(
-        &self,
-        #[param(help = "Elide identifier names when comparing")] elide_identifiers: bool,
-        #[param(help = "Elide literal values when comparing")] elide_literals: bool,
-        #[param(help = "Show source code for matches")] show_source: bool,
-        #[param(help = "Minimum lines for a block to be considered")] min_lines: Option<usize>,
-        #[param(help = "Minimum similarity threshold (0.0-1.0)")] similarity: Option<f64>,
-        #[param(help = "Match on control-flow structure")] skeleton: bool,
-        #[param(help = "Include pairs where both blocks are inside same-name functions")]
-        include_trait_impls: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<SimilarBlocksReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
-        Ok(
-            crate::commands::analyze::duplicates::build_similar_blocks_report(
-                SimilarBlocksConfig {
-                    root: &root_path,
-                    min_lines: min_lines.unwrap_or(10),
-                    similarity: similarity.unwrap_or(0.85),
-                    elide_identifiers, // true by default in existing CLI; server-less bool flags default false
-                    elide_literals,
-                    skeleton,
-                    show_source,
-                    include_trait_impls,
-                    allow: None,
-                    reason: None,
-                    filter: filter.as_ref(),
-                },
-            ),
-        )
+        match (scope, similar) {
+            (DuplicateScope::Functions, false) => {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+                    discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
+                } else {
+                    vec![root_path.clone()]
+                };
+                Ok(DuplicatesOutput::DuplicateFunctions(
+                    crate::commands::analyze::duplicates::build_duplicate_functions_report(
+                        DuplicateFunctionsConfig {
+                            roots: &roots,
+                            elide_identifiers,
+                            elide_literals,
+                            show_source,
+                            min_lines: min_lines.unwrap_or(1),
+                            include_trait_impls,
+                            filter: filter.as_ref(),
+                        },
+                    ),
+                ))
+            }
+            (DuplicateScope::Blocks, false) => Ok(DuplicatesOutput::DuplicateBlocks(
+                crate::commands::analyze::duplicates::build_duplicate_blocks_report(
+                    DuplicateBlocksConfig {
+                        root: &root_path,
+                        min_lines: min_lines.unwrap_or(5),
+                        elide_identifiers,
+                        elide_literals,
+                        skip_functions,
+                        show_source,
+                        allow: None,
+                        reason: None,
+                        filter: filter.as_ref(),
+                    },
+                ),
+            )),
+            (DuplicateScope::Functions, true) => {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+                    discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
+                } else {
+                    vec![root_path.clone()]
+                };
+                Ok(DuplicatesOutput::SimilarFunctions(
+                    crate::commands::analyze::duplicates::build_similar_functions_report(
+                        SimilarFunctionsConfig {
+                            roots: &roots,
+                            min_lines: min_lines.unwrap_or(10),
+                            similarity: similarity.unwrap_or(0.85),
+                            elide_identifiers,
+                            elide_literals,
+                            skeleton,
+                            show_source,
+                            include_trait_impls,
+                            allow: None,
+                            reason: None,
+                            filter: filter.as_ref(),
+                        },
+                    ),
+                ))
+            }
+            (DuplicateScope::Blocks, true) => Ok(DuplicatesOutput::SimilarBlocks(
+                crate::commands::analyze::duplicates::build_similar_blocks_report(
+                    SimilarBlocksConfig {
+                        root: &root_path,
+                        min_lines: min_lines.unwrap_or(10),
+                        similarity: similarity.unwrap_or(0.85),
+                        elide_identifiers,
+                        elide_literals,
+                        skeleton,
+                        show_source,
+                        include_trait_impls,
+                        allow: None,
+                        reason: None,
+                        filter: filter.as_ref(),
+                    },
+                ),
+            )),
+        }
     }
 
     /// Detect duplicate type definitions

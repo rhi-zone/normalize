@@ -24,11 +24,8 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 ### Duplicates & Similarity
 | Subcommand | Description |
 |------------|-------------|
-| `duplicate-functions` | Detect code clones (exact hash) |
-| `duplicate-blocks` | Detect duplicate code blocks |
+| `duplicates` | Detect duplicate/similar code (`--scope functions\|blocks`, `--similar`) |
 | `duplicate-types` | Detect similar type definitions |
-| `similar-functions` | Detect similar functions via MinHash LSH |
-| `similar-blocks` | Detect similar code blocks via MinHash LSH |
 | `clusters` | Group similar functions into structural clusters |
 | `patterns` | Auto-detect recurring structural code patterns |
 
@@ -115,7 +112,10 @@ normalize analyze complexity --threshold 15
 normalize analyze security
 
 # Find code duplicates
-normalize analyze duplicate-functions
+normalize analyze duplicates                                # exact function duplicates
+normalize analyze duplicates --similar                      # similar functions (MinHash)
+normalize analyze duplicates --scope blocks                 # exact block duplicates
+normalize analyze duplicates --scope blocks --similar       # similar blocks (MinHash)
 
 # Trace a symbol's data flow
 normalize analyze trace parse_config
@@ -170,13 +170,18 @@ normalize analyze rules --sarif      # SARIF output for IDEs
 - `--reason <TEXT>` - Reason for allowing (with --allow)
 - `-n, --limit <N>` - Number of results to show
 
-**duplicate-functions:**
-- `--elide-identifiers` - Ignore identifier names when comparing (default: true)
+**duplicates:**
+- `--scope functions|blocks` - Detection scope (default: functions)
+- `--similar` - Use fuzzy MinHash matching instead of exact hash
+- `--elide-identifiers` - Ignore identifier names when comparing
 - `--elide-literals` - Ignore literal values when comparing
-- `--show-source` - Show source code for duplicates
-- `--min-lines <N>` - Minimum function lines to consider
-- `--allow <LOCATION>` - Add to allow file
-- `--reason <TEXT>` - Reason for allowing
+- `--show-source` - Show source code for matches
+- `--min-lines <N>` - Minimum lines to consider
+- `--include-trait-impls` - Include same-name groups (likely trait impls)
+- `--similarity <F>` - MinHash similarity threshold (similar mode only)
+- `--skeleton` - Match on control-flow structure (similar mode only)
+- `--repos <DIR>` - Scan across sibling repos (functions scope only)
+- `--skip-functions` - Skip function nodes (blocks scope only)
 
 **trace:**
 - `--target <FILE>` - Target file to search in
@@ -198,7 +203,7 @@ Patterns can be excluded via `.normalize/` allow files:
 |------|---------|
 | `.normalize/large-files-allow` | Exclude from `analyze files` |
 | `.normalize/hotspots-allow` | Exclude from `analyze churn --hotspots` |
-| `.normalize/duplicate-functions-allow` | Exclude from duplicate detection |
+| `.normalize/duplicate-functions-allow` | Exclude from `analyze duplicates` |
 | `.normalize/duplicate-types-allow` | Exclude type pairs |
 | `.normalize/test-gaps-allow` | Exclude from `analyze coverage --gaps` |
 

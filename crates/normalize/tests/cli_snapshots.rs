@@ -293,28 +293,8 @@ fn test_help_analyze_check_examples() {
 }
 
 #[test]
-fn test_help_analyze_duplicate_functions() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "duplicate-functions"]));
-}
-
-#[test]
 fn test_help_analyze_duplicate_types() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "duplicate-types"]));
-}
-
-#[test]
-fn test_help_analyze_duplicate_blocks() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "duplicate-blocks"]));
-}
-
-#[test]
-fn test_help_analyze_similar_functions() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "similar-functions"]));
-}
-
-#[test]
-fn test_help_analyze_similar_blocks() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "similar-blocks"]));
 }
 
 #[test]

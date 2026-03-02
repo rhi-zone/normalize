@@ -22,6 +22,7 @@ pub mod density;
 pub mod depth_map;
 pub mod docs;
 pub mod duplicates;
+pub mod duplicates_views;
 pub mod files;
 pub mod hotspots;
 pub mod impact;
@@ -324,18 +325,6 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::CheckExamples) => {
             print_schema::<check_examples::CheckExamplesReport>();
-        }
-        Some(AnalyzeCommand::DuplicateFunctions { .. }) => {
-            print_schema::<duplicates::DuplicateFunctionsReport>();
-        }
-        Some(AnalyzeCommand::DuplicateBlocks { .. }) => {
-            print_schema::<duplicates::DuplicateBlocksReport>();
-        }
-        Some(AnalyzeCommand::SimilarFunctions { .. }) => {
-            print_schema::<duplicates::SimilarFunctionsReport>();
-        }
-        Some(AnalyzeCommand::SimilarBlocks { .. }) => {
-            print_schema::<duplicates::SimilarBlocksReport>();
         }
         Some(AnalyzeCommand::Clusters { .. }) => {
             print_schema::<clusters::ClustersReport>();
@@ -698,108 +687,6 @@ fn dispatch_command(
         Some(AnalyzeCommand::StaleDocs) => stale_docs::cmd_stale_docs(&effective_root),
 
         Some(AnalyzeCommand::CheckExamples) => check_examples::cmd_check_examples(&effective_root),
-
-        Some(AnalyzeCommand::DuplicateFunctions {
-            elide_identifiers,
-            elide_literals,
-            show_source,
-            min_lines,
-            include_trait_impls,
-            allow,
-            reason,
-        }) => {
-            if let Some(location) = allow {
-                duplicates::cmd_allow_duplicate_function(
-                    &effective_root,
-                    &location,
-                    reason.as_deref(),
-                    elide_identifiers,
-                    elide_literals,
-                    min_lines,
-                )
-            } else {
-                let result = duplicates::cmd_duplicate_functions_with_count(
-                    duplicates::DuplicateFunctionsConfig {
-                        roots: std::slice::from_ref(&effective_root),
-                        elide_identifiers,
-                        elide_literals,
-                        show_source,
-                        min_lines,
-                        include_trait_impls,
-                        filter: filter.as_ref(),
-                    },
-                );
-                result.exit_code
-            }
-        }
-
-        Some(AnalyzeCommand::DuplicateBlocks {
-            elide_identifiers,
-            elide_literals,
-            show_source,
-            min_lines,
-            skip_functions,
-            allow,
-            reason,
-        }) => duplicates::cmd_duplicate_blocks(duplicates::DuplicateBlocksConfig {
-            root: &effective_root,
-            min_lines,
-            elide_identifiers,
-            elide_literals,
-            skip_functions,
-            show_source,
-            allow,
-            reason,
-            filter: filter.as_ref(),
-        }),
-
-        Some(AnalyzeCommand::SimilarFunctions {
-            elide_identifiers,
-            elide_literals,
-            show_source,
-            min_lines,
-            similarity,
-            skeleton,
-            include_trait_impls,
-            allow,
-            reason,
-        }) => duplicates::cmd_similar_functions(duplicates::SimilarFunctionsConfig {
-            roots: std::slice::from_ref(&effective_root),
-            min_lines,
-            similarity,
-            elide_identifiers,
-            elide_literals,
-            skeleton,
-            show_source,
-            include_trait_impls,
-            allow,
-            reason,
-            filter: filter.as_ref(),
-        }),
-
-        Some(AnalyzeCommand::SimilarBlocks {
-            elide_identifiers,
-            elide_literals,
-            show_source,
-            min_lines,
-            similarity,
-            skeleton,
-            include_trait_impls,
-            allow,
-            reason,
-        }) => duplicates::cmd_similar_blocks(duplicates::SimilarBlocksConfig {
-            root: &effective_root,
-            min_lines,
-            similarity,
-            elide_identifiers,
-            elide_literals,
-            skeleton,
-            show_source,
-            include_trait_impls,
-            allow,
-            reason,
-            filter: filter.as_ref(),
-        }),
 
         Some(AnalyzeCommand::Clusters {
             min_lines,

@@ -42,6 +42,7 @@ mod tests {
             DuplicateBlocksReport, DuplicateFunctionsReport, DuplicateTypesReport,
             SimilarBlocksReport, SimilarFunctionsReport,
         };
+        use crate::commands::analyze::duplicates_views::DuplicatesOutput;
         use crate::commands::analyze::files::FileLengthReport;
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::impact::ImpactReport;
@@ -103,6 +104,7 @@ mod tests {
         assert_output_formatter::<DuplicateBlocksReport>();
         assert_output_formatter::<DuplicateFunctionsReport>();
         assert_output_formatter::<DuplicateTypesReport>();
+        assert_output_formatter::<DuplicatesOutput>();
         assert_output_formatter::<FileLengthReport>();
         assert_output_formatter::<GrammarListReport>();
         assert_output_formatter::<GrammarPathsReport>();
