@@ -1,8 +1,7 @@
 //! Translate command - convert code between programming languages.
 
-use clap::ValueEnum;
-
-#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum SourceLanguage {
     /// TypeScript/JavaScript
@@ -13,7 +12,8 @@ pub enum SourceLanguage {
     Python,
 }
 
-#[derive(Clone, Copy, ValueEnum, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum TargetLanguage {
     /// TypeScript
@@ -81,6 +81,7 @@ impl std::str::FromStr for TargetLanguage {
 }
 
 /// Service-callable translate command.
+#[cfg(feature = "cli")]
 pub fn cmd_translate_service(
     input: &str,
     from: Option<SourceLanguage>,

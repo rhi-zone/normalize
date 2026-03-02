@@ -1,6 +1,5 @@
 //! Package registry queries.
 
-use clap::Subcommand;
 use normalize_ecosystems::{
     AuditResult, PackageError, PackageInfo, VulnerabilitySeverity, all_ecosystems,
     detect_all_ecosystems,
@@ -8,7 +7,8 @@ use normalize_ecosystems::{
 use nu_ansi_term::Color::Yellow;
 use std::path::Path;
 
-#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum PackageAction {
     /// Query package info from registry
     Info {
@@ -451,6 +451,7 @@ fn available_ecosystems() -> Vec<&'static str> {
 
 /// Service-callable package command.
 /// Dispatches to the appropriate subcommand based on `action` string.
+#[cfg(feature = "cli")]
 pub fn cmd_package_service(
     action: &str,
     package: Option<&str>,

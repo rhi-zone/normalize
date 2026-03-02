@@ -2,7 +2,6 @@
 
 use crate::output::OutputFormatter;
 use crate::parsers;
-use clap::Subcommand;
 use serde::Serialize;
 use std::io::Read;
 use std::path::PathBuf;
@@ -64,7 +63,8 @@ impl OutputFormatter for GrammarPathsReport {
     }
 }
 
-#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum GrammarAction {
     /// List installed grammars
     List,
@@ -72,11 +72,11 @@ pub enum GrammarAction {
     /// Install grammars from GitHub release
     Install {
         /// Specific version to install (default: latest)
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         version: Option<String>,
 
         /// Force reinstall even if grammars exist
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         force: bool,
     },
@@ -199,6 +199,7 @@ fn cmd_paths() -> i32 {
 }
 
 /// Install grammars, returning a structured result (for server-less service).
+#[cfg(feature = "cli")]
 pub fn cmd_install_service(
     version: Option<String>,
     force: bool,

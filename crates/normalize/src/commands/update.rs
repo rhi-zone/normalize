@@ -3,6 +3,7 @@
 use std::io::Read;
 
 /// Service-callable update command (returns structured result).
+#[cfg(feature = "cli")]
 pub fn cmd_update_service(check_only: bool) -> Result<crate::service::UpdateResult, String> {
     const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
     const GITHUB_REPO: &str = "rhi-zone/normalize";

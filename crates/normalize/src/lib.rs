@@ -34,6 +34,7 @@ pub mod path_resolve;
 pub mod paths;
 pub mod rules;
 pub mod serve;
+#[cfg(feature = "cli")]
 pub mod service;
 pub mod sessions;
 pub mod shadow;

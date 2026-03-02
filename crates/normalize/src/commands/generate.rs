@@ -1,9 +1,9 @@
 //! Generate command - code generation from API specs and schemas.
 
-use clap::ValueEnum;
 use std::path::PathBuf;
 
-#[derive(Clone, Copy, ValueEnum, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum InputFormat {
     /// Auto-detect from file content
@@ -40,7 +40,8 @@ impl std::str::FromStr for InputFormat {
     }
 }
 
-#[derive(Clone, Copy, ValueEnum, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum Backend {
     /// TypeScript interfaces/types
@@ -90,6 +91,7 @@ impl std::str::FromStr for Backend {
 }
 
 /// Service-callable version of run_types.
+#[cfg(feature = "cli")]
 #[allow(clippy::too_many_arguments)]
 pub fn run_types_service(
     input: PathBuf,
@@ -114,6 +116,7 @@ pub fn run_types_service(
 }
 
 /// Service-callable version of run_cli_snapshot.
+#[cfg(feature = "cli")]
 pub fn run_cli_snapshot_service(
     binary: PathBuf,
     output: Option<PathBuf>,
@@ -123,6 +126,7 @@ pub fn run_cli_snapshot_service(
     write_generate_result(code, output)
 }
 
+#[cfg(feature = "cli")]
 fn write_generate_result(
     code: String,
     output: Option<PathBuf>,

@@ -1,6 +1,5 @@
 //! Unified rule management - list, run, add, update, remove rules (syntax + fact).
 
-use clap::Subcommand;
 use normalize_facts_rules_interpret as interpret;
 use normalize_syntax_rules::{self, DebugFlags};
 use serde::{Deserialize, Serialize};
@@ -9,7 +8,8 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 /// Rule type filter for list/run commands.
-#[derive(Clone, Debug, Default, clap::ValueEnum, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum RuleType {
     #[default]
@@ -40,36 +40,37 @@ impl std::str::FromStr for RuleType {
     }
 }
 
-#[derive(Subcommand, Deserialize, schemars::JsonSchema)]
+#[derive(Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum RulesAction {
     /// List all rules (syntax + fact, builtin + user)
     List {
         /// Show source URLs for imported rules
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         sources: bool,
 
         /// Filter by rule type
-        #[arg(long, default_value = "all")]
+        #[cfg_attr(feature = "cli", arg(long, default_value = "all"))]
         #[serde(default)]
         r#type: RuleType,
 
         /// Filter by tag (e.g. "debug-print", "security")
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         tag: Option<String>,
 
         /// Filter to enabled rules only
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         enabled: bool,
 
         /// Filter to disabled rules only
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         disabled: bool,
 
         /// Hide the description line (compact one-line-per-rule output)
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         no_desc: bool,
     },
@@ -77,20 +78,20 @@ pub enum RulesAction {
     /// Run rules against the codebase
     Run {
         /// Specific rule ID to run
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         rule: Option<String>,
 
         /// Filter by tag (e.g. "debug-print", "security")
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         tag: Option<String>,
 
         /// Apply auto-fixes (syntax rules only)
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         fix: bool,
 
         /// Output in SARIF format
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         sarif: bool,
 
@@ -98,12 +99,12 @@ pub enum RulesAction {
         target: Option<String>,
 
         /// Filter by rule type
-        #[arg(long, default_value = "all")]
+        #[cfg_attr(feature = "cli", arg(long, default_value = "all"))]
         #[serde(default)]
         r#type: RuleType,
 
         /// Debug flags (comma-separated)
-        #[arg(long, value_delimiter = ',')]
+        #[cfg_attr(feature = "cli", arg(long, value_delimiter = ','))]
         #[serde(default)]
         debug: Vec<String>,
     },
@@ -114,7 +115,7 @@ pub enum RulesAction {
         id_or_tag: String,
 
         /// Preview changes without writing
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         dry_run: bool,
     },
@@ -125,7 +126,7 @@ pub enum RulesAction {
         id_or_tag: String,
 
         /// Preview changes without writing
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         dry_run: bool,
     },
@@ -139,12 +140,12 @@ pub enum RulesAction {
     /// List all tags and the rules they group
     Tags {
         /// Expand each tag to show its member rules
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         show_rules: bool,
 
         /// Show only this specific tag
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         tag: Option<String>,
     },
 
@@ -154,7 +155,7 @@ pub enum RulesAction {
         url: String,
 
         /// Install to global rules (~/.config/normalize/rules/) instead of project
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         global: bool,
     },
@@ -1607,8 +1608,10 @@ fn sha256_hex(content: &str) -> String {
 // Service-callable functions
 // =============================================================================
 
+#[cfg(feature = "cli")]
 use crate::service::rules::RuleResult;
 
+#[cfg(feature = "cli")]
 fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
     if exit_code == 0 {
         Ok(RuleResult {
@@ -1622,6 +1625,7 @@ fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
 }
 
 /// Service-callable list.
+#[cfg(feature = "cli")]
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_list_service(
     root: Option<&str>,
@@ -1655,6 +1659,7 @@ pub fn cmd_list_service(
 }
 
 /// Service-callable run.
+#[cfg(feature = "cli")]
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_run_service(
     root: Option<&str>,
@@ -1688,6 +1693,7 @@ pub fn cmd_run_service(
 }
 
 /// Service-callable enable/disable.
+#[cfg(feature = "cli")]
 pub fn cmd_enable_disable_service(
     root: Option<&str>,
     id_or_tag: &str,
@@ -1703,6 +1709,7 @@ pub fn cmd_enable_disable_service(
 }
 
 /// Service-callable show.
+#[cfg(feature = "cli")]
 pub fn cmd_show_service(
     root: Option<&str>,
     id: &str,
@@ -1717,6 +1724,7 @@ pub fn cmd_show_service(
 }
 
 /// Service-callable tags.
+#[cfg(feature = "cli")]
 pub fn cmd_tags_service(
     root: Option<&str>,
     show_rules: bool,
@@ -1732,18 +1740,21 @@ pub fn cmd_tags_service(
 }
 
 /// Service-callable add.
+#[cfg(feature = "cli")]
 pub fn cmd_add_service(url: &str, global: bool) -> Result<RuleResult, String> {
     let exit_code = cmd_add(url, global, false);
     exit_to_result(exit_code)
 }
 
 /// Service-callable update.
+#[cfg(feature = "cli")]
 pub fn cmd_update_service(rule_id: Option<&str>) -> Result<RuleResult, String> {
     let exit_code = cmd_update(rule_id, false);
     exit_to_result(exit_code)
 }
 
 /// Service-callable remove.
+#[cfg(feature = "cli")]
 pub fn cmd_remove_service(rule_id: &str) -> Result<RuleResult, String> {
     let exit_code = cmd_remove(rule_id, false);
     exit_to_result(exit_code)

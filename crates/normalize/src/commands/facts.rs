@@ -4,16 +4,14 @@ use crate::index;
 use crate::paths::get_normalize_dir;
 use crate::rules;
 use crate::skeleton;
-use clap::Subcommand;
 use normalize_facts_rules_api::Relations;
 use normalize_languages::external_packages;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 /// What to extract during indexing (files are always indexed).
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Deserialize, schemars::JsonSchema,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum FactsContent {
     /// Skip content extraction (files only)
@@ -64,12 +62,13 @@ fn default_limit() -> usize {
     100
 }
 
-#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum FactsAction {
     /// Rebuild the file index
     Rebuild {
         /// What to extract: symbols, calls, imports (default: all)
-        #[arg(long, value_delimiter = ',', default_values_t = vec![FactsContent::Symbols, FactsContent::Calls, FactsContent::Imports])]
+        #[cfg_attr(feature = "cli", arg(long, value_delimiter = ',', default_values_t = vec![FactsContent::Symbols, FactsContent::Calls, FactsContent::Imports]))]
         #[serde(default = "default_include")]
         include: Vec<FactsContent>,
     },
@@ -77,7 +76,7 @@ pub enum FactsAction {
     /// Show index statistics (DB size vs codebase size)
     Stats {
         /// Show storage usage for index and caches
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         storage: bool,
     },
@@ -88,7 +87,7 @@ pub enum FactsAction {
         prefix: Option<String>,
 
         /// Maximum number of files to show
-        #[arg(short, long, default_value = "100")]
+        #[cfg_attr(feature = "cli", arg(short, long, default_value = "100"))]
         #[serde(default = "default_limit")]
         limit: usize,
     },
@@ -96,12 +95,12 @@ pub enum FactsAction {
     /// Index external packages (stdlib, site-packages) into global cache
     Packages {
         /// Ecosystems to index (python, go, js, deno, java, cpp, rust). Defaults to all available.
-        #[arg(long, value_delimiter = ',')]
+        #[cfg_attr(feature = "cli", arg(long, value_delimiter = ','))]
         #[serde(default)]
         only: Vec<String>,
 
         /// Clear existing index before re-indexing
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         clear: bool,
     },
@@ -109,15 +108,15 @@ pub enum FactsAction {
     /// Run compiled rule packs (dylibs) against extracted facts
     Rules {
         /// Specific rule to run (runs all if not specified)
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         rule: Option<String>,
 
         /// Path to a specific rule pack dylib
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         pack: Option<PathBuf>,
 
         /// List available rules instead of running them
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         list: bool,
     },
@@ -128,7 +127,7 @@ pub enum FactsAction {
         rules_file: Option<PathBuf>,
 
         /// List available rules instead of running them
-        #[arg(long)]
+        #[cfg_attr(feature = "cli", arg(long))]
         #[serde(default)]
         list: bool,
     },
@@ -987,12 +986,14 @@ fn format_size(bytes: u64) -> String {
 // Service-callable functions (return data instead of printing)
 // =============================================================================
 
+#[cfg(feature = "cli")]
 use crate::service::facts::{
     CommandResult, EcosystemCounts, ExtensionCount, FactsStats, FactsStatsOutput, FileList,
     PackagesResult, RebuildResult, StorageEntry, StorageReport,
 };
 
 /// Service-callable rebuild.
+#[cfg(feature = "cli")]
 pub fn cmd_rebuild_service(
     root: Option<&str>,
     include: &[FactsContent],
@@ -1003,6 +1004,7 @@ pub fn cmd_rebuild_service(
     rt.block_on(cmd_rebuild_data(root_ref, include))
 }
 
+#[cfg(feature = "cli")]
 async fn cmd_rebuild_data(
     root: Option<&Path>,
     include: &[FactsContent],
@@ -1055,6 +1057,7 @@ async fn cmd_rebuild_data(
 }
 
 /// Service-callable stats.
+#[cfg(feature = "cli")]
 pub fn cmd_stats_service(root: Option<&str>, storage: bool) -> Result<FactsStatsOutput, String> {
     let root_path = root.map(PathBuf::from);
     let root_ref = root_path.as_deref();
@@ -1071,6 +1074,7 @@ pub fn cmd_stats_service(root: Option<&str>, storage: bool) -> Result<FactsStats
         .map(FactsStatsOutput::Stats)
 }
 
+#[cfg(feature = "cli")]
 async fn cmd_stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
     let root = root
         .map(|p| p.to_path_buf())
@@ -1148,6 +1152,7 @@ async fn cmd_stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
     })
 }
 
+#[cfg(feature = "cli")]
 fn build_storage_report(root: &Path) -> StorageReport {
     let index_path = root.join(".normalize").join("index.sqlite");
     let index_size = std::fs::metadata(&index_path).map(|m| m.len()).unwrap_or(0);
@@ -1180,6 +1185,7 @@ fn build_storage_report(root: &Path) -> StorageReport {
 }
 
 /// Service-callable list files.
+#[cfg(feature = "cli")]
 pub fn cmd_list_files_service(
     prefix: Option<&str>,
     root: Option<&str>,
@@ -1191,6 +1197,7 @@ pub fn cmd_list_files_service(
     rt.block_on(cmd_list_files_data(prefix, root_ref, limit))
 }
 
+#[cfg(feature = "cli")]
 async fn cmd_list_files_data(
     prefix: Option<&str>,
     root: Option<&Path>,
@@ -1221,6 +1228,7 @@ async fn cmd_list_files_data(
 }
 
 /// Service-callable packages indexing.
+#[cfg(feature = "cli")]
 pub fn cmd_packages_service(
     only: &[String],
     clear: bool,
@@ -1232,6 +1240,7 @@ pub fn cmd_packages_service(
     rt.block_on(cmd_packages_data(only, clear, root_ref))
 }
 
+#[cfg(feature = "cli")]
 async fn cmd_packages_data(
     only: &[String],
     clear: bool,
@@ -1307,6 +1316,7 @@ async fn cmd_packages_data(
 }
 
 /// Service-callable facts rules (compiled dylibs).
+#[cfg(feature = "cli")]
 pub fn cmd_facts_rules_service(
     root: Option<&str>,
     rule: Option<&str>,
@@ -1331,6 +1341,7 @@ pub fn cmd_facts_rules_service(
 }
 
 /// Service-callable facts check (interpreted Datalog).
+#[cfg(feature = "cli")]
 pub fn cmd_check_service(
     root: Option<&str>,
     rules_file: Option<&str>,

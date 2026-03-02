@@ -2,9 +2,7 @@
 //!
 //! Servers expose normalize functionality over various protocols.
 
-use clap::{Args, Subcommand};
 use serde::Deserialize;
-use std::path::PathBuf;
 
 use normalize_derive::Merge;
 
@@ -33,17 +31,19 @@ impl ServeConfig {
 }
 
 /// Serve command arguments
-#[derive(Args)]
+#[cfg(feature = "cli")]
+#[derive(clap::Args)]
 pub struct ServeArgs {
     #[command(subcommand)]
     pub protocol: ServeProtocol,
 
     /// Root directory (defaults to current directory)
     #[arg(short, long, global = true)]
-    pub root: Option<PathBuf>,
+    pub root: Option<std::path::PathBuf>,
 }
 
-#[derive(Subcommand)]
+#[cfg(feature = "cli")]
+#[derive(clap::Subcommand)]
 pub enum ServeProtocol {
     /// Start MCP server for LLM integration (stdio transport)
     Mcp,
@@ -64,10 +64,14 @@ pub enum ServeProtocol {
 }
 
 /// Run the serve command
+#[cfg(feature = "cli")]
 pub fn run(args: ServeArgs) -> i32 {
     use crate::config::NormalizeConfig;
 
-    let root = args.root.clone().unwrap_or_else(|| PathBuf::from("."));
+    let root = args
+        .root
+        .clone()
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
     let config = NormalizeConfig::load(&root);
 
     match args.protocol {

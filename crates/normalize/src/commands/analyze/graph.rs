@@ -16,16 +16,9 @@ use std::path::Path;
 
 /// What the graph nodes represent.
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    clap::ValueEnum,
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum GraphTarget {
     /// Nodes are files, edges are imports

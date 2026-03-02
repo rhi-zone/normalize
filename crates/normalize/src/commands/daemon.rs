@@ -1,7 +1,6 @@
 //! Daemon management commands for normalize CLI.
 
 use crate::daemon::{self, DaemonClient, Response, global_socket_path};
-use clap::Subcommand;
 use std::path::PathBuf;
 
 /// Handle a daemon response, calling success_fn for Ok(resp.ok) case.
@@ -31,7 +30,8 @@ fn default_path() -> PathBuf {
     PathBuf::from(".")
 }
 
-#[derive(Subcommand, serde::Deserialize, schemars::JsonSchema)]
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "cli", derive(clap::Subcommand))]
 pub enum DaemonAction {
     /// Show daemon status
     Status,
@@ -48,7 +48,7 @@ pub enum DaemonAction {
     /// Add a root to watch
     Add {
         /// Path to the project root
-        #[arg(default_value = ".")]
+        #[cfg_attr(feature = "cli", arg(default_value = "."))]
         #[serde(default = "default_path")]
         path: PathBuf,
     },
@@ -56,7 +56,7 @@ pub enum DaemonAction {
     /// Remove a root from watching
     Remove {
         /// Path to the project root
-        #[arg(default_value = ".")]
+        #[cfg_attr(feature = "cli", arg(default_value = "."))]
         #[serde(default = "default_path")]
         path: PathBuf,
     },
