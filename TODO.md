@@ -46,6 +46,24 @@ Analyze across multiple repositories — activity trends, shared patterns, inter
 - Output: per-repo breakdown + aggregate summary
 - Incremental: cache per-repo results, only re-analyze changed repos
 
+## Recently Completed
+
+### Analyze Performance (6x speedup)
+
+`normalize analyze health` optimized from 8.5s → 1.4s (debug build):
+- [x] Parallelized `duplicate-functions`, `similar-functions` file walks with rayon `par_iter`
+- [x] Parallelized `compute_extra_metrics` sub-analyses via nested `rayon::join`
+- [x] Deduplicated `build_similar_functions_report` (was a full copy of `find_similar_function_pairs`)
+- [x] Eliminated redundant file walk in `analyze_uniqueness` (piggybacked function counts on minhash walk)
+- [x] Parallelized LSH bucketing per-band and candidate scoring (`into_par_iter`)
+- [x] Parallelized `analyze_ceremony` (was the last sequential bottleneck)
+
+Remaining opportunity: `build_duplicate_functions_report` and `find_similar_function_pairs`
+still do separate file walks (same files, same tree-sitter parsing). Could compute both
+exact hash and minhash signature in one pass. Currently ~500ms each, running in parallel
+via `rayon::join` so wall-clock overlap is good — merging would reduce thread pool contention
+rather than wall time.
+
 ## Remaining Work
 
 ### ~~OutputFormatter audit~~ ✓ done
@@ -243,9 +261,9 @@ its composition and compression potential.
   free functions, per-language, top files. For normalize: 62% ceremony, dominated by
   the ~98 Language trait impls (all 100% ceremony, as expected).
 
-- [ ] **Structural clustering**: `similar-functions` finds pairs; this groups them into
-  families. "These 40 files share the same impl shape" > "A is 93% similar to B".
-  Shows repetition topology, not just pairwise similarity.
+- [x] **Structural clustering**: `similar-functions` finds pairs; `clusters` groups them into
+  families via connected components. "These 40 files share the same impl shape" > "A is 93%
+  similar to B". → `normalize analyze clusters`
 
 - [x] **Import centrality**: rank modules by fan-in (how many other modules import them).
   Most-imported = load-bearing and essential. Least-imported = leaf utilities or dead weight.
@@ -258,6 +276,86 @@ its composition and compression potential.
 - [x] **Churn × complexity**: combine hotspots (git churn) with complexity scores. High churn
   AND high complexity = real danger zone, likely source of incidental complexity. Already
   baked into `normalize analyze hotspots` (score = commits × √churn × log₂(1+complexity)).
+
+- [x] **Budget breakdown**: classify every line by purpose — logic, test, docs, config,
+  generated, vendored. Answers "what is this codebase made of?" without reading it.
+  → `normalize analyze budget`
+
+- [x] **Information density**: per-module compression ratio + token uniqueness score.
+  Low density = repetitive/boilerplate. High density = novel logic.
+  → `normalize analyze density`
+
+- [x] **Function uniqueness**: per-module ratio of structurally unique vs clustered functions
+  (functions with a near-twin elsewhere). Measures how much of the codebase is truly novel
+  vs repeated patterns. → `normalize analyze uniqueness`
+
+- [x] **Call-complexity**: effective reachable cyclomatic complexity via call-graph BFS.
+  Not just "this function is complex" but "this function calls 5 other complex functions."
+  → `normalize analyze call-complexity`
+
+- [x] **Module health scorecard**: composite score across test ratio, uniqueness, density,
+  and duplicate functions per workspace member. Worst modules first. Color-coded grade
+  ladder (A-F). → `normalize analyze module-health`
+
+- [x] **Health report**: unified health score aggregating all above metrics — complexity,
+  test ratio, ceremony, duplicates, density, uniqueness. Single-command codebase assessment.
+  → `normalize analyze health`
+
+### Observability Gaps — What's Still Missing
+
+The current analysis suite answers "what exists" (size, budget, ceremony) and "what's
+redundant" (duplicates, clusters, uniqueness, density). Missing: tools for understanding
+**how the codebase fits together** and **what matters to change**.
+
+**Structural understanding:**
+
+- [ ] **Dependency depth map**: for each module, how deep is it in the import DAG?
+  Shallow modules are easy to change. Deep modules ripple. `analyze architecture` has
+  deep-chains but doesn't surface per-module depth as a sortable metric. Want:
+  module-level "blast radius" score = (fan-out × depth × downstream dependents).
+
+- [ ] **Interface surface area**: per-module count of public symbols vs total symbols.
+  High public ratio = wide interface, hard to change safely. Low = well-encapsulated.
+  Combine with fan-in: wide interface AND high fan-in = most constrained module.
+
+- [ ] **Abstraction layering**: are imports flowing downward (good) or upward/sideways
+  (coupling)? `analyze architecture` has layer-deps but doesn't score the direction.
+  Want: per-module "layering compliance" — fraction of imports that go downward.
+
+**Change impact:**
+
+- [ ] **What-if analysis**: `normalize analyze impact <module>` — if this module changes,
+  what's affected? Transitive reverse-dependency closure + estimated blast radius.
+  Combines import graph with test coverage to show untested impact paths.
+
+- [ ] **Change coupling clusters**: beyond pairwise `analyze coupling`, group files into
+  change-sets that always move together. "These 12 files are effectively one module
+  spread across 4 directories." Uses temporal coupling + import graph.
+
+**Distillation / compression:**
+
+- [ ] **Codebase summary**: `normalize analyze summary` — single-page overview of a repo
+  for someone who has never seen it. Auto-generated from: size breakdown, top modules by
+  fan-in, key abstractions (most-used types/traits), test coverage, language mix, entry
+  points. The "README that writes itself."
+
+- [ ] **Skeleton diff**: `normalize diff --skeleton <commit>` — show what structurally
+  changed between commits. Not line-level diffs but: "3 functions added to module X,
+  1 interface changed in Y, test coverage for Z dropped from 40% to 20%." Structural
+  changelog.
+
+- [ ] **Pattern catalog**: auto-detect recurring code patterns (not just duplicates but
+  design patterns, idioms, anti-patterns). "This codebase uses 4 distinct error-handling
+  patterns" or "37 functions follow the parse-validate-transform shape." Requires
+  clustering at a higher abstraction level than current minhash (which is token-level).
+
+**Cross-time analysis:**
+
+- [ ] **Trend tracking**: `normalize analyze trend` — run health/module-health over
+  git history at regular intervals. Show whether metrics are improving or degrading.
+  "Uniqueness ratio dropped 5% in the last month" or "test coverage has been flat
+  for 6 months." Requires running analysis at historical commits (expensive but
+  cacheable).
 
 ### Lint / Analysis Architecture
 
