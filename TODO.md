@@ -307,6 +307,12 @@ The current analysis suite answers "what exists" (size, budget, ceremony) and "w
 redundant" (duplicates, clusters, uniqueness, density). Missing: tools for understanding
 **how the codebase fits together** and **what matters to change**.
 
+**Index auto-build with smart invalidation:**
+
+- [ ] Commands that require the facts index (`impact`, `architecture`, `imports`) should
+  auto-build it if missing or stale, rather than requiring `normalize facts` first.
+  Smart invalidation: compare file mtimes against last index time, only re-index changed files.
+
 **Structural understanding:**
 
 - [ ] **Dependency depth map**: for each module, how deep is it in the import DAG?
