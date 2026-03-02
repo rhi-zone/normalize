@@ -2092,9 +2092,20 @@ pub struct SimilarFunctionsConfig<'a> {
 }
 
 /// Core pair detection: extract MinHash signatures and find similar function pairs via LSH.
+/// Result of similar-function detection including per-file function counts.
+pub(crate) struct SimilarFunctionPairsResult {
+    pub files_scanned: usize,
+    pub functions_analyzed: usize,
+    pub pairs: Vec<SimilarFunctionPair>,
+    /// Per-file total function counts and line counts (relative path, fn_count, line_count).
+    /// Includes all functions, not just those above min_lines. Useful for computing
+    /// uniqueness ratios without a redundant file walk.
+    pub file_fn_counts: Vec<(String, usize, usize)>,
+}
+
 ///
-/// Returns `(files_scanned, functions_analyzed, pairs)`. Pairs are sorted by similarity
-/// descending. Used by both `cmd_similar_functions` and the clustering analysis.
+/// Returns similar function pairs plus per-file function counts. Pairs are sorted by
+/// similarity descending. Used by both `cmd_similar_functions` and the clustering analysis.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn find_similar_function_pairs(
     roots: &[PathBuf],
@@ -2105,11 +2116,12 @@ pub(crate) fn find_similar_function_pairs(
     skeleton: bool,
     include_trait_impls: bool,
     filter: Option<&crate::filter::Filter>,
-) -> (usize, usize, Vec<SimilarFunctionPair>) {
+) -> SimilarFunctionPairsResult {
     let extractor = Extractor::new();
     let multi_repo = roots.len() > 1;
     let mut all_fns: Vec<(String, String, usize, usize, [u64; MINHASH_N])> = Vec::new();
     let mut files_scanned = 0usize;
+    let mut file_fn_counts: Vec<(String, usize, usize)> = Vec::new();
 
     for root in roots {
         let repo_name = root
@@ -2139,8 +2151,15 @@ pub(crate) fn find_similar_function_pairs(
             .map(|e| e.path().to_path_buf())
             .collect();
 
+        // Per-file: (total_fn_count, minhash_entries)
+        // Per-file: (rel_path, total_fn_count, line_count, minhash_entries)
         #[allow(clippy::type_complexity)]
-        let per_file: Vec<Vec<(String, String, usize, usize, [u64; MINHASH_N])>> = files
+        let per_file: Vec<(
+            String,
+            usize,
+            usize,
+            Vec<(String, String, usize, usize, [u64; MINHASH_N])>,
+        )> = files
             .par_iter()
             .filter_map(|path| {
                 let content = std::fs::read_to_string(path).ok()?;
@@ -2153,14 +2172,17 @@ pub(crate) fn find_similar_function_pairs(
                     root_rel.display().to_string()
                 };
 
+                let line_count = content.lines().count();
                 let result = extractor.extract(path, &content);
                 let mut entries = Vec::new();
+                let mut total_fn_count = 0usize;
 
                 for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
                     let kind = sym.kind.as_str();
                     if kind != "function" && kind != "method" {
                         continue;
                     }
+                    total_fn_count += 1;
 
                     let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
                     if line_count < min_lines {
@@ -2200,17 +2222,18 @@ pub(crate) fn find_similar_function_pairs(
                         ));
                     }
                 }
-                if entries.is_empty() {
+                if total_fn_count == 0 {
                     None
                 } else {
-                    Some(entries)
+                    Some((rel_path, total_fn_count, line_count, entries))
                 }
             })
             .collect();
 
-        for entries in per_file {
+        for (rel_path, fn_count, lines, entries) in per_file {
             files_scanned += 1;
             all_fns.extend(entries);
+            file_fn_counts.push((rel_path, fn_count, lines));
         }
     }
 
@@ -2306,7 +2329,12 @@ pub(crate) fn find_similar_function_pairs(
             .then_with(|| b.line_count.cmp(&a.line_count))
     });
 
-    (files_scanned, functions_analyzed, pairs)
+    SimilarFunctionPairsResult {
+        files_scanned,
+        functions_analyzed,
+        pairs,
+        file_fn_counts,
+    }
 }
 
 pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
@@ -2326,7 +2354,7 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
     } = cfg;
 
     let multi_repo = roots.len() > 1;
-    let (files_scanned, functions_analyzed, pairs) = find_similar_function_pairs(
+    let result = find_similar_function_pairs(
         roots,
         min_lines,
         similarity,
@@ -2336,6 +2364,9 @@ pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
         include_trait_impls,
         filter,
     );
+    let files_scanned = result.files_scanned;
+    let functions_analyzed = result.functions_analyzed;
+    let pairs = result.pairs;
 
     let fn_allow_key = |file: &str, symbol: &str, start: usize, end: usize| {
         format!("{}:{}:{}-{}", file, symbol, start, end)
@@ -2745,7 +2776,7 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Simila
     } = cfg;
 
     let multi_repo = roots.len() > 1;
-    let (files_scanned, functions_analyzed, pairs) = find_similar_function_pairs(
+    let result = find_similar_function_pairs(
         roots,
         min_lines,
         similarity,
@@ -2755,6 +2786,9 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Simila
         include_trait_impls,
         filter,
     );
+    let files_scanned = result.files_scanned;
+    let functions_analyzed = result.functions_analyzed;
+    let pairs = result.pairs;
 
     let fn_allow_key = |file: &str, symbol: &str, start: usize, end: usize| {
         format!("{}:{}:{}-{}", file, symbol, start, end)

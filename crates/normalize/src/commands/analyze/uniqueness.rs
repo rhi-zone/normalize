@@ -1,5 +1,3 @@
-use normalize_languages::support_for_path;
-use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -272,8 +270,9 @@ pub fn analyze_uniqueness(
     let module_dirs = discover_module_dirs(root);
     let roots = vec![root.to_path_buf()];
 
-    // Find similar function pairs
-    let (files_scanned, _functions_analyzed, pairs) = find_similar_function_pairs(
+    // Find similar function pairs — also returns per-file total function counts
+    // so we don't need a redundant file walk + parse.
+    let result = find_similar_function_pairs(
         &roots,
         min_lines,
         similarity,
@@ -283,6 +282,8 @@ pub fn analyze_uniqueness(
         include_trait_impls,
         filter,
     );
+    let files_scanned = result.files_scanned;
+    let pairs = result.pairs;
 
     // Build set of functions that have at least one twin
     // key: (file, start_line, end_line)
@@ -290,7 +291,6 @@ pub fn analyze_uniqueness(
     // Also track cluster membership for cluster summary
     // Use union-find via pair graph
     type FnId = (String, usize, usize); // (file, start_line, end_line)
-    let mut all_clustered_fns: Vec<FnId> = Vec::new();
 
     // Group into clusters via adjacency (simple flood-fill)
     // Build adjacency list
@@ -325,37 +325,13 @@ pub fn analyze_uniqueness(
                 }
             }
         }
-        all_clustered_fns.extend(cluster.iter().cloned());
         clusters.push(cluster);
     }
 
-    // Now count all functions per module via file walk
-    let all_files = crate::path_resolve::all_files(root);
-
-    // (module_key -> (total_fns, lines))
-    // Also track per-file function counts for uniqueness
-    let file_fn_counts: Vec<(String, usize, usize)> = all_files
-        .par_iter()
-        .filter(|f| f.kind == "file")
-        .filter_map(|f| {
-            let abs_path = root.join(&f.path);
-            support_for_path(&abs_path)?;
-            let content = std::fs::read_to_string(&abs_path).ok()?;
-            if content.is_empty() {
-                return None;
-            }
-            let fn_count = count_fns_via_language(&abs_path, &content);
-            if fn_count == 0 {
-                return None;
-            }
-            let lines = content.lines().count();
-            Some((f.path.clone(), fn_count, lines))
-        })
-        .collect();
-
+    // Use per-file function counts from the minhash walk (no redundant file walk)
     // Aggregate per module
     let mut module_totals: BTreeMap<String, (usize, usize)> = BTreeMap::new(); // (total_fns, total_lines)
-    for (path, fn_count, lines) in &file_fn_counts {
+    for (path, fn_count, lines) in &result.file_fn_counts {
         let key = module_key(path, &module_dirs);
         let entry = module_totals.entry(key).or_default();
         entry.0 += fn_count;
@@ -371,7 +347,7 @@ pub fn analyze_uniqueness(
         entry.1 += end.saturating_sub(*start) + 1;
     }
 
-    let total_functions: usize = file_fn_counts.iter().map(|(_, c, _)| c).sum();
+    let total_functions: usize = result.file_fn_counts.iter().map(|(_, c, _)| c).sum();
     let clustered_functions = has_twin.len();
     let unique_functions = total_functions.saturating_sub(clustered_functions);
     let overall_uniqueness_ratio = if total_functions > 0 {
@@ -464,31 +440,4 @@ pub fn analyze_uniqueness(
         modules,
         top_clusters: cluster_summaries,
     }
-}
-
-/// Count functions and methods in a file using the language trait's symbol extraction.
-fn count_fns_via_language(abs_path: &Path, content: &str) -> usize {
-    let support = match support_for_path(abs_path) {
-        Some(s) => s,
-        None => return 0,
-    };
-    let grammar = support.grammar_name();
-    let tree = match crate::parsers::parse_with_grammar(grammar, content) {
-        Some(t) => t,
-        None => return 0,
-    };
-    count_fn_nodes(tree.root_node(), support.function_kinds())
-}
-
-fn count_fn_nodes(node: tree_sitter::Node, fn_kinds: &[&str]) -> usize {
-    let mut count = 0;
-    if fn_kinds.contains(&node.kind()) {
-        count += 1;
-    }
-    for i in 0..node.child_count() {
-        if let Some(child) = node.child(i as u32) {
-            count += count_fn_nodes(child, fn_kinds);
-        }
-    }
-    count
 }

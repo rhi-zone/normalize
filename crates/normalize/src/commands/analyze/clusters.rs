@@ -178,7 +178,7 @@ fn build_clusters_report_multi(
     limit: usize,
     filter: Option<&Filter>,
 ) -> ClustersReport {
-    let (files_scanned, functions_analyzed, pairs) = find_similar_function_pairs(
+    let result = find_similar_function_pairs(
         roots,
         min_lines,
         similarity,
@@ -188,6 +188,9 @@ fn build_clusters_report_multi(
         include_trait_impls,
         filter,
     );
+    let files_scanned = result.files_scanned;
+    let functions_analyzed = result.functions_analyzed;
+    let pairs = result.pairs;
 
     let pairs_analyzed = pairs.len();
 
