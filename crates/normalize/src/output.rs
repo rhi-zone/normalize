@@ -40,6 +40,7 @@ mod tests {
         };
         use crate::commands::analyze::files::FileLengthReport;
         use crate::commands::analyze::hotspots::HotspotsReport;
+        use crate::commands::analyze::impact::ImpactReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
         use crate::commands::analyze::ownership::OwnershipReport;
@@ -97,6 +98,7 @@ mod tests {
         assert_output_formatter::<HistoryStatusReport>();
         assert_output_formatter::<HistoryTreeReport>();
         assert_output_formatter::<HotspotsReport>();
+        assert_output_formatter::<ImpactReport>();
         assert_output_formatter::<ImportCentralityReport>();
         assert_output_formatter::<LengthReport>();
         assert_output_formatter::<ModuleHealthReport>();

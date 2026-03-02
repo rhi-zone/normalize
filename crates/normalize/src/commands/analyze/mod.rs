@@ -20,6 +20,7 @@ pub mod docs;
 pub mod duplicates;
 pub mod files;
 pub mod hotspots;
+pub mod impact;
 pub mod imports;
 pub mod length;
 pub mod module_health;
@@ -291,6 +292,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         Some(AnalyzeCommand::Architecture) => {
             crate::output::print_output_schema::<architecture::ArchitectureReport>();
         }
+        Some(AnalyzeCommand::Impact { .. }) => {
+            crate::output::print_output_schema::<impact::ImpactReport>();
+        }
         Some(AnalyzeCommand::Activity { .. }) => {
             crate::output::print_output_schema::<activity::ActivityReport>();
         }
@@ -483,6 +487,10 @@ pub fn run(
         }
 
         Some(AnalyzeCommand::Architecture) => architecture::cmd_architecture(&effective_root, json),
+
+        Some(AnalyzeCommand::Impact { target }) => {
+            impact::cmd_impact(&effective_root, &target, json)
+        }
 
         Some(AnalyzeCommand::Complexity {
             target,

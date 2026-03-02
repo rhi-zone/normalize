@@ -503,6 +503,12 @@ pub enum AnalyzeCommand {
         limit: usize,
     },
 
+    /// What-if impact analysis: reverse-dependency closure + blast radius (requires facts index)
+    Impact {
+        /// Target file to analyze impact for
+        target: String,
+    },
+
     /// Rank modules by import fan-in (requires facts index)
     Imports {
         /// Maximum number of modules to show (0 = no limit)

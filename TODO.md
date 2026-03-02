@@ -324,7 +324,7 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
 
 **Change impact:**
 
-- [ ] **What-if analysis**: `normalize analyze impact <module>` — if this module changes,
+- [x] **What-if analysis**: `normalize analyze impact <module>` — if this module changes,
   what's affected? Transitive reverse-dependency closure + estimated blast radius.
   Combines import graph with test coverage to show untested impact paths.
 

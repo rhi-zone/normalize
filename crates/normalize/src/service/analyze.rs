@@ -22,6 +22,7 @@ use crate::commands::analyze::duplicates::{
 };
 use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::hotspots::{HotspotsRepoEntry, HotspotsReport};
+use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::module_health::ModuleHealthReport;
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
@@ -101,6 +102,14 @@ impl AnalyzeService {
     }
 
     fn display_architecture(&self, r: &ArchitectureReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_impact(&self, r: &ImpactReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -476,6 +485,34 @@ impl AnalyzeService {
             crate::commands::analyze::architecture::analyze_architecture(&idx)
                 .await
                 .map_err(|e| format!("Architecture analysis failed: {}", e))
+        })
+    }
+
+    /// What-if impact analysis: reverse-dependency closure + blast radius
+    #[cli(display_with = "display_impact")]
+    pub fn impact(
+        &self,
+        #[param(positional, help = "Target file to analyze impact for")] target: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ImpactReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| format!("Failed to create runtime: {}", e))?;
+        rt.block_on(async {
+            let idx = crate::index::open_if_enabled(&root_path)
+                .await
+                .ok_or_else(|| {
+                    "Impact analysis requires the facts index. Run `normalize facts` first."
+                        .to_string()
+                })?;
+            crate::commands::analyze::impact::analyze_impact(&idx, &target)
+                .await
+                .map_err(|e| format!("Impact analysis failed: {}", e))
         })
     }
 

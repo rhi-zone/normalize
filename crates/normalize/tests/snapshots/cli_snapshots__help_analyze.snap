@@ -15,6 +15,7 @@ Commands:
                        Show callers and/or callees of a symbol
   trace                Trace value provenance for a symbol
   architecture         Show architecture analysis (coupling, cycles, hubs)
+  impact               What-if impact analysis: reverse-dependency closure + blast radius
   health               Run health analysis (file counts, complexity stats, large file warnings)
   all                  Run all analysis passes
   security             Run security analysis

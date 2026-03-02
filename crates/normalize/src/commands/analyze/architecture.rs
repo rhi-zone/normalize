@@ -300,13 +300,13 @@ pub fn cmd_architecture(root: &Path, json: bool) -> i32 {
 }
 
 /// Import graph: maps of who imports whom and who is imported by whom.
-struct ImportGraph {
-    imports_by_file: HashMap<String, HashSet<String>>,
-    importers_by_file: HashMap<String, HashSet<String>>,
-    raw_import_count: usize,
+pub(crate) struct ImportGraph {
+    pub(crate) imports_by_file: HashMap<String, HashSet<String>>,
+    pub(crate) importers_by_file: HashMap<String, HashSet<String>>,
+    pub(crate) raw_import_count: usize,
 }
 
-async fn build_import_graph(idx: &FileIndex) -> Result<ImportGraph, libsql::Error> {
+pub(crate) async fn build_import_graph(idx: &FileIndex) -> Result<ImportGraph, libsql::Error> {
     let mut imports_by_file: HashMap<String, HashSet<String>> = HashMap::new();
     let mut importers_by_file: HashMap<String, HashSet<String>> = HashMap::new();
     let mut unresolved = 0usize;
