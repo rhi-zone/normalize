@@ -36,6 +36,7 @@ pub mod rules_cmd;
 mod sarif;
 pub mod security;
 pub mod size;
+pub mod skeleton_diff;
 pub mod stale_docs;
 pub mod summary;
 pub mod surface;

@@ -33,6 +33,7 @@ use crate::commands::analyze::provenance::ProvenanceReport;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::size::SizeReport;
+use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::stale_docs::StaleDocsReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::surface::SurfaceReport;
@@ -398,6 +399,14 @@ impl AnalyzeService {
     }
 
     fn display_imports(&self, r: &ImportCentralityReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_skeleton_diff(&self, r: &SkeletonDiffReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1662,5 +1671,26 @@ impl AnalyzeService {
             true,
             case_insensitive,
         ))
+    }
+
+    /// Show structural changes between a base ref and HEAD
+    #[cli(display_with = "display_skeleton_diff")]
+    pub fn skeleton_diff(
+        &self,
+        #[param(positional, help = "Base ref to diff against (branch, commit, HEAD~N)")]
+        base: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<SkeletonDiffReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::skeleton_diff::analyze_skeleton_diff(
+            &root_path, &base, &exclude, &only,
+        )
     }
 }

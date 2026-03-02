@@ -51,6 +51,7 @@ mod tests {
         use crate::commands::analyze::repo_coupling::RepoCouplingReport;
         use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
         use crate::commands::analyze::size::SizeReport;
+        use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
         use crate::commands::analyze::stale_docs::StaleDocsReport;
         use crate::commands::analyze::summary::SummaryReport;
         use crate::commands::analyze::surface::SurfaceReport;
@@ -122,6 +123,7 @@ mod tests {
         assert_output_formatter::<SessionShowReport>();
         assert_output_formatter::<SimilarBlocksReport>();
         assert_output_formatter::<SimilarFunctionsReport>();
+        assert_output_formatter::<SkeletonDiffReport>();
         assert_output_formatter::<SizeReport>();
         assert_output_formatter::<StaleDocsReport>();
         assert_output_formatter::<SummaryReport>();

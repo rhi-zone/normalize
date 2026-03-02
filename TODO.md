@@ -351,10 +351,8 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
   for someone who has never seen it. Auto-generated from: health grade, budget composition,
   module health, architecture stats, and top concerns. Supports `--compact`, `--pretty`, `--json`.
 
-- [ ] **Skeleton diff**: `normalize diff --skeleton <commit>` — show what structurally
-  changed between commits. Not line-level diffs but: "3 functions added to module X,
-  1 interface changed in Y, test coverage for Z dropped from 40% to 20%." Structural
-  changelog.
+- [x] **Skeleton diff**: `normalize analyze skeleton-diff <base>` — show what structurally
+  changed between commits. Symbol-level diff: added/removed/changed functions, structs, etc.
 
 - [ ] **Pattern catalog**: auto-detect recurring code patterns (not just duplicates but
   design patterns, idioms, anti-patterns). "This codebase uses 4 distinct error-handling
