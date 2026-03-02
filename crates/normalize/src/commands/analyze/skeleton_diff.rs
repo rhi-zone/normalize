@@ -250,6 +250,18 @@ pub fn analyze_skeleton_diff(
     exclude_patterns: &[String],
     only_patterns: &[String],
 ) -> Result<SkeletonDiffReport, String> {
+    // Check that we're in a git repository before attempting git commands
+    if !root.join(".git").exists()
+        && !std::process::Command::new("git")
+            .args(["rev-parse", "--git-dir"])
+            .current_dir(root)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    {
+        return Err("Not a git repository".to_string());
+    }
+
     let base_ref = resolve_base(root, base)?;
     let diff_files = get_diff_files_with_status(root, &base_ref)?;
 

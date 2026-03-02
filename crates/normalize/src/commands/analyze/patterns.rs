@@ -244,8 +244,8 @@ pub fn analyze_patterns(
                     let mut tokens = Vec::new();
                     serialize_structural_tokens(&node, &structural_kinds, &mut tokens);
 
-                    // Skip trivial functions with < 3 structural tokens
-                    if tokens.len() < 3 {
+                    // Skip trivial functions with < 5 structural tokens
+                    if tokens.len() < 5 {
                         continue;
                     }
 

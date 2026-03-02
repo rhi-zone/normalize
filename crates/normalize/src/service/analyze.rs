@@ -738,7 +738,9 @@ impl AnalyzeService {
     #[cli(display_with = "display_doc_coverage")]
     pub fn docs(
         &self,
-        #[param(short = 'l', help = "Number of worst-covered files to show")] limit: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
+            usize,
+        >,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -760,7 +762,9 @@ impl AnalyzeService {
     #[cli(display_with = "display_file_length")]
     pub fn files(
         &self,
-        #[param(short = 'l', help = "Number of files to show")] limit: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
+            usize,
+        >,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -796,7 +800,9 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(short = 'l', help = "Number of high-ceremony files to show")] limit: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
+            usize,
+        >,
     ) -> Result<CeremonyReport, String> {
         let root_path = Self::root_path(root);
         Ok(crate::commands::analyze::ceremony::analyze_ceremony(
@@ -815,7 +821,8 @@ impl AnalyzeService {
         >,
         #[param(help = "Minimum lines for a function to be considered")] min_lines: Option<usize>,
         #[param(help = "Minimum similarity threshold (0.0–1.0)")] similarity: Option<f64>,
-        #[param(short = 'l', help = "Maximum number of clusters to show")] limit: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of clusters to show (0=no limit)")]
+        limit: Option<usize>,
         #[param(help = "Match on control-flow structure only")] skeleton: bool,
         #[param(help = "Include same-name clusters (likely interface implementations)")]
         include_trait_impls: bool,
@@ -906,7 +913,9 @@ impl AnalyzeService {
         #[param(help = "Minimum number of shared commits to report a pair")] min_commits: Option<
             usize,
         >,
-        #[param(short = 'l', help = "Maximum number of pairs to show")] limit: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of pairs to show (0=no limit)")] limit: Option<
+            usize,
+        >,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -956,10 +965,12 @@ impl AnalyzeService {
     #[allow(clippy::too_many_arguments)]
     pub fn coupling_clusters(
         &self,
-        #[param(help = "Minimum shared commits for an edge (default: 3)")] min_commits: Option<
-            usize,
-        >,
-        #[param(short = 'l', help = "Maximum number of clusters to show")] limit: Option<usize>,
+        #[param(
+            help = "Minimum shared commits for an edge (default: auto — 5% of total commits, min 3)"
+        )]
+        min_commits: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of clusters to show (0=no limit)")]
+        limit: Option<usize>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -970,9 +981,25 @@ impl AnalyzeService {
     ) -> Result<CouplingClustersReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
+        let effective_min = min_commits.unwrap_or_else(|| {
+            // Adaptive default: 5% of total commits (min 3, max 50)
+            let total = std::process::Command::new("git")
+                .args(["rev-list", "--count", "HEAD"])
+                .current_dir(&root_path)
+                .output()
+                .ok()
+                .and_then(|o| {
+                    String::from_utf8_lossy(&o.stdout)
+                        .trim()
+                        .parse::<usize>()
+                        .ok()
+                })
+                .unwrap_or(60); // fallback assumes ~60 commits
+            (total / 20).clamp(3, 50)
+        });
         crate::commands::analyze::coupling_clusters::analyze_coupling_clusters(
             &root_path,
-            min_commits.unwrap_or(3),
+            effective_min,
             limit.unwrap_or(20),
             &exclude,
             &only,
@@ -983,7 +1010,9 @@ impl AnalyzeService {
     #[cli(display_with = "display_ownership")]
     pub fn ownership(
         &self,
-        #[param(short = 'l', help = "Maximum number of files to show")] limit: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
+            usize,
+        >,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -1513,7 +1542,7 @@ impl AnalyzeService {
         )
     }
 
-    /// Per-module dependency depth + ripple risk (requires facts index)
+    /// Per-module dependency depth + ripple risk
     #[cli(display_with = "display_depth_map")]
     pub fn depth_map(
         &self,
@@ -1534,7 +1563,7 @@ impl AnalyzeService {
         crate::commands::analyze::depth_map::analyze_depth_map_sync(&root_path, effective_limit)
     }
 
-    /// Per-module public symbol count, public ratio, and constraint score (requires facts index)
+    /// Per-module public symbol count, public ratio, and constraint score
     #[cli(display_with = "display_surface")]
     pub fn surface(
         &self,
@@ -1555,7 +1584,7 @@ impl AnalyzeService {
         crate::commands::analyze::surface::analyze_surface_sync(&root_path, effective_limit)
     }
 
-    /// Per-module import layering compliance — are imports flowing downward? (requires facts index)
+    /// Per-module import layering compliance — are imports flowing downward?
     #[cli(display_with = "display_layering")]
     pub fn layering(
         &self,
@@ -1734,11 +1763,15 @@ impl AnalyzeService {
     #[allow(clippy::too_many_arguments)]
     pub fn patterns(
         &self,
-        #[param(short = 's', help = "Minimum structural similarity (default: 0.5)")]
+        #[param(short = 's', help = "Minimum structural similarity (default: 0.7)")]
         similarity: Option<f64>,
-        #[param(short = 'n', help = "Minimum cluster size to report (default: 3)")]
+        #[param(short = 'm', help = "Minimum cluster size to report (default: 3)")]
         min_members: Option<usize>,
-        #[param(help = "Max patterns to show (default: 20)")] limit: Option<usize>,
+        #[param(
+            short = 'l',
+            help = "Maximum number of patterns to show (0=no limit, default: 20)"
+        )]
+        limit: Option<usize>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -1751,7 +1784,7 @@ impl AnalyzeService {
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::patterns::analyze_patterns(
             &root_path,
-            similarity.unwrap_or(0.5),
+            similarity.unwrap_or(0.7),
             min_members.unwrap_or(3),
             limit.unwrap_or(20),
             &exclude,

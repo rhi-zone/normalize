@@ -497,7 +497,17 @@ pub fn run(
         Err(code) => return code,
     };
 
-    // Dispatch based on subcommand
+    dispatch_command(args, effective_root, &config, json, filter)
+}
+
+/// Dispatch the analyze subcommand to its handler.
+fn dispatch_command(
+    args: AnalyzeArgs,
+    effective_root: PathBuf,
+    config: &NormalizeConfig,
+    json: bool,
+    filter: Option<normalize_filter::Filter>,
+) -> i32 {
     match args.command {
         Some(AnalyzeCommand::Health { target }) => {
             let report = report::analyze(

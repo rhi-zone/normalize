@@ -554,6 +554,27 @@ pub struct HealthScoreBreakdown {
 
 impl HealthReport {
     pub fn score_breakdown(&self) -> HealthScoreBreakdown {
+        // Empty codebase: no data to score — return zero rather than perfect defaults
+        if self.total_files == 0 {
+            return HealthScoreBreakdown {
+                total: 0.0,
+                complexity: 0.0,
+                risk: 0.0,
+                file_size: 0.0,
+                test_coverage: 0.0,
+                ceremony: 0.0,
+                duplicates: 0.0,
+                uniqueness: 0.0,
+                complexity_reason: "no files".to_string(),
+                risk_reason: "no files".to_string(),
+                file_size_reason: "no files".to_string(),
+                test_coverage_reason: "no files".to_string(),
+                ceremony_reason: "no files".to_string(),
+                duplicates_reason: "no files".to_string(),
+                uniqueness_reason: "no files".to_string(),
+            };
+        }
+
         let complexity_score = if self.avg_complexity <= 3.0 {
             1.0
         } else if self.avg_complexity <= 5.0 {

@@ -116,16 +116,16 @@ fn select_snapshots(commits: &[CommitInfo], n: usize) -> Vec<&CommitInfo> {
         return selected;
     }
 
-    let interval = (last_ts - first_ts) as f64 / n as f64;
+    // Place n evenly-spaced targets from first_ts to last_ts (inclusive of both endpoints).
+    let interval = (last_ts - first_ts) as f64 / (n - 1).max(1) as f64;
     let mut selected = Vec::with_capacity(n);
 
     for i in 0..n {
-        let target_ts = first_ts as f64 + interval * (i as f64 + 1.0);
-        // Find the last commit at or before the target timestamp
+        let target_ts = first_ts as f64 + interval * i as f64;
+        // Find the commit closest to the target timestamp
         let best = commits
             .iter()
-            .rev()
-            .find(|c| (c.timestamp as f64) <= target_ts);
+            .min_by_key(|c| ((c.timestamp as f64) - target_ts).abs() as i64);
         if let Some(commit) = best {
             // Avoid duplicates
             if selected
@@ -135,15 +135,6 @@ fn select_snapshots(commits: &[CommitInfo], n: usize) -> Vec<&CommitInfo> {
                 selected.push(commit);
             }
         }
-    }
-
-    // Always include the latest commit
-    if let Some(last) = commits.last()
-        && selected
-            .last()
-            .is_none_or(|prev: &&CommitInfo| prev.hash != last.hash)
-    {
-        selected.push(last);
     }
 
     selected
