@@ -317,14 +317,16 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
 
 **Structural understanding:**
 
-- [ ] **Dependency depth map**: for each module, how deep is it in the import DAG?
+- [x] **Dependency depth map**: for each module, how deep is it in the import DAG?
   Shallow modules are easy to change. Deep modules ripple. `analyze architecture` has
   deep-chains but doesn't surface per-module depth as a sortable metric. Want:
   module-level "blast radius" score = (fan-out × depth × downstream dependents).
+  → Done: `analyze depth-map` — per-module depth, fan-in/out, downstream, ripple score.
 
-- [ ] **Interface surface area**: per-module count of public symbols vs total symbols.
+- [x] **Interface surface area**: per-module count of public symbols vs total symbols.
   High public ratio = wide interface, hard to change safely. Low = well-encapsulated.
   Combine with fan-in: wide interface AND high fan-in = most constrained module.
+  → Done: `analyze surface` — public/private counts, public ratio, fan-in, constraint score.
 
 - [ ] **Abstraction layering**: are imports flowing downward (good) or upward/sideways
   (coupling)? `analyze architecture` has layer-deps but doesn't score the direction.

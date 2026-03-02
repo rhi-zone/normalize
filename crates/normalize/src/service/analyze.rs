@@ -32,6 +32,7 @@ use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::size::SizeReport;
 use crate::commands::analyze::stale_docs::StaleDocsReport;
 use crate::commands::analyze::summary::SummaryReport;
+use crate::commands::analyze::surface::SurfaceReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -295,6 +296,14 @@ impl AnalyzeService {
     }
 
     fn display_depth_map(&self, r: &DepthMapReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_surface(&self, r: &SurfaceReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1449,6 +1458,27 @@ impl AnalyzeService {
             n => n,
         };
         crate::commands::analyze::depth_map::analyze_depth_map_sync(&root_path, effective_limit)
+    }
+
+    /// Per-module public symbol count, public ratio, and constraint score (requires facts index)
+    #[cli(display_with = "display_surface")]
+    pub fn surface(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<SurfaceReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        crate::commands::analyze::surface::analyze_surface_sync(&root_path, effective_limit)
     }
 
     /// Find public functions with no direct test caller

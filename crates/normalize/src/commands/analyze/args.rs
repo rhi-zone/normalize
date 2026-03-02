@@ -516,6 +516,13 @@ pub enum AnalyzeCommand {
         limit: usize,
     },
 
+    /// Per-module public symbol count, public ratio, and constraint score (requires facts index)
+    Surface {
+        /// Maximum number of modules to show (0 = no limit)
+        #[arg(short = 'l', long, default_value = "30")]
+        limit: usize,
+    },
+
     /// Rank modules by import fan-in (requires facts index)
     Imports {
         /// Maximum number of modules to show (0 = no limit)

@@ -35,6 +35,7 @@ pub mod security;
 pub mod size;
 pub mod stale_docs;
 pub mod summary;
+pub mod surface;
 pub mod test_gaps;
 pub mod test_ratio;
 pub mod trace;
@@ -343,6 +344,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::DepthMap { .. }) => {
             crate::output::print_output_schema::<depth_map::DepthMapReport>();
+        }
+        Some(AnalyzeCommand::Surface { .. }) => {
+            crate::output::print_output_schema::<surface::SurfaceReport>();
         }
         Some(AnalyzeCommand::Imports { .. }) => {
             crate::output::print_output_schema::<imports::ImportCentralityReport>();
@@ -939,6 +943,20 @@ pub fn run(
         Some(AnalyzeCommand::DepthMap { limit }) => {
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             match depth_map::analyze_depth_map_sync(&effective_root, effective_limit) {
+                Ok(report) => {
+                    report.print(&format);
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                    1
+                }
+            }
+        }
+
+        Some(AnalyzeCommand::Surface { limit }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            match surface::analyze_surface_sync(&effective_root, effective_limit) {
                 Ok(report) => {
                     report.print(&format);
                     0

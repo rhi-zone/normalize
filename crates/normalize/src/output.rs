@@ -50,6 +50,7 @@ mod tests {
         use crate::commands::analyze::size::SizeReport;
         use crate::commands::analyze::stale_docs::StaleDocsReport;
         use crate::commands::analyze::summary::SummaryReport;
+        use crate::commands::analyze::surface::SurfaceReport;
         use crate::commands::analyze::test_ratio::TestRatioReport;
         use crate::commands::analyze::uniqueness::UniquenessReport;
         use crate::commands::context::{ContextListReport, ContextReport};
@@ -117,6 +118,7 @@ mod tests {
         assert_output_formatter::<SizeReport>();
         assert_output_formatter::<StaleDocsReport>();
         assert_output_formatter::<SummaryReport>();
+        assert_output_formatter::<SurfaceReport>();
         assert_output_formatter::<TestGapsReport>();
         assert_output_formatter::<TestRatioReport>();
         assert_output_formatter::<ViewOutput>();
