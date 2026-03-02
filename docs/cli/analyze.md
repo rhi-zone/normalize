@@ -1,38 +1,111 @@
 # normalize analyze
 
-Analyze codebase quality: health, complexity, security, duplicates, hotspots.
+Analyze codebase quality: health, complexity, security, duplicates, docs.
 
 ## Subcommands
 
+### Health & Scoring
 | Subcommand | Description |
 |------------|-------------|
-| `health` | File counts, complexity stats, large file warnings |
-| `architecture` | Codebase architecture: coupling, cycles, dependencies |
-| `complexity` | Cyclomatic complexity analysis |
+| `health` | File counts, complexity stats, large file warnings (default when no subcommand) |
+| `module-health` | Score each module across test ratio, uniqueness, and density |
+| `cross-repo-health` | Rank repos by tech debt (churn + complexity + coupling) |
+| `summary` | Auto-generated single-page codebase overview |
+| `trend` | Track health metrics over git history at regular intervals |
+| `all` | Run all analysis passes with overall grade |
+
+### Complexity
+| Subcommand | Description |
+|------------|-------------|
+| `complexity` | Cyclomatic complexity per function |
+| `call-complexity` | Effective (reachable) cyclomatic complexity via call-graph BFS |
 | `length` | Function length analysis |
-| `security` | Security vulnerability patterns |
-| `docs` | Documentation coverage |
-| `files` | Longest files in codebase |
-| `hotspots` | Git history hotspots (frequently changed files) |
-| `duplicate-functions` | Detect code clones |
+
+### Duplicates & Similarity
+| Subcommand | Description |
+|------------|-------------|
+| `duplicate-functions` | Detect code clones (exact hash) |
+| `duplicate-blocks` | Detect duplicate code blocks |
 | `duplicate-types` | Detect similar type definitions |
-| `test-gaps` | Find public functions with no direct test caller |
-| `trace` | Trace value provenance for a symbol |
+| `similar-functions` | Detect similar functions via MinHash LSH |
+| `similar-blocks` | Detect similar code blocks via MinHash LSH |
+| `clusters` | Group similar functions into structural clusters |
+| `patterns` | Auto-detect recurring structural code patterns |
+
+### Coverage & Testing
+| Subcommand | Description |
+|------------|-------------|
+| `coverage` | Test coverage: ratio (default), `--gaps` for untested functions, `--budget` for line breakdown |
+
+### Information Density
+| Subcommand | Description |
+|------------|-------------|
+| `density` | Compression ratio + token uniqueness per module |
+| `uniqueness` | Fraction of functions with no structural near-twin per module |
+| `ceremony` | Ceremony ratio: fraction of callables that are trait/interface boilerplate |
+
+### Churn & Coupling
+| Subcommand | Description |
+|------------|-------------|
+| `churn` | Temporal churn: coupling pairs (default), `--cluster` for change-clusters, `--hotspots` for churn × complexity |
+| `ownership` | Per-file ownership concentration from git blame |
+
+### Dependencies & Structure
+| Subcommand | Description |
+|------------|-------------|
+| `imports` | Rank modules by import fan-in (requires facts index) |
+| `depth-map` | Per-module dependency depth + ripple risk |
+| `surface` | Per-module public symbol count, public ratio, and constraint score |
+| `layering` | Per-module import layering compliance |
+| `architecture` | Codebase architecture: coupling, cycles, dependencies |
+| `call-graph` | Show callers and/or callees of a symbol |
 | `callers` | Show what calls a symbol |
 | `callees` | Show what a symbol calls |
+| `trace` | Trace value provenance for a symbol |
+| `impact` | What-if impact analysis: reverse-dependency closure + blast radius |
+
+### Documentation
+| Subcommand | Description |
+|------------|-------------|
+| `docs` | Documentation coverage |
 | `check-refs` | Check documentation for broken links |
 | `stale-docs` | Find docs with stale code references |
 | `check-examples` | Check example references in docs |
+
+### Cross-cutting
+| Subcommand | Description |
+|------------|-------------|
+| `security` | Security vulnerability patterns |
+| `files` | Longest files in codebase |
+| `size` | Hierarchical LOC breakdown (ncdu-style) |
+| `skeleton-diff` | Structural changes between a base ref and HEAD |
+| `provenance` | Git blame → session mapping + code relations |
+| `activity` | Cross-repo activity over time |
+| `contributors` | Analyze contributors across repos |
+| `repo-coupling` | Analyze cross-repo coupling |
+
+### Rule Engine
+| Subcommand | Description |
+|------------|-------------|
 | `rules` | Run syntax rules from .normalize/rules/*.scm |
 | `ast` | Show AST for a file (for authoring rules) |
 | `query` | Test a tree-sitter query against a file |
-| `all` | Run all analysis passes with overall grade |
 
 ## Examples
 
 ```bash
 # Quick health check
 normalize analyze
+
+# Test coverage — three views
+normalize analyze coverage                    # test/impl ratio per module
+normalize analyze coverage --gaps             # untested public functions
+normalize analyze coverage --budget           # line budget breakdown
+
+# Churn analysis — three views
+normalize analyze churn                       # temporal coupling pairs
+normalize analyze churn --cluster             # change-clusters
+normalize analyze churn --hotspots            # churn × complexity hotspots
 
 # Architecture analysis
 normalize analyze architecture
@@ -45,9 +118,6 @@ normalize analyze security
 
 # Find code duplicates
 normalize analyze duplicate-functions
-
-# Git hotspots (frequently changed files)
-normalize analyze hotspots
 
 # Trace a symbol's data flow
 normalize analyze trace parse_config
@@ -68,12 +138,16 @@ normalize analyze rules --sarif      # SARIF output for IDEs
 ### Global
 - `-r, --root <PATH>` - Root directory
 - `--json` - Output as JSON
+- `--jsonl` - Output one JSON object per line
 - `--jq <EXPR>` - Filter JSON with jq
 - `--pretty` - Human-friendly output
 - `--compact` - Compact output without colors
 - `--exclude <PATTERN>` - Exclude paths
 - `--only <PATTERN>` - Include only paths
 - `--diff [<BASE>]` - Analyze only files changed since base ref (default: origin's default branch)
+- `--input-schema` - Print JSON Schema of input parameters
+- `--output-schema` - Print JSON Schema of return type
+- `--params-json <JSON>` - Provide all parameters as a JSON object
 
 ### Subcommand-specific
 
@@ -81,7 +155,19 @@ normalize analyze rules --sarif      # SARIF output for IDEs
 - `-t, --threshold <N>` - Only show functions above threshold
 - `--kind <TYPE>` - Filter by: function, method
 
-**files / hotspots:**
+**coverage:**
+- `--gaps` - Show untested public functions
+- `--budget` - Show line budget breakdown by purpose
+- `--all` - Show all functions including tested (gaps view)
+- `--min-risk <N>` - Risk threshold (gaps view)
+
+**churn:**
+- `--cluster` - Show change-clusters (connected components)
+- `--hotspots` - Show churn × complexity hotspots
+- `--recency` - Weight recent changes higher (hotspots view)
+- `--min-commits <N>` - Minimum shared commits for coupling
+
+**files:**
 - `--allow <PATTERN>` - Add pattern to allow file
 - `--reason <TEXT>` - Reason for allowing (with --allow)
 - `-n, --limit <N>` - Number of results to show
@@ -113,14 +199,14 @@ Patterns can be excluded via `.normalize/` allow files:
 | File | Purpose |
 |------|---------|
 | `.normalize/large-files-allow` | Exclude from `analyze files` |
-| `.normalize/hotspots-allow` | Exclude from `analyze hotspots` |
+| `.normalize/hotspots-allow` | Exclude from `analyze churn --hotspots` |
 | `.normalize/duplicate-functions-allow` | Exclude from duplicate detection |
 | `.normalize/duplicate-types-allow` | Exclude type pairs |
+| `.normalize/test-gaps-allow` | Exclude from `analyze coverage --gaps` |
 
 Add via CLI:
 ```bash
 normalize analyze files --allow "**/generated/*.rs" --reason "generated code"
-normalize analyze hotspots --allow "CHANGELOG.md" --reason "expected to change often"
 ```
 
 ## Config
@@ -143,24 +229,4 @@ health = 1.0
 complexity = 0.5
 security = 2.0
 duplicate_functions = 0.3
-```
-
-## Module Structure
-
-```
-analyze/
-├── mod.rs        # Main dispatch, config
-├── args.rs       # CLI argument definitions
-├── report.rs     # Report formatting, grading
-├── health.rs     # Health analysis
-├── complexity.rs # Complexity metrics
-├── security.rs   # Security patterns
-├── files.rs      # File length analysis
-├── hotspots.rs   # Git hotspots
-├── duplicates.rs # Code clone detection
-├── trace.rs      # Value provenance tracing
-├── call_graph.rs # Caller/callee analysis
-├── docs.rs       # Documentation coverage
-├── lint.rs       # Linter integration
-└── ...
 ```
