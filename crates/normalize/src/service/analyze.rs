@@ -13,6 +13,8 @@ use crate::commands::analyze::clusters::ClustersReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
 use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
+use crate::commands::analyze::coupling_views::CouplingOutput;
+use crate::commands::analyze::coverage::CoverageOutput;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::density::DensityReport;
 use crate::commands::analyze::depth_map::DepthMapReport;
@@ -425,6 +427,22 @@ impl AnalyzeService {
     }
 
     fn display_patterns(&self, r: &PatternsReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_coverage(&self, r: &CoverageOutput) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_coupling_output(&self, r: &CouplingOutput) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1006,6 +1024,81 @@ impl AnalyzeService {
         )
     }
 
+    /// Temporal churn analysis: coupling pairs, change-clusters, or hotspots
+    ///
+    /// Default: coupling pairs (files that change together).
+    /// Use --cluster for change-clusters (connected components).
+    /// Use --hotspots for churn × complexity hotspots.
+    #[cli(display_with = "display_coupling_output")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn churn(
+        &self,
+        #[param(help = "Show change-clusters (connected components)")] cluster: bool,
+        #[param(help = "Show churn × complexity hotspots")] hotspots: bool,
+        #[param(help = "Minimum shared commits for coupling/cluster edges")] min_commits: Option<
+            usize,
+        >,
+        #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Weight recent changes higher (hotspots view)")] recency: bool,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<CouplingOutput, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        if hotspots {
+            let config = crate::config::NormalizeConfig::load(&root_path);
+            let mut excludes = config.analyze.hotspots_exclude.clone();
+            excludes.extend(crate::commands::analyze::load_allow_file(
+                &root_path,
+                "hotspots-allow",
+            ));
+            Ok(CouplingOutput::Hotspots(
+                crate::commands::analyze::hotspots::analyze_hotspots(
+                    &root_path, &excludes, recency,
+                )?,
+            ))
+        } else if cluster {
+            let effective_min = min_commits.unwrap_or_else(|| {
+                let total = std::process::Command::new("git")
+                    .args(["rev-list", "--count", "HEAD"])
+                    .current_dir(&root_path)
+                    .output()
+                    .ok()
+                    .and_then(|o| {
+                        String::from_utf8_lossy(&o.stdout)
+                            .trim()
+                            .parse::<usize>()
+                            .ok()
+                    })
+                    .unwrap_or(60);
+                (total / 20).clamp(3, 50)
+            });
+            Ok(CouplingOutput::Clusters(
+                crate::commands::analyze::coupling_clusters::analyze_coupling_clusters(
+                    &root_path,
+                    effective_min,
+                    limit.unwrap_or(20),
+                    &exclude,
+                    &only,
+                )?,
+            ))
+        } else {
+            let min = min_commits.unwrap_or(3);
+            let lim = limit.unwrap_or(20);
+            Ok(CouplingOutput::Pairs(
+                crate::commands::analyze::coupling::analyze_coupling(
+                    &root_path, min, lim, &exclude,
+                )?,
+            ))
+        }
+    }
+
     /// Show per-file ownership concentration from git blame
     #[cli(display_with = "display_ownership")]
     pub fn ownership(
@@ -1334,6 +1427,76 @@ impl AnalyzeService {
             &root_path,
             effective_limit,
         ))
+    }
+
+    /// Test coverage analysis: ratio, gaps, or budget view
+    ///
+    /// Default: test-ratio (test/impl line ratio per module).
+    /// Use --gaps to find untested public functions.
+    /// Use --budget for line budget breakdown by purpose.
+    #[cli(display_with = "display_coverage")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn coverage(
+        &self,
+        #[param(positional, help = "Target file or directory (for gaps view)")] target: Option<
+            String,
+        >,
+        #[param(help = "Show untested public functions")] gaps: bool,
+        #[param(help = "Show line budget breakdown by purpose")] budget: bool,
+        #[param(help = "Show all functions including tested (gaps view)")] all: bool,
+        #[param(help = "Only show functions above this risk threshold (gaps view)")]
+        min_risk: Option<f64>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<CoverageOutput, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        if gaps {
+            let filter = Self::build_filter(&root_path, &exclude, &only);
+            let allowlist =
+                crate::commands::analyze::load_allow_file(&root_path, "test-gaps-allow");
+            let effective_limit = match limit.unwrap_or(20) {
+                0 => usize::MAX,
+                n => n,
+            };
+            Ok(CoverageOutput::Gaps(
+                crate::commands::analyze::test_gaps::analyze_test_gaps(
+                    &root_path,
+                    target.as_deref(),
+                    all,
+                    min_risk,
+                    effective_limit,
+                    filter.as_ref(),
+                    &allowlist,
+                ),
+            ))
+        } else if budget {
+            let effective_limit = match limit.unwrap_or(30) {
+                0 => usize::MAX,
+                n => n,
+            };
+            Ok(CoverageOutput::Budget(
+                crate::commands::analyze::budget::analyze_budget(&root_path, effective_limit),
+            ))
+        } else {
+            let effective_limit = match limit.unwrap_or(30) {
+                0 => usize::MAX,
+                n => n,
+            };
+            Ok(CoverageOutput::Ratio(
+                crate::commands::analyze::test_ratio::analyze_test_ratio(
+                    &root_path,
+                    effective_limit,
+                ),
+            ))
+        }
     }
 
     /// Show test/impl line ratio per module (sorted by least-tested first)

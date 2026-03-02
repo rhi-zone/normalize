@@ -32,6 +32,8 @@ mod tests {
         use crate::commands::analyze::contributors::ContributorsReport;
         use crate::commands::analyze::coupling::CouplingReport;
         use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
+        use crate::commands::analyze::coupling_views::CouplingOutput;
+        use crate::commands::analyze::coverage::CoverageOutput;
         use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
         use crate::commands::analyze::density::DensityReport;
         use crate::commands::analyze::depth_map::DepthMapReport;
@@ -93,6 +95,8 @@ mod tests {
         assert_output_formatter::<ContextListReport>();
         assert_output_formatter::<ContextReport>();
         assert_output_formatter::<CouplingClustersReport>();
+        assert_output_formatter::<CouplingOutput>();
+        assert_output_formatter::<CoverageOutput>();
         assert_output_formatter::<CouplingReport>();
         assert_output_formatter::<CrossRepoHealthReport>();
         assert_output_formatter::<DocCoverageReport>();

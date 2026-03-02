@@ -371,10 +371,10 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 49 flat subcommands → composable families. Each command is a point in metric × scope × time × shape space. Users shouldn't memorize 49 names.
 
 **Phase 2 — Merge obvious families:**
-- [ ] **2a. `health`**: absorb `module-health` (`--by-module`) and `cross-repo-health` (`--cross-repo`)
-- [ ] **2b. `coverage`**: absorb `test-gaps` (`--gaps`) and `budget` (`--budget`). Default = test-ratio.
-- [ ] **2c. `density`**: absorb `uniqueness` (`--uniqueness`) and `ceremony` (`--ceremony`)
-- [ ] **2d. `coupling`**: absorb `coupling-clusters` (`--cluster`) and `hotspots` (`--hotspots`)
+- [x] **2b. `coverage`**: absorb `test-gaps` (`--gaps`) and `budget` (`--budget`). Default = test-ratio.
+- [x] **2d. `churn`**: absorb `coupling-clusters` (`--cluster`) and `hotspots` (`--hotspots`). Default = coupling pairs.
+- [ ] **2a. `health`**: needs design — `health` is default command, param signatures diverge
+- [ ] **2c. `density`**: needs design — `uniqueness` has 8 extra params
 
 **Phase 3 — Further consolidation (needs design):**
 - [ ] `duplicates`: collapse 7 commands (duplicate-functions/blocks/types, similar-functions/blocks, clusters, patterns)

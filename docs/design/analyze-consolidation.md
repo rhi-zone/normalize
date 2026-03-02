@@ -184,3 +184,39 @@ The key constraint is that server-less `#[cli]` methods must return a single typ
 | After Phase 3 (est.) | ~25 | ~-16 more |
 
 The goal isn't minimizing count for its own sake — it's making the mental model learnable. 25 commands with clear families is better than 49 flat names where `module-health` and `health` feel unrelated.
+
+## Implementation Progress
+
+### Done
+
+**`coverage`** — unifies `test-ratio`, `test-gaps`, `budget`:
+- `normalize analyze coverage` → test-ratio (default)
+- `normalize analyze coverage --gaps` → test-gaps
+- `normalize analyze coverage --budget` → budget
+- Enum: `CoverageOutput` in `commands/analyze/coverage.rs`
+- Old commands remain for backward compatibility
+
+**`churn`** — unifies `coupling`, `coupling-clusters`, `hotspots`:
+- `normalize analyze churn` → coupling pairs (default)
+- `normalize analyze churn --cluster` → coupling-clusters
+- `normalize analyze churn --hotspots` → hotspots
+- Enum: `CouplingOutput` in `commands/analyze/coupling_views.rs`
+- Old commands remain for backward compatibility
+
+### Deferred
+
+**`health`**: Existing `health` is the default command (`#[cli(default)]`), changing its return type is too disruptive. `module-health` and `cross-repo-health` have very different param signatures (target vs limit+min_lines vs repos_dir). Needs server-less alias support or a design rethink.
+
+**`density`**: `uniqueness` has 8 extra params (similarity, min_lines, skeleton, include_trait_impls, clusters, exclude, only) that make a unified method unwieldy. Needs a way to scope params to specific views.
+
+### Pattern Learned
+
+Enum wrapper (`CoverageOutput`, `CouplingOutput`) + `OutputFormatter` delegation works well when:
+- Views share most parameters (root, limit, exclude, only)
+- View-specific params are few and can be `Option`
+- No `#[cli(default)]` collision
+
+It doesn't work well when:
+- Parameter signatures diverge significantly (health family)
+- One view has 5+ unique params (density/uniqueness)
+- The parent command is already the CLI default

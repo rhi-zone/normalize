@@ -28,6 +28,11 @@ Commands:
   hotspots             Show git history hotspots (frequently changed files)
   coupling             Find files that frequently change together (temporal coupling)
   coupling-clusters    Group files into change-clusters based on temporal coupling
+  churn                Temporal churn analysis: coupling pairs, change-clusters, or hotspots
+                       
+                       Default: coupling pairs (files that change together).
+                       Use --cluster for change-clusters (connected components).
+                       Use --hotspots for churn × complexity hotspots.
   ownership            Show per-file ownership concentration from git blame
   contributors         Analyze contributors across repos
   activity             Analyze cross-repo activity over time
@@ -40,6 +45,11 @@ Commands:
   similar-blocks       Detect similar code blocks via MinHash LSH
   duplicate-types      Detect duplicate type definitions
   budget               Show line budget breakdown by purpose (logic, test, docs, config, generated, vendored)
+  coverage             Test coverage analysis: ratio, gaps, or budget view
+                       
+                       Default: test-ratio (test/impl line ratio per module).
+                       Use --gaps to find untested public functions.
+                       Use --budget for line budget breakdown by purpose.
   test-ratio           Show test/impl line ratio per module (sorted by least-tested first)
   density              Measure information density (compression ratio + token uniqueness) per module
   uniqueness           Measure what fraction of functions have no structural near-twin per module

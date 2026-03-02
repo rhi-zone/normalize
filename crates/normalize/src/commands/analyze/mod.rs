@@ -15,6 +15,8 @@ pub mod complexity;
 pub mod contributors;
 pub mod coupling;
 pub mod coupling_clusters;
+pub mod coupling_views;
+pub mod coverage;
 pub mod cross_repo_health;
 pub mod density;
 pub mod depth_map;
