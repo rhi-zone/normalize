@@ -14,6 +14,7 @@ use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::{CouplingRepoEntry, CouplingReport};
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::density::DensityReport;
+use crate::commands::analyze::depth_map::DepthMapReport;
 use crate::commands::analyze::docs::DocCoverageReport;
 use crate::commands::analyze::duplicates::{
     DuplicateBlocksConfig, DuplicateBlocksReport, DuplicateFunctionsConfig,
@@ -286,6 +287,14 @@ impl AnalyzeService {
     }
 
     fn display_test_gaps(&self, r: &crate::analyze::test_gaps::TestGapsReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_depth_map(&self, r: &DepthMapReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1419,6 +1428,27 @@ impl AnalyzeService {
             effective_limit,
             internal,
         )
+    }
+
+    /// Per-module dependency depth + ripple risk (requires facts index)
+    #[cli(display_with = "display_depth_map")]
+    pub fn depth_map(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DepthMapReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        crate::commands::analyze::depth_map::analyze_depth_map_sync(&root_path, effective_limit)
     }
 
     /// Find public functions with no direct test caller

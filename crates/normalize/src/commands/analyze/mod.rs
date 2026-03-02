@@ -16,6 +16,7 @@ pub mod contributors;
 pub mod coupling;
 pub mod cross_repo_health;
 pub mod density;
+pub mod depth_map;
 pub mod docs;
 pub mod duplicates;
 pub mod files;
@@ -339,6 +340,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         Some(AnalyzeCommand::TestRatio { .. }) => {
             crate::output::print_output_schema::<test_ratio::TestRatioReport>();
+        }
+        Some(AnalyzeCommand::DepthMap { .. }) => {
+            crate::output::print_output_schema::<depth_map::DepthMapReport>();
         }
         Some(AnalyzeCommand::Imports { .. }) => {
             crate::output::print_output_schema::<imports::ImportCentralityReport>();
@@ -930,6 +934,20 @@ pub fn run(
             let report = test_ratio::analyze_test_ratio(&effective_root, effective_limit);
             report.print(&format);
             0
+        }
+
+        Some(AnalyzeCommand::DepthMap { limit }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            match depth_map::analyze_depth_map_sync(&effective_root, effective_limit) {
+                Ok(report) => {
+                    report.print(&format);
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                    1
+                }
+            }
         }
 
         Some(AnalyzeCommand::Imports { limit, internal }) => {

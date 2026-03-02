@@ -47,6 +47,7 @@ Commands:
   module-health        Score each module across test ratio, uniqueness, and density (worst first)
   summary              Auto-generated single-page codebase overview
   imports              Rank modules by import fan-in (requires facts index)
+  depth-map            Per-module dependency depth + ripple risk (requires facts index)
   test-gaps            Find public functions with no direct test caller
   callers              Show callers of a symbol
   callees              Show what functions a symbol calls

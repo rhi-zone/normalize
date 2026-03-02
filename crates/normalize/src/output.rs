@@ -33,6 +33,7 @@ mod tests {
         use crate::commands::analyze::coupling::CouplingReport;
         use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
         use crate::commands::analyze::density::DensityReport;
+        use crate::commands::analyze::depth_map::DepthMapReport;
         use crate::commands::analyze::docs::DocCoverageReport;
         use crate::commands::analyze::duplicates::{
             DuplicateBlocksReport, DuplicateFunctionsReport, DuplicateTypesReport,
@@ -69,6 +70,7 @@ mod tests {
         assert_output_formatter::<ActivityReport>();
         assert_output_formatter::<CallComplexityReport>();
         assert_output_formatter::<DensityReport>();
+        assert_output_formatter::<DepthMapReport>();
         assert_output_formatter::<UniquenessReport>();
         assert_output_formatter::<AnalyzeReport>();
         assert_output_formatter::<AliasesReport>();
