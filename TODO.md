@@ -17,15 +17,24 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-### Feature-gate CLI behind `cli` feature
+### Feature-gate CLI behind `cli` feature (workspace-wide)
 
-Library consumers shouldn't have to pull in clap, server-less, or the service layer. The `normalize` crate exposes analysis functions, session parsing, etc. — none of that requires CLI machinery.
+Every crate should be usable both as a library and as a standalone CLI tool. Library consumers shouldn't pull in clap; CLI users get a binary. This is a workspace-wide convention, not a one-off.
 
-Gate behind `features = ["cli"]` (default for binary, opt-out for lib consumers):
-- `service/` module + `#[cli(...)]` annotations → `cfg(feature = "cli")`
-- `clap` dependency → optional, enabled by `cli`
-- `server-less` dependency → optional, enabled by `cli`
+**Pattern for every crate:**
+- Default: pure library (no clap, no CLI deps)
+- `features = ["cli"]`: adds clap, binary target, CLI entry point
 - Binary target → `required-features = ["cli"]`
+
+**Top-level `normalize` crate additionally:**
+- `service/` module + `#[cli(...)]` annotations → `cfg(feature = "cli")`
+- `server-less` dependency → optional, enabled by `cli`
+
+**Sub-crates that should get standalone CLIs:**
+- `normalize-facts` — `normalize-facts index`, `normalize-facts check`
+- `normalize-filter` — pipe-friendly filtering tool
+- `normalize-syntax-rules` — standalone rule runner
+- Others as needed — each crate's CLI exposes its core functionality directly
 
 ### Type relationship extraction (facts index) — HIGH PRIORITY
 
