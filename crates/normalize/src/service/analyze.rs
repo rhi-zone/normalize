@@ -1536,50 +1536,6 @@ impl AnalyzeService {
         ))
     }
 
-    /// Show callers of a symbol
-    #[cli(display_with = "display_call_graph")]
-    pub fn callers(
-        &self,
-        #[param(positional, help = "Symbol to find callers for")] symbol: String,
-        #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<Vec<CallEntry>, String> {
-        let root_path = Self::root_path(root);
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| format!("Failed to create runtime: {}", e))?;
-        rt.block_on(crate::commands::analyze::call_graph::build_call_graph(
-            &root_path,
-            &symbol,
-            true,
-            false,
-            case_insensitive,
-        ))
-    }
-
-    /// Show what functions a symbol calls
-    #[cli(display_with = "display_call_graph")]
-    pub fn callees(
-        &self,
-        #[param(positional, help = "Symbol to find callees for")] symbol: String,
-        #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<Vec<CallEntry>, String> {
-        let root_path = Self::root_path(root);
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| format!("Failed to create runtime: {}", e))?;
-        rt.block_on(crate::commands::analyze::call_graph::build_call_graph(
-            &root_path,
-            &symbol,
-            false,
-            true,
-            case_insensitive,
-        ))
-    }
-
     /// Show structural changes between a base ref and HEAD
     #[cli(display_with = "display_skeleton_diff")]
     pub fn skeleton_diff(

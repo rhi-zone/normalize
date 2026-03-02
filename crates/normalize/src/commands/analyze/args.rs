@@ -151,28 +151,6 @@ pub enum AnalyzeCommand {
         case_insensitive: bool,
     },
 
-    /// Show what functions call a symbol
-    Callers {
-        /// Symbol to find callers for
-        symbol: String,
-
-        /// Case-insensitive symbol matching
-        #[arg(short = 'i', long)]
-        #[serde(default)]
-        case_insensitive: bool,
-    },
-
-    /// Show what functions a symbol calls
-    Callees {
-        /// Symbol to find callees for
-        symbol: String,
-
-        /// Case-insensitive symbol matching
-        #[arg(short = 'i', long)]
-        #[serde(default)]
-        case_insensitive: bool,
-    },
-
     /// Show per-file ownership concentration from git blame
     Ownership {
         /// Maximum number of files to show

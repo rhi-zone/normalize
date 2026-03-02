@@ -58,9 +58,7 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 | `surface` | Per-module public symbol count, public ratio, and constraint score |
 | `layering` | Per-module import layering compliance |
 | `architecture` | Codebase architecture: coupling, cycles, dependencies |
-| `call-graph` | Show callers and/or callees of a symbol |
-| `callers` | Show what calls a symbol |
-| `callees` | Show what a symbol calls |
+| `call-graph` | Show callers and/or callees of a symbol (`--callers`, `--callees`) |
 | `trace` | Trace value provenance for a symbol |
 | `impact` | What-if impact analysis: reverse-dependency closure + blast radius |
 
@@ -123,8 +121,8 @@ normalize analyze duplicate-functions
 normalize analyze trace parse_config
 
 # Call graph
-normalize analyze callers handle_request
-normalize analyze callees main
+normalize analyze call-graph handle_request --callers
+normalize analyze call-graph handle_request --callees
 
 # Syntax rules
 normalize analyze rules              # Run all rules

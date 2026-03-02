@@ -363,8 +363,6 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         }
         // These don't have structured output
         Some(AnalyzeCommand::Trace { .. })
-        | Some(AnalyzeCommand::Callers { .. })
-        | Some(AnalyzeCommand::Callees { .. })
         | Some(AnalyzeCommand::Ast { .. })
         | Some(AnalyzeCommand::Query { .. })
         | Some(AnalyzeCommand::Rules { .. }) => {
@@ -675,16 +673,6 @@ fn dispatch_command(
             recursive,
             case_insensitive,
         ),
-
-        Some(AnalyzeCommand::Callers {
-            symbol,
-            case_insensitive,
-        }) => call_graph::cmd_call_graph(&effective_root, &symbol, true, false, case_insensitive),
-
-        Some(AnalyzeCommand::Callees {
-            symbol,
-            case_insensitive,
-        }) => call_graph::cmd_call_graph(&effective_root, &symbol, false, true, case_insensitive),
 
         Some(AnalyzeCommand::Ownership { limit }) => {
             ownership::cmd_ownership(&effective_root, limit, &args.exclude)

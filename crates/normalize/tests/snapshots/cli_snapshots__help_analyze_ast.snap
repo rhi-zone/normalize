@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 347
 expression: "snapshot_help(&[\"analyze\", \"ast\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -57,8 +56,6 @@ Commands:
   surface              Per-module public symbol count, public ratio, and constraint score
   layering             Per-module import layering compliance — are imports flowing downward?
   provenance           Provenance graph: git blame → session mapping + code relations
-  callers              Show callers of a symbol
-  callees              Show what functions a symbol calls
   skeleton-diff        Show structural changes between a base ref and HEAD
   trend                Track health metrics over git history at regular intervals
   patterns             Auto-detect recurring structural code patterns

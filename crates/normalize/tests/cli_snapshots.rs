@@ -268,16 +268,6 @@ fn test_help_analyze_trace() {
 }
 
 #[test]
-fn test_help_analyze_callers() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "callers"]));
-}
-
-#[test]
-fn test_help_analyze_callees() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "callees"]));
-}
-
-#[test]
 fn test_help_analyze_ownership() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "ownership"]));
 }
