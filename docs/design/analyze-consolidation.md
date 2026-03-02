@@ -115,39 +115,28 @@ Full mapping of all 49 commands to their axis coordinates:
 
 Add `--trend` and `--diff <ref>` as universal modifiers on any scoring command. This is highest leverage but requires the most infrastructure (any command that returns a score needs to be runnable at arbitrary commits). Deferred until Phase 2 proves the family model works.
 
-### Phase 2 — Merge obvious families (current focus)
+### Phase 2 — Merge families with compatible parameters
 
-Group commands that share implementation machinery under a single parent command with view flags. Old names become aliases (backward compat).
+Merge commands that share most parameters into a single command with view flags. Delete old names (no aliases — we're at v0.1.0).
 
-**2a. `health` family:**
-```
-normalize analyze health                     # was: health (default)
-normalize analyze health --by-module         # was: module-health
-normalize analyze health --cross-repo DIR    # was: cross-repo-health
-```
-Shared machinery: `HealthReport`, `score_breakdown()`, grade ladder.
+**Only merge when parameter signatures are compatible.** If one view has 5+ unique params, or params are semantically different (target path vs repos directory), they're different commands.
 
-**2b. `coverage` family:**
+**2a. ~~`health` family~~** — NOT MERGING. `health`, `module-health`, `cross-repo-health` have divergent params (target vs limit+min_lines vs repos_dir). Keep separate.
+
+**2b. `coverage` family** (done):
 ```
 normalize analyze coverage                   # was: test-ratio (default)
 normalize analyze coverage --gaps            # was: test-gaps
 normalize analyze coverage --budget          # was: budget
 ```
-All three measure test/coverage at module level.
 
-**2c. `density` family:**
-```
-normalize analyze density                    # was: density (default)
-normalize analyze density --uniqueness       # was: uniqueness
-normalize analyze density --ceremony         # was: ceremony
-```
-All three are per-module information quality metrics.
+**2c. ~~`density` family~~** — NOT MERGING. `uniqueness` has 8 unique params. Keep `density`, `uniqueness`, `ceremony` separate.
 
-**2d. `coupling` family:**
+**2d. `churn` family** (done):
 ```
-normalize analyze coupling                   # was: coupling (default)
-normalize analyze coupling --cluster         # was: coupling-clusters
-normalize analyze coupling --hotspots        # was: hotspots
+normalize analyze churn                      # was: coupling (default)
+normalize analyze churn --cluster            # was: coupling-clusters
+normalize analyze churn --hotspots           # was: hotspots
 ```
 All three are temporal co-change analyses from git history.
 
@@ -165,25 +154,23 @@ Candidates that need more design work:
 
 ## Implementation Strategy
 
-Each Phase 2 merge follows this pattern:
+Each merge follows this pattern:
 
-1. Add a `view` or mode parameter to the parent command's service method
-2. Dispatch to the appropriate analysis function based on the view
-3. Return the existing report type (no report struct changes needed — each view returns its own type)
-4. The old command names remain as aliases (server-less `#[cli(alias = "...")]`)
+1. Add view flag(s) to the parent command's service method
+2. Dispatch to the appropriate analysis function based on the flag
+3. Return an enum wrapper type (e.g. `CoverageOutput`) with `OutputFormatter` delegation
+4. **Delete the old commands** — no aliases, no backward compat at v0.1.0
 5. Update snapshot tests
-
-The key constraint is that server-less `#[cli]` methods must return a single type. For families where each view returns a different report type, we'll need an enum wrapper. This is the same pattern used by `ViewResult` in the view service.
 
 ## Command Count
 
 | Phase | Commands | Reduction |
 |-------|----------|-----------|
 | Current | 49 | — |
-| After Phase 2 | 41 | -8 (4 families absorb 12 commands, net -8) |
-| After Phase 3 (est.) | ~25 | ~-16 more |
+| After Phase 2 (coverage + churn merged, old deleted) | 43 | -6 |
+| After Phase 3 (est.) | ~30 | ~-13 more |
 
-The goal isn't minimizing count for its own sake — it's making the mental model learnable. 25 commands with clear families is better than 49 flat names where `module-health` and `health` feel unrelated.
+The goal isn't minimizing count for its own sake — it's making the mental model learnable. Fewer commands with clear names is better than 49 flat names, but don't force merges where parameter signatures diverge.
 
 ## Implementation Progress
 
@@ -194,29 +181,27 @@ The goal isn't minimizing count for its own sake — it's making the mental mode
 - `normalize analyze coverage --gaps` → test-gaps
 - `normalize analyze coverage --budget` → budget
 - Enum: `CoverageOutput` in `commands/analyze/coverage.rs`
-- Old commands remain for backward compatibility
+- Old commands: `test-ratio`, `test-gaps`, `budget` — delete once coverage is proven
 
 **`churn`** — unifies `coupling`, `coupling-clusters`, `hotspots`:
 - `normalize analyze churn` → coupling pairs (default)
 - `normalize analyze churn --cluster` → coupling-clusters
 - `normalize analyze churn --hotspots` → hotspots
 - Enum: `CouplingOutput` in `commands/analyze/coupling_views.rs`
-- Old commands remain for backward compatibility
+- Old commands: `coupling`, `coupling-clusters`, `hotspots` — delete once churn is proven
 
-### Deferred
+### Not merging (by design)
 
-**`health`**: Existing `health` is the default command (`#[cli(default)]`), changing its return type is too disruptive. `module-health` and `cross-repo-health` have very different param signatures (target vs limit+min_lines vs repos_dir). Needs server-less alias support or a design rethink.
+**`health`, `module-health`, `cross-repo-health`**: Different parameter signatures (target vs limit+min_lines vs repos_dir) mean these are genuinely different commands, not views of one command. Forcing them under one method creates a god-function with mostly-unused params. Keep separate.
 
-**`density`**: `uniqueness` has 8 extra params (similarity, min_lines, skeleton, include_trait_impls, clusters, exclude, only) that make a unified method unwieldy. Needs a way to scope params to specific views.
+**`density`, `uniqueness`, `ceremony`**: `uniqueness` has 8 unique params. Merging creates a 15-flag method where most flags are irrelevant to 2 of 3 views. Keep separate.
 
 ### Pattern Learned
 
 Enum wrapper (`CoverageOutput`, `CouplingOutput`) + `OutputFormatter` delegation works well when:
 - Views share most parameters (root, limit, exclude, only)
 - View-specific params are few and can be `Option`
-- No `#[cli(default)]` collision
 
-It doesn't work well when:
-- Parameter signatures diverge significantly (health family)
-- One view has 5+ unique params (density/uniqueness)
-- The parent command is already the CLI default
+It doesn't work when parameter signatures diverge — that means they're different commands, not different views. Don't force a merge with aliases or god-functions; accept that separate commands are the right design.
+
+**No aliases.** We're at v0.1.0 with no external users depending on old names. Old commands get deleted, not aliased. Aliases double surface area and never get cleaned up.
