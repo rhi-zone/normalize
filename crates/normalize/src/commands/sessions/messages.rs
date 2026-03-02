@@ -157,7 +157,7 @@ impl OutputFormatter for MessagesReport {
             pairs.iter().map(|(k, v)| format!("{}: {}", k, v)).collect()
         };
         lines.push(format!(
-            "\n\x1b[1m--- {} messages from {} sessions ({}) ---\x1b[0m",
+            "\x1b[1m--- {} messages from {} sessions ({}) ---\x1b[0m",
             self.stats.total_messages,
             self.stats.total_sessions,
             role_summary.join(", "),
@@ -304,7 +304,7 @@ pub fn build_messages_report(
                 }
 
                 // Truncate + collapse whitespace for display
-                let display_text = collapse_whitespace(&text, max_text_len);
+                let display_text = truncate_text(&text, max_text_len);
 
                 messages.push(MessageRecord {
                     session_id: session_id.clone(),
@@ -341,28 +341,16 @@ pub fn build_messages_report(
     })
 }
 
-/// Collapse whitespace and optionally truncate to max_len characters.
-fn collapse_whitespace(s: &str, max_len: usize) -> String {
-    let mut result = String::new();
-    let mut char_count = 0;
-    let mut prev_was_space = false;
-    for ch in s.chars() {
-        if ch.is_whitespace() {
-            if !prev_was_space {
-                result.push(' ');
-                char_count += 1;
-                prev_was_space = true;
-            }
-        } else {
-            result.push(ch);
-            char_count += 1;
-            prev_was_space = false;
-        }
-        if char_count >= max_len {
-            // Truncate at the last complete char we pushed
-            result.push_str("...");
-            return result;
-        }
+/// Truncate text to max_len characters without collapsing whitespace.
+fn truncate_text(s: &str, max_len: usize) -> String {
+    let trimmed = s.trim();
+    if trimmed.len() <= max_len {
+        return trimmed.to_string();
     }
-    result
+    let mut end = max_len;
+    // Don't cut in the middle of a multi-byte char
+    while !trimmed.is_char_boundary(end) && end > 0 {
+        end -= 1;
+    }
+    format!("{}...", &trimmed[..end])
 }

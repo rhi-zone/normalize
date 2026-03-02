@@ -329,7 +329,7 @@ impl TurnSummary {
                                     if let Some(cmd) = input.get("command").and_then(|v| v.as_str())
                                     {
                                         actions.push(Action::Bash {
-                                            command: collapse_newlines(cmd),
+                                            command: cmd.trim().to_string(),
                                         });
                                     } else {
                                         *other_map.entry(name.clone()).or_insert(0) += 1;
@@ -391,7 +391,7 @@ impl TurnSummary {
         // User prompt
         if let Some(prompt) = &self.user_prompt {
             let _ = writeln!(out, "## Turn {}", turn_idx);
-            let _ = writeln!(out, "> {}", collapse_newlines(prompt));
+            let _ = writeln!(out, "> {}", indent_continuation(prompt, "  "));
             let _ = writeln!(out);
         } else if !self.is_tool_only() && self.assistant_text.is_some() {
             let _ = writeln!(out, "## Turn {}", turn_idx);
@@ -421,7 +421,7 @@ impl TurnSummary {
                     let _ = writeln!(out, "{}{} {}", indent, verb, path);
                 }
                 Action::Bash { command } => {
-                    let _ = writeln!(out, "{}$ {}", indent, command);
+                    let _ = writeln!(out, "{}$ {}", indent, indent_continuation(command, "    "));
                 }
                 Action::Tool { verb, arg } => {
                     let _ = writeln!(out, "{}{} {}", indent, verb, arg);
@@ -431,7 +431,12 @@ impl TurnSummary {
 
         // Errors
         for err in &self.errors {
-            let _ = writeln!(out, "{}ERROR: {}", indent, collapse_newlines(err));
+            let _ = writeln!(
+                out,
+                "{}ERROR: {}",
+                indent,
+                indent_continuation(err, "          ")
+            );
         }
 
         // Blank line between turns (only if we printed something substantive)
@@ -450,7 +455,12 @@ impl TurnSummary {
                 "{}",
                 Blue.bold().paint(format!("## Turn {}", turn_idx))
             );
-            let _ = writeln!(out, "{} {}", Blue.paint(">"), collapse_newlines(prompt));
+            let _ = writeln!(
+                out,
+                "{} {}",
+                Blue.paint(">"),
+                indent_continuation(prompt, "  ")
+            );
             let _ = writeln!(out);
         } else if !self.is_tool_only() && self.assistant_text.is_some() {
             let _ = writeln!(
@@ -489,7 +499,13 @@ impl TurnSummary {
                     );
                 }
                 Action::Bash { command } => {
-                    let _ = writeln!(out, "{}{} {}", indent, Green.paint("$"), command);
+                    let _ = writeln!(
+                        out,
+                        "{}{} {}",
+                        indent,
+                        Green.paint("$"),
+                        indent_continuation(command, "    ")
+                    );
                 }
                 Action::Tool { verb, arg } => {
                     let _ = writeln!(
@@ -509,7 +525,7 @@ impl TurnSummary {
                 "{}{} {}",
                 indent,
                 Red.bold().paint("ERROR:"),
-                collapse_newlines(err)
+                indent_continuation(err, "          ")
             );
         }
 
@@ -595,13 +611,10 @@ fn extract_tool_action(name: &str, input: &serde_json::Value) -> Option<Action> 
     }
 }
 
-/// Collapse newlines into spaces, trim.
-fn collapse_newlines(s: &str) -> String {
-    let collapsed: String = s
-        .chars()
-        .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
-        .collect();
-    collapsed.trim().to_string()
+/// Indent continuation lines so multi-line content stays nested.
+fn indent_continuation(s: &str, prefix: &str) -> String {
+    let trimmed = s.trim();
+    trimmed.replace('\n', &format!("\n{}", prefix))
 }
 
 /// Format a content block as plain text.
