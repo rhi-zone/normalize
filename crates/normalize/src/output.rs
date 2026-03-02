@@ -56,6 +56,7 @@ mod tests {
         use crate::commands::analyze::summary::SummaryReport;
         use crate::commands::analyze::surface::SurfaceReport;
         use crate::commands::analyze::test_ratio::TestRatioReport;
+        use crate::commands::analyze::trend::TrendReport;
         use crate::commands::analyze::uniqueness::UniquenessReport;
         use crate::commands::context::{ContextListReport, ContextReport};
         use crate::commands::grammars::{GrammarListReport, GrammarPathsReport};
@@ -131,6 +132,7 @@ mod tests {
         assert_output_formatter::<LayeringReport>();
         assert_output_formatter::<TestGapsReport>();
         assert_output_formatter::<TestRatioReport>();
+        assert_output_formatter::<TrendReport>();
         assert_output_formatter::<ViewOutput>();
     }
 }

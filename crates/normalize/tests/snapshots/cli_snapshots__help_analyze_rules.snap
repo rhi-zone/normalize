@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 357
 expression: "snapshot_help(&[\"analyze\", \"rules\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -55,6 +56,7 @@ Commands:
   callers              Show callers of a symbol
   callees              Show what functions a symbol calls
   skeleton-diff        Show structural changes between a base ref and HEAD
+  trend                Track health metrics over git history at regular intervals
   help                 Print this message or the help of the given subcommand(s)
 
 Options:

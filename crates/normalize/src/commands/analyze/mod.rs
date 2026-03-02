@@ -43,6 +43,7 @@ pub mod surface;
 pub mod test_gaps;
 pub mod test_ratio;
 pub mod trace;
+pub mod trend;
 pub mod uniqueness;
 
 use crate::config::NormalizeConfig;

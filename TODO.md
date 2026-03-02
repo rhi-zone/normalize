@@ -361,11 +361,9 @@ redundant" (duplicates, clusters, uniqueness, density). Missing: tools for under
 
 **Cross-time analysis:**
 
-- [ ] **Trend tracking**: `normalize analyze trend` — run health/module-health over
-  git history at regular intervals. Show whether metrics are improving or degrading.
-  "Uniqueness ratio dropped 5% in the last month" or "test coverage has been flat
-  for 6 months." Requires running analysis at historical commits (expensive but
-  cacheable).
+- [x] **Trend tracking**: `normalize analyze trend` — run health over git history
+  at regular intervals via git worktrees. Shows metric deltas (improving/degrading/stable).
+  Supports `--snapshots N` to control granularity.
 
 ### Lint / Analysis Architecture
 

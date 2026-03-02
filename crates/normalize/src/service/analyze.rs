@@ -37,6 +37,7 @@ use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::stale_docs::StaleDocsReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::surface::SurfaceReport;
+use crate::commands::analyze::trend::TrendReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -407,6 +408,14 @@ impl AnalyzeService {
     }
 
     fn display_skeleton_diff(&self, r: &SkeletonDiffReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_trend(&self, r: &TrendReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1692,5 +1701,22 @@ impl AnalyzeService {
         crate::commands::analyze::skeleton_diff::analyze_skeleton_diff(
             &root_path, &base, &exclude, &only,
         )
+    }
+
+    /// Track health metrics over git history at regular intervals
+    #[cli(display_with = "display_trend")]
+    pub fn trend(
+        &self,
+        #[param(short = 'n', help = "Number of historical snapshots (default: 6)")]
+        snapshots: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<TrendReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::trend::analyze_trend(&root_path, snapshots.unwrap_or(6))
     }
 }
