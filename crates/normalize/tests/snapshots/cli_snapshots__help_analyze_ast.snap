@@ -50,6 +50,7 @@ Commands:
   summary            Auto-generated single-page codebase overview
   imports            Rank modules by import fan-in (requires facts index)
   depth-map          Per-module dependency depth + ripple risk
+  graph              Graph-theoretic properties of the module dependency graph
   surface            Per-module public symbol count, public ratio, and constraint score
   layering           Per-module import layering compliance — are imports flowing downward?
   provenance         Provenance graph: git blame → session mapping + code relations

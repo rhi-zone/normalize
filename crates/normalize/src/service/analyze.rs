@@ -23,6 +23,7 @@ use crate::commands::analyze::duplicates::{
 };
 use crate::commands::analyze::duplicates_views::{DuplicateScope, DuplicatesOutput};
 use crate::commands::analyze::files::FileLengthReport;
+use crate::commands::analyze::graph::GraphReport;
 use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::layering::LayeringReport;
@@ -253,6 +254,14 @@ impl AnalyzeService {
     }
 
     fn display_depth_map(&self, r: &DepthMapReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_graph(&self, r: &GraphReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1376,6 +1385,26 @@ impl AnalyzeService {
             n => n,
         };
         crate::commands::analyze::depth_map::analyze_depth_map_sync(&root_path, effective_limit)
+    }
+
+    /// Graph-theoretic properties of the module dependency graph
+    #[cli(display_with = "display_graph")]
+    pub fn graph(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Max examples per section (0=no limit)")] limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<GraphReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(10) {
+            0 => usize::MAX,
+            n => n,
+        };
+        crate::commands::analyze::graph::analyze_graph_sync(&root_path, effective_limit)
     }
 
     /// Per-module public symbol count, public ratio, and constraint score

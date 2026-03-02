@@ -44,6 +44,7 @@ mod tests {
         };
         use crate::commands::analyze::duplicates_views::DuplicatesOutput;
         use crate::commands::analyze::files::FileLengthReport;
+        use crate::commands::analyze::graph::GraphReport;
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::impact::ImpactReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
@@ -108,6 +109,7 @@ mod tests {
         assert_output_formatter::<FileLengthReport>();
         assert_output_formatter::<GrammarListReport>();
         assert_output_formatter::<GrammarPathsReport>();
+        assert_output_formatter::<GraphReport>();
         assert_output_formatter::<GrepResult>();
         assert_output_formatter::<HistoryDiffReport>();
         assert_output_formatter::<HistoryListReport>();

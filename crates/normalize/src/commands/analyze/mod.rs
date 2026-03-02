@@ -24,6 +24,7 @@ pub mod docs;
 pub mod duplicates;
 pub mod duplicates_views;
 pub mod files;
+pub mod graph;
 pub mod hotspots;
 pub mod impact;
 pub mod imports;
@@ -305,6 +306,9 @@ fn print_subcommand_schema(command: &Option<AnalyzeCommand>) -> i32 {
         Some(AnalyzeCommand::Architecture) => {
             print_schema::<architecture::ArchitectureReport>();
         }
+        Some(AnalyzeCommand::Graph { .. }) => {
+            print_schema::<graph::GraphReport>();
+        }
         Some(AnalyzeCommand::Impact { .. }) => {
             print_schema::<impact::ImpactReport>();
         }
@@ -498,6 +502,20 @@ fn dispatch_command(
         }
 
         Some(AnalyzeCommand::Architecture) => architecture::cmd_architecture(&effective_root, json),
+
+        Some(AnalyzeCommand::Graph { limit }) => {
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            match graph::analyze_graph_sync(&effective_root, effective_limit) {
+                Ok(report) => {
+                    println!("{}", report.format_text());
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                    1
+                }
+            }
+        }
 
         Some(AnalyzeCommand::Impact { target }) => {
             impact::cmd_impact(&effective_root, &target, json)

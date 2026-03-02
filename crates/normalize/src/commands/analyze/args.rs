@@ -242,6 +242,13 @@ pub enum AnalyzeCommand {
         limit: usize,
     },
 
+    /// Graph-theoretic properties of the module dependency graph (requires facts index)
+    Graph {
+        /// Maximum examples per section (0 = no limit)
+        #[arg(short = 'l', long, default_value = "10")]
+        limit: usize,
+    },
+
     /// What-if impact analysis: reverse-dependency closure + blast radius (requires facts index)
     Impact {
         /// Target file to analyze impact for
