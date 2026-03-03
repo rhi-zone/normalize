@@ -354,6 +354,35 @@ impl Editor {
         result
     }
 
+    /// Rename an identifier on a specific line (1-based) using word-boundary matching.
+    ///
+    /// Replaces the first word-boundary occurrence of `old_name` on the given line
+    /// with `new_name`. Returns `None` if the line number is out of range or if
+    /// `old_name` is not found on that line as a whole word.
+    pub fn rename_identifier_in_line(
+        &self,
+        content: &str,
+        line_no: usize,
+        old_name: &str,
+        new_name: &str,
+    ) -> Option<String> {
+        // Find byte range of the target line
+        let (line_start, line_end) = line_byte_range(content, line_no)?;
+        let line = &content[line_start..line_end];
+
+        // Find word-boundary occurrence of old_name in this line
+        let offset = find_word_in(line, old_name)?;
+
+        let abs_start = line_start + offset;
+        let abs_end = abs_start + old_name.len();
+
+        let mut result = String::with_capacity(content.len() + new_name.len());
+        result.push_str(&content[..abs_start]);
+        result.push_str(new_name);
+        result.push_str(&content[abs_end..]);
+        Some(result)
+    }
+
     /// Apply indentation to content
     pub fn apply_indent(&self, content: &str, indent: &str) -> String {
         content
@@ -371,6 +400,64 @@ impl Editor {
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
+
+/// Returns the byte range [start, end) of the Nth (1-based) line in `content`,
+/// not including the trailing newline. Returns `None` if `line_no` is out of range.
+fn line_byte_range(content: &str, line_no: usize) -> Option<(usize, usize)> {
+    if line_no == 0 {
+        return None;
+    }
+    let mut start = 0usize;
+    let mut current_line = 1usize;
+    for (i, c) in content.char_indices() {
+        if current_line == line_no {
+            // start is set; find end
+            let end = content[i..]
+                .find('\n')
+                .map(|n| i + n)
+                .unwrap_or(content.len());
+            return Some((start, end));
+        }
+        if c == '\n' {
+            current_line += 1;
+            start = i + 1;
+        }
+    }
+    // Handle single-line file with no newline
+    if current_line == line_no {
+        Some((start, content.len()))
+    } else {
+        None
+    }
+}
+
+/// Find the byte offset of `word` in `text` as a whole word (word-boundary match).
+/// Returns the offset of the first match, or `None`.
+fn find_word_in(text: &str, word: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut offset = 0;
+    while offset + word.len() <= text.len() {
+        if let Some(pos) = text[offset..].find(word) {
+            let abs = offset + pos;
+            let before_ok = abs == 0 || {
+                let b = bytes[abs - 1];
+                !b.is_ascii_alphanumeric() && b != b'_'
+            };
+            let after = abs + word.len();
+            let after_ok = after >= bytes.len() || {
+                let b = bytes[after];
+                !b.is_ascii_alphanumeric() && b != b'_'
+            };
+            if before_ok && after_ok {
+                return Some(abs);
+            }
+            offset = abs + 1;
+        } else {
+            break;
+        }
+    }
+    None
 }
 
 fn find_container_body_in_node(

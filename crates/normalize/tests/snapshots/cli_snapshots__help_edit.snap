@@ -21,6 +21,10 @@ Commands:
            
            With `--each`, applies the insert to every file matching `--only` that contains
            the symbol — useful for adding a method to all implementations of a trait.
+  rename   Rename a symbol across its definition, call sites, and import statements.
+           
+           Uses the facts index to find cross-file references. If the index is unavailable,
+           falls back to renaming only the definition.
   undo     Undo the last N edits
   redo     Redo the last undone edit
   goto     Jump to a specific shadow commit

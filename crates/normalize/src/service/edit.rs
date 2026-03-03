@@ -175,6 +175,28 @@ impl EditService {
         )
     }
 
+    /// Rename a symbol across its definition, call sites, and import statements.
+    ///
+    /// Uses the facts index to find cross-file references. If the index is unavailable,
+    /// falls back to renaming only the definition.
+    pub fn rename(
+        &self,
+        #[param(positional, help = "Target symbol (path/Symbol)")] target: String,
+        #[param(positional, help = "New name for the symbol")] new_name: String,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<EditResult, String> {
+        let root_path = root.as_deref().map(std::path::Path::new);
+        crate::commands::edit::cmd_edit_rename(
+            &target,
+            &new_name,
+            root_path,
+            dry_run,
+            message.as_deref(),
+        )
+    }
+
     /// Undo the last N edits
     pub fn undo(
         &self,
