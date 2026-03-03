@@ -2924,4 +2924,84 @@ mod tests {
             "agda: double call should resolve to type sig definition"
         );
     }
+
+    // --- glsl ---
+
+    #[test]
+    fn scope_glsl_function_param() {
+        let l = loader();
+        if skip_if_no(&l, "glsl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "float computeLight(vec3 pos, float intensity) {\n    float result = pos.x * intensity;\n    return result;\n}\n";
+        let defs = engine.find_definitions("glsl", src, "intensity");
+        assert_eq!(
+            defs.len(),
+            1,
+            "glsl: intensity should be defined as parameter"
+        );
+        let refs = engine.find_references("glsl", src, "intensity");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "glsl: intensity should resolve to param"
+        );
+    }
+
+    #[test]
+    fn scope_glsl_local_var() {
+        let l = loader();
+        if skip_if_no(&l, "glsl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "void main() {\n    vec3 color = vec3(1.0, 0.0, 0.0);\n    gl_FragColor = vec4(color, 1.0);\n}\n";
+        let defs = engine.find_definitions("glsl", src, "color");
+        assert_eq!(defs.len(), 1, "glsl: color should be defined as local var");
+        let refs = engine.find_references("glsl", src, "color");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "glsl: color should resolve to local var"
+        );
+    }
+
+    // --- hlsl ---
+
+    #[test]
+    fn scope_hlsl_function_param() {
+        let l = loader();
+        if skip_if_no(&l, "hlsl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "float computeValue(float x, float y) {\n    float result = x + y;\n    return result;\n}\n";
+        let defs = engine.find_definitions("hlsl", src, "x");
+        assert_eq!(defs.len(), 1, "hlsl: x should be defined as parameter");
+        let refs = engine.find_references("hlsl", src, "x");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "hlsl: x should resolve to param"
+        );
+    }
+
+    #[test]
+    fn scope_hlsl_local_var() {
+        let l = loader();
+        if skip_if_no(&l, "hlsl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "float4 PSMain() : SV_Target {\n    float brightness = 1.0;\n    return float4(brightness, 0.0, 0.0, 1.0);\n}\n";
+        let defs = engine.find_definitions("hlsl", src, "brightness");
+        assert_eq!(
+            defs.len(),
+            1,
+            "hlsl: brightness should be defined as local var"
+        );
+        let refs = engine.find_references("hlsl", src, "brightness");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "hlsl: brightness should resolve to local var"
+        );
+    }
 }
