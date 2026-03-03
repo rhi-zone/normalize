@@ -295,4 +295,110 @@ mod tests {
             "should return empty when no grammar/locals"
         );
     }
+
+    fn skip_if_no_rust(l: &GrammarLoader) -> bool {
+        l.get("rust").is_none() || l.get_locals("rust").is_none()
+    }
+
+    #[test]
+    fn test_rust_has_locals() {
+        let l = loader();
+        if l.get("rust").is_none() {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        assert!(
+            engine.has_locals("rust"),
+            "rust.locals.scm should be present after xtask build-grammars"
+        );
+    }
+
+    #[test]
+    fn test_rust_function_parameter() {
+        let l = loader();
+        if skip_if_no_rust(&l) {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn add(x: i32, y: i32) -> i32 { x + y }";
+        // `x` should be found: one definition (parameter) and one reference (body)
+        let refs = engine.find_references("rust", src, "x");
+        assert!(!refs.is_empty(), "x should appear as reference");
+        let has_def = refs.iter().any(|r| r.definition.is_some());
+        assert!(
+            has_def,
+            "x reference should resolve to its parameter definition"
+        );
+        let defs = engine.find_definitions("rust", src, "x");
+        assert_eq!(defs.len(), 1, "x should have exactly one definition");
+    }
+
+    #[test]
+    fn test_rust_let_binding() {
+        let l = loader();
+        if skip_if_no_rust(&l) {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn f() { let v = 1; let w = v + 1; w }";
+        let defs = engine.find_definitions("rust", src, "v");
+        assert_eq!(defs.len(), 1, "v should have one definition");
+        let refs = engine.find_references("rust", src, "v");
+        // At least one reference to v that resolves to the let binding
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "v reference in body should resolve to let binding"
+        );
+    }
+
+    #[test]
+    fn test_rust_for_loop_variable() {
+        let l = loader();
+        if skip_if_no_rust(&l) {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn f() { for i in 0..10 { let _ = i; } }";
+        let defs = engine.find_definitions("rust", src, "i");
+        assert_eq!(
+            defs.len(),
+            1,
+            "for loop variable i should have one definition"
+        );
+        let refs = engine.find_references("rust", src, "i");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "i inside loop should resolve to for pattern");
+    }
+
+    #[test]
+    fn test_rust_closure_parameter() {
+        let l = loader();
+        if skip_if_no_rust(&l) {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn f() { let g = |a: i32| a * 2; }";
+        let defs = engine.find_definitions("rust", src, "a");
+        assert_eq!(defs.len(), 1, "closure param a should have one definition");
+        let refs = engine.find_references("rust", src, "a");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "a in closure body should resolve to closure param"
+        );
+    }
+
+    #[test]
+    fn test_rust_no_cross_scope_leakage() {
+        let l = loader();
+        if skip_if_no_rust(&l) {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // x in first function should not resolve to x in second function
+        let src = "fn f(x: i32) -> i32 { x } fn g(x: i32) -> i32 { x }";
+        let defs = engine.find_definitions("rust", src, "x");
+        assert_eq!(defs.len(), 2, "two separate x parameter definitions");
+    }
 }

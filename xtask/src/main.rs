@@ -54,7 +54,7 @@ fn build_grammars(args: &[String]) {
     let mut queries_copied = 0;
 
     for (lang, crate_dir) in &grammars {
-        // Always copy query files (highlights.scm, injections.scm, locals.scm)
+        // Copy query files from arborium (highlights.scm, injections.scm, locals.scm)
         queries_copied += copy_query_files(lang, crate_dir, &out_dir);
 
         // Check if grammar already exists
@@ -76,6 +76,15 @@ fn build_grammars(args: &[String]) {
                 failed += 1;
             }
         }
+    }
+
+    // Copy bundled query files from the workspace queries/ directory.
+    // These supplement arborium grammars for languages that don't ship their own.
+    // Arborium-provided files take precedence (already written above); bundled files
+    // are copied only when the destination doesn't exist yet.
+    let workspace_queries = find_workspace_queries_dir();
+    if let Some(ref qdir) = workspace_queries {
+        queries_copied += copy_bundled_queries(qdir, &out_dir);
     }
 
     println!("\nCompiled {compiled} grammars, skipped {skipped} (already built), {failed} failed");
@@ -127,13 +136,45 @@ fn copy_query_files(lang: &str, crate_dir: &Path, out_dir: &Path) -> usize {
         let src = crate_dir.join("queries").join(src_name);
         let dest = out_dir.join(dest_name);
 
-        if src.exists() && !dest.exists() {
-            if fs::copy(&src, &dest).is_ok() {
-                copied += 1;
-            }
+        if src.exists() && !dest.exists() && fs::copy(&src, &dest).is_ok() {
+            copied += 1;
         }
     }
 
+    copied
+}
+
+/// Find the workspace `queries/` directory (sibling of `xtask/`).
+fn find_workspace_queries_dir() -> Option<PathBuf> {
+    // CARGO_MANIFEST_DIR is xtask/; workspace root is one level up.
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").ok()?;
+    let workspace_root = Path::new(&manifest_dir).parent()?;
+    let qdir = workspace_root.join("queries");
+    qdir.is_dir().then_some(qdir)
+}
+
+/// Copy bundled query files from the workspace `queries/` directory to `out_dir`.
+/// Files are named `{lang}.{kind}.scm` (e.g., `rust.locals.scm`).
+/// Skips files that already exist in `out_dir` (arborium takes precedence).
+/// Returns the number of files copied.
+fn copy_bundled_queries(queries_dir: &Path, out_dir: &Path) -> usize {
+    let mut copied = 0;
+    let Ok(entries) = fs::read_dir(queries_dir) else {
+        return 0;
+    };
+    for entry in entries.flatten() {
+        let src = entry.path();
+        if src.extension().and_then(|e| e.to_str()) != Some("scm") {
+            continue;
+        }
+        let Some(filename) = src.file_name() else {
+            continue;
+        };
+        let dest = out_dir.join(filename);
+        if !dest.exists() && fs::copy(&src, &dest).is_ok() {
+            copied += 1;
+        }
+    }
     copied
 }
 

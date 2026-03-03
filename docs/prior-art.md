@@ -2134,9 +2134,106 @@ When context is dynamic rather than accumulated, compression/masking become unne
 
 **Key Metric Worth Adopting**: "Tokens-per-task" not tokens-per-request. Measures end-to-end efficiency including re-fetching costs from over-aggressive compression.
 
+## Code Transformation & Refactoring Tools
+
+### facebook/codemod
+- **Repo**: https://github.com/facebook/codemod
+- **What it is**: Python CLI for large-scale codebase refactors via regex/grep substitution
+- **Key capabilities**: `codemod -m -d /path --extensions py 'old_pattern' 'new_pattern'`
+  - Regex find-and-replace across files, interactive confirmation per match
+  - Multi-line matching (`-m`), file extension filtering
+  - Simple, proven, widely used for bulk renames and API migrations
+- **Normalize floor**: normalize must be at least as powerful as codemod (handle all its use
+  cases) and more correct (codemod is regex-only — no AST awareness, no scope resolution,
+  will rename strings and comments, won't distinguish `foo` the function from `foo` the variable)
+
+### jscodeshift (Meta)
+- **Repo**: https://github.com/facebook/jscodeshift
+- **What it is**: JS/TS codemod toolkit — runs transform scripts against AST (via recast)
+- **Key capabilities**: Full AST access, preserves formatting, handles complex transformations
+  - Transform scripts as JS functions: `module.exports = (fileInfo, api) => { ... }`
+  - Used for React API migrations, prop renames, hook conversions at massive scale
+- **Normalize angle**: normalize's `edit rename` + scope analysis should eventually match
+  jscodeshift's precision for JS/TS. normalize adds cross-language generality and no-script
+  UX (CLI flags instead of writing a transform script for common cases).
+
+### ast-grep
+- **Repo**: https://github.com/ast-sitter/ast-grep
+- **What it is**: CLI for structural search/replace using tree-sitter AST patterns
+- **Key capabilities**: `sg --pattern 'console.log($A)' --rewrite 'logger.log($A)'`
+  - Pattern language with metavariables (`$A`, `$B`)
+  - Supports 20+ languages via tree-sitter
+  - Rule files (YAML) for complex multi-step transforms
+- **Normalize angle**: structural search-replace (`--pattern 'fn $name($args) -> $ret'`)
+  is on normalize's roadmap. ast-grep's pattern syntax is a good reference for the UX.
+
+### Semgrep
+- **Repo**: https://github.com/semgrep/semgrep
+- **What it is**: Multi-language static analysis and codemod tool
+- **Key capabilities**: Pattern-matching rules in YAML, metavariables, taint analysis
+  - Security-focused but also used for migration/refactoring
+  - Commercial product with free tier
+- **Normalize angle**: normalize's `grep` and `analyze` overlap with semgrep's search.
+  normalize is not security-focused but the pattern language concepts apply.
+
+### JetBrains IDEs (IntelliJ IDEA, CLion, etc.) — the gold standard
+
+JetBrains IDEs represent the current ceiling for automated refactoring. Every normalize
+refactoring feature should be evaluated against what IntelliJ does.
+
+- **What they do**: Rename, move, extract method/variable/constant, inline, change
+  signature, introduce parameter object, pull up/push down, safe delete — all
+  fully semantic, all with preview, all undoable.
+- **How they do it**: Each IDE has a full language-specific PSI (Program Structure
+  Interface) — a high-fidelity AST with semantic bindings, type resolution, and
+  cross-file reference tracking. Refactoring is implemented on top of this PSI per
+  language (Kotlin/Java share IntelliJ, Rust uses RustRover/CLion+rust-analyzer, etc.).
+- **Why they're the gold standard**:
+  - Zero false positives: rename only renames the symbol you asked to rename,
+    scope-aware, type-aware. Won't rename a different `foo` in a different scope.
+  - Preview before commit: shows every change before applying.
+  - Handles edge cases: constructor calls, string literals (optionally), doc
+    comments, generated code, reflection uses (with warnings).
+  - IDE integration: changes are atomic, undo works across files.
+- **Their weaknesses (normalize's angles)**:
+  - **Language-specific**: IntelliJ's Java refactoring doesn't help your Go code.
+    normalize targets cross-language consistency from a single CLI.
+  - **ReSharper** (C#/.NET): JetBrains' flagship .NET plugin for Visual Studio adds
+    the same refactoring quality to the Microsoft ecosystem. Also includes code
+    generation: generate `Equals`/`GetHashCode`/`ToString`/constructors from fields,
+    implement interface members, create missing methods from usage. This is a category
+    normalize doesn't touch yet — **code generation from structure** (derive-like, but
+    IDE-driven). C# and Java both lean heavily on generated boilerplate; ReSharper
+    makes it painless.
+- **IDE-bound**: Requires the GUI, a project open, indexing complete. normalize
+    works headlessly on any directory.
+  - **Slow at scale**: Large monorepos can take minutes to index before refactoring
+    is available. normalize's pre-built index makes rename instant.
+  - **No LLM integration**: JetBrains AI Assistant is add-on, not integrated into
+    the refactoring engine. normalize's agent loop can use refactoring as a tool.
+  - **No cross-repo support**: Can't rename a symbol across 50 repos at once.
+
+**Normalize ceiling**: IntelliJ-quality rename and find-references for all languages
+normalize supports — zero false positives, full scope resolution, no IDE required.
+The path: locals.scm + scope engine + cross-file import resolution = JetBrains-level
+correctness without the PSI.
+
+### Sorbet / Rubocop autocorrect / similar language-specific tools
+- Language-specific refactoring tools exist for most major languages (Roslyn for C#,
+  etc.) — normalize's value prop is cross-language consistency and no-IDE, no-LSP
+  operation.
+
+**Normalize position**: normalize must surpass codemod (the baseline) on correctness
+while matching it on ease of use. For JS/TS, eventually match jscodeshift's precision.
+For structural patterns, ast-grep is the reference UX. The ceiling is JetBrains-level
+semantic correctness — zero false positives, full scope resolution — delivered without
+per-language tooling or writing transform scripts for common cases (rename, move,
+inline, extract).
+
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness
 - [ ] Compare normalize's anchor-based patching vs search/replace vs diff
 - [ ] Measure structural context (skeleton) value vs raw file context
+- [ ] Benchmark normalize edit rename vs codemod on false positive rate (correctness floor)
 - [ ] Test architect/editor pattern with normalize infrastructure
