@@ -1300,6 +1300,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 7. **Message filtering + token usage** (PARTIALLY DONE)
    - ✅ `normalize sessions messages` — cross-session extraction with `--role`, `--grep`, date filters
    - ✅ Per-turn token usage: `--show-usage` flag adds `[in:N out:N cache_read:N]` to each assistant turn header; `--sort-by-tokens` sorts heaviest turns first; JSON format includes `usage` object on each message; stats show totals
+   - **Bug: `Turn::token_usage` only captures the last API call per turn.** In `claude_code.rs`, `last_request_id` is overwritten on each assistant entry — so multi-round turns (user → tool call → tool result → final answer) only account for the final API call. Fix: accumulate all `requestId`s seen within a turn (`turn_request_ids: Vec<String>`) and sum their `request_tokens` on flush.
    - `--role` is only one filter axis; evolve toward a composable filter system:
      - `--has-tool <name>` — messages in turns that used a specific tool
      - `--min-chars <N>` / `--max-chars <N>` — filter by message length (not just truncation)

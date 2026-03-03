@@ -91,7 +91,9 @@ impl LogFormat for ClaudeCodeFormat {
         let mut session = Session::new(path.to_path_buf(), self.name());
         let mut current_turn = Turn::default();
         let mut request_tokens: HashMap<String, TokenUsage> = HashMap::new();
-        let mut last_request_id: Option<String> = None;
+        // All requestIds seen in the current turn (one per API call; multi-round turns
+        // have multiple calls: tool-call round 1, tool-call round 2, ..., final answer).
+        let mut turn_request_ids: Vec<String> = Vec::new();
 
         for line in reader.lines() {
             let line = line.map_err(|e| e.to_string())?;
@@ -126,11 +128,9 @@ impl LogFormat for ClaudeCodeFormat {
                     } else {
                         // Flush previous turn if we have messages
                         if !current_turn.messages.is_empty() {
-                            if let Some(req_id) = &last_request_id
-                                && let Some(usage) = request_tokens.remove(req_id)
-                            {
-                                current_turn.token_usage = Some(usage);
-                            }
+                            current_turn.token_usage =
+                                sum_turn_tokens(&turn_request_ids, &mut request_tokens);
+                            turn_request_ids.clear();
                             session.turns.push(std::mem::take(&mut current_turn));
                         }
                         current_turn.messages.push(message);
@@ -197,7 +197,11 @@ impl LogFormat for ClaudeCodeFormat {
 
                     let message = parse_message(&entry, Role::Assistant);
                     current_turn.messages.push(message);
-                    last_request_id = request_id;
+                    if let Some(req_id) = request_id
+                        && !turn_request_ids.contains(&req_id)
+                    {
+                        turn_request_ids.push(req_id);
+                    }
                 }
                 "summary" => {
                     // Extract session metadata from summary
@@ -221,11 +225,7 @@ impl LogFormat for ClaudeCodeFormat {
 
         // Flush final turn
         if !current_turn.messages.is_empty() {
-            if let Some(req_id) = &last_request_id
-                && let Some(usage) = request_tokens.remove(req_id)
-            {
-                current_turn.token_usage = Some(usage);
-            }
+            current_turn.token_usage = sum_turn_tokens(&turn_request_ids, &mut request_tokens);
             session.turns.push(current_turn);
         }
 
@@ -237,6 +237,41 @@ impl LogFormat for ClaudeCodeFormat {
 }
 
 /// Parse a JSONL entry into a Message.
+/// Sum token usage across all API calls in a turn.
+///
+/// A single user-prompt turn may involve multiple API calls (e.g. tool-call
+/// rounds before the final answer). Each call has its own `requestId` and its
+/// own `usage` entry. We sum them so `Turn::token_usage` reflects the full cost
+/// of the turn, not just the last API call.
+fn sum_turn_tokens(
+    ids: &[String],
+    request_tokens: &mut HashMap<String, TokenUsage>,
+) -> Option<TokenUsage> {
+    if ids.is_empty() {
+        return None;
+    }
+    let mut total = TokenUsage::default();
+    let mut any = false;
+    for id in ids {
+        if let Some(u) = request_tokens.remove(id) {
+            total.input += u.input;
+            total.output += u.output;
+            if let Some(cr) = u.cache_read {
+                *total.cache_read.get_or_insert(0) += cr;
+            }
+            if let Some(cc) = u.cache_create {
+                *total.cache_create.get_or_insert(0) += cc;
+            }
+            // Use the model from the last API call (most likely the final answer)
+            if u.model.is_some() {
+                total.model = u.model;
+            }
+            any = true;
+        }
+    }
+    any.then_some(total)
+}
+
 fn parse_message(entry: &Value, role: Role) -> Message {
     let mut content_blocks = Vec::new();
 
