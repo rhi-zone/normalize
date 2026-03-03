@@ -4,8 +4,8 @@
 ; represented as call nodes with target "def"/"defp". Without predicate
 ; support we can't capture their parameters as definitions here.
 ;
-; This file covers anonymous functions (fn...end), stab clauses, and
-; pattern match bindings (x = expr).
+; This file covers anonymous functions (fn...end), stab clauses,
+; and pattern match bindings (x = expr).
 
 ; Scopes
 ; ------
@@ -25,9 +25,16 @@
   left: (arguments
     (identifier) @local.definition))
 
-; Pattern match binding (x = expr) is intentionally omitted: tree-sitter
-; text predicates (#eq?) don't work on unnamed node captures in field position,
-; and the broad fallback (left of any binary_operator) produces false positives.
+; Pattern match binding: x = expr defines x.
+;
+; We can't use (#eq? @op "=") on the unnamed operator node because tree-sitter
+; doesn't evaluate text predicates on unnamed node captures in field position.
+; Instead, we capture the binary_operator node itself (@_binop) and apply a
+; custom predicate (#is-match-op! @_binop) handled in the scope engine's Rust
+; code, which walks the node's children to check for an unnamed "=" child.
+((binary_operator
+  left: (identifier) @local.definition) @_binop
+ (#is-match-op! @_binop))
 
 ; References
 ; ----------

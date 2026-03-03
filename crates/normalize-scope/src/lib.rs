@@ -144,6 +144,13 @@ impl<'a> ScopeEngine<'a> {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         while let Some(m) = matches.next() {
+            // Evaluate custom predicates (general_predicates) that tree-sitter
+            // doesn't handle natively. This covers `#is-match-op!` and similar
+            // language-specific filters in locals.scm files.
+            if !check_general_predicates(m, &query, source.as_bytes()) {
+                continue;
+            }
+
             for cap in m.captures {
                 let name = &capture_names[cap.index as usize];
                 let node = cap.node;
@@ -195,6 +202,54 @@ impl<'a> ScopeEngine<'a> {
             references,
         })
     }
+}
+
+// ── Custom predicate evaluation ─────────────────────────────────────────────
+
+/// Evaluate custom (general) predicates that tree-sitter doesn't handle natively.
+///
+/// Built-in text predicates (`#eq?`, `#any-of?`, `#match?`) are evaluated
+/// automatically by `QueryCursor::matches` via `satisfies_text_predicates`.
+/// However, they only work reliably on **named** node captures. Unnamed node
+/// captures in field position (e.g. `operator: _ @op`) are silently skipped.
+///
+/// This function handles custom predicates defined in locals.scm files:
+///
+/// - `#is-match-op!` — checks that the captured node has an unnamed `=` child.
+///   Used to filter `binary_operator` matches to only assignment (`x = expr`).
+///
+/// Unknown predicates pass through (return true) to avoid breaking other queries.
+fn check_general_predicates(
+    m: &tree_sitter::QueryMatch<'_, '_>,
+    query: &tree_sitter::Query,
+    source: &[u8],
+) -> bool {
+    use tree_sitter::QueryPredicateArg;
+    query
+        .general_predicates(m.pattern_index)
+        .iter()
+        .all(|pred| match pred.operator.as_ref() {
+            "is-match-op!" => {
+                // Expect one capture arg: the node to inspect for an `=` child.
+                if let Some(QueryPredicateArg::Capture(cap_idx)) = pred.args.first() {
+                    m.captures
+                        .iter()
+                        .filter(|c| c.index == *cap_idx)
+                        .any(|c| node_has_unnamed_child(c.node, "=", source))
+                } else {
+                    true
+                }
+            }
+            _ => true,
+        })
+}
+
+/// Returns true if `node` has an unnamed child whose source text equals `text`.
+fn node_has_unnamed_child(node: tree_sitter::Node<'_>, text: &str, source: &[u8]) -> bool {
+    (0..node.child_count()).any(|i| {
+        node.child(i as u32)
+            .is_some_and(|child| !child.is_named() && child.utf8_text(source) == Ok(text))
+    })
 }
 
 // ── Internal types ──────────────────────────────────────────────────────────
@@ -773,15 +828,26 @@ mod tests {
     }
 
     #[test]
+    fn test_elixir_pattern_match() {
+        let l = loader();
+        if skip_if_no(&l, "elixir") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // x = 42 defines x via the "=" string literal pattern
+        let src = "x = 42\n";
+        let defs = engine.find_definitions("elixir", src, "x");
+        assert_eq!(defs.len(), 1, "elixir: x = 42 should define x");
+    }
+
+    #[test]
     fn test_elixir_no_false_definitions() {
         let l = loader();
         if skip_if_no(&l, "elixir") {
             return;
         }
         let engine = ScopeEngine::new(&l);
-        // x + y should not produce definitions — predicates on unnamed operator nodes
-        // don't work in tree-sitter field position, so we omit the binary_operator
-        // pattern rather than risk false positives.
+        // x + y should not produce definitions — "=" literal pattern only matches =
         let src = "x + y\n";
         let defs = engine.find_definitions("elixir", src, "x");
         assert_eq!(

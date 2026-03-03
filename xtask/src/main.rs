@@ -155,8 +155,9 @@ fn find_workspace_queries_dir() -> Option<PathBuf> {
 
 /// Copy bundled query files from the workspace `queries/` directory to `out_dir`.
 /// Files are named `{lang}.{kind}.scm` (e.g., `rust.locals.scm`).
-/// Skips files that already exist in `out_dir` (arborium takes precedence).
-/// Returns the number of files copied.
+/// Skips files that already exist in `out_dir` from arborium (same content),
+/// but updates them when the workspace version differs (e.g. after edits).
+/// Returns the number of files copied or updated.
 fn copy_bundled_queries(queries_dir: &Path, out_dir: &Path) -> usize {
     let mut copied = 0;
     let Ok(entries) = fs::read_dir(queries_dir) else {
@@ -171,7 +172,13 @@ fn copy_bundled_queries(queries_dir: &Path, out_dir: &Path) -> usize {
             continue;
         };
         let dest = out_dir.join(filename);
-        if !dest.exists() && fs::copy(&src, &dest).is_ok() {
+        let needs_copy = if dest.exists() {
+            // Update if content differs (workspace edit propagates on next build).
+            fs::read(&src).ok() != fs::read(&dest).ok()
+        } else {
+            true
+        };
+        if needs_copy && fs::copy(&src, &dest).is_ok() {
             copied += 1;
         }
     }
