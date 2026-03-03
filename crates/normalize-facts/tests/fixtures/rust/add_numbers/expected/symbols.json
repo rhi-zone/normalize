@@ -1,0 +1,65 @@
+[
+  {
+    "file": "Cargo.toml",
+    "kind": "Module",
+    "name": "package",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "Cargo.toml",
+    "kind": "Module",
+    "name": "workspace",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "src/main.rs",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "src/math.rs",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "src/math.rs",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "src/math.rs",
+    "kind": "Struct",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 11
+  },
+  {
+    "file": "src/math.rs",
+    "kind": "Method",
+    "name": "new",
+    "parent": "Calculator",
+    "start_line": 17
+  },
+  {
+    "file": "src/math.rs",
+    "kind": "Method",
+    "name": "compute",
+    "parent": "Calculator",
+    "start_line": 21
+  },
+  {
+    "file": "src/math.rs",
+    "kind": "Method",
+    "name": "default",
+    "parent": "Calculator",
+    "start_line": 29
+  }
+]

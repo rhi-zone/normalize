@@ -2142,7 +2142,10 @@ class MyClass:
         index.refresh_call_graph().await.unwrap();
 
         // Find callers of method_b - should include method_a and method_c
-        let callers = index.find_callers("method_b").await.unwrap();
+        let callers = index
+            .find_callers("method_b", "src/myclass.py")
+            .await
+            .unwrap();
         assert!(!callers.is_empty(), "Should find callers of method_b");
 
         let caller_names: Vec<&str> = callers.iter().map(|(_, name, _)| name.as_str()).collect();
@@ -2156,7 +2159,10 @@ class MyClass:
         );
 
         // Find callers of MyClass.method_b - more specific
-        let callers = index.find_callers("MyClass.method_b").await.unwrap();
+        let callers = index
+            .find_callers("MyClass.method_b", "src/myclass.py")
+            .await
+            .unwrap();
         assert!(
             !callers.is_empty(),
             "Should find callers of MyClass.method_b"

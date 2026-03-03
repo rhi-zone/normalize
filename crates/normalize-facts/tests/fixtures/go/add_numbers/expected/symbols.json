@@ -1,0 +1,23 @@
+[
+  {
+    "file": "main.go",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "math.go",
+    "kind": "Function",
+    "name": "Add",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "math.go",
+    "kind": "Function",
+    "name": "Multiply",
+    "parent": null,
+    "start_line": 9
+  }
+]

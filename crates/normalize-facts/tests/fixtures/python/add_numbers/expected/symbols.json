@@ -1,0 +1,44 @@
+[
+  {
+    "file": "main.py",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "math_utils.py",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "math_utils.py",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 9
+  },
+  {
+    "file": "math_utils.py",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 14
+  },
+  {
+    "file": "math_utils.py",
+    "kind": "Method",
+    "name": "__init__",
+    "parent": "Calculator",
+    "start_line": 17
+  },
+  {
+    "file": "math_utils.py",
+    "kind": "Method",
+    "name": "compute",
+    "parent": "Calculator",
+    "start_line": 20
+  }
+]

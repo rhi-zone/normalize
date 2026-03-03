@@ -69,6 +69,8 @@ cache/
 
 # debugging text files
 *.txt
+# ...except fixture expected outputs
+!**/tests/fixtures/**/expected/*.txt
 
 *.cpuprofile
 

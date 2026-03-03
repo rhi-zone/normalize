@@ -3555,6 +3555,7 @@ dependencies = [
  "normalize-local-deps",
  "rayon",
  "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "tree-sitter",

@@ -1,0 +1,37 @@
+[
+  {
+    "file": "math.js",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "math.js",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 9
+  },
+  {
+    "file": "math.js",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 13
+  },
+  {
+    "file": "math.js",
+    "kind": "Method",
+    "name": "constructor",
+    "parent": "Calculator",
+    "start_line": 14
+  },
+  {
+    "file": "math.js",
+    "kind": "Method",
+    "name": "compute",
+    "parent": "Calculator",
+    "start_line": 18
+  }
+]
