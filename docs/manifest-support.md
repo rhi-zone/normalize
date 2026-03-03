@@ -62,7 +62,13 @@ but heuristic extraction of deps is possible and useful:
 | `mix.exs` | Elixir / Hex | `mix.exs` | Elixir file; `{:pkg, "~> 1.0"}` tuples in `deps/0` — regex-matchable. |
 | `dub.json` / `dub.sdl` | D / Dub | `dub.json`, `dub.sdl` | JSON or custom SDL; `"dependencies"` object. |
 | `*.csproj` | .NET / NuGet | `*.csproj` | XML; `<PackageReference Include="..." Version="..."/>`. |
+| `packages.config` | .NET / NuGet (legacy) | `packages.config` | XML; `<package id="..." version="..."/>`. Older projects before SDK-style csproj. |
 | `*.rockspec` | Lua / LuaRocks | `*.rockspec` | Lua file; `dependencies = { "pkg >= 1.0" }` table — string list, regex-matchable. Non-standard filename (contains version: `pkg-1.0-1.rockspec`). |
+
+**.sln is not a manifest.** Visual Studio solution files list which `.csproj`/`.vbproj`/`.fsproj`
+projects belong to a solution (GUIDs + paths), but contain no dependency declarations. To get .NET
+deps: find `*.sln` → extract referenced project file paths → parse each `*.csproj`. The `.sln`
+itself is only useful as a project enumerator, not a dep source.
 
 Notes:
 - **Nimble** and **Gemfile** are the most tractable (simple line patterns).
