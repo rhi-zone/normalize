@@ -1122,4 +1122,327 @@ mod tests {
             "d: v reference should resolve to auto binding"
         );
     }
+
+    // ── TypeScript ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_typescript_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "typescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function add(x: number, y: number): number { return x + y; }";
+        let defs = engine.find_definitions("typescript", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "typescript: required parameter x should have one definition"
+        );
+        let refs = engine.find_references("typescript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "typescript: x reference should resolve to param"
+        );
+    }
+
+    #[test]
+    fn test_typescript_variable_declarator() {
+        let l = loader();
+        if skip_if_no(&l, "typescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // const inside a function scope so resolution works
+        let src = "function f() { const x = 1; return x; }";
+        let defs = engine.find_definitions("typescript", src, "x");
+        assert_eq!(defs.len(), 1, "typescript: const x should define x");
+        let refs = engine.find_references("typescript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "typescript: x reference should resolve to const"
+        );
+    }
+
+    #[test]
+    fn test_typescript_function_declaration() {
+        let l = loader();
+        if skip_if_no(&l, "typescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function greet(name: string): void { console.log(name); }";
+        let defs = engine.find_definitions("typescript", src, "greet");
+        assert_eq!(
+            defs.len(),
+            1,
+            "typescript: function declaration greet should be defined"
+        );
+    }
+
+    #[test]
+    fn test_typescript_arrow_function_single_param() {
+        let l = loader();
+        if skip_if_no(&l, "typescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "const double = x => x * 2;";
+        let defs = engine.find_definitions("typescript", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "typescript: arrow function single param x should be defined"
+        );
+        let refs = engine.find_references("typescript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "typescript: x in arrow body should resolve");
+    }
+
+    // ── JavaScript ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_javascript_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function add(x, y) { return x + y; }";
+        let defs = engine.find_definitions("javascript", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "javascript: function param x should have one definition"
+        );
+        let refs = engine.find_references("javascript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "javascript: x reference should resolve to param"
+        );
+    }
+
+    #[test]
+    fn test_javascript_variable_declarator() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // const inside a function scope so resolution works
+        let src = "function f() { const x = 1; return x; }";
+        let defs = engine.find_definitions("javascript", src, "x");
+        assert_eq!(defs.len(), 1, "javascript: const x should define x");
+        let refs = engine.find_references("javascript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "javascript: x reference should resolve");
+    }
+
+    #[test]
+    fn test_javascript_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function greet() { return 'hello'; }";
+        let defs = engine.find_definitions("javascript", src, "greet");
+        assert_eq!(
+            defs.len(),
+            1,
+            "javascript: function declaration greet should be defined"
+        );
+    }
+
+    #[test]
+    fn test_javascript_arrow_function_single_param() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "const double = x => x * 2;";
+        let defs = engine.find_definitions("javascript", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "javascript: arrow single param x should be defined"
+        );
+        let refs = engine.find_references("javascript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "javascript: x in arrow body should resolve");
+    }
+
+    // ── Lua ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_lua_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "lua") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function add(x, y) return x + y end";
+        let defs = engine.find_definitions("lua", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "lua: function param x should have one definition"
+        );
+        let refs = engine.find_references("lua", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "lua: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_lua_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "lua") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function greet() return 'hello' end";
+        let defs = engine.find_definitions("lua", src, "greet");
+        assert_eq!(
+            defs.len(),
+            1,
+            "lua: function declaration greet should be defined"
+        );
+    }
+
+    #[test]
+    fn test_lua_for_numeric() {
+        let l = loader();
+        if skip_if_no(&l, "lua") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "for i = 1, 10 do print(i) end";
+        let defs = engine.find_definitions("lua", src, "i");
+        assert_eq!(
+            defs.len(),
+            1,
+            "lua: for numeric variable i should be defined"
+        );
+        let refs = engine.find_references("lua", src, "i");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "lua: i in for body should resolve");
+    }
+
+    // ── Scala ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_scala_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "scala") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def add(x: Int, y: Int): Int = x + y";
+        let defs = engine.find_definitions("scala", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "scala: function param x should have one definition"
+        );
+        let refs = engine.find_references("scala", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "scala: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_scala_val_definition() {
+        let l = loader();
+        if skip_if_no(&l, "scala") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "val x = 42";
+        let defs = engine.find_definitions("scala", src, "x");
+        assert_eq!(defs.len(), 1, "scala: val x should be defined");
+    }
+
+    #[test]
+    fn test_scala_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "scala") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def greet(name: String): String = \"hello \" + name";
+        let defs = engine.find_definitions("scala", src, "greet");
+        assert_eq!(
+            defs.len(),
+            1,
+            "scala: def greet should define function name"
+        );
+    }
+
+    // ── R ─────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_r_arrow_assignment() {
+        let l = loader();
+        if skip_if_no(&l, "r") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // assignment inside function scope so x resolves
+        let src = "f <- function(a) { x <- a * 2; x }\n";
+        let defs = engine.find_definitions("r", src, "x");
+        assert_eq!(defs.len(), 1, "r: x <- ... should define x");
+        let refs = engine.find_references("r", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "r: x reference in body should resolve");
+    }
+
+    #[test]
+    fn test_r_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "r") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "f <- function(a, b) { a + b }\n";
+        let defs = engine.find_definitions("r", src, "a");
+        assert_eq!(defs.len(), 1, "r: function param a should be defined");
+        let refs = engine.find_references("r", src, "a");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "r: a reference in body should resolve");
+    }
+
+    // ── OCaml ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_ocaml_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "ocaml") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // Let binding: x is a value_pattern (definition)
+        let src = "let x = 42 in x + 1";
+        let defs = engine.find_definitions("ocaml", src, "x");
+        assert_eq!(defs.len(), 1, "ocaml: let x = 42 should define x");
+    }
+
+    #[test]
+    fn test_ocaml_function_params() {
+        let l = loader();
+        if skip_if_no(&l, "ocaml") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // OCaml curried function: params are value_patterns
+        let src = "let add x y = x + y";
+        let defs = engine.find_definitions("ocaml", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "ocaml: curried function param x should be defined"
+        );
+    }
 }
