@@ -1445,4 +1445,183 @@ mod tests {
             "ocaml: curried function param x should be defined"
         );
     }
+
+    // ── TSX ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_tsx_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "tsx") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function add(x: number, y: number): number { return x + y; }";
+        let defs = engine.find_definitions("tsx", src, "x");
+        assert_eq!(defs.len(), 1, "tsx: required parameter x should be defined");
+        let refs = engine.find_references("tsx", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "tsx: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_tsx_variable_declarator() {
+        let l = loader();
+        if skip_if_no(&l, "tsx") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function f() { const x = 1; return x; }";
+        let defs = engine.find_definitions("tsx", src, "x");
+        assert_eq!(defs.len(), 1, "tsx: const x should define x");
+    }
+
+    // ── Gleam ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_gleam_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "gleam") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn add(x, y) { x + y }";
+        let defs = engine.find_definitions("gleam", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "gleam: function_parameter x should be defined"
+        );
+        let refs = engine.find_references("gleam", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "gleam: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_gleam_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "gleam") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn f() { let x = 1 x }";
+        let defs = engine.find_definitions("gleam", src, "x");
+        assert_eq!(defs.len(), 1, "gleam: let x should define x");
+    }
+
+    // ── TLA+ ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_tlaplus_operator_definition() {
+        let l = loader();
+        if skip_if_no(&l, "tlaplus") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // TLA+ operator definition with parameters
+        let src = "---- MODULE Test ----\nOp(x, y) == x + y\n====";
+        let defs = engine.find_definitions("tlaplus", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "tlaplus: operator parameter x should be defined"
+        );
+        let refs = engine.find_references("tlaplus", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "tlaplus: x reference should resolve");
+    }
+
+    #[test]
+    fn test_tlaplus_let_in() {
+        let l = loader();
+        if skip_if_no(&l, "tlaplus") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "---- MODULE Test ----\nExpr == LET x == 1 IN x + 1\n====";
+        let defs = engine.find_definitions("tlaplus", src, "x");
+        assert_eq!(defs.len(), 1, "tlaplus: LET x should define x");
+    }
+
+    // ── Swift ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_swift_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "swift") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // Swift function with internal parameter name
+        let src = "func add(_ x: Int, _ y: Int) -> Int { return x + y }";
+        let defs = engine.find_definitions("swift", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "swift: function parameter x should be defined"
+        );
+        let refs = engine.find_references("swift", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "swift: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_swift_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "swift") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "func greet() -> String { return \"hello\" }";
+        let defs = engine.find_definitions("swift", src, "greet");
+        assert_eq!(
+            defs.len(),
+            1,
+            "swift: function name greet should be defined"
+        );
+    }
+
+    // ── Elm ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_elm_function_definition() {
+        let l = loader();
+        if skip_if_no(&l, "elm") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // Elm function with parameters
+        let src = "add x y = x + y";
+        let defs = engine.find_definitions("elm", src, "x");
+        assert_eq!(defs.len(), 1, "elm: function parameter x should be defined");
+    }
+
+    // ── F# ────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_fsharp_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "fsharp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "let add x y = x + y";
+        let defs = engine.find_definitions("fsharp", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "fsharp: function parameter x should be defined"
+        );
+    }
+
+    #[test]
+    fn test_fsharp_value_binding() {
+        let l = loader();
+        if skip_if_no(&l, "fsharp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "let x = 42";
+        let defs = engine.find_definitions("fsharp", src, "x");
+        assert_eq!(defs.len(), 1, "fsharp: let x should define x");
+    }
 }
