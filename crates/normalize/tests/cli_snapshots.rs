@@ -78,6 +78,11 @@ fn test_help_aliases() {
 }
 
 #[test]
+fn test_help_find_references() {
+    insta::assert_snapshot!(snapshot_help(&["find-references"]));
+}
+
+#[test]
 fn test_help_context() {
     insta::assert_snapshot!(snapshot_help(&["context"]));
 }

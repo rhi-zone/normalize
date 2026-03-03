@@ -54,7 +54,7 @@ fn build_grammars(args: &[String]) {
     let mut queries_copied = 0;
 
     for (lang, crate_dir) in &grammars {
-        // Always copy query files (highlights.scm, injections.scm)
+        // Always copy query files (highlights.scm, injections.scm, locals.scm)
         queries_copied += copy_query_files(lang, crate_dir, &out_dir);
 
         // Check if grammar already exists
@@ -112,7 +112,7 @@ fn lib_extension() -> &'static str {
     }
 }
 
-/// Copy query files (highlights.scm, injections.scm) if they don't exist.
+/// Copy query files (highlights.scm, injections.scm, locals.scm) if they don't exist.
 /// Returns the number of files copied.
 fn copy_query_files(lang: &str, crate_dir: &Path, out_dir: &Path) -> usize {
     let mut copied = 0;
@@ -120,6 +120,7 @@ fn copy_query_files(lang: &str, crate_dir: &Path, out_dir: &Path) -> usize {
     let query_files = [
         ("highlights.scm", format!("{lang}.highlights.scm")),
         ("injections.scm", format!("{lang}.injections.scm")),
+        ("locals.scm", format!("{lang}.locals.scm")),
     ];
 
     for (src_name, dest_name) in &query_files {

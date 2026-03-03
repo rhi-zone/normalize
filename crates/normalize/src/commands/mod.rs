@@ -34,6 +34,7 @@ pub mod context;
 pub mod daemon;
 pub mod edit;
 pub mod facts;
+pub mod find_references;
 pub mod generate;
 pub mod grammars;
 pub mod history;

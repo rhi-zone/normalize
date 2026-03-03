@@ -33,6 +33,7 @@ members = [
     "crates/normalize-rules-loader",
     "crates/normalize-deps",
     "crates/normalize-filter",
+    "crates/normalize-scope",
     "xtask",
 ]
 

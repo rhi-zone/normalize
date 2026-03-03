@@ -34,6 +34,7 @@ pub mod tools;
 use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
 use crate::commands::context::{ContextListReport, ContextReport, collect_context_files};
+use crate::commands::find_references::ReferencesReport;
 use crate::commands::translate::{SourceLanguage, TargetLanguage};
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
@@ -157,6 +158,11 @@ impl NormalizeService {
         } else {
             format!("{}{}", prefix, text)
         }
+    }
+
+    /// Display bridge for ReferencesReport.
+    fn display_find_references(&self, value: &ReferencesReport) -> String {
+        self.display_output(value)
     }
 }
 
@@ -478,6 +484,29 @@ impl NormalizeService {
             from.map(|s| s.parse().map_err(|e: String| e)).transpose()?;
 
         commands::translate::cmd_translate_service(&input, from_lang, to_lang, output.as_deref())
+    }
+
+    /// Find all references to a symbol (within-file scope analysis + cross-file index)
+    #[cli(display_with = "display_find_references")]
+    pub fn find_references(
+        &self,
+        #[param(positional, help = "Symbol name to find references for")] symbol: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'f', help = "Restrict search to a single file")] file: Option<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ReferencesReport, String> {
+        let root_path = root
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        self.resolve_format(pretty, compact, &root_path);
+        Ok(commands::find_references::cmd_find_references(
+            &root_path,
+            &symbol,
+            file.as_deref(),
+        ))
     }
 
     /// Manage the global normalize daemon

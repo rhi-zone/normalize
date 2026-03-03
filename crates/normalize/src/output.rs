@@ -64,6 +64,7 @@ mod tests {
         use crate::commands::analyze::trend::TrendReport;
         use crate::commands::analyze::uniqueness::UniquenessReport;
         use crate::commands::context::{ContextListReport, ContextReport};
+        use crate::commands::find_references::ReferencesReport;
         use crate::commands::grammars::{GrammarListReport, GrammarPathsReport};
         use crate::commands::history::{
             HistoryDiffReport, HistoryListReport, HistoryPruneReport, HistoryStatusReport,
@@ -107,6 +108,7 @@ mod tests {
         assert_output_formatter::<DuplicateTypesReport>();
         assert_output_formatter::<DuplicatesOutput>();
         assert_output_formatter::<FileLengthReport>();
+        assert_output_formatter::<ReferencesReport>();
         assert_output_formatter::<GrammarListReport>();
         assert_output_formatter::<GrammarPathsReport>();
         assert_output_formatter::<GraphReport>();

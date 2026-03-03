@@ -3446,6 +3446,7 @@ dependencies = [
  "normalize-output",
  "normalize-path-resolve",
  "normalize-rules-loader",
+ "normalize-scope",
  "normalize-session-analysis",
  "normalize-shadow",
  "normalize-surface-syntax",
@@ -3801,6 +3802,17 @@ dependencies = [
  "abi_stable",
  "dirs",
  "normalize-facts-rules-api",
+]
+
+[[package]]
+name = "normalize-scope"
+version = "0.1.0"
+dependencies = [
+ "normalize-languages",
+ "schemars",
+ "serde",
+ "streaming-iterator",
+ "tree-sitter",
 ]
 
 [[package]]

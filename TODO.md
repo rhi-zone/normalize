@@ -2,6 +2,37 @@
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
+## Priorities
+
+Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
+extract, inline, move — correct, without LSPs, without false positives.
+
+1. **Scope analysis engine** (foundation for everything else)
+   - Copy `locals.scm` in xtask; add `get_locals()` to `GrammarLoader`
+   - Parse `@definition.*` / `@reference` / `@scope` captures → within-file reference graph
+   - `normalize find-references <symbol>` command (locals within-file + facts index cross-file)
+   - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
+
+2. **Fix `edit rename` false positives**
+   - Store module-qualified caller/callee in facts index
+   - Post-filter: verify callee resolves to definition file via import graph
+   - Then: wire rename to use find-references instead of find-callers-by-name
+   - See: "HIGH PRIORITY: `edit rename` false positives" in [Semantic Editing](#semantic-editing)
+
+3. **locals.scm for high-value languages** (rust, python, go, java, c, cpp, c_sharp, kotlin,
+   ruby, php, bash, zig, dart, elixir, erlang, clojure — the ones without them already)
+   - Each locals.scm must ship with fixtures verifying scope resolution is correct
+   - An unverified locals.scm is worse than none: silent wrong renames
+   - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
+
+4. **Comprehensive language fixtures** (long-term, nix flake verification)
+   - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
+
+5. **normalize as LSP server** (stretch)
+   - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize
+   - Proxy mode: `normalize serve lsp --proxy 'rust-analyzer'`
+   - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
+
 ## Next Up
 
 - [x] Fixture-based tests for all syntax rules (`normalize-syntax-rules`):
@@ -424,6 +455,81 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 - [ ] `deps`: collapse 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact)
 - [ ] `docs`: collapse 4 commands (docs, check-refs, stale-docs, check-examples)
 - [ ] Cross-cutting `--trend` and `--diff <ref>` modifiers on any scoring command
+
+### Semantic Refactoring Infrastructure
+
+Goal: production-grade refactoring (rename, find-references, extract, inline, move) across
+all ~98 supported languages, without relying on LSPs. Strategy: tree-sitter locals queries
+for within-file scope/reference resolution, facts index for cross-file import/export graph.
+
+**locals.scm query support (foundation):**
+- [ ] Copy `locals.scm` in xtask alongside `highlights.scm`/`injections.scm`
+- [ ] Add `get_locals(name)` to `GrammarLoader` (mirrors `get_highlights`/`get_injections`)
+- [ ] Scope analysis engine: parse `@definition.*`, `@reference`, `@scope` captures → reference graph
+      - Given a reference node: walk scope tree upward to find the matching definition
+      - Given a definition node: find all reference nodes in its scope
+- [ ] `normalize find-references <symbol>` command (within-file via locals + cross-file via facts index)
+- [ ] Fix `normalize edit rename` to use find-references instead of find-callers-by-name
+
+**21 arborium grammars already have locals.scm** (no work needed):
+ada, capnp, elm, fsharp, gleam, haskell, javascript, lua, nix, objc,
+ocaml, r, rescript, scala, starlark, svelte, swift, thrift, tlaplus, tsx, typescript
+
+**Write locals.scm for remaining 77 languages** (scope/reference queries — not type inference,
+just: which declaration does this identifier refer to?):
+- Each locals.scm must be accompanied by fixtures before it counts as done.
+  An unverified locals.scm is worse than none — it produces silent wrong renames.
+- [ ] High-value tier (most-used, well-understood grammars): rust, python, go, java, c, cpp,
+      c_sharp, kotlin, ruby, php, bash, zig, dart, elixir, erlang, haskell (already done), clojure
+- [ ] Medium tier: julia, nim, crystal, d, groovy, perl, fortran, cobol, pascal, prolog, racket,
+      scheme, common_lisp, janet, fennel, haxe, actionscript, coffeescript, purescript, reason,
+      solidity, move, wren, v
+- [ ] Config/DSL tier (simpler scoping rules): toml, yaml, json (trivially no locals), css, scss,
+      less, graphql, proto, thrift (already done), wasm, wat
+- [ ] Markup/template tier (inject into embedded languages): html, markdown, jinja, liquid, erb,
+      vue (already done), svelte (already done), astro
+- [ ] Niche/legacy tier: awk, sed (trivial), make, cmake, meson, nix (already done), dhall,
+      cue, nickel, kdl, ron
+
+**Comprehensive language fixtures** (long-term, verification via nix flakes):
+Goal: for every language we support, a test suite that exercises the full extraction pipeline
+and can be run in CI with real language toolchains provided by nix devShells/flake outputs.
+
+- [ ] Design fixture schema: input source file → expected symbols, imports, calls, references
+      (similar to existing syntax-rules fixtures but for extraction + scope resolution)
+- [ ] Nix flake approach: each language's fixtures run in a devShell with the real compiler/runtime
+      available — lets us verify against `rustc`, `tsc`, `python`, `go build` etc. for ground truth
+- [ ] Fixture runner: language-agnostic test runner (like syntax-rules fixture runner) that loads
+      `tests/fixtures/<lang>/locals/<case>/input.<ext>` + `expected.json` and diffs
+- [ ] Seed fixtures for top 20 languages (high confidence, hand-verified)
+- [ ] Automated fixture generation: use `normalize analyze` + LLM to bootstrap expected outputs,
+      then human-verify before committing
+- [ ] CI integration: `nix flake check` runs all language fixture suites in parallel
+
+**Qualified/namespaced import resolution in the facts index:**
+Already tracked as "HIGH PRIORITY: `edit rename` false positives" below, but the root fix
+belongs here. `find_callers(name)` is name-only — it will rename two unrelated `foo()`
+functions in different modules simultaneously. Fix: store module-qualified caller/callee
+names in the index so lookups resolve to a specific definition, not a name string.
+The locals.scm reference resolution work above addresses the same root cause for within-file
+scope; the index needs the same upgrade for cross-file correctness.
+- [ ] Store caller/callee with module qualification in facts index
+- [ ] Post-filter in `find_callers`: verify callee resolves to definition file via import graph
+- [ ] Update `edit rename` to use qualified lookup (eliminates false positives)
+
+**Stretch goal: normalize as an LSP server (with optional proxy)**
+`normalize serve lsp` exists but is presumably minimal. The endgame: normalize IS a language
+server, exposing textDocument/references, textDocument/rename, textDocument/definition, etc.
+backed by our own scope analysis + facts index. Works for all 98 languages without any
+external LSP. For languages where a native LSP exists, optionally proxy requests to it and
+merge/prefer results.
+- [ ] Implement core LSP methods backed by normalize's own reference resolution:
+      `textDocument/references`, `textDocument/rename`, `textDocument/definition`,
+      `textDocument/documentSymbol`, `workspace/symbol`
+- [ ] LSP proxy mode: `normalize serve lsp --proxy 'rust-analyzer'` — forward requests to
+      an arbitrary LSP command, use normalize as fallback or supplement
+- [ ] Editor integration: VS Code extension, Neovim config — use normalize LSP for languages
+      without a native server, proxy for languages that have one
 
 ### Lint / Analysis Architecture
 

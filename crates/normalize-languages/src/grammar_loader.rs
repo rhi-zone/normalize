@@ -68,6 +68,8 @@ pub struct GrammarLoader {
     highlight_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached injection queries.
     injection_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached locals queries.
+    locals_cache: RwLock<HashMap<String, Arc<String>>>,
 }
 
 impl GrammarLoader {
@@ -98,6 +100,7 @@ impl GrammarLoader {
             cache: RwLock::new(HashMap::new()),
             highlight_cache: RwLock::new(HashMap::new()),
             injection_cache: RwLock::new(HashMap::new()),
+            locals_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -108,6 +111,7 @@ impl GrammarLoader {
             cache: RwLock::new(HashMap::new()),
             highlight_cache: RwLock::new(HashMap::new()),
             injection_cache: RwLock::new(HashMap::new()),
+            locals_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -152,6 +156,20 @@ impl GrammarLoader {
         }
 
         self.load_query(name, "injections", &self.injection_cache)
+    }
+
+    /// Get the locals query for a grammar.
+    ///
+    /// Returns None if no locals query found for the grammar.
+    /// Query files are {name}.locals.scm in the grammar search paths.
+    /// Used for within-file scope/reference resolution.
+    pub fn get_locals(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.locals_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        self.load_query(name, "locals", &self.locals_cache)
     }
 
     /// Load a query file (.scm) from external file.
