@@ -85,6 +85,9 @@ libloading = "0.8"
 # TOML parsing
 toml = "0.8"
 
+# XML parsing (read-only tree)
+roxmltree = "0.21"
+
 # Service framework
 server-less = { version = "0.2.1-alpha.3", default-features = false, features = ["cli", "jsonschema"] }
 

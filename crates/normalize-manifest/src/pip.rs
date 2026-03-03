@@ -38,7 +38,7 @@ impl ManifestParser for PipParser {
     }
 }
 
-fn parse_pip_requirement(line: &str) -> Option<DeclaredDep> {
+pub(crate) fn parse_pip_requirement(line: &str) -> Option<DeclaredDep> {
     let line = line.trim();
     if line.is_empty() {
         return None;

@@ -10,3 +10,4 @@ description = "Manifest file parsing for programming language ecosystems"
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
+roxmltree = { workspace = true }
