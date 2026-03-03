@@ -123,6 +123,18 @@ context isn't being thrown away.
 
 Before the handoff plan, update TODO.md and memory files with anything worth preserving.
 
+## Context Management
+
+**Use subagents to protect the main context window.** When a task requires broad
+exploration (many files, deep search, multi-step research), delegate to an Explore or
+general-purpose subagent rather than running the searches inline. The subagent returns
+a distilled summary; raw tool output stays out of the main context.
+
+Rules of thumb:
+- Expect to search >5 files or run >3 rounds of grep/read → use a subagent
+- Codebase-wide analysis (architecture, patterns, cross-crate survey) → always subagent
+- Single targeted lookup (one file, one symbol) → inline is fine
+
 ## Commit Convention
 
 Use conventional commits: `type(scope): message`
