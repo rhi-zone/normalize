@@ -479,6 +479,11 @@ for within-file scope/reference resolution, facts index for cross-file import/ex
 ada, capnp, elm, fsharp, gleam, haskell, javascript, lua, nix, objc,
 ocaml, r, rescript, scala, starlark, svelte, swift, thrift, tlaplus, tsx, typescript
 
+**Known locals.scm scope engine limitation:**
+- Nested destructuring (e.g. `{ a: { b } }` in parameters) requires recursive queries which
+  tree-sitter does not support. One level of object/array destructuring IS covered for JS/TS/TSX.
+  Fixing deeper nesting would require engine-level recursion (walk into nested patterns).
+
 **Write locals.scm for remaining 77 languages** (scope/reference queries — not type inference,
 just: which declaration does this identifier refer to?):
 - Each locals.scm must be accompanied by fixtures before it counts as done.
