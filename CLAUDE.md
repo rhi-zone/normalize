@@ -114,11 +114,14 @@ Use plan mode as a handoff mechanism when:
 - The session has drifted from its original purpose
 - Context has accumulated enough that a fresh start would help
 
-Enter plan mode → investigate → write the plan file → ExitPlanMode.
-The user approves, redirects, or stops. Investigation happens *inside* plan mode, not before it.
+For handoffs (session complete or drifted): enter plan mode, write a short plan file
+pointing at TODO.md, and ExitPlanMode. Do NOT investigate first — the session is already
+context-heavy and about to be discarded. The fresh session investigates after approval.
 
-After the plan is approved and the new session begins, update TODO.md and memory files
-with anything worth preserving before diving into implementation.
+For mid-session planning on a different topic: investigating inside plan mode is fine —
+context isn't being thrown away.
+
+Before the handoff plan, update TODO.md and memory files with anything worth preserving.
 
 ## Commit Convention
 
