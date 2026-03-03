@@ -1012,10 +1012,14 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] Case-insensitive matching (`-i` flag): `text-search` ✓, `view` ✓, `edit` ✓ all have it
 - `normalize fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
 - [x] Multi-file batch edit: `normalize edit --batch edits.json` (see docs/design/batch-edit.md)
-- Semantic refactoring: `normalize edit <glob> --before 'fn extract_attributes' 'fn extract_attributes(...) { ... }'`
-  - Insert method before/after another method across multiple files
-  - Uses tree-sitter for semantic targeting (not regex)
-  - `--batch` flag for multiple targets in one invocation
+- Semantic editing (proper):
+  - [x] `edit insert --each`: applies an insert to every file matching `--only` that contains the symbol
+  - Rename symbol across all callers: `normalize edit rename src/foo.rs/my_func new_name`
+    - Update all call sites, not just the definition
+  - Replace symbol by pattern: `normalize edit replace --pattern 'fn $name($args) { $body }' ...`
+    - Structural (AST-level) search-replace, not regex
+  - Add/remove trait impl boilerplate across all implementors
+  - Detect and refuse edits that would break callers (dry-run shows impact)
 - Cross-file refactors: `normalize move src/foo.rs/my_func src/bar.rs`
   - Move functions/types between files with import updates
   - Handles visibility changes (pub when crossing module boundaries)
