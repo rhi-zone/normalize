@@ -923,22 +923,38 @@ impl FileIndex {
         Ok(callees)
     }
 
-    /// Find callees with resolved import info (name, line, source_module)
-    /// Returns: (local_name, line, Option<(source_module, original_name)>)
+    /// Find callees with their resolved definition file.
+    ///
+    /// Returns `(callee_name, line, Option<def_file>)` where `def_file` is the
+    /// root-relative path of the file that defines the callee, resolved via the
+    /// imports table's `resolved_file` column. `None` means the callee is locally
+    /// defined, external, or could not be resolved.
     pub async fn find_callees_resolved(
         &self,
         file: &str,
         symbol_name: &str,
-    ) -> Result<Vec<(String, usize, Option<(String, String)>)>, libsql::Error> {
-        let callees = self.find_callees(file, symbol_name).await?;
-        let mut resolved = Vec::with_capacity(callees.len());
-
-        for (callee_name, line) in callees {
-            let source = self.resolve_import(file, &callee_name).await?;
-            resolved.push((callee_name, line, source));
+    ) -> Result<Vec<(String, usize, Option<String>)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT c.callee_name, c.line, i.resolved_file
+                 FROM calls c
+                 LEFT JOIN imports i
+                   ON c.caller_file = i.file
+                   AND c.callee_name = COALESCE(i.alias, i.name)
+                 WHERE c.caller_file = ?1 AND c.caller_symbol = ?2",
+                params![file, symbol_name],
+            )
+            .await?;
+        let mut callees = Vec::new();
+        while let Some(row) = rows.next().await? {
+            callees.push((
+                row.get(0)?,
+                row.get::<i64>(1)? as usize,
+                row.get::<Option<String>>(2)?,
+            ));
         }
-
-        Ok(resolved)
+        Ok(callees)
     }
 
     /// Find a symbol by name
