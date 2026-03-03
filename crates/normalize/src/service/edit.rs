@@ -99,7 +99,7 @@ impl EditService {
     pub fn insert(
         &self,
         #[param(positional, help = "Target symbol")] target: String,
-        #[param(positional, help = "Content to insert")] content: String,
+        #[param(help = "Content to insert")] content: String,
         #[param(help = "Position: before, after, prepend, append")] at: Position,
         #[param(help = "Dry run - show what would change")] dry_run: bool,
         #[param(help = "Exclude files matching patterns")] exclude: Vec<String>,

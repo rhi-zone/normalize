@@ -1,5 +1,30 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 138
 expression: "snapshot_help(&[\"edit\", \"insert\"])"
 ---
+Insert content relative to a symbol
 
+Usage: normalize edit insert [OPTIONS] [target]
+
+Arguments:
+  [target]  Target symbol
+
+Options:
+      --content <content>          Content to insert
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
+      --at <at>                    Position: before, after, prepend, append
+      --compact                    Compact output without colors (overrides TTY detection)
+      --json                       Output machine-readable JSON
+      --dry-run                    Dry run - show what would change
+      --jq <jq>                    Filter output through jq expression
+      --exclude <exclude>          Exclude files matching patterns
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --only <only>                Only include files matching patterns
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+  -m, --message <message>          Message for shadow history
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -i, --case-insensitive           Case-insensitive matching
+  -r, --root <root>                Root directory
+  -h, --help                       Print help
