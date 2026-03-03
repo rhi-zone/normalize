@@ -268,6 +268,14 @@ impl Language for Groovy {
             || name.ends_with("Spec.groovy")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/src/test/**/*.groovy",
+            "**/*Test.groovy",
+            "**/*Spec.groovy",
+        ]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

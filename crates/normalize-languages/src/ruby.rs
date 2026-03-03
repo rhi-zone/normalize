@@ -215,6 +215,15 @@ impl Language for Ruby {
         name.ends_with("_test.rb") || name.ends_with("_spec.rb")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/spec/**/*.rb",
+            "**/test/**/*.rb",
+            "**/*_test.rb",
+            "**/*_spec.rb",
+        ]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

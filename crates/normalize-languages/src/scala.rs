@@ -255,6 +255,15 @@ impl Language for Scala {
             || name.ends_with("Suite.scala")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/src/test/**/*.scala",
+            "**/*Test.scala",
+            "**/*Spec.scala",
+            "**/*Suite.scala",
+        ]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

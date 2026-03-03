@@ -257,6 +257,10 @@ impl Language for Perl {
         name.ends_with(".t")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/t/**/*.t", "**/*.t"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

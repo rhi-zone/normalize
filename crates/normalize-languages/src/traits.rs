@@ -203,6 +203,11 @@ pub trait Language: Send + Sync {
     /// Note: Rust integration tests in tests/ should still return true.
     fn is_test_path(&self, path: &Path) -> bool;
 
+    /// Glob patterns (relative, using `**` wildcards) that identify dedicated test files.
+    /// Used to build a GlobSet for fast batch matching.
+    /// Return `&[]` for languages with no dedicated test files (e.g. those using only inline tests).
+    fn test_file_globs(&self) -> &'static [&'static str];
+
     // === Embedded Languages ===
 
     /// Extract embedded content from a node (e.g., JS/CSS in Vue/HTML).

@@ -323,6 +323,10 @@ impl Language for Php {
         name.ends_with("Test.php")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/*Test.php"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

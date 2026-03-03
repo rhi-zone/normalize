@@ -3728,6 +3728,7 @@ version = "0.1.0"
 dependencies = [
  "ast-grep-core",
  "dirs",
+ "globset",
  "libloading 0.8.9",
  "libsql",
  "normalize-facts-core",

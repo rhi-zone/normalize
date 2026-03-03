@@ -435,6 +435,10 @@ impl Language for Python {
         name.starts_with("test_") || name.ends_with("_test.py")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/test_*.py", "**/*_test.py"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

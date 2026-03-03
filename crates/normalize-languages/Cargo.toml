@@ -170,6 +170,7 @@ lang-zig = []
 lang-zsh = []
 
 [dependencies]
+globset = "0.4"
 tree-sitter = "0.26"
 tree-sitter-language = "0.1"
 libloading.workspace = true

@@ -272,6 +272,10 @@ impl Language for FSharp {
         name.ends_with("Test.fs") || name.ends_with("Tests.fs")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/*Test.fs", "**/*Tests.fs"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

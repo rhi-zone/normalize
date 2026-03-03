@@ -369,6 +369,10 @@ impl Language for CSharp {
         name.ends_with("Test.cs") || name.ends_with("Tests.cs")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/*Test.cs", "**/*Tests.cs"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

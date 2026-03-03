@@ -252,6 +252,10 @@ impl Language for VB {
         name.ends_with("Test.vb") || name.ends_with("Tests.vb")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/*Test.vb", "**/*Tests.vb"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

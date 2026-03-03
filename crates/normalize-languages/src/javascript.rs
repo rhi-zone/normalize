@@ -138,6 +138,17 @@ impl Language for JavaScript {
             || name.ends_with(".spec.jsx")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/__tests__/**/*.js",
+            "**/__mocks__/**/*.js",
+            "**/*.test.js",
+            "**/*.spec.js",
+            "**/*.test.jsx",
+            "**/*.spec.jsx",
+        ]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

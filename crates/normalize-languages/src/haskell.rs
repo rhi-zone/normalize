@@ -272,6 +272,10 @@ impl Language for Haskell {
         name.ends_with("Spec.hs") || name.ends_with("Test.hs") || name.ends_with("Tests.hs")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/test/**/*.hs", "**/*Spec.hs", "**/*Test.hs"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

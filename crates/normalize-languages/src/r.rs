@@ -251,6 +251,10 @@ impl Language for R {
         name.starts_with("test-") || name.starts_with("test_")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/test-*.R", "**/test_*.R"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

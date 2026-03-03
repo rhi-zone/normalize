@@ -135,6 +135,17 @@ impl Language for TypeScript {
             || name.ends_with(".spec.tsx")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/__tests__/**/*.ts",
+            "**/__mocks__/**/*.ts",
+            "**/*.test.ts",
+            "**/*.spec.ts",
+            "**/*.test.tsx",
+            "**/*.spec.tsx",
+        ]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }
@@ -298,6 +309,17 @@ impl Language for Tsx {
             || name.ends_with(".spec.ts")
             || name.ends_with(".test.tsx")
             || name.ends_with(".spec.tsx")
+    }
+
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/__tests__/**/*.ts",
+            "**/__mocks__/**/*.ts",
+            "**/*.test.ts",
+            "**/*.spec.ts",
+            "**/*.test.tsx",
+            "**/*.spec.tsx",
+        ]
     }
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {

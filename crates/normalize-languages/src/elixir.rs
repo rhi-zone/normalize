@@ -297,6 +297,10 @@ impl Language for Elixir {
         name.ends_with("_test.exs")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/test/**/*.exs", "**/*_test.exs"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

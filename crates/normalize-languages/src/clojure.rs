@@ -254,6 +254,10 @@ impl Language for Clojure {
         name.ends_with("_test.clj") || name.ends_with("_test.cljs") || name.ends_with("_test.cljc")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/*_test.clj", "**/*_test.cljs", "**/*_test.cljc"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

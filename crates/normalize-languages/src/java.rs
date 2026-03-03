@@ -315,6 +315,15 @@ impl Language for Java {
         name.starts_with("Test") || name.ends_with("Test.java") || name.ends_with("Tests.java")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/src/test/**/*.java",
+            "**/Test*.java",
+            "**/*Test.java",
+            "**/*Tests.java",
+        ]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

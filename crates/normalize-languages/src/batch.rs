@@ -158,6 +158,10 @@ impl Language for Batch {
         false
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

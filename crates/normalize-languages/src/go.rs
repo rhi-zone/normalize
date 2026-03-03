@@ -288,6 +288,10 @@ impl Language for Go {
             .unwrap_or(false)
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/*_test.go"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

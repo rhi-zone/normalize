@@ -302,6 +302,10 @@ impl Language for Erlang {
         name.ends_with("_SUITE.erl") || name.ends_with("_test.erl") || name.ends_with("_tests.erl")
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/*_SUITE.erl", "**/*_test.erl", "**/*_tests.erl"]
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

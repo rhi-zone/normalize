@@ -280,10 +280,33 @@ pub fn support_for_path(path: &Path) -> Option<&'static dyn Language> {
 /// Check if a file path is a dedicated test file for its language.
 ///
 /// Returns false for unknown file types or languages that use inline tests.
+/// Matches against the language's `test_file_globs()` patterns.
 pub fn is_test_path(path: &Path) -> bool {
+    let lang = match support_for_path(path) {
+        Some(l) => l,
+        None => return false,
+    };
+    let globs = lang.test_file_globs();
+    if globs.is_empty() {
+        return false;
+    }
+    let mut builder = globset::GlobSetBuilder::new();
+    for g in globs {
+        if let Ok(glob) = globset::Glob::new(g) {
+            builder.add(glob);
+        }
+    }
+    let Ok(set) = builder.build() else {
+        return false;
+    };
+    set.is_match(path)
+}
+
+/// Get all glob patterns that identify test files for a given language extension.
+pub fn test_file_globs_for_path(path: &Path) -> &'static [&'static str] {
     support_for_path(path)
-        .map(|lang| lang.is_test_path(path))
-        .unwrap_or(false)
+        .map(|lang| lang.test_file_globs())
+        .unwrap_or(&[])
 }
 
 /// Get all supported languages.

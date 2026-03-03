@@ -270,6 +270,10 @@ impl Language for Svelte {
         false
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
         extract_embedded_content(node, content)
     }

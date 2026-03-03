@@ -107,6 +107,10 @@ impl Language for Html {
         false
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
         match node.kind() {
             "script_element" => {
