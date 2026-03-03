@@ -3,7 +3,7 @@
 use super::list::project_from_path;
 use super::stats::{list_all_project_sessions, parse_date};
 use crate::output::OutputFormatter;
-use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile};
+use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile, TokenUsage};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -60,6 +60,9 @@ pub struct MessageRecord {
     pub timestamp: Option<String>,
     pub text: String,
     pub char_count: usize,
+    /// Token usage for this turn (present on assistant messages when available).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<TokenUsage>,
 }
 
 /// Report containing all extracted messages.
@@ -70,6 +73,9 @@ pub struct MessagesReport {
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) pretty: bool,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) show_usage: bool,
 }
 
 /// Aggregate stats for the messages report.
@@ -79,6 +85,12 @@ pub struct MessagesStats {
     pub total_sessions: usize,
     pub total_chars: usize,
     pub by_role: HashMap<String, usize>,
+    /// Total input tokens across all assistant turns (when usage data available).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_input_tokens: Option<u64>,
+    /// Total output tokens across all assistant turns (when usage data available).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_output_tokens: Option<u64>,
 }
 
 impl OutputFormatter for MessagesReport {
@@ -95,9 +107,16 @@ impl OutputFormatter for MessagesReport {
             // Trim timestamp to just date+time (no timezone)
             let ts_short = if ts.len() > 19 { &ts[..19] } else { ts };
             let ts_display = ts_short.replace('T', " ");
+
+            let usage_suffix = if self.show_usage {
+                format_usage_text(msg.usage.as_ref())
+            } else {
+                String::new()
+            };
+
             lines.push(format!(
-                "[{}] turn {} ({}, {}) {}",
-                id_short, msg.turn, msg.role, ts_display, msg.text
+                "[{}] turn {} ({}, {}){} {}",
+                id_short, msg.turn, msg.role, ts_display, usage_suffix, msg.text
             ));
         }
 
@@ -107,11 +126,23 @@ impl OutputFormatter for MessagesReport {
             pairs.sort_by_key(|(k, _)| (*k).clone());
             pairs.iter().map(|(k, v)| format!("{}: {}", k, v)).collect()
         };
+        let token_summary = if self.show_usage {
+            match (
+                self.stats.total_input_tokens,
+                self.stats.total_output_tokens,
+            ) {
+                (Some(i), Some(o)) => format!(" | tokens: in={} out={}", i, o),
+                _ => String::new(),
+            }
+        } else {
+            String::new()
+        };
         lines.push(format!(
-            "--- {} messages from {} sessions ({}) ---",
+            "--- {} messages from {} sessions ({}){} ---",
             self.stats.total_messages,
             self.stats.total_sessions,
             role_summary.join(", "),
+            token_summary,
         ));
 
         lines.join("\n")
@@ -144,9 +175,15 @@ impl OutputFormatter for MessagesReport {
                 .map(|p| format!(" \x1b[36m{}\x1b[0m", p))
                 .unwrap_or_default();
 
+            let usage_tag = if self.show_usage {
+                format_usage_pretty(msg.usage.as_ref())
+            } else {
+                String::new()
+            };
+
             lines.push(format!(
-                "\x1b[33m{}\x1b[0m {} \x1b[90m{}\x1b[0m{} {}",
-                id_short, role_badge, ts_display, project_tag, msg.text
+                "\x1b[33m{}\x1b[0m {} \x1b[90m{}\x1b[0m{}{} {}",
+                id_short, role_badge, ts_display, project_tag, usage_tag, msg.text
             ));
         }
 
@@ -156,15 +193,60 @@ impl OutputFormatter for MessagesReport {
             pairs.sort_by_key(|(k, _)| (*k).clone());
             pairs.iter().map(|(k, v)| format!("{}: {}", k, v)).collect()
         };
+        let token_summary = if self.show_usage {
+            match (
+                self.stats.total_input_tokens,
+                self.stats.total_output_tokens,
+            ) {
+                (Some(i), Some(o)) => format!(" | \x1b[33mtokens:\x1b[0m in={} out={}", i, o),
+                _ => String::new(),
+            }
+        } else {
+            String::new()
+        };
         lines.push(format!(
-            "\x1b[1m--- {} messages from {} sessions ({}) ---\x1b[0m",
+            "\x1b[1m--- {} messages from {} sessions ({}){} ---\x1b[0m",
             self.stats.total_messages,
             self.stats.total_sessions,
             role_summary.join(", "),
+            token_summary,
         ));
 
         lines.join("\n")
     }
+}
+
+/// Format usage as a compact text suffix: ` [in:1234 out:567]`
+fn format_usage_text(usage: Option<&TokenUsage>) -> String {
+    let Some(u) = usage else {
+        return String::new();
+    };
+    let mut parts = vec![format!("in:{}", u.input), format!("out:{}", u.output)];
+    if let Some(cr) = u.cache_read.filter(|&v| v > 0) {
+        parts.push(format!("cache_read:{}", cr));
+    }
+    if let Some(cc) = u.cache_create.filter(|&v| v > 0) {
+        parts.push(format!("cache_create:{}", cc));
+    }
+    format!(" [{}]", parts.join(" "))
+}
+
+/// Format usage as a colored pretty tag for terminal output.
+fn format_usage_pretty(usage: Option<&TokenUsage>) -> String {
+    let Some(u) = usage else {
+        return String::new();
+    };
+    let mut parts = vec![
+        format!("\x1b[33min:{}\x1b[0m", u.input),
+        format!("\x1b[32mout:{}\x1b[0m", u.output),
+    ];
+    if let Some(cr) = u.cache_read.filter(|&v| v > 0) {
+        parts.push(format!("\x1b[36mcr:{}\x1b[0m", cr));
+    }
+    if let Some(cc) = u.cache_create.filter(|&v| v > 0) {
+        parts.push(format!("\x1b[35mcc:{}\x1b[0m", cc));
+    }
+    format!(" \x1b[90m[{}]\x1b[0m", parts.join(" "))
 }
 
 /// Build a messages report by extracting messages from sessions.
@@ -182,6 +264,8 @@ pub fn build_messages_report(
     all_projects: bool,
     max_chars: Option<usize>,
     no_truncate: bool,
+    show_usage: bool,
+    sort_by_tokens: bool,
     pretty: bool,
 ) -> Result<MessagesReport, String> {
     let registry = FormatRegistry::new();
@@ -306,6 +390,13 @@ pub fn build_messages_report(
                 // Truncate + collapse whitespace for display
                 let display_text = truncate_text(&text, max_text_len);
 
+                // Token usage: attach to assistant messages from the turn
+                let usage = if role_str == "assistant" {
+                    turn.token_usage.clone()
+                } else {
+                    None
+                };
+
                 messages.push(MessageRecord {
                     session_id: session_id.clone(),
                     project: project.clone(),
@@ -314,17 +405,35 @@ pub fn build_messages_report(
                     timestamp: msg.timestamp.clone(),
                     char_count: text.len(),
                     text: display_text,
+                    usage,
                 });
             }
         }
     }
 
+    // Sort by descending total tokens if requested
+    if sort_by_tokens {
+        messages.sort_by(|a, b| {
+            let tok_a = a.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
+            let tok_b = b.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
+            tok_b.cmp(&tok_a)
+        });
+    }
+
     // Build stats
     let mut by_role: HashMap<String, usize> = HashMap::new();
     let mut total_chars = 0;
+    let mut total_input_tokens: u64 = 0;
+    let mut total_output_tokens: u64 = 0;
+    let mut has_token_data = false;
     for msg in &messages {
         *by_role.entry(msg.role.clone()).or_insert(0) += 1;
         total_chars += msg.char_count;
+        if let Some(ref u) = msg.usage {
+            total_input_tokens += u.input;
+            total_output_tokens += u.output;
+            has_token_data = true;
+        }
     }
 
     let stats = MessagesStats {
@@ -332,12 +441,15 @@ pub fn build_messages_report(
         total_sessions: session_count,
         total_chars,
         by_role,
+        total_input_tokens: has_token_data.then_some(total_input_tokens),
+        total_output_tokens: has_token_data.then_some(total_output_tokens),
     };
 
     Ok(MessagesReport {
         messages,
         stats,
         pretty,
+        show_usage,
     })
 }
 

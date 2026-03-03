@@ -220,6 +220,9 @@ impl SessionsService {
         #[param(short = 'n', help = "Maximum number of sessions")] limit: Option<usize>,
         #[param(help = "Truncate message text to N chars (default: 200)")] max_chars: Option<usize>,
         #[param(help = "Don't truncate message text")] no_truncate: bool,
+        #[param(help = "Show per-turn token usage (input/output/cache)")] show_usage: bool,
+        #[param(help = "Sort by descending token count (heaviest turns first)")]
+        sort_by_tokens: bool,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -244,6 +247,8 @@ impl SessionsService {
             all_projects,
             max_chars,
             no_truncate,
+            show_usage,
+            sort_by_tokens,
             is_pretty,
         )
     }

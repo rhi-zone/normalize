@@ -1299,14 +1299,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 
 7. **Message filtering + token usage** (PARTIALLY DONE)
    - ✅ `normalize sessions messages` — cross-session extraction with `--role`, `--grep`, date filters
-   - **Add per-turn token usage to `sessions messages` output.**
-     Claude JSONL logs include `usage` fields (`input_tokens`, `output_tokens`, `cache_read_input_tokens`,
-     `cache_creation_input_tokens`) on assistant turns. Surface these per turn:
-     - Text format: append `[in: 1234 out: 567]` (or similar) after each turn header
-     - JSON format: include `usage: { input_tokens, output_tokens, cache_read, cache_creation }` on each message
-     - Add `--usage` flag to opt in (off by default to keep output concise), or always show in JSON
-     - Also consider: `--sort-by tokens` to surface the heaviest turns
-     - Feeds into `sessions stats` token hotspot analysis
+   - ✅ Per-turn token usage: `--show-usage` flag adds `[in:N out:N cache_read:N]` to each assistant turn header; `--sort-by-tokens` sorts heaviest turns first; JSON format includes `usage` object on each message; stats show totals
    - `--role` is only one filter axis; evolve toward a composable filter system:
      - `--has-tool <name>` — messages in turns that used a specific tool
      - `--min-chars <N>` / `--max-chars <N>` — filter by message length (not just truncation)

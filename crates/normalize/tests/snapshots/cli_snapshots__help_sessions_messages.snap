@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 383
 expression: "snapshot_help(&[\"sessions\", \"messages\"])"
 ---
 Extract all messages across sessions into a flat, queryable form
@@ -25,6 +24,8 @@ Options:
   -n, --limit <limit>              Maximum number of sessions
       --max-chars <max-chars>      Truncate message text to N chars (default: 200)
       --no-truncate                Don't truncate message text
+      --show-usage                 Show per-turn token usage (input/output/cache)
+      --sort-by-tokens             Sort by descending token count (heaviest turns first)
   -r, --root <root>                Root directory (defaults to current directory)
       --pretty                     Enable pretty
       --compact                    Enable compact
