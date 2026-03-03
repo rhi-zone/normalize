@@ -17,8 +17,12 @@ impl LogFormat for ClaudeCodeFormat {
     }
 
     fn sessions_dir(&self, project: Option<&Path>) -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        let claude_dir = PathBuf::from(home).join(".claude/projects");
+        let claude_dir = if let Ok(dir) = std::env::var("CLAUDE_SESSIONS_DIR") {
+            PathBuf::from(dir)
+        } else {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+            PathBuf::from(home).join(".claude/projects")
+        };
 
         // Claude encodes project paths - check which encoding variant exists
         let path_to_claude_dir = |path: &Path| -> PathBuf {
