@@ -400,6 +400,32 @@ fn collect_binding_identifiers(
 mod tests {
     use super::*;
 
+    fn print_tree(lang: &str, src: &str, loader: &GrammarLoader) {
+        let Some(grammar) = loader.get(lang) else {
+            eprintln!("no grammar for {lang}");
+            return;
+        };
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&grammar).unwrap();
+        let tree = parser.parse(src, None).unwrap();
+        fn walk(node: tree_sitter::Node, src: &[u8], indent: usize) {
+            let text = node.utf8_text(src).unwrap_or("?");
+            let display = if text.len() > 40 { &text[..40] } else { text };
+            eprintln!(
+                "{}{} [{}..{}] {:?}",
+                "  ".repeat(indent),
+                node.kind(),
+                node.start_byte(),
+                node.end_byte(),
+                display
+            );
+            for child in node.children(&mut node.walk()) {
+                walk(child, src, indent + 1);
+            }
+        }
+        walk(tree.root_node(), src.as_bytes(), 0);
+    }
+
     fn grammar_dir() -> Option<std::path::PathBuf> {
         let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -2039,5 +2065,384 @@ mod tests {
         let src = "@0xdbb9ad1f14bf0b36;\nstruct Point { x @0 :Float64; y @1 :Float64; }";
         let defs = engine.find_definitions("capnp", src, "x");
         assert_eq!(defs.len(), 1, "capnp: field x should be defined");
+    }
+
+    // ── Scheme ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_scheme_function_define() {
+        let l = loader();
+        if skip_if_no(&l, "scheme") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(define (f x y) (+ x y))";
+        let defs = engine.find_definitions("scheme", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "scheme: parameter x in (define (f x y) ...) should be defined"
+        );
+        let refs = engine.find_references("scheme", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "scheme: x reference should resolve");
+    }
+
+    #[test]
+    fn test_scheme_variable_define() {
+        let l = loader();
+        if skip_if_no(&l, "scheme") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(define x 42)";
+        let defs = engine.find_definitions("scheme", src, "x");
+        assert_eq!(defs.len(), 1, "scheme: (define x val) should define x");
+    }
+
+    #[test]
+    fn test_scheme_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "scheme") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(lambda (unused) (let ((z 1)) z))";
+        let defs = engine.find_definitions("scheme", src, "z");
+        assert_eq!(defs.len(), 1, "scheme: let binding z should be defined");
+        let refs = engine.find_references("scheme", src, "z");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "scheme: z reference should resolve to let binding"
+        );
+    }
+
+    #[test]
+    fn test_scheme_lambda_param() {
+        let l = loader();
+        if skip_if_no(&l, "scheme") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(lambda (x y) (+ x y))";
+        let defs = engine.find_definitions("scheme", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "scheme: lambda parameter x should be defined"
+        );
+    }
+
+    // ── Common Lisp ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_commonlisp_defun_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "commonlisp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(defun add (x y) (+ x y))";
+        let defs = engine.find_definitions("commonlisp", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "commonlisp: defun parameter x should be defined"
+        );
+        let refs = engine.find_references("commonlisp", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "commonlisp: x reference should resolve");
+    }
+
+    #[test]
+    fn test_commonlisp_defun_name() {
+        let l = loader();
+        if skip_if_no(&l, "commonlisp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(defun add (x y) (+ x y))";
+        let defs = engine.find_definitions("commonlisp", src, "add");
+        assert_eq!(
+            defs.len(),
+            1,
+            "commonlisp: defun name add should be defined"
+        );
+    }
+
+    #[test]
+    fn test_commonlisp_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "commonlisp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(defun f () (let ((z 1)) z))";
+        let defs = engine.find_definitions("commonlisp", src, "z");
+        assert_eq!(defs.len(), 1, "commonlisp: let binding z should be defined");
+        let refs = engine.find_references("commonlisp", src, "z");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "commonlisp: z reference should resolve to let binding"
+        );
+    }
+
+    // ── Emacs Lisp ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_elisp_defun_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "elisp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(defun add (x y) (+ x y))";
+        let defs = engine.find_definitions("elisp", src, "x");
+        assert_eq!(defs.len(), 1, "elisp: defun parameter x should be defined");
+        let refs = engine.find_references("elisp", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "elisp: x reference should resolve");
+    }
+
+    #[test]
+    fn test_elisp_defun_name() {
+        let l = loader();
+        if skip_if_no(&l, "elisp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(defun add (x y) (+ x y))";
+        let defs = engine.find_definitions("elisp", src, "add");
+        assert_eq!(defs.len(), 1, "elisp: defun name add should be defined");
+    }
+
+    #[test]
+    fn test_elisp_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "elisp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(defun f () (let ((z 1)) z))";
+        let defs = engine.find_definitions("elisp", src, "z");
+        assert_eq!(defs.len(), 1, "elisp: let binding z should be defined");
+        let refs = engine.find_references("elisp", src, "z");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "elisp: z reference should resolve to let binding"
+        );
+    }
+
+    // ── Prolog ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_prolog_clause_variable() {
+        let l = loader();
+        if skip_if_no(&l, "prolog") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "foo(X, Y) :- bar(X), baz(Y).";
+        let defs = engine.find_definitions("prolog", src, "X");
+        assert!(!defs.is_empty(), "prolog: variable X should be captured");
+        let refs = engine.find_references("prolog", src, "X");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "prolog: X reference should resolve within clause"
+        );
+    }
+
+    #[test]
+    fn test_prolog_anon_variable_excluded() {
+        let l = loader();
+        if skip_if_no(&l, "prolog") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "foo(_, X) :- bar(X).";
+        let defs = engine.find_definitions("prolog", src, "_");
+        assert_eq!(
+            defs.len(),
+            0,
+            "prolog: anonymous variable _ should not be defined"
+        );
+    }
+
+    // ── Fish ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_fish_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "fish") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function myfunc\n  echo hello\nend";
+        let defs = engine.find_definitions("fish", src, "myfunc");
+        assert_eq!(
+            defs.len(),
+            1,
+            "fish: function name myfunc should be defined"
+        );
+    }
+
+    #[test]
+    fn test_fish_for_variable() {
+        let l = loader();
+        if skip_if_no(&l, "fish") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function outer\n  for i in a b c\n    echo $i\n  end\nend";
+        let defs = engine.find_definitions("fish", src, "i");
+        assert_eq!(defs.len(), 1, "fish: for loop variable i should be defined");
+        let refs = engine.find_references("fish", src, "i");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "fish: $i reference should resolve to for variable"
+        );
+    }
+
+    // ── Zsh ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_zsh_variable_assignment() {
+        let l = loader();
+        if skip_if_no(&l, "zsh") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "x=1";
+        let defs = engine.find_definitions("zsh", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "zsh: bare variable assignment x should be defined"
+        );
+    }
+
+    // ── PowerShell ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_powershell_function_param() {
+        let l = loader();
+        if skip_if_no(&l, "powershell") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function foo {\n  param($x)\n  $x + 1\n}";
+        let defs = engine.find_definitions("powershell", src, "$x");
+        assert_eq!(defs.len(), 1, "powershell: param $x should be defined");
+        let refs = engine.find_references("powershell", src, "$x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "powershell: $x reference should resolve");
+    }
+
+    #[test]
+    fn test_powershell_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "powershell") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function foo {\n  param($x)\n  $x + 1\n}";
+        let defs = engine.find_definitions("powershell", src, "foo");
+        assert_eq!(
+            defs.len(),
+            1,
+            "powershell: function name foo should be defined"
+        );
+    }
+
+    #[test]
+    fn test_powershell_foreach_variable() {
+        let l = loader();
+        if skip_if_no(&l, "powershell") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "foreach ($item in @(1,2,3)) { $item }";
+        let defs = engine.find_definitions("powershell", src, "$item");
+        assert_eq!(
+            defs.len(),
+            1,
+            "powershell: foreach variable $item should be defined"
+        );
+    }
+
+    // ── Vim ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_vim_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "vim") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function! Foo()\n  let x = 1\n  let y = x + 1\nendfunction";
+        let defs = engine.find_definitions("vim", src, "x");
+        assert_eq!(defs.len(), 1, "vim: let x should be defined");
+        let refs = engine.find_references("vim", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "vim: x reference should resolve");
+    }
+
+    #[test]
+    fn test_vim_function_param() {
+        let l = loader();
+        if skip_if_no(&l, "vim") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function! Foo(bar)\n  let l:x = bar\nendfunction";
+        let defs = engine.find_definitions("vim", src, "bar");
+        assert_eq!(
+            defs.len(),
+            1,
+            "vim: function parameter bar should be defined"
+        );
+    }
+
+    #[test]
+    fn test_vim_scoped_let() {
+        let l = loader();
+        if skip_if_no(&l, "vim") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function! Foo()\n  let l:y = 1\nendfunction";
+        let defs = engine.find_definitions("vim", src, "y");
+        assert_eq!(defs.len(), 1, "vim: let l:y should define y");
+    }
+
+    // ── SQL ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_sql_cte_name() {
+        let l = loader();
+        if skip_if_no(&l, "sql") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "WITH x AS (SELECT 1) SELECT * FROM x";
+        let defs = engine.find_definitions("sql", src, "x");
+        assert_eq!(defs.len(), 1, "sql: CTE name x should be defined");
+    }
+
+    #[test]
+    fn test_sql_table_alias() {
+        let l = loader();
+        if skip_if_no(&l, "sql") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "SELECT t.col FROM tbl AS t";
+        let defs = engine.find_definitions("sql", src, "t");
+        assert_eq!(defs.len(), 1, "sql: table alias t should be defined");
     }
 }
