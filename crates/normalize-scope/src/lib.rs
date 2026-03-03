@@ -2,11 +2,32 @@
 //!
 //! Parses `locals.scm` query files to resolve symbol references to their
 //! definitions within a single source file. Uses the tree-sitter locals
-//! convention:
+//! convention plus one engine extension:
 //!
 //! - `@local.scope` — marks a node that creates a new lexical scope
 //! - `@local.definition` / `@local.definition.*` — marks a name-binding site
 //! - `@local.reference` — marks an identifier that refers to a bound name
+//!
+//! ## Engine extension: `@local.definition.each`
+//!
+//! Standard tree-sitter queries have no recursion, so a query like
+//! `(object_pattern (identifier) @local.definition)` only catches identifiers
+//! one level deep — it misses `{ a: { b } }`.
+//!
+//! This engine adds `@local.definition.each`: when a pattern node is captured
+//! with this name, the engine recursively walks the subtree and emits a
+//! definition for every named leaf node whose kind is `"identifier"` or ends
+//! with `"_pattern"` (e.g. `shorthand_property_identifier_pattern`). This
+//! handles arbitrarily nested destructuring without enumerating depths in the
+//! query.
+//!
+//! Example — in `javascript.locals.scm`:
+//! ```text
+//! (formal_parameters (_) @local.definition.each)
+//! ```
+//! This captures every direct child of `formal_parameters` and recurses into
+//! it, collecting `x`, `a`, `b` from `f(x, { a: { b } })` without knowing
+//! the nesting depth in advance.
 //!
 //! # Usage
 //!
