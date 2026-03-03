@@ -4,8 +4,8 @@
 ; represented as call nodes with target "def"/"defp". Without predicate
 ; support we can't capture their parameters as definitions here.
 ;
-; This file covers anonymous functions (fn...end) and stab clauses,
-; which do use explicit stab_clause nodes.
+; This file covers anonymous functions (fn...end), stab clauses, and
+; pattern match bindings (x = expr).
 
 ; Scopes
 ; ------
@@ -24,6 +24,10 @@
 (stab_clause
   left: (arguments
     (identifier) @local.definition))
+
+; Pattern match binding (x = expr) is intentionally omitted: tree-sitter
+; text predicates (#eq?) don't work on unnamed node captures in field position,
+; and the broad fallback (left of any binary_operator) produces false positives.
 
 ; References
 ; ----------

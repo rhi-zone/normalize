@@ -779,7 +779,9 @@ mod tests {
             return;
         }
         let engine = ScopeEngine::new(&l);
-        // x + y should NOT produce any definitions (x is a reference, not a binding)
+        // x + y should not produce definitions — predicates on unnamed operator nodes
+        // don't work in tree-sitter field position, so we omit the binary_operator
+        // pattern rather than risk false positives.
         let src = "x + y\n";
         let defs = engine.find_definitions("elixir", src, "x");
         assert_eq!(
@@ -816,5 +818,65 @@ mod tests {
         let src = "F = fun(X) -> X * 2 end.\n";
         let defs = engine.find_definitions("erlang", src, "X");
         assert_eq!(defs.len(), 1, "erlang: anonymous function parameter X");
+    }
+
+    // ── Clojure ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_clojure_defn_name() {
+        let l = loader();
+        if skip_if_no(&l, "clojure") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(defn add [x y] (+ x y))\n";
+        let defs = engine.find_definitions("clojure", src, "add");
+        assert_eq!(defs.len(), 1, "clojure: defn should define function name");
+    }
+
+    #[test]
+    fn test_clojure_fn_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "clojure") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(fn [x y] (+ x y))\n";
+        let defs = engine.find_definitions("clojure", src, "x");
+        assert_eq!(defs.len(), 1, "clojure: fn parameter x");
+        let refs = engine.find_references("clojure", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "clojure: x reference should resolve to param"
+        );
+    }
+
+    #[test]
+    fn test_clojure_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "clojure") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "(let [x 1] (inc x))\n";
+        let defs = engine.find_definitions("clojure", src, "x");
+        assert_eq!(defs.len(), 1, "clojure: let binding x");
+        let refs = engine.find_references("clojure", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "clojure: x in (inc x) should resolve");
+    }
+
+    #[test]
+    fn test_clojure_no_false_scope() {
+        let l = loader();
+        if skip_if_no(&l, "clojure") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // A regular function call (not a def form) should not create definitions
+        let src = "(foo x y)\n";
+        let defs = engine.find_definitions("clojure", src, "foo");
+        assert_eq!(defs.len(), 0, "clojure: (foo x y) should not define foo");
     }
 }
