@@ -10,24 +10,22 @@
 //!
 //! ## Engine extension: `@local.definition.each`
 //!
-//! Standard tree-sitter queries have no recursion, so a query like
+//! Tree-sitter queries have no recursion. A pattern like
 //! `(object_pattern (identifier) @local.definition)` only catches identifiers
-//! one level deep — it misses `{ a: { b } }`.
+//! one level deep and misses `{ a: { b } }`.
 //!
-//! This engine adds `@local.definition.each`: when a pattern node is captured
-//! with this name, the engine recursively walks the subtree and emits a
-//! definition for every named leaf node whose kind is `"identifier"` or ends
-//! with `"_pattern"` (e.g. `shorthand_property_identifier_pattern`). This
-//! handles arbitrarily nested destructuring without enumerating depths in the
-//! query.
+//! Use `@local.definition.each` to capture a pattern node and have the engine
+//! recursively walk its subtree, emitting a definition for every named leaf
+//! whose kind is `"identifier"` or ends with `"_pattern"`.
 //!
-//! Example — in `javascript.locals.scm`:
+//! Example (`javascript.locals.scm`):
+//!
 //! ```text
 //! (formal_parameters (_) @local.definition.each)
 //! ```
-//! This captures every direct child of `formal_parameters` and recurses into
-//! it, collecting `x`, `a`, `b` from `f(x, { a: { b } })` without knowing
-//! the nesting depth in advance.
+//!
+//! This collects `x`, `a`, and `b` from `f(x, { a: { b } })` without
+//! knowing the nesting depth in advance.
 //!
 //! # Usage
 //!
