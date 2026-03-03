@@ -1259,10 +1259,72 @@ pub fn cmd_edit_rename(
         }
     }
 
+    // Build scope-aware callers_by_file.
+    //
+    // For languages that have locals.scm queries, use the scope engine to filter
+    // out references that resolve to a *locally-defined* symbol (i.e., a different
+    // function with the same name defined in the same file). References where
+    // `definition = None` are unresolved within the file — meaning they refer to
+    // something outside (an import), and are safe to rename.
+    //
+    // Falls back to the index callers (name-only match) for languages without
+    // locals.scm support. These may still contain false positives.
+    let callers_by_file: std::collections::HashMap<String, Vec<usize>> = {
+        use normalize_languages::support_for_path;
+        use normalize_scope::ScopeEngine;
+        let loader = normalize_languages::GrammarLoader::new();
+        let engine = ScopeEngine::new(&loader);
+
+        // Candidate files: union of index callers + importers
+        let mut candidate_files: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        for (file, _, _) in &callers {
+            candidate_files.insert(file.clone());
+        }
+        for (file, _, _, _) in &importers {
+            candidate_files.insert(file.clone());
+        }
+
+        let mut map: std::collections::HashMap<String, Vec<usize>> =
+            std::collections::HashMap::new();
+        for rel_path in candidate_files {
+            if rel_path == def_rel_path {
+                continue; // definition file handled separately
+            }
+            let abs_path = root.join(&rel_path);
+            if let Some(lang) = support_for_path(&abs_path)
+                && engine.has_locals(lang.grammar_name())
+            {
+                // Scope-aware path: only include references that do NOT
+                // resolve to a local definition in this file. Those are
+                // the imported (cross-file) references we want to rename.
+                if let Ok(source) = std::fs::read_to_string(&abs_path) {
+                    let refs = engine.find_references(lang.grammar_name(), &source, old_name);
+                    let lines: Vec<usize> = refs
+                        .iter()
+                        .filter(|r| r.definition.is_none())
+                        .map(|r| r.location.line)
+                        .collect();
+                    if !lines.is_empty() {
+                        map.insert(rel_path, lines);
+                    }
+                }
+                continue;
+            }
+            // Fallback: use index callers for this file (name-only, may have false positives)
+            for (file, _, line) in &callers {
+                if file == &rel_path {
+                    map.entry(rel_path.clone()).or_default().push(*line);
+                }
+            }
+        }
+        map
+    };
+
     // Collect all files to touch (deduplicated)
     let mut all_files: HashSet<String> = HashSet::new();
     all_files.insert(def_rel_path.clone());
-    for (file, _, _) in &callers {
+    for file in callers_by_file.keys() {
         all_files.insert(file.clone());
     }
     for (file, _, _, _) in &importers {
@@ -1301,13 +1363,6 @@ pub fn cmd_edit_rename(
     }
 
     // 2. Rename at call sites
-    // Group callers by file so we read each file once
-    let mut callers_by_file: std::collections::HashMap<String, Vec<usize>> =
-        std::collections::HashMap::new();
-    for (file, _, line) in &callers {
-        callers_by_file.entry(file.clone()).or_default().push(*line);
-    }
-
     for (rel_path, lines) in &callers_by_file {
         if rel_path == &def_rel_path {
             // Already handled (definition); any self-recursive calls also in definition file

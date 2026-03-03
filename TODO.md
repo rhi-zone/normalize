@@ -7,16 +7,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
 extract, inline, move — correct, without LSPs, without false positives.
 
-1. **Scope analysis engine** (foundation for everything else)
-   - Copy `locals.scm` in xtask; add `get_locals()` to `GrammarLoader`
-   - Parse `@definition.*` / `@reference` / `@scope` captures → within-file reference graph
-   - `normalize find-references <symbol>` command (locals within-file + facts index cross-file)
+1. ~~**Scope analysis engine** (foundation for everything else)~~ **DONE**
+   - [x] Copy `locals.scm` in xtask; add `get_locals()` to `GrammarLoader`
+   - [x] Parse `@definition.*` / `@reference` / `@scope` captures → within-file reference graph (`normalize-scope` crate)
+   - [x] `normalize find-references <symbol>` command (locals within-file scope engine)
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
-2. **Fix `edit rename` false positives**
-   - Store module-qualified caller/callee in facts index
-   - Post-filter: verify callee resolves to definition file via import graph
-   - Then: wire rename to use find-references instead of find-callers-by-name
+2. ~~**Fix `edit rename` false positives** (step 1 done)~~ **PARTIALLY DONE**
+   - [x] Wire rename to use scope engine for files with locals.scm (filters out locally-defined symbols)
+   - [ ] Store module-qualified caller/callee in facts index (step 2: cross-file correctness)
+   - [ ] Post-filter: verify callee resolves to definition file via import graph (step 3)
    - See: "HIGH PRIORITY: `edit rename` false positives" in [Semantic Editing](#semantic-editing)
 
 3. **locals.scm for high-value languages** (rust, python, go, java, c, cpp, c_sharp, kotlin,
@@ -463,13 +463,13 @@ all ~98 supported languages, without relying on LSPs. Strategy: tree-sitter loca
 for within-file scope/reference resolution, facts index for cross-file import/export graph.
 
 **locals.scm query support (foundation):**
-- [ ] Copy `locals.scm` in xtask alongside `highlights.scm`/`injections.scm`
-- [ ] Add `get_locals(name)` to `GrammarLoader` (mirrors `get_highlights`/`get_injections`)
-- [ ] Scope analysis engine: parse `@definition.*`, `@reference`, `@scope` captures → reference graph
+- [x] Copy `locals.scm` in xtask alongside `highlights.scm`/`injections.scm`
+- [x] Add `get_locals(name)` to `GrammarLoader` (mirrors `get_highlights`/`get_injections`)
+- [x] Scope analysis engine: parse `@definition.*`, `@reference`, `@scope` captures → reference graph
       - Given a reference node: walk scope tree upward to find the matching definition
       - Given a definition node: find all reference nodes in its scope
-- [ ] `normalize find-references <symbol>` command (within-file via locals + cross-file via facts index)
-- [ ] Fix `normalize edit rename` to use find-references instead of find-callers-by-name
+- [x] `normalize find-references <symbol>` command (within-file via locals + cross-file via facts index)
+- [x] Fix `normalize edit rename` to use scope engine for languages with locals.scm (step 1: within-file disambiguation)
 
 **21 arborium grammars already have locals.scm** (no work needed):
 ada, capnp, elm, fsharp, gleam, haskell, javascript, lua, nix, objc,
@@ -1130,13 +1130,15 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
     - [x] Conflict detection: refuse when new name already exists as symbol or import; --force to override
     - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
     - Integration with shadow git: checkpoint before large refactors, rollback on failure
-    - **HIGH PRIORITY: `edit rename` false positives from `find_callers`.**
-      `find_callers(name)` is not module-scoped: it returns every call to any function named `name`
-      across the whole codebase, not just callers of the specific definition being renamed.
-      A project with two unrelated `foo()` functions in different modules will have both renamed.
-      Fix requires the index to store module-qualified caller/callee names, or a post-filter that
-      checks whether the callee resolves to the same definition file via the imports graph.
-      Until fixed, `edit rename` is safe only when the symbol name is unique across the project.
+    - **`edit rename` false positives — step 1 done, steps 2+3 remain.**
+      Step 1 (done): for languages with locals.scm, scope engine filters out references that
+      resolve to a locally-defined symbol (different `foo` in the same file). References with
+      `definition = None` (unresolved = likely imported) are the only ones renamed.
+      Step 2 (todo): store module-qualified caller/callee in the facts index — fixes cross-file
+      case where two files each define a different `foo` but both appear in `find_callers`.
+      Step 3 (todo): post-filter callers via import graph (verify callee resolves to def file).
+      Until step 2+3 done, rename is still unsafe for non-scope-supported languages when the
+      same name exists in multiple modules.
     - **Local rename (`edit rename path/func/local new_name`)**: scoped rename within a block.
       No index needed. Two tiers:
       - Conservative: `replace_all_words` within the container's byte range, stop at any nested
