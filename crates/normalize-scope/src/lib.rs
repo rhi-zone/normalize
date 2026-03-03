@@ -2,30 +2,40 @@
 //!
 //! Parses `locals.scm` query files to resolve symbol references to their
 //! definitions within a single source file. Uses the tree-sitter locals
-//! convention plus one engine extension:
+//! convention:
 //!
 //! - `@local.scope` — marks a node that creates a new lexical scope
 //! - `@local.definition` / `@local.definition.*` — marks a name-binding site
 //! - `@local.reference` — marks an identifier that refers to a bound name
 //!
-//! ## Engine extension: `@local.definition.each`
+//! ## Handling destructuring patterns: `@local.definition.each` + `@local.binding-leaf`
 //!
-//! Tree-sitter queries have no recursion. A pattern like
-//! `(object_pattern (identifier) @local.definition)` only catches identifiers
-//! one level deep and misses `{ a: { b } }`.
+//! Tree-sitter queries only match direct children (`(A (B))` requires `B` to be
+//! a named child of `A`). Arbitrarily nested destructuring (`{ a: { b } }`)
+//! can't be expressed in a finite set of fixed-depth query patterns.
 //!
-//! Use `@local.definition.each` to capture a pattern node and have the engine
-//! recursively walk its subtree, emitting a definition for every named leaf
-//! whose kind is `"identifier"` or ends with `"_pattern"`.
+//! This engine supports two extension captures that work together:
+//!
+//! - **`@local.binding-leaf`** — declares which node kinds count as binding
+//!   identifiers in this language. The engine collects these kinds from all
+//!   matches in the query pass.
+//! - **`@local.definition.each`** — captures a container node (e.g. a pattern
+//!   or parameter node) and triggers recursive descent, emitting a definition
+//!   for every descendant leaf whose kind is in the `@local.binding-leaf` set.
 //!
 //! Example (`javascript.locals.scm`):
 //!
 //! ```text
+//! ; Declare binding leaf kinds for this language
+//! (identifier) @local.binding-leaf
+//! (shorthand_property_identifier_pattern) @local.binding-leaf
+//!
+//! ; Recurse into each parameter child — handles f(x), f({ a: { b } }), f([x, y])
 //! (formal_parameters (_) @local.definition.each)
 //! ```
 //!
-//! This collects `x`, `a`, and `b` from `f(x, { a: { b } })` without
-//! knowing the nesting depth in advance.
+//! The engine has no hardcoded knowledge of which node kinds are bindings in any
+//! given language — that belongs entirely in the `.scm` file.
 //!
 //! # Usage
 //!
@@ -154,7 +164,11 @@ impl<'a> ScopeEngine<'a> {
             .map(|s| s.to_string())
             .collect();
 
-        // Collect all captures in one pass
+        // First pass: collect binding leaf kinds declared via @local.binding-leaf
+        // and defer @local.definition.each nodes (can't expand until leaf kinds known).
+        let mut binding_leaf_kinds: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        let mut deferred_each: Vec<tree_sitter::Node> = Vec::new();
         let mut scopes: Vec<ScopeRange> = Vec::new();
         let mut raw_defs: Vec<RawCapture> = Vec::new();
         let mut raw_refs: Vec<RawCapture> = Vec::new();
@@ -184,16 +198,19 @@ impl<'a> ScopeEngine<'a> {
                     end_byte: node.end_byte(),
                 };
 
-                if name == "local.scope" {
+                if name == "local.binding-leaf" {
+                    // Declares which leaf node kinds @local.definition.each should
+                    // collect when recursing. The .scm file is the authority on
+                    // what counts as a binding identifier in that language.
+                    binding_leaf_kinds.insert(node.kind().to_string());
+                } else if name == "local.definition.each" {
+                    // Defer: we need binding_leaf_kinds fully populated first.
+                    deferred_each.push(node);
+                } else if name == "local.scope" {
                     scopes.push(ScopeRange {
                         start_byte: node.start_byte(),
                         end_byte: node.end_byte(),
                     });
-                } else if name == "local.definition.each" {
-                    // Recursively collect all binding identifiers from a pattern
-                    // node (e.g. object_pattern, array_pattern). This handles
-                    // arbitrary nesting depth that tree-sitter queries can't express.
-                    collect_binding_identifiers(node, source.as_bytes(), &mut raw_defs);
                 } else if name.starts_with("local.definition") {
                     raw_defs.push(RawCapture {
                         name: text.to_string(),
@@ -206,6 +223,16 @@ impl<'a> ScopeEngine<'a> {
                     });
                 }
             }
+        }
+
+        // Expand deferred @local.definition.each nodes now that binding_leaf_kinds is complete.
+        for node in deferred_each {
+            collect_binding_identifiers(
+                node,
+                source.as_bytes(),
+                &binding_leaf_kinds,
+                &mut raw_defs,
+            );
         }
 
         // Resolve references to definitions via scope walk
@@ -334,23 +361,21 @@ fn resolve_reference(
 
 /// Recursively collect all binding identifier leaf nodes from a pattern node.
 ///
-/// Used by the `@local.definition.each` capture to handle destructuring patterns
-/// of arbitrary nesting depth — something tree-sitter queries can't express since
-/// they have no recursion.
-///
-/// A node is a binding identifier if it is:
-/// - a named node (not an anonymous punctuation/keyword token)
-/// - a leaf (no children)
-/// - its kind is `"identifier"` or ends with `"_pattern"` (e.g.
-///   `shorthand_property_identifier_pattern`, `rest_pattern`, etc.)
-fn collect_binding_identifiers(node: tree_sitter::Node, source: &[u8], out: &mut Vec<RawCapture>) {
+/// Used by `@local.definition.each`. Recurses into the subtree and emits a
+/// `RawCapture` for every named leaf node whose kind is in `binding_leaf_kinds`.
+/// That set is populated from `@local.binding-leaf` captures in the same query,
+/// so the `.scm` file (not the engine) defines what counts as a binding identifier.
+fn collect_binding_identifiers(
+    node: tree_sitter::Node,
+    source: &[u8],
+    binding_leaf_kinds: &std::collections::HashSet<String>,
+    out: &mut Vec<RawCapture>,
+) {
     if !node.is_named() {
         return;
     }
-    let kind = node.kind();
     if node.child_count() == 0 {
-        // Leaf node: emit if it looks like a binding identifier
-        if kind == "identifier" || kind.ends_with("_pattern") {
+        if binding_leaf_kinds.contains(node.kind()) {
             if let Ok(text) = node.utf8_text(source) {
                 out.push(RawCapture {
                     name: text.to_string(),
@@ -364,10 +389,9 @@ fn collect_binding_identifiers(node: tree_sitter::Node, source: &[u8], out: &mut
             }
         }
     } else {
-        // Container node: recurse into children
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            collect_binding_identifiers(child, source, out);
+            collect_binding_identifiers(child, source, binding_leaf_kinds, out);
         }
     }
 }

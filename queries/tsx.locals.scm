@@ -35,9 +35,12 @@
 (variable_declarator
   name: (identifier) @local.definition)
 
-; Function parameters — simple identifier or any destructuring pattern.
-; @local.definition.each recurses into the pattern node to collect all binding
-; identifiers, handling arbitrary nesting depth (e.g. { a: { b } }, [[x, y]]).
+; Binding leaf kinds for @local.definition.each recursion.
+(identifier) @local.binding-leaf
+(shorthand_property_identifier_pattern) @local.binding-leaf
+
+; Function parameters — pattern: field restricts to the binding side;
+; @local.definition.each recurses into it collecting binding leaves at any depth.
 (required_parameter
   pattern: (_) @local.definition.each)
 
