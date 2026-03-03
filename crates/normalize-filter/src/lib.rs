@@ -71,25 +71,12 @@ impl AliasConfig {
     fn builtin(name: &str, languages: &[&str]) -> Option<Vec<String>> {
         let patterns: Vec<&str> = match name {
             "tests" => {
-                let mut p = vec!["**/test_*.py", "**/*_test.py", "**/tests/**"];
+                let mut p: Vec<&str> = vec![];
                 for lang in languages {
-                    match *lang {
-                        "go" => p.extend(["*_test.go", "**/*_test.go"]),
-                        "rust" => p.extend(["**/tests/**/*.rs"]),
-                        "javascript" | "typescript" => p.extend([
-                            "**/*.test.js",
-                            "**/*.spec.js",
-                            "**/*.test.ts",
-                            "**/*.spec.ts",
-                            "**/__tests__/**",
-                        ]),
-                        "java" => p.extend(["**/test/**", "**/*Test.java"]),
-                        "ruby" => {
-                            p.extend(["**/test/**", "**/*_test.rb", "**/spec/**", "**/*_spec.rb"])
-                        }
-                        _ => {}
-                    }
+                    p.extend(normalize_language_meta::test_file_globs_for_language(lang).iter());
                 }
+                p.sort_unstable();
+                p.dedup();
                 p
             }
             "config" => vec![

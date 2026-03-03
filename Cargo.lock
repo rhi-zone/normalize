@@ -3610,6 +3610,7 @@ dependencies = [
  "ignore",
  "normalize-core",
  "normalize-derive",
+ "normalize-language-meta",
  "schemars",
  "serde",
 ]

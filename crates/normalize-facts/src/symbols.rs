@@ -609,11 +609,14 @@ impl SymbolParser {
     /// Returns references to types found in struct fields, function params/returns,
     /// inheritance, trait bounds, type aliases, etc.
     pub fn find_type_refs(&mut self, path: &Path, content: &str) -> Vec<TypeRef> {
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        match ext {
-            "rs" => Self::find_rust_type_refs(content),
-            "ts" | "tsx" => Self::find_typescript_type_refs(content, ext == "tsx"),
-            "py" => Self::find_python_type_refs(content),
+        let lang = match normalize_languages::support_for_path(path) {
+            Some(l) => l,
+            None => return Vec::new(),
+        };
+        match lang.name() {
+            "Rust" => Self::find_rust_type_refs(content),
+            "TypeScript" | "TSX" => Self::find_typescript_type_refs(content, lang.name() == "TSX"),
+            "Python" => Self::find_python_type_refs(content),
             _ => Vec::new(),
         }
     }

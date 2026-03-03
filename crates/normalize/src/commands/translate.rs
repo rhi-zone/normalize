@@ -102,29 +102,27 @@ pub fn cmd_translate_service(
             .map_err(|e| format!("Failed to read {}: {}", input, e))?
     };
 
-    // Determine source language
-    let source_lang = match from {
-        Some(lang) => lang.as_str(),
+    // Determine source language reader
+    let reader = match from {
+        Some(ref lang) => normalize_surface_syntax::registry::reader_for_language(lang.as_str())
+            .ok_or_else(|| format!("No reader available for language: {}", lang))?,
         None => {
             if is_stdin {
                 return Err("--from is required when reading from stdin".to_string());
             }
-            match input_path.extension().and_then(|e| e.to_str()) {
-                Some("ts") | Some("tsx") | Some("js") | Some("jsx") => "typescript",
-                Some("lua") => "lua",
-                Some("py") => "python",
-                _ => {
-                    return Err(
-                        "Cannot detect language from extension. Use --from to specify source language."
-                            .to_string(),
-                    );
-                }
-            }
+            let ext = input_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .ok_or_else(|| {
+                    "Cannot detect language from extension. Use --from to specify source language."
+                        .to_string()
+                })?;
+            normalize_surface_syntax::registry::reader_for_extension(ext).ok_or_else(|| {
+                "Cannot detect language from extension. Use --from to specify source language."
+                    .to_string()
+            })?
         }
     };
-
-    let reader = normalize_surface_syntax::registry::reader_for_language(source_lang)
-        .ok_or_else(|| format!("No reader available for language: {}", source_lang))?;
 
     let target_lang = to.as_str();
     let writer = normalize_surface_syntax::registry::writer_for_language(target_lang)
@@ -132,7 +130,7 @@ pub fn cmd_translate_service(
 
     let ir = reader
         .read(&content)
-        .map_err(|e| format!("Failed to parse {} as {}: {}", input, source_lang, e))?;
+        .map_err(|e| format!("Failed to parse {} as {}: {}", input, reader.language(), e))?;
 
     let code = writer.write(&ir);
 
@@ -141,7 +139,7 @@ pub fn cmd_translate_service(
         eprintln!("Translated {} -> {} ({})", input, path, target_lang);
         Ok(crate::service::TranslateResult {
             code,
-            source_language: source_lang.to_string(),
+            source_language: reader.language().to_string(),
             target_language: target_lang.to_string(),
             input_path: input.to_string(),
             output_path: Some(path.to_string()),
@@ -149,7 +147,7 @@ pub fn cmd_translate_service(
     } else {
         Ok(crate::service::TranslateResult {
             code,
-            source_language: source_lang.to_string(),
+            source_language: reader.language().to_string(),
             target_language: target_lang.to_string(),
             input_path: input.to_string(),
             output_path: None,

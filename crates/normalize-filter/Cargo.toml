@@ -13,6 +13,7 @@ config = ["dep:normalize-core", "dep:normalize-derive", "dep:schemars"]
 
 [dependencies]
 ignore = "0.4"
+normalize-language-meta = { path = "../normalize-language-meta", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 
 # Optional config integration deps

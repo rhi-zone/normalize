@@ -68,12 +68,8 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
         })
     {
         let path = entry.path();
-        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
-        if !matches!(
-            ext,
-            "rs" | "py" | "js" | "ts" | "tsx" | "jsx" | "go" | "java" | "c" | "cpp" | "rb"
-        ) {
+        if normalize_languages::support_for_path(path).is_none() {
             continue;
         }
 
@@ -189,13 +185,9 @@ pub fn cmd_check_examples(root: &Path) -> i32 {
         })
     {
         let path = entry.path();
-        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
         // Only check source files (where we'd have // [example:] markers)
-        if !matches!(
-            ext,
-            "rs" | "py" | "js" | "ts" | "tsx" | "jsx" | "go" | "java" | "c" | "cpp" | "rb"
-        ) {
+        if normalize_languages::support_for_path(path).is_none() {
             continue;
         }
 

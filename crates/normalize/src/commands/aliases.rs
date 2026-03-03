@@ -102,37 +102,8 @@ pub fn detect_project_languages(root: &Path) -> Vec<String> {
 
     for entry in walker.flatten() {
         let path = entry.path();
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            match ext {
-                "go" => {
-                    languages.insert("go".to_string());
-                }
-                "py" | "pyi" => {
-                    languages.insert("python".to_string());
-                }
-                "rs" => {
-                    languages.insert("rust".to_string());
-                }
-                "js" | "mjs" | "cjs" => {
-                    languages.insert("javascript".to_string());
-                }
-                "ts" | "mts" | "cts" => {
-                    languages.insert("typescript".to_string());
-                }
-                "java" => {
-                    languages.insert("java".to_string());
-                }
-                "rb" => {
-                    languages.insert("ruby".to_string());
-                }
-                "c" | "h" => {
-                    languages.insert("c".to_string());
-                }
-                "cpp" | "cc" | "cxx" | "hpp" => {
-                    languages.insert("cpp".to_string());
-                }
-                _ => {}
-            }
+        if let Some(lang) = normalize_languages::support_for_path(path) {
+            languages.insert(lang.name().to_string());
         }
     }
 
