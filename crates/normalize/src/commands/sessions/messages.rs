@@ -390,8 +390,10 @@ pub fn build_messages_report(
                 // Truncate + collapse whitespace for display
                 let display_text = truncate_text(&text, max_text_len);
 
-                // Token usage: attach to assistant messages from the turn
-                let usage = if role_str == "assistant" {
+                // Token usage: attach to user messages (the trigger) and the first
+                // assistant message. This way --role user (default) shows cost-per-prompt,
+                // and --role assistant shows cost-per-response.
+                let usage = if role_str == "user" || role_str == "assistant" {
                     turn.token_usage.clone()
                 } else {
                     None
