@@ -94,7 +94,10 @@ impl EditService {
         )
     }
 
-    /// Insert content relative to a symbol
+    /// Insert content relative to a symbol.
+    ///
+    /// With `--each`, applies the insert to every file matching `--only` that contains
+    /// the symbol — useful for adding a method to all implementations of a trait.
     #[allow(clippy::too_many_arguments)]
     pub fn insert(
         &self,
@@ -107,7 +110,21 @@ impl EditService {
         #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
         #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
+        #[param(help = "Apply to every file matching --only that contains the symbol")] each: bool,
     ) -> Result<EditResult, String> {
+        let root_path = root.as_deref().map(std::path::Path::new);
+        if each {
+            return crate::commands::edit::cmd_edit_each(
+                &target,
+                EditAction::Insert { content, at },
+                root_path,
+                dry_run,
+                &exclude,
+                &only,
+                message.as_deref(),
+                case_insensitive,
+            );
+        }
         crate::commands::edit::cmd_edit_service(
             &target,
             EditAction::Insert { content, at },

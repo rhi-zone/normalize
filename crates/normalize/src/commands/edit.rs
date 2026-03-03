@@ -150,6 +150,154 @@ pub enum EditAction {
     },
 }
 
+/// Apply the same structural edit to a named symbol across all files matching a filter.
+/// Skips files where the symbol is not found. Returns the list of modified files.
+#[allow(clippy::too_many_arguments)]
+pub fn cmd_edit_each(
+    symbol: &str,
+    action: EditAction,
+    root: Option<&Path>,
+    dry_run: bool,
+    exclude: &[String],
+    only: &[String],
+    message: Option<&str>,
+    case_insensitive: bool,
+) -> Result<EditResult, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    let filter = super::build_filter(&root, exclude, only);
+    let all = path_resolve::all_files(&root);
+    let editor = edit::Editor::new();
+
+    let mut modified: Vec<String> = vec![];
+    let mut _skipped = 0usize;
+    let mut errors: Vec<String> = vec![];
+
+    // Collect files to edit first (so shadow gets all paths at once)
+    let candidates: Vec<_> = all
+        .iter()
+        .filter(|m| m.kind == "file")
+        .filter(|m| {
+            filter
+                .as_ref()
+                .is_none_or(|f| f.matches(Path::new(&m.path)))
+        })
+        .collect();
+
+    // Shadow: snapshot before any writes
+    if !dry_run && shadow_enabled {
+        let paths: Vec<_> = candidates.iter().map(|m| root.join(&m.path)).collect();
+        let shadow = Shadow::new(&root);
+        if let Err(e) = shadow.before_edit(&paths.iter().map(|p| p.as_path()).collect::<Vec<_>>()) {
+            eprintln!("warning: shadow git: {}", e);
+        }
+    }
+
+    for m in &candidates {
+        let file_path = root.join(&m.path);
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => {
+                _skipped += 1;
+                continue;
+            }
+        };
+
+        let loc = match editor.find_symbol(&file_path, &content, symbol, case_insensitive) {
+            Some(l) => l,
+            None => {
+                _skipped += 1;
+                continue;
+            }
+        };
+
+        let new_content = match &action {
+            EditAction::Insert {
+                content: insert_content,
+                at,
+            } => match at {
+                Position::Before => editor.insert_before(&content, &loc, insert_content),
+                Position::After => editor.insert_after(&content, &loc, insert_content),
+                Position::Prepend => {
+                    match editor.find_container_body(&file_path, &content, symbol) {
+                        Some(body) => editor.prepend_to_container(&content, &body, insert_content),
+                        None => {
+                            errors.push(format!("{}: no container body for prepend", m.path));
+                            continue;
+                        }
+                    }
+                }
+                Position::Append => {
+                    match editor.find_container_body(&file_path, &content, symbol) {
+                        Some(body) => editor.append_to_container(&content, &body, insert_content),
+                        None => {
+                            errors.push(format!("{}: no container body for append", m.path));
+                            continue;
+                        }
+                    }
+                }
+            },
+            EditAction::Delete => editor.delete_symbol(&content, &loc),
+            EditAction::Replace { content: new_code } => {
+                editor.replace_symbol(&content, &loc, new_code)
+            }
+            _ => {
+                errors.push(format!("{}: action not supported in --each mode", m.path));
+                continue;
+            }
+        };
+
+        if dry_run {
+            modified.push(m.path.clone());
+            continue;
+        }
+
+        match std::fs::write(&file_path, &new_content) {
+            Ok(_) => modified.push(m.path.clone()),
+            Err(e) => errors.push(format!("{}: {}", m.path, e)),
+        }
+    }
+
+    // Shadow: commit after all writes
+    if !dry_run && shadow_enabled && !modified.is_empty() {
+        let paths: Vec<_> = modified.iter().map(|p| root.join(p)).collect();
+        let shadow = Shadow::new(&root);
+        let info = EditInfo {
+            operation: "insert_each".to_string(),
+            target: symbol.to_string(),
+            files: paths.clone(),
+            message: message.map(String::from),
+            workflow: None,
+        };
+        if let Err(e) = shadow.after_edit(&info) {
+            eprintln!("warning: shadow git: {}", e);
+        }
+    }
+
+    if !errors.is_empty() {
+        eprintln!("Errors during --each edit:");
+        for e in &errors {
+            eprintln!("  {}", e);
+        }
+    }
+
+    Ok(EditResult {
+        success: errors.is_empty(),
+        operation: "insert_each".to_string(),
+        file: None,
+        symbol: Some(symbol.to_string()),
+        dry_run,
+        new_content: None,
+        changes: vec![],
+        files: modified,
+    })
+}
+
 /// Perform structural edits on a file.
 #[allow(clippy::too_many_arguments)]
 fn cmd_edit(
@@ -910,6 +1058,24 @@ pub struct EditResult {
 
 impl std::fmt::Display for EditResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Multi-file result (--each or batch) — handled same for dry-run and actual
+        if !self.files.is_empty() {
+            let prefix = if let Some(ref sym) = self.symbol {
+                format!("{} in {} file(s)", sym, self.files.len())
+            } else {
+                format!("{} file(s)", self.files.len())
+            };
+            if self.dry_run {
+                write!(f, "Would {}: {}", self.operation, prefix)?;
+            } else {
+                write!(f, "{}: {}", self.operation, prefix)?;
+            }
+            for file in &self.files {
+                write!(f, "\n  {}", file)?;
+            }
+            return Ok(());
+        }
+
         if self.dry_run {
             if let Some(ref content) = self.new_content {
                 if let Some(ref sym) = self.symbol {
@@ -961,10 +1127,6 @@ impl std::fmt::Display for EditResult {
                 }
             }
             return Ok(());
-        }
-        if !self.files.is_empty() {
-            // batch
-            return write!(f, "Applied edits to {} file(s)", self.files.len());
         }
         // structural edit
         match (&self.symbol, &self.file) {

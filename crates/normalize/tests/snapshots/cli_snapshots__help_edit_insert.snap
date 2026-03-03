@@ -3,7 +3,10 @@ source: crates/normalize/tests/cli_snapshots.rs
 assertion_line: 138
 expression: "snapshot_help(&[\"edit\", \"insert\"])"
 ---
-Insert content relative to a symbol
+Insert content relative to a symbol.
+
+With `--each`, applies the insert to every file matching `--only` that contains
+the symbol — useful for adding a method to all implementations of a trait.
 
 Usage: normalize edit insert [OPTIONS] [target]
 
@@ -27,4 +30,5 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -i, --case-insensitive           Case-insensitive matching
   -r, --root <root>                Root directory
+      --each                       Apply to every file matching --only that contains the symbol
   -h, --help                       Print help

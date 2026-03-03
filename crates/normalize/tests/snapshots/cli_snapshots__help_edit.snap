@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 37
 expression: "snapshot_help(&[\"edit\"])"
 ---
 Structural editing of code symbols
@@ -10,7 +11,10 @@ Commands:
   delete   Delete a symbol
   replace  Replace a symbol with new content
   swap     Swap two symbols
-  insert   Insert content relative to a symbol
+  insert   Insert content relative to a symbol.
+           
+           With `--each`, applies the insert to every file matching `--only` that contains
+           the symbol — useful for adding a method to all implementations of a trait.
   undo     Undo the last N edits
   redo     Redo the last undone edit
   goto     Jump to a specific shadow commit
