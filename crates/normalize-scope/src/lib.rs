@@ -945,4 +945,181 @@ mod tests {
         let defs = engine.find_definitions("clojure", src, "foo");
         assert_eq!(defs.len(), 0, "clojure: (foo x y) should not define foo");
     }
+
+    // ── Julia ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_julia_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "julia") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function add(x, y)\n  x + y\nend\n";
+        let defs = engine.find_definitions("julia", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "julia: function param x should have one definition"
+        );
+        let refs = engine.find_references("julia", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "julia: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_julia_for_variable() {
+        let l = loader();
+        if skip_if_no(&l, "julia") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "for i in 1:10\n  println(i)\nend\n";
+        let defs = engine.find_definitions("julia", src, "i");
+        assert_eq!(defs.len(), 1, "julia: for loop variable i");
+        let refs = engine.find_references("julia", src, "i");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "julia: i reference should resolve to for binding"
+        );
+    }
+
+    #[test]
+    fn test_julia_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "julia") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "let a = 1\n  a + 1\nend\n";
+        let defs = engine.find_definitions("julia", src, "a");
+        assert_eq!(defs.len(), 1, "julia: let binding a");
+    }
+
+    // ── Perl ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_perl_my_scalar() {
+        let l = loader();
+        if skip_if_no(&l, "perl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // my $name defines "name"; print $name references "name"
+        let src = "sub greet {\n  my $name = \"world\";\n  print $name;\n}\n";
+        let defs = engine.find_definitions("perl", src, "name");
+        assert_eq!(defs.len(), 1, "perl: my $name should define name");
+        let refs = engine.find_references("perl", src, "name");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "perl: $name reference should resolve");
+    }
+
+    #[test]
+    fn test_perl_my_list() {
+        let l = loader();
+        if skip_if_no(&l, "perl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "my ($a, $b) = (1, 2);\n";
+        let defs_a = engine.find_definitions("perl", src, "a");
+        assert_eq!(defs_a.len(), 1, "perl: my ($a, $b) should define a");
+        let defs_b = engine.find_definitions("perl", src, "b");
+        assert_eq!(defs_b.len(), 1, "perl: my ($a, $b) should define b");
+    }
+
+    // ── Groovy ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_groovy_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "groovy") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def add(x, y) {\n  return x + y\n}\n";
+        let defs = engine.find_definitions("groovy", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "groovy: function param x should have one definition"
+        );
+        let refs = engine.find_references("groovy", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "groovy: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_groovy_closure_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "groovy") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def f = { a, b -> a + b }\n";
+        let defs = engine.find_definitions("groovy", src, "a");
+        assert_eq!(
+            defs.len(),
+            1,
+            "groovy: closure param a should have one definition"
+        );
+        let refs = engine.find_references("groovy", src, "a");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "groovy: a reference should resolve to closure param"
+        );
+    }
+
+    #[test]
+    fn test_groovy_variable_declaration() {
+        let l = loader();
+        if skip_if_no(&l, "groovy") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def f() {\n  def v = 1\n  return v\n}\n";
+        let defs = engine.find_definitions("groovy", src, "v");
+        assert_eq!(defs.len(), 1, "groovy: def v should define v");
+    }
+
+    // ── D ─────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_d_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "d") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "int add(int x, int y) {\n  return x + y;\n}\n";
+        let defs = engine.find_definitions("d", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "d: function param x should have one definition"
+        );
+        let refs = engine.find_references("d", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "d: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_d_auto_declaration() {
+        let l = loader();
+        if skip_if_no(&l, "d") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "void f() {\n  auto v = 42;\n  writeln(v);\n}\n";
+        let defs = engine.find_definitions("d", src, "v");
+        assert_eq!(defs.len(), 1, "d: auto v should define v");
+        let refs = engine.find_references("d", src, "v");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "d: v reference should resolve to auto binding"
+        );
+    }
 }
