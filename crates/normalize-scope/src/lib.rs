@@ -296,8 +296,12 @@ mod tests {
         );
     }
 
+    fn skip_if_no(l: &GrammarLoader, lang: &str) -> bool {
+        l.get(lang).is_none() || l.get_locals(lang).is_none()
+    }
+
     fn skip_if_no_rust(l: &GrammarLoader) -> bool {
-        l.get("rust").is_none() || l.get_locals("rust").is_none()
+        skip_if_no(l, "rust")
     }
 
     #[test]
@@ -400,5 +404,246 @@ mod tests {
         let src = "fn f(x: i32) -> i32 { x } fn g(x: i32) -> i32 { x }";
         let defs = engine.find_definitions("rust", src, "x");
         assert_eq!(defs.len(), 2, "two separate x parameter definitions");
+    }
+
+    // ── Python ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_python_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "python") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def add(x, y):\n    return x + y\n";
+        let defs = engine.find_definitions("python", src, "x");
+        assert_eq!(defs.len(), 1, "python: x should have one definition");
+        let refs = engine.find_references("python", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "python: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_python_assignment() {
+        let l = loader();
+        if skip_if_no(&l, "python") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def f():\n    v = 1\n    return v\n";
+        let defs = engine.find_definitions("python", src, "v");
+        assert_eq!(defs.len(), 1, "python: v should have one definition");
+    }
+
+    #[test]
+    fn test_python_for_variable() {
+        let l = loader();
+        if skip_if_no(&l, "python") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def f():\n    for i in range(10):\n        print(i)\n";
+        let defs = engine.find_definitions("python", src, "i");
+        assert_eq!(defs.len(), 1, "python: for loop variable i");
+    }
+
+    // ── Go ────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_go_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "go") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "package p\nfunc add(x int, y int) int { return x + y }\n";
+        let defs = engine.find_definitions("go", src, "x");
+        assert_eq!(defs.len(), 1, "go: x should have one definition");
+        let refs = engine.find_references("go", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "go: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_go_short_var_decl() {
+        let l = loader();
+        if skip_if_no(&l, "go") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "package p\nfunc f() {\n    v := 1\n    _ = v\n}\n";
+        let defs = engine.find_definitions("go", src, "v");
+        assert_eq!(defs.len(), 1, "go: short var decl v");
+    }
+
+    // ── Java ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_java_method_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "java") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "class A { int add(int x, int y) { return x + y; } }\n";
+        let defs = engine.find_definitions("java", src, "x");
+        assert_eq!(defs.len(), 1, "java: x should have one definition");
+        let refs = engine.find_references("java", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "java: x should resolve to param def");
+    }
+
+    #[test]
+    fn test_java_local_variable() {
+        let l = loader();
+        if skip_if_no(&l, "java") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "class A { void f() { int v = 1; int w = v + 1; } }\n";
+        let defs = engine.find_definitions("java", src, "v");
+        assert_eq!(defs.len(), 1, "java: local variable v");
+    }
+
+    // ── C ─────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_c_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "c") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "int add(int x, int y) { return x + y; }\n";
+        let defs = engine.find_definitions("c", src, "x");
+        assert_eq!(defs.len(), 1, "c: x should have one definition");
+        let refs = engine.find_references("c", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "c: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_c_local_variable() {
+        let l = loader();
+        if skip_if_no(&l, "c") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "void f() { int v = 1; int w = v + 1; }\n";
+        let defs = engine.find_definitions("c", src, "v");
+        assert_eq!(defs.len(), 1, "c: local variable v");
+    }
+
+    // ── C++ ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_cpp_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "cpp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "int add(int x, int y) { return x + y; }\n";
+        let defs = engine.find_definitions("cpp", src, "x");
+        assert_eq!(defs.len(), 1, "cpp: x should have one definition");
+        let refs = engine.find_references("cpp", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "cpp: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_cpp_local_variable() {
+        let l = loader();
+        if skip_if_no(&l, "cpp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "void f() { int v = 1; int w = v + 1; }\n";
+        let defs = engine.find_definitions("cpp", src, "v");
+        assert_eq!(defs.len(), 1, "cpp: local variable v");
+    }
+
+    // ── C# ────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_csharp_method_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "c-sharp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "class A { int Add(int x, int y) { return x + y; } }\n";
+        let defs = engine.find_definitions("c-sharp", src, "x");
+        assert_eq!(defs.len(), 1, "c#: x should have one definition");
+        let refs = engine.find_references("c-sharp", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "c#: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_csharp_local_variable() {
+        let l = loader();
+        if skip_if_no(&l, "c-sharp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "class A { void F() { int v = 1; int w = v + 1; } }\n";
+        let defs = engine.find_definitions("c-sharp", src, "v");
+        assert_eq!(defs.len(), 1, "c#: local variable v");
+    }
+
+    // ── Ruby ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_ruby_method_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "ruby") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def add(x, y)\n  x + y\nend\n";
+        let defs = engine.find_definitions("ruby", src, "x");
+        assert_eq!(defs.len(), 1, "ruby: x should have one definition");
+        let refs = engine.find_references("ruby", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "ruby: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_ruby_assignment() {
+        let l = loader();
+        if skip_if_no(&l, "ruby") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def f\n  v = 1\n  v + 2\nend\n";
+        let defs = engine.find_definitions("ruby", src, "v");
+        assert_eq!(defs.len(), 1, "ruby: assignment v");
+    }
+
+    // ── Bash ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_bash_function_and_variable() {
+        let l = loader();
+        if skip_if_no(&l, "bash") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "greet() {\n  name=\"world\"\n  echo \"$name\"\n}\n";
+        let defs = engine.find_definitions("bash", src, "name");
+        assert_eq!(defs.len(), 1, "bash: variable assignment name");
+    }
+
+    #[test]
+    fn test_bash_for_variable() {
+        let l = loader();
+        if skip_if_no(&l, "bash") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "for item in a b c; do\n  echo \"$item\"\ndone\n";
+        let defs = engine.find_definitions("bash", src, "item");
+        assert_eq!(defs.len(), 1, "bash: for loop variable item");
     }
 }
