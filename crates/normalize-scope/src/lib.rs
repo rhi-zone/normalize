@@ -2674,4 +2674,79 @@ mod tests {
         let defs = engine.find_definitions("vhdl", src, "y");
         assert_eq!(defs.len(), 1, "vhdl: process variable y should be defined");
     }
+
+    // ── jq ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_jq_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "jq") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def foo(x): x + 1;";
+        let defs = engine.find_definitions("jq", src, "x");
+        assert_eq!(defs.len(), 1, "jq: function parameter x should be defined");
+    }
+
+    #[test]
+    fn test_jq_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "jq") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def foo(x): x;";
+        let defs = engine.find_definitions("jq", src, "foo");
+        assert_eq!(defs.len(), 1, "jq: function name foo should be defined");
+    }
+
+    #[test]
+    fn test_jq_as_binding() {
+        let l = loader();
+        if skip_if_no(&l, "jq") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def f: . as $item | $item; f";
+        let defs = engine.find_definitions("jq", src, "$item");
+        assert_eq!(defs.len(), 1, "jq: as binding $item should be defined");
+        let refs = engine.find_references("jq", src, "$item");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "jq: $item reference should resolve");
+    }
+
+    // ── Meson ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_meson_variable_assignment() {
+        let l = loader();
+        if skip_if_no(&l, "meson") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "x = 1\ny = x";
+        let defs = engine.find_definitions("meson", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "meson: variable assignment x should be defined"
+        );
+    }
+
+    #[test]
+    fn test_meson_foreach_variable() {
+        let l = loader();
+        if skip_if_no(&l, "meson") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "foreach item : ['a', 'b']\n  message(item)\nendforeach";
+        let defs = engine.find_definitions("meson", src, "item");
+        assert_eq!(
+            defs.len(),
+            1,
+            "meson: foreach variable item should be defined"
+        );
+    }
 }
