@@ -167,6 +167,13 @@ pub fn cmd_edit_each(
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
+    let op_name = match &action {
+        EditAction::Insert { .. } => "insert_each",
+        EditAction::Delete => "delete_each",
+        EditAction::Replace { .. } => "replace_each",
+        _ => "edit_each",
+    };
+
     let config = NormalizeConfig::load(&root);
     let shadow_enabled = config.shadow.enabled();
 
@@ -268,7 +275,7 @@ pub fn cmd_edit_each(
         let paths: Vec<_> = modified.iter().map(|p| root.join(p)).collect();
         let shadow = Shadow::new(&root);
         let info = EditInfo {
-            operation: "insert_each".to_string(),
+            operation: op_name.to_string(),
             target: symbol.to_string(),
             files: paths.clone(),
             message: message.map(String::from),
@@ -288,7 +295,7 @@ pub fn cmd_edit_each(
 
     Ok(EditResult {
         success: errors.is_empty(),
-        operation: "insert_each".to_string(),
+        operation: op_name.to_string(),
         file: None,
         symbol: Some(symbol.to_string()),
         dry_run,

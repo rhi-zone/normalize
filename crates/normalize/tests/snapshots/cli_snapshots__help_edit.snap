@@ -8,8 +8,14 @@ Structural editing of code symbols
 Usage: normalize edit [OPTIONS] [COMMAND]
 
 Commands:
-  delete   Delete a symbol
-  replace  Replace a symbol with new content
+  delete   Delete a symbol.
+           
+           With `--each`, deletes the symbol from every file matching `--only` that contains it —
+           useful for removing a trait method from all implementations at once.
+  replace  Replace a symbol with new content.
+           
+           With `--each`, replaces the symbol in every file matching `--only` that contains it —
+           useful for updating a trait method body across all implementations at once.
   swap     Swap two symbols
   insert   Insert content relative to a symbol.
            

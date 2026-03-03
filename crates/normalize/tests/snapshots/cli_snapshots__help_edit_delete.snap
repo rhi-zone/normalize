@@ -1,8 +1,12 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 123
 expression: "snapshot_help(&[\"edit\", \"delete\"])"
 ---
-Delete a symbol
+Delete a symbol.
+
+With `--each`, deletes the symbol from every file matching `--only` that contains it —
+useful for removing a trait method from all implementations at once.
 
 Usage: normalize edit delete [OPTIONS] [target]
 
@@ -26,4 +30,5 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -i, --case-insensitive           Case-insensitive matching
   -r, --root <root>                Root directory
+      --each                       Delete from every file matching --only that contains the symbol
   -h, --help                       Print help

@@ -1,5 +1,34 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 128
 expression: "snapshot_help(&[\"edit\", \"replace\"])"
 ---
+Replace a symbol with new content.
 
+With `--each`, replaces the symbol in every file matching `--only` that contains it —
+useful for updating a trait method body across all implementations at once.
+
+Usage: normalize edit replace [OPTIONS] [target]
+
+Arguments:
+  [target]  Target to edit (path/Symbol)
+
+Options:
+      --content <content>          Replacement content
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --dry-run                    Dry run - show what would change
+      --json                       Output machine-readable JSON
+      --exclude <exclude>          Exclude files matching patterns
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --only <only>                Only include files matching patterns
+      --multiple                   Allow glob patterns to match multiple symbols
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+  -m, --message <message>          Message for shadow history
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -i, --case-insensitive           Case-insensitive matching
+  -r, --root <root>                Root directory
+      --each                       Replace in every file matching --only that contains the symbol
+  -h, --help                       Print help

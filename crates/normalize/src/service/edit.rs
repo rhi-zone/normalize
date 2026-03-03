@@ -11,7 +11,10 @@ pub struct EditService {
 
 #[cli(name = "edit", about = "Structural editing of code symbols")]
 impl EditService {
-    /// Delete a symbol
+    /// Delete a symbol.
+    ///
+    /// With `--each`, deletes the symbol from every file matching `--only` that contains it —
+    /// useful for removing a trait method from all implementations at once.
     #[allow(clippy::too_many_arguments)]
     pub fn delete(
         &self,
@@ -24,7 +27,22 @@ impl EditService {
         #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
         #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
+        #[param(help = "Delete from every file matching --only that contains the symbol")]
+        each: bool,
     ) -> Result<EditResult, String> {
+        if each {
+            let root_path = root.as_deref().map(std::path::Path::new);
+            return crate::commands::edit::cmd_edit_each(
+                &target,
+                EditAction::Delete,
+                root_path,
+                dry_run,
+                &exclude,
+                &only,
+                message.as_deref(),
+                case_insensitive,
+            );
+        }
         crate::commands::edit::cmd_edit_service(
             &target,
             EditAction::Delete,
@@ -39,12 +57,15 @@ impl EditService {
         )
     }
 
-    /// Replace a symbol with new content
+    /// Replace a symbol with new content.
+    ///
+    /// With `--each`, replaces the symbol in every file matching `--only` that contains it —
+    /// useful for updating a trait method body across all implementations at once.
     #[allow(clippy::too_many_arguments)]
     pub fn replace(
         &self,
         #[param(positional, help = "Target to edit (path/Symbol)")] target: String,
-        #[param(positional, help = "Replacement content")] content: String,
+        #[param(help = "Replacement content")] content: String,
         #[param(help = "Dry run - show what would change")] dry_run: bool,
         #[param(help = "Exclude files matching patterns")] exclude: Vec<String>,
         #[param(help = "Only include files matching patterns")] only: Vec<String>,
@@ -52,7 +73,22 @@ impl EditService {
         #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
         #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
+        #[param(help = "Replace in every file matching --only that contains the symbol")]
+        each: bool,
     ) -> Result<EditResult, String> {
+        if each {
+            let root_path = root.as_deref().map(std::path::Path::new);
+            return crate::commands::edit::cmd_edit_each(
+                &target,
+                EditAction::Replace { content },
+                root_path,
+                dry_run,
+                &exclude,
+                &only,
+                message.as_deref(),
+                case_insensitive,
+            );
+        }
         crate::commands::edit::cmd_edit_service(
             &target,
             EditAction::Replace { content },
