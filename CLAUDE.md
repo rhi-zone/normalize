@@ -169,6 +169,7 @@ Do not:
 - Replace content when editing lists - extend, don't replace
 - Cut corners with fallbacks - implement properly for each case
 - Mark as done prematurely - note what remains
+- Name gaps "known limitations" and stop — a limitation is a bug to fix, not a category to accept. "X doesn't support Y" is only valid when the underlying tool genuinely cannot do it; otherwise fix it
 - Fear "over-modularization" - 100 lines is fine for a module
 - Consider time constraints - we're NOT short on time; optimize for correctness
 - Use path dependencies in Cargo.toml - causes clippy to stash changes across repos

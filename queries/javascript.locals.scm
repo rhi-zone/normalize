@@ -24,9 +24,24 @@
 (variable_declarator
   name: (identifier) @local.definition)
 
-; Function parameters (simple identifiers in formal parameter list)
+; Function parameters — simple identifier
 (formal_parameters
   (identifier) @local.definition)
+
+; Object destructuring parameter: function f({ a, b }) {}
+(formal_parameters
+  (object_pattern
+    (shorthand_property_identifier_pattern) @local.definition))
+
+; Array destructuring parameter: function f([x, y]) {}
+(formal_parameters
+  (array_pattern
+    (identifier) @local.definition))
+
+; Default parameter: function f(c = 1) {}
+(formal_parameters
+  (assignment_pattern
+    left: (identifier) @local.definition))
 
 ; Arrow function single parameter (no parentheses)
 (arrow_function

@@ -1201,6 +1201,50 @@ mod tests {
         assert!(resolved >= 1, "typescript: x in arrow body should resolve");
     }
 
+    #[test]
+    fn test_typescript_object_destructuring_param() {
+        let l = loader();
+        if skip_if_no(&l, "typescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function f({ a, b }: T) { return a + b; }";
+        let defs_a = engine.find_definitions("typescript", src, "a");
+        assert_eq!(
+            defs_a.len(),
+            1,
+            "typescript: destructured param a should be defined"
+        );
+        let refs_a = engine.find_references("typescript", src, "a");
+        let resolved = refs_a.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "typescript: a in body should resolve to destructured param"
+        );
+    }
+
+    #[test]
+    fn test_typescript_array_destructuring_param() {
+        let l = loader();
+        if skip_if_no(&l, "typescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function f([x, y]: U) { return x + y; }";
+        let defs = engine.find_definitions("typescript", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "typescript: destructured array param x should be defined"
+        );
+        let refs = engine.find_references("typescript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "typescript: x in body should resolve to destructured param"
+        );
+    }
+
     // ── JavaScript ────────────────────────────────────────────────────────────
 
     #[test]
@@ -1274,6 +1318,72 @@ mod tests {
         let refs = engine.find_references("javascript", src, "x");
         let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
         assert!(resolved >= 1, "javascript: x in arrow body should resolve");
+    }
+
+    #[test]
+    fn test_javascript_object_destructuring_param() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function f({ a, b }) { return a + b; }";
+        let defs_a = engine.find_definitions("javascript", src, "a");
+        assert_eq!(
+            defs_a.len(),
+            1,
+            "javascript: destructured param a should be defined"
+        );
+        let refs_a = engine.find_references("javascript", src, "a");
+        let resolved = refs_a.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "javascript: a in body should resolve to destructured param"
+        );
+    }
+
+    #[test]
+    fn test_javascript_array_destructuring_param() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function f([x, y]) { return x + y; }";
+        let defs = engine.find_definitions("javascript", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "javascript: destructured array param x should be defined"
+        );
+        let refs = engine.find_references("javascript", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "javascript: x in body should resolve to destructured param"
+        );
+    }
+
+    #[test]
+    fn test_javascript_default_param() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function f(c = 1) { return c; }";
+        let defs = engine.find_definitions("javascript", src, "c");
+        assert_eq!(
+            defs.len(),
+            1,
+            "javascript: default param c should be defined"
+        );
+        let refs = engine.find_references("javascript", src, "c");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "javascript: c in body should resolve to default param"
+        );
     }
 
     // ── Lua ───────────────────────────────────────────────────────────────────
