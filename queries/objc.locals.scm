@@ -35,9 +35,9 @@
 (init_declarator
   declarator: (identifier) @local.definition)
 
-; ObjC method parameter (the local variable name after the type)
+; ObjC method parameter (the local variable name after the type, no named field)
 (method_parameter
-  declarator: (identifier) @local.definition)
+  (identifier) @local.definition)
 
 ; References
 (identifier) @local.reference

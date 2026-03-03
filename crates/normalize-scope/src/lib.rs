@@ -1707,11 +1707,10 @@ mod tests {
             return;
         }
         let engine = ScopeEngine::new(&l);
-        // ObjC is a superset of C; C-style function parsing always works.
-        // ObjC method syntax (- (int)foo:(int)x) requires @implementation context.
-        let src = "int add(int x, int y) { return x + y; }";
+        // ObjC method syntax requires @implementation context.
+        let src = "@implementation Foo\n- (int)add:(int)x {\n    return x + 1;\n}\n@end";
         let defs = engine.find_definitions("objc", src, "x");
-        assert_eq!(defs.len(), 1, "objc: parameter x should be defined");
+        assert_eq!(defs.len(), 1, "objc: method parameter x should be defined");
         let refs = engine.find_references("objc", src, "x");
         let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
         assert!(resolved >= 1, "objc: x reference should resolve");
