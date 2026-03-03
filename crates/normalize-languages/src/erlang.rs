@@ -296,12 +296,6 @@ impl Language for Erlang {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        // Common Test: *_SUITE.erl; EUnit: *_test.erl or *_tests.erl
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.ends_with("_SUITE.erl") || name.ends_with("_test.erl") || name.ends_with("_tests.erl")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*_SUITE.erl", "**/*_test.erl", "**/*_tests.erl"]
     }

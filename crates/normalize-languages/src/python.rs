@@ -430,11 +430,6 @@ impl Language for Python {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.starts_with("test_") || name.ends_with("_test.py")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/test_*.py", "**/*_test.py"]
     }

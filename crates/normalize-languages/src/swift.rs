@@ -395,12 +395,6 @@ impl Language for Swift {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        // XCTest convention: FooTests.swift
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.ends_with("Tests.swift") || name.ends_with("Test.swift")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*Tests.swift", "**/*Test.swift"]
     }

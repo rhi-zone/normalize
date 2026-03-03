@@ -364,11 +364,6 @@ impl Language for CSharp {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.ends_with("Test.cs") || name.ends_with("Tests.cs")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*Test.cs", "**/*Tests.cs"]
     }

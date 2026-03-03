@@ -259,10 +259,6 @@ impl Language for Cpp {
         }
     }
 
-    fn is_test_path(&self, _path: &std::path::Path) -> bool {
-        false
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &[]
     }

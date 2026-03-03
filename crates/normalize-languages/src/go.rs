@@ -281,13 +281,6 @@ impl Language for Go {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        path.file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.ends_with("_test.go"))
-            .unwrap_or(false)
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*_test.go"]
     }

@@ -247,16 +247,6 @@ impl Language for Perl {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        // Perl tests: *.t files, typically in t/ directory
-        let s = path.to_string_lossy();
-        if s.contains("/t/") || s.starts_with("t/") {
-            return true;
-        }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.ends_with(".t")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/t/**/*.t", "**/*.t"]
     }

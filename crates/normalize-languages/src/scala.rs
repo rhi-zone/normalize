@@ -243,18 +243,6 @@ impl Language for Scala {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        let s = path.to_string_lossy();
-        if s.contains("/src/test/") {
-            return true;
-        }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.ends_with("Test.scala")
-            || name.ends_with("Tests.scala")
-            || name.ends_with("Spec.scala")
-            || name.ends_with("Suite.scala")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &[
             "**/src/test/**/*.scala",

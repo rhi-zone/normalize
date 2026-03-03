@@ -249,11 +249,6 @@ impl Language for Clojure {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.ends_with("_test.clj") || name.ends_with("_test.cljs") || name.ends_with("_test.cljc")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*_test.clj", "**/*_test.cljs", "**/*_test.cljc"]
     }

@@ -245,12 +245,6 @@ impl Language for R {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        // testthat convention: test-*.R or test_*.R
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.starts_with("test-") || name.starts_with("test_")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/test-*.R", "**/test_*.R"]
     }

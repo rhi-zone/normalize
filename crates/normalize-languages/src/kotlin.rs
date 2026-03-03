@@ -341,15 +341,6 @@ impl Language for Kotlin {
         }
     }
 
-    fn is_test_path(&self, path: &std::path::Path) -> bool {
-        let s = path.to_string_lossy();
-        if s.contains("/src/test/") {
-            return true;
-        }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        name.starts_with("Test") || name.ends_with("Test.kt") || name.ends_with("Tests.kt")
-    }
-
     fn test_file_globs(&self) -> &'static [&'static str] {
         &[
             "**/src/test/**/*.kt",
