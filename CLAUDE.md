@@ -114,15 +114,11 @@ Use plan mode as a handoff mechanism when:
 - The session has drifted from its original purpose
 - Context has accumulated enough that a fresh start would help
 
-Before entering plan mode:
-- Update TODO.md with any remaining work
-- Update memory files with anything worth preserving across sessions
+Enter plan mode → investigate → write the plan file → ExitPlanMode.
+The user approves, redirects, or stops. Investigation happens *inside* plan mode, not before it.
 
-Then enter plan mode and write a plan file that either:
-- Proposes the next task if it's clear: "next up: X — see TODO.md"
-- Flags that direction is needed: "task complete / session drifted — see TODO.md"
-
-ExitPlanMode hands control back to the user to approve, redirect, or stop.
+After the plan is approved and the new session begins, update TODO.md and memory files
+with anything worth preserving before diving into implementation.
 
 ## Commit Convention
 
