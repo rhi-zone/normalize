@@ -646,4 +646,80 @@ mod tests {
         let defs = engine.find_definitions("bash", src, "item");
         assert_eq!(defs.len(), 1, "bash: for loop variable item");
     }
+
+    // ── Kotlin ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_kotlin_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "kotlin") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fun add(x: Int, y: Int): Int = x + y\n";
+        let defs = engine.find_definitions("kotlin", src, "x");
+        assert_eq!(defs.len(), 1, "kotlin: x should have one definition");
+        let resolved = engine.find_references("kotlin", src, "x");
+        assert!(!resolved.is_empty(), "kotlin: x reference should exist");
+    }
+
+    #[test]
+    fn test_kotlin_variable_declaration() {
+        let l = loader();
+        if skip_if_no(&l, "kotlin") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fun f() {\n    val v = 1\n    val w = v + 1\n}\n";
+        let defs = engine.find_definitions("kotlin", src, "v");
+        assert_eq!(defs.len(), 1, "kotlin: val declaration v");
+    }
+
+    // ── PHP ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_php_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "php") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "<?php\nfunction add($x, $y) {\n    return $x + $y;\n}\n";
+        // PHP variables are captured as variable_name including $ sigil
+        let defs = engine.find_definitions("php", src, "$x");
+        assert_eq!(defs.len(), 1, "php: $x should have one definition");
+        let refs = engine.find_references("php", src, "$x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "php: $x reference should resolve to param");
+    }
+
+    // ── Zig ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_zig_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "zig") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn add(x: i32, y: i32) i32 { return x + y; }\n";
+        // ParamDecl.parameter captures x as a definition
+        let defs = engine.find_definitions("zig", src, "x");
+        assert_eq!(defs.len(), 1, "zig: x should have one definition");
+        // References are captured (IDENTIFIER matches everywhere including body)
+        let refs = engine.find_references("zig", src, "x");
+        assert!(!refs.is_empty(), "zig: x should appear as a reference");
+    }
+
+    #[test]
+    fn test_zig_var_decl() {
+        let l = loader();
+        if skip_if_no(&l, "zig") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn f() void {\n    const v = 1;\n    const w = v + 1;\n}\n";
+        let defs = engine.find_definitions("zig", src, "v");
+        assert_eq!(defs.len(), 1, "zig: const declaration v");
+    }
 }
