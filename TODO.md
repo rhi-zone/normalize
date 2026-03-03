@@ -1020,10 +1020,17 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
     - What is the full taxonomy of semantic edit operations? (rename, move, inline, extract, add-impl, remove-impl, …)
     - Which require cross-file call-site awareness (need the index) vs which are structural-only?
     - How should `--each` generalise to multi-symbol targets? (e.g. all callsites of a function)
-    - Signature for `edit rename`: update definition + all call sites + import paths
+    - [x] Signature for `edit rename`: update definition + all call sites + import paths
+    - [x] Conflict detection: refuse when new name already exists as symbol or import; --force to override
     - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
-    - Conflict detection: refuse / warn when an edit would break callers (dry-run shows impact)
     - Integration with shadow git: checkpoint before large refactors, rollback on failure
+    - **HIGH PRIORITY: `edit rename` false positives from `find_callers`.**
+      `find_callers(name)` is not module-scoped: it returns every call to any function named `name`
+      across the whole codebase, not just callers of the specific definition being renamed.
+      A project with two unrelated `foo()` functions in different modules will have both renamed.
+      Fix requires the index to store module-qualified caller/callee names, or a post-filter that
+      checks whether the callee resolves to the same definition file via the imports graph.
+      Until fixed, `edit rename` is safe only when the symbol name is unique across the project.
 - Cross-file refactors: `normalize move src/foo.rs/my_func src/bar.rs`
   - Move functions/types between files with import updates
   - Handles visibility changes (pub when crossing module boundaries)

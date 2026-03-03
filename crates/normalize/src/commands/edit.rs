@@ -1150,12 +1150,14 @@ impl std::fmt::Display for EditResult {
 /// index is not available (renames only the definition).
 ///
 /// `target` is in `path/SymbolName` format (same as other edit commands).
+/// Set `force` to proceed even when name conflicts are detected.
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_edit_rename(
     target: &str,
     new_name: &str,
     root: Option<&Path>,
     dry_run: bool,
+    force: bool,
     message: Option<&str>,
 ) -> Result<EditResult, String> {
     use std::collections::HashSet;
@@ -1214,6 +1216,48 @@ pub fn cmd_edit_rename(
             }
         }
     });
+
+    // ── Conflict detection ───────────────────────────────────────────────────
+    // Check before touching any file so we can abort cleanly.
+    if !force {
+        let mut conflicts: Vec<String> = vec![];
+
+        // 1. Does new_name already exist as a symbol in the definition file?
+        if editor
+            .find_symbol(&def_abs_path, &def_content, new_name, false)
+            .is_some()
+        {
+            conflicts.push(format!(
+                "{}: symbol '{}' already exists",
+                def_rel_path, new_name
+            ));
+        }
+
+        // 2. Does any importer file already import something named new_name?
+        if !importers.is_empty() {
+            rt.block_on(async {
+                if let Some(idx) = crate::index::open_if_enabled(&root).await {
+                    for (file, _, _, _) in &importers {
+                        if idx.has_import_named(file, new_name).await.unwrap_or(false) {
+                            conflicts.push(format!("{}: already imports '{}'", file, new_name));
+                        }
+                    }
+                }
+            });
+        }
+
+        if !conflicts.is_empty() {
+            let detail = conflicts
+                .iter()
+                .map(|c| format!("  {}", c))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Err(format!(
+                "Rename '{}' → '{}' would cause conflicts (use --force to override):\n{}",
+                old_name, new_name, detail
+            ));
+        }
+    }
 
     // Collect all files to touch (deduplicated)
     let mut all_files: HashSet<String> = HashSet::new();

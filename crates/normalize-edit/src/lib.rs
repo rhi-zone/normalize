@@ -354,11 +354,11 @@ impl Editor {
         result
     }
 
-    /// Rename an identifier on a specific line (1-based) using word-boundary matching.
+    /// Rename all word-boundary occurrences of `old_name` on a specific line (1-based).
     ///
-    /// Replaces the first word-boundary occurrence of `old_name` on the given line
-    /// with `new_name`. Returns `None` if the line number is out of range or if
-    /// `old_name` is not found on that line as a whole word.
+    /// Replaces every whole-word occurrence of `old_name` on that line with `new_name`.
+    /// Returns `None` if the line number is out of range or if `old_name` does not
+    /// appear as a whole word anywhere on that line.
     pub fn rename_identifier_in_line(
         &self,
         content: &str,
@@ -366,20 +366,16 @@ impl Editor {
         old_name: &str,
         new_name: &str,
     ) -> Option<String> {
-        // Find byte range of the target line
         let (line_start, line_end) = line_byte_range(content, line_no)?;
         let line = &content[line_start..line_end];
-
-        // Find word-boundary occurrence of old_name in this line
-        let offset = find_word_in(line, old_name)?;
-
-        let abs_start = line_start + offset;
-        let abs_end = abs_start + old_name.len();
-
-        let mut result = String::with_capacity(content.len() + new_name.len());
-        result.push_str(&content[..abs_start]);
-        result.push_str(new_name);
-        result.push_str(&content[abs_end..]);
+        let new_line = replace_all_words(line, old_name, new_name);
+        if new_line == line {
+            return None;
+        }
+        let mut result = String::with_capacity(content.len() + new_name.len() * 4);
+        result.push_str(&content[..line_start]);
+        result.push_str(&new_line);
+        result.push_str(&content[line_end..]);
         Some(result)
     }
 
@@ -432,32 +428,50 @@ fn line_byte_range(content: &str, line_no: usize) -> Option<(usize, usize)> {
     }
 }
 
-/// Find the byte offset of `word` in `text` as a whole word (word-boundary match).
-/// Returns the offset of the first match, or `None`.
-fn find_word_in(text: &str, word: &str) -> Option<usize> {
+/// Replace all whole-word occurrences of `old` in `text` with `new_word`.
+/// Returns the original string unchanged if no occurrences are found.
+fn replace_all_words(text: &str, old: &str, new_word: &str) -> String {
+    if old.is_empty() {
+        return text.to_string();
+    }
     let bytes = text.as_bytes();
+    let mut result = String::with_capacity(text.len());
     let mut offset = 0;
-    while offset + word.len() <= text.len() {
-        if let Some(pos) = text[offset..].find(word) {
-            let abs = offset + pos;
-            let before_ok = abs == 0 || {
-                let b = bytes[abs - 1];
-                !b.is_ascii_alphanumeric() && b != b'_'
-            };
-            let after = abs + word.len();
-            let after_ok = after >= bytes.len() || {
-                let b = bytes[after];
-                !b.is_ascii_alphanumeric() && b != b'_'
-            };
-            if before_ok && after_ok {
-                return Some(abs);
+    loop {
+        match text[offset..].find(old) {
+            None => {
+                result.push_str(&text[offset..]);
+                break;
             }
-            offset = abs + 1;
-        } else {
-            break;
+            Some(pos) => {
+                let abs = offset + pos;
+                let before_ok = abs == 0 || {
+                    let b = bytes[abs - 1];
+                    !b.is_ascii_alphanumeric() && b != b'_'
+                };
+                let after = abs + old.len();
+                let after_ok = after >= bytes.len() || {
+                    let b = bytes[after];
+                    !b.is_ascii_alphanumeric() && b != b'_'
+                };
+                if before_ok && after_ok {
+                    result.push_str(&text[offset..abs]);
+                    result.push_str(new_word);
+                    offset = after;
+                } else {
+                    // Not a word boundary — copy one char and keep searching
+                    let next = text[abs..]
+                        .chars()
+                        .next()
+                        .map(|c| c.len_utf8())
+                        .unwrap_or(1);
+                    result.push_str(&text[offset..abs + next]);
+                    offset = abs + next;
+                }
+            }
         }
     }
-    None
+    result
 }
 
 fn find_container_body_in_node(

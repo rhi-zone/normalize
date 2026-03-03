@@ -179,11 +179,15 @@ impl EditService {
     ///
     /// Uses the facts index to find cross-file references. If the index is unavailable,
     /// falls back to renaming only the definition.
+    ///
+    /// Aborts if the new name already exists as a symbol in the definition file or as
+    /// an import in any affected file. Use `--force` to override conflict checks.
     pub fn rename(
         &self,
         #[param(positional, help = "Target symbol (path/Symbol)")] target: String,
         #[param(positional, help = "New name for the symbol")] new_name: String,
         #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(help = "Proceed even when name conflicts are detected")] force: bool,
         #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
     ) -> Result<EditResult, String> {
@@ -193,6 +197,7 @@ impl EditService {
             &new_name,
             root_path,
             dry_run,
+            force,
             message.as_deref(),
         )
     }

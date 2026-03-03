@@ -1443,6 +1443,24 @@ impl FileIndex {
         Ok(importers)
     }
 
+    /// Check whether a file already has an import named `name` (as `name` or `alias`).
+    /// Used for rename conflict detection.
+    pub async fn has_import_named(&self, file: &str, name: &str) -> Result<bool, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT COUNT(*) FROM imports WHERE file = ?1 AND (name = ?2 OR alias = ?2)",
+                params![file, name],
+            )
+            .await?;
+        if let Some(row) = rows.next().await? {
+            let count: i64 = row.get(0)?;
+            Ok(count > 0)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Find files that import a specific symbol by name.
     /// Returns: (file, imported_name, alias, line)
     /// Useful for rename: find all files that need their import statement updated.

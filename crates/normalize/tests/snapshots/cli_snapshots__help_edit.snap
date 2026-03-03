@@ -25,6 +25,9 @@ Commands:
            
            Uses the facts index to find cross-file references. If the index is unavailable,
            falls back to renaming only the definition.
+           
+           Aborts if the new name already exists as a symbol in the definition file or as
+           an import in any affected file. Use `--force` to override conflict checks.
   undo     Undo the last N edits
   redo     Redo the last undone edit
   goto     Jump to a specific shadow commit
