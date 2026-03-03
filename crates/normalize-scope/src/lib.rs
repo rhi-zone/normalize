@@ -2445,4 +2445,233 @@ mod tests {
         let defs = engine.find_definitions("sql", src, "t");
         assert_eq!(defs.len(), 1, "sql: table alias t should be defined");
     }
+
+    // ── Debug AST probes ──────────────────────────────────────────────────
+
+    // ── MATLAB ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_matlab_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "matlab") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function y = foo(x)\n  y = x + 1;\nend";
+        let defs = engine.find_definitions("matlab", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "matlab: function parameter x should be defined"
+        );
+        let refs = engine.find_references("matlab", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "matlab: x reference should resolve");
+    }
+
+    #[test]
+    fn test_matlab_return_variable() {
+        let l = loader();
+        if skip_if_no(&l, "matlab") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function y = foo(x)\n  y = x + 1;\nend";
+        let defs = engine.find_definitions("matlab", src, "y");
+        assert!(
+            defs.len() >= 1,
+            "matlab: return variable y should be defined"
+        );
+    }
+
+    #[test]
+    fn test_matlab_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "matlab") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function y = foo(x)\n  y = x + 1;\nend";
+        let defs = engine.find_definitions("matlab", src, "foo");
+        assert_eq!(defs.len(), 1, "matlab: function name foo should be defined");
+    }
+
+    // ── AWK ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_awk_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "awk") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function foo(x, y) { return x + y }";
+        let defs = engine.find_definitions("awk", src, "x");
+        assert_eq!(defs.len(), 1, "awk: function parameter x should be defined");
+        let refs = engine.find_references("awk", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "awk: x reference should resolve");
+    }
+
+    #[test]
+    fn test_awk_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "awk") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function foo(x) { return x }";
+        let defs = engine.find_definitions("awk", src, "foo");
+        assert_eq!(defs.len(), 1, "awk: function name foo should be defined");
+    }
+
+    // ── CMake ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_cmake_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "cmake") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "function(foo x y)\n  set(z 1)\nendfunction()";
+        let defs = engine.find_definitions("cmake", src, "foo");
+        assert_eq!(defs.len(), 1, "cmake: function name foo should be defined");
+    }
+
+    #[test]
+    fn test_cmake_set_variable() {
+        let l = loader();
+        if skip_if_no(&l, "cmake") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "set(MY_VAR hello)";
+        let defs = engine.find_definitions("cmake", src, "MY_VAR");
+        assert_eq!(defs.len(), 1, "cmake: set(MY_VAR ...) should define MY_VAR");
+    }
+
+    #[test]
+    fn test_cmake_foreach_variable() {
+        let l = loader();
+        if skip_if_no(&l, "cmake") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "foreach(item IN LISTS mylist)\n  message(${item})\nendforeach()";
+        let defs = engine.find_definitions("cmake", src, "item");
+        assert_eq!(
+            defs.len(),
+            1,
+            "cmake: foreach loop variable item should be defined"
+        );
+    }
+
+    // ── Typst ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_typst_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "typst") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "#let x = 1\n#let y = x + 1";
+        let defs = engine.find_definitions("typst", src, "x");
+        assert_eq!(defs.len(), 1, "typst: #let x = 1 should define x");
+    }
+
+    #[test]
+    fn test_typst_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "typst") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "#let foo(a, b) = a + b";
+        let defs = engine.find_definitions("typst", src, "a");
+        assert_eq!(
+            defs.len(),
+            1,
+            "typst: function parameter a should be defined"
+        );
+    }
+
+    #[test]
+    fn test_typst_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "typst") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "#let foo(a) = a";
+        let defs = engine.find_definitions("typst", src, "foo");
+        assert_eq!(defs.len(), 1, "typst: function name foo should be defined");
+    }
+
+    // ── HCL ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_hcl_locals_attribute() {
+        let l = loader();
+        if skip_if_no(&l, "hcl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "locals {\n  x = 1\n  y = local.x + 1\n}";
+        let defs = engine.find_definitions("hcl", src, "x");
+        assert_eq!(defs.len(), 1, "hcl: locals block should define x");
+    }
+
+    // ── Verilog ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_verilog_module_port() {
+        let l = loader();
+        if skip_if_no(&l, "verilog") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "module foo (input x, output y); endmodule";
+        let defs = engine.find_definitions("verilog", src, "x");
+        assert_eq!(defs.len(), 1, "verilog: input port x should be defined");
+    }
+
+    #[test]
+    fn test_verilog_wire_declaration() {
+        let l = loader();
+        if skip_if_no(&l, "verilog") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "module foo (); wire z; endmodule";
+        let defs = engine.find_definitions("verilog", src, "z");
+        assert_eq!(defs.len(), 1, "verilog: wire z should be defined");
+    }
+
+    // ── VHDL ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_vhdl_signal_declaration() {
+        let l = loader();
+        if skip_if_no(&l, "vhdl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "architecture Foo of Bar is\n  signal x : std_logic;\nbegin\nend Foo;";
+        let defs = engine.find_definitions("vhdl", src, "x");
+        assert_eq!(defs.len(), 1, "vhdl: signal x should be defined");
+    }
+
+    #[test]
+    fn test_vhdl_process_variable() {
+        let l = loader();
+        if skip_if_no(&l, "vhdl") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "architecture Foo of Bar is\nbegin\nprocess\n  variable y : integer;\nbegin\nend process;\nend Foo;";
+        let defs = engine.find_definitions("vhdl", src, "y");
+        assert_eq!(defs.len(), 1, "vhdl: process variable y should be defined");
+    }
 }
