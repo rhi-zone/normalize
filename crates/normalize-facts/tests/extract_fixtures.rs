@@ -127,6 +127,28 @@ fn extract_symbols_json(project_dir: &Path) -> Value {
     Value::Array(rows)
 }
 
+/// Find the first recognized manifest file in a project dir and parse it.
+fn extract_manifest_json(project_dir: &Path) -> Option<Value> {
+    const MANIFEST_FILENAMES: &[&str] = &[
+        "Cargo.toml",
+        "go.mod",
+        "package.json",
+        "requirements.txt",
+        "pyproject.toml",
+    ];
+    for filename in MANIFEST_FILENAMES {
+        let path = project_dir.join(filename);
+        if path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Some(manifest) = normalize_manifest::parse_manifest(filename, &content) {
+                    return Some(serde_json::to_value(&manifest).unwrap());
+                }
+            }
+        }
+    }
+    None
+}
+
 fn extract_imports_json(project_dir: &Path) -> Value {
     let parser = SymbolParser::new();
     let mut rows: Vec<Value> = Vec::new();
@@ -308,6 +330,14 @@ fn extract_fixtures() {
         if imports_expected.exists() || update_mode() {
             let actual = extract_imports_json(&project_dir);
             write_or_compare_json(&actual, &imports_expected, &format!("{label} imports"));
+        }
+
+        // --- manifest ---
+        let manifest_expected = expected_dir.join("manifest.json");
+        if manifest_expected.exists() || update_mode() {
+            if let Some(manifest) = extract_manifest_json(&project_dir) {
+                write_or_compare_json(&manifest, &manifest_expected, &format!("{label} manifest"));
+            }
         }
 
         // --- execution ---

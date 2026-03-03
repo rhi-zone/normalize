@@ -4,6 +4,7 @@ default-members = ["crates/normalize"]
 exclude = ["crates/normalize-cli-parser/fixtures"]
 members = [
     "crates/normalize",
+    "crates/normalize-manifest",
     "crates/normalize-cli-parser",
     "crates/normalize-surface-syntax",
     "crates/normalize-typegen",
@@ -80,6 +81,9 @@ grep-searcher = "0.1"
 
 # Dynamic loading
 libloading = "0.8"
+
+# TOML parsing
+toml = "0.8"
 
 # Service framework
 server-less = { version = "0.2.1-alpha.3", default-features = false, features = ["cli", "jsonschema"] }

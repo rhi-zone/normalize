@@ -137,13 +137,17 @@ fn resolve_node_import(import_path: &str, node_modules: &Path) -> Option<Resolve
     // No subpath - use package.json to find entry point
     let pkg_json = pkg_dir.join("package.json");
     if pkg_json.is_file()
-        && let Some(entry) = get_package_entry_point(&pkg_dir, &pkg_json)
+        && let Ok(content) = std::fs::read_to_string(&pkg_json)
+        && let Some(rel) = normalize_manifest::npm_entry_point(&content)
     {
-        return Some(ResolvedPackage {
-            path: entry,
-            name: import_path.to_string(),
-            is_namespace: false,
-        });
+        let entry = pkg_dir.join(rel.trim_start_matches("./"));
+        if let Some(resolved) = resolve_node_file_or_dir(&entry) {
+            return Some(ResolvedPackage {
+                path: resolved,
+                name: import_path.to_string(),
+                is_namespace: false,
+            });
+        }
     }
 
     // Fall back to index.js
@@ -195,71 +199,6 @@ fn parse_node_package_name(import_path: &str) -> ParsedPackage<'_> {
             }
         }
     }
-}
-
-/// Get the entry point from package.json.
-fn get_package_entry_point(pkg_dir: &Path, pkg_json: &Path) -> Option<PathBuf> {
-    let content = std::fs::read_to_string(pkg_json).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
-
-    // Try "exports" field (simplified - just handle string or { ".": ... })
-    if let Some(exports) = json.get("exports")
-        && let Some(entry) = exports.as_str()
-    {
-        let path = pkg_dir.join(entry.trim_start_matches("./"));
-        if path.is_file() {
-            return Some(path);
-        }
-    } else if let Some(exports) = json.get("exports")
-        && let Some(obj) = exports.as_object()
-        && let Some(dot) = obj.get(".")
-        && let Some(entry) = extract_export_entry(dot)
-    {
-        let path = pkg_dir.join(entry.trim_start_matches("./"));
-        if path.is_file() {
-            return Some(path);
-        }
-    }
-
-    // Try "module" field (ESM entry point)
-    if let Some(module) = json.get("module").and_then(|v| v.as_str()) {
-        let path = pkg_dir.join(module.trim_start_matches("./"));
-        if path.is_file() {
-            return Some(path);
-        }
-    }
-
-    // Try "main" field
-    if let Some(main) = json.get("main").and_then(|v| v.as_str()) {
-        let path = pkg_dir.join(main.trim_start_matches("./"));
-        if let Some(resolved) = resolve_node_file_or_dir(&path) {
-            return Some(resolved);
-        }
-    }
-
-    None
-}
-
-/// Extract entry point from an exports value.
-fn extract_export_entry(value: &serde_json::Value) -> Option<&str> {
-    if let Some(s) = value.as_str() {
-        return Some(s);
-    }
-    if let Some(obj) = value.as_object() {
-        // Prefer: import > require > default
-        for key in &["import", "require", "default"] {
-            if let Some(entry) = obj.get(*key) {
-                if let Some(s) = entry.as_str() {
-                    return Some(s);
-                }
-                // Recursive for nested conditions
-                if let Some(s) = extract_export_entry(entry) {
-                    return Some(s);
-                }
-            }
-        }
-    }
-    None
 }
 
 /// Resolve a path to a file, trying extensions and index files.
@@ -545,24 +484,20 @@ fn deno_version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 /// Find entry point for a JavaScript/TypeScript package.
-/// Checks package.json for module/main fields, falls back to index.{js,mjs,cjs,ts}.
+/// Checks package.json for exports/module/main fields, falls back to index.{js,mjs,cjs,ts}.
 pub fn find_package_entry(dir: &Path) -> Option<PathBuf> {
     let pkg_json = dir.join("package.json");
     if pkg_json.is_file()
         && let Ok(content) = std::fs::read_to_string(&pkg_json)
-        && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+        && let Some(rel) = normalize_manifest::npm_entry_point(&content)
     {
-        for field in &["module", "main"] {
-            if let Some(entry) = json.get(field).and_then(|v| v.as_str()) {
-                let path = dir.join(entry.trim_start_matches("./"));
-                if path.is_file() {
-                    return Some(path);
-                }
-                let with_ext = path.with_extension("js");
-                if with_ext.is_file() {
-                    return Some(with_ext);
-                }
-            }
+        let path = dir.join(rel.trim_start_matches("./"));
+        if path.is_file() {
+            return Some(path);
+        }
+        let with_ext = path.with_extension("js");
+        if with_ext.is_file() {
+            return Some(with_ext);
         }
     }
 

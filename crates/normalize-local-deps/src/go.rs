@@ -1,6 +1,7 @@
 //! Go local dependency discovery.
 
 use crate::{LocalDepSource, LocalDepSourceKind, LocalDeps, ResolvedPackage};
+use normalize_manifest::GoModule;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -8,42 +9,10 @@ use std::process::Command;
 // Go module parsing (for local import resolution)
 // ============================================================================
 
-/// Information from a go.mod file
-#[derive(Debug, Clone)]
-struct GoModule {
-    /// Module path (e.g., "github.com/user/project")
-    path: String,
-    /// Go version (e.g., "1.21")
-    #[allow(dead_code)]
-    go_version: Option<String>,
-}
-
 /// Parse a go.mod file to extract module information.
 fn parse_go_mod(path: &Path) -> Option<GoModule> {
     let content = std::fs::read_to_string(path).ok()?;
-    parse_go_mod_content(&content)
-}
-
-/// Parse go.mod content string.
-fn parse_go_mod_content(content: &str) -> Option<GoModule> {
-    let mut module_path = None;
-    let mut go_version = None;
-
-    for line in content.lines() {
-        let line = line.trim();
-
-        // module github.com/user/project
-        if line.starts_with("module ") {
-            module_path = Some(line.trim_start_matches("module ").trim().to_string());
-        }
-
-        // go 1.21
-        if line.starts_with("go ") {
-            go_version = Some(line.trim_start_matches("go ").trim().to_string());
-        }
-    }
-
-    module_path.map(|path| GoModule { path, go_version })
+    normalize_manifest::go_module(&content)
 }
 
 /// Find go.mod by walking up from a directory.
@@ -454,7 +423,7 @@ require (
     golang.org/x/sync v0.3.0
 )
 "#;
-        let module = parse_go_mod_content(content).unwrap();
+        let module = normalize_manifest::go_module(content).unwrap();
         assert_eq!(module.path, "github.com/user/project");
         assert_eq!(module.go_version, Some("1.21".to_string()));
     }

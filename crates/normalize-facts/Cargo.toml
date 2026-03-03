@@ -29,6 +29,7 @@ rayon.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
+normalize-manifest = { path = "../normalize-manifest", version = "0.1.0" }
 tempfile = "3"
 tokio = { workspace = true }
 serde_json = { workspace = true }

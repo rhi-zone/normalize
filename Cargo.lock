@@ -3553,6 +3553,7 @@ dependencies = [
  "normalize-facts-core",
  "normalize-languages",
  "normalize-local-deps",
+ "normalize-manifest",
  "rayon",
  "serde",
  "serde_json",
@@ -3746,7 +3747,16 @@ dependencies = [
 name = "normalize-local-deps"
 version = "0.1.0"
 dependencies = [
+ "normalize-manifest",
+]
+
+[[package]]
+name = "normalize-manifest"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "serde_json",
+ "toml",
 ]
 
 [[package]]

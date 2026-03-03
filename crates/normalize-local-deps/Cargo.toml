@@ -26,4 +26,4 @@ lang-c = []
 lang-cpp = []
 
 [dependencies]
-serde_json = { workspace = true }
+normalize-manifest = { path = "../normalize-manifest", version = "0.1.0" }
