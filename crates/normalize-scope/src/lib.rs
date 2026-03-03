@@ -170,6 +170,11 @@ impl<'a> ScopeEngine<'a> {
                         start_byte: node.start_byte(),
                         end_byte: node.end_byte(),
                     });
+                } else if name == "local.definition.each" {
+                    // Recursively collect all binding identifiers from a pattern
+                    // node (e.g. object_pattern, array_pattern). This handles
+                    // arbitrary nesting depth that tree-sitter queries can't express.
+                    collect_binding_identifiers(node, source.as_bytes(), &mut raw_defs);
                 } else if name.starts_with("local.definition") {
                     raw_defs.push(RawCapture {
                         name: text.to_string(),
@@ -306,6 +311,46 @@ fn resolve_reference(
     }
 
     None
+}
+
+/// Recursively collect all binding identifier leaf nodes from a pattern node.
+///
+/// Used by the `@local.definition.each` capture to handle destructuring patterns
+/// of arbitrary nesting depth — something tree-sitter queries can't express since
+/// they have no recursion.
+///
+/// A node is a binding identifier if it is:
+/// - a named node (not an anonymous punctuation/keyword token)
+/// - a leaf (no children)
+/// - its kind is `"identifier"` or ends with `"_pattern"` (e.g.
+///   `shorthand_property_identifier_pattern`, `rest_pattern`, etc.)
+fn collect_binding_identifiers(node: tree_sitter::Node, source: &[u8], out: &mut Vec<RawCapture>) {
+    if !node.is_named() {
+        return;
+    }
+    let kind = node.kind();
+    if node.child_count() == 0 {
+        // Leaf node: emit if it looks like a binding identifier
+        if kind == "identifier" || kind.ends_with("_pattern") {
+            if let Ok(text) = node.utf8_text(source) {
+                out.push(RawCapture {
+                    name: text.to_string(),
+                    location: Location {
+                        line: node.start_position().row + 1,
+                        column: node.start_position().column + 1,
+                        start_byte: node.start_byte(),
+                        end_byte: node.end_byte(),
+                    },
+                });
+            }
+        }
+    } else {
+        // Container node: recurse into children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            collect_binding_identifiers(child, source, out);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1383,6 +1428,29 @@ mod tests {
         assert!(
             resolved >= 1,
             "javascript: c in body should resolve to default param"
+        );
+    }
+
+    #[test]
+    fn test_javascript_nested_destructuring_param() {
+        let l = loader();
+        if skip_if_no(&l, "javascript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // Nested: { a: { b } } — b is two levels deep inside object_pattern
+        let src = "function f({ a: { b } }) { return b; }";
+        let defs = engine.find_definitions("javascript", src, "b");
+        assert_eq!(
+            defs.len(),
+            1,
+            "javascript: nested destructured param b should be defined"
+        );
+        let refs = engine.find_references("javascript", src, "b");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(
+            resolved >= 1,
+            "javascript: b should resolve from nested destructuring"
         );
     }
 
