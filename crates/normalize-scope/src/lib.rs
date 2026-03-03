@@ -3004,4 +3004,46 @@ mod tests {
             "hlsl: brightness should resolve to local var"
         );
     }
+
+    // --- yuri ---
+
+    #[test]
+    fn scope_yuri_function_param() {
+        let l = loader();
+        if skip_if_no(&l, "yuri") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // Yuri syntax: fn name(params) : return_type { body }
+        // No semicolons — variable_item value extends to end of expression
+        let src = "fn add(a: f32, b: f32) : f32 {\n    let result = a\n    result\n}\n";
+        let defs = engine.find_definitions("yuri", src, "a");
+        assert_eq!(defs.len(), 1, "yuri: a should be defined as parameter");
+        let refs = engine.find_references("yuri", src, "a");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "yuri: a should resolve to param definition"
+        );
+    }
+
+    #[test]
+    fn scope_yuri_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "yuri") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "fn add(a: f32, b: f32) : f32 {\n    let result = a\n    result\n}\n";
+        let defs = engine.find_definitions("yuri", src, "result");
+        assert_eq!(
+            defs.len(),
+            1,
+            "yuri: result should be defined by let binding"
+        );
+        let refs = engine.find_references("yuri", src, "result");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "yuri: result should resolve to let binding"
+        );
+    }
 }
