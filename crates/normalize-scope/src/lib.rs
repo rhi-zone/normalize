@@ -2749,4 +2749,179 @@ mod tests {
             "meson: foreach variable item should be defined"
         );
     }
+
+    // --- AST exploration tests for locals.scm authoring ---
+    // Run with: cargo test -p normalize-scope -- --nocapture ast_batch
+    // (or ast_vb, ast_idris, ast_wit)
+
+    // --- vb ---
+
+    #[test]
+    fn scope_vb_method_param() {
+        let l = loader();
+        if skip_if_no(&l, "vb") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "Module M\r\n    Function Add(ByVal x As Integer, ByVal y As Integer) As Integer\r\n        Return x + y\r\n    End Function\r\nEnd Module\r\n";
+        let defs = engine.find_definitions("vb", src, "x");
+        assert_eq!(defs.len(), 1, "vb: x should be defined as parameter");
+        let refs = engine.find_references("vb", src, "x");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "vb: x reference should resolve to param"
+        );
+    }
+
+    #[test]
+    fn scope_vb_dim_statement() {
+        let l = loader();
+        if skip_if_no(&l, "vb") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "Module M\r\n    Sub Run()\r\n        Dim result As Integer = 42\r\n        Console.WriteLine(result)\r\n    End Sub\r\nEnd Module\r\n";
+        let defs = engine.find_definitions("vb", src, "result");
+        assert_eq!(defs.len(), 1, "vb: result should be defined via Dim");
+        let refs = engine.find_references("vb", src, "result");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "vb: result should resolve to Dim"
+        );
+    }
+
+    #[test]
+    fn scope_vb_for_each() {
+        let l = loader();
+        if skip_if_no(&l, "vb") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "Module M\r\n    Sub Run(items As Object)\r\n        For Each item In items\r\n            Console.WriteLine(item)\r\n        Next\r\n    End Sub\r\nEnd Module\r\n";
+        let defs = engine.find_definitions("vb", src, "item");
+        assert_eq!(defs.len(), 1, "vb: item should be defined by For Each");
+    }
+
+    // --- idris ---
+
+    #[test]
+    fn scope_idris_function_param() {
+        let l = loader();
+        if skip_if_no(&l, "idris") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "add : Int -> Int -> Int\nadd x y = x + y\n";
+        let defs = engine.find_definitions("idris", src, "x");
+        assert_eq!(defs.len(), 1, "idris: x should be defined as pattern param");
+        let refs = engine.find_references("idris", src, "x");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "idris: x should resolve to param definition"
+        );
+    }
+
+    #[test]
+    fn scope_idris_function_name() {
+        let l = loader();
+        if skip_if_no(&l, "idris") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "double : Int -> Int\ndouble n = n + n\n";
+        let defs = engine.find_definitions("idris", src, "n");
+        assert_eq!(defs.len(), 1, "idris: n should be defined as pattern param");
+    }
+
+    // --- lean ---
+
+    #[test]
+    fn scope_lean_def_param() {
+        let l = loader();
+        if skip_if_no(&l, "lean") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def double (n : Nat) : Nat := n + n\n";
+        let defs = engine.find_definitions("lean", src, "n");
+        assert_eq!(
+            defs.len(),
+            1,
+            "lean: n should be defined as explicit binder"
+        );
+        let refs = engine.find_references("lean", src, "n");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "lean: n should resolve to param"
+        );
+    }
+
+    #[test]
+    fn scope_lean_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "lean") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def example : Nat :=\n  let x := 5\n  x + x\n";
+        let defs = engine.find_definitions("lean", src, "x");
+        assert_eq!(defs.len(), 1, "lean: x should be defined by let binding");
+        let refs = engine.find_references("lean", src, "x");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "lean: x should resolve to let binding"
+        );
+    }
+
+    #[test]
+    fn scope_lean_fun_param() {
+        let l = loader();
+        if skip_if_no(&l, "lean") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def apply := fun x => x + 1\n";
+        let defs = engine.find_definitions("lean", src, "x");
+        assert_eq!(defs.len(), 1, "lean: x should be defined as fun parameter");
+    }
+
+    // --- agda ---
+
+    #[test]
+    fn scope_agda_type_sig_def() {
+        let l = loader();
+        if skip_if_no(&l, "agda") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "module Main where\n\ndouble : Nat -> Nat\ndouble n = n + n\n";
+        let defs = engine.find_definitions("agda", src, "double");
+        assert_eq!(
+            defs.len(),
+            1,
+            "agda: double type sig should be captured as definition"
+        );
+    }
+
+    #[test]
+    fn scope_agda_reference_resolves() {
+        let l = loader();
+        if skip_if_no(&l, "agda") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // double is defined via type signature; call site in 'main' should resolve
+        let src = "module Main where\n\ndouble : Nat -> Nat\ndouble n = n + n\n\nmain : IO ()\nmain = double 5\n";
+        let defs = engine.find_definitions("agda", src, "double");
+        assert_eq!(
+            defs.len(),
+            1,
+            "agda: double type sig should be a definition"
+        );
+        let refs = engine.find_references("agda", src, "double");
+        assert!(
+            refs.iter().any(|r| r.definition.is_some()),
+            "agda: double call should resolve to type sig definition"
+        );
+    }
 }
