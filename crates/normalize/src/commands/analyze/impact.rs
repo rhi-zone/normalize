@@ -2,6 +2,7 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use normalize_languages::is_test_path;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
@@ -60,7 +61,6 @@ pub struct ImpactReport {
 /// Run impact analysis: BFS through reverse import graph from target.
 pub async fn analyze_impact(idx: &FileIndex, target: &str) -> Result<ImpactReport, libsql::Error> {
     use super::architecture::build_import_graph;
-    use super::test_ratio::is_test_file_path;
 
     let graph = build_import_graph(idx).await?;
 
@@ -105,7 +105,7 @@ pub async fn analyze_impact(idx: &FileIndex, target: &str) -> Result<ImpactRepor
         let entry = ImpactEntry {
             file: file.clone(),
             depth: *depth,
-            has_tests: is_test_file_path(file),
+            has_tests: is_test_path(Path::new(file)),
             fan_in: fan_in.get(file.as_str()).copied().unwrap_or(0),
         };
         if *depth == 1 {
@@ -151,12 +151,10 @@ fn build_untested_paths(
     visited: &HashMap<String, usize>,
     importers_by_file: &HashMap<String, HashSet<String>>,
 ) -> Vec<String> {
-    use super::test_ratio::is_test_file_path;
-
     // Collect untested files sorted by depth
     let mut untested: Vec<(&String, usize)> = visited
         .iter()
-        .filter(|(f, _)| !is_test_file_path(f))
+        .filter(|(f, _)| !is_test_path(Path::new(f)))
         .map(|(f, d)| (f, *d))
         .collect();
     untested.sort_by_key(|(_, d)| *d);
@@ -172,7 +170,7 @@ fn build_untested_paths(
         if let Some(next_importers) = importers_by_file.get(*file) {
             for next in next_importers {
                 if let Some(nd) = visited.get(next)
-                    && !is_test_file_path(next)
+                    && !is_test_path(Path::new(next))
                     && *nd > 1
                 {
                     chain.push(format!("{} (depth {})", next, nd));

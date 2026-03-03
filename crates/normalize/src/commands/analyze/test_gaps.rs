@@ -8,7 +8,7 @@ use crate::analyze::test_gaps::{FunctionTestGap, TestGapsReport, check_de_priori
 use crate::extract::Extractor;
 use crate::filter::Filter;
 use crate::path_resolve;
-use normalize_languages::{SymbolKind, Visibility, support_for_path};
+use normalize_languages::{SymbolKind, Visibility, is_test_path, support_for_path};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -113,7 +113,7 @@ pub fn analyze_test_gaps(
                 .map(|f| ((f.name.clone(), f.start_line), f.complexity))
                 .collect();
 
-            let is_test_file = is_test_file_path(&file.path);
+            let is_test_file = is_test_path(std::path::Path::new(&file.path));
             let mut public_functions = Vec::new();
             let mut test_symbols = Vec::new();
 
@@ -297,21 +297,4 @@ pub fn analyze_test_gaps(
         allowed_count,
         show_all,
     }
-}
-
-/// Check if a file path is in a test directory/file pattern.
-fn is_test_file_path(path: &str) -> bool {
-    let p = path.to_lowercase();
-    p.starts_with("tests/")
-        || p.starts_with("test/")
-        || p.contains("/tests/")
-        || p.contains("/test/")
-        || p.contains("/__tests__/")
-        || p.ends_with("_test.go")
-        || p.ends_with("_test.rs")
-        || p.ends_with(".test.ts")
-        || p.ends_with(".test.js")
-        || p.ends_with(".spec.ts")
-        || p.ends_with(".spec.js")
-        || p.ends_with("_test.py")
 }

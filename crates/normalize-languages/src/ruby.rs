@@ -206,6 +206,15 @@ impl Language for Ruby {
         }
     }
 
+    fn is_test_path(&self, path: &std::path::Path) -> bool {
+        let s = path.to_string_lossy();
+        if s.contains("/spec/") || s.contains("/test/") {
+            return true;
+        }
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        name.ends_with("_test.rb") || name.ends_with("_spec.rb")
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

@@ -2,6 +2,7 @@
 
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
+use normalize_languages::is_test_path;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -126,7 +127,7 @@ pub fn analyze_docs(
     let files: Vec<_> = all_files
         .iter()
         .filter(|f| f.kind == "file")
-        .filter(|f| !is_test_file(&f.path))
+        .filter(|f| !is_test_path(Path::new(&f.path)))
         .filter(|f| {
             if let Some(flt) = filter {
                 flt.matches(Path::new(&f.path))
@@ -262,30 +263,4 @@ fn process_file(
             total,
         });
     }
-}
-
-/// Check if a file is a test file (should be excluded from doc coverage)
-fn is_test_file(path: &str) -> bool {
-    let path_lower = path.to_lowercase();
-
-    // Check path components for test directories
-    if path_lower.contains("/tests/")
-        || path_lower.contains("/test/")
-        || path_lower.contains("/__tests__/")
-    {
-        return true;
-    }
-
-    // Get filename
-    let filename = path.rsplit('/').next().unwrap_or(path);
-    let name_lower = filename.to_lowercase();
-
-    // Common test file patterns
-    name_lower.ends_with("_test.rs")
-        || name_lower.ends_with("_tests.rs")
-        || name_lower.starts_with("test_")
-        || name_lower.ends_with(".test.ts")
-        || name_lower.ends_with(".test.js")
-        || name_lower.ends_with(".spec.ts")
-        || name_lower.ends_with(".spec.js")
 }

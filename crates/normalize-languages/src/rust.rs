@@ -441,6 +441,13 @@ impl Language for Rust {
         }
     }
 
+    fn is_test_path(&self, path: &std::path::Path) -> bool {
+        // Rust unit tests are inline (#[cfg(test)]), so no test file convention.
+        // Integration tests live in tests/ and are genuine test files.
+        let s = path.to_string_lossy();
+        s.contains("/tests/") || s.starts_with("tests/")
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

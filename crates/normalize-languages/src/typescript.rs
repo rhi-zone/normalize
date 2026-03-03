@@ -123,6 +123,18 @@ impl Language for TypeScript {
         }
     }
 
+    fn is_test_path(&self, path: &std::path::Path) -> bool {
+        let s = path.to_string_lossy();
+        if s.contains("/__tests__/") || s.contains("/__mocks__/") {
+            return true;
+        }
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        name.ends_with(".test.ts")
+            || name.ends_with(".spec.ts")
+            || name.ends_with(".test.tsx")
+            || name.ends_with(".spec.tsx")
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }
@@ -274,6 +286,18 @@ impl Language for Tsx {
             crate::SymbolKind::Module => name == "tests" || name == "test" || name == "__tests__",
             _ => false,
         }
+    }
+
+    fn is_test_path(&self, path: &std::path::Path) -> bool {
+        let s = path.to_string_lossy();
+        if s.contains("/__tests__/") || s.contains("/__mocks__/") {
+            return true;
+        }
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        name.ends_with(".test.ts")
+            || name.ends_with(".spec.ts")
+            || name.ends_with(".test.tsx")
+            || name.ends_with(".spec.tsx")
     }
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {

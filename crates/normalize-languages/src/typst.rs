@@ -162,6 +162,10 @@ impl Language for Typst {
         false
     }
 
+    fn is_test_path(&self, _path: &std::path::Path) -> bool {
+        false
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

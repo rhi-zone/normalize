@@ -317,6 +317,12 @@ impl Language for Php {
         }
     }
 
+    fn is_test_path(&self, path: &std::path::Path) -> bool {
+        // PHPUnit convention: FooTest.php
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        name.ends_with("Test.php")
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

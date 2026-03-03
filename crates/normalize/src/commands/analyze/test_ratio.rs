@@ -4,6 +4,7 @@
 //! Shows which parts of the codebase have thin or no test coverage by LOC.
 
 use crate::output::OutputFormatter;
+use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::path::Path;
@@ -79,8 +80,7 @@ fn truncate_path(s: &str, max: usize) -> String {
 /// For Rust files: extract `#[cfg(test)]` block lines as test lines, rest as impl.
 /// For other languages: entire file is test if path matches test pattern.
 fn classify_file(path: &Path, content: &str) -> (usize, usize) {
-    let rel = path.to_string_lossy();
-    if is_test_file_path(&rel) {
+    if is_test_path(path) {
         return (0, content.lines().count());
     }
 
@@ -162,34 +162,6 @@ pub(crate) fn split_rust_test_lines(content: &str) -> (usize, usize) {
     }
 
     (impl_lines, test_lines)
-}
-
-/// Check whether a file path looks like a dedicated test file.
-pub(crate) fn is_test_file_path(path: &str) -> bool {
-    let p = path.to_lowercase();
-    // Dedicated test directories
-    p.starts_with("tests/")
-        || p.starts_with("test/")
-        || p.contains("/tests/")
-        || p.contains("/test/")
-        || p.contains("/__tests__/")
-        // Rust _test.rs suffix
-        || p.ends_with("_test.rs")
-        // Go
-        || p.ends_with("_test.go")
-        // Python
-        || p.ends_with("_test.py")
-        || p.starts_with("test_")
-        || p.contains("/test_")
-        // JS/TS
-        || p.ends_with(".test.ts")
-        || p.ends_with(".test.js")
-        || p.ends_with(".test.tsx")
-        || p.ends_with(".test.jsx")
-        || p.ends_with(".spec.ts")
-        || p.ends_with(".spec.js")
-        || p.ends_with(".spec.tsx")
-        || p.ends_with(".spec.jsx")
 }
 
 /// Analyze test/impl ratio across the codebase.

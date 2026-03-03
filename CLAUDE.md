@@ -139,6 +139,7 @@ Scope is optional but recommended for multi-crate repos.
 ## Negative Constraints
 
 Do not:
+- Hardcode file extensions anywhere — ever. Extension → language mapping belongs in the `Language` registry. Any `match ext { "rs" => ..., "ts" => ..., _ => default }` in non-registry code is wrong. Use `registry.language_for_extension(ext)` or equivalent.
 - Ship mutating commands without `--dry-run` - every command that writes, deletes, or modifies anything must support `--dry-run` to preview what would happen
 - Announce actions ("I will now...") - just do them
 - Leave work uncommitted — after completing a task and tests pass, commit immediately without asking

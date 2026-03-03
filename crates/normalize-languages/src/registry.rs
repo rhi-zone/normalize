@@ -277,6 +277,15 @@ pub fn support_for_path(path: &Path) -> Option<&'static dyn Language> {
         .and_then(support_for_extension)
 }
 
+/// Check if a file path is a dedicated test file for its language.
+///
+/// Returns false for unknown file types or languages that use inline tests.
+pub fn is_test_path(path: &Path) -> bool {
+    support_for_path(path)
+        .map(|lang| lang.is_test_path(path))
+        .unwrap_or(false)
+}
+
 /// Get all supported languages.
 pub fn supported_languages() -> Vec<&'static dyn Language> {
     init_builtin();

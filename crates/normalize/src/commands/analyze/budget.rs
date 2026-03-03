@@ -3,9 +3,10 @@
 //! Answers "where do our lines go?" — business logic, tests, docs, config, generated, vendored.
 
 use crate::commands::analyze::test_ratio::{
-    discover_module_dirs, is_test_file_path, module_key, split_rust_test_lines,
+    discover_module_dirs, module_key, split_rust_test_lines,
 };
 use crate::output::OutputFormatter;
+use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -359,7 +360,7 @@ fn classify_file(rel_path: &str, content: &str) -> FileClassification {
     }
 
     // Priority 5: test file (entire file is test)
-    if is_test_file_path(rel_path) {
+    if is_test_path(Path::new(rel_path)) {
         return FileClassification {
             rel_path: rel_path.to_string(),
             logic_lines: 0,

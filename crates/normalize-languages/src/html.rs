@@ -103,6 +103,10 @@ impl Language for Html {
         false
     }
 
+    fn is_test_path(&self, _path: &std::path::Path) -> bool {
+        false
+    }
+
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
         match node.kind() {
             "script_element" => {

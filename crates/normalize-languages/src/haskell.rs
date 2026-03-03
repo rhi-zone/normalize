@@ -262,6 +262,16 @@ impl Language for Haskell {
         }
     }
 
+    fn is_test_path(&self, path: &std::path::Path) -> bool {
+        // HSpec: *Spec.hs; HUnit: *Test.hs; tests in test/ dir
+        let s = path.to_string_lossy();
+        if s.contains("/test/") {
+            return true;
+        }
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        name.ends_with("Spec.hs") || name.ends_with("Test.hs") || name.ends_with("Tests.hs")
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

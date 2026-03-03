@@ -256,6 +256,18 @@ impl Language for Groovy {
         }
     }
 
+    fn is_test_path(&self, path: &std::path::Path) -> bool {
+        let s = path.to_string_lossy();
+        if s.contains("/src/test/") {
+            return true;
+        }
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        // JUnit convention; Spock framework uses *Spec.groovy
+        name.ends_with("Test.groovy")
+            || name.ends_with("Tests.groovy")
+            || name.ends_with("Spec.groovy")
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

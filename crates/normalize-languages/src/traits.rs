@@ -1,5 +1,6 @@
 //! Core trait for language support.
 
+use std::path::Path;
 use tree_sitter::Node;
 
 // Re-export core types from normalize-facts-core
@@ -196,6 +197,11 @@ pub trait Language: Send + Sync {
     /// Check if a symbol is a test (for filtering).
     /// Each language must implement this - test conventions are language-specific.
     fn is_test_symbol(&self, symbol: &Symbol) -> bool;
+
+    /// Check if a file path is a dedicated test file for this language.
+    /// Return false for languages that use inline tests (e.g. Rust's #[cfg(test)] unit tests).
+    /// Note: Rust integration tests in tests/ should still return true.
+    fn is_test_path(&self, path: &Path) -> bool;
 
     // === Embedded Languages ===
 
