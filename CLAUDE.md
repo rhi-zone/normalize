@@ -45,12 +45,14 @@ pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, comp
 
 ## Core Rule
 
-**Note things down immediately:**
+**Note things down immediately — no deferral:**
 - Bugs/issues → fix or add to TODO.md
 - Design decisions → docs/ or code comments
-- Future work → TODO.md
+- Future work → TODO.md **right now, in the same response** — never say "I'll note this later"
 - Key insights → this file
 - Friction with normalize → TODO.md (we dogfood, friction = improvement opportunity)
+
+"I'll add that to TODO.md" or "I'll note that" without immediately editing the file is the failure mode. Edit first, then respond.
 
 **Keep docs in sync with code.** When renaming a command, adding a subcommand, or changing CLI structure: update `docs/cli/`, `README.md`, `LLMS.md`, `Architecture.md`, and `docs/cli-design.md` in the same commit. Stale docs compound — 200 commits of drift = a full day of cleanup.
 
