@@ -43,6 +43,11 @@ pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, comp
 - Assembly at top level: `deps_for_language(lang.name())` bridges syntax and deps lookups.
 - When a trait grows beyond its domain, extract a new crate rather than expanding. Watch for: methods that only ~10% of impls override, methods that need filesystem access in a syntax trait, methods that need new dependencies.
 
+**Manifest parsing lives in `normalize-manifest` (sibling to `normalize-local-deps`).**
+- `normalize-manifest`: Static parsing of project manifest files (Cargo.toml, package.json, go.mod, requirements.txt/pyproject.toml, …) → `ParsedManifest { name, version, dependencies: Vec<DeclaredDep> }`. No filesystem discovery — pure content parsing.
+- `normalize-local-deps` **depends on** `normalize-manifest` and uses it internally wherever it currently does ad-hoc partial parsing (e.g. `go.rs::parse_go_mod()`, `ecmascript.rs::get_package_entry_point()`). Do not add new manifest-content parsing directly to `normalize-local-deps`.
+- The distinction: `normalize-manifest` answers "what does this project declare?" (static); `normalize-local-deps` answers "what is installed on disk?" (runtime discovery).
+
 ## Core Rule
 
 **Note things down immediately — no deferral:**
