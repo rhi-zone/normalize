@@ -375,18 +375,18 @@ fn collect_binding_identifiers(
         return;
     }
     if node.child_count() == 0 {
-        if binding_leaf_kinds.contains(node.kind()) {
-            if let Ok(text) = node.utf8_text(source) {
-                out.push(RawCapture {
-                    name: text.to_string(),
-                    location: Location {
-                        line: node.start_position().row + 1,
-                        column: node.start_position().column + 1,
-                        start_byte: node.start_byte(),
-                        end_byte: node.end_byte(),
-                    },
-                });
-            }
+        if binding_leaf_kinds.contains(node.kind())
+            && let Ok(text) = node.utf8_text(source)
+        {
+            out.push(RawCapture {
+                name: text.to_string(),
+                location: Location {
+                    line: node.start_position().row + 1,
+                    column: node.start_position().column + 1,
+                    start_byte: node.start_byte(),
+                    end_byte: node.end_byte(),
+                },
+            });
         }
     } else {
         let mut cursor = node.walk();
