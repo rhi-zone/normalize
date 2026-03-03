@@ -62,6 +62,7 @@ but heuristic extraction of deps is possible and useful:
 | `mix.exs` | Elixir / Hex | `mix.exs` | Elixir file; `{:pkg, "~> 1.0"}` tuples in `deps/0` — regex-matchable. |
 | `dub.json` / `dub.sdl` | D / Dub | `dub.json`, `dub.sdl` | JSON or custom SDL; `"dependencies"` object. |
 | `*.csproj` | .NET / NuGet | `*.csproj` | XML; `<PackageReference Include="..." Version="..."/>`. |
+| `*.rockspec` | Lua / LuaRocks | `*.rockspec` | Lua file; `dependencies = { "pkg >= 1.0" }` table — string list, regex-matchable. Non-standard filename (contains version: `pkg-1.0-1.rockspec`). |
 
 Notes:
 - **Nimble** and **Gemfile** are the most tractable (simple line patterns).
