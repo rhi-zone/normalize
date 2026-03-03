@@ -413,8 +413,18 @@ impl LanguageServer for MossBackend {
             }
         }
 
-        // Find callers (references)
-        if let Ok(callers) = index.find_callers(&word).await {
+        // Find callers (references), filtered to the definition's file to avoid false positives
+        // from unrelated symbols with the same name in other modules.
+        let def_file = index
+            .find_symbol(&word)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .next()
+            .map(|(file, ..)| file);
+        if let Some(def_file) = def_file
+            && let Ok(callers) = index.find_callers(&word, &def_file).await
+        {
             for (file, _caller_name, line) in callers {
                 if let Some(loc) = make_location_at_line(&file, &root, line) {
                     locations.push(loc);
@@ -467,22 +477,14 @@ impl LanguageServer for MossBackend {
             None => return Ok(None),
         };
 
-        // Check if symbol exists in index
+        // Check if symbol is known (has a definition in the index)
         if index
             .find_symbol(&word_info.word)
             .await
             .map(|m| m.is_empty())
             .unwrap_or(true)
         {
-            // Also check if it's a caller (referenced symbol)
-            if index
-                .find_callers(&word_info.word)
-                .await
-                .map(|m| m.is_empty())
-                .unwrap_or(true)
-            {
-                return Ok(None);
-            }
+            return Ok(None);
         }
 
         Ok(Some(PrepareRenameResponse::Range(Range {
@@ -538,9 +540,13 @@ impl LanguageServer for MossBackend {
         let mut file_edits: std::collections::HashMap<Url, Vec<TextEdit>> =
             std::collections::HashMap::new();
 
-        // Find definition sites
+        // Find definition sites; keep track of def_file to filter callers correctly.
+        let mut def_file: Option<String> = None;
         if let Ok(defs) = index.find_symbol(&old_name).await {
             for (file, _kind, start_line, _end_line) in defs {
+                if def_file.is_none() {
+                    def_file = Some(file.clone());
+                }
                 let target_path = root.join(&file);
                 if let Ok(target_uri) = Url::from_file_path(&target_path)
                     && let Ok(file_content) = std::fs::read_to_string(&target_path)
@@ -552,8 +558,10 @@ impl LanguageServer for MossBackend {
             }
         }
 
-        // Find reference sites (callers)
-        if let Ok(callers) = index.find_callers(&old_name).await {
+        // Find reference sites (callers), filtered to def_file to avoid false positives.
+        if let Some(def_file) = &def_file
+            && let Ok(callers) = index.find_callers(&old_name, def_file).await
+        {
             for (file, _caller_name, line) in callers {
                 let target_path = root.join(&file);
                 if let Ok(target_uri) = Url::from_file_path(&target_path)

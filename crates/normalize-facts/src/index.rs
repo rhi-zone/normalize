@@ -811,13 +811,20 @@ impl FileIndex {
         Ok(())
     }
 
-    /// Find callers of a symbol by name (from call graph)
-    /// Resolves through imports: if file A imports X as Y and calls Y(), finds that as a caller of X
-    /// Also handles qualified calls: if file A does `import foo` and calls `foo.bar()`, finds caller of `bar`
-    /// Also handles method calls: `self.method()` is resolved to the containing class's method
+    /// Find callers of a specific symbol definition (from call graph).
+    ///
+    /// `def_file` is the file that contains the definition being searched. Results are
+    /// restricted to files that are `def_file` itself (self-recursive calls) or that
+    /// explicitly import the symbol. This prevents false positives from unrelated
+    /// functions with the same name in other modules.
+    ///
+    /// Resolves through imports: if file A imports X as Y and calls Y(), it is found
+    /// as a caller of X. Also handles qualified calls (`foo.bar()`) and `self.method()`
+    /// resolved to the containing class.
     pub async fn find_callers(
         &self,
         symbol_name: &str,
+        def_file: &str,
     ) -> Result<Vec<(String, String, usize)>, libsql::Error> {
         // Handle Class.method format - split and search for method within class
         let (class_filter, method_name) = if symbol_name.contains('.') {
@@ -849,9 +856,11 @@ impl FileIndex {
             }
         }
 
-        // Combined query: direct calls + calls via import aliases + qualified calls via module imports
+        // Direct calls restricted to def_file (self-recursive) plus all import-based callers.
+        // The import-based branches already filter to files that explicitly import the symbol,
+        // so they don't need further filtering by def_file.
         let mut rows = self.conn.query(
-            "SELECT caller_file, caller_symbol, line FROM calls WHERE callee_name = ?1
+            "SELECT caller_file, caller_symbol, line FROM calls WHERE callee_name = ?1 AND caller_file = ?2
              UNION
              SELECT c.caller_file, c.caller_symbol, c.line
              FROM calls c
@@ -867,36 +876,7 @@ impl FileIndex {
              FROM calls c
              JOIN symbols s ON c.caller_file = s.file AND c.caller_symbol = s.name
              WHERE c.callee_name = ?1 AND c.callee_qualifier = 'self' AND s.parent IS NOT NULL",
-            params![method_name],
-        ).await?;
-        let mut callers = Vec::new();
-        while let Some(row) = rows.next().await? {
-            callers.push((row.get(0)?, row.get(1)?, row.get::<i64>(2)? as usize));
-        }
-
-        if !callers.is_empty() {
-            return Ok(callers);
-        }
-
-        // Try case-insensitive match (direct only for simplicity)
-        let mut rows = self.conn.query(
-            "SELECT caller_file, caller_symbol, line FROM calls WHERE LOWER(callee_name) = LOWER(?1)",
-            params![method_name],
-        ).await?;
-        let mut callers = Vec::new();
-        while let Some(row) = rows.next().await? {
-            callers.push((row.get(0)?, row.get(1)?, row.get::<i64>(2)? as usize));
-        }
-
-        if !callers.is_empty() {
-            return Ok(callers);
-        }
-
-        // Try LIKE pattern match (contains)
-        let pattern = format!("%{}%", method_name);
-        let mut rows = self.conn.query(
-            "SELECT caller_file, caller_symbol, line FROM calls WHERE LOWER(callee_name) LIKE LOWER(?1) LIMIT 100",
-            params![pattern],
+            params![method_name, def_file],
         ).await?;
         let mut callers = Vec::new();
         while let Some(row) = rows.next().await? {

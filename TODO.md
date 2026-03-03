@@ -13,11 +13,14 @@ extract, inline, move — correct, without LSPs, without false positives.
    - [x] `normalize find-references <symbol>` command (locals within-file scope engine)
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
-2. ~~**Fix `edit rename` false positives** (step 1 done)~~ **PARTIALLY DONE**
-   - [x] Wire rename to use scope engine for files with locals.scm (filters out locally-defined symbols)
-   - [ ] Store module-qualified caller/callee in facts index (step 2: cross-file correctness)
-   - [ ] Post-filter: verify callee resolves to definition file via import graph (step 3)
-   - See: "HIGH PRIORITY: `edit rename` false positives" in [Semantic Editing](#semantic-editing)
+2. ~~**Fix `edit rename` false positives**~~ **DONE**
+   - [x] `find_callers(symbol, def_file)` — always requires def_file, restricts direct calls to
+         def_file (self-recursive), keeps import-join branches for cross-file callers
+   - [x] All call sites updated: `edit rename`, LSP references/rename, call graph
+   - [ ] Module resolution: `find_callers` import branches match by name not by resolved file path,
+         so if two files export the same name and both are imported, results include both. Needs
+         `resolved_file` column in imports table for full correctness (future work).
+   - See: "Semantic Refactoring Infrastructure" in [Semantic Editing](#semantic-editing)
 
 3. **locals.scm for high-value languages** (rust, python, go, java, c, cpp, c_sharp, kotlin,
    ruby, php, bash, zig, dart, elixir, erlang, clojure — the ones without them already)
@@ -469,7 +472,7 @@ for within-file scope/reference resolution, facts index for cross-file import/ex
       - Given a reference node: walk scope tree upward to find the matching definition
       - Given a definition node: find all reference nodes in its scope
 - [x] `normalize find-references <symbol>` command (within-file via locals + cross-file via facts index)
-- [x] Fix `normalize edit rename` to use scope engine for languages with locals.scm (step 1: within-file disambiguation)
+- [x] Fix `normalize edit rename` false positives: `find_callers(symbol, def_file)` now always requires the definition file; restricts direct calls to def_file, uses import-join for cross-file
 
 **21 arborium grammars already have locals.scm** (no work needed):
 ada, capnp, elm, fsharp, gleam, haskell, javascript, lua, nix, objc,
@@ -1130,15 +1133,13 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
     - [x] Conflict detection: refuse when new name already exists as symbol or import; --force to override
     - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
     - Integration with shadow git: checkpoint before large refactors, rollback on failure
-    - **`edit rename` false positives — step 1 done, steps 2+3 remain.**
-      Step 1 (done): for languages with locals.scm, scope engine filters out references that
-      resolve to a locally-defined symbol (different `foo` in the same file). References with
-      `definition = None` (unresolved = likely imported) are the only ones renamed.
-      Step 2 (todo): store module-qualified caller/callee in the facts index — fixes cross-file
-      case where two files each define a different `foo` but both appear in `find_callers`.
-      Step 3 (todo): post-filter callers via import graph (verify callee resolves to def file).
-      Until step 2+3 done, rename is still unsafe for non-scope-supported languages when the
-      same name exists in multiple modules.
+    - **`edit rename` false positives — fixed at the index level.**
+      `find_callers(symbol, def_file)` now always requires the definition file. Direct
+      (no-import) call results are restricted to def_file (self-recursive calls). The
+      import-join branches handle cross-file callers. All call sites updated.
+      Remaining gap: the import-join matches by symbol *name*, not by resolved file path.
+      If two files export the same name and a third imports both, both callers would be
+      included. Fix requires a `resolved_file` column in the imports table (future work).
     - **Local rename (`edit rename path/func/local new_name`)**: scoped rename within a block.
       No index needed. Two tiers:
       - Conservative: `replace_all_words` within the container's byte range, stop at any nested

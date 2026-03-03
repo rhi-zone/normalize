@@ -52,11 +52,34 @@ async fn cmd_call_graph_async(
         return 1;
     }
 
+    // Resolve def_file: either from explicit file:symbol input or by looking up
+    // the symbol's definition in the index. Required for accurate caller lookup.
+    let def_file = if let Some(f) = &file_hint {
+        let matches = path_resolve::resolve(f, root);
+        matches
+            .iter()
+            .find(|m| m.kind == "file")
+            .map(|m| m.path.clone())
+    } else {
+        idx.find_symbol(&symbol)
+            .await
+            .ok()
+            .and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
+    };
+
+    let Some(def_file) = def_file else {
+        eprintln!(
+            "Symbol '{}' not found in index. Try: file/Symbol format.",
+            symbol
+        );
+        return 1;
+    };
+
     let mut results: Vec<(String, String, usize, &str)> = Vec::new(); // (file, symbol, line, direction)
 
     // Get callers if requested
     if show_callers {
-        match idx.find_callers(&symbol).await {
+        match idx.find_callers(&symbol, &def_file).await {
             Ok(callers) => {
                 for (file, sym, line) in callers {
                     results.push((file, sym, line, "caller"));
@@ -70,30 +93,14 @@ async fn cmd_call_graph_async(
 
     // Get callees if requested
     if show_callees {
-        // Need to find file for symbol first
-        let file_path = if let Some(f) = &file_hint {
-            let matches = path_resolve::resolve(f, root);
-            matches
-                .iter()
-                .find(|m| m.kind == "file")
-                .map(|m| m.path.clone())
-        } else {
-            idx.find_symbol(&symbol)
-                .await
-                .ok()
-                .and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
-        };
-
-        if let Some(file_path) = file_path {
-            match idx.find_callees(&file_path, &symbol).await {
-                Ok(callees) => {
-                    for (name, line) in callees {
-                        results.push((file_path.clone(), name, line, "callee"));
-                    }
+        match idx.find_callees(&def_file, &symbol).await {
+            Ok(callees) => {
+                for (name, line) in callees {
+                    results.push((def_file.clone(), name, line, "callee"));
                 }
-                Err(e) => {
-                    eprintln!("Error finding callees: {}", e);
-                }
+            }
+            Err(e) => {
+                eprintln!("Error finding callees: {}", e);
             }
         }
     }
@@ -179,10 +186,31 @@ pub async fn build_call_graph(
 
     let _ = case_insensitive; // Index methods already have case-insensitive fallbacks
 
+    // Resolve def_file from hint or index lookup.
+    let def_file = if let Some(f) = &file_hint {
+        let matches = path_resolve::resolve(f, root);
+        matches
+            .iter()
+            .find(|m| m.kind == "file")
+            .map(|m| m.path.clone())
+    } else {
+        idx.find_symbol(&symbol)
+            .await
+            .ok()
+            .and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
+    };
+
+    let def_file = def_file.ok_or_else(|| {
+        format!(
+            "Symbol '{}' not found in index. Try: file/Symbol format.",
+            symbol
+        )
+    })?;
+
     let mut results: Vec<CallEntry> = Vec::new();
 
     if show_callers {
-        match idx.find_callers(&symbol).await {
+        match idx.find_callers(&symbol, &def_file).await {
             Ok(callers) => {
                 for (file, sym, line) in callers {
                     results.push(CallEntry {
@@ -200,34 +228,19 @@ pub async fn build_call_graph(
     }
 
     if show_callees {
-        let file_path = if let Some(f) = &file_hint {
-            let matches = path_resolve::resolve(f, root);
-            matches
-                .iter()
-                .find(|m| m.kind == "file")
-                .map(|m| m.path.clone())
-        } else {
-            idx.find_symbol(&symbol)
-                .await
-                .ok()
-                .and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
-        };
-
-        if let Some(file_path) = file_path {
-            match idx.find_callees(&file_path, &symbol).await {
-                Ok(callees) => {
-                    for (name, line) in callees {
-                        results.push(CallEntry {
-                            file: file_path.clone(),
-                            symbol: name,
-                            line,
-                            direction: "callee".to_string(),
-                        });
-                    }
+        match idx.find_callees(&def_file, &symbol).await {
+            Ok(callees) => {
+                for (name, line) in callees {
+                    results.push(CallEntry {
+                        file: def_file.clone(),
+                        symbol: name,
+                        line,
+                        direction: "callee".to_string(),
+                    });
                 }
-                Err(e) => {
-                    eprintln!("Error finding callees: {}", e);
-                }
+            }
+            Err(e) => {
+                eprintln!("Error finding callees: {}", e);
             }
         }
     }
