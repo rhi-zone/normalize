@@ -17,9 +17,10 @@ extract, inline, move — correct, without LSPs, without false positives.
    - [x] `find_callers(symbol, def_file)` — always requires def_file, restricts direct calls to
          def_file (self-recursive), keeps import-join branches for cross-file callers
    - [x] All call sites updated: `edit rename`, LSP references/rename, call graph
-   - [ ] Module resolution: `find_callers` import branches match by name not by resolved file path,
-         so if two files export the same name and both are imported, results include both. Needs
-         `resolved_file` column in imports table for full correctness (future work).
+   - [x] Module resolution: `resolved_file` column added to imports table; populated after
+         indexing via `resolve_all_imports()` using `module_to_files()`; `find_callers` import
+         branches now filter `resolved_file = def_file OR resolved_file IS NULL` (null = external
+         package or unresolvable — conservative fallback, not a false positive source).
    - See: "Semantic Refactoring Infrastructure" in [Semantic Editing](#semantic-editing)
 
 3. **locals.scm for high-value languages** (rust, python, go, java, c, cpp, c_sharp, kotlin,
@@ -1133,13 +1134,12 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
     - [x] Conflict detection: refuse when new name already exists as symbol or import; --force to override
     - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
     - Integration with shadow git: checkpoint before large refactors, rollback on failure
-    - **`edit rename` false positives — fixed at the index level.**
-      `find_callers(symbol, def_file)` now always requires the definition file. Direct
-      (no-import) call results are restricted to def_file (self-recursive calls). The
-      import-join branches handle cross-file callers. All call sites updated.
-      Remaining gap: the import-join matches by symbol *name*, not by resolved file path.
-      If two files export the same name and a third imports both, both callers would be
-      included. Fix requires a `resolved_file` column in the imports table (future work).
+    - **`edit rename` false positives — fully fixed.**
+      `find_callers(symbol, def_file)` requires definition file. Direct calls restricted
+      to def_file (self-recursive). Import-based branches filter by `resolved_file = def_file`
+      (or NULL fallback for unresolvable imports). `resolved_file` is populated after
+      indexing via `resolve_all_imports()` → `module_to_files()` → `LocalDeps`. All
+      root-relative, consistent with the rest of the index.
     - **Local rename (`edit rename path/func/local new_name`)**: scoped rename within a block.
       No index needed. Two tiers:
       - Conservative: `replace_all_words` within the container's byte range, stop at any nested

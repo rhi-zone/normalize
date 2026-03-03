@@ -36,7 +36,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -273,7 +273,8 @@ impl FileIndex {
                 module TEXT,
                 name TEXT NOT NULL,
                 alias TEXT,
-                line INTEGER NOT NULL
+                line INTEGER NOT NULL,
+                resolved_file TEXT
             )",
             (),
         )
@@ -290,6 +291,11 @@ impl FileIndex {
         .await?;
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_imports_module ON imports(module)",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_imports_resolved ON imports(resolved_file)",
             (),
         )
         .await?;
@@ -373,6 +379,10 @@ impl FileIndex {
             conn.execute("DELETE FROM calls", ()).await.ok();
             conn.execute("DELETE FROM symbols", ()).await.ok();
             conn.execute("DELETE FROM imports", ()).await.ok();
+            // Add new columns that may not exist in older schema versions.
+            conn.execute("ALTER TABLE imports ADD COLUMN resolved_file TEXT", ())
+                .await
+                .ok(); // ignore "duplicate column" error on fresh DBs
             conn.execute("DELETE FROM type_methods", ()).await.ok();
             conn.execute("DELETE FROM type_refs", ()).await.ok();
             conn.execute("DELETE FROM symbol_attributes", ()).await.ok();
@@ -856,9 +866,14 @@ impl FileIndex {
             }
         }
 
-        // Direct calls restricted to def_file (self-recursive) plus all import-based callers.
-        // The import-based branches already filter to files that explicitly import the symbol,
-        // so they don't need further filtering by def_file.
+        // Direct calls restricted to def_file (self-recursive calls only).
+        //
+        // Import-based branches use resolved_file for precise filtering:
+        //   - resolved_file = def_file  → this import provably references our definition
+        //   - resolved_file IS NULL     → module couldn't be resolved (external package,
+        //                                 no LocalDeps support); include as fallback so we
+        //                                 don't silently drop real callers
+        //   - resolved_file = other     → different module's symbol with the same name; exclude
         let mut rows = self.conn.query(
             "SELECT caller_file, caller_symbol, line FROM calls WHERE callee_name = ?1 AND caller_file = ?2
              UNION
@@ -866,11 +881,13 @@ impl FileIndex {
              FROM calls c
              JOIN imports i ON c.caller_file = i.file AND c.callee_name = COALESCE(i.alias, i.name)
              WHERE i.name = ?1
+               AND (i.resolved_file = ?2 OR i.resolved_file IS NULL)
              UNION
              SELECT c.caller_file, c.caller_symbol, c.line
              FROM calls c
              JOIN imports i ON c.caller_file = i.file AND c.callee_qualifier = COALESCE(i.alias, i.name)
              WHERE c.callee_name = ?1 AND i.module IS NULL
+               AND (i.resolved_file = ?2 OR i.resolved_file IS NULL)
              UNION
              SELECT c.caller_file, c.caller_symbol, c.line
              FROM calls c
@@ -1324,6 +1341,45 @@ impl FileIndex {
         result
     }
 
+    /// Resolve all unresolved import rows by populating `resolved_file`.
+    ///
+    /// For each import row where `module IS NOT NULL` and `resolved_file IS NULL`,
+    /// calls `module_to_files()` to convert the module specifier to a project-relative
+    /// file path and writes it back. Rows that cannot be resolved (external packages,
+    /// stdlib, unknown modules) keep `resolved_file = NULL`.
+    ///
+    /// Safe to call multiple times — only processes rows with `resolved_file IS NULL`.
+    pub async fn resolve_all_imports(&self) -> Result<usize, libsql::Error> {
+        // Collect distinct (file, module) pairs that still need resolution.
+        // We can't mutate while iterating, so collect first.
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT DISTINCT file, module FROM imports WHERE module IS NOT NULL AND resolved_file IS NULL",
+                (),
+            )
+            .await?;
+        let mut pending: Vec<(String, String)> = Vec::new();
+        while let Some(row) = rows.next().await? {
+            pending.push((row.get(0)?, row.get(1)?));
+        }
+
+        let mut resolved_count = 0;
+        for (file, module) in pending {
+            let files = self.module_to_files(&module, &file).await;
+            if let Some(resolved_file) = files.first() {
+                self.conn
+                    .execute(
+                        "UPDATE imports SET resolved_file = ?1 WHERE file = ?2 AND module = ?3 AND resolved_file IS NULL",
+                        params![resolved_file.clone(), file.clone(), module.clone()],
+                    )
+                    .await?;
+                resolved_count += 1;
+            }
+        }
+        Ok(resolved_count)
+    }
+
     /// Check if a file exports (defines) a given symbol
     async fn file_exports_symbol(&self, file: &str, symbol: &str) -> Result<bool, libsql::Error> {
         // Check if symbol is defined in this file (top-level only, parent IS NULL)
@@ -1681,6 +1737,10 @@ impl FileIndex {
 
         self.conn.execute("COMMIT", ()).await?;
 
+        // Resolve import module specifiers to root-relative file paths now that all
+        // files are indexed. Must run after COMMIT so module_to_files() can query them.
+        self.resolve_all_imports().await.ok();
+
         Ok(CallGraphStats {
             symbols: symbol_count,
             calls: call_count,
@@ -1817,6 +1877,9 @@ impl FileIndex {
         }
 
         self.conn.execute("COMMIT", ()).await?;
+
+        // Resolve any newly inserted imports to root-relative file paths.
+        self.resolve_all_imports().await.ok();
 
         Ok(CallGraphStats {
             symbols: symbol_count,
