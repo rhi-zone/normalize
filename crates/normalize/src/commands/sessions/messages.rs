@@ -241,10 +241,10 @@ fn format_usage_pretty(usage: Option<&TokenUsage>) -> String {
         format!("\x1b[32mout:{}\x1b[0m", u.output),
     ];
     if let Some(cr) = u.cache_read.filter(|&v| v > 0) {
-        parts.push(format!("\x1b[36mcr:{}\x1b[0m", cr));
+        parts.push(format!("\x1b[36mcache_read:{}\x1b[0m", cr));
     }
     if let Some(cc) = u.cache_create.filter(|&v| v > 0) {
-        parts.push(format!("\x1b[35mcc:{}\x1b[0m", cc));
+        parts.push(format!("\x1b[35mcache_create:{}\x1b[0m", cc));
     }
     format!(" \x1b[90m[{}]\x1b[0m", parts.join(" "))
 }
