@@ -1031,6 +1031,13 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
       Fix requires the index to store module-qualified caller/callee names, or a post-filter that
       checks whether the callee resolves to the same definition file via the imports graph.
       Until fixed, `edit rename` is safe only when the symbol name is unique across the project.
+    - **Local rename (`edit rename path/func/local new_name`)**: scoped rename within a block.
+      No index needed. Two tiers:
+      - Conservative: `replace_all_words` within the container's byte range, stop at any nested
+        binding with the same name (avoids worst-case shadowing corruption, misses outer refs past inner shadow)
+      - Correct: tree-sitter scope walk — find the declaration node, then walk identifier nodes
+        that resolve to the same binding. Language-specific scope rules required (Rust, JS, Python differ).
+      SkeletonExtractor doesn't surface locals; needs a dedicated local-variable locator.
 - Cross-file refactors: `normalize move src/foo.rs/my_func src/bar.rs`
   - Move functions/types between files with import updates
   - Handles visibility changes (pub when crossing module boundaries)
