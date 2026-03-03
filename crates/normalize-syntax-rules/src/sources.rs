@@ -308,34 +308,15 @@ impl RustSource {
 
     /// Detect if a file is a test file based on path patterns and content.
     fn is_test_file(ctx: &SourceContext) -> bool {
-        let path = ctx.rel_path;
-
-        // Path-based detection
-        if path.starts_with("tests/")
-            || path.starts_with("tests\\")
-            || path.contains("/tests/")
-            || path.contains("\\tests\\")
-        {
+        // Path-based detection via Language trait
+        if normalize_languages::is_test_path(ctx.file_path) {
             return true;
         }
 
-        // Filename patterns
-        if let Some(filename) = ctx.file_path.file_name().and_then(|n| n.to_str())
-            && (filename.ends_with("_test.rs")
-                || filename.ends_with("_tests.rs")
-                || filename.starts_with("test_"))
-        {
-            return true;
-        }
-
-        // Check file content for top-level #[cfg(test)]
-        // This catches files that are primarily test code
+        // Content-based: catch Rust files that are primarily test code via inline #[cfg(test)]
         if let Ok(content) = std::fs::read_to_string(ctx.file_path) {
-            // Look for #[cfg(test)] at start of line (top-level attribute)
             for line in content.lines().take(50) {
-                // Skip to first non-comment, non-empty line with #[cfg(test)]
-                let trimmed = line.trim();
-                if trimmed.starts_with("#[cfg(test)]") {
+                if line.trim().starts_with("#[cfg(test)]") {
                     return true;
                 }
             }
@@ -376,7 +357,8 @@ impl RuleSource for RustSource {
 
 /// TypeScript/JavaScript project source - parses tsconfig.json and package.json.
 ///
-/// Provides `typescript.target`, `typescript.module`, `typescript.strict`, `node.version`.
+/// Provides `typescript.target`, `typescript.module`, `typescript.strict`, `node.version`,
+/// `typescript.is_test_file`.
 pub struct TypeScriptSource;
 
 impl TypeScriptSource {
@@ -514,17 +496,18 @@ impl RuleSource for TypeScriptSource {
             result.extend(Self::parse_package_json(&content));
         }
 
-        if result.is_empty() {
-            None
-        } else {
-            Some(result)
-        }
+        result.insert(
+            "is_test_file".to_string(),
+            normalize_languages::is_test_path(ctx.file_path).to_string(),
+        );
+
+        Some(result)
     }
 }
 
 /// Python project source - parses pyproject.toml for project metadata.
 ///
-/// Provides `python.version`, `python.name`.
+/// Provides `python.version`, `python.name`, `python.is_test_file`.
 pub struct PythonSource;
 
 impl PythonSource {
@@ -587,22 +570,27 @@ impl RuleSource for PythonSource {
             return None;
         }
 
-        // Find nearest pyproject.toml
-        let pyproject = Self::find_pyproject(ctx.file_path)?;
-        let content = std::fs::read_to_string(&pyproject).ok()?;
+        let mut result = HashMap::new();
 
-        let result = Self::parse_pyproject(&content);
-        if result.is_empty() {
-            None
-        } else {
-            Some(result)
+        // Parse pyproject.toml if present
+        if let Some(pyproject) = Self::find_pyproject(ctx.file_path)
+            && let Ok(content) = std::fs::read_to_string(&pyproject)
+        {
+            result.extend(Self::parse_pyproject(&content));
         }
+
+        result.insert(
+            "is_test_file".to_string(),
+            normalize_languages::is_test_path(ctx.file_path).to_string(),
+        );
+
+        Some(result)
     }
 }
 
 /// Go project source - parses go.mod for module metadata.
 ///
-/// Provides `go.version`, `go.module`.
+/// Provides `go.version`, `go.module`, `go.is_test_file`.
 pub struct GoSource;
 
 impl GoSource {
@@ -651,16 +639,21 @@ impl RuleSource for GoSource {
             return None;
         }
 
-        // Find nearest go.mod
-        let go_mod = Self::find_go_mod(ctx.file_path)?;
-        let content = std::fs::read_to_string(&go_mod).ok()?;
+        let mut result = HashMap::new();
 
-        let result = Self::parse_go_mod(&content);
-        if result.is_empty() {
-            None
-        } else {
-            Some(result)
+        // Parse go.mod if present
+        if let Some(go_mod) = Self::find_go_mod(ctx.file_path)
+            && let Ok(content) = std::fs::read_to_string(&go_mod)
+        {
+            result.extend(Self::parse_go_mod(&content));
         }
+
+        result.insert(
+            "is_test_file".to_string(),
+            normalize_languages::is_test_path(ctx.file_path).to_string(),
+        );
+
+        Some(result)
     }
 }
 
