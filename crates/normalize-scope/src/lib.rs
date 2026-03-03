@@ -1624,4 +1624,200 @@ mod tests {
         let defs = engine.find_definitions("fsharp", src, "x");
         assert_eq!(defs.len(), 1, "fsharp: let x should define x");
     }
+
+    // ── Ada ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_ada_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "ada") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "procedure Add(X : Integer; Y : Integer) is begin null; end Add;";
+        let defs = engine.find_definitions("ada", src, "X");
+        assert_eq!(defs.len(), 1, "ada: parameter X should be defined");
+    }
+
+    // ── Starlark ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_starlark_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "starlark") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def add(x, y):\n  return x + y\n";
+        let defs = engine.find_definitions("starlark", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "starlark: function param x should be defined"
+        );
+        let refs = engine.find_references("starlark", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "starlark: x in body should resolve");
+    }
+
+    #[test]
+    fn test_starlark_assignment() {
+        let l = loader();
+        if skip_if_no(&l, "starlark") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "def f():\n  x = 1\n  return x\n";
+        let defs = engine.find_definitions("starlark", src, "x");
+        assert_eq!(defs.len(), 1, "starlark: assignment x should be defined");
+    }
+
+    // ── Thrift ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_thrift_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "thrift") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "service Calc { i32 add(1: i32 x, 2: i32 y) }";
+        let defs = engine.find_definitions("thrift", src, "x");
+        assert_eq!(defs.len(), 1, "thrift: parameter x should be defined");
+    }
+
+    #[test]
+    fn test_thrift_service_name() {
+        let l = loader();
+        if skip_if_no(&l, "thrift") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "service Calc { i32 add(1: i32 x) }";
+        let defs = engine.find_definitions("thrift", src, "Calc");
+        assert_eq!(defs.len(), 1, "thrift: service name Calc should be defined");
+    }
+
+    // ── Objective-C ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_objc_method_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "objc") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // ObjC is a superset of C; C-style function parsing always works.
+        // ObjC method syntax (- (int)foo:(int)x) requires @implementation context.
+        let src = "int add(int x, int y) { return x + y; }";
+        let defs = engine.find_definitions("objc", src, "x");
+        assert_eq!(defs.len(), 1, "objc: parameter x should be defined");
+        let refs = engine.find_references("objc", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "objc: x reference should resolve");
+    }
+
+    // ── Nix ───────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_nix_function_formal() {
+        let l = loader();
+        if skip_if_no(&l, "nix") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // Nix attrset destructuring function: { x, y }: x + y
+        let src = "{ x, y }: x + y";
+        let defs = engine.find_definitions("nix", src, "x");
+        assert_eq!(defs.len(), 1, "nix: formal parameter x should be defined");
+    }
+
+    #[test]
+    fn test_nix_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "nix") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "let x = 1; in x + 1";
+        let defs = engine.find_definitions("nix", src, "x");
+        assert_eq!(defs.len(), 1, "nix: let binding x should be defined");
+    }
+
+    // ── ReScript ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_rescript_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "rescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "let add = (x, y) => x + y";
+        let defs = engine.find_definitions("rescript", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "rescript: function parameter x should be defined"
+        );
+    }
+
+    #[test]
+    fn test_rescript_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "rescript") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "let x = 1";
+        let defs = engine.find_definitions("rescript", src, "x");
+        assert_eq!(defs.len(), 1, "rescript: let x should be defined");
+    }
+
+    // ── Haskell ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_haskell_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "haskell") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "add x y = x + y";
+        let defs = engine.find_definitions("haskell", src, "x");
+        assert_eq!(
+            defs.len(),
+            1,
+            "haskell: function parameter x should be defined"
+        );
+        let refs = engine.find_references("haskell", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "haskell: x reference should resolve");
+    }
+
+    #[test]
+    fn test_haskell_let_binding() {
+        let l = loader();
+        if skip_if_no(&l, "haskell") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "f = let x = 1 in x + 1";
+        let defs = engine.find_definitions("haskell", src, "x");
+        assert_eq!(defs.len(), 1, "haskell: let x should be defined");
+    }
+
+    // ── Cap'n Proto ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_capnp_field_definition() {
+        let l = loader();
+        if skip_if_no(&l, "capnp") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "@0xdbb9ad1f14bf0b36;\nstruct Point { x @0 :Float64; y @1 :Float64; }";
+        let defs = engine.find_definitions("capnp", src, "x");
+        assert_eq!(defs.len(), 1, "capnp: field x should be defined");
+    }
 }
