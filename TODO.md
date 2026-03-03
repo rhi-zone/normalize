@@ -25,8 +25,7 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 3. **locals.scm for high-value languages** ✅ DONE for: rust, python, go, java, c, cpp, c_sharp,
    kotlin, ruby, php, bash, zig, dart, elixir, erlang
-   - **Clojure skipped**: homoiconic structure — `defn`/`fn`/`let` are all `list_lit` nodes;
-     meaningful scope analysis requires predicate support (`#eq?`, `#any-of?`) not yet in engine
+   - **Clojure**: `#any-of?` on named `sym_lit` captures works — `defn`/`fn`/`let` distinguished ✅
    - Each locals.scm ships with fixture tests verifying scope resolution
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
