@@ -1014,12 +1014,16 @@ All major package managers now have multi-repo support. Remaining unit-struct fe
 - [x] Multi-file batch edit: `normalize edit --batch edits.json` (see docs/design/batch-edit.md)
 - Semantic editing (proper):
   - [x] `edit insert --each`: applies an insert to every file matching `--only` that contains the symbol
-  - Rename symbol across all callers: `normalize edit rename src/foo.rs/my_func new_name`
-    - Update all call sites, not just the definition
-  - Replace symbol by pattern: `normalize edit replace --pattern 'fn $name($args) { $body }' ...`
-    - Structural (AST-level) search-replace, not regex
-  - Add/remove trait impl boilerplate across all implementors
-  - Detect and refuse edits that would break callers (dry-run shows impact)
+  - [x] `edit delete --each`: deletes a symbol from every matching file (used to remove is_test_path from 98 files)
+  - [x] `edit replace --each`: replaces a symbol in every matching file
+  - **Next: sketch a proper semantic editing design.** Key questions:
+    - What is the full taxonomy of semantic edit operations? (rename, move, inline, extract, add-impl, remove-impl, …)
+    - Which require cross-file call-site awareness (need the index) vs which are structural-only?
+    - How should `--each` generalise to multi-symbol targets? (e.g. all callsites of a function)
+    - Signature for `edit rename`: update definition + all call sites + import paths
+    - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
+    - Conflict detection: refuse / warn when an edit would break callers (dry-run shows impact)
+    - Integration with shadow git: checkpoint before large refactors, rollback on failure
 - Cross-file refactors: `normalize move src/foo.rs/my_func src/bar.rs`
   - Move functions/types between files with import updates
   - Handles visibility changes (pub when crossing module boundaries)
