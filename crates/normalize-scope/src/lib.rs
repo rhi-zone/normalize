@@ -722,4 +722,99 @@ mod tests {
         let defs = engine.find_definitions("zig", src, "v");
         assert_eq!(defs.len(), 1, "zig: const declaration v");
     }
+
+    // ── Dart ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_dart_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "dart") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "int add(int x, int y) { return x + y; }\n";
+        // Parameters are captured as definitions (within function_signature scope).
+        // Cross-scope resolution to the sibling function_body is not supported by
+        // this grammar structure, so we only verify the definition is found.
+        let defs = engine.find_definitions("dart", src, "x");
+        assert_eq!(defs.len(), 1, "dart: x should have one definition");
+    }
+
+    #[test]
+    fn test_dart_local_variable() {
+        let l = loader();
+        if skip_if_no(&l, "dart") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "void f() {\n  var result = 42;\n  print(result);\n}\n";
+        let defs = engine.find_definitions("dart", src, "result");
+        assert_eq!(defs.len(), 1, "dart: local variable result");
+        let refs = engine.find_references("dart", src, "result");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "dart: result reference should resolve");
+    }
+
+    // ── Elixir ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_elixir_anon_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "elixir") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "f = fn x, y -> x + y end\n";
+        let defs = engine.find_definitions("elixir", src, "x");
+        assert_eq!(defs.len(), 1, "elixir: anonymous function parameter x");
+        let refs = engine.find_references("elixir", src, "x");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "elixir: x reference should resolve to param");
+    }
+
+    #[test]
+    fn test_elixir_no_false_definitions() {
+        let l = loader();
+        if skip_if_no(&l, "elixir") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        // x + y should NOT produce any definitions (x is a reference, not a binding)
+        let src = "x + y\n";
+        let defs = engine.find_definitions("elixir", src, "x");
+        assert_eq!(
+            defs.len(),
+            0,
+            "elixir: x in x + y should not be a definition"
+        );
+    }
+
+    // ── Erlang ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_erlang_function_parameter() {
+        let l = loader();
+        if skip_if_no(&l, "erlang") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "add(X, Y) -> X + Y.\n";
+        let defs = engine.find_definitions("erlang", src, "X");
+        assert_eq!(defs.len(), 1, "erlang: function parameter X");
+        let refs = engine.find_references("erlang", src, "X");
+        let resolved = refs.iter().filter(|r| r.definition.is_some()).count();
+        assert!(resolved >= 1, "erlang: X reference should resolve to param");
+    }
+
+    #[test]
+    fn test_erlang_anon_function() {
+        let l = loader();
+        if skip_if_no(&l, "erlang") {
+            return;
+        }
+        let engine = ScopeEngine::new(&l);
+        let src = "F = fun(X) -> X * 2 end.\n";
+        let defs = engine.find_definitions("erlang", src, "X");
+        assert_eq!(defs.len(), 1, "erlang: anonymous function parameter X");
+    }
 }

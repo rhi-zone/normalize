@@ -23,10 +23,11 @@ extract, inline, move — correct, without LSPs, without false positives.
          package or unresolvable — conservative fallback, not a false positive source).
    - See: "Semantic Refactoring Infrastructure" in [Semantic Editing](#semantic-editing)
 
-3. **locals.scm for high-value languages** (rust, python, go, java, c, cpp, c_sharp, kotlin,
-   ruby, php, bash, zig, dart, elixir, erlang, clojure — the ones without them already)
-   - Each locals.scm must ship with fixtures verifying scope resolution is correct
-   - An unverified locals.scm is worse than none: silent wrong renames
+3. **locals.scm for high-value languages** ✅ DONE for: rust, python, go, java, c, cpp, c_sharp,
+   kotlin, ruby, php, bash, zig, dart, elixir, erlang
+   - **Clojure skipped**: homoiconic structure — `defn`/`fn`/`let` are all `list_lit` nodes;
+     meaningful scope analysis requires predicate support (`#eq?`, `#any-of?`) not yet in engine
+   - Each locals.scm ships with fixture tests verifying scope resolution
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
 4. **Comprehensive language fixtures** (long-term, nix flake verification)
