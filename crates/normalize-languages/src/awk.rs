@@ -64,19 +64,6 @@ impl Language for Awk {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["func_def", "block"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "while_statement",
-            "for_statement",
-            "for_in_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -84,15 +71,6 @@ impl Language for Awk {
             "for_statement",
             "for_in_statement",
             "ternary_exp",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "func_def",
-            "if_statement",
-            "while_statement",
-            "for_statement",
         ]
     }
 

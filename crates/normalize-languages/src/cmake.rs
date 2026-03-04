@@ -66,14 +66,6 @@ impl Language for CMake {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_def", "macro_def"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_condition", "foreach_loop", "while_loop"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_condition",
@@ -81,10 +73,6 @@ impl Language for CMake {
             "foreach_loop",
             "while_loop",
         ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["function_def", "macro_def", "if_condition", "foreach_loop"]
     }
 
     fn signature_suffix(&self) -> &'static str {

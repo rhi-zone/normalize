@@ -48,33 +48,6 @@ impl Language for Cpp {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::HeaderBased // Also has public/private in classes, but header-based is primary
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "for_statement",
-            "for_range_loop",
-            "while_statement",
-            "compound_statement",
-            "lambda_expression",
-            "namespace_definition",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "for_range_loop",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "return_statement",
-            "break_statement",
-            "continue_statement",
-            "throw_statement",
-            "goto_statement",
-            "try_statement",
-        ]
-    }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
@@ -91,23 +64,6 @@ impl Language for Cpp {
             "&&",
             "||",
             "conditional_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "for_range_loop",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "function_definition",
-            "class_specifier",
-            "struct_specifier",
-            "namespace_definition",
-            "lambda_expression",
         ]
     }
 

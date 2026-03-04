@@ -103,37 +103,6 @@ impl Language for CSharp {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "for_statement",
-            "foreach_statement",
-            "while_statement",
-            "do_statement",
-            "try_statement",
-            "catch_clause",
-            "switch_statement",
-            "using_statement",
-            "block",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "foreach_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "return_statement",
-            "break_statement",
-            "continue_statement",
-            "throw_statement",
-            "yield_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -145,21 +114,6 @@ impl Language for CSharp {
             "catch_clause",
             "conditional_expression",
             "binary_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "foreach_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "method_declaration",
-            "class_declaration",
-            "lambda_expression",
         ]
     }
 

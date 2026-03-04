@@ -96,19 +96,7 @@ impl Language for Elisp {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["list"] // let, let*, lambda
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["list"] // if, cond, when, unless, while
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["list"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
         &["list"]
     }
 

@@ -72,20 +72,8 @@ impl Language for Idris {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function", "where", "exp_let_in", "exp_do"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["exp_if", "exp_case"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["exp_if", "exp_case", "alt"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["exp_if", "exp_case", "exp_do", "exp_let_in"]
     }
 
     fn signature_suffix(&self) -> &'static str {

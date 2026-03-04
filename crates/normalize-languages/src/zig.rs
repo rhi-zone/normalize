@@ -70,19 +70,6 @@ impl Language for Zig {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["Block", "ForStatement", "WhileStatement"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "IfStatement",
-            "ForStatement",
-            "WhileStatement",
-            "SwitchExpr",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "IfStatement",
@@ -91,17 +78,6 @@ impl Language for Zig {
             "SwitchExpr",
             "ErrorUnionExpr",
             "BinaryExpr",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "IfStatement",
-            "ForStatement",
-            "WhileStatement",
-            "SwitchExpr",
-            "FnProto",
-            "ContainerDecl",
         ]
     }
 

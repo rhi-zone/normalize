@@ -67,19 +67,6 @@ impl Language for Hlsl {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "compound_statement"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "switch_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -88,15 +75,6 @@ impl Language for Hlsl {
             "switch_statement",
             "case_statement",
             "conditional_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "if_statement",
-            "for_statement",
-            "while_statement",
         ]
     }
 

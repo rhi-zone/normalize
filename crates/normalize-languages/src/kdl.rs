@@ -62,18 +62,8 @@ impl Language for Kdl {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["node"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["node"]
     }
 
     fn signature_suffix(&self) -> &'static str {

@@ -97,30 +97,12 @@ impl Language for Ada {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "package_body",
-            "subprogram_body",
-            "block_statement",
-            "loop_statement",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        // Ada grammar uses expression-based nodes
-        &["case_expression", "if_expression", "quantified_expression"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "case_expression",
             "if_expression",
             "case_expression_alternative",
         ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["case_expression", "if_expression", "declare_expression"]
     }
 
     fn signature_suffix(&self) -> &'static str {

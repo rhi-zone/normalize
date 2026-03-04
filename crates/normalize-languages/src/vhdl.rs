@@ -68,25 +68,8 @@ impl Language for Vhdl {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "entity_declaration",
-            "architecture_body",
-            "function_body",
-            "procedure_body",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "case_statement", "loop_statement"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_statement", "case_statement", "loop_statement"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["entity_declaration", "architecture_body"]
     }
 
     fn signature_suffix(&self) -> &'static str {

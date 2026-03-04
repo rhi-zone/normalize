@@ -116,25 +116,6 @@ impl Language for D {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_literal",
-            "class_declaration",
-            "struct_declaration",
-            "block_statement",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "switch_statement",
-            "while_statement",
-            "for_statement",
-            "foreach_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -143,16 +124,6 @@ impl Language for D {
             "for_statement",
             "foreach_statement",
             "catch",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "switch_statement",
-            "while_statement",
-            "for_statement",
-            "class_declaration",
         ]
     }
 

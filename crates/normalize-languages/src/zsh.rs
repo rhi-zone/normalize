@@ -65,19 +65,6 @@ impl Language for Zsh {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "subshell", "command_substitution"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "case_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -86,15 +73,6 @@ impl Language for Zsh {
             "while_statement",
             "case_statement",
             "case_item",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "if_statement",
-            "for_statement",
-            "while_statement",
         ]
     }
 

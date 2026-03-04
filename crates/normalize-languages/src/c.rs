@@ -43,23 +43,6 @@ impl Language for C {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::HeaderBased
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["for_statement", "while_statement", "compound_statement"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "return_statement",
-            "break_statement",
-            "continue_statement",
-            "goto_statement",
-        ]
-    }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
@@ -72,17 +55,6 @@ impl Language for C {
             "&&",
             "||",
             "conditional_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "function_definition",
         ]
     }
 

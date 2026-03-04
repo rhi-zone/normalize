@@ -43,17 +43,8 @@ impl Language for TypeScript {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::ExplicitExport
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        ecmascript::SCOPE_CREATING_KINDS
-    }
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        ecmascript::CONTROL_FLOW_KINDS
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         ecmascript::COMPLEXITY_NODES
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        ecmascript::NESTING_NODES
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -207,17 +198,8 @@ impl Language for Tsx {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::ExplicitExport
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        ecmascript::SCOPE_CREATING_KINDS
-    }
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        ecmascript::CONTROL_FLOW_KINDS
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         ecmascript::COMPLEXITY_NODES
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        ecmascript::NESTING_NODES
     }
 
     fn signature_suffix(&self) -> &'static str {

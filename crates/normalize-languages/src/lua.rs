@@ -61,27 +61,6 @@ impl Language for Lua {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "do_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_statement",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_statement",
-            "return_statement",
-            "break_statement",
-            "goto_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -91,17 +70,6 @@ impl Language for Lua {
             "repeat_statement",
             "and",
             "or",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_statement",
-            "function_declaration",
-            "function_definition",
         ]
     }
 

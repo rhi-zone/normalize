@@ -95,34 +95,6 @@ impl Language for Php {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "for_statement",
-            "foreach_statement",
-            "while_statement",
-            "do_statement",
-            "try_statement",
-            "catch_clause",
-            "switch_statement",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "foreach_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "return_statement",
-            "break_statement",
-            "continue_statement",
-            "throw_expression",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -133,22 +105,6 @@ impl Language for Php {
             "case_statement",
             "catch_clause",
             "conditional_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "foreach_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "function_definition",
-            "method_declaration",
-            "class_declaration",
-            "arrow_function",
         ]
     }
 

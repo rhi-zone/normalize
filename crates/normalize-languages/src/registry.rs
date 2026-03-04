@@ -412,16 +412,7 @@ pub fn validate_unused_kinds_audit(
     for kind in lang.public_symbol_kinds() {
         used_kinds.insert(kind);
     }
-    for kind in lang.scope_creating_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.control_flow_kinds() {
-        used_kinds.insert(kind);
-    }
     for kind in lang.complexity_nodes() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.nesting_nodes() {
         used_kinds.insert(kind);
     }
 
@@ -534,10 +525,7 @@ mod tests {
                 ("type_kinds", lang.type_kinds()),
                 ("import_kinds", lang.import_kinds()),
                 ("public_symbol_kinds", lang.public_symbol_kinds()),
-                ("scope_creating_kinds", lang.scope_creating_kinds()),
-                ("control_flow_kinds", lang.control_flow_kinds()),
                 ("complexity_nodes", lang.complexity_nodes()),
-                ("nesting_nodes", lang.nesting_nodes()),
             ];
 
             for (method, kinds) in all_kinds {
@@ -646,16 +634,7 @@ mod tests {
             for kind in lang.public_symbol_kinds() {
                 used_kinds.insert(kind);
             }
-            for kind in lang.scope_creating_kinds() {
-                used_kinds.insert(kind);
-            }
-            for kind in lang.control_flow_kinds() {
-                used_kinds.insert(kind);
-            }
             for kind in lang.complexity_nodes() {
-                used_kinds.insert(kind);
-            }
-            for kind in lang.nesting_nodes() {
                 used_kinds.insert(kind);
             }
 

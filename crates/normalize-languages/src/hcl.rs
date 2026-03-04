@@ -71,20 +71,8 @@ impl Language for Hcl {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["block", "object"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["conditional", "for_expr"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["conditional", "for_expr"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["block", "object"]
     }
 
     fn signature_suffix(&self) -> &'static str {

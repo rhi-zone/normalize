@@ -68,24 +68,8 @@ impl Language for Nix {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["let_expression", "with_expression", "function_expression"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_expression"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_expression"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "attrset_expression",
-            "let_expression",
-            "function_expression",
-        ]
     }
 
     fn signature_suffix(&self) -> &'static str {

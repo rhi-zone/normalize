@@ -62,33 +62,8 @@ impl Language for Erlang {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "case_expr",
-            "if_expr",
-            "receive_expr",
-            "try_expr",
-            "fun_clause",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["case_expr", "if_expr", "receive_expr", "try_expr"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["cr_clause", "if_clause", "catch_clause", "guard"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "case_expr",
-            "if_expr",
-            "receive_expr",
-            "try_expr",
-            "function_clause",
-            "fun_clause",
-        ]
     }
 
     fn signature_suffix(&self) -> &'static str {

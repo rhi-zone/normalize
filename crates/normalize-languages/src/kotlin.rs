@@ -97,30 +97,6 @@ impl Language for Kotlin {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "for_statement",
-            "while_statement",
-            "do_while_statement",
-            "try_expression",
-            "catch_block",
-            "when_expression",
-            "lambda_literal",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "for_statement",
-            "while_statement",
-            "do_while_statement",
-            "when_expression",
-            "try_expression",
-            "jump_expression",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_expression",
@@ -132,19 +108,6 @@ impl Language for Kotlin {
             "elvis_expression",
             "conjunction_expression",
             "disjunction_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "for_statement",
-            "while_statement",
-            "do_while_statement",
-            "when_expression",
-            "try_expression",
-            "function_declaration",
-            "class_declaration",
         ]
     }
 

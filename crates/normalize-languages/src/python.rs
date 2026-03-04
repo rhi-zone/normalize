@@ -71,50 +71,8 @@ impl Language for Python {
         ]
     }
 
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "try_statement",
-            "with_statement",
-            "match_statement",
-            "function_definition",
-            "class_definition",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
-    }
-
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        // Additional scope-creating nodes beyond functions and containers
-        &[
-            "for_statement",
-            "with_statement",
-            "list_comprehension",
-            "set_comprehension",
-            "dictionary_comprehension",
-            "generator_expression",
-            "lambda",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "try_statement",
-            "with_statement",
-            "match_statement",
-            "return_statement",
-            "break_statement",
-            "continue_statement",
-            "raise_statement",
-            "assert_statement",
-        ]
     }
 
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {

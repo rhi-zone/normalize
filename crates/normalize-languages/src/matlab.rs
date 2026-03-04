@@ -72,25 +72,6 @@ impl Language for Matlab {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "class_definition",
-            "methods",
-            "properties",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "switch_statement",
-            "while_statement",
-            "for_statement",
-            "try_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -98,16 +79,6 @@ impl Language for Matlab {
             "while_statement",
             "for_statement",
             "catch_clause",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "switch_statement",
-            "while_statement",
-            "for_statement",
-            "function_definition",
         ]
     }
 

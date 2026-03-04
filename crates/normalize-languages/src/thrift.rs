@@ -65,18 +65,8 @@ impl Language for Thrift {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["struct_definition", "service_definition"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["struct_definition", "service_definition"]
     }
 
     fn signature_suffix(&self) -> &'static str {

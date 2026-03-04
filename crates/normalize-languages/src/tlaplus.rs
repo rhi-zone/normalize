@@ -64,20 +64,8 @@ impl Language for TlaPlus {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["module", "operator_definition"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_then_else"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_then_else", "case"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["module"]
     }
 
     fn signature_suffix(&self) -> &'static str {

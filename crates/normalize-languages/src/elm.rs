@@ -76,20 +76,8 @@ impl Language for Elm {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["let_in_expr", "anonymous_function_expr"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_else_expr", "case_of_expr"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_else_expr", "case_of_branch"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["value_declaration", "let_in_expr", "case_of_expr"]
     }
 
     fn signature_suffix(&self) -> &'static str {

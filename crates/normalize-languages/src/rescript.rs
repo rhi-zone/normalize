@@ -81,25 +81,8 @@ impl Language for ReScript {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["let_binding", "module_declaration", "block"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_expression", "switch_expression"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_expression", "switch_expression", "switch_match"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "switch_expression",
-            "block",
-            "module_declaration",
-        ]
     }
 
     fn signature_suffix(&self) -> &'static str {

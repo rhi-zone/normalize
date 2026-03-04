@@ -43,16 +43,7 @@ impl Language for Json {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::NotApplicable
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
         &[]
     }
 

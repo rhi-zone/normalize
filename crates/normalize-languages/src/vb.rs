@@ -77,21 +77,6 @@ impl Language for VB {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["class_block", "module_block", "method_declaration"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "select_case_statement",
-            "while_statement",
-            "for_statement",
-            "for_each_statement",
-            "do_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -100,16 +85,6 @@ impl Language for VB {
             "for_statement",
             "for_each_statement",
             "case_clause",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "select_case_statement",
-            "while_statement",
-            "for_statement",
-            "do_statement",
         ]
     }
 

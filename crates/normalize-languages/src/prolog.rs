@@ -63,20 +63,8 @@ impl Language for Prolog {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["clause_term"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[] // Prolog uses pattern matching and backtracking
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["clause_term"] // Each clause adds complexity
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["clause_term"]
     }
 
     fn signature_suffix(&self) -> &'static str {

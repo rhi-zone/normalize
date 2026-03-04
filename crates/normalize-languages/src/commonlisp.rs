@@ -83,19 +83,7 @@ impl Language for CommonLisp {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // let, flet, labels, lambda
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // if, cond, case, when, unless
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["list_lit"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
         &["list_lit"]
     }
 

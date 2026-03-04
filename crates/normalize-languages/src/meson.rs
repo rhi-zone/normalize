@@ -60,20 +60,8 @@ impl Language for Meson {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["if_command", "foreach_command"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_command", "foreach_command"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_command", "foreach_command", "if_condition"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_command", "foreach_command"]
     }
 
     fn signature_suffix(&self) -> &'static str {

@@ -72,23 +72,6 @@ impl Language for Scala {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["for_expression", "block", "lambda_expression"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "for_expression",
-            "while_expression",
-            "do_while_expression",
-            "try_expression",
-            "return_expression",
-            "throw_expression",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_expression",
@@ -100,22 +83,6 @@ impl Language for Scala {
             "try_expression",
             "catch_clause",
             "infix_expression", // for && and ||
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "for_expression",
-            "while_expression",
-            "do_while_expression",
-            "try_expression",
-            "function_definition",
-            "class_definition",
-            "object_definition",
-            "trait_definition",
-            "block",
         ]
     }
 

@@ -95,33 +95,6 @@ impl Language for Dart {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "block",
-            "for_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "return_statement",
-            "break_statement",
-            "continue_statement",
-            "throw_expression",
-            "rethrow_expression",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -133,20 +106,6 @@ impl Language for Dart {
             "conditional_expression",
             "logical_and_expression",
             "logical_or_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "function_body",
-            "class_definition",
-            "function_expression",
         ]
     }
 

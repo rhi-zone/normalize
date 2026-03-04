@@ -67,21 +67,6 @@ impl Language for PowerShell {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_statement", "class_statement", "script_block"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "while_statement",
-            "for_statement",
-            "foreach_statement",
-            "switch_statement",
-            "try_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -91,17 +76,6 @@ impl Language for PowerShell {
             "foreach_statement",
             "switch_statement",
             "catch_clause",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "function_statement",
-            "class_statement",
-            "if_statement",
-            "while_statement",
-            "for_statement",
-            "try_statement",
         ]
     }
 

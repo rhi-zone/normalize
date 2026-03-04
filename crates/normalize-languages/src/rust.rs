@@ -59,46 +59,8 @@ impl Language for Rust {
         ]
     }
 
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "for_expression",
-            "while_expression",
-            "loop_expression",
-            "function_item",
-            "impl_item",
-            "trait_item",
-            "mod_item",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
-    }
-
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        // Additional scope-creating nodes beyond functions and containers
-        &[
-            "block",
-            "for_expression",
-            "while_expression",
-            "loop_expression",
-            "closure_expression",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "for_expression",
-            "while_expression",
-            "loop_expression",
-            "return_expression",
-            "break_expression",
-            "continue_expression",
-        ]
     }
 
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {

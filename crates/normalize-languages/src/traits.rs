@@ -156,26 +156,10 @@ pub trait Language: Send + Sync {
     /// For Go/Java/Python: checks visibility and returns public symbols.
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export>;
 
-    // === Scope Analysis ===
-
-    /// Nodes that create new variable scopes (for scope analysis)
-    /// Includes: loops, blocks, comprehensions, lambdas, with statements
-    /// Note: Functions and containers (from function_kinds/container_kinds) also create scopes
-    fn scope_creating_kinds(&self) -> &'static [&'static str];
-
-    // === Control Flow ===
-
-    /// Nodes that affect control flow (for CFG analysis)
-    /// Includes: if, for, while, return, break, continue, try, match
-    fn control_flow_kinds(&self) -> &'static [&'static str];
-
     // === Complexity ===
 
     /// Nodes that increase cyclomatic complexity
     fn complexity_nodes(&self) -> &'static [&'static str];
-
-    /// Nodes that indicate nesting depth
-    fn nesting_nodes(&self) -> &'static [&'static str];
 
     // === Display/Formatting ===
 

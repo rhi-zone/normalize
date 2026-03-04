@@ -106,31 +106,6 @@ impl Language for Swift {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "for_statement",
-            "while_statement",
-            "repeat_while_statement",
-            "do_statement",
-            "catch_block",
-            "switch_statement",
-            "guard_statement",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_while_statement",
-            "switch_statement",
-            "guard_statement",
-            "do_statement",
-            "control_transfer_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -141,20 +116,6 @@ impl Language for Swift {
             "catch_block",
             "ternary_expression",
             "nil_coalescing_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_while_statement",
-            "switch_statement",
-            "do_statement",
-            "function_declaration",
-            "class_declaration",
-            "lambda_literal",
         ]
     }
 

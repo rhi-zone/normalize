@@ -65,20 +65,8 @@ impl Language for Vim {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "for_loop", "while_loop", "try_statement"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_statement", "elseif_statement", "for_loop", "while_loop"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["function_definition", "if_statement", "for_loop"]
     }
 
     fn signature_suffix(&self) -> &'static str {

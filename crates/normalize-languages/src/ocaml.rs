@@ -73,20 +73,8 @@ impl Language for OCaml {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["let_expression", "function_expression", "match_expression"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_expression", "match_expression", "try_expression"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_expression", "match_expression", "match_case"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["let_expression", "module_definition", "match_expression"]
     }
 
     fn signature_suffix(&self) -> &'static str {

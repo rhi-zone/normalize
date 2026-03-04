@@ -65,20 +65,8 @@ impl Language for Jq {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["funcdef"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if", "try"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if", "try", "reduce"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["funcdef", "if"]
     }
 
     fn signature_suffix(&self) -> &'static str {

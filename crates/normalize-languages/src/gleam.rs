@@ -75,20 +75,8 @@ impl Language for Gleam {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function", "anonymous_function"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["case", "if"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["case", "case_clause", "if"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["function", "case", "block"]
     }
 
     fn signature_suffix(&self) -> &'static str {

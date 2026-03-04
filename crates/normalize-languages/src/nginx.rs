@@ -62,20 +62,8 @@ impl Language for Nginx {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["block"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["block_directive"] // if blocks are block_directives
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["block_directive"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["block", "block_directive"]
     }
 
     fn signature_suffix(&self) -> &'static str {

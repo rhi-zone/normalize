@@ -64,19 +64,6 @@ impl Language for Fish {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "begin_statement"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "while_statement",
-            "for_statement",
-            "switch_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -85,15 +72,6 @@ impl Language for Fish {
             "for_statement",
             "switch_statement",
             "case_clause",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "if_statement",
-            "while_statement",
-            "for_statement",
         ]
     }
 

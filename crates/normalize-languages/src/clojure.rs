@@ -76,20 +76,8 @@ impl Language for Clojure {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // let, fn, loop, etc.
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // if, cond, case, when
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["list_lit"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["list_lit", "vec_lit", "map_lit"]
     }
 
     fn signature_suffix(&self) -> &'static str {

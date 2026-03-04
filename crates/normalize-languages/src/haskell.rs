@@ -69,20 +69,8 @@ impl Language for Haskell {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["let", "where", "do", "lambda"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["conditional", "case", "match", "guard"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["conditional", "case", "match", "guard", "lambda"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["function", "let", "where", "do", "case"]
     }
 
     fn signature_suffix(&self) -> &'static str {

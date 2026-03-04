@@ -73,26 +73,6 @@ impl Language for FSharp {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "for_expression",
-            "while_expression",
-            "try_expression",
-            "match_expression",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "for_expression",
-            "while_expression",
-            "try_expression",
-            "application_expression",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_expression",
@@ -101,18 +81,6 @@ impl Language for FSharp {
             "while_expression",
             "try_expression",
             "infix_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "for_expression",
-            "while_expression",
-            "try_expression",
-            "function_or_value_defn",
-            "module_defn",
         ]
     }
 

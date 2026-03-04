@@ -85,30 +85,8 @@ impl Language for R {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "braced_expression"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_statement", "for_statement", "while_statement"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "if_statement",
-            "for_statement",
-            "braced_expression",
-        ]
     }
 
     fn signature_suffix(&self) -> &'static str {

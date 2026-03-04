@@ -71,25 +71,8 @@ impl Language for Svelte {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "each_statement", "await_statement"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "each_statement", "await_statement"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_statement", "each_statement", "else_if_block"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "each_statement",
-            "await_statement",
-            "script_element",
-        ]
     }
 
     fn signature_suffix(&self) -> &'static str {

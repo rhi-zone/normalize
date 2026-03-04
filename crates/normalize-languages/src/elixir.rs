@@ -92,20 +92,8 @@ impl Language for Elixir {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["do_block", "anonymous_function"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["call"] // if, case, cond, with, for, try
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["call", "binary_operator"] // if, case, cond, and/or
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["call", "do_block", "anonymous_function"]
     }
 
     fn signature_suffix(&self) -> &'static str {

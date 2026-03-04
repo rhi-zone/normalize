@@ -93,19 +93,7 @@ impl Language for Scheme {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["list"] // let, let*, letrec, lambda
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["list"] // if, cond, case, when
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["list"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
         &["list"]
     }
 

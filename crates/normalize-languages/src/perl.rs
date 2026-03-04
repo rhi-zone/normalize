@@ -65,34 +65,12 @@ impl Language for Perl {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["block", "subroutine_declaration_statement"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "conditional_statement",
-            "loop_statement",
-            "for_statement",
-            "cstyle_for_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "conditional_statement",
             "loop_statement",
             "for_statement",
             "conditional_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "subroutine_declaration_statement",
-            "conditional_statement",
-            "loop_statement",
-            "block",
         ]
     }
 

@@ -65,18 +65,8 @@ impl Language for Wit {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["interface_item", "world_item"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["interface_item", "world_item"]
     }
 
     fn signature_suffix(&self) -> &'static str {

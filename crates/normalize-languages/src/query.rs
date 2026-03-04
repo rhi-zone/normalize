@@ -64,18 +64,8 @@ impl Language for Query {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["grouping"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["grouping"]
     }
 
     fn signature_suffix(&self) -> &'static str {

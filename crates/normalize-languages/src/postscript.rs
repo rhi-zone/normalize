@@ -62,20 +62,8 @@ impl Language for PostScript {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["procedure"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[] // PostScript is stack-based, no dedicated control flow nodes
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["procedure"]
     }
 
     fn signature_suffix(&self) -> &'static str {

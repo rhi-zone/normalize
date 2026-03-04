@@ -60,18 +60,8 @@ impl Language for Caddy {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["site_block", "directive_block"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["site_block", "directive_block"]
     }
 
     fn signature_suffix(&self) -> &'static str {

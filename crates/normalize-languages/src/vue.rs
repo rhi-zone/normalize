@@ -45,20 +45,8 @@ impl Language for Vue {
         VisibilityMechanism::ExplicitExport
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["element"] // Vue template elements create scope
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["directive_attribute"] // v-if, v-for, v-show are directives
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["directive_attribute", "interpolation"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["element", "template_element", "script_element"]
     }
 
     fn signature_suffix(&self) -> &'static str {

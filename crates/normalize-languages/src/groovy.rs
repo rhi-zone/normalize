@@ -66,21 +66,6 @@ impl Language for Groovy {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["class_definition", "function_definition", "closure"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_loop",
-            "for_in_loop",
-            "while_loop",
-            "switch_statement",
-            "try_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -90,16 +75,6 @@ impl Language for Groovy {
             "switch_statement",
             "case",
             "ternary_op",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "class_definition",
-            "function_definition",
-            "if_statement",
-            "for_loop",
-            "closure",
         ]
     }
 

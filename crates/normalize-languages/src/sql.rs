@@ -69,20 +69,8 @@ impl Language for Sql {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["subquery", "cte"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["case"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["case", "join", "where", "having"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["subquery", "case"]
     }
 
     fn signature_suffix(&self) -> &'static str {

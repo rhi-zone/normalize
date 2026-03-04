@@ -62,29 +62,8 @@ impl Language for Verilog {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "module_declaration",
-            "function_declaration",
-            "task_declaration",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_generate_construct",
-            "case_generate_construct",
-            "conditional_statement",
-            "case_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["conditional_statement", "case_statement", "loop_statement"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["module_declaration"]
     }
 
     fn signature_suffix(&self) -> &'static str {

@@ -81,20 +81,8 @@ impl Language for Agda {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["module", "where"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[] // Agda is purely functional
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["function", "lambda_clause"] // Pattern matching
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["module", "where", "do"]
     }
 
     fn signature_suffix(&self) -> &'static str {

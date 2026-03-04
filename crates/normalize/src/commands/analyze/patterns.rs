@@ -224,12 +224,7 @@ pub fn analyze_patterns(
                 .to_string();
 
             // Build structural kinds set from language traits
-            let structural_kinds: HashSet<&str> = lang
-                .control_flow_kinds()
-                .iter()
-                .chain(lang.complexity_nodes().iter())
-                .copied()
-                .collect();
+            let structural_kinds: HashSet<&str> = lang.complexity_nodes().iter().copied().collect();
 
             let result = extractor.extract(path, &content);
             let mut entries = Vec::new();

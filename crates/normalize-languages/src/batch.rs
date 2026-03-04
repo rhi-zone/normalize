@@ -72,19 +72,7 @@ impl Language for Batch {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[] // batch grammar doesn't have control flow nodes
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
         &[]
     }
 

@@ -44,17 +44,6 @@ impl Language for Ruby {
         VisibilityMechanism::AllPublic // Ruby methods are public by default
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["do_block", "block", "lambda", "for"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if", "unless", "case", "while", "until", "for", "return", "break", "next", "redo",
-            "retry", "begin",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if",
@@ -69,24 +58,6 @@ impl Language for Ruby {
             "and",
             "or",
             "conditional",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if",
-            "unless",
-            "case",
-            "while",
-            "until",
-            "for",
-            "begin",
-            "method",
-            "singleton_method",
-            "class",
-            "module",
-            "do_block",
-            "block",
         ]
     }
 

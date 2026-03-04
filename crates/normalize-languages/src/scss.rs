@@ -70,34 +70,12 @@ impl Language for Scss {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["block", "rule_set"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "each_statement",
-            "while_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
             "for_statement",
             "each_statement",
             "while_statement",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "rule_set",
-            "mixin_statement",
-            "function_statement",
-            "if_statement",
         ]
     }
 

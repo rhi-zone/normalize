@@ -72,20 +72,8 @@ impl Language for Lean {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["namespace", "section", "def", "theorem", "where_decl"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_then_else", "match"]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_then_else", "match", "match_alt"]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_then_else", "match", "do", "namespace", "section"]
     }
 
     fn signature_suffix(&self) -> &'static str {

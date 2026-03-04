@@ -113,18 +113,8 @@ impl Language for GraphQL {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["selection_set"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["selection_set"]
-    }
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["selection_set", "object_type_definition"]
     }
 
     fn signature_suffix(&self) -> &'static str {

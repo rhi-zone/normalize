@@ -41,18 +41,6 @@ impl Language for Bash {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::AllPublic
     }
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["subshell", "command_substitution"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "case_statement",
-        ]
-    }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
@@ -64,17 +52,6 @@ impl Language for Bash {
             "case_item",
             "pipeline", // | chains
             "list",     // && and || chains
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "case_statement",
-            "function_definition",
-            "subshell",
         ]
     }
 

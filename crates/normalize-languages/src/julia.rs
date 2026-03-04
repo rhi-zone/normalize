@@ -86,24 +86,6 @@ impl Language for Julia {
         }]
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "let_statement",
-            "do_clause",
-            "module_definition",
-        ]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "try_statement",
-        ]
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &[
             "if_statement",
@@ -111,16 +93,6 @@ impl Language for Julia {
             "while_statement",
             "elseif_clause",
             "ternary_expression",
-        ]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "module_definition",
-            "struct_definition",
-            "if_statement",
-            "for_statement",
         ]
     }
 

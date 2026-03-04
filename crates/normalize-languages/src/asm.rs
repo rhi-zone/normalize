@@ -63,19 +63,7 @@ impl Language for Asm {
         Vec::new()
     }
 
-    fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["label"]
-    }
-
-    fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[] // Assembly control flow is via jumps
-    }
-
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn nesting_nodes(&self) -> &'static [&'static str] {
         &[]
     }
 
