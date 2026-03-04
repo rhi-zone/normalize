@@ -1,517 +1,460 @@
-// rg subcommand — embeds grep-* as a drop-in `rg` (ripgrep) replacement.
-mod cli;
+#![allow(warnings, clippy::all, unexpected_cfgs)]
+// Vendored from ripgrep 14.1.1 (MIT/Unlicense)
+/*!
+The main entry point into ripgrep.
+*/
 
-use cli::Cli;
-use grep_regex::RegexMatcherBuilder;
-use grep_searcher::{
-    Searcher, SearcherBuilder, Sink, SinkContext, SinkContextKind, SinkFinish, SinkMatch,
-};
-use std::ffi::OsString;
-use std::io::{self, IsTerminal, Write};
-use std::path::PathBuf;
-use std::process::ExitCode;
+use std::{io::Write, process::ExitCode};
 
-/// Run rg with the given arguments (not including argv[0]).
-///
-/// Entry point for both `normalize rg [args...]` and `rg -> normalize` symlink.
-pub fn run_rg(args: impl Iterator<Item = OsString>) -> ExitCode {
-    let mut out = io::stdout();
-    let mut err = io::stderr();
+use ignore::WalkState;
 
-    let cli = match Cli::parse(args) {
-        Ok(cli) => cli,
-        Err(e) => {
-            let _ = writeln!(err, "error: {e}");
-            return ExitCode::from(2);
-        }
-    };
+use crate::rg::flags::{HiArgs, SearchMode};
 
-    if cli.version {
-        let _ = writeln!(
-            out,
-            "rg (normalize {}) [grep-searcher]",
-            env!("CARGO_PKG_VERSION")
-        );
-        return ExitCode::SUCCESS;
-    }
-    if cli.help {
-        let _ = write!(out, "{}", include_str!("help.txt"));
-        return ExitCode::SUCCESS;
-    }
+#[macro_use]
+mod messages;
 
-    match real_main(&cli) {
-        Ok(found) => {
-            if found {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(1)
+mod flags;
+mod haystack;
+mod logger;
+mod search;
+
+/// Run ripgrep with the given argv iterator (should not include the program name).
+pub fn run_rg(argv: impl Iterator<Item = std::ffi::OsString>) -> ExitCode {
+    match run(flags::parse(argv)) {
+        Ok(code) => code,
+        Err(err) => {
+            // Look for a broken pipe error. In this case, we generally want
+            // to exit "gracefully" with a success exit code. This matches
+            // existing Unix convention. We need to handle this explicitly
+            // since the Rust runtime doesn't ask for PIPE signals, and thus
+            // we get an I/O error instead. Traditional C Unix applications
+            // quit by getting a PIPE signal that they don't handle, and thus
+            // the unhandled signal causes the process to unceremoniously
+            // terminate.
+            for cause in err.chain() {
+                if let Some(ioerr) = cause.downcast_ref::<std::io::Error>() {
+                    if ioerr.kind() == std::io::ErrorKind::BrokenPipe {
+                        return ExitCode::from(0);
+                    }
+                }
             }
-        }
-        Err(e) => {
-            let _ = writeln!(err, "error: {e}");
+            eprintln_locked!("{:#}", err);
             ExitCode::from(2)
         }
     }
 }
 
-fn real_main(cli: &Cli) -> Result<bool, String> {
-    let color = cli.use_color(&io::stdout());
+/// The main entry point for ripgrep.
+///
+/// The given parse result determines ripgrep's behavior. The parse
+/// result should be the result of parsing CLI arguments in a low level
+/// representation, and then followed by an attempt to convert them into a
+/// higher level representation. The higher level representation has some nicer
+/// abstractions, for example, instead of representing the `-g/--glob` flag
+/// as a `Vec<String>` (as in the low level representation), the globs are
+/// converted into a single matcher.
+fn run(result: crate::rg::flags::ParseResult<HiArgs>) -> anyhow::Result<ExitCode> {
+    use crate::rg::flags::{Mode, ParseResult};
 
-    // --files: list files that would be searched, no pattern needed
-    if cli.files {
-        let paths = search_paths(cli);
-        let mut out = io::stdout();
-        for path in walk_paths(&paths, cli) {
-            let p = path.map_err(|e| e.to_string())?;
-            let sep = if cli.null { "\0" } else { "\n" };
-            let _ = write!(out, "{}{sep}", p.display());
-        }
-        return Ok(true);
-    }
-
-    // Determine patterns
-    let patterns: Vec<&str> = if !cli.patterns.is_empty() {
-        cli.patterns.iter().map(String::as_str).collect()
-    } else if let Some(p) = &cli.pattern {
-        vec![p.as_str()]
-    } else {
-        return Err(
-            "No pattern given. Use -e PATTERN or provide PATTERN as first argument.".to_string(),
-        );
+    let args = match result {
+        ParseResult::Err(err) => return Err(err),
+        ParseResult::Special(mode) => return special(mode),
+        ParseResult::Ok(args) => args,
     };
-
-    // Build matcher
-    let pattern = if patterns.len() == 1 {
-        patterns[0].to_string()
-    } else {
-        patterns
-            .iter()
-            .map(|p| format!("(?:{p})"))
-            .collect::<Vec<_>>()
-            .join("|")
+    let matched = match args.mode() {
+        Mode::Search(_) if !args.matches_possible() => false,
+        Mode::Search(mode) if args.threads() == 1 => search(&args, mode)?,
+        Mode::Search(mode) => search_parallel(&args, mode)?,
+        Mode::Files if args.threads() == 1 => files(&args)?,
+        Mode::Files => files_parallel(&args)?,
+        Mode::Types => return types(&args),
+        Mode::Generate(mode) => return generate(mode),
     };
+    Ok(if matched && (args.quiet() || !messages::errored()) {
+        ExitCode::from(0)
+    } else if messages::errored() {
+        ExitCode::from(2)
+    } else {
+        ExitCode::from(1)
+    })
+}
 
-    let effective_ignore_case =
-        cli.ignore_case || (cli.smart_case && pattern.chars().all(|c| !c.is_uppercase()));
+/// The top-level entry point for single-threaded search.
+///
+/// This recursively steps through the file list (current directory by default)
+/// and searches each file sequentially.
+fn search(args: &HiArgs, mode: SearchMode) -> anyhow::Result<bool> {
+    let started_at = std::time::Instant::now();
+    let haystack_builder = args.haystack_builder();
+    let unsorted = args
+        .walk_builder()?
+        .build()
+        .filter_map(|result| haystack_builder.build_from_result(result));
+    let haystacks = args.sort(unsorted);
 
-    let matcher = RegexMatcherBuilder::new()
-        .case_insensitive(effective_ignore_case)
-        .word(cli.word_regexp)
-        .fixed_strings(cli.fixed_strings)
-        .multi_line(cli.multiline)
-        .dot_matches_new_line(cli.multiline)
-        .build(&pattern)
-        .map_err(|e| format!("Invalid pattern: {e}"))?;
-
-    // Build searcher
-    let searcher = SearcherBuilder::new()
-        .line_number(true) // always track; sink decides whether to show
-        .before_context(if cli.invert_match {
-            0
-        } else {
-            cli.before_context
-        })
-        .after_context(if cli.invert_match {
-            0
-        } else {
-            cli.after_context
-        })
-        .passthru(cli.invert_match)
-        .build();
-
-    let paths = search_paths(cli);
-    let multiple_paths = has_multiple_paths(&paths);
-
-    // Auto-detect display options based on TTY
-    let is_tty = io::stdout().is_terminal();
-    let show_line_number = cli.line_number.unwrap_or(is_tty);
-    let no_heading = cli.no_heading.unwrap_or(!is_tty);
-    let show_filename = cli.with_filename.unwrap_or(multiple_paths);
-
-    let mut any_match = false;
-    let mut total_matches: u64 = 0;
-    let mut files_searched: u64 = 0;
-    let mut files_with_match: u64 = 0;
-
-    let mut out = io::stdout();
-
-    for entry in walk_paths(&paths, cli) {
-        let path = match entry {
-            Ok(p) => p,
-            Err(e) => {
-                let _ = writeln!(io::stderr(), "error: {e}");
+    let mut matched = false;
+    let mut searched = false;
+    let mut stats = args.stats();
+    let mut searcher = args.search_worker(
+        args.matcher()?,
+        args.searcher()?,
+        args.printer(mode, args.stdout()),
+    )?;
+    for haystack in haystacks {
+        searched = true;
+        let search_result = match searcher.search(&haystack) {
+            Ok(search_result) => search_result,
+            // A broken pipe means graceful termination.
+            Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => break,
+            Err(err) => {
+                err_message!("{}: {}", haystack.path().display(), err);
                 continue;
             }
         };
-
-        files_searched += 1;
-
-        let path_str = path.to_string_lossy().into_owned();
-        let effective_show_filename = show_filename || !no_heading;
-
-        let mut sink = RgSink::new(
-            &path_str,
-            effective_show_filename,
-            no_heading,
-            show_line_number,
-            cli.count,
-            cli.files_with_matches,
-            cli.files_without_match,
-            cli.quiet,
-            cli.null,
-            cli.max_count,
-            cli.before_context,
-            cli.after_context,
-            cli.invert_match,
-            cli.only_matching,
-            color,
-        );
-
-        let result = if path_str == "-" || path_str == "/dev/stdin" {
-            searcher
-                .clone()
-                .search_reader(&matcher, io::stdin().lock(), &mut sink)
-        } else {
-            searcher.clone().search_path(&matcher, &path, &mut sink)
-        };
-
-        if let Err(e) = result {
-            let _ = writeln!(io::stderr(), "{path_str}: {e}");
-            continue;
+        matched = matched || search_result.has_match();
+        if let Some(ref mut stats) = stats {
+            *stats += search_result.stats().unwrap();
         }
-
-        if sink.had_match {
-            any_match = true;
-            files_with_match += 1;
-        }
-        total_matches += sink.match_count;
-
-        // Flush sink output
-        let _ = out.write_all(&sink.buf);
-
-        // Print heading after file output (for --heading mode with multiple files)
-        // Heading (filename separator) is already handled in the sink.
-
-        // For --files-without-match: handled inside sink
-        if cli.files_without_match && !sink.had_match {
-            let sep = if cli.null { "\0" } else { "\n" };
-            let _ = write!(out, "{path_str}{sep}");
+        if matched && args.quit_after_match() {
+            break;
         }
     }
-
-    if cli.stats {
-        let _ = writeln!(
-            out,
-            "\n{total_matches} matches\n{files_with_match} matched lines\n{files_searched} files searched"
-        );
+    if args.has_implicit_path() && !searched {
+        eprint_nothing_searched();
     }
-
-    Ok(any_match)
+    if let Some(ref stats) = stats {
+        let wtr = searcher.printer().get_mut();
+        let _ = print_stats(mode, stats, started_at, wtr);
+    }
+    Ok(matched)
 }
 
-fn search_paths(cli: &Cli) -> Vec<PathBuf> {
-    if cli.paths.is_empty() {
-        vec![PathBuf::from(".")]
-    } else {
-        cli.paths.clone()
-    }
-}
+/// The top-level entry point for multi-threaded search.
+///
+/// The parallelism is itself achieved by the recursive directory traversal.
+/// All we need to do is feed it a worker for performing a search on each file.
+///
+/// Requesting a sorted output from ripgrep (such as with `--sort path`) will
+/// automatically disable parallelism and hence sorting is not handled here.
+fn search_parallel(args: &HiArgs, mode: SearchMode) -> anyhow::Result<bool> {
+    use std::sync::atomic::{AtomicBool, Ordering};
 
-fn has_multiple_paths(paths: &[PathBuf]) -> bool {
-    if paths.len() > 1 {
-        return true;
-    }
-    if paths.len() == 1 && paths[0].is_dir() {
-        return true;
-    }
-    false
-}
+    let started_at = std::time::Instant::now();
+    let haystack_builder = args.haystack_builder();
+    let bufwtr = args.buffer_writer();
+    let stats = args.stats().map(std::sync::Mutex::new);
+    let matched = AtomicBool::new(false);
+    let searched = AtomicBool::new(false);
 
-fn walk_paths<'a>(
-    paths: &'a [PathBuf],
-    cli: &'a Cli,
-) -> impl Iterator<Item = Result<PathBuf, ignore::Error>> + 'a {
-    // If a single path is "-", return stdin marker
-    if paths.len() == 1 && paths[0].as_os_str() == "-" {
-        return WalkIter::Stdin(std::iter::once(Ok(PathBuf::from("-"))));
-    }
+    let mut searcher = args.search_worker(
+        args.matcher()?,
+        args.searcher()?,
+        args.printer(mode, bufwtr.buffer()),
+    )?;
+    args.walk_builder()?.build_parallel().run(|| {
+        let bufwtr = &bufwtr;
+        let stats = &stats;
+        let matched = &matched;
+        let searched = &searched;
+        let haystack_builder = &haystack_builder;
+        let mut searcher = searcher.clone();
 
-    let mut builder = ignore::WalkBuilder::new(&paths[0]);
-    for p in &paths[1..] {
-        builder.add(p);
-    }
-    builder
-        .hidden(!cli.hidden)
-        .git_ignore(!cli.no_ignore && !cli.no_ignore_vcs)
-        .git_global(!cli.no_ignore)
-        .git_exclude(!cli.no_ignore)
-        .ignore(!cli.no_ignore)
-        .follow_links(cli.follow)
-        .max_depth(cli.max_depth);
-
-    if !cli.globs.is_empty() {
-        let mut override_builder = ignore::overrides::OverrideBuilder::new(".");
-        for glob in &cli.globs {
-            let _ = override_builder.add(glob);
-        }
-        if let Ok(overrides) = override_builder.build() {
-            builder.overrides(overrides);
-        }
-    }
-
-    WalkIter::Walk(
-        builder
-            .build()
-            .filter_map(|entry| match entry {
-                Ok(e) => {
-                    if e.file_type().map(|t| t.is_file()).unwrap_or(false) {
-                        Some(Ok(e.into_path()))
-                    } else {
-                        None
-                    }
-                }
-                Err(e) => Some(Err(e)),
-            })
-            .collect::<Vec<_>>()
-            .into_iter(),
-    )
-}
-
-// Helper enum to unify iterator types
-enum WalkIter<A, B> {
-    Stdin(A),
-    Walk(B),
-}
-
-impl<A, B, T> Iterator for WalkIter<A, B>
-where
-    A: Iterator<Item = T>,
-    B: Iterator<Item = T>,
-{
-    type Item = T;
-    fn next(&mut self) -> Option<T> {
-        match self {
-            WalkIter::Stdin(a) => a.next(),
-            WalkIter::Walk(b) => b.next(),
-        }
-    }
-}
-
-// ANSI color codes
-const COLOR_PATH: &str = "\x1b[35m"; // magenta
-const COLOR_LINE: &str = "\x1b[32m"; // green
-const _COLOR_MATCH: &str = "\x1b[1;31m"; // bold red (reserved for future match highlighting)
-const COLOR_SEP: &str = "\x1b[36m"; // cyan
-const COLOR_RESET: &str = "\x1b[0m";
-
-struct RgSink {
-    path: String,
-    show_filename: bool,
-    no_heading: bool,
-    show_line_number: bool,
-    count_only: bool,
-    files_with_matches: bool,
-    files_without_match: bool,
-    quiet: bool,
-    null: bool,
-    max_count: Option<u64>,
-    before_context: usize,
-    after_context: usize,
-    invert_match: bool,
-    only_matching: bool,
-    color: bool,
-
-    // State
-    pub match_count: u64,
-    pub had_match: bool,
-    printed_heading: bool,
-
-    // Output buffer (flushed after each file)
-    pub buf: Vec<u8>,
-}
-
-impl RgSink {
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        path: &str,
-        show_filename: bool,
-        no_heading: bool,
-        show_line_number: bool,
-        count_only: bool,
-        files_with_matches: bool,
-        files_without_match: bool,
-        quiet: bool,
-        null: bool,
-        max_count: Option<u64>,
-        before_context: usize,
-        after_context: usize,
-        invert_match: bool,
-        only_matching: bool,
-        color: bool,
-    ) -> Self {
-        Self {
-            path: path.to_string(),
-            show_filename,
-            no_heading,
-            show_line_number,
-            count_only,
-            files_with_matches,
-            files_without_match,
-            quiet,
-            null,
-            max_count,
-            before_context,
-            after_context,
-            invert_match,
-            only_matching,
-            color,
-            match_count: 0,
-            had_match: false,
-            printed_heading: false,
-            buf: Vec::new(),
-        }
-    }
-
-    fn print_heading(&mut self) {
-        if self.printed_heading || self.no_heading || !self.show_filename {
-            return;
-        }
-        if self.color {
-            let _ = write!(self.buf, "\n{COLOR_PATH}{}{COLOR_RESET}\n", self.path);
-        } else {
-            let _ = writeln!(self.buf, "\n{}", self.path);
-        }
-        self.printed_heading = true;
-    }
-
-    fn print_line(
-        &mut self,
-        bytes: &[u8],
-        line_num: Option<u64>,
-        is_match: bool,
-    ) -> io::Result<()> {
-        if self.quiet || self.count_only || self.files_with_matches || self.files_without_match {
-            return Ok(());
-        }
-
-        let line = String::from_utf8_lossy(bytes);
-        let line = line.trim_end_matches('\n').trim_end_matches('\r');
-        let sep = if is_match { ':' } else { '-' };
-
-        if !self.no_heading && self.show_filename {
-            self.print_heading();
-        }
-
-        if self.no_heading && self.show_filename {
-            if self.color {
-                write!(self.buf, "{COLOR_PATH}{}{COLOR_RESET}{sep}", self.path)?;
-            } else {
-                write!(self.buf, "{}{sep}", self.path)?;
-            }
-        }
-
-        if self.show_line_number
-            && let Some(n) = line_num
-        {
-            let num_str = if self.color {
-                format!("{COLOR_LINE}{n}{COLOR_RESET}{sep}")
-            } else {
-                format!("{n}{sep}")
+        Box::new(move |result| {
+            let haystack = match haystack_builder.build_from_result(result) {
+                Some(haystack) => haystack,
+                None => return WalkState::Continue,
             };
-            self.buf.extend_from_slice(num_str.as_bytes());
-        }
-
-        writeln!(self.buf, "{line}")?;
-        Ok(())
+            searched.store(true, Ordering::SeqCst);
+            searcher.printer().get_mut().clear();
+            let search_result = match searcher.search(&haystack) {
+                Ok(search_result) => search_result,
+                Err(err) => {
+                    err_message!("{}: {}", haystack.path().display(), err);
+                    return WalkState::Continue;
+                }
+            };
+            if search_result.has_match() {
+                matched.store(true, Ordering::SeqCst);
+            }
+            if let Some(ref locked_stats) = *stats {
+                let mut stats = locked_stats.lock().unwrap();
+                *stats += search_result.stats().unwrap();
+            }
+            if let Err(err) = bufwtr.print(searcher.printer().get_mut()) {
+                // A broken pipe means graceful termination.
+                if err.kind() == std::io::ErrorKind::BrokenPipe {
+                    return WalkState::Quit;
+                }
+                // Otherwise, we continue on our merry way.
+                err_message!("{}: {}", haystack.path().display(), err);
+            }
+            if matched.load(Ordering::SeqCst) && args.quit_after_match() {
+                WalkState::Quit
+            } else {
+                WalkState::Continue
+            }
+        })
+    });
+    if args.has_implicit_path() && !searched.load(Ordering::SeqCst) {
+        eprint_nothing_searched();
     }
-
-    fn at_limit(&self) -> bool {
-        self.max_count.is_some_and(|m| self.match_count >= m)
+    if let Some(ref locked_stats) = stats {
+        let stats = locked_stats.lock().unwrap();
+        let mut wtr = searcher.printer().get_mut();
+        let _ = print_stats(mode, &stats, started_at, &mut wtr);
+        let _ = bufwtr.print(&mut wtr);
     }
+    Ok(matched.load(Ordering::SeqCst))
 }
 
-impl Sink for RgSink {
-    type Error = io::Error;
+/// The top-level entry point for file listing without searching.
+///
+/// This recursively steps through the file list (current directory by default)
+/// and prints each path sequentially using a single thread.
+fn files(args: &HiArgs) -> anyhow::Result<bool> {
+    let haystack_builder = args.haystack_builder();
+    let unsorted = args
+        .walk_builder()?
+        .build()
+        .filter_map(|result| haystack_builder.build_from_result(result));
+    let haystacks = args.sort(unsorted);
 
-    fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, io::Error> {
-        if self.invert_match {
-            // In passthru mode: matched lines are what we want to SKIP
-            return Ok(!self.at_limit());
+    let mut matched = false;
+    let mut path_printer = args.path_printer_builder().build(args.stdout());
+    for haystack in haystacks {
+        matched = true;
+        if args.quit_after_match() {
+            break;
         }
-
-        self.had_match = true;
-        self.match_count += 1;
-
-        if !self.quiet && !self.count_only && !self.files_with_matches && !self.files_without_match
-        {
-            if self.only_matching {
-                // Print only the matched portion; re-find the match span
-                // We print the full line for now since we don't have the span here
-                // TODO: use matcher to re-find span for exact -o output
-                self.print_line(mat.bytes(), mat.line_number(), true)?;
-            } else {
-                self.print_line(mat.bytes(), mat.line_number(), true)?;
+        if let Err(err) = path_printer.write(haystack.path()) {
+            // A broken pipe means graceful termination.
+            if err.kind() == std::io::ErrorKind::BrokenPipe {
+                break;
             }
+            // Otherwise, we have some other error that's preventing us from
+            // writing to stdout, so we should bubble it up.
+            return Err(err.into());
         }
-
-        Ok(!self.at_limit())
     }
+    Ok(matched)
+}
 
-    fn context(&mut self, _searcher: &Searcher, ctx: &SinkContext<'_>) -> Result<bool, io::Error> {
-        if self.invert_match {
-            // In passthru mode: context lines are non-matching lines — print them
-            self.had_match = true;
-            self.match_count += 1;
+/// The top-level entry point for multi-threaded file listing without
+/// searching.
+///
+/// This recursively steps through the file list (current directory by default)
+/// and prints each path sequentially using multiple threads.
+///
+/// Requesting a sorted output from ripgrep (such as with `--sort path`) will
+/// automatically disable parallelism and hence sorting is not handled here.
+fn files_parallel(args: &HiArgs) -> anyhow::Result<bool> {
+    use std::{
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            mpsc,
+        },
+        thread,
+    };
 
-            if !self.quiet
-                && !self.count_only
-                && !self.files_with_matches
-                && !self.files_without_match
-            {
-                self.print_line(ctx.bytes(), ctx.line_number(), true)?;
-            }
+    let haystack_builder = args.haystack_builder();
+    let mut path_printer = args.path_printer_builder().build(args.stdout());
+    let matched = AtomicBool::new(false);
+    let (tx, rx) = mpsc::channel::<crate::rg::haystack::Haystack>();
 
-            return Ok(!self.at_limit());
-        }
-
-        // Normal context (before/after a match)
-        if self.before_context > 0 || self.after_context > 0 {
-            let is_before = matches!(ctx.kind(), SinkContextKind::Before);
-            let _ = is_before; // used for future color distinction
-            self.print_line(ctx.bytes(), ctx.line_number(), false)?;
-        }
-        Ok(true)
-    }
-
-    fn context_break(&mut self, _searcher: &Searcher) -> Result<bool, io::Error> {
-        if !self.quiet
-            && !self.count_only
-            && !self.files_with_matches
-            && !self.files_without_match
-            && !self.invert_match
-            && (self.before_context > 0 || self.after_context > 0)
-        {
-            if self.color {
-                let _ = writeln!(self.buf, "{COLOR_SEP}--{COLOR_RESET}");
-            } else {
-                let _ = writeln!(self.buf, "--");
-            }
-        }
-        Ok(true)
-    }
-
-    fn finish(&mut self, _searcher: &Searcher, _fin: &SinkFinish) -> Result<(), io::Error> {
-        if self.count_only && !self.quiet {
-            if self.show_filename {
-                writeln!(self.buf, "{}:{}", self.path, self.match_count)?;
-            } else {
-                writeln!(self.buf, "{}", self.match_count)?;
-            }
-        }
-        if self.files_with_matches && self.had_match {
-            let sep = if self.null { "\0" } else { "\n" };
-            write!(self.buf, "{}{sep}", self.path)?;
+    // We spawn a single printing thread to make sure we don't tear writes.
+    // We use a channel here under the presumption that it's probably faster
+    // than using a mutex in the worker threads below, but this has never been
+    // seriously litigated.
+    let print_thread = thread::spawn(move || -> std::io::Result<()> {
+        for haystack in rx.iter() {
+            path_printer.write(haystack.path())?;
         }
         Ok(())
+    });
+    args.walk_builder()?.build_parallel().run(|| {
+        let haystack_builder = &haystack_builder;
+        let matched = &matched;
+        let tx = tx.clone();
+
+        Box::new(move |result| {
+            let haystack = match haystack_builder.build_from_result(result) {
+                Some(haystack) => haystack,
+                None => return WalkState::Continue,
+            };
+            matched.store(true, Ordering::SeqCst);
+            if args.quit_after_match() {
+                WalkState::Quit
+            } else {
+                match tx.send(haystack) {
+                    Ok(_) => WalkState::Continue,
+                    Err(_) => WalkState::Quit,
+                }
+            }
+        })
+    });
+    drop(tx);
+    if let Err(err) = print_thread.join().unwrap() {
+        // A broken pipe means graceful termination, so fall through.
+        // Otherwise, something bad happened while writing to stdout, so bubble
+        // it up.
+        if err.kind() != std::io::ErrorKind::BrokenPipe {
+            return Err(err.into());
+        }
+    }
+    Ok(matched.load(Ordering::SeqCst))
+}
+
+/// The top-level entry point for `--type-list`.
+fn types(args: &HiArgs) -> anyhow::Result<ExitCode> {
+    let mut count = 0;
+    let mut stdout = args.stdout();
+    for def in args.types().definitions() {
+        count += 1;
+        stdout.write_all(def.name().as_bytes())?;
+        stdout.write_all(b": ")?;
+
+        let mut first = true;
+        for glob in def.globs() {
+            if !first {
+                stdout.write_all(b", ")?;
+            }
+            stdout.write_all(glob.as_bytes())?;
+            first = false;
+        }
+        stdout.write_all(b"\n")?;
+    }
+    Ok(ExitCode::from(if count == 0 { 1 } else { 0 }))
+}
+
+/// Implements ripgrep's "generate" modes.
+///
+/// These modes correspond to generating some kind of ancillary data related
+/// to ripgrep. At present, this includes ripgrep's man page (in roff format)
+/// and supported shell completions.
+fn generate(mode: crate::rg::flags::GenerateMode) -> anyhow::Result<ExitCode> {
+    use crate::rg::flags::GenerateMode;
+
+    let output = match mode {
+        GenerateMode::Man => flags::generate_man_page(),
+        GenerateMode::CompleteBash => flags::generate_complete_bash(),
+        GenerateMode::CompleteZsh => flags::generate_complete_zsh(),
+        GenerateMode::CompleteFish => flags::generate_complete_fish(),
+        GenerateMode::CompletePowerShell => flags::generate_complete_powershell(),
+    };
+    writeln!(std::io::stdout(), "{}", output.trim_end())?;
+    Ok(ExitCode::from(0))
+}
+
+/// Implements ripgrep's "special" modes.
+///
+/// A special mode is one that generally short-circuits most (not all) of
+/// ripgrep's initialization logic and skips right to this routine. The
+/// special modes essentially consist of printing help and version output. The
+/// idea behind the short circuiting is to ensure there is as little as possible
+/// (within reason) that would prevent ripgrep from emitting help output.
+///
+/// For example, part of the initialization logic that is skipped (among
+/// other things) is accessing the current working directory. If that fails,
+/// ripgrep emits an error. We don't want to emit an error if it fails and
+/// the user requested version or help information.
+fn special(mode: crate::rg::flags::SpecialMode) -> anyhow::Result<ExitCode> {
+    use crate::rg::flags::SpecialMode;
+
+    let mut exit = ExitCode::from(0);
+    let output = match mode {
+        SpecialMode::HelpShort => flags::generate_help_short(),
+        SpecialMode::HelpLong => flags::generate_help_long(),
+        SpecialMode::VersionShort => flags::generate_version_short(),
+        SpecialMode::VersionLong => flags::generate_version_long(),
+        // --pcre2-version is a little special because it emits an error
+        // exit code if this build of ripgrep doesn't support PCRE2.
+        SpecialMode::VersionPCRE2 => {
+            let (output, available) = flags::generate_version_pcre2();
+            if !available {
+                exit = ExitCode::from(1);
+            }
+            output
+        }
+    };
+    writeln!(std::io::stdout(), "{}", output.trim_end())?;
+    Ok(exit)
+}
+
+/// Prints a heuristic error messages when nothing is searched.
+///
+/// This can happen if an applicable ignore file has one or more rules that
+/// are too broad and cause ripgrep to ignore everything.
+///
+/// We only show this error message when the user does *not* provide an
+/// explicit path to search. This is because the message can otherwise be
+/// noisy, e.g., when it is intended that there is nothing to search.
+fn eprint_nothing_searched() {
+    err_message!(
+        "No files were searched, which means ripgrep probably \
+         applied a filter you didn't expect.\n\
+         Running with --debug will show why files are being skipped."
+    );
+}
+
+/// Prints the statistics given to the writer given.
+///
+/// The search mode given determines whether the stats should be printed in
+/// a plain text format or in a JSON format.
+///
+/// The `started` time should be the time at which ripgrep started working.
+///
+/// If an error occurs while writing, then writing stops and the error is
+/// returned. Note that callers should probably ignore this errror, since
+/// whether stats fail to print or not generally shouldn't cause ripgrep to
+/// enter into an "error" state. And usually the only way for this to fail is
+/// if writing to stdout itself fails.
+fn print_stats<W: Write>(
+    mode: SearchMode,
+    stats: &grep::printer::Stats,
+    started: std::time::Instant,
+    mut wtr: W,
+) -> std::io::Result<()> {
+    let elapsed = std::time::Instant::now().duration_since(started);
+    if matches!(mode, SearchMode::JSON) {
+        // We specifically match the format laid out by the JSON printer in
+        // the grep-printer crate. We simply "extend" it with the 'summary'
+        // message type.
+        serde_json::to_writer(
+            &mut wtr,
+            &serde_json::json!({
+                "type": "summary",
+                "data": {
+                    "stats": stats,
+                    "elapsed_total": {
+                        "secs": elapsed.as_secs(),
+                        "nanos": elapsed.subsec_nanos(),
+                        "human": format!("{:0.6}s", elapsed.as_secs_f64()),
+                    },
+                }
+            }),
+        )?;
+        write!(wtr, "\n")
+    } else {
+        write!(
+            wtr,
+            "
+{matches} matches
+{lines} matched lines
+{searches_with_match} files contained matches
+{searches} files searched
+{bytes_printed} bytes printed
+{bytes_searched} bytes searched
+{search_time:0.6} seconds spent searching
+{process_time:0.6} seconds
+",
+            matches = stats.matches(),
+            lines = stats.matched_lines(),
+            searches_with_match = stats.searches_with_match(),
+            searches = stats.searches(),
+            bytes_printed = stats.bytes_printed(),
+            bytes_searched = stats.bytes_searched(),
+            search_time = stats.elapsed().as_secs_f64(),
+            process_time = elapsed.as_secs_f64(),
+        )
     }
 }

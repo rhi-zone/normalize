@@ -79,6 +79,13 @@ normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true
+grep = "0.3"
+lexopt = "0.3"
+anyhow = "1"
+bstr = "1"
+termcolor = "1"
+textwrap = { version = "0.16", default-features = false }
+log = "0.4"
 rayon.workspace = true
 tokio.workspace = true
 axum.workspace = true
