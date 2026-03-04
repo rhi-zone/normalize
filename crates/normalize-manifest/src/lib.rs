@@ -53,6 +53,7 @@ pub mod racket;
 pub mod rockspec;
 pub mod sbt;
 pub mod setup_cfg;
+pub mod setup_py;
 pub mod stack;
 pub mod swift_pm;
 pub mod vcpkg;
@@ -144,6 +145,7 @@ pub fn parse_manifest(filename: &str, content: &str) -> Option<ParsedManifest> {
         "requirements.txt" => pip::PipParser.parse(content).ok(),
         "pyproject.toml" => pyproject::PyprojectParser.parse(content).ok(),
         "setup.cfg" => setup_cfg::SetupCfgParser.parse(content).ok(),
+        "setup.py" => setup_py::SetupPyParser.parse(content).ok(),
         // PHP
         "composer.json" => composer::ComposerParser.parse(content).ok(),
         // JVM

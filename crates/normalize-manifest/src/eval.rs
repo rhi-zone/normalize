@@ -19,6 +19,7 @@ pub(crate) fn try_eval(filename: &str, root: &Path) -> Option<ParsedManifest> {
         "go.mod" => eval_go(root),
         "Gemfile" => eval_gemfile(root),
         "mix.exs" => eval_mix_exs(root),
+        "setup.py" => eval_setup_py(root),
         _ => None,
     }
 }
@@ -273,6 +274,105 @@ fn parse_mix_json(json: &str) -> Option<ParsedManifest> {
     })
 }
 
+// ── Python — `python3 -c '…'` / `python -c '…'` ──────────────────────────────
+
+const SETUP_PY_SCRIPT: &str = r#"import sys, json
+sys.argv = ['setup.py']  # prevent argparse surprises
+
+captured = {}
+
+def _mock_setup(**kw):
+    captured.update(kw)
+
+# Patch both setuptools and distutils before importing setup.py
+import types
+_fake = types.ModuleType('setuptools')
+_fake.setup = _mock_setup
+_fake.find_packages = lambda *a, **kw: []
+_fake.find_namespace_packages = lambda *a, **kw: []
+sys.modules['setuptools'] = _fake
+
+try:
+    import distutils.core as _dc
+    _dc.setup = _mock_setup
+except Exception:
+    pass
+
+try:
+    with open('setup.py') as _f:
+        exec(compile(_f.read(), 'setup.py', 'exec'), {'__name__': '__main__'})
+except SystemExit:
+    pass
+except Exception as e:
+    sys.stderr.write(str(e) + '\n')
+
+def _parse_req(r):
+    import re
+    m = re.match(r'([A-Za-z0-9_.\-]+)(.*)', r.strip())
+    if not m:
+        return None
+    return {'name': m.group(1).replace('-','_').lower(), 'version': m.group(2).strip() or None}
+
+deps = []
+for r in captured.get('install_requires', []):
+    p = _parse_req(r)
+    if p:
+        deps.append({'name': p['name'], 'version': p['version'], 'kind': 'normal'})
+for r in captured.get('tests_require', []):
+    p = _parse_req(r)
+    if p:
+        deps.append({'name': p['name'], 'version': p['version'], 'kind': 'dev'})
+for grp, reqs in (captured.get('extras_require', None) or {}).items():
+    kind = 'dev' if grp in ('dev','test','testing','tests','develop','development') else 'optional'
+    for r in (reqs or []):
+        p = _parse_req(r)
+        if p:
+            deps.append({'name': p['name'], 'version': p['version'], 'kind': kind})
+
+print(json.dumps({
+    'name': captured.get('name'),
+    'version': captured.get('version'),
+    'deps': deps,
+}))
+"#;
+
+fn eval_setup_py(root: &Path) -> Option<ParsedManifest> {
+    // Try python3 first, fall back to python
+    let stdout = run("python3", &["-c", SETUP_PY_SCRIPT], root)
+        .or_else(|| run("python", &["-c", SETUP_PY_SCRIPT], root))?;
+    parse_setup_py_json(&stdout)
+}
+
+fn parse_setup_py_json(json: &str) -> Option<ParsedManifest> {
+    let v: serde_json::Value = serde_json::from_str(json.trim()).ok()?;
+
+    let name = v["name"].as_str().map(|s| s.to_string());
+    let version = v["version"].as_str().map(|s| s.to_string());
+
+    let mut deps = Vec::new();
+    for dep in v["deps"].as_array().unwrap_or(&vec![]) {
+        let dep_name = dep["name"].as_str()?.to_string();
+        let version_req = dep["version"].as_str().map(|s| s.to_string());
+        let kind = match dep["kind"].as_str() {
+            Some("dev") => DepKind::Dev,
+            Some("optional") => DepKind::Optional,
+            _ => DepKind::Normal,
+        };
+        deps.push(DeclaredDep {
+            name: dep_name,
+            version_req,
+            kind,
+        });
+    }
+
+    Some(ParsedManifest {
+        ecosystem: "python",
+        name,
+        version,
+        dependencies: deps,
+    })
+}
+
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -405,6 +505,57 @@ mod tests {
             .find(|d| d.name == "nokogiri")
             .unwrap();
         assert_eq!(noko.version_req.as_deref(), Some("> 1.5.0"));
+    }
+
+    #[test]
+    fn test_parse_setup_py_json() {
+        let json = r#"{
+            "name": "mypackage",
+            "version": "1.0.0",
+            "deps": [
+                {"name": "requests", "version": ">=2.28.0", "kind": "normal"},
+                {"name": "click", "version": ">=8.0", "kind": "normal"},
+                {"name": "pytest", "version": ">=7.0", "kind": "dev"},
+                {"name": "black", "version": null, "kind": "dev"},
+                {"name": "sphinx", "version": ">=5.0", "kind": "optional"}
+            ]
+        }"#;
+
+        let m = parse_setup_py_json(json).unwrap();
+        assert_eq!(m.ecosystem, "python");
+        assert_eq!(m.name.as_deref(), Some("mypackage"));
+        assert_eq!(m.version.as_deref(), Some("1.0.0"));
+        assert_eq!(m.dependencies.len(), 5);
+
+        let req = m
+            .dependencies
+            .iter()
+            .find(|d| d.name == "requests")
+            .unwrap();
+        assert_eq!(req.version_req.as_deref(), Some(">=2.28.0"));
+        assert_eq!(req.kind, DepKind::Normal);
+
+        let pytest = m.dependencies.iter().find(|d| d.name == "pytest").unwrap();
+        assert_eq!(pytest.kind, DepKind::Dev);
+        assert_eq!(pytest.version_req.as_deref(), Some(">=7.0"));
+
+        let black = m.dependencies.iter().find(|d| d.name == "black").unwrap();
+        assert_eq!(black.kind, DepKind::Dev);
+        assert!(black.version_req.is_none());
+
+        let sphinx = m.dependencies.iter().find(|d| d.name == "sphinx").unwrap();
+        assert_eq!(sphinx.kind, DepKind::Optional);
+    }
+
+    #[test]
+    fn test_parse_setup_py_json_minimal() {
+        // name/version null, empty deps
+        let json = r#"{"name": null, "version": null, "deps": []}"#;
+        let m = parse_setup_py_json(json).unwrap();
+        assert_eq!(m.ecosystem, "python");
+        assert!(m.name.is_none());
+        assert!(m.version.is_none());
+        assert!(m.dependencies.is_empty());
     }
 
     #[test]
