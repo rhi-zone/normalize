@@ -6,12 +6,13 @@
 
 use crate::extract::Extractor;
 use crate::output::OutputFormatter;
-use normalize_languages::support_for_path;
+use normalize_languages::{parsers::grammar_loader, support_for_path};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use streaming_iterator::StreamingIterator;
 
 use super::duplicates::{
     LSH_BANDS, MINHASH_N, compute_minhash, find_function_node, flatten_symbols, jaccard_estimate,
@@ -95,13 +96,13 @@ impl UnionFind {
 /// assignment) node kinds. Everything else is ignored.
 fn serialize_structural_tokens(
     node: &tree_sitter::Node,
-    structural_kinds: &HashSet<&str>,
+    complexity_ids: &HashSet<usize>,
     out: &mut Vec<u64>,
 ) {
     let kind = node.kind();
 
     let is_structural =
-        structural_kinds.contains(kind) || kind.contains("call") || kind.contains("assignment");
+        complexity_ids.contains(&node.id()) || kind.contains("call") || kind.contains("assignment");
 
     if is_structural {
         let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -112,12 +113,36 @@ fn serialize_structural_tokens(
     let mut cursor = node.walk();
     if cursor.goto_first_child() {
         loop {
-            serialize_structural_tokens(&cursor.node(), structural_kinds, out);
+            serialize_structural_tokens(&cursor.node(), complexity_ids, out);
             if !cursor.goto_next_sibling() {
                 break;
             }
         }
     }
+}
+
+/// Run the complexity query on a function node and return the IDs of all matched nodes.
+fn complexity_node_ids(
+    fn_node: &tree_sitter::Node,
+    grammar: tree_sitter::Language,
+    query_str: &str,
+    source: &[u8],
+) -> HashSet<usize> {
+    let Ok(query) = tree_sitter::Query::new(&grammar, query_str) else {
+        return HashSet::new();
+    };
+    let complexity_idx = query.capture_index_for_name("complexity");
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let mut ids = HashSet::new();
+    let mut matches = cursor.matches(&query, *fn_node, source);
+    while let Some(m) = matches.next() {
+        for cap in m.captures {
+            if complexity_idx.is_some_and(|i| i == cap.index) {
+                ids.insert(cap.node.id());
+            }
+        }
+    }
+    ids
 }
 
 /// Categorize a node kind into a readable label for pattern naming.
@@ -223,8 +248,10 @@ pub fn analyze_patterns(
                 .display()
                 .to_string();
 
-            // Build structural kinds set from language traits
-            let structural_kinds: HashSet<&str> = lang.complexity_nodes().iter().copied().collect();
+            // Load complexity query for this language (used per-function below)
+            let loader = grammar_loader();
+            let complexity_query = loader.get_complexity(lang.grammar_name());
+            let grammar = loader.get(lang.grammar_name());
 
             let result = extractor.extract(path, &content);
             let mut entries = Vec::new();
@@ -236,8 +263,16 @@ pub fn analyze_patterns(
                 }
 
                 if let Some(node) = find_function_node(&tree, sym.start_line) {
+                    // Build complexity node ID set from query, or empty if unavailable
+                    let complexity_ids = match (&complexity_query, &grammar) {
+                        (Some(q), Some(g)) => {
+                            complexity_node_ids(&node, g.clone(), q, content.as_bytes())
+                        }
+                        _ => HashSet::new(),
+                    };
+
                     let mut tokens = Vec::new();
-                    serialize_structural_tokens(&node, &structural_kinds, &mut tokens);
+                    serialize_structural_tokens(&node, &complexity_ids, &mut tokens);
 
                     // Skip trivial functions with < 5 structural tokens
                     if tokens.len() < 5 {
@@ -246,7 +281,7 @@ pub fn analyze_patterns(
 
                     // Collect the actual node kind strings for labeling
                     let mut kind_counts: HashMap<String, usize> = HashMap::new();
-                    collect_structural_kinds(&node, &structural_kinds, &mut kind_counts);
+                    collect_structural_kinds(&node, &complexity_ids, &mut kind_counts);
                     let mut kinds_vec: Vec<(String, usize)> = kind_counts.into_iter().collect();
                     kinds_vec.sort_by(|a, b| b.1.cmp(&a.1));
                     let kind_names: Vec<String> =
@@ -437,17 +472,17 @@ pub fn analyze_patterns(
 /// Collect structural node kind counts from an AST subtree.
 fn collect_structural_kinds(
     node: &tree_sitter::Node,
-    structural_kinds: &HashSet<&str>,
+    complexity_ids: &HashSet<usize>,
     counts: &mut HashMap<String, usize>,
 ) {
     let kind = node.kind();
-    if structural_kinds.contains(kind) || kind.contains("call") || kind.contains("assignment") {
+    if complexity_ids.contains(&node.id()) || kind.contains("call") || kind.contains("assignment") {
         *counts.entry(kind.to_string()).or_default() += 1;
     }
     let mut cursor = node.walk();
     if cursor.goto_first_child() {
         loop {
-            collect_structural_kinds(&cursor.node(), structural_kinds, counts);
+            collect_structural_kinds(&cursor.node(), complexity_ids, counts);
             if !cursor.goto_next_sibling() {
                 break;
             }
