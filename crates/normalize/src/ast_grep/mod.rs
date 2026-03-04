@@ -9,6 +9,7 @@ pub(crate) mod print;
 pub(crate) mod run;
 pub(crate) mod scan;
 pub(crate) mod utils;
+pub(crate) mod verify;
 
 use std::ffi::OsString;
 use std::process::ExitCode;
@@ -20,6 +21,7 @@ use config::ProjectConfig;
 use run::{RunArg, run_with_pattern};
 use scan::{ScanArg, run_with_config};
 use utils::exit_with_error;
+use verify::{TestArg, run_test_rule};
 
 const LOGO: &str = r#"
 Search and Rewrite code at large scale using AST pattern.
@@ -44,6 +46,8 @@ enum Commands {
     Run(RunArg),
     /// Scan the codebase with rules from sgconfig.yml or specified rule files.
     Scan(ScanArg),
+    /// Test ast-grep rules against test cases in YAML files.
+    Test(TestArg),
 }
 
 /// Run ast-grep with the given arguments (not including argv[0]).
@@ -97,6 +101,10 @@ fn main_with_args(args: impl Iterator<Item = String>) -> Result<ExitCode> {
         Commands::Scan(arg) => {
             let project = ProjectConfig::setup(None)?;
             run_with_config(arg, project)
+        }
+        Commands::Test(arg) => {
+            let project = ProjectConfig::setup(None)?;
+            run_test_rule(arg, project)
         }
     }
 }

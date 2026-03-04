@@ -19,7 +19,7 @@ use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
 /// Build an ignore `Types` that selects YAML config files.
-fn config_file_type() -> Types {
+pub(crate) fn config_file_type() -> Types {
     let mut builder = TypesBuilder::new();
     builder.add("yaml", "*.yml").unwrap();
     builder.add("yaml", "*.yaml").unwrap();
