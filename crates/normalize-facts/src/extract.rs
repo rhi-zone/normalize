@@ -2,10 +2,28 @@
 //!
 //! This module provides the core AST traversal logic for extracting
 //! symbols, imports, and other facts from source files.
+//!
+//! ## Extraction paths
+//!
+//! There are two extraction paths, selected automatically:
+//!
+//! 1. **Tags path** (`collect_symbols_from_tags`): Used when a `*.tags.scm` query is
+//!    available for the language (currently 11 languages). Runs the tags query, groups
+//!    `@definition.*` + `@name` captures per match, reconstructs nesting by line-range
+//!    containment, and returns a `Vec<Symbol>`.
+//!
+//! 2. **Trait path** (`collect_symbols`): Fallback for all other languages. Uses
+//!    `Language` trait methods (`function_kinds`, `container_kinds`, `type_kinds`) to
+//!    classify nodes and recurse the AST.
+//!
+//! Both paths feed the same post-processing steps (Rust impl-block merging,
+//! TypeScript/JavaScript interface marking).
 
 use crate::parsers;
+use normalize_facts_core::SymbolKind;
 use normalize_languages::{Language, Symbol, Visibility, support_for_grammar, support_for_path};
 use std::path::Path;
+use streaming_iterator::StreamingIterator;
 use tree_sitter;
 
 /// Result of extracting symbols from a file.
@@ -273,24 +291,56 @@ impl Extractor {
         resolver: Option<&dyn InterfaceResolver>,
         current_file: &str,
     ) -> Vec<Symbol> {
-        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
+        let grammar_name = support.grammar_name();
+        let tree = match parsers::parse_with_grammar(grammar_name, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
 
-        let mut symbols = Vec::new();
-        let root = tree.root_node();
-        let mut cursor = root.walk();
-
-        self.collect_symbols(&mut cursor, content, support, &mut symbols, false);
+        // Try the tags-based extraction path first.
+        // If a tags query is available and produces results, use them.
+        // Otherwise fall back to the trait-method path.
+        let loader = parsers::grammar_loader();
+        let mut symbols = if let Some(tags_query_str) = loader.get_tags(grammar_name) {
+            let grammar_lang = loader.get(grammar_name);
+            let tags_result = grammar_lang
+                .and_then(|lang| tree_sitter::Query::new(&lang, &tags_query_str).ok())
+                .and_then(|query| {
+                    collect_symbols_from_tags(
+                        &tree,
+                        &query,
+                        content,
+                        support,
+                        self.options.include_private,
+                    )
+                });
+            match tags_result {
+                Some(syms) => syms,
+                None => {
+                    // Tags path produced nothing; fall back to trait path
+                    let mut syms = Vec::new();
+                    let root = tree.root_node();
+                    let mut cursor = root.walk();
+                    self.collect_symbols(&mut cursor, content, support, &mut syms, false);
+                    syms
+                }
+            }
+        } else {
+            // No tags query; use the trait-method path
+            let mut syms = Vec::new();
+            let root = tree.root_node();
+            let mut cursor = root.walk();
+            self.collect_symbols(&mut cursor, content, support, &mut syms, false);
+            syms
+        };
 
         // Post-process for Rust: merge impl blocks with their types
-        if support.grammar_name() == "rust" {
+        if grammar_name == "rust" {
             Self::merge_rust_impl_blocks(&mut symbols);
         }
 
         // Post-process for TypeScript/JavaScript: mark interface implementations
-        if support.grammar_name() == "typescript" || support.grammar_name() == "javascript" {
+        if grammar_name == "typescript" || grammar_name == "javascript" {
             Self::mark_interface_implementations(&mut symbols, resolver, current_file);
         }
 
@@ -595,6 +645,257 @@ fn adjust_lines(sym: &mut Symbol, offset: usize) {
     sym.end_line += offset;
     for child in &mut sym.children {
         adjust_lines(child, offset);
+    }
+}
+
+/// Map a `@definition.*` capture name to a `SymbolKind`.
+///
+/// Returns `None` for capture names that are not definitions (e.g., `reference.call`),
+/// which should be ignored during symbol extraction.
+fn tags_capture_to_kind(capture_name: &str) -> Option<SymbolKind> {
+    match capture_name {
+        "definition.function" => Some(SymbolKind::Function),
+        // Methods are tagged as Function here; they get re-classified to Method
+        // once we reconstruct nesting (children of containers become methods).
+        "definition.method" => Some(SymbolKind::Function),
+        "definition.class" => Some(SymbolKind::Class),
+        "definition.interface" => Some(SymbolKind::Interface),
+        "definition.module" => Some(SymbolKind::Module),
+        "definition.type" => Some(SymbolKind::Type),
+        // No Macro variant — map to Function (closest semantic equivalent)
+        "definition.macro" => Some(SymbolKind::Function),
+        "definition.constant" => Some(SymbolKind::Constant),
+        _ => None,
+    }
+}
+
+/// Whether a `SymbolKind` is a container that can hold child symbols.
+fn is_container_kind(kind: SymbolKind) -> bool {
+    matches!(
+        kind,
+        SymbolKind::Class | SymbolKind::Interface | SymbolKind::Module
+    )
+}
+
+/// Intermediate record built from a single tags-query match before nesting reconstruction.
+/// Retains the node ID so we can call Language trait methods on the correct node.
+struct TagDef<'tree> {
+    /// The definition AST node (e.g. function_item, class_definition).
+    node: tree_sitter::Node<'tree>,
+    /// `SymbolKind` derived from the `@definition.*` capture name.
+    kind: SymbolKind,
+    /// True when the capture name was `definition.method` (explicit method tag).
+    is_method_capture: bool,
+    /// True when the capture name identifies a container kind (class/interface/module).
+    is_container: bool,
+    /// Line numbers (1-indexed) of the definition node.
+    start_line: usize,
+    end_line: usize,
+}
+
+/// Extract symbols from a parsed tree using a tags query.
+///
+/// Uses the tags query for *node classification* (which nodes are which kind of def),
+/// then calls the standard `Language` trait extraction methods on those nodes for
+/// symbol content (name, signature, visibility, docstring, implements, etc.).
+///
+/// Nesting is reconstructed by line-range containment: a def whose line range is
+/// fully enclosed by a container def is placed as a child of that container.
+///
+/// Returns `None` if the query produces no definition matches (caller falls back to
+/// the trait path).
+fn collect_symbols_from_tags<'tree>(
+    tree: &'tree tree_sitter::Tree,
+    query: &tree_sitter::Query,
+    content: &str,
+    support: &dyn Language,
+    include_private: bool,
+) -> Option<Vec<Symbol>> {
+    let capture_names = query.capture_names();
+
+    // We require a @name capture to be present in the query.
+    let name_idx = capture_names.iter().position(|n| *n == "name")?;
+    let _ = name_idx; // present but not needed — definition node gives us position
+
+    // If the query uses `@reference.implementation` patterns, it means the language
+    // uses separate "impl blocks" (e.g. Rust `impl Trait for Type`) to express
+    // interface relationships. The tags path cannot reconstruct `implements` from these
+    // references, so fall back to the trait path which handles this correctly.
+    if capture_names.contains(&"reference.implementation") {
+        return None;
+    }
+
+    // Run the query and collect TagDef records.
+    let root = tree.root_node();
+    let mut qcursor = tree_sitter::QueryCursor::new();
+    let mut matches = qcursor.matches(query, root, content.as_bytes());
+
+    let mut defs: Vec<TagDef<'tree>> = Vec::new();
+
+    while let Some(m) = matches.next() {
+        // Each match should contain a @definition.* capture.
+        // We skip matches that have no definition capture (e.g. pure reference matches).
+        let mut def_capture: Option<(tree_sitter::Node<'tree>, &str)> = None;
+
+        for capture in m.captures {
+            let cn = &capture_names[capture.index as usize];
+            if tags_capture_to_kind(cn).is_some() {
+                // SAFETY: The tree lives as long as 'tree; captures borrow from it.
+                let node = capture.node;
+                def_capture = Some((node, cn));
+            }
+        }
+
+        let Some((def_node, capture_name)) = def_capture else {
+            continue;
+        };
+        let kind = match tags_capture_to_kind(capture_name) {
+            Some(k) => k,
+            None => continue,
+        };
+
+        defs.push(TagDef {
+            node: def_node,
+            kind,
+            is_method_capture: capture_name == "definition.method",
+            is_container: is_container_kind(kind),
+            start_line: def_node.start_position().row + 1,
+            end_line: def_node.end_position().row + 1,
+        });
+    }
+
+    if defs.is_empty() {
+        return None;
+    }
+
+    // Sort by start line, with outer containers before inner defs at the same line.
+    defs.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then(b.end_line.cmp(&a.end_line))
+    });
+
+    // De-duplicate: remove defs with identical byte ranges.
+    // Some tags queries match the same node multiple times (e.g. both a generic and
+    // a specific pattern). Keep the first (which has the most specific kind after sorting).
+    defs.dedup_by(|b, a| {
+        a.node.start_byte() == b.node.start_byte() && a.node.end_byte() == b.node.end_byte()
+    });
+
+    // Container indices (for nesting reconstruction).
+    let container_idxs: Vec<usize> = (0..defs.len()).filter(|&i| defs[i].is_container).collect();
+
+    // Sanity check: if any explicit `definition.method` capture has no enclosing container
+    // in the tags defs, the tags query is structurally incomplete for nesting (e.g. Rust
+    // impl blocks not captured). Fall back to the trait path.
+    for i in 0..defs.len() {
+        if !defs[i].is_method_capture {
+            continue;
+        }
+        let has_container = container_idxs.iter().any(|&ci| {
+            let c = &defs[ci];
+            c.start_line <= defs[i].start_line && c.end_line >= defs[i].end_line
+        });
+        if !has_container {
+            return None;
+        }
+    }
+
+    // Process each def in order, placing it either as a top-level symbol or as a child
+    // of its innermost enclosing container.
+    //
+    // We build `top_level` and use a map from def-index → position-in-top_level
+    // for containers so we can append children later.
+    let mut top_level: Vec<Symbol> = Vec::new();
+    // def_idx → index in top_level (containers only)
+    let mut container_top_idx: std::collections::HashMap<usize, usize> =
+        std::collections::HashMap::new();
+
+    for i in 0..defs.len() {
+        let def = &defs[i];
+
+        // Find the innermost enclosing container (by line range).
+        let enclosing_ci = container_idxs
+            .iter()
+            .filter(|&&ci| ci != i) // don't self-enclose
+            .rev()
+            .find(|&&ci| {
+                let c = &defs[ci];
+                c.start_line <= def.start_line && c.end_line >= def.end_line
+            });
+
+        let in_container = enclosing_ci.is_some();
+
+        if def.is_container {
+            // Use extract_container for the full Symbol (includes implements, etc.).
+            // Fall back to extract_type if the Language impl doesn't handle this node
+            // kind as a container (e.g. Rust's struct_item is typed, not a container).
+            // If neither works, the tags query classified a node incorrectly for this
+            // language — signal failure so the caller falls back to the trait path.
+            let sym_opt = support
+                .extract_container(&def.node, content)
+                .or_else(|| support.extract_type(&def.node, content));
+            // The tags query identified this node as a container but the Language
+            // impl doesn't know how to extract it. Abort and fall back.
+            let mut sym = sym_opt?;
+            if !include_private
+                && matches!(
+                    sym.visibility,
+                    Visibility::Private | Visibility::Protected | Visibility::Internal
+                )
+            {
+                continue;
+            }
+            // Container body children will be filled by the leaf pass below.
+            // Clear any children that extract_container may have populated
+            // (we reconstruct nesting ourselves from the tags list).
+            sym.children.clear();
+
+            let pos = top_level.len();
+            container_top_idx.insert(i, pos);
+            top_level.push(sym);
+        } else {
+            // Leaf: function, method, type, constant.
+            let sym_opt = match def.kind {
+                SymbolKind::Type => support
+                    .extract_type(&def.node, content)
+                    .or_else(|| support.extract_function(&def.node, content, in_container)),
+                SymbolKind::Constant | SymbolKind::Variable => support
+                    .extract_type(&def.node, content)
+                    .or_else(|| support.extract_function(&def.node, content, in_container)),
+                _ => support.extract_function(&def.node, content, in_container),
+            };
+
+            let mut sym = match sym_opt {
+                Some(s) => s,
+                None => continue,
+            };
+
+            if !include_private
+                && matches!(
+                    sym.visibility,
+                    Visibility::Private | Visibility::Protected | Visibility::Internal
+                )
+            {
+                continue;
+            }
+
+            // Re-classify to Method if this def is inside a container or was tagged method.
+            if def.is_method_capture || in_container {
+                sym.kind = SymbolKind::Method;
+            }
+
+            match enclosing_ci.and_then(|&ci| container_top_idx.get(&ci)) {
+                Some(&pos) => top_level[pos].children.push(sym),
+                None => top_level.push(sym),
+            }
+        }
+    }
+
+    if top_level.is_empty() {
+        None
+    } else {
+        Some(top_level)
     }
 }
 

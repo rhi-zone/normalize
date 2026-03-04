@@ -6,7 +6,6 @@
   .
   (method_definition
     name: (property_identifier) @name) @definition.method
-  (#not-eq? @name "constructor")
   (#strip! @doc "^[\\s\\*/]+|^[\\s\\*/]$")
   (#select-adjacent! @doc @definition.method)
 )

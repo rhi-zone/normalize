@@ -10,6 +10,12 @@
 (abstract_method_signature
   name: (property_identifier) @name) @definition.method
 
+(method_definition
+  name: (property_identifier) @name) @definition.method
+
+(class_declaration
+  name: (type_identifier) @name) @definition.class
+
 (abstract_class_declaration
   name: (type_identifier) @name) @definition.class
 
