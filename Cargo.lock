@@ -3430,6 +3430,7 @@ dependencies = [
  "libsql",
  "normalize-chat-sessions",
  "normalize-cli-parser",
+ "normalize-code-similarity",
  "normalize-core",
  "normalize-deps",
  "normalize-ecosystems",
@@ -3495,6 +3496,15 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "normalize-code-similarity"
+version = "0.1.0"
+dependencies = [
+ "normalize-languages",
+ "streaming-iterator",
+ "tree-sitter",
 ]
 
 [[package]]

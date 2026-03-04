@@ -1,23 +1,22 @@
 //! Pattern catalog — auto-detect recurring structural code patterns.
 //!
 //! Finds functions with the same control-flow skeleton even when the actual code
-//! is completely different. Uses MinHash + LSH from `duplicates.rs` on structural
+//! is completely different. Uses MinHash + LSH from `normalize-code-similarity` on structural
 //! tokens (control-flow nodes, calls, assignments) instead of full AST tokens.
 
 use crate::extract::Extractor;
 use crate::output::OutputFormatter;
+use normalize_code_similarity::{
+    LSH_BANDS, MINHASH_N, UnionFind, collect_structural_kinds, compute_minhash, find_function_node,
+    flatten_symbols, generate_pattern_label, jaccard_estimate, lsh_band_hash,
+    serialize_structural_tokens,
+};
 use normalize_languages::{parsers::grammar_loader, support_for_path};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use streaming_iterator::StreamingIterator;
-
-use super::duplicates::{
-    LSH_BANDS, MINHASH_N, compute_minhash, find_function_node, flatten_symbols, jaccard_estimate,
-    lsh_band_hash,
-};
 
 // ── Data structures ───────────────────────────────────────────────────────────
 
@@ -51,150 +50,28 @@ pub struct PatternsReport {
     pub unclustered_functions: usize,
 }
 
-// ── Union-Find ────────────────────────────────────────────────────────────────
-
-struct UnionFind {
-    parent: Vec<usize>,
-    rank: Vec<usize>,
-}
-
-impl UnionFind {
-    fn new(n: usize) -> Self {
-        Self {
-            parent: (0..n).collect(),
-            rank: vec![0; n],
-        }
-    }
-
-    fn find(&mut self, x: usize) -> usize {
-        if self.parent[x] != x {
-            self.parent[x] = self.find(self.parent[x]);
-        }
-        self.parent[x]
-    }
-
-    fn union(&mut self, x: usize, y: usize) {
-        let rx = self.find(x);
-        let ry = self.find(y);
-        if rx == ry {
-            return;
-        }
-        match self.rank[rx].cmp(&self.rank[ry]) {
-            std::cmp::Ordering::Less => self.parent[rx] = ry,
-            std::cmp::Ordering::Greater => self.parent[ry] = rx,
-            std::cmp::Ordering::Equal => {
-                self.parent[ry] = rx;
-                self.rank[rx] += 1;
-            }
-        }
-    }
-}
-
-// ── Structural tokenization ───────────────────────────────────────────────────
-
-/// Walk an AST node and emit hashes only for structural (control-flow, call,
-/// assignment) node kinds. Everything else is ignored.
-fn serialize_structural_tokens(
-    node: &tree_sitter::Node,
-    complexity_ids: &HashSet<usize>,
-    out: &mut Vec<u64>,
-) {
-    let kind = node.kind();
-
-    let is_structural =
-        complexity_ids.contains(&node.id()) || kind.contains("call") || kind.contains("assignment");
-
-    if is_structural {
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        kind.hash(&mut h);
-        out.push(h.finish());
-    }
-
-    let mut cursor = node.walk();
-    if cursor.goto_first_child() {
-        loop {
-            serialize_structural_tokens(&cursor.node(), complexity_ids, out);
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-}
-
-/// Run the complexity query on a function node and return the IDs of all matched nodes.
-fn complexity_node_ids(
+/// Run the complexity query on a function node and return the kinds of all matched nodes.
+fn complexity_node_kinds(
     fn_node: &tree_sitter::Node,
     grammar: tree_sitter::Language,
     query_str: &str,
     source: &[u8],
-) -> HashSet<usize> {
+) -> HashSet<String> {
     let Ok(query) = tree_sitter::Query::new(&grammar, query_str) else {
         return HashSet::new();
     };
     let complexity_idx = query.capture_index_for_name("complexity");
     let mut cursor = tree_sitter::QueryCursor::new();
-    let mut ids = HashSet::new();
+    let mut kinds = HashSet::new();
     let mut matches = cursor.matches(&query, *fn_node, source);
     while let Some(m) = matches.next() {
         for cap in m.captures {
             if complexity_idx.is_some_and(|i| i == cap.index) {
-                ids.insert(cap.node.id());
+                kinds.insert(cap.node.kind().to_string());
             }
         }
     }
-    ids
-}
-
-/// Categorize a node kind into a readable label for pattern naming.
-fn categorize_kind(kind: &str) -> &str {
-    if kind.contains("if") || kind.contains("match") || kind.contains("switch") {
-        "branch"
-    } else if kind.contains("for") || kind.contains("while") || kind.contains("loop") {
-        "loop"
-    } else if kind.contains("try") || kind.contains("catch") || kind.contains("rescue") {
-        "error-handling"
-    } else if kind.contains("return") || kind.contains("break") || kind.contains("continue") {
-        "exit"
-    } else if kind.contains("call") {
-        "call"
-    } else if kind.contains("assignment") {
-        "transform"
-    } else {
-        "control"
-    }
-}
-
-/// Generate a human-readable label from structural element counts.
-fn generate_pattern_label(elements: &[(String, usize)]) -> String {
-    if elements.is_empty() {
-        return "unknown".to_string();
-    }
-
-    // Categorize and aggregate
-    let mut categories: HashMap<&str, usize> = HashMap::new();
-    for (kind, count) in elements {
-        let cat = categorize_kind(kind);
-        *categories.entry(cat).or_default() += count;
-    }
-
-    // Sort by count descending, pick top 2
-    let mut sorted: Vec<(&str, usize)> = categories.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
-
-    let parts: Vec<&str> = sorted.iter().take(2).map(|(cat, _)| *cat).collect();
-
-    match parts.len() {
-        0 => "unknown".to_string(),
-        1 => {
-            let total: usize = elements.iter().map(|(_, c)| c).sum();
-            if total > 6 {
-                format!("{}-heavy", parts[0])
-            } else {
-                parts[0].to_string()
-            }
-        }
-        _ => format!("{}-{}", parts[0], parts[1]),
-    }
+    kinds
 }
 
 // ── Core analysis ─────────────────────────────────────────────────────────────
@@ -263,16 +140,18 @@ pub fn analyze_patterns(
                 }
 
                 if let Some(node) = find_function_node(&tree, sym.start_line) {
-                    // Build complexity node ID set from query, or empty if unavailable
-                    let complexity_ids = match (&complexity_query, &grammar) {
+                    // Build complexity node kind set from query, or empty if unavailable
+                    let complexity_kinds_owned = match (&complexity_query, &grammar) {
                         (Some(q), Some(g)) => {
-                            complexity_node_ids(&node, g.clone(), q, content.as_bytes())
+                            complexity_node_kinds(&node, g.clone(), q, content.as_bytes())
                         }
                         _ => HashSet::new(),
                     };
+                    let complexity_kinds: HashSet<&str> =
+                        complexity_kinds_owned.iter().map(|s| s.as_str()).collect();
 
                     let mut tokens = Vec::new();
-                    serialize_structural_tokens(&node, &complexity_ids, &mut tokens);
+                    serialize_structural_tokens(&node, &complexity_kinds, &mut tokens);
 
                     // Skip trivial functions with < 5 structural tokens
                     if tokens.len() < 5 {
@@ -281,7 +160,7 @@ pub fn analyze_patterns(
 
                     // Collect the actual node kind strings for labeling
                     let mut kind_counts: HashMap<String, usize> = HashMap::new();
-                    collect_structural_kinds(&node, &complexity_ids, &mut kind_counts);
+                    collect_structural_kinds(&node, &complexity_kinds, &mut kind_counts);
                     let mut kinds_vec: Vec<(String, usize)> = kind_counts.into_iter().collect();
                     kinds_vec.sort_by(|a, b| b.1.cmp(&a.1));
                     let kind_names: Vec<String> =
@@ -467,27 +346,6 @@ pub fn analyze_patterns(
         patterns,
         total_functions,
     })
-}
-
-/// Collect structural node kind counts from an AST subtree.
-fn collect_structural_kinds(
-    node: &tree_sitter::Node,
-    complexity_ids: &HashSet<usize>,
-    counts: &mut HashMap<String, usize>,
-) {
-    let kind = node.kind();
-    if complexity_ids.contains(&node.id()) || kind.contains("call") || kind.contains("assignment") {
-        *counts.entry(kind.to_string()).or_default() += 1;
-    }
-    let mut cursor = node.walk();
-    if cursor.goto_first_child() {
-        loop {
-            collect_structural_kinds(&cursor.node(), complexity_ids, counts);
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
 }
 
 // ── OutputFormatter ───────────────────────────────────────────────────────────

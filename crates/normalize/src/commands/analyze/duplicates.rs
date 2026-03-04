@@ -4,6 +4,10 @@ use crate::extract::Extractor;
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
 use crate::parsers;
+use normalize_code_similarity::{
+    LSH_BANDS, MINHASH_N, SHINGLE_K, compute_function_hash, compute_minhash, find_function_node,
+    flatten_symbols, jaccard_estimate, lsh_band_hash, serialize_subtree_tokens,
+};
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -26,7 +30,6 @@ fn resolve_file_path(roots: &[PathBuf], rel: &str) -> PathBuf {
 }
 
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 /// A group of duplicate functions
@@ -772,143 +775,6 @@ pub fn cmd_allow_duplicate_type(
     0
 }
 
-/// Flatten nested symbols into a flat list
-pub(crate) fn flatten_symbols(
-    sym: &normalize_languages::Symbol,
-) -> Vec<&normalize_languages::Symbol> {
-    let mut result = vec![sym];
-    for child in &sym.children {
-        result.extend(flatten_symbols(child));
-    }
-    result
-}
-
-/// Find a function node at a given line
-pub(crate) fn find_function_node(
-    tree: &tree_sitter::Tree,
-    target_line: usize,
-) -> Option<tree_sitter::Node<'_>> {
-    let root = tree.root_node();
-    let mut cursor = root.walk();
-    find_node_at_line_recursive(&mut cursor, target_line)
-}
-
-fn find_node_at_line_recursive<'a>(
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-    target_line: usize,
-) -> Option<tree_sitter::Node<'a>> {
-    loop {
-        let node = cursor.node();
-        let start = node.start_position().row + 1;
-
-        if start == target_line {
-            let kind = node.kind();
-            if kind.contains("function")
-                || kind.contains("method")
-                || kind == "function_definition"
-                || kind == "method_definition"
-                || kind == "function_item"
-                || kind == "function_declaration"
-                || kind == "arrow_function"
-                || kind == "generator_function"
-            {
-                return Some(node);
-            }
-        }
-
-        if cursor.goto_first_child() {
-            if let Some(found) = find_node_at_line_recursive(cursor, target_line) {
-                return Some(found);
-            }
-            cursor.goto_parent();
-        }
-
-        if !cursor.goto_next_sibling() {
-            break;
-        }
-    }
-    None
-}
-
-/// Compute a normalized AST hash for duplicate function detection.
-fn compute_function_hash(
-    node: &tree_sitter::Node,
-    content: &[u8],
-    elide_identifiers: bool,
-    elide_literals: bool,
-) -> u64 {
-    use std::collections::hash_map::DefaultHasher;
-    let mut hasher = DefaultHasher::new();
-    hash_node_recursive(
-        node,
-        content,
-        &mut hasher,
-        elide_identifiers,
-        elide_literals,
-    );
-    hasher.finish()
-}
-
-/// Recursively hash a node and its children.
-fn hash_node_recursive(
-    node: &tree_sitter::Node,
-    content: &[u8],
-    hasher: &mut impl Hasher,
-    elide_identifiers: bool,
-    elide_literals: bool,
-) {
-    let kind = node.kind();
-
-    // Hash the node kind (structure)
-    kind.hash(hasher);
-
-    // For leaf nodes, decide whether to hash content
-    if node.child_count() == 0 {
-        let should_hash = if is_identifier_kind(kind) {
-            !elide_identifiers
-        } else if is_literal_kind(kind) {
-            !elide_literals
-        } else {
-            // Operators, keywords - their kind is sufficient
-            false
-        };
-
-        if should_hash {
-            let text = &content[node.start_byte()..node.end_byte()];
-            text.hash(hasher);
-        }
-    }
-
-    // Recurse into children
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        hash_node_recursive(&child, content, hasher, elide_identifiers, elide_literals);
-    }
-}
-
-/// Check if a node kind represents an identifier.
-fn is_identifier_kind(kind: &str) -> bool {
-    kind == "identifier"
-        || kind == "field_identifier"
-        || kind == "type_identifier"
-        || kind == "property_identifier"
-        || kind.ends_with("_identifier")
-}
-
-/// Check if a node kind represents a literal value.
-fn is_literal_kind(kind: &str) -> bool {
-    kind.contains("string")
-        || kind.contains("integer")
-        || kind.contains("float")
-        || kind.contains("number")
-        || kind.contains("boolean")
-        || kind == "true"
-        || kind == "false"
-        || kind == "nil"
-        || kind == "null"
-        || kind == "none"
-}
-
 // ── Duplicate block detection (subtree-level) ─────────────────────────────────
 
 /// A location of a duplicate block instance
@@ -1355,11 +1221,6 @@ pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
 
 // ── Fuzzy / partial clone detection (MinHash LSH) ─────────────────────────────
 
-pub(crate) const MINHASH_N: usize = 128;
-pub(crate) const SHINGLE_K: usize = 3;
-pub(crate) const LSH_BANDS: usize = 32; // 32 bands × 4 rows → good recall at ≥0.7 similarity
-pub(crate) const LSH_ROWS: usize = 4; // MINHASH_N / LSH_BANDS
-
 /// A pair of similar (but not necessarily identical) blocks.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct SimilarBlockPair {
@@ -1444,131 +1305,6 @@ impl OutputFormatter for SimilarBlocksReport {
 
         lines.join("\n")
     }
-}
-
-/// Serialize an AST subtree to a flat token sequence for shingling.
-/// Returns true for node kinds that represent a block/body — used by skeleton
-/// mode to replace the entire subtree with a `<body>` placeholder token.
-fn is_body_kind(kind: &str) -> bool {
-    // Exact matches for common block/body node names across languages.
-    matches!(
-        kind,
-        "block"                  // Rust, Go, many others
-        | "body"                 // Python, Kotlin
-        | "statement_block"      // JavaScript, TypeScript
-        | "compound_statement"   // C, C++, Bash
-        | "declaration_list"     // C/C++ struct/union body
-        | "field_declaration_list" // Rust struct body
-        | "enum_body"            // Java, Kotlin
-        | "class_body"           // Java, Kotlin, TypeScript
-        | "interface_body"       // Java
-        | "object_body"          // Kotlin
-        | "do_block"             // Ruby
-        | "begin_block"          // Ruby
-        | "block_body" // generic
-    ) || kind.ends_with("_body")
-        || kind.ends_with("_block")
-        || kind.ends_with("_list") && kind.contains("statement")
-}
-
-/// Hash token for skeleton body placeholder — a fixed sentinel value.
-const BODY_PLACEHOLDER: u64 = 0xb0d7_b0d7_b0d7_b0d7;
-
-fn serialize_subtree_tokens(
-    node: &tree_sitter::Node,
-    content: &[u8],
-    elide_identifiers: bool,
-    elide_literals: bool,
-    skeleton: bool,
-    out: &mut Vec<u64>,
-) {
-    use std::collections::hash_map::DefaultHasher;
-    let kind = node.kind();
-
-    // In skeleton mode, replace body/block subtrees with a fixed placeholder.
-    if skeleton && node.child_count() > 0 && is_body_kind(kind) {
-        out.push(BODY_PLACEHOLDER);
-        return;
-    }
-
-    let mut h = DefaultHasher::new();
-    kind.hash(&mut h);
-
-    if node.child_count() == 0 {
-        let should_include = if is_identifier_kind(kind) {
-            !elide_identifiers
-        } else if is_literal_kind(kind) {
-            !elide_literals
-        } else {
-            false
-        };
-        if should_include {
-            let text = &content[node.start_byte()..node.end_byte()];
-            text.hash(&mut h);
-        }
-    }
-    out.push(h.finish());
-
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        serialize_subtree_tokens(
-            &child,
-            content,
-            elide_identifiers,
-            elide_literals,
-            skeleton,
-            out,
-        );
-    }
-}
-
-/// Simple universal hash for MinHash: mixes x with a per-function seed.
-#[inline]
-pub(crate) fn minhash_hash(x: u64, seed: u64) -> u64 {
-    let a = 6364136223846793005u64.wrapping_add(seed.wrapping_mul(2654435761));
-    let b = 1442695040888963407u64.wrapping_add(seed.wrapping_mul(1013904223));
-    a.wrapping_mul(x).wrapping_add(b)
-}
-
-/// Compute a MinHash signature over k-shingles of the token sequence.
-pub(crate) fn compute_minhash(tokens: &[u64]) -> [u64; MINHASH_N] {
-    let mut sig = [u64::MAX; MINHASH_N];
-    if tokens.len() < SHINGLE_K {
-        return sig;
-    }
-    for window in tokens.windows(SHINGLE_K) {
-        // Hash the shingle into a single u64.
-        use std::collections::hash_map::DefaultHasher;
-        let mut h = DefaultHasher::new();
-        window.hash(&mut h);
-        let shingle_hash = h.finish();
-
-        for (i, slot) in sig.iter_mut().enumerate() {
-            let v = minhash_hash(shingle_hash, i as u64);
-            if v < *slot {
-                *slot = v;
-            }
-        }
-    }
-    sig
-}
-
-/// Estimate Jaccard similarity from two MinHash signatures.
-pub(crate) fn jaccard_estimate(a: &[u64; MINHASH_N], b: &[u64; MINHASH_N]) -> f64 {
-    let matches = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
-    matches as f64 / MINHASH_N as f64
-}
-
-/// Hash one LSH band of a signature.
-pub(crate) fn lsh_band_hash(sig: &[u64; MINHASH_N], band: usize) -> u64 {
-    use std::collections::hash_map::DefaultHasher;
-    let start = band * LSH_ROWS;
-    let mut h = DefaultHasher::new();
-    band.hash(&mut h);
-    for v in &sig[start..start + LSH_ROWS] {
-        v.hash(&mut h);
-    }
-    h.finish()
 }
 
 /// Collect all subtrees above min_lines, returning (location, minhash signature).

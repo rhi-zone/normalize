@@ -1,0 +1,12 @@
+[package]
+name = "normalize-code-similarity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Code similarity algorithms: MinHash LSH, normalized AST hashing, structural tokenization"
+
+[dependencies]
+tree-sitter = "0.26"
+streaming-iterator = "0.1"
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
