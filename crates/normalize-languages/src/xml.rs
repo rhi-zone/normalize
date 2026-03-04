@@ -23,15 +23,6 @@ impl Language for Xml {
         false
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["element"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }

@@ -321,30 +321,14 @@ impl LengthAnalyzer {
 
         let loader = parsers::grammar_loader();
 
-        // Prefer tags-based path when a tags query is available.
-        let tags_result = loader
+        loader
             .get_tags(grammar_name)
             .zip(loader.get(grammar_name))
             .and_then(|(tags_scm, ts_lang)| tree_sitter::Query::new(&ts_lang, &tags_scm).ok())
             .map(|tags_query| {
                 Self::collect_functions_from_tags(&tree, &tags_query, content, support)
-            });
-        if let Some(result) = tags_result
-            && !result.is_empty()
-        {
-            return result;
-        }
-
-        // Fall back to trait-based walker when function_kinds() is non-empty.
-        if support.function_kinds().is_empty() {
-            return Vec::new();
-        }
-
-        let mut functions = Vec::new();
-        let root = tree.root_node();
-        let mut cursor = root.walk();
-        Self::collect_functions(&mut cursor, content, support, &mut functions, None);
-        functions
+            })
+            .unwrap_or_default()
     }
 
     /// Collect function lengths using a tags query.
@@ -458,49 +442,6 @@ impl LengthAnalyzer {
         }
 
         functions
-    }
-
-    fn collect_functions(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        support: &dyn Language,
-        functions: &mut Vec<FunctionLength>,
-        parent: Option<&str>,
-    ) {
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-            // Check if this is a function
-            if support.function_kinds().contains(&kind)
-                && let Some(name) = support.node_name(&node, content)
-            {
-                let start_line = node.start_position().row + 1;
-                let end_line = node.end_position().row + 1;
-                let lines = end_line.saturating_sub(start_line) + 1;
-                functions.push(FunctionLength {
-                    name: name.to_string(),
-                    lines,
-                    start_line,
-                    end_line,
-                    parent: parent.map(String::from),
-                    file_path: None,
-                });
-            }
-            // Check for container (class, impl, module) holding methods
-            let new_parent = if support.container_kinds().contains(&kind) {
-                support.node_name(&node, content).map(|s| s.to_string())
-            } else {
-                parent.map(String::from)
-            };
-            // Recurse into children
-            if cursor.goto_first_child() {
-                Self::collect_functions(cursor, content, support, functions, new_parent.as_deref());
-                cursor.goto_parent();
-            }
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
     }
 }
 impl Default for LengthAnalyzer {

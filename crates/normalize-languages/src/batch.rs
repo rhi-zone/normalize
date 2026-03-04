@@ -23,18 +23,6 @@ impl Language for Batch {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "variable_declaration"]
     }

@@ -5,23 +5,16 @@
 //!
 //! ## Extraction paths
 //!
-//! There are two extraction paths, selected automatically:
+//! Symbol extraction uses the tags path: a `*.tags.scm` query is run against the
+//! tree-sitter parse tree. The query groups `@definition.*` + `@name` captures per
+//! match, reconstructs nesting by line-range containment, and returns a `Vec<Symbol>`.
 //!
-//! 1. **Tags path** (`collect_symbols_from_tags`): Used when a `*.tags.scm` query is
-//!    available for the language (currently 11 languages). Runs the tags query, groups
-//!    `@definition.*` + `@name` captures per match, reconstructs nesting by line-range
-//!    containment, and returns a `Vec<Symbol>`.
-//!
-//! 2. **Trait path** (`collect_symbols`): Fallback for all other languages. Uses
-//!    `Language` trait methods (`function_kinds`, `container_kinds`, `type_kinds`) to
-//!    classify nodes and recurse the AST.
-//!
-//! Both paths feed the same post-processing steps (Rust impl-block merging,
+//! After extraction, post-processing steps apply (Rust impl-block merging,
 //! TypeScript/JavaScript interface marking).
 
 use crate::parsers;
 use normalize_facts_core::SymbolKind;
-use normalize_languages::{Language, Symbol, Visibility, support_for_grammar, support_for_path};
+use normalize_languages::{Language, Symbol, Visibility, support_for_path};
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
 use tree_sitter;
@@ -297,13 +290,11 @@ impl Extractor {
             None => return Vec::new(),
         };
 
-        // Try the tags-based extraction path first.
-        // If a tags query is available and produces results, use them.
-        // Otherwise fall back to the trait-method path.
+        // Use the tags-based extraction path.
         let loader = parsers::grammar_loader();
         let mut symbols = if let Some(tags_query_str) = loader.get_tags(grammar_name) {
             let grammar_lang = loader.get(grammar_name);
-            let tags_result = grammar_lang
+            grammar_lang
                 .and_then(|lang| tree_sitter::Query::new(&lang, &tags_query_str).ok())
                 .and_then(|query| {
                     collect_symbols_from_tags(
@@ -313,25 +304,10 @@ impl Extractor {
                         support,
                         self.options.include_private,
                     )
-                });
-            match tags_result {
-                Some(syms) => syms,
-                None => {
-                    // Tags path produced nothing; fall back to trait path
-                    let mut syms = Vec::new();
-                    let root = tree.root_node();
-                    let mut cursor = root.walk();
-                    self.collect_symbols(&mut cursor, content, support, &mut syms, false);
-                    syms
-                }
-            }
+                })
+                .unwrap_or_default()
         } else {
-            // No tags query; use the trait-method path
-            let mut syms = Vec::new();
-            let root = tree.root_node();
-            let mut cursor = root.walk();
-            self.collect_symbols(&mut cursor, content, support, &mut syms, false);
-            syms
+            Vec::new()
         };
 
         // Post-process for Rust: merge impl blocks with their types
@@ -345,112 +321,6 @@ impl Extractor {
         }
 
         symbols
-    }
-
-    fn collect_symbols(
-        &self,
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        support: &dyn Language,
-        symbols: &mut Vec<Symbol>,
-        in_container: bool,
-    ) {
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-
-            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
-            if let Some(embedded) = support.embedded_content(&node, content)
-                && let Some(sub_lang) = support_for_grammar(embedded.grammar)
-                && let Some(sub_tree) =
-                    parsers::parse_with_grammar(embedded.grammar, &embedded.content)
-            {
-                let mut sub_symbols = Vec::new();
-                let sub_root = sub_tree.root_node();
-                let mut sub_cursor = sub_root.walk();
-                self.collect_symbols(
-                    &mut sub_cursor,
-                    &embedded.content,
-                    sub_lang,
-                    &mut sub_symbols,
-                    false,
-                );
-
-                // Adjust line numbers for embedded content offset
-                for mut sym in sub_symbols {
-                    adjust_lines(&mut sym, embedded.start_line - 1);
-                    symbols.push(sym);
-                }
-                // Don't descend into embedded nodes - we've already processed them
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-
-            // Check if this is a function
-            if support.function_kinds().contains(&kind) {
-                if let Some(sym) = support.extract_function(&node, content, in_container)
-                    && self.should_include(&sym)
-                {
-                    symbols.push(sym);
-                }
-            }
-            // Check if this is a container (class, impl, module)
-            else if support.container_kinds().contains(&kind) {
-                if let Some(mut sym) = support.extract_container(&node, content)
-                    && self.should_include(&sym)
-                {
-                    // Recurse into container body
-                    if let Some(body) = support.container_body(&node) {
-                        let mut body_cursor = body.walk();
-                        if body_cursor.goto_first_child() {
-                            self.collect_symbols(
-                                &mut body_cursor,
-                                content,
-                                support,
-                                &mut sym.children,
-                                true,
-                            );
-                        }
-                    }
-
-                    // Propagate is_interface_impl to all children
-                    if sym.is_interface_impl {
-                        propagate_interface_impl(&mut sym.children);
-                    }
-
-                    symbols.push(sym);
-                }
-                // Don't descend further after processing container
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-            // Check if this is a standalone type (struct, enum, etc.)
-            else if support.type_kinds().contains(&kind)
-                && !support.container_kinds().contains(&kind)
-                && let Some(sym) = support.extract_type(&node, content)
-                && self.should_include(&sym)
-            {
-                symbols.push(sym);
-            }
-
-            // Descend into children for other nodes
-            if cursor.goto_first_child() {
-                self.collect_symbols(cursor, content, support, symbols, in_container);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    fn should_include(&self, sym: &Symbol) -> bool {
-        self.options.include_private || matches!(sym.visibility, Visibility::Public)
     }
 
     /// Merge Rust impl blocks with their corresponding struct/enum types
@@ -628,23 +498,6 @@ impl Extractor {
             current_file,
             &mut cross_file_cache,
         );
-    }
-}
-
-/// Recursively mark all children as interface implementations.
-fn propagate_interface_impl(symbols: &mut [Symbol]) {
-    for sym in symbols {
-        sym.is_interface_impl = true;
-        propagate_interface_impl(&mut sym.children);
-    }
-}
-
-/// Recursively adjust line numbers for symbols (used for embedded content).
-fn adjust_lines(sym: &mut Symbol, offset: usize) {
-    sym.start_line += offset;
-    sym.end_line += offset;
-    for child in &mut sym.children {
-        adjust_lines(child, offset);
     }
 }
 

@@ -397,15 +397,6 @@ pub fn validate_unused_kinds_audit(
 
     // Collect all kinds used by Language trait methods
     let mut used_kinds: HashSet<&str> = HashSet::new();
-    for kind in lang.container_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.function_kinds() {
-        used_kinds.insert(kind);
-    }
-    for kind in lang.type_kinds() {
-        used_kinds.insert(kind);
-    }
     for kind in lang.public_symbol_kinds() {
         used_kinds.insert(kind);
     }
@@ -544,12 +535,8 @@ mod tests {
             };
 
             // Collect all node kinds from trait methods
-            let all_kinds: Vec<(&str, &[&str])> = vec![
-                ("container_kinds", lang.container_kinds()),
-                ("function_kinds", lang.function_kinds()),
-                ("type_kinds", lang.type_kinds()),
-                ("public_symbol_kinds", lang.public_symbol_kinds()),
-            ];
+            let all_kinds: Vec<(&str, &[&str])> =
+                vec![("public_symbol_kinds", lang.public_symbol_kinds())];
 
             for (method, kinds) in all_kinds {
                 for kind in kinds {
@@ -642,15 +629,6 @@ mod tests {
 
             // Collect all kinds currently used by the language
             let mut used_kinds: HashSet<&str> = HashSet::new();
-            for kind in lang.container_kinds() {
-                used_kinds.insert(kind);
-            }
-            for kind in lang.function_kinds() {
-                used_kinds.insert(kind);
-            }
-            for kind in lang.type_kinds() {
-                used_kinds.insert(kind);
-            }
             for kind in lang.public_symbol_kinds() {
                 used_kinds.insert(kind);
             }

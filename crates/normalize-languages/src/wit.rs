@@ -23,18 +23,6 @@ impl Language for Wit {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["interface_item", "world_item"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["func_item"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_item", "record_item"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["interface_item", "world_item", "func_item"]
     }

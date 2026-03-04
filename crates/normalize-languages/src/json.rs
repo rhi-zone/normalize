@@ -25,15 +25,6 @@ impl Language for Json {
 
     // JSON is data, not code - no functions/types/control flow
     // "pair" nodes are key-value pairs that we extract as symbols
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["pair"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }

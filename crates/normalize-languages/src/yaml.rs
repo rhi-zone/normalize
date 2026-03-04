@@ -24,15 +24,6 @@ impl Language for Yaml {
     }
 
     // YAML is data, not code - no functions/types/control flow
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["block_mapping", "flow_mapping"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }

@@ -846,10 +846,8 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
             .filter(|f| f.kind == "file")
             .filter_map(|f| normalize_languages::support_for_path(std::path::Path::new(&f.path)))
             .filter(|lang| {
-                // Language has extractable functions when either:
-                // - it has explicit function_kinds() (trait path), or
-                // - it has a tags.scm that includes definition.function/method captures
-                !lang.function_kinds().is_empty() || loader.get_tags(lang.grammar_name()).is_some()
+                // Language has extractable functions when a tags.scm is available.
+                loader.get_tags(lang.grammar_name()).is_some()
             })
             .filter(|lang| parser_for(lang.grammar_name()).is_none())
             .filter(|lang| seen.insert(lang.grammar_name()))

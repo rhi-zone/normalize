@@ -24,18 +24,8 @@ impl Language for Dockerfile {
     }
 
     // Dockerfiles have stages (FROM ... AS name) that act as containers
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["from_instruction"]
-    }
 
     // No functions in Dockerfile
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["from_instruction"]

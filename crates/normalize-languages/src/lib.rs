@@ -26,7 +26,7 @@
 //! let python_grammar = loader.get("python").expect("grammar not found");
 //!
 //! // Static usage (compile-time known language):
-//! println!("Python function kinds: {:?}", Python.function_kinds());
+//! println!("Python name: {}", Python.name());
 //!
 //! // Dynamic lookup (from file path):
 //! if let Some(support) = support_for_path(Path::new("foo.py")) {

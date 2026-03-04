@@ -25,15 +25,6 @@ impl Language for Markdown {
 
     // Markdown sections are modeled as `section` nodes in the grammar,
     // each containing an atx_heading as the first child followed by content blocks.
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["section"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }

@@ -22,15 +22,6 @@ impl Language for Css {
     }
 
     // CSS has no functions/containers/types in the traditional sense
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }

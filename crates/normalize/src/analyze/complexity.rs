@@ -370,11 +370,10 @@ impl ComplexityAnalyzer {
         }
     }
 
-    /// Analyze using the Language trait, with tags.scm as the preferred path.
+    /// Analyze using the Language trait with tags.scm.
     ///
-    /// When a tags query is available, uses it to identify function/method nodes
-    /// and compute per-function complexity (via `.complexity.scm` when present).
-    /// Falls back to the trait-based walker when `function_kinds()` is non-empty.
+    /// Uses the tags query to identify function/method nodes and compute
+    /// per-function complexity (via `.complexity.scm` when present).
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionComplexity> {
         let grammar_name = support.grammar_name();
         let tree = match parsers::parse_with_grammar(grammar_name, content) {
@@ -384,8 +383,7 @@ impl ComplexityAnalyzer {
 
         let loader = parsers::grammar_loader();
 
-        // Try tags-based path first (preferred when a tags query is available).
-        let tags_result = loader
+        loader
             .get_tags(grammar_name)
             .zip(loader.get(grammar_name))
             .and_then(|(tags_scm, ts_lang)| tree_sitter::Query::new(&ts_lang, &tags_scm).ok())
@@ -398,35 +396,8 @@ impl ComplexityAnalyzer {
                     loader.as_ref(),
                     grammar_name,
                 )
-            });
-        if let Some(result) = tags_result
-            && !result.is_empty()
-        {
-            return result;
-        }
-
-        // Fall back to trait-based walker when function_kinds() is non-empty.
-        if support.function_kinds().is_empty() {
-            return Vec::new();
-        }
-
-        let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
-            let grammar = loader.get(grammar_name)?;
-            tree_sitter::Query::new(&grammar, &scm).ok()
-        });
-
-        let mut functions = Vec::new();
-        let root = tree.root_node();
-        let mut cursor = root.walk();
-        self.collect_functions_with_trait(
-            &mut cursor,
-            content,
-            support,
-            &mut functions,
-            None,
-            complexity_query.as_ref(),
-        );
-        functions
+            })
+            .unwrap_or_default()
     }
 
     /// Collect function complexity data using a tags query.
@@ -557,80 +528,6 @@ impl ComplexityAnalyzer {
         }
 
         functions
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn collect_functions_with_trait(
-        &self,
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        support: &dyn Language,
-        functions: &mut Vec<FunctionComplexity>,
-        parent: Option<&str>,
-        complexity_query: Option<&tree_sitter::Query>,
-    ) {
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-
-            // Check if this is a function
-            if support.function_kinds().contains(&kind) {
-                if let Some(name) = support.node_name(&node, content) {
-                    let complexity = if let Some(query) = complexity_query {
-                        self.count_complexity_with_query(&node, query, content)
-                    } else {
-                        1
-                    };
-
-                    functions.push(FunctionComplexity {
-                        name: name.to_string(),
-                        complexity,
-                        start_line: node.start_position().row + 1,
-                        end_line: node.end_position().row + 1,
-                        parent: parent.map(String::from),
-                        file_path: None,
-                    });
-                }
-            }
-            // Check if this is a container (class, impl, module)
-            else if support.container_kinds().contains(&kind)
-                && let Some(name) = support.node_name(&node, content)
-            {
-                // Recurse into container with the container name as parent
-                if cursor.goto_first_child() {
-                    self.collect_functions_with_trait(
-                        cursor,
-                        content,
-                        support,
-                        functions,
-                        Some(name),
-                        complexity_query,
-                    );
-                    cursor.goto_parent();
-                }
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-
-            // Recurse into other nodes
-            if !support.container_kinds().contains(&kind) && cursor.goto_first_child() {
-                self.collect_functions_with_trait(
-                    cursor,
-                    content,
-                    support,
-                    functions,
-                    parent,
-                    complexity_query,
-                );
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
     }
 
     /// Count complexity using a tree-sitter query with `@complexity` captures.

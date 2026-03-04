@@ -23,17 +23,6 @@ impl Language for Caddy {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["site_block", "directive_block"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["site_block"]
     }

@@ -23,18 +23,6 @@ impl Language for Capnp {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["struct", "interface", "enum"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["method"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct", "interface", "enum"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["struct", "interface", "enum"]
     }

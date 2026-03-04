@@ -23,18 +23,6 @@ impl Language for Thrift {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["struct_definition", "service_definition", "enum_definition"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_definition", "enum_definition", "typedef_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["struct_definition", "service_definition", "enum_definition"]
     }

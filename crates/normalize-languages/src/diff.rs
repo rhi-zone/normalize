@@ -23,16 +23,6 @@ impl Language for Diff {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["file_change"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["file_change"]
     }

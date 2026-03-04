@@ -281,14 +281,8 @@ impl Editor {
         let support = support_for_path(path)?;
         let grammar = support.grammar_name();
         let tree = parse_with_grammar(grammar, content)?;
-        let root = tree.root_node();
 
-        // If the language has container_kinds(), use the trait-based search.
-        if !support.container_kinds().is_empty() {
-            return find_container_body_in_node(root, content, name, support);
-        }
-
-        // Fallback: use the tags query to locate container nodes by name.
+        // Use the tags query to locate container nodes by name.
         let loader = grammar_loader();
         let tags_scm = loader.get_tags(grammar)?;
         let ts_lang = loader.get(grammar)?;
@@ -484,43 +478,6 @@ fn replace_all_words(text: &str, old: &str, new_word: &str) -> String {
         }
     }
     result
-}
-
-fn find_container_body_in_node(
-    node: tree_sitter::Node,
-    content: &str,
-    name: &str,
-    support: &dyn Language,
-) -> Option<ContainerBody> {
-    let kind = node.kind();
-
-    if support.container_kinds().contains(&kind)
-        && let Some(container_name) = support.node_name(&node, content)
-        && container_name == name
-        && let Some(body_node) = support.container_body(&node)
-    {
-        let start_byte = node.start_byte();
-        let line_start = content[..start_byte]
-            .rfind('\n')
-            .map(|i| i + 1)
-            .unwrap_or(0);
-        let container_indent: String = content[line_start..start_byte]
-            .chars()
-            .take_while(|c| c.is_whitespace())
-            .collect();
-        let inner_indent = format!("{}    ", container_indent);
-
-        return support.analyze_container_body(&body_node, content, &inner_indent);
-    }
-
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if let Some(body) = find_container_body_in_node(child, content, name, support) {
-            return Some(body);
-        }
-    }
-
-    None
 }
 
 /// Find a container body using a tags query.

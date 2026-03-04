@@ -23,18 +23,6 @@ impl Language for Ron {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["struct", "map"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["struct", "struct_entry"]
     }

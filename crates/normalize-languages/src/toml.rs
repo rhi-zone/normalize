@@ -24,15 +24,6 @@ impl Language for Toml {
     }
 
     // TOML is config, not code - no functions/types/control flow
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["table", "table_array_element"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }

@@ -101,31 +101,6 @@ pub trait Language: Send + Sync {
     fn has_symbols(&self) -> bool;
 
     // === Node Classification ===
-    //
-    // The four kind-list methods below default to `&[]`.
-    // They are only needed for languages that lack a `*.tags.scm` file.
-    // When a tags query is present, extraction, complexity, and length analysis
-    // use that query instead of these lists. The defaults allow the trait to be
-    // implemented without these methods for tags-equipped languages, and they
-    // will be removed from the trait entirely once all languages have tags.scm.
-
-    /// Container nodes that can hold methods (class, impl, module).
-    /// Defaults to `&[]`; override only when no tags.scm covers this language.
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    /// Function/method definition nodes.
-    /// Defaults to `&[]`; override only when no tags.scm covers this language.
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    /// Type definition nodes (struct, enum, interface, type alias).
-    /// Defaults to `&[]`; override only when no tags.scm covers this language.
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
 
     /// AST node kinds that may contain publicly visible symbols.
     /// For JS/TS: export_statement nodes.
