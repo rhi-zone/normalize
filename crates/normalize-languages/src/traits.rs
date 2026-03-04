@@ -139,7 +139,13 @@ pub trait Language: Send + Sync {
 
     // === Visibility ===
 
-    /// Get visibility of a node
+    /// Get visibility of a node.
+    ///
+    /// This is a genuine interface method (not just an impl helper): `normalize-deps`
+    /// calls it externally during export detection to decide which tagged nodes are
+    /// public. The alternative — calling `extract_function/container/type()` and
+    /// inspecting `symbol.visibility` — would be correct but unnecessarily heavy
+    /// (computes signature, docstring, etc. just to check one field).
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility;
 
     /// Check if a symbol is a test (for filtering).
