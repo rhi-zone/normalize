@@ -457,7 +457,7 @@ fn bundled_types_query(name: &str) -> Option<&'static str> {
         "cpp" => Some(include_str!("queries/cpp.types.scm")),
         "kotlin" => Some(include_str!("queries/kotlin.types.scm")),
         "swift" => Some(include_str!("queries/swift.types.scm")),
-        "c_sharp" => Some(include_str!("queries/c_sharp.types.scm")),
+        "c-sharp" => Some(include_str!("queries/c-sharp.types.scm")),
         "scala" => Some(include_str!("queries/scala.types.scm")),
         "haskell" => Some(include_str!("queries/haskell.types.scm")),
         "ruby" => Some(include_str!("queries/ruby.types.scm")),
@@ -529,7 +529,7 @@ fn bundled_complexity_query(name: &str) -> Option<&'static str> {
         "ruby" => Some(include_str!("queries/ruby.complexity.scm")),
         "kotlin" => Some(include_str!("queries/kotlin.complexity.scm")),
         "swift" => Some(include_str!("queries/swift.complexity.scm")),
-        "c_sharp" => Some(include_str!("queries/c_sharp.complexity.scm")),
+        "c-sharp" => Some(include_str!("queries/c-sharp.complexity.scm")),
         "bash" => Some(include_str!("queries/bash.complexity.scm")),
         "lua" => Some(include_str!("queries/lua.complexity.scm")),
         "elixir" => Some(include_str!("queries/elixir.complexity.scm")),
@@ -585,7 +585,7 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "ruby" => Some(include_str!("queries/ruby.calls.scm")),
         "kotlin" => Some(include_str!("queries/kotlin.calls.scm")),
         "swift" => Some(include_str!("queries/swift.calls.scm")),
-        "c_sharp" => Some(include_str!("queries/c_sharp.calls.scm")),
+        "c-sharp" => Some(include_str!("queries/c-sharp.calls.scm")),
         "bash" => Some(include_str!("queries/bash.calls.scm")),
         "scala" => Some(include_str!("queries/scala.calls.scm")),
         "elixir" => Some(include_str!("queries/elixir.calls.scm")),
@@ -699,7 +699,7 @@ mod tests {
             "cpp",
             "kotlin",
             "swift",
-            "c_sharp",
+            "c-sharp",
             "scala",
             "haskell",
             "ruby",
@@ -741,7 +741,7 @@ mod tests {
             "ruby",
             "kotlin",
             "swift",
-            "c_sharp",
+            "c-sharp",
             "bash",
             "lua",
             "elixir",
@@ -806,7 +806,7 @@ mod tests {
             "ruby",
             "kotlin",
             "swift",
-            "c_sharp",
+            "c-sharp",
             "bash",
             "scala",
             "elixir",
@@ -921,7 +921,7 @@ mod tests {
         assert!(loader.get_types("cpp").is_some());
         assert!(loader.get_types("kotlin").is_some());
         assert!(loader.get_types("swift").is_some());
-        assert!(loader.get_types("c_sharp").is_some());
+        assert!(loader.get_types("c-sharp").is_some());
         assert!(loader.get_types("unknown-lang-xyz").is_none());
     }
 
@@ -936,7 +936,7 @@ mod tests {
         assert!(loader.get_calls("ruby").is_some());
         assert!(loader.get_calls("kotlin").is_some());
         assert!(loader.get_calls("swift").is_some());
-        assert!(loader.get_calls("c_sharp").is_some());
+        assert!(loader.get_calls("c-sharp").is_some());
         assert!(loader.get_calls("bash").is_some());
         assert!(loader.get_calls("unknown-lang-xyz").is_none());
     }
