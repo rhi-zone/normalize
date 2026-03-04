@@ -2,8 +2,9 @@
 //!
 //! Racket package info files use `#lang info` followed by `define` expressions.
 //! We heuristically extract `collection`/`name`, `version`, `deps`, and
-//! `build-deps` without executing Racket.
+//! `build-deps` without executing Racket, using the shared [`crate::sexpr`] parser.
 
+use crate::sexpr::{Sexp, kw_arg};
 use crate::{DeclaredDep, DepKind, ManifestError, ManifestParser, ParsedManifest};
 
 /// Parser for `info.rkt` files.
@@ -19,16 +20,9 @@ impl ManifestParser for RacketInfoParser {
         let mut version: Option<String> = None;
         let mut deps: Vec<DeclaredDep> = Vec::new();
 
-        // Tokenise the whole file using a minimal S-expression tokeniser.
-        // info.rkt is a subset of Racket — each `(define ...)` is a top-level form.
-        let tokens: Vec<RktToken> = tokenise_rkt(content);
-
-        for token in &tokens {
-            if let RktToken::List(children) = token
-                && let Some(RktToken::Atom(head)) = children.first()
-                && head == "define"
-            {
-                parse_define(children, &mut name, &mut version, &mut deps);
+        for token in &Sexp::parse(content) {
+            if let Some(items) = token.tagged_list("define") {
+                parse_define(items, &mut name, &mut version, &mut deps);
             }
         }
 
@@ -42,64 +36,62 @@ impl ManifestParser for RacketInfoParser {
 }
 
 fn parse_define(
-    children: &[RktToken],
+    items: &[Sexp],
     name: &mut Option<String>,
     version: &mut Option<String>,
     deps: &mut Vec<DeclaredDep>,
 ) {
-    let key = match children.get(1) {
-        Some(RktToken::Atom(k)) => k.as_str(),
+    let key = match items.first() {
+        Some(Sexp::Atom(k)) => k.as_str(),
         _ => return,
     };
 
     match key {
         "collection" | "name" => {
             if name.is_none()
-                && let Some(val) = get_string_value(&children[2..])
+                && let Some(val) = first_text_value(&items[1..])
             {
                 *name = Some(val);
             }
         }
         "version" => {
             if version.is_none()
-                && let Some(val) = get_string_value(&children[2..])
+                && let Some(val) = first_text_value(&items[1..])
             {
                 *version = Some(val);
             }
         }
         "deps" => {
-            collect_dep_list(&children[2..], DepKind::Normal, deps);
+            collect_dep_list(&items[1..], DepKind::Normal, deps);
         }
         "build-deps" => {
-            collect_dep_list(&children[2..], DepKind::Dev, deps);
+            collect_dep_list(&items[1..], DepKind::Dev, deps);
         }
         _ => {}
     }
 }
 
-/// Get the first string literal from a token slice.
-fn get_string_value(tokens: &[RktToken]) -> Option<String> {
+/// Return the first string or atom value from a token slice.
+fn first_text_value(tokens: &[Sexp]) -> Option<String> {
     for tok in tokens {
-        match tok {
-            RktToken::Atom(s) => return Some(strip_string(s)),
-            RktToken::List(_) => {}
+        if let Some(s) = tok.as_text() {
+            return Some(s.to_string());
         }
     }
     None
 }
 
 /// Collect deps from the quoted list that follows `(define deps '(...))`.
-/// The quote `'` is absorbed by the tokeniser as a `(quote inner-list)` wrapper.
-fn collect_dep_list(tokens: &[RktToken], kind: DepKind, deps: &mut Vec<DeclaredDep>) {
+/// The `'` is parsed as `(quote inner-list)` by the shared parser.
+fn collect_dep_list(tokens: &[Sexp], kind: DepKind, deps: &mut Vec<DeclaredDep>) {
     for tok in tokens {
         match tok {
-            RktToken::List(inner) => {
-                // `'(...)` becomes `(quote (...))` — unwrap the quote.
-                if let Some(RktToken::Atom(head)) = inner.first()
+            Sexp::List(inner) => {
+                // `'(...)` became `(quote (...))` — unwrap the quote.
+                if let Some(Sexp::Atom(head)) = inner.first()
                     && head == "quote"
                 {
-                    // The actual list is the second child.
-                    if let Some(RktToken::List(actual)) = inner.get(1) {
+                    if let Some(Sexp::List(actual)) = inner.get(1) {
                         collect_dep_list_items(actual, kind, deps);
                     }
                     continue;
@@ -107,12 +99,10 @@ fn collect_dep_list(tokens: &[RktToken], kind: DepKind, deps: &mut Vec<DeclaredD
                 // Otherwise treat it as the list of items directly.
                 collect_dep_list_items(inner, kind, deps);
             }
-            RktToken::Atom(s) => {
-                // Bare string atom at the top level after define.
-                let s = strip_string(s);
+            Sexp::Str(s) | Sexp::Atom(s) => {
                 if !s.is_empty() {
                     deps.push(DeclaredDep {
-                        name: s,
+                        name: s.clone(),
                         version_req: None,
                         kind,
                     });
@@ -122,28 +112,35 @@ fn collect_dep_list(tokens: &[RktToken], kind: DepKind, deps: &mut Vec<DeclaredD
     }
 }
 
-fn collect_dep_list_items(items: &[RktToken], kind: DepKind, deps: &mut Vec<DeclaredDep>) {
+fn collect_dep_list_items(items: &[Sexp], kind: DepKind, deps: &mut Vec<DeclaredDep>) {
     for item in items {
         match item {
-            RktToken::Atom(s) => {
-                // String literals are package names; skip bare symbols like "quote".
-                let s_inner = strip_string(s);
-                // Only accept values that were originally string literals (started with '"')
-                // or bare atoms that look like package names (not empty).
-                if !s_inner.is_empty() && (s.trim().starts_with('"') || !s_inner.contains('"')) {
+            Sexp::Str(s) => {
+                // String literals are package names.
+                if !s.is_empty() {
                     deps.push(DeclaredDep {
-                        name: s_inner,
+                        name: s.clone(),
                         version_req: None,
                         kind,
                     });
                 }
             }
-            RktToken::List(sub) => {
-                // Check for nested (quote ...) or `("pkg-name" #:version "1.0")`.
-                if let Some(RktToken::Atom(head)) = sub.first()
+            Sexp::Atom(s) => {
+                // Bare symbols are also package names; skip keywords.
+                if !s.is_empty() && !s.starts_with('#') && !s.starts_with(':') {
+                    deps.push(DeclaredDep {
+                        name: s.clone(),
+                        version_req: None,
+                        kind,
+                    });
+                }
+            }
+            Sexp::List(sub) => {
+                // Check for nested `(quote ...)`.
+                if let Some(Sexp::Atom(head)) = sub.first()
                     && head == "quote"
                 {
-                    if let Some(RktToken::List(actual)) = sub.get(1) {
+                    if let Some(Sexp::List(actual)) = sub.get(1) {
                         collect_dep_list_items(actual, kind, deps);
                     }
                     continue;
@@ -156,175 +153,22 @@ fn collect_dep_list_items(items: &[RktToken], kind: DepKind, deps: &mut Vec<Decl
     }
 }
 
-fn parse_versioned_dep(sub: &[RktToken], kind: DepKind) -> Option<DeclaredDep> {
+fn parse_versioned_dep(sub: &[Sexp], kind: DepKind) -> Option<DeclaredDep> {
     // Form: ("name" #:version "ver") or ("name" #:version "ver" ...)
-    let pkg_name = match sub.first() {
-        Some(RktToken::Atom(s)) => strip_string(s),
-        _ => return None,
-    };
+    let pkg_name = sub.first()?.as_text()?.to_string();
     if pkg_name.is_empty() {
         return None;
     }
 
-    // Look for #:version keyword.
-    let mut version_req: Option<String> = None;
-    let mut i = 1;
-    while i < sub.len() {
-        if let RktToken::Atom(kw) = &sub[i]
-            && kw == "#:version"
-        {
-            if let Some(RktToken::Atom(ver)) = sub.get(i + 1) {
-                version_req = Some(strip_string(ver));
-            }
-            break;
-        }
-        i += 1;
-    }
+    let version_req = kw_arg(sub, "#:version")
+        .and_then(|t| t.as_text())
+        .map(|s| s.to_string());
 
     Some(DeclaredDep {
         name: pkg_name,
         version_req,
         kind,
     })
-}
-
-fn strip_string(s: &str) -> String {
-    let s = s.trim();
-    if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
-        s[1..s.len() - 1].to_string()
-    } else {
-        s.to_string()
-    }
-}
-
-// ============================================================================
-// Minimal Racket tokeniser (handles strings, atoms, lists, quote)
-// ============================================================================
-
-#[derive(Debug, Clone)]
-enum RktToken {
-    Atom(String),
-    List(Vec<RktToken>),
-}
-
-fn tokenise_rkt(input: &str) -> Vec<RktToken> {
-    let chars: Vec<char> = input.chars().collect();
-    let mut pos = 0;
-    let mut out = Vec::new();
-    while pos < chars.len() {
-        if let Some(tok) = read_rkt_token(&chars, &mut pos) {
-            out.push(tok);
-        }
-    }
-    out
-}
-
-fn skip_rkt_whitespace_comments(chars: &[char], pos: &mut usize) {
-    while *pos < chars.len() {
-        match chars[*pos] {
-            ' ' | '\t' | '\n' | '\r' => *pos += 1,
-            ';' => {
-                while *pos < chars.len() && chars[*pos] != '\n' {
-                    *pos += 1;
-                }
-            }
-            '#' if *pos + 1 < chars.len() && chars[*pos + 1] == '|' => {
-                *pos += 2;
-                while *pos + 1 < chars.len() {
-                    if chars[*pos] == '|' && chars[*pos + 1] == '#' {
-                        *pos += 2;
-                        break;
-                    }
-                    *pos += 1;
-                }
-            }
-            '#' if *pos + 1 < chars.len() && chars[*pos + 1] == '!' => {
-                // Shebang or #lang line — skip to end of line.
-                while *pos < chars.len() && chars[*pos] != '\n' {
-                    *pos += 1;
-                }
-            }
-            _ => break,
-        }
-    }
-}
-
-fn read_rkt_token(chars: &[char], pos: &mut usize) -> Option<RktToken> {
-    skip_rkt_whitespace_comments(chars, pos);
-    if *pos >= chars.len() {
-        return None;
-    }
-
-    match chars[*pos] {
-        '(' | '[' => {
-            let close = if chars[*pos] == '(' { ')' } else { ']' };
-            *pos += 1;
-            let mut children = Vec::new();
-            loop {
-                skip_rkt_whitespace_comments(chars, pos);
-                if *pos >= chars.len() {
-                    break;
-                }
-                if chars[*pos] == close {
-                    *pos += 1;
-                    break;
-                }
-                if let Some(tok) = read_rkt_token(chars, pos) {
-                    children.push(tok);
-                }
-            }
-            Some(RktToken::List(children))
-        }
-        ')' | ']' => {
-            *pos += 1;
-            None
-        }
-        '"' => {
-            *pos += 1;
-            let mut s = String::from('"');
-            while *pos < chars.len() && chars[*pos] != '"' {
-                if chars[*pos] == '\\' {
-                    *pos += 1;
-                }
-                if *pos < chars.len() {
-                    s.push(chars[*pos]);
-                    *pos += 1;
-                }
-            }
-            s.push('"');
-            if *pos < chars.len() {
-                *pos += 1;
-            }
-            Some(RktToken::Atom(s))
-        }
-        '\'' => {
-            // Quote sugar: 'expr → wrap expr in a List.
-            *pos += 1;
-            read_rkt_token(chars, pos)
-                .map(|inner| RktToken::List(vec![RktToken::Atom("quote".to_string()), inner]))
-        }
-        '`' | ',' => {
-            *pos += 1;
-            read_rkt_token(chars, pos)
-        }
-        _ => {
-            let mut s = String::new();
-            while *pos < chars.len()
-                && !matches!(
-                    chars[*pos],
-                    ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '"' | ';' | '\''
-                )
-            {
-                s.push(chars[*pos]);
-                *pos += 1;
-            }
-            if s.is_empty() {
-                None
-            } else {
-                Some(RktToken::Atom(s))
-            }
-        }
-    }
 }
 
 #[cfg(test)]

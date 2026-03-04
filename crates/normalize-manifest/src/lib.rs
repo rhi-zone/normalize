@@ -54,6 +54,7 @@ pub mod rockspec;
 pub mod sbt;
 pub mod setup_cfg;
 pub mod setup_py;
+pub mod sexpr;
 pub mod stack;
 pub mod swift_pm;
 pub mod vcpkg;
