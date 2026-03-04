@@ -485,6 +485,15 @@ fn bundled_complexity_query(name: &str) -> Option<&'static str> {
         "ruby" => Some(include_str!("queries/ruby.complexity.scm")),
         "kotlin" => Some(include_str!("queries/kotlin.complexity.scm")),
         "swift" => Some(include_str!("queries/swift.complexity.scm")),
+        "c_sharp" => Some(include_str!("queries/c_sharp.complexity.scm")),
+        "bash" => Some(include_str!("queries/bash.complexity.scm")),
+        "lua" => Some(include_str!("queries/lua.complexity.scm")),
+        "elixir" => Some(include_str!("queries/elixir.complexity.scm")),
+        "scala" => Some(include_str!("queries/scala.complexity.scm")),
+        "dart" => Some(include_str!("queries/dart.complexity.scm")),
+        "zig" => Some(include_str!("queries/zig.complexity.scm")),
+        "ocaml" => Some(include_str!("queries/ocaml.complexity.scm")),
+        "erlang" => Some(include_str!("queries/erlang.complexity.scm")),
         _ => None,
     }
 }
