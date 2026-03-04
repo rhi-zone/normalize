@@ -24,22 +24,6 @@ impl Language for OCaml {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "module_definition",
-            "module_type_definition",
-            "type_definition",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["value_definition", "let_binding"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["value_definition", "type_definition", "module_definition"]
     }
@@ -262,8 +246,7 @@ mod tests {
             "let_open_class_type", "let_open_expression", "let_operator",
             "list_expression", "local_open_expression", "local_open_type",
             "match_operator", "method_definition", "method_invocation",
-            "method_name", "method_specification", "method_type", "module_application",
-            "module_binding", "module_name", "module_parameter", "module_path",
+            "method_name", "method_specification", "method_type", "module_application", "module_name", "module_parameter", "module_path",
             "module_type_constraint", "module_type_name", "module_type_of",
             "module_type_path", "mult_operator", "new_expression", "object_copy_expression",
             "object_expression", "object_type", "or_operator",
@@ -276,11 +259,19 @@ mod tests {
             "refutation_case", "rel_operator", "sequence_expression",
             "set_expression", "sign_expression", "sign_operator",
             "string_get_expression", "structure", "tag_specification",
-            "then_clause", "tuple_expression", "tuple_type", "type_binding",
+            "then_clause", "tuple_expression", "tuple_type",
             "type_constraint", "type_constructor", "type_constructor_path",
             "type_parameter_constraint", "type_variable", "typed_class_expression",
             "typed_expression", "typed_module_expression", "typed_pattern",
             "value_specification", "variant_declaration", "while_expression",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "match_expression",
+            "open_module",
+            "let_expression",
+            "match_case",
+            "function_expression",
+            "if_expression",
+            "try_expression",
         ];
         validate_unused_kinds_audit(&OCaml, documented_unused)
             .expect("OCaml unused node kinds audit failed");

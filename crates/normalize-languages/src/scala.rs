@@ -23,16 +23,6 @@ impl Language for Scala {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_definition", "object_definition", "trait_definition"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_definition", "trait_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_definition",
@@ -263,8 +253,22 @@ mod tests {
             "function_type", "generic_type", "given_definition", "infix_type", "lazy_parameter_type",
             "literal_type", "match_type", "named_tuple_type", "parameter_types",
             "projected_type", "repeated_parameter_type", "singleton_type", "stable_identifier",
-            "stable_type_identifier", "structural_type", "tuple_type", "type_arguments",
-            "type_definition", "type_identifier", "type_lambda", "type_parameters", "typed_pattern",
+            "stable_type_identifier", "structural_type", "tuple_type", "type_arguments", "type_identifier", "type_lambda", "type_parameters", "typed_pattern",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "while_expression",
+            "match_expression",
+            "catch_clause",
+            "import_declaration",
+            "return_expression",
+            "if_expression",
+            "for_expression",
+            "throw_expression",
+            "block",
+            "infix_expression",
+            "case_clause",
+            "try_expression",
+            "do_while_expression",
+            "lambda_expression",
         ];
 
         validate_unused_kinds_audit(&Scala, documented_unused)

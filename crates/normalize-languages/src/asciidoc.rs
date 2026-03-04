@@ -210,6 +210,8 @@ mod tests {
             "block_macro_name", "block_macro_attr",
             // Other content
             "body", "ident_block_line", "admonition_important",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "block_macro",
         ];
         validate_unused_kinds_audit(&AsciiDoc, documented_unused)
             .expect("AsciiDoc unused node kinds audit failed");

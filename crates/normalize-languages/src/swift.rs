@@ -41,28 +41,6 @@ impl Language for Swift {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "protocol_declaration"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_declaration",
-            "init_declaration",
-            "subscript_declaration",
-            "computed_property",
-            "lambda_literal",
-        ]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "protocol_declaration",
-            "typealias_declaration",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",
@@ -388,6 +366,21 @@ mod tests {
             "prefix_expression", "range_expression", "selector_expression", "try_expression",
             // TYPE
             "array_type", "dictionary_type", "function_type",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "repeat_while_statement",
+            "while_statement",
+            "import_declaration",
+            "subscript_declaration",
+            "lambda_literal",
+            "for_statement",
+            "if_statement",
+            "nil_coalescing_expression",
+            "do_statement",
+            "ternary_expression",
+            "catch_block",
+            "control_transfer_statement",
+            "switch_statement",
+            "guard_statement",
         ];
 
         validate_unused_kinds_audit(&Swift, documented_unused)

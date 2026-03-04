@@ -23,18 +23,6 @@ impl Language for Elisp {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (defgroup ...), etc.
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (defun ...), (defmacro ...), etc.
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (cl-defstruct ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list"]
     }

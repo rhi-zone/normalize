@@ -23,18 +23,6 @@ impl Language for Meson {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[] // Meson doesn't have traditional containers
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["normal_command"] // function calls
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["expression_statement"]
     }
@@ -175,6 +163,10 @@ mod tests {
             "else_command", "elseif_command",
             // Expression-related
             "formatunit", "identifier", "operatorunit", "ternaryoperator",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "foreach_command",
+            "if_condition",
+            "if_command",
         ];
         validate_unused_kinds_audit(&Meson, documented_unused)
             .expect("Meson unused node kinds audit failed");

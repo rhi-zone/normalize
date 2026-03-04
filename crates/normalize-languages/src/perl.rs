@@ -23,18 +23,6 @@ impl Language for Perl {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["package_statement"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["subroutine_declaration_statement"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["subroutine_declaration_statement"]
     }
@@ -277,6 +265,15 @@ mod tests {
             "stub_expression", "substitution_regexp_modifiers", "transliteration_expression",
             "transliteration_modifiers", "try_statement", "unary_expression", "undef_expression",
             "use_version_statement", "variable_declaration",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "for_statement",
+            "conditional_statement",
+            "loop_statement",
+            "cstyle_for_statement",
+            "require_expression",
+            "block",
+            "use_statement",
+            "conditional_expression",
         ];
         validate_unused_kinds_audit(&Perl, documented_unused)
             .expect("Perl unused node kinds audit failed");

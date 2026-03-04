@@ -23,18 +23,6 @@ impl Language for Verilog {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["module_declaration"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "task_declaration"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["module_declaration"]
     }
@@ -489,6 +477,15 @@ mod tests {
             "property_formal_type1", "sequence_formal_type1", "let_formal_type1",
             "package_or_generate_item_declaration", "notifier",
             "ps_or_hierarchical_array_identifier", "value_range",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "function_declaration",
+            "case_generate_construct",
+            "conditional_statement",
+            "task_declaration",
+            "loop_statement",
+            "package_import_declaration",
+            "case_statement",
+            "if_generate_construct",
         ];
         validate_unused_kinds_audit(&Verilog, documented_unused)
             .expect("Verilog unused node kinds audit failed");

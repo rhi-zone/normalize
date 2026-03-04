@@ -23,18 +23,6 @@ impl Language for Gleam {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["type_definition", "type_alias"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_definition", "type_alias"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "type_definition", "type_alias", "constant"]
     }
@@ -283,6 +271,12 @@ mod tests {
             "unqualified_import", "unqualified_imports",
             // Comments and identifiers
             "identifier", "module", "module_comment", "statement_comment",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "block",
+            "import",
+            "anonymous_function",
+            "case_clause",
+            "case",
         ];
         validate_unused_kinds_audit(&Gleam, documented_unused)
             .expect("Gleam unused node kinds audit failed");

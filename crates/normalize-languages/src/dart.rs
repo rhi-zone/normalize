@@ -23,34 +23,6 @@ impl Language for Dart {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_definition",
-            "enum_declaration",
-            "mixin_declaration",
-            "extension_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_signature",
-            "method_signature",
-            "function_body",
-            "getter_signature",
-            "setter_signature",
-        ]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_definition",
-            "enum_declaration",
-            "mixin_declaration",
-            "type_alias",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_definition",
@@ -381,6 +353,28 @@ mod tests {
             "type_parameter", "type_parameters", "type_test", "type_test_expression",
             "typed_identifier", "unary_expression", "void_type", "yield_each_statement",
             "yield_statement",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "logical_and_expression",
+            "for_statement",
+            "do_statement",
+            "try_statement",
+            "return_statement",
+            "continue_statement",
+            "catch_clause",
+            "conditional_expression",
+            "break_statement",
+            "switch_statement_case",
+            "block",
+            "switch_statement",
+            "if_statement",
+            "throw_expression",
+            "rethrow_expression",
+            "function_body",
+            "function_expression",
+            "logical_or_expression",
+            "library_export",
+            "while_statement",
+            "import_specification",
         ];
         validate_unused_kinds_audit(&Dart, documented_unused)
             .expect("Dart unused node kinds audit failed");

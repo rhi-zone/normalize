@@ -23,18 +23,6 @@ impl Language for Prolog {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["directive_term"] // module declarations
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["clause_term"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["clause_term", "directive_term"]
     }

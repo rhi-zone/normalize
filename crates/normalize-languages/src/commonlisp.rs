@@ -23,18 +23,6 @@ impl Language for CommonLisp {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (defpackage ...), (defclass ...), etc.
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (defun ...), (defmacro ...), etc.
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (defstruct ...), (defclass ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list_lit"]
     }

@@ -23,18 +23,6 @@ impl Language for Matlab {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_definition"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_definition"]
     }
@@ -284,6 +272,14 @@ mod tests {
             "block", "field_expression", "formatting_sequence", "function_arguments",
             "function_call", "function_output", "function_signature", "identifier", "lambda",
             "parfor_options", "validation_functions",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_statement",
+            "catch_clause",
+            "switch_statement",
+            "while_statement",
+            "for_statement",
+            "try_statement",
+            "methods",
         ];
         validate_unused_kinds_audit(&Matlab, documented_unused)
             .expect("MATLAB unused node kinds audit failed");

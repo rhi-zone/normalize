@@ -23,18 +23,6 @@ impl Language for ReScript {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["module_declaration"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["let_binding", "external_declaration"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["let_binding", "type_declaration", "module_declaration"]
     }
@@ -272,6 +260,12 @@ mod tests {
             "else_clause", "else_if_clause",
             // Other
             "function", "expression_statement", "formal_parameters",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_expression",
+            "block",
+            "switch_expression",
+            "open_statement",
+            "switch_match",
         ];
         validate_unused_kinds_audit(&ReScript, documented_unused)
             .expect("ReScript unused node kinds audit failed");

@@ -23,16 +23,6 @@ impl Language for Ruby {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class", "module"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["method", "singleton_method"]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["class", "module"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class", "module", "method", "singleton_method"]
     }
@@ -206,14 +196,23 @@ mod tests {
             "body_statement", "class_variable", "destructured_left_assignment",
             "destructured_parameter", "else", "elsif", "empty_statement", "end_block",
             "exception_variable", "exceptions", "expression_reference_pattern", "forward_argument",
-            "forward_parameter", "heredoc_body", "identifier", "lambda_parameters",
-            "method_parameters", "operator", "operator_assignment", "parenthesized_statements",
-            "singleton_class", "superclass",
+            "forward_parameter", "heredoc_body", "lambda_parameters",
+            "method_parameters", "operator", "operator_assignment", "parenthesized_statements", "superclass",
             // CLAUSE
             "case_match", "if_guard", "if_modifier", "in_clause", "match_pattern",
             "rescue_modifier", "unless_modifier", "until_modifier", "while_modifier",
             // EXPRESSION
             "yield",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "case",
+            "while",
+            "block",
+            "retry",
+            "do_block",
+            "return",
+            "for",
+            "if",
+            "lambda",
         ];
 
         validate_unused_kinds_audit(&Ruby, documented_unused)

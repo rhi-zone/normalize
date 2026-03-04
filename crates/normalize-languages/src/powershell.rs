@@ -24,18 +24,6 @@ impl Language for PowerShell {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_statement"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_statement"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_statement", "enum_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_statement", "class_statement"]
     }
@@ -263,6 +251,16 @@ mod tests {
             "switch_clause", "switch_clause_condition", "switch_clauses", "trap_statement",
             "type_identifier", "type_literal", "type_name", "type_spec", "unary_expression",
             "while_condition",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_statement",
+            "try_statement",
+            "catch_clause",
+            "while_statement",
+            "switch_statement",
+            "for_statement",
+            "elseif_clause",
+            "foreach_statement",
+            "script_block",
         ];
         validate_unused_kinds_audit(&PowerShell, documented_unused)
             .expect("PowerShell unused node kinds audit failed");

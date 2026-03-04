@@ -23,18 +23,6 @@ impl Language for R {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["binary_operator"] // assignments in R are binary operators
     }
@@ -254,6 +242,13 @@ mod tests {
         let documented_unused: &[&str] = &[
             "extract_operator", "identifier",
             "namespace_operator", "parenthesized_expression", "return", "unary_operator",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "braced_expression",
+            "if_statement",
+            "while_statement",
+            "function_definition",
+            "repeat_statement",
+            "for_statement",
         ];
         validate_unused_kinds_audit(&R, documented_unused)
             .expect("R unused node kinds audit failed");

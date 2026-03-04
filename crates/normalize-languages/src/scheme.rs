@@ -23,18 +23,6 @@ impl Language for Scheme {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (define-library ...), (module ...)
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (define (name args) ...)
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (define-record-type ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list"]
     }

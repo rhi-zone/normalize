@@ -27,18 +27,6 @@ impl Language for Python {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_definition"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_definition"]
     }
@@ -486,13 +474,6 @@ mod tests {
     }
 
     #[test]
-    fn test_python_function_kinds() {
-        let support = Python;
-        assert!(support.function_kinds().contains(&"function_definition"));
-        // async functions are function_definition with "async" keyword as first child
-    }
-
-    #[test]
     fn test_python_extract_function() {
         let support = Python;
         let content = r#"def foo(x: int) -> str:
@@ -596,11 +577,9 @@ def __dunder__(): pass
             // STRUCTURAL
             "aliased_import",          // used internally by extract_imports
             "block",                   // generic block wrapper (duplicate in grammar)
-            "expression_list",         // comma-separated expressions
-            "identifier",              // too common, used everywhere
+            "expression_list",         // comma-separated expressions              // too common, used everywhere
             "import_prefix",           // dots in relative imports
-            "lambda_parameters",       // internal to lambda
-            "module",                  // root node of file
+            "lambda_parameters",       // internal to lambda                  // root node of file
             "parenthesized_expression",// grouping only
             "relative_import",         // handled in extract_imports
             "tuple_expression",        // comma-separated values
@@ -655,6 +634,28 @@ def __dunder__(): pass
             "global_statement",        // scope modifier
             "nonlocal_statement",      // scope modifier
             "pass_statement",          // no-op, detect empty bodies
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "lambda",
+            "import_statement",
+            "continue_statement",
+            "raise_statement",
+            "case_clause",
+            "generator_expression",
+            "assert_statement",
+            "if_statement",
+            "while_statement",
+            "with_statement",
+            "try_statement",
+            "import_from_statement",
+            "return_statement",
+            "except_clause",
+            "dictionary_comprehension",
+            "conditional_expression",
+            "match_statement",
+            "set_comprehension",
+            "for_statement",
+            "list_comprehension",
+            "break_statement",
         ];
 
         validate_unused_kinds_audit(&Python, documented_unused)

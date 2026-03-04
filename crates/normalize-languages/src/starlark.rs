@@ -23,18 +23,6 @@ impl Language for Starlark {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }
@@ -200,6 +188,11 @@ mod tests {
             "lambda", "lambda_parameters",
             // Other
             "identifier",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "for_statement",
+            "load_statement",
+            "if_statement",
+            "conditional_expression",
         ];
         validate_unused_kinds_audit(&Starlark, documented_unused)
             .expect("Starlark unused node kinds audit failed");

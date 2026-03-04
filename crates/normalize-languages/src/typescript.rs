@@ -25,15 +25,6 @@ impl Language for TypeScript {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        ecmascript::TS_CONTAINER_KINDS
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        ecmascript::TS_FUNCTION_KINDS
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        ecmascript::TS_TYPE_KINDS
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS
     }
@@ -174,15 +165,6 @@ impl Language for Tsx {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        ecmascript::TS_CONTAINER_KINDS
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        ecmascript::TS_FUNCTION_KINDS
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        ecmascript::TS_TYPE_KINDS
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS
     }
@@ -354,8 +336,7 @@ mod tests {
             "call_expression",         // foo()
             "function_expression",     // function() {}
             "instantiation_expression",// generic call
-            "member_expression",       // foo.bar
-            "new_expression",          // new Foo()
+            "member_expression",       // foo.bar          // new Foo()
             "non_null_expression",     // x!
             "parenthesized_expression",// (expr)
             "satisfies_expression",    // x satisfies T
@@ -372,8 +353,7 @@ mod tests {
             "construct_signature",     // new(): T
             "constructor_type",        // new (x: T) => U
             "existential_type",        // *
-            "flow_maybe_type",         // ?T
-            "function_signature",      // function sig
+            "flow_maybe_type",         // ?T      // function sig
             "function_type",           // (x: T) => U
             "generic_type",            // T<U>
             "index_type_query",        // keyof T
@@ -394,11 +374,9 @@ mod tests {
             "template_literal_type",   // `${T}`
             "template_type",           // template type
             "this_type",               // this
-            "tuple_type",              // [T, U]
-            "type_annotation",         // : T
+            "tuple_type",              // [T, U]         // : T
             "type_arguments",          // <T, U>
-            "type_assertion",          // <T>x
-            "type_identifier",         // type name
+            "type_assertion",          // <T>x         // type name
             "type_parameter",          // T
             "type_parameters",         // <T, U>
             "type_predicate",          // x is T
@@ -420,9 +398,7 @@ mod tests {
             "namespace_export",        // export * as ns
             "namespace_import",        // import * as ns
 
-            // DECLARATION
-            "abstract_class_declaration", // abstract class
-            "abstract_method_signature", // abstract method
+            // DECLARATION // abstract class // abstract method
             "ambient_declaration",     // declare
             "debugger_statement",      // debugger;
             "empty_statement",         // ;
@@ -431,11 +407,32 @@ mod tests {
             "generator_function_declaration", // function* declaration
             "internal_module",         // namespace/module
             "labeled_statement",       // label: stmt
-            "lexical_declaration",     // let/const
-            "module",                  // module keyword
+            "lexical_declaration",     // let/const                  // module keyword
             "using_declaration",       // using x = ...
             "variable_declaration",    // var x
             "with_statement",          // with (obj) - deprecated
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "for_in_statement",
+            "switch_case",
+            "continue_statement",
+            "do_statement",
+            "return_statement",
+            "class",
+            "switch_statement",
+            "enum_declaration",
+            "binary_expression",
+            "type_alias_declaration",
+            "while_statement",
+            "for_statement",
+            "if_statement",
+            "throw_statement",
+            "try_statement",
+            "function_declaration",
+            "break_statement",
+            "arrow_function",
+            "catch_clause",
+            "ternary_expression",
+            "import_statement",
         ];
 
         validate_unused_kinds_audit(&TypeScript, documented_unused)

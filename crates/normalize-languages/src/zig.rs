@@ -23,18 +23,6 @@ impl Language for Zig {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["ContainerDecl"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["FnProto", "TestDecl"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["ContainerDecl"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["FnProto", "ContainerDecl"]
     }
@@ -298,6 +286,11 @@ mod tests {
             "LoopTypeExpr", "ParamType", "PrefixTypeOp", "PtrTypeStart",
             "SliceTypeStart", "Statement", "SwitchCase", "WhileContinueExpr",
             "WhileExpr", "WhilePrefix", "WhileTypeExpr",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "ForStatement",
+            "WhileStatement",
+            "Block",
+            "IfStatement",
         ];
         validate_unused_kinds_audit(&Zig, documented_unused)
             .expect("Zig unused node kinds audit failed");

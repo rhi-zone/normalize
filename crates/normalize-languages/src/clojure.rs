@@ -23,18 +23,6 @@ impl Language for Clojure {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (defn ...), (ns ...), etc.
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (defn name [...] ...)
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (defrecord ...), (defprotocol ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list_lit"]
     }

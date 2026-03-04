@@ -24,30 +24,6 @@ impl Language for Julia {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "module_definition",
-            "struct_definition",
-            "abstract_definition",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "arrow_function_expression",
-            "macro_definition",
-        ]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "struct_definition",
-            "abstract_definition",
-            "primitive_definition",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "function_definition",
@@ -266,6 +242,19 @@ mod tests {
             "range_expression", "return_statement", "selected_import", "splat_expression",
             "tuple_expression", "type_head", "typed_expression", "unary_expression",
             "unary_typed_expression", "vector_expression", "where_expression",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "arrow_function_expression",
+            "if_statement",
+            "using_statement",
+            "primitive_definition",
+            "for_statement",
+            "let_statement",
+            "ternary_expression",
+            "do_clause",
+            "while_statement",
+            "try_statement",
+            "elseif_clause",
+            "import_statement",
         ];
         validate_unused_kinds_audit(&Julia, documented_unused)
             .expect("Julia unused node kinds audit failed");

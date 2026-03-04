@@ -23,30 +23,6 @@ impl Language for Ada {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "package_declaration",
-            "package_body",
-            "generic_package_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[
-            "subprogram_declaration",
-            "subprogram_body",
-            "expression_function_declaration",
-        ]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "full_type_declaration",
-            "private_type_declaration",
-            "incomplete_type_declaration",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "package_declaration",
@@ -336,6 +312,16 @@ mod tests {
             "iterator_specification", "multiplying_operator", "procedure_specification", "quantifier",
             "real_range_specification", "record_definition", "reduction_specification",
             "relational_operator", "subpool_specification", "unary_adding_operator",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "declare_expression",
+            "if_expression",
+            "quantified_expression",
+            "block_statement",
+            "loop_statement",
+            "case_expression",
+            "with_clause",
+            "case_expression_alternative",
+            "use_clause",
         ];
         validate_unused_kinds_audit(&Ada, documented_unused)
             .expect("Ada unused node kinds audit failed");

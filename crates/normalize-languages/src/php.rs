@@ -23,33 +23,6 @@ impl Language for Php {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "interface_declaration",
-            "trait_declaration",
-            "enum_declaration",
-            "namespace_definition",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_definition",
-            "method_declaration",
-            "arrow_function",
-        ]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "interface_declaration",
-            "trait_declaration",
-            "enum_declaration",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",
@@ -346,6 +319,23 @@ mod tests {
             // STATEMENT
             "echo_statement", "empty_statement", "exit_statement", "expression_statement",
             "global_declaration", "goto_statement", "named_label_statement", "unset_statement",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "do_statement",
+            "break_statement",
+            "arrow_function",
+            "if_statement",
+            "for_statement",
+            "return_statement",
+            "foreach_statement",
+            "case_statement",
+            "namespace_use_declaration",
+            "switch_statement",
+            "throw_expression",
+            "continue_statement",
+            "catch_clause",
+            "conditional_expression",
+            "while_statement",
+            "try_statement",
         ];
 
         validate_unused_kinds_audit(&Php, documented_unused)

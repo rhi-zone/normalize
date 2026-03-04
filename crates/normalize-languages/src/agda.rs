@@ -23,18 +23,6 @@ impl Language for Agda {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["module", "record"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function", "signature"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["data", "record"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["module", "data", "record", "function"]
     }
@@ -292,6 +280,9 @@ mod tests {
             "record_constructor", "record_constructor_instance", "record_declarations_block",
             // Bindings
             "typed_binding", "untyped_binding", "with_expressions",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "lambda_clause",
+            "import",
         ];
         validate_unused_kinds_audit(&Agda, documented_unused)
             .expect("Agda unused node kinds audit failed");

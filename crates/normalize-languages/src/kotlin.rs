@@ -41,22 +41,6 @@ impl Language for Kotlin {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "object_declaration", "enum_class_body"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_declaration",
-            "anonymous_function",
-            "lambda_literal",
-        ]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "object_declaration", "type_alias"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",
@@ -389,11 +373,9 @@ mod tests {
             "class_body",              // class body
             "class_modifier",          // class modifiers
             "class_parameter",         // class param
-            "constructor_delegation_call", // this(), super()
-            "constructor_invocation",  // constructor call
+            "constructor_delegation_call", // this(), super()  // constructor call
             "control_structure_body",  // control body
-            "delegation_specifier",    // delegation
-            "enum_entry",              // enum value
+            "delegation_specifier",    // delegation              // enum value
             "function_body",           // function body
             "function_modifier",       // fun modifiers
             "function_type_parameters",// (T) -> U params
@@ -412,27 +394,23 @@ mod tests {
             "parameter_modifiers",     // param modifiers list
             "parameter_with_optional_type", // optional type param
             "platform_modifier",       // expect, actual
-            "primary_constructor",     // primary constructor
-            "property_declaration",    // property
+            "primary_constructor",     // primary constructor    // property
             "property_modifier",       // property modifiers
             "reification_modifier",    // reified
-            "secondary_constructor",   // secondary constructor
-            "simple_identifier",       // simple id
+            "secondary_constructor",   // secondary constructor       // simple id
             "statements",              // statement list
             "visibility_modifier",     // public, private
 
             // EXPRESSION
             "additive_expression",     // a + b
-            "as_expression",           // x as T
-            "call_expression",         // foo()
+            "as_expression",           // x as T         // foo()
             "check_expression",        // is, !is
             "comparison_expression",   // a < b
             "directly_assignable_expression", // assignable
             "equality_expression",     // a == b
             "indexing_expression",     // arr[i]
             "infix_expression",        // a infix b
-            "multiplicative_expression", // a * b
-            "navigation_expression",   // a.b
+            "multiplicative_expression", // a * b   // a.b
             "parenthesized_expression",// (expr)
             "postfix_expression",      // x++
             "prefix_expression",       // ++x
@@ -451,21 +429,35 @@ mod tests {
             "receiver_type",           // T.
             "type_arguments",          // <T, U>
             "type_constraint",         // T : Bound
-            "type_constraints",        // where clause
-            "type_identifier",         // type name
+            "type_constraints",        // where clause         // type name
             "type_modifiers",          // type modifiers
             "type_parameter",          // T
             "type_parameter_modifiers",// type param mods
             "type_parameters",         // <T, U>
             "type_projection",         // out T, in T
             "type_projection_modifiers", // projection mods
-            "type_test",               // is T
-            "user_type",               // user-defined type
+            "type_test",               // is T               // user-defined type
             "variance_modifier",       // in, out
 
             // OTHER
-            "finally_block",           // finally
-            "variable_declaration",    // var/val decl
+            "finally_block",           // finally    // var/val decl
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_expression",
+            "anonymous_function",
+            "when_entry",
+            "conjunction_expression",
+            "disjunction_expression",
+            "while_statement",
+            "do_while_statement",
+            "enum_class_body",
+            "for_statement",
+            "import_header",
+            "elvis_expression",
+            "jump_expression",
+            "when_expression",
+            "try_expression",
+            "lambda_literal",
+            "catch_block",
         ];
 
         validate_unused_kinds_audit(&Kotlin, documented_unused)

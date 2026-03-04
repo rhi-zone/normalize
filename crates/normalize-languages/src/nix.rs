@@ -23,22 +23,6 @@ impl Language for Nix {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "attrset_expression",
-            "let_expression",
-            "rec_attrset_expression",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_expression"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["binding"]
     }
@@ -260,6 +244,11 @@ mod tests {
             "variable_expression",
             // Control flow / application — not definition constructs
             "apply_expression", "if_expression", "with_expression",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "let_expression",
+            "attrset_expression",
+            "rec_attrset_expression",
+            "function_expression",
         ];
         validate_unused_kinds_audit(&Nix, documented_unused)
             .expect("Nix unused node kinds audit failed");

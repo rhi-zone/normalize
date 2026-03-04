@@ -23,18 +23,6 @@ impl Language for Sql {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["create_table", "create_view", "create_schema"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["create_function"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["create_type"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["create_table", "create_view", "create_function"]
     }
@@ -259,6 +247,8 @@ mod tests {
             "window_function", "window_specification",
             // Control flow in SQL procedural code — not definition kinds
             "case",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "create_type",
         ];
         validate_unused_kinds_audit(&Sql, documented_unused)
             .expect("SQL unused node kinds audit failed");

@@ -24,18 +24,6 @@ impl Language for CMake {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["function_def", "macro_def"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_def", "macro_def"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_def", "macro_def"]
     }
@@ -214,6 +202,11 @@ mod tests {
             "endwhile_command", "foreach", "foreach_command", "function",
             "function_command", "identifier", "if", "if_command", "while",
             "while_command",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_condition",
+            "foreach_loop",
+            "while_loop",
+            "elseif_command",
         ];
         validate_unused_kinds_audit(&CMake, documented_unused)
             .expect("CMake unused node kinds audit failed");

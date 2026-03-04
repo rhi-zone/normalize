@@ -23,18 +23,6 @@ impl Language for Groovy {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_definition"] // Groovy grammar only has class_definition
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "closure"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class_definition", "function_definition"]
     }
@@ -265,6 +253,15 @@ mod tests {
             "identifier", "juxt_function_call", "modifier",
             "parenthesized_expression", "qualified_name", "return", "switch_block",
             "type_with_generics", "wildcard_import",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "switch_statement",
+            "if_statement",
+            "groovy_import",
+            "while_loop",
+            "try_statement",
+            "for_in_loop",
+            "for_loop",
+            "case",
         ];
         validate_unused_kinds_audit(&Groovy, documented_unused)
             .expect("Groovy unused node kinds audit failed");

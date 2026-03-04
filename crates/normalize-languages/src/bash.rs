@@ -23,15 +23,6 @@ impl Language for Bash {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }
@@ -157,6 +148,13 @@ mod tests {
             "heredoc_body", "parenthesized_expression", "postfix_expression",
             "redirected_statement", "ternary_expression", "test_operator",
             "unary_expression",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_statement",
+            "for_statement",
+            "case_statement",
+            "case_item",
+            "while_statement",
+            "elif_clause",
         ];
         validate_unused_kinds_audit(&Bash, documented_unused)
             .expect("Bash unused node kinds audit failed");

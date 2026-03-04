@@ -24,18 +24,6 @@ impl Language for Zsh {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }
@@ -199,6 +187,13 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "else_clause",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "case_item",
+            "if_statement",
+            "elif_clause",
+            "while_statement",
+            "for_statement",
+            "case_statement",
         ];
         validate_unused_kinds_audit(&Zsh, documented_unused)
             .expect("Zsh unused node kinds audit failed");

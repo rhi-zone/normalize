@@ -23,18 +23,6 @@ impl Language for Idris {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["data", "record", "interface"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function", "signature"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[] // Idris grammar doesn't have type alias node
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "data", "record"]
     }
@@ -245,6 +233,10 @@ mod tests {
             "with", "with_pat", "with_arg",
             // Pragmas
             "pragma_export", "pragma_foreign", "pragma_foreign_impl", "pragma_transform",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "exp_if",
+            "exp_case",
+            "import",
         ];
         validate_unused_kinds_audit(&Idris, documented_unused)
             .expect("Idris unused node kinds audit failed");

@@ -24,18 +24,6 @@ impl Language for Fish {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    } // source command
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }
@@ -196,6 +184,14 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "else_clause", "negated_statement", "redirect_statement", "return",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "begin_statement",
+            "switch_statement",
+            "for_statement",
+            "case_clause",
+            "if_statement",
+            "else_if_clause",
+            "while_statement",
         ];
         validate_unused_kinds_audit(&Fish, documented_unused)
             .expect("Fish unused node kinds audit failed");

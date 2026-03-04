@@ -23,17 +23,6 @@ impl Language for Nginx {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["block"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["block", "directive"]
     }

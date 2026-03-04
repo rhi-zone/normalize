@@ -23,23 +23,6 @@ impl Language for VB {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_block",
-            "module_block",
-            "structure_block",
-            "interface_block",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["method_declaration", "property_declaration"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["enum_block", "delegate_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class_block", "module_block", "method_declaration"]
     }
@@ -278,6 +261,15 @@ mod tests {
             // Other
             "identifier", "attribute_block", "option_statements",
             "relational_operator", "lambda_parameter",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "case_clause",
+            "while_statement",
+            "for_statement",
+            "for_each_statement",
+            "imports_statement",
+            "do_statement",
+            "if_statement",
+            "select_case_statement",
         ];
         validate_unused_kinds_audit(&VB, documented_unused)
             .expect("Visual Basic unused node kinds audit failed");

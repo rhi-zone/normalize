@@ -24,18 +24,6 @@ impl Language for Glsl {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["struct_specifier"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_specifier"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "struct_specifier"]
     }
@@ -217,6 +205,14 @@ mod tests {
             "storage_class_specifier", "subscript_expression", "type_definition",
             "type_descriptor", "type_identifier", "type_qualifier", "unary_expression",
             "union_specifier", "update_expression",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "switch_statement",
+            "if_statement",
+            "while_statement",
+            "for_statement",
+            "conditional_expression",
+            "compound_statement",
+            "case_statement",
         ];
         validate_unused_kinds_audit(&Glsl, documented_unused)
             .expect("GLSL unused node kinds audit failed");

@@ -23,18 +23,6 @@ impl Language for Scss {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["rule_set", "mixin_statement", "function_statement"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["mixin_statement", "function_statement"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["mixin_statement", "function_statement"]
     }

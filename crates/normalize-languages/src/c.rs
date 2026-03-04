@@ -23,16 +23,6 @@ impl Language for C {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[]
-    } // C doesn't have containers
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_specifier", "enum_specifier", "type_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }
@@ -233,8 +223,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // STRUCTURAL
-            "bitfield_clause",         // : width
-            "declaration",             // declaration
+            "bitfield_clause",         // : width             // declaration
             "declaration_list",        // decl list
             "enumerator",              // enum value
             "enumerator_list",         // enum body
@@ -277,8 +266,7 @@ mod tests {
             "update_expression",       // x++
 
             // FUNCTION
-            "abstract_function_declarator", // abstract func
-            "function_declarator",     // func decl
+            "abstract_function_declarator", // abstract func     // func decl
 
             // PREPROCESSOR
             "preproc_elif",            // #elif
@@ -313,6 +301,19 @@ mod tests {
             "seh_finally_clause",      // __finally
             "seh_leave_statement",     // __leave
             "seh_try_statement",       // __try
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_statement",
+            "conditional_expression",
+            "case_statement",
+            "continue_statement",
+            "for_statement",
+            "while_statement",
+            "return_statement",
+            "break_statement",
+            "switch_statement",
+            "compound_statement",
+            "do_statement",
+            "goto_statement",
         ];
 
         validate_unused_kinds_audit(&C, documented_unused)

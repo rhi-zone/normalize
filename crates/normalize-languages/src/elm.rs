@@ -24,22 +24,6 @@ impl Language for Elm {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "module_declaration",
-            "type_alias_declaration",
-            "type_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["value_declaration", "function_declaration_left"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_alias_declaration", "type_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "value_declaration",
@@ -252,6 +236,13 @@ mod tests {
             "record_base_identifier", "record_type", "tuple_type", "type",
             "type_annotation", "type_expression", "type_ref", "type_variable",
             "upper_case_identifier", "upper_case_qid",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_else_expr",
+            "import_clause",
+            "anonymous_function_expr",
+            "module_declaration",
+            "case_of_expr",
+            "case_of_branch",
         ];
         validate_unused_kinds_audit(&Elm, documented_unused)
             .expect("Elm unused node kinds audit failed");

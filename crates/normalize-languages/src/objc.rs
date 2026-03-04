@@ -23,22 +23,6 @@ impl Language for ObjC {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_interface",
-            "class_implementation",
-            "protocol_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["method_declaration", "function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_specifier", "enum_specifier", "type_definition"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_interface",
@@ -385,6 +369,12 @@ mod tests {
             // Other
             "method_parameter", "block_pointer_declarator", "abstract_function_declarator",
             "bitfield_clause", "identifier", "struct_declarator", "gnu_asm_qualifier",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "while_statement",
+            "for_statement",
+            "switch_statement",
+            "if_statement",
+            "compound_statement",
         ];
         validate_unused_kinds_audit(&ObjC, documented_unused)
             .expect("Objective-C unused node kinds audit failed");

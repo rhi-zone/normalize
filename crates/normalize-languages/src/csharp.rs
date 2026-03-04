@@ -23,38 +23,6 @@ impl Language for CSharp {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "struct_declaration",
-            "interface_declaration",
-            "enum_declaration",
-            "record_declaration",
-            "namespace_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[
-            "method_declaration",
-            "constructor_declaration",
-            "property_declaration",
-            "local_function_statement",
-            "lambda_expression",
-        ]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "struct_declaration",
-            "interface_declaration",
-            "enum_declaration",
-            "record_declaration",
-            "delegate_declaration",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",

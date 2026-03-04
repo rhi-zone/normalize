@@ -39,28 +39,6 @@ impl Language for D {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "module_declaration",
-            "class_declaration",
-            "struct_declaration",
-            "interface_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_literal", "auto_declaration"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "alias_declaration",
-            "enum_declaration",
-            "class_declaration",
-            "struct_declaration",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "module_declaration",
@@ -386,11 +364,20 @@ mod tests {
             "gcc_ext_asm_instruction", "gcc_goto_asm_instruction",
             // Misc
             "alt_declarator_identifier", "base_class_list", "base_interface_list",
-            "block_comment", "declaration_block", "declarator_identifier_list", "dot_identifier",
-            "identifier", "nesting_block_comment", "static_if_condition", "struct_initializer",
+            "block_comment", "declaration_block", "declarator_identifier_list", "dot_identifier", "nesting_block_comment", "static_if_condition", "struct_initializer",
             "struct_member_initializer", "struct_member_initializers", "super_class_or_interface",
             "traits_arguments", "traits_keyword", "var_declarator_identifier", "vector_base_type",
             "attribute_specifier",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "block_statement",
+            "import_declaration",
+            "while_statement",
+            "switch_statement",
+            "if_statement",
+            "function_literal",
+            "for_statement",
+            "foreach_statement",
+            "catch",
         ];
         validate_unused_kinds_audit(&D, documented_unused)
             .expect("D unused node kinds audit failed");

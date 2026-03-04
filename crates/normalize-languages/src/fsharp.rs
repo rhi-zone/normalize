@@ -23,18 +23,6 @@ impl Language for FSharp {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["module_defn", "type_definition"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_or_value_defn", "member_defn"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_definition", "record_type_defn", "union_type_defn"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_or_value_defn", "type_definition", "module_defn"]
     }
@@ -269,11 +257,10 @@ mod tests {
             "delegate_type_defn", "do_expression", "dot_expression", "elif_expression",
             "enum_type_case", "enum_type_cases", "enum_type_defn",
             "exception_definition", "flexible_type", "format_string",
-            "format_string_eval", "format_triple_quoted_string", "fun_expression",
-            "function_declaration_left", "function_expression", "function_type",
-            "generic_type", "identifier", "identifier_pattern", "index_expression", "interface_implementation",
+            "format_string_eval", "format_triple_quoted_string", "fun_expression", "function_expression", "function_type",
+            "generic_type", "identifier_pattern", "index_expression", "interface_implementation",
             "interface_type_defn", "list_expression", "list_type", "literal_expression",
-            "long_identifier", "long_identifier_or_op", "method_or_prop_defn",
+            "long_identifier", "long_identifier_or_op",
             "module_abbrev", "mutate_expression", "named_module", "object_expression",
             "op_identifier", "paren_expression", "paren_type", "postfix_type",
             "prefixed_expression", "preproc_else", "preproc_if", "range_expression",
@@ -281,11 +268,21 @@ mod tests {
             "static_type", "trait_member_constraint", "tuple_expression",
             "type_abbrev_defn", "type_argument", "type_argument_constraints",
             "type_argument_defn", "type_arguments", "type_attribute", "type_attributes",
-            "type_check_pattern", "type_extension", "type_extension_elements",
-            "type_name", "typed_expression", "typed_pattern", "typecast_expression",
+            "type_check_pattern", "type_extension", "type_extension_elements", "typed_expression", "typed_pattern", "typecast_expression",
             "types", "union_type_case", "union_type_cases", "union_type_field",
             "union_type_fields", "value_declaration", "value_declaration_left",
             "with_field_expression",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "union_type_defn",
+            "for_expression",
+            "application_expression",
+            "import_decl",
+            "while_expression",
+            "match_expression",
+            "record_type_defn",
+            "infix_expression",
+            "if_expression",
+            "try_expression",
         ];
         validate_unused_kinds_audit(&FSharp, documented_unused)
             .expect("F# unused node kinds audit failed");

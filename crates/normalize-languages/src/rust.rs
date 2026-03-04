@@ -23,18 +23,6 @@ impl Language for Rust {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["impl_item", "trait_item", "mod_item"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_item"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_item", "enum_item", "type_item", "trait_item"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_item", "struct_item", "enum_item", "trait_item"]
     }
@@ -456,8 +444,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // STRUCTURAL
-            "block_comment",           // comments
-            "declaration_list",        // extern block contents
+            "block_comment",           // comments        // extern block contents
             "field_declaration",       // struct field
             "field_declaration_list",  // struct body
             "field_expression",        // foo.bar
@@ -485,8 +472,7 @@ mod tests {
             "array_expression",        // [1, 2, 3]
             "assignment_expression",   // x = y
             "async_block",             // async { }
-            "await_expression",        // foo.await
-            "call_expression",         // foo()
+            "await_expression",        // foo.await         // foo()
             "generic_function",        // foo::<T>()
             "index_expression",        // arr[i]
             "parenthesized_expression",// (expr)
@@ -537,8 +523,7 @@ mod tests {
             // MACRO
             "fragment_specifier",      // $x:expr
             "macro_arguments_declaration", // macro args
-            "macro_body_v2",           // macro body
-            "macro_definition",        // macro_rules!
+            "macro_body_v2",           // macro body        // macro_rules!
             "macro_definition_v2",     // macro 2.0
 
             // OTHER
@@ -555,6 +540,20 @@ mod tests {
             "unsafe_block",            // unsafe { }
             "use_as_clause",           // use foo as bar
             "empty_statement",         // ;
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "closure_expression",
+            "continue_expression",
+            "match_expression",
+            "use_declaration",
+            "for_expression",
+            "match_arm",
+            "break_expression",
+            "while_expression",
+            "loop_expression",
+            "return_expression",
+            "if_expression",
+            "block",
+            "binary_expression",
         ];
 
         validate_unused_kinds_audit(&Rust, documented_unused)

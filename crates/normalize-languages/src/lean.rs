@@ -23,18 +23,6 @@ impl Language for Lean {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["structure", "inductive", "class", "namespace"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["def", "theorem", "constant", "axiom", "example"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["abbrev"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["def", "theorem", "structure", "inductive", "instance"]
     }
@@ -260,6 +248,11 @@ mod tests {
             "do_return",
             // Classes
             "class_inductive",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "if_then_else",
+            "match_alt",
+            "match",
+            "import",
         ];
         validate_unused_kinds_audit(&Lean, documented_unused)
             .expect("Lean unused node kinds audit failed");

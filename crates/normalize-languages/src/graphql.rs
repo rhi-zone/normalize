@@ -48,31 +48,6 @@ impl Language for GraphQL {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "object_type_definition",
-            "interface_type_definition",
-            "enum_type_definition",
-            "union_type_definition",
-            "input_object_type_definition",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["field_definition", "operation_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "object_type_definition",
-            "interface_type_definition",
-            "enum_type_definition",
-            "union_type_definition",
-            "input_object_type_definition",
-            "scalar_type_definition",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "object_type_definition",
@@ -271,6 +246,12 @@ mod tests {
             "root_operation_type_definition", "scalar_type_extension", "schema_definition",
             "enum_type_extension", "input_object_type_extension", "interface_type_extension",
             "type_system_directive_location", "union_type_extension", "variable_definitions",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "scalar_type_definition",
+            "union_type_definition",
+            "field_definition",
+            "input_object_type_definition",
+            "enum_type_definition",
         ];
         validate_unused_kinds_audit(&GraphQL, documented_unused)
             .expect("GraphQL unused node kinds audit failed");

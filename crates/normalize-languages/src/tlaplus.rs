@@ -23,18 +23,6 @@ impl Language for TlaPlus {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["module"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["operator_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["module", "operator_definition"]
     }

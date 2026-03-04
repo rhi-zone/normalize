@@ -23,18 +23,6 @@ impl Language for Elixir {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["call"] // defmodule, defprotocol, defimpl
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["call"] // def, defp, defmacro, defmacrop
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["call"] // defstruct, @type
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["call"] // def, defmacro (not defp, defmacrop)
     }
@@ -351,6 +339,10 @@ mod tests {
             "else_block", "identifier", "interpolation", "operator_identifier",
             "rescue_block", "sigil_modifiers", "stab_clause", "struct",
             "unary_operator",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "binary_operator",
+            "do_block",
+            "anonymous_function",
         ];
         validate_unused_kinds_audit(&Elixir, documented_unused)
             .expect("Elixir unused node kinds audit failed");

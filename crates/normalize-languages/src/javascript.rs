@@ -22,15 +22,6 @@ impl Language for JavaScript {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        ecmascript::JS_CONTAINER_KINDS
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        ecmascript::JS_FUNCTION_KINDS
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        ecmascript::JS_TYPE_KINDS
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS
     }
@@ -165,8 +156,7 @@ mod tests {
             "class_heritage",          // extends clause
             "class_static_block",      // static { }
             "formal_parameters",       // function params
-            "field_definition",        // class field
-            "identifier",              // too common
+            "field_definition",        // class field              // too common
             "private_property_identifier", // #field
             "property_identifier",     // obj.prop
             "shorthand_property_identifier", // { x } shorthand
@@ -179,14 +169,9 @@ mod tests {
             "else_clause",             // else branch
             "finally_clause",          // finally block
 
-            // EXPRESSION
-            "assignment_expression",   // x = y
+            // EXPRESSION   // x = y
             "augmented_assignment_expression", // x += y
-            "await_expression",        // await foo
-            "call_expression",         // foo()
-            "function_expression",     // function() {}
-            "member_expression",       // foo.bar
-            "new_expression",          // new Foo()
+            "await_expression",        // await foo         // foo()     // function() {}       // foo.bar          // new Foo()
             "parenthesized_expression",// (expr)
             "sequence_expression",     // a, b
             "subscript_expression",    // arr[i]
@@ -208,16 +193,30 @@ mod tests {
             // DECLARATION
             "debugger_statement",      // debugger;
             "empty_statement",         // ;
-            "expression_statement",    // expr;
-            "generator_function",      // function* foo
-            "labeled_statement",       // label: stmt
-            "lexical_declaration",     // let/const
-            "using_declaration",       // using x = ...
-            "variable_declaration",    // var x
+            "expression_statement",    // expr;      // function* foo
+            "labeled_statement",       // label: stmt     // let/const
+            "using_declaration",       // using x = ...    // var x
             "with_statement",          // with (obj) - deprecated
 
             // JSX
             "jsx_expression",          // {expr} in JSX
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "break_statement",
+            "while_statement",
+            "throw_statement",
+            "if_statement",
+            "for_statement",
+            "import_statement",
+            "ternary_expression",
+            "catch_clause",
+            "do_statement",
+            "return_statement",
+            "try_statement",
+            "for_in_statement",
+            "continue_statement",
+            "switch_statement",
+            "switch_case",
+            "arrow_function",
         ];
 
         validate_unused_kinds_audit(&JavaScript, documented_unused)

@@ -23,22 +23,6 @@ impl Language for Vhdl {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "entity_declaration",
-            "architecture_body",
-            "package_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_body", "procedure_body"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["full_type_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["entity_declaration", "package_declaration"]
     }
@@ -389,6 +373,15 @@ mod tests {
             "PSL_Bounding_FL_Property", "PSL_Suffix_Implication_FL_Property",
             "PSL_VUnit", "PSL_VProp", "PSL_VMode",
             "PSL_Hierarchical_HDL_Name", "PSL_Inherit_Spec",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "procedure_body",
+            "loop_statement",
+            "architecture_body",
+            "function_body",
+            "use_clause",
+            "full_type_declaration",
+            "case_statement",
+            "if_statement",
         ];
         validate_unused_kinds_audit(&Vhdl, documented_unused)
             .expect("VHDL unused node kinds audit failed");

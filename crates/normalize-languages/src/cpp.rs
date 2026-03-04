@@ -23,21 +23,6 @@ impl Language for Cpp {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_specifier", "struct_specifier"]
-    }
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_specifier",
-            "struct_specifier",
-            "enum_specifier",
-            "type_definition",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_specifier", "struct_specifier"]
     }
@@ -258,8 +243,7 @@ mod tests {
             "access_specifier",        // public:, private:
             "base_class_clause",       // : public Base
             "bitfield_clause",         // : width
-            "condition_clause",        // if condition
-            "declaration",             // declaration
+            "condition_clause",        // if condition             // declaration
             "declaration_list",        // decl list
             "default_method_clause",   // = default
             "delete_method_clause",    // = delete
@@ -346,8 +330,7 @@ mod tests {
             // FUNCTION
             "abstract_function_declarator", // abstract func
             "explicit_function_specifier", // explicit
-            "explicit_object_parameter_declaration", // this param
-            "function_declarator",     // func decl
+            "explicit_object_parameter_declaration", // this param     // func decl
             "operator_cast",           // operator T()
             "optional_parameter_declaration", // param = default
             "optional_type_parameter_declaration", // T = U
@@ -412,6 +395,25 @@ mod tests {
             "seh_finally_clause",      // __finally
             "seh_leave_statement",     // __leave
             "seh_try_statement",       // __try
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "case_statement",
+            "for_range_loop",
+            "conditional_expression",
+            "do_statement",
+            "if_statement",
+            "catch_clause",
+            "while_statement",
+            "lambda_expression",
+            "continue_statement",
+            "switch_statement",
+            "throw_statement",
+            "try_statement",
+            "return_statement",
+            "break_statement",
+            "compound_statement",
+            "namespace_definition",
+            "goto_statement",
+            "for_statement",
         ];
 
         validate_unused_kinds_audit(&Cpp, documented_unused)

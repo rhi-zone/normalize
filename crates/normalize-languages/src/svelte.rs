@@ -24,18 +24,6 @@ impl Language for Svelte {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["script_element", "style_element"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &[] // JS functions are in embedded script, not Svelte grammar
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[] // JS exports are in embedded script, not Svelte grammar
     }

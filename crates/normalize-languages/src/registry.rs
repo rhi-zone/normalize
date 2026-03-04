@@ -409,6 +409,34 @@ pub fn validate_unused_kinds_audit(
     for kind in lang.public_symbol_kinds() {
         used_kinds.insert(kind);
     }
+
+    // Also collect kinds referenced in tags.scm (these replace container/function/type_kinds)
+    let tags_kinds: HashSet<String> = {
+        let mut kinds = HashSet::new();
+        if let Some(tags_content) = loader.get_tags(lang.grammar_name()) {
+            // Extract top-level node kind names: lines starting with "(<identifier>"
+            // These are the patterns like "(function_definition ..." in the query
+            for line in tags_content.lines() {
+                let trimmed = line.trim_start();
+                if trimmed.starts_with('(')
+                    && !trimmed.starts_with(";;")
+                    && !trimmed.starts_with(";")
+                {
+                    // Extract the first word after the opening paren
+                    let inner = &trimmed[1..];
+                    let kind_name: String = inner
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                        .collect();
+                    if !kind_name.is_empty() && !kind_name.starts_with('@') {
+                        kinds.insert(kind_name);
+                    }
+                }
+            }
+        }
+        kinds
+    };
+
     let documented_set: HashSet<&str> = documented_unused.iter().copied().collect();
 
     // Get all valid named node kinds from grammar
@@ -433,10 +461,10 @@ pub fn validate_unused_kinds_audit(
                 kind
             ));
         }
-        // Also check it's not actually being used
-        if used_kinds.contains(*kind) {
+        // Also check it's not actually being used (in trait methods or tags.scm)
+        if used_kinds.contains(*kind) || tags_kinds.contains(*kind) {
             errors.push(format!(
-                "Documented kind '{}' is actually used in trait methods",
+                "Documented kind '{}' is actually used in trait methods or tags.scm",
                 kind
             ));
         }
@@ -447,7 +475,11 @@ pub fn validate_unused_kinds_audit(
         let lower = kind.to_lowercase();
         let is_interesting = interesting_patterns.iter().any(|p| lower.contains(p));
 
-        if is_interesting && !used_kinds.contains(*kind) && !documented_set.contains(*kind) {
+        if is_interesting
+            && !used_kinds.contains(*kind)
+            && !tags_kinds.contains(*kind)
+            && !documented_set.contains(*kind)
+        {
             errors.push(format!(
                 "Potentially useful kind '{}' is neither used nor documented",
                 kind

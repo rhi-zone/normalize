@@ -23,18 +23,6 @@ impl Language for Go {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[] // Go types don't have children in the tree-sitter sense
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "method_declaration"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_spec"] // The actual type is in type_spec, not type_declaration
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "function_declaration",
@@ -316,9 +304,7 @@ mod tests {
             "blank_identifier",        // _
             "field_declaration",       // struct field
             "field_declaration_list",  // struct body
-            "field_identifier",        // field name
-            "identifier",              // too common
-            "package_clause",          // package foo
+            "field_identifier",        // field name              // too common          // package foo
             "package_identifier",      // package name
             "parameter_declaration",   // func param
             "statement_list",          // block contents
@@ -332,11 +318,8 @@ mod tests {
             "method_elem",             // interface method
             "range_clause",            // for range
 
-            // EXPRESSION
-            "call_expression",         // foo()
-            "index_expression",        // arr[i]
-            "parenthesized_expression",// (expr)
-            "selector_expression",     // foo.bar
+            // EXPRESSION         // foo()
+            "index_expression",        // arr[i]// (expr)     // foo.bar
             "slice_expression",        // arr[1:3]
             "type_assertion_expression", // x.(T)
             "type_conversion_expression", // T(x)
@@ -359,22 +342,18 @@ mod tests {
             "struct_type",             // struct{}
             "type_arguments",          // [T, U]
             "type_constraint",         // T constraint
-            "type_elem",               // type element
-            "type_identifier",         // type name
+            "type_elem",               // type element         // type name
             "type_parameter_declaration", // [T any]
             "type_parameter_list",     // type params
 
             // DECLARATION
-            "assignment_statement",    // x = y
-            "const_declaration",       // const x = 1
+            "assignment_statement",    // x = y       // const x = 1
             "dec_statement",           // x--
             "expression_list",         // a, b, c
             "expression_statement",    // expr
             "inc_statement",           // x++
             "short_var_declaration",   // x := y
-            "type_alias",              // type X = Y
-            "type_declaration",        // type X struct{}
-            "var_declaration",         // var x int
+            "type_alias",              // type X = Y        // type X struct{}         // var x int
 
             // CONTROL FLOW DETAILS
             "empty_statement",         // ;
@@ -383,6 +362,22 @@ mod tests {
             "labeled_statement",       // label:
             "receive_statement",       // <-ch
             "send_statement",          // ch <- x
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "return_statement",
+            "continue_statement",
+            "break_statement",
+            "if_statement",
+            "for_statement",
+            "goto_statement",
+            "expression_switch_statement",
+            "expression_case",
+            "type_case",
+            "type_switch_statement",
+            "select_statement",
+            "block",
+            "defer_statement",
+            "binary_expression",
+            "communication_case",
         ];
 
         validate_unused_kinds_audit(&Go, documented_unused)

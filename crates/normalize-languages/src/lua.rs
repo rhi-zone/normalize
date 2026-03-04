@@ -23,18 +23,6 @@ impl Language for Lua {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[] // Lua doesn't have traditional classes
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_declaration", "function_definition"]
     }
@@ -244,13 +232,22 @@ mod tests {
     #[test]
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
-        let documented_unused: &[&str] = &[
-            "assignment_statement", "binary_expression", "block",
-            "bracket_index_expression", "dot_index_expression", "else_statement",
-            "empty_statement", "expression_list", "for_generic_clause",
-            "for_numeric_clause", "identifier", "label_statement",
-            "method_index_expression", "parenthesized_expression", "table_constructor",
+        let documented_unused: &[&str] = &[ "binary_expression", "block",
+            "bracket_index_expression", "else_statement",
+            "empty_statement", "for_generic_clause",
+            "for_numeric_clause", "identifier", "label_statement", "parenthesized_expression", "table_constructor",
             "unary_expression", "vararg_expression", "variable_declaration",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "return_statement",
+            "while_statement",
+            "elseif_statement",
+            "for_statement",
+            "goto_statement",
+            "do_statement",
+            "if_statement",
+            "break_statement",
+            "repeat_statement",
+            "function_call",
         ];
         validate_unused_kinds_audit(&Lua, documented_unused)
             .expect("Lua unused node kinds audit failed");

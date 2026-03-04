@@ -23,26 +23,6 @@ impl Language for Java {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "interface_declaration",
-            "enum_declaration",
-        ]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["method_declaration", "constructor_declaration"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "interface_declaration",
-            "enum_declaration",
-        ]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",
@@ -326,10 +306,8 @@ mod tests {
             "interface_body",          // interface body
             "modifiers",               // access modifiers
             "scoped_identifier",       // pkg.Class
-            "scoped_type_identifier",  // pkg.Type
-            "superclass",              // extends
-            "super_interfaces",        // implements
-            "type_identifier",         // type name
+            "scoped_type_identifier",  // pkg.Type              // extends
+            "super_interfaces",        // implements         // type name
 
             // CLAUSE
             "catch_formal_parameter",  // catch param
@@ -345,10 +323,8 @@ mod tests {
             "assignment_expression",   // x = y
             "cast_expression",         // (T)x
             "instanceof_expression",   // x instanceof T
-            "lambda_expression",       // x -> y
-            "method_invocation",       // obj.method()
-            "method_reference",        // Class::method
-            "object_creation_expression", // new Foo()
+            "lambda_expression",       // x -> y       // obj.method()
+            "method_reference",        // Class::method // new Foo()
             "parenthesized_expression",// (expr)
             "template_expression",     // string template
             "unary_expression",        // -x, !x
@@ -363,8 +339,7 @@ mod tests {
             "generic_type",            // T<U>
             "integral_type",           // int, long
             "type_arguments",          // <T, U>
-            "type_bound",              // T extends X
-            "type_list",               // T, U, V
+            "type_bound",              // T extends X               // T, U, V
             "type_parameter",          // T
             "type_parameters",         // <T, U>
             "type_pattern",            // type pattern
@@ -399,6 +374,24 @@ mod tests {
             "resource_specification", // try-with-resources
             "synchronized_statement",  // synchronized
             "try_with_resources_statement", // try-with
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "do_statement",
+            "return_statement",
+            "constructor_declaration",
+            "binary_expression",
+            "try_statement",
+            "continue_statement",
+            "switch_expression",
+            "ternary_expression",
+            "while_statement",
+            "break_statement",
+            "enhanced_for_statement",
+            "import_declaration",
+            "for_statement",
+            "block",
+            "throw_statement",
+            "catch_clause",
+            "if_statement",
         ];
 
         validate_unused_kinds_audit(&Java, documented_unused)

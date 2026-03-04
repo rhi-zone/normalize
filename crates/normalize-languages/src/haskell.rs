@@ -24,18 +24,6 @@ impl Language for Haskell {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["data_type", "newtype", "type_synomym", "class", "instance"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function", "signature"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["data_type", "newtype", "type_synomym"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "data_type", "newtype", "class"]
     }
@@ -301,6 +289,11 @@ mod tests {
             "type_family_injectivity", "type_family_result", "type_instance",
             "type_params", "type_patterns", "type_role",
             "typed_quote",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "lambda",
+            "case",
+            "match",
+            "import",
         ];
         validate_unused_kinds_audit(&Haskell, documented_unused)
             .expect("Haskell unused node kinds audit failed");

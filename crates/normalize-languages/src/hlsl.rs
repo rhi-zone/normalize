@@ -24,18 +24,6 @@ impl Language for Hlsl {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["struct_specifier", "cbuffer_specifier"]
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_specifier"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "struct_specifier"]
     }
@@ -273,6 +261,15 @@ mod tests {
             "type_requirement", "unary_expression", "union_specifier", "update_expression",
             "using_declaration", "variadic_parameter_declaration",
             "variadic_type_parameter_declaration", "virtual_specifier",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "conditional_expression",
+            "case_statement",
+            "for_statement",
+            "compound_statement",
+            "if_statement",
+            "switch_statement",
+            "cbuffer_specifier",
+            "while_statement",
         ];
         validate_unused_kinds_audit(&Hlsl, documented_unused)
             .expect("HLSL unused node kinds audit failed");

@@ -23,18 +23,6 @@ impl Language for Erlang {
         true
     }
 
-    fn container_kinds(&self) -> &'static [&'static str] {
-        &["module_attribute"] // -module(name).
-    }
-
-    fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_clause"]
-    }
-
-    fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_alias", "record_decl"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_clause"] // Only exported functions are public
     }
@@ -313,6 +301,14 @@ mod tests {
             "range_type", "remote_module", "replacement_cr_clauses",
             "replacement_function_clauses", "ssr_definition", "try_after",
             "try_class", "try_stack", "type_guards", "type_name", "type_sig",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "cr_clause",
+            "try_expr",
+            "fun_clause",
+            "if_expr",
+            "if_clause",
+            "case_expr",
+            "catch_clause",
         ];
         validate_unused_kinds_audit(&Erlang, documented_unused)
             .expect("Erlang unused node kinds audit failed");
