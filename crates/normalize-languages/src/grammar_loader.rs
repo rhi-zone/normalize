@@ -78,6 +78,8 @@ pub struct GrammarLoader {
     types_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached tags queries.
     tags_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached imports queries.
+    imports_cache: RwLock<HashMap<String, Arc<String>>>,
 }
 
 impl GrammarLoader {
@@ -113,6 +115,7 @@ impl GrammarLoader {
             calls_cache: RwLock::new(HashMap::new()),
             types_cache: RwLock::new(HashMap::new()),
             tags_cache: RwLock::new(HashMap::new()),
+            imports_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -128,6 +131,7 @@ impl GrammarLoader {
             calls_cache: RwLock::new(HashMap::new()),
             types_cache: RwLock::new(HashMap::new()),
             tags_cache: RwLock::new(HashMap::new()),
+            imports_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -282,6 +286,30 @@ impl GrammarLoader {
         let bundled = bundled_tags_query(name)?;
         let query = Arc::new(bundled.to_string());
         if let Ok(mut c) = self.tags_cache.write() {
+            c.insert(name.to_string(), Arc::clone(&query));
+        }
+        Some(query)
+    }
+
+    /// Get the imports query for a grammar.
+    ///
+    /// Returns the bundled query for supported languages, or an external file if one
+    /// exists at `{name}.imports.scm` in the grammar search paths (external wins).
+    pub fn get_imports(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.imports_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        // External file takes priority over bundled
+        if let Some(q) = self.load_query(name, "imports", &self.imports_cache) {
+            return Some(q);
+        }
+
+        // Fall back to bundled query
+        let bundled = bundled_imports_query(name)?;
+        let query = Arc::new(bundled.to_string());
+        if let Ok(mut c) = self.imports_cache.write() {
             c.insert(name.to_string(), Arc::clone(&query));
         }
         Some(query)
@@ -577,6 +605,28 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "clojure" => Some(include_str!("queries/clojure.calls.scm")),
         "d" => Some(include_str!("queries/d.calls.scm")),
         "objc" => Some(include_str!("queries/objc.calls.scm")),
+        "elisp" => Some(include_str!("queries/elisp.calls.scm")),
+        "hcl" => Some(include_str!("queries/hcl.calls.scm")),
+        "matlab" => Some(include_str!("queries/matlab.calls.scm")),
+        "nix" => Some(include_str!("queries/nix.calls.scm")),
+        "starlark" => Some(include_str!("queries/starlark.calls.scm")),
+        "vim" => Some(include_str!("queries/vim.calls.scm")),
+        "zsh" => Some(include_str!("queries/zsh.calls.scm")),
+        "rescript" => Some(include_str!("queries/rescript.calls.scm")),
+        "prolog" => Some(include_str!("queries/prolog.calls.scm")),
+        "sql" => Some(include_str!("queries/sql.calls.scm")),
+        _ => None,
+    }
+}
+
+/// Return a bundled imports query for a grammar, if available.
+fn bundled_imports_query(name: &str) -> Option<&'static str> {
+    match name {
+        "python" => Some(include_str!("queries/python.imports.scm")),
+        "javascript" => Some(include_str!("queries/javascript.imports.scm")),
+        "go" => Some(include_str!("queries/go.imports.scm")),
+        "lua" => Some(include_str!("queries/lua.imports.scm")),
+        "rust" => Some(include_str!("queries/rust.imports.scm")),
         _ => None,
     }
 }
@@ -763,6 +813,16 @@ mod tests {
             "clojure",
             "d",
             "objc",
+            "elisp",
+            "hcl",
+            "matlab",
+            "nix",
+            "starlark",
+            "vim",
+            "zsh",
+            "rescript",
+            "prolog",
+            "sql",
         ] {
             let query = bundled_calls_query(lang);
             assert!(query.is_some(), "Missing bundled calls query for {lang}");
@@ -771,6 +831,29 @@ mod tests {
                 "Empty bundled calls query for {lang}"
             );
         }
+    }
+
+    #[test]
+    fn test_bundled_imports_queries() {
+        for lang in &["python", "javascript", "go", "lua", "rust"] {
+            let query = bundled_imports_query(lang);
+            assert!(query.is_some(), "Missing bundled imports query for {lang}");
+            assert!(
+                !query.unwrap().is_empty(),
+                "Empty bundled imports query for {lang}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_imports_returns_bundled() {
+        let loader = GrammarLoader::with_paths(vec![]);
+        assert!(loader.get_imports("python").is_some());
+        assert!(loader.get_imports("javascript").is_some());
+        assert!(loader.get_imports("go").is_some());
+        assert!(loader.get_imports("lua").is_some());
+        assert!(loader.get_imports("rust").is_some());
+        assert!(loader.get_imports("unknown-lang-xyz").is_none());
     }
 
     #[test]
