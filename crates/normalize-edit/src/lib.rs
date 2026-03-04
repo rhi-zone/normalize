@@ -1,7 +1,8 @@
-use normalize_languages::parsers::parse_with_grammar;
+use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
 use normalize_languages::{Language, support_for_path};
 use normalize_view::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use std::path::Path;
+use streaming_iterator::StreamingIterator;
 
 pub use normalize_languages::ContainerBody;
 
@@ -281,7 +282,18 @@ impl Editor {
         let grammar = support.grammar_name();
         let tree = parse_with_grammar(grammar, content)?;
         let root = tree.root_node();
-        find_container_body_in_node(root, content, name, support)
+
+        // If the language has container_kinds(), use the trait-based search.
+        if !support.container_kinds().is_empty() {
+            return find_container_body_in_node(root, content, name, support);
+        }
+
+        // Fallback: use the tags query to locate container nodes by name.
+        let loader = grammar_loader();
+        let tags_scm = loader.get_tags(grammar)?;
+        let ts_lang = loader.get(grammar)?;
+        let tags_query = tree_sitter::Query::new(&ts_lang, &tags_scm).ok()?;
+        find_container_body_via_tags(&tree, &tags_query, content, name, support)
     }
 
     /// Prepend content inside a container (class/impl body)
@@ -505,6 +517,59 @@ fn find_container_body_in_node(
     for child in node.children(&mut cursor) {
         if let Some(body) = find_container_body_in_node(child, content, name, support) {
             return Some(body);
+        }
+    }
+
+    None
+}
+
+/// Find a container body using a tags query.
+///
+/// Used when the language has no `container_kinds()` but has a `*.tags.scm`.
+/// Runs the tags query to find `@definition.class`, `@definition.module`, or
+/// `@definition.interface` nodes whose name matches `name`, then delegates to
+/// the Language trait's `container_body` / `analyze_container_body` methods.
+fn find_container_body_via_tags(
+    tree: &tree_sitter::Tree,
+    tags_query: &tree_sitter::Query,
+    content: &str,
+    name: &str,
+    support: &dyn Language,
+) -> Option<ContainerBody> {
+    let capture_names = tags_query.capture_names();
+
+    let root = tree.root_node();
+    let mut qcursor = tree_sitter::QueryCursor::new();
+    let mut matches = qcursor.matches(tags_query, root, content.as_bytes());
+
+    while let Some(m) = matches.next() {
+        for capture in m.captures {
+            let cn = capture_names[capture.index as usize];
+            if !matches!(
+                cn,
+                "definition.class" | "definition.module" | "definition.interface"
+            ) {
+                continue;
+            }
+            let node = capture.node;
+            let container_name = support.node_name(&node, content)?;
+            if container_name != name {
+                continue;
+            }
+            let body_node = support.container_body(&node)?;
+            let start_byte = node.start_byte();
+            let line_start = content[..start_byte]
+                .rfind('\n')
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            let container_indent: String = content[line_start..start_byte]
+                .chars()
+                .take_while(|c| c.is_whitespace())
+                .collect();
+            let inner_indent = format!("{}    ", container_indent);
+            if let Some(body) = support.analyze_container_body(&body_node, content, &inner_indent) {
+                return Some(body);
+            }
         }
     }
 

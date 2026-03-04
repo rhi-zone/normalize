@@ -838,12 +838,19 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
 
     // If complexity came back empty, check whether any present languages have missing grammars.
     let missing_grammars = if report.functions.is_empty() {
+        use normalize_languages::GrammarLoader;
+        let loader = GrammarLoader::new();
         let mut seen: HashSet<&'static str> = HashSet::new();
         all_files(root, None)
             .iter()
             .filter(|f| f.kind == "file")
             .filter_map(|f| normalize_languages::support_for_path(std::path::Path::new(&f.path)))
-            .filter(|lang| !lang.function_kinds().is_empty())
+            .filter(|lang| {
+                // Language has extractable functions when either:
+                // - it has explicit function_kinds() (trait path), or
+                // - it has a tags.scm that includes definition.function/method captures
+                !lang.function_kinds().is_empty() || loader.get_tags(lang.grammar_name()).is_some()
+            })
             .filter(|lang| parser_for(lang.grammar_name()).is_none())
             .filter(|lang| seen.insert(lang.grammar_name()))
             .map(|lang| lang.name().to_string())

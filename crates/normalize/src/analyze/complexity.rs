@@ -5,6 +5,7 @@
 
 use crate::output::OutputFormatter;
 use crate::parsers;
+use normalize_facts::extract::compute_complexity;
 use normalize_languages::{Language, support_for_path};
 use serde::Serialize;
 use std::path::Path;
@@ -369,10 +370,11 @@ impl ComplexityAnalyzer {
         }
     }
 
-    /// Analyze using the Language trait.
+    /// Analyze using the Language trait, with tags.scm as the preferred path.
     ///
-    /// Prefers a query-based complexity walker (from `.complexity.scm` files) when
-    /// available, falling back to the trait-based `complexity_nodes()` walker.
+    /// When a tags query is available, uses it to identify function/method nodes
+    /// and compute per-function complexity (via `.complexity.scm` when present).
+    /// Falls back to the trait-based walker when `function_kinds()` is non-empty.
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionComplexity> {
         let grammar_name = support.grammar_name();
         let tree = match parsers::parse_with_grammar(grammar_name, content) {
@@ -380,16 +382,41 @@ impl ComplexityAnalyzer {
             None => return Vec::new(),
         };
 
-        let mut functions = Vec::new();
-        let root = tree.root_node();
-
-        // Try query-based complexity counting first
         let loader = parsers::grammar_loader();
+
+        // Try tags-based path first (preferred when a tags query is available).
+        let tags_result = loader
+            .get_tags(grammar_name)
+            .zip(loader.get(grammar_name))
+            .and_then(|(tags_scm, ts_lang)| tree_sitter::Query::new(&ts_lang, &tags_scm).ok())
+            .map(|tags_query| {
+                self.collect_functions_from_tags(
+                    &tree,
+                    &tags_query,
+                    content,
+                    support,
+                    loader.as_ref(),
+                    grammar_name,
+                )
+            });
+        if let Some(result) = tags_result
+            && !result.is_empty()
+        {
+            return result;
+        }
+
+        // Fall back to trait-based walker when function_kinds() is non-empty.
+        if support.function_kinds().is_empty() {
+            return Vec::new();
+        }
+
         let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
             let grammar = loader.get(grammar_name)?;
             tree_sitter::Query::new(&grammar, &scm).ok()
         });
 
+        let mut functions = Vec::new();
+        let root = tree.root_node();
         let mut cursor = root.walk();
         self.collect_functions_with_trait(
             &mut cursor,
@@ -399,6 +426,142 @@ impl ComplexityAnalyzer {
             None,
             complexity_query.as_ref(),
         );
+        functions
+    }
+
+    /// Collect function complexity data using a tags query.
+    ///
+    /// Runs the tags query to find `@definition.function` and `@definition.method`
+    /// nodes, computes complexity for each using the complexity query (if any),
+    /// and reconstructs parent names via line-range containment.
+    fn collect_functions_from_tags(
+        &self,
+        tree: &tree_sitter::Tree,
+        tags_query: &tree_sitter::Query,
+        content: &str,
+        support: &dyn Language,
+        loader: &normalize_languages::GrammarLoader,
+        grammar_name: &str,
+    ) -> Vec<FunctionComplexity> {
+        use streaming_iterator::StreamingIterator;
+
+        let capture_names = tags_query.capture_names();
+
+        // Skip languages whose tags query uses `@reference.implementation` — those
+        // require the trait path for correct nesting (e.g. Rust impl blocks).
+        if capture_names.contains(&"reference.implementation") {
+            return Vec::new();
+        }
+
+        let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
+            let grammar = loader.get(grammar_name)?;
+            tree_sitter::Query::new(&grammar, &scm).ok()
+        });
+
+        let root = tree.root_node();
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        let mut matches = qcursor.matches(tags_query, root, content.as_bytes());
+
+        // Collect (node, capture_name) for all function/method/container definitions.
+        struct TagNode<'t> {
+            node: tree_sitter::Node<'t>,
+            capture_name: String,
+        }
+
+        let mut tag_nodes: Vec<TagNode<'_>> = Vec::new();
+
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                let cn = capture_names[capture.index as usize];
+                if matches!(
+                    cn,
+                    "definition.function"
+                        | "definition.method"
+                        | "definition.class"
+                        | "definition.module"
+                        | "definition.interface"
+                ) {
+                    tag_nodes.push(TagNode {
+                        node: capture.node,
+                        capture_name: cn.to_string(),
+                    });
+                }
+            }
+        }
+
+        if tag_nodes.is_empty() {
+            return Vec::new();
+        }
+
+        // Sort by start line, containers first when lines match.
+        tag_nodes.sort_by(|a, b| {
+            let a_start = a.node.start_position().row;
+            let a_end = a.node.end_position().row;
+            let b_start = b.node.start_position().row;
+            let b_end = b.node.end_position().row;
+            a_start.cmp(&b_start).then(b_end.cmp(&a_end))
+        });
+
+        // De-duplicate identical byte ranges (some queries match the same node twice).
+        tag_nodes.dedup_by(|b, a| {
+            a.node.start_byte() == b.node.start_byte() && a.node.end_byte() == b.node.end_byte()
+        });
+
+        // For each function/method node, find its enclosing container name.
+        let is_container = |cn: &str| {
+            matches!(
+                cn,
+                "definition.class" | "definition.module" | "definition.interface"
+            )
+        };
+
+        let mut functions = Vec::new();
+
+        for i in 0..tag_nodes.len() {
+            let tn = &tag_nodes[i];
+            if is_container(&tn.capture_name) {
+                continue;
+            }
+
+            let fn_start = tn.node.start_position().row + 1;
+            let fn_end = tn.node.end_position().row + 1;
+
+            // Find innermost enclosing container.
+            let parent_name: Option<String> = tag_nodes
+                .iter()
+                .enumerate()
+                .filter(|(j, c)| *j != i && is_container(&c.capture_name))
+                .filter(|(_, c)| {
+                    let c_start = c.node.start_position().row + 1;
+                    let c_end = c.node.end_position().row + 1;
+                    c_start <= fn_start && c_end >= fn_end
+                })
+                // innermost = largest start_line among enclosing containers
+                .max_by_key(|(_, c)| c.node.start_position().row)
+                .and_then(|(_, c)| support.node_name(&c.node, content))
+                .map(|s| s.to_string());
+
+            let name = match support.node_name(&tn.node, content) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+
+            let complexity = if let Some(ref cq) = complexity_query {
+                self.count_complexity_with_query(&tn.node, cq, content)
+            } else {
+                compute_complexity(&tn.node, support, content.as_bytes())
+            };
+
+            functions.push(FunctionComplexity {
+                name,
+                complexity,
+                start_line: fn_start,
+                end_line: fn_end,
+                parent: parent_name,
+                file_path: None,
+            });
+        }
+
         functions
     }
 

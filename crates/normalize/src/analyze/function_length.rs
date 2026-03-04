@@ -6,6 +6,8 @@ use crate::parsers;
 use normalize_languages::{Language, support_for_path};
 use serde::Serialize;
 use std::path::Path;
+use streaming_iterator::StreamingIterator;
+use tree_sitter;
 /// Length classification for functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub enum LengthCategory {
@@ -311,16 +313,153 @@ impl LengthAnalyzer {
         }
     }
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionLength> {
-        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
+        let grammar_name = support.grammar_name();
+        let tree = match parsers::parse_with_grammar(grammar_name, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
+
+        let loader = parsers::grammar_loader();
+
+        // Prefer tags-based path when a tags query is available.
+        let tags_result = loader
+            .get_tags(grammar_name)
+            .zip(loader.get(grammar_name))
+            .and_then(|(tags_scm, ts_lang)| tree_sitter::Query::new(&ts_lang, &tags_scm).ok())
+            .map(|tags_query| {
+                Self::collect_functions_from_tags(&tree, &tags_query, content, support)
+            });
+        if let Some(result) = tags_result
+            && !result.is_empty()
+        {
+            return result;
+        }
+
+        // Fall back to trait-based walker when function_kinds() is non-empty.
+        if support.function_kinds().is_empty() {
+            return Vec::new();
+        }
+
         let mut functions = Vec::new();
         let root = tree.root_node();
         let mut cursor = root.walk();
         Self::collect_functions(&mut cursor, content, support, &mut functions, None);
         functions
     }
+
+    /// Collect function lengths using a tags query.
+    fn collect_functions_from_tags(
+        tree: &tree_sitter::Tree,
+        tags_query: &tree_sitter::Query,
+        content: &str,
+        support: &dyn Language,
+    ) -> Vec<FunctionLength> {
+        let capture_names = tags_query.capture_names();
+
+        // Skip when impl-block references are used (requires trait path for nesting).
+        if capture_names.contains(&"reference.implementation") {
+            return Vec::new();
+        }
+
+        let root = tree.root_node();
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        let mut matches = qcursor.matches(tags_query, root, content.as_bytes());
+
+        struct TagNode<'t> {
+            node: tree_sitter::Node<'t>,
+            capture_name: String,
+        }
+
+        let mut tag_nodes: Vec<TagNode<'_>> = Vec::new();
+
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                let cn = capture_names[capture.index as usize];
+                if matches!(
+                    cn,
+                    "definition.function"
+                        | "definition.method"
+                        | "definition.class"
+                        | "definition.module"
+                        | "definition.interface"
+                ) {
+                    tag_nodes.push(TagNode {
+                        node: capture.node,
+                        capture_name: cn.to_string(),
+                    });
+                }
+            }
+        }
+
+        if tag_nodes.is_empty() {
+            return Vec::new();
+        }
+
+        // Sort by start line, containers first when start lines match.
+        tag_nodes.sort_by(|a, b| {
+            let a_start = a.node.start_position().row;
+            let a_end = a.node.end_position().row;
+            let b_start = b.node.start_position().row;
+            let b_end = b.node.end_position().row;
+            a_start.cmp(&b_start).then(b_end.cmp(&a_end))
+        });
+
+        // De-duplicate identical byte ranges.
+        tag_nodes.dedup_by(|b, a| {
+            a.node.start_byte() == b.node.start_byte() && a.node.end_byte() == b.node.end_byte()
+        });
+
+        let is_container = |cn: &str| {
+            matches!(
+                cn,
+                "definition.class" | "definition.module" | "definition.interface"
+            )
+        };
+
+        let mut functions = Vec::new();
+
+        for i in 0..tag_nodes.len() {
+            let tn = &tag_nodes[i];
+            if is_container(&tn.capture_name) {
+                continue;
+            }
+
+            let fn_start = tn.node.start_position().row + 1;
+            let fn_end = tn.node.end_position().row + 1;
+
+            // Find innermost enclosing container for the parent name.
+            let parent_name: Option<String> = tag_nodes
+                .iter()
+                .enumerate()
+                .filter(|(j, c)| *j != i && is_container(&c.capture_name))
+                .filter(|(_, c)| {
+                    let c_start = c.node.start_position().row + 1;
+                    let c_end = c.node.end_position().row + 1;
+                    c_start <= fn_start && c_end >= fn_end
+                })
+                .max_by_key(|(_, c)| c.node.start_position().row)
+                .and_then(|(_, c)| support.node_name(&c.node, content))
+                .map(|s| s.to_string());
+
+            let name = match support.node_name(&tn.node, content) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+
+            let lines = fn_end.saturating_sub(fn_start) + 1;
+            functions.push(FunctionLength {
+                name,
+                lines,
+                start_line: fn_start,
+                end_line: fn_end,
+                parent: parent_name,
+                file_path: None,
+            });
+        }
+
+        functions
+    }
+
     fn collect_functions(
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
