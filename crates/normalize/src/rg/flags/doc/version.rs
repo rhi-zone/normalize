@@ -13,7 +13,7 @@ use std::fmt::Write;
 ///
 /// This includes the git revision hash.
 pub(crate) fn generate_digits() -> String {
-    let semver = option_env!("CARGO_PKG_VERSION").unwrap_or("N/A");
+    let semver = "15.1.0";
     match option_env!("RIPGREP_BUILD_GIT_HASH") {
         None => semver.to_string(),
         Some(hash) => format!("{semver} (rev {hash})"),
