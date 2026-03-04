@@ -1,6 +1,6 @@
 //! Yuri language support (tree-sitter-yuri).
 
-use crate::{Import, Language, Symbol, Visibility};
+use crate::{Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// Yuri language support.
@@ -17,10 +17,6 @@ impl Language for Yuri {
         "yuri"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(
         &self,
         _node: &Node,
@@ -34,14 +30,6 @@ impl Language for Yuri {
     }
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // Yuri has no import mechanism
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

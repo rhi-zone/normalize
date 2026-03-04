@@ -33,10 +33,6 @@ impl Language for D {
         "d"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

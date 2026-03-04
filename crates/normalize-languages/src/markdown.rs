@@ -1,6 +1,6 @@
 //! Markdown language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Markdown language support.
@@ -15,10 +15,6 @@ impl Language for Markdown {
     }
     fn grammar_name(&self) -> &'static str {
         "markdown"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     // Markdown sections are modeled as `section` nodes in the grammar,
@@ -79,14 +75,6 @@ impl Language for Markdown {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // Markdown has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

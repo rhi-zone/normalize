@@ -17,10 +17,6 @@ impl Language for Bash {
         "bash"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         Some(Symbol {
@@ -44,9 +40,6 @@ impl Language for Bash {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
     }
 
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {

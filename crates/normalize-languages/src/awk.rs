@@ -1,6 +1,6 @@
 //! AWK language support.
 
-use crate::{Import, Language, Symbol, Visibility, simple_function_symbol};
+use crate::{Language, Symbol, Visibility, simple_function_symbol};
 use tree_sitter::Node;
 
 /// AWK language support.
@@ -17,10 +17,6 @@ impl Language for Awk {
         "awk"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         Some(simple_function_symbol(node, content, name, None))
@@ -31,15 +27,6 @@ impl Language for Awk {
     }
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // AWK has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

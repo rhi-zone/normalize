@@ -17,10 +17,6 @@ impl Language for Cpp {
         "cpp"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

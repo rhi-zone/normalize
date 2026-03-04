@@ -17,10 +17,6 @@ impl Language for Ruby {
         "ruby"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn signature_suffix(&self) -> &'static str {
         "; end"
     }
@@ -81,9 +77,6 @@ impl Language for Ruby {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
     }
 
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {

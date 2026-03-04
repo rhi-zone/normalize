@@ -1,6 +1,6 @@
 //! JSON language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// JSON language support.
@@ -56,14 +56,6 @@ impl Language for Json {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // JSON has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

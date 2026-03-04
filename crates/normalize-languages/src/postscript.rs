@@ -1,6 +1,6 @@
 //! PostScript support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// PostScript language support.
@@ -15,10 +15,6 @@ impl Language for PostScript {
     }
     fn grammar_name(&self) -> &'static str {
         "postscript"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -51,14 +47,6 @@ impl Language for PostScript {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // PostScript has no standard import mechanism
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

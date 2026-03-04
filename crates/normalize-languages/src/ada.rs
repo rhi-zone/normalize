@@ -17,10 +17,6 @@ impl Language for Ada {
         "ada"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         match node.kind() {
             "subprogram_declaration" | "subprogram_body" | "expression_function_declaration" => {

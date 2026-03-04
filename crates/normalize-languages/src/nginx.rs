@@ -17,10 +17,6 @@ impl Language for Nginx {
         "nginx"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(
         &self,
         _node: &Node,

@@ -35,10 +35,6 @@ impl Language for Kotlin {
         "kotlin"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

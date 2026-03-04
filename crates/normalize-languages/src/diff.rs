@@ -1,6 +1,6 @@
 //! Diff/patch file support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Diff language support.
@@ -15,10 +15,6 @@ impl Language for Diff {
     }
     fn grammar_name(&self) -> &'static str {
         "diff"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     fn extract_function(
@@ -62,14 +58,6 @@ impl Language for Diff {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // Diff has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

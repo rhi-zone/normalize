@@ -17,10 +17,6 @@ impl Language for R {
         "r"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         // R functions are typically assigned: name <- function(...) {}
         // We need to look at the parent assignment (binary_operator in R grammar)

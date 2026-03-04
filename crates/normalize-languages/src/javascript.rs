@@ -18,10 +18,6 @@ impl Language for JavaScript {
         "javascript"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

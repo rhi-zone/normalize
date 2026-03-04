@@ -21,10 +21,6 @@ impl Language for Python {
         "python"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
 

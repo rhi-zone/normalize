@@ -1,6 +1,6 @@
 //! KDL (KDocument Language) support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// KDL language support.
@@ -15,10 +15,6 @@ impl Language for Kdl {
     }
     fn grammar_name(&self) -> &'static str {
         "kdl"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     fn extract_function(
@@ -56,14 +52,6 @@ impl Language for Kdl {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // KDL has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

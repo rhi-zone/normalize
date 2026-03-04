@@ -17,10 +17,6 @@ impl Language for Agda {
         "agda"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "function" && node.kind() != "signature" {
             return None;

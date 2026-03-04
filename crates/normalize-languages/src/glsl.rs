@@ -1,8 +1,6 @@
 //! GLSL (OpenGL Shading Language) support.
 
-use crate::{
-    ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
-};
+use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility, simple_function_symbol};
 use tree_sitter::Node;
 
 /// GLSL language support.
@@ -17,10 +15,6 @@ impl Language for Glsl {
     }
     fn grammar_name(&self) -> &'static str {
         "glsl"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -54,15 +48,6 @@ impl Language for Glsl {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // GLSL has no standard import mechanism (uses #include via extensions)
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

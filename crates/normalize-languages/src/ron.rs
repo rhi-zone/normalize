@@ -1,6 +1,6 @@
 //! RON (Rusty Object Notation) support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// RON language support.
@@ -15,10 +15,6 @@ impl Language for Ron {
     }
     fn grammar_name(&self) -> &'static str {
         "ron"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     fn extract_function(
@@ -59,15 +55,6 @@ impl Language for Ron {
             return None;
         }
         self.extract_container(node, content)
-    }
-
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // RON has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

@@ -17,10 +17,6 @@ impl Language for Batch {
         "batch"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "function_definition" {
             return None;
@@ -49,9 +45,6 @@ impl Language for Batch {
     }
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new() // batch grammar doesn't have import nodes
     }
 
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {

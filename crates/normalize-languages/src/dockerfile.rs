@@ -17,10 +17,6 @@ impl Language for Dockerfile {
         "dockerfile"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     // Dockerfiles have stages (FROM ... AS name) that act as containers
 
     // No functions in Dockerfile

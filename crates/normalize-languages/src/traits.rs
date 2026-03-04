@@ -96,7 +96,9 @@ pub trait Language: Send + Sync {
     fn grammar_name(&self) -> &'static str;
 
     /// Whether this language has code symbols (functions, classes, etc.)
-    fn has_symbols(&self) -> bool;
+    fn has_symbols(&self) -> bool {
+        true
+    }
 
     // === Symbol Extraction ===
 
@@ -112,12 +114,16 @@ pub trait Language: Send + Sync {
     // === Import/Export ===
 
     /// Extract imports from an import node (may return multiple)
-    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import>;
+    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
+        Vec::new()
+    }
 
     /// Format an import as source code.
     /// If `names` is Some, only include those names (for multi-import filtering).
     /// If `names` is None, format the complete import.
-    fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String;
+    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
+        String::new()
+    }
 
     // === Display/Formatting ===
 

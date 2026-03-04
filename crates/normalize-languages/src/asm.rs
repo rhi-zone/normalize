@@ -17,10 +17,6 @@ impl Language for Asm {
         "asm"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "label" {
             return None;
@@ -52,11 +48,6 @@ impl Language for Asm {
     }
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new() // asm grammar doesn't have imports
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // Assembly has no standard import mechanism
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

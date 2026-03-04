@@ -21,10 +21,6 @@ impl Language for TypeScript {
         "typescript"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

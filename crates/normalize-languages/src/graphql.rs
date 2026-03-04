@@ -1,6 +1,6 @@
 //! GraphQL language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_symbol};
+use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility, simple_symbol};
 use tree_sitter::Node;
 
 /// GraphQL language support.
@@ -39,10 +39,6 @@ impl Language for GraphQL {
     }
     fn grammar_name(&self) -> &'static str {
         "graphql"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -88,15 +84,6 @@ impl Language for GraphQL {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
-        Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // GraphQL has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

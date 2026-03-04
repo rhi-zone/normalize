@@ -17,10 +17,6 @@ impl Language for Hcl {
         "hcl"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(
         &self,
         _node: &Node,
@@ -99,11 +95,6 @@ impl Language for Hcl {
         }
 
         Vec::new()
-    }
-
-    fn format_import(&self, _import: &Import, _names: Option<&[&str]>) -> String {
-        // HCL has no imports
-        String::new()
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

@@ -17,10 +17,6 @@ impl Language for Prolog {
         "prolog"
     }
 
-    fn has_symbols(&self) -> bool {
-        true
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "clause_term" {
             return None;
