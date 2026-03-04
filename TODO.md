@@ -212,6 +212,7 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 - [ ] `duplicates`: collapse 7 commands (duplicate-functions/blocks/types, similar-functions/blocks, clusters, patterns)
 - [ ] `deps`: collapse 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact)
 - [ ] `docs`: collapse 4 commands (docs, check-refs, stale-docs, check-examples)
+- [ ] `git`: collapse 4 commands (ownership, contributors, activity, repo-coupling) — all git/repo-centric analysis
 - [ ] Cross-cutting `--trend` and `--diff <ref>` modifiers on any scoring command
 
 **Design pressure:** ~43 commands after Phase 2 is still too spread out. Phase 3 must happen. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
