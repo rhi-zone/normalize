@@ -4,6 +4,7 @@ use normalize_facts_core::TypeRef;
 use normalize_facts_core::TypeRefKind;
 use normalize_languages::{Language, Symbol as LangSymbol, support_for_grammar, support_for_path};
 use std::path::Path;
+use streaming_iterator::StreamingIterator;
 
 // Re-export for use by other modules in this crate
 pub use normalize_facts_core::{FlatImport, FlatSymbol};
@@ -201,62 +202,12 @@ impl SymbolParser {
             None => return Vec::new(),
         };
 
-        // Extract symbol source
-        let lines: Vec<&str> = content.lines().collect();
-        let start = symbol.start_line.saturating_sub(1);
-        let end = symbol.end_line.min(lines.len());
-        let source = lines[start..end].join("\n");
-
-        let lang = support_for_path(path).map(|s| s.name());
-        match lang {
-            Some("Python") => self.find_python_calls(&source),
-            Some("Rust") => self.find_rust_calls(&source),
-            _ => Vec::new(),
-        }
-    }
-
-    fn find_python_calls(&self, source: &str) -> Vec<String> {
-        let tree = match parsers::parse_with_grammar("python", source) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut calls = std::collections::HashSet::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_python_calls(&mut cursor, source, &mut calls);
-
-        let mut result: Vec<_> = calls.into_iter().collect();
+        let calls = self.find_callees_for_symbol(path, content, &symbol);
+        let mut unique: std::collections::HashSet<String> =
+            calls.into_iter().map(|(name, _, _)| name).collect();
+        let mut result: Vec<_> = unique.drain().collect();
         result.sort();
         result
-    }
-
-    fn collect_python_calls(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        calls: &mut std::collections::HashSet<String>,
-    ) {
-        loop {
-            let node = cursor.node();
-
-            if node.kind() == "call" {
-                // Get the function being called
-                if let Some(func_node) = node.child_by_field_name("function") {
-                    let func_text = &content[func_node.byte_range()];
-                    // Extract just the function name (last part if dotted)
-                    let name = func_text.split('.').next_back().unwrap_or(func_text);
-                    calls.insert(name.to_string());
-                }
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_python_calls(cursor, content, calls);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
     }
 
     /// Find callees with line numbers (for call graph indexing)
@@ -285,323 +236,87 @@ impl SymbolParser {
         content: &str,
         symbol: &FlatSymbol,
     ) -> Vec<(String, usize, Option<String>)> {
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+
+        let grammar_name = support.grammar_name();
+        let loader = normalize_languages::parsers::grammar_loader();
+
+        let calls_query = match loader.get_calls(grammar_name) {
+            Some(scm) => scm,
+            None => return Vec::new(),
+        };
+
+        let grammar = match loader.get(grammar_name) {
+            Some(g) => g,
+            None => return Vec::new(),
+        };
+
+        let query = match tree_sitter::Query::new(&grammar, &calls_query) {
+            Ok(q) => q,
+            Err(_) => return Vec::new(),
+        };
+
         let lines: Vec<&str> = content.lines().collect();
         let start = symbol.start_line.saturating_sub(1);
         let end = symbol.end_line.min(lines.len());
         let source = lines[start..end].join("\n");
 
-        let lang = support_for_path(path).map(|s| s.name());
-        match lang {
-            Some("Python") => self.find_python_calls_with_lines(&source, symbol.start_line),
-            Some("Rust") => self.find_rust_calls_with_lines(&source, symbol.start_line),
-            Some("TSX") => self.find_typescript_calls_with_lines(&source, symbol.start_line, true),
-            Some("TypeScript") => {
-                self.find_typescript_calls_with_lines(&source, symbol.start_line, false)
-            }
-            Some("JavaScript") => self.find_javascript_calls_with_lines(&source, symbol.start_line),
-            Some("Java") => self.find_java_calls_with_lines(&source, symbol.start_line),
-            Some("Go") => self.find_go_calls_with_lines(&source, symbol.start_line),
-            _ => Vec::new(),
-        }
-    }
-
-    fn find_python_calls_with_lines(
-        &self,
-        source: &str,
-        base_line: usize,
-    ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match parsers::parse_with_grammar("python", source) {
+        let tree = match parsers::parse_with_grammar(grammar_name, &source) {
             Some(t) => t,
             None => return Vec::new(),
         };
 
-        let mut calls = Vec::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_python_calls_with_lines(&mut cursor, source, base_line, &mut calls);
-        calls
+        Self::collect_calls_with_query(&tree.root_node(), &source, &query, symbol.start_line)
     }
 
-    fn collect_python_calls_with_lines(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
+    /// Generic query-based call extraction using `@call` and `@call.qualifier` captures.
+    fn collect_calls_with_query(
+        root: &tree_sitter::Node,
+        source: &str,
+        query: &tree_sitter::Query,
         base_line: usize,
-        calls: &mut Vec<(String, usize, Option<String>)>,
-    ) {
-        loop {
-            let node = cursor.node();
+    ) -> Vec<(String, usize, Option<String>)> {
+        let call_idx = query.capture_names().iter().position(|n| *n == "call");
+        let qualifier_idx = query
+            .capture_names()
+            .iter()
+            .position(|n| *n == "call.qualifier");
 
-            if node.kind() == "call"
-                && let Some(func_node) = node.child_by_field_name("function")
-            {
-                let func_text = &content[func_node.byte_range()];
-                let line = node.start_position().row + base_line;
+        let Some(call_idx) = call_idx else {
+            return Vec::new();
+        };
 
-                // Parse qualifier.name or just name
-                if let Some(dot_pos) = func_text.rfind('.') {
-                    let qualifier = &func_text[..dot_pos];
-                    let name = &func_text[dot_pos + 1..];
-                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
-                } else {
-                    calls.push((func_text.to_string(), line, None));
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        let mut calls = Vec::new();
+
+        let mut matches = qcursor.matches(query, *root, source.as_bytes());
+        while let Some(m) = matches.next() {
+            let mut name: Option<(&str, usize)> = None;
+            let mut qualifier: Option<&str> = None;
+
+            for capture in m.captures {
+                if capture.index as usize == call_idx {
+                    let text = &source[capture.node.byte_range()];
+                    let line = capture.node.start_position().row + base_line;
+                    name = Some((text, line));
+                } else if Some(capture.index as usize) == qualifier_idx {
+                    qualifier = Some(&source[capture.node.byte_range()]);
                 }
             }
 
-            if cursor.goto_first_child() {
-                Self::collect_python_calls_with_lines(cursor, content, base_line, calls);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    fn find_rust_calls_with_lines(
-        &self,
-        source: &str,
-        base_line: usize,
-    ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match parsers::parse_with_grammar("rust", source) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut calls = Vec::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_rust_calls_with_lines(&mut cursor, source, base_line, &mut calls);
-        calls
-    }
-
-    fn collect_rust_calls_with_lines(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        base_line: usize,
-        calls: &mut Vec<(String, usize, Option<String>)>,
-    ) {
-        loop {
-            let node = cursor.node();
-
-            if node.kind() == "call_expression"
-                && let Some(func_node) = node.child_by_field_name("function")
-            {
-                let func_text = &content[func_node.byte_range()];
-                let line = node.start_position().row + base_line;
-
-                // Parse qualifier::name, qualifier.name, or just name
-                // For Rust: foo::bar() or foo.bar() or bar()
-                if let Some(sep_pos) = func_text.rfind("::").or_else(|| func_text.rfind('.')) {
-                    let sep_len = if func_text[sep_pos..].starts_with("::") {
-                        2
-                    } else {
-                        1
-                    };
-                    let qualifier = &func_text[..sep_pos];
-                    let name = &func_text[sep_pos + sep_len..];
-                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
-                } else {
-                    calls.push((func_text.to_string(), line, None));
-                }
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_rust_calls_with_lines(cursor, content, base_line, calls);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
+            if let Some((call_name, line)) = name {
+                calls.push((
+                    call_name.to_string(),
+                    line,
+                    qualifier.map(|q| q.to_string()),
+                ));
             }
         }
-    }
 
-    fn find_typescript_calls_with_lines(
-        &self,
-        source: &str,
-        base_line: usize,
-        is_tsx: bool,
-    ) -> Vec<(String, usize, Option<String>)> {
-        let grammar = if is_tsx { "tsx" } else { "typescript" };
-        let tree = match parsers::parse_with_grammar(grammar, source) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut calls = Vec::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
         calls
-    }
-
-    fn find_javascript_calls_with_lines(
-        &self,
-        source: &str,
-        base_line: usize,
-    ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match parsers::parse_with_grammar("javascript", source) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut calls = Vec::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
-        calls
-    }
-
-    /// Shared implementation for JavaScript and TypeScript call extraction
-    fn collect_js_ts_calls_with_lines(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        base_line: usize,
-        calls: &mut Vec<(String, usize, Option<String>)>,
-    ) {
-        loop {
-            let node = cursor.node();
-
-            if node.kind() == "call_expression"
-                && let Some(func_node) = node.child_by_field_name("function")
-            {
-                let func_text = &content[func_node.byte_range()];
-                let line = node.start_position().row + base_line;
-
-                // Parse qualifier.name or just name (e.g., obj.method(), func())
-                if let Some(dot_pos) = func_text.rfind('.') {
-                    let qualifier = &func_text[..dot_pos];
-                    let name = &func_text[dot_pos + 1..];
-                    calls.push((name.to_string(), line, Some(qualifier.to_string())));
-                } else {
-                    calls.push((func_text.to_string(), line, None));
-                }
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_js_ts_calls_with_lines(cursor, content, base_line, calls);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    fn find_java_calls_with_lines(
-        &self,
-        source: &str,
-        base_line: usize,
-    ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match parsers::parse_with_grammar("java", source) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut calls = Vec::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_java_calls_with_lines(&mut cursor, source, base_line, &mut calls);
-        calls
-    }
-
-    fn collect_java_calls_with_lines(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        base_line: usize,
-        calls: &mut Vec<(String, usize, Option<String>)>,
-    ) {
-        loop {
-            let node = cursor.node();
-
-            // Java uses "method_invocation" for method calls
-            if node.kind() == "method_invocation"
-                && let Some(name_node) = node.child_by_field_name("name")
-            {
-                let name = &content[name_node.byte_range()];
-                let line = node.start_position().row + base_line;
-
-                // Get the object/qualifier if present
-                let qualifier = node
-                    .child_by_field_name("object")
-                    .map(|obj| content[obj.byte_range()].to_string());
-
-                calls.push((name.to_string(), line, qualifier));
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_java_calls_with_lines(cursor, content, base_line, calls);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    fn find_go_calls_with_lines(
-        &self,
-        source: &str,
-        base_line: usize,
-    ) -> Vec<(String, usize, Option<String>)> {
-        let tree = match parsers::parse_with_grammar("go", source) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        // Go dot-separated call syntax matches JS/TS: obj.method() → same pattern
-        let mut calls = Vec::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_js_ts_calls_with_lines(&mut cursor, source, base_line, &mut calls);
-        calls
-    }
-
-    fn find_rust_calls(&self, source: &str) -> Vec<String> {
-        let tree = match parsers::parse_with_grammar("rust", source) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut calls = std::collections::HashSet::new();
-        let mut cursor = tree.root_node().walk();
-        Self::collect_rust_calls(&mut cursor, source, &mut calls);
-
-        let mut result: Vec<_> = calls.into_iter().collect();
-        result.sort();
-        result
-    }
-
-    fn collect_rust_calls(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        calls: &mut std::collections::HashSet<String>,
-    ) {
-        loop {
-            let node = cursor.node();
-
-            if node.kind() == "call_expression" {
-                // Get the function being called
-                if let Some(func_node) = node.child_by_field_name("function") {
-                    let func_text = &content[func_node.byte_range()];
-                    // Extract just the function name
-                    let name = func_text
-                        .split("::")
-                        .last()
-                        .unwrap_or(func_text)
-                        .split('.')
-                        .next_back()
-                        .unwrap_or(func_text);
-                    calls.insert(name.to_string());
-                }
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_rust_calls(cursor, content, calls);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
     }
 
     /// Extract type references from a source file.
@@ -1308,11 +1023,12 @@ impl SymbolParser {
             if *is_dir {
                 continue;
             }
-            if !path.ends_with(".py") && !path.ends_with(".rs") {
-                continue;
-            }
 
             let full_path = root.join(path);
+            // Skip files without language support or calls query
+            if support_for_path(&full_path).is_none() {
+                continue;
+            }
             let content = match std::fs::read_to_string(&full_path) {
                 Ok(c) => c,
                 Err(_) => continue,
