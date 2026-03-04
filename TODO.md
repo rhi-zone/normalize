@@ -82,30 +82,24 @@ The `Language` trait has several methods that return `&'static [&'static str]` �
 tree-sitter node type names. These are tree-sitter queries expressed as Rust data instead of
 using the query system. See `docs/architecture-decisions.md` ("scm Query Files over Rust").
 
-Candidates for migration to `*.{concept}.scm` query files:
-- `complexity_nodes()` + `nesting_nodes()` → `*.complexity.scm` with `@complexity`/`@nesting`
-- `control_flow_kinds()` → same file or `*.control_flow.scm`
-- `scope_creating_kinds()` → already covered by `@local.scope` in `*.locals.scm`
-- call extraction (currently missing entirely) → `*.calls.scm` with `@call`
+Completed migrations:
+- [x] `complexity_nodes()` + `nesting_nodes()` → `*.complexity.scm` (12 languages)
+- [x] call extraction → `*.calls.scm` + generic walker in `symbols.rs` (7 languages)
+- [x] `GrammarLoader::get_complexity()` + `get_calls()` added
 
-Migration path per method:
-- [ ] Add `GrammarLoader::get_complexity(name)` (mirrors `get_locals`)
-- [ ] Add `GrammarLoader::get_calls(name)`
-- [ ] Write `*.complexity.scm` for high-value languages (Rust, Python, Go, JS/TS, Java, C/C++)
-- [ ] Write `*.calls.scm` for same
-- [ ] Replace `complexity_nodes()`/`nesting_nodes()` callers with query-based walker
-- [ ] Replace call-finding inline code in `symbols.rs` with query-based walker
-- [ ] Deprecate and remove migrated trait methods
-
-### Language trait: call extraction — design gap
-
-`normalize-facts/src/symbols.rs` contains per-language inline call-finders
-(Python, Rust, TypeScript, JavaScript, Java, Go) because the `Language` trait
-has no `call_kinds()` or `extract_calls()` method. This is the reason hardcoded
-language dispatch existed there in the first place (now uses language name via
-registry, but still hardcoded to 6 languages).
-
-- [ ] Add `call_node_kinds() -> &'static [&'static str]` to `Language` trait (or equivalent)
+Next candidates:
+- [ ] **`*.tags.scm`** — tree-sitter standard for symbol definitions/references
+  (`@name.definition.function`, `@name.definition.class`, etc.). Community-maintained
+  files exist for most languages. Would replace `container_kinds()`, `function_kinds()`,
+  `type_kinds()`, `extract_function()`, `extract_container()`, `extract_type()` — the
+  entire symbol extraction infrastructure. Highest leverage, largest deletion.
+- [x] **`*.types.scm`** — type reference extraction. Replaced cursor-based
+  `collect_type_identifiers()` in `view/symbol.rs` with query walker; fallback retained
+  for grammars without a bundled query. (rust, typescript, tsx, python)
+- [ ] **`*.imports.scm`** — import/require statement extraction. Would replace `import_kinds()`
+  + `extract_imports()` across ~98 language impls. Captures: `@import.path`, `@import.name`.
+- [ ] Remove now-redundant trait methods once .scm is source of truth:
+  `complexity_nodes()`, `nesting_nodes()`, `control_flow_kinds()`, `scope_creating_kinds()`
 - [ ] Implement for all languages that have call extraction (start with the 6 already in symbols.rs)
 - [ ] Replace per-language inline walkers in `symbols.rs` with a generic walker over `call_node_kinds()`
 - [ ] This also fixes the fact that call extraction is silently missing for the other 92 languages
