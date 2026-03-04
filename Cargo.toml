@@ -35,6 +35,7 @@ members = [
     "crates/normalize-deps",
     "crates/normalize-filter",
     "crates/normalize-scope",
+    "crates/normalize-graph",
     "xtask",
 ]
 

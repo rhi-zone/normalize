@@ -60,6 +60,7 @@ normalize-rules-loader = { path = "../normalize-rules-loader", version = "0.1.0"
 normalize-deps = { path = "../normalize-deps", version = "0.1.0" }
 normalize-filter = { path = "../normalize-filter", version = "0.1.0", features = ["config"] }
 normalize-scope = { path = "../normalize-scope", version = "0.1.0" }
+normalize-graph = { path = "../normalize-graph", version = "0.1.0" }
 normalize-tools = { path = "../normalize-tools", version = "0.1.0" }
 server-less = { workspace = true, optional = true }
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }

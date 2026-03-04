@@ -3439,6 +3439,7 @@ dependencies = [
  "normalize-facts-rules-api",
  "normalize-facts-rules-interpret",
  "normalize-filter",
+ "normalize-graph",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-openapi",
@@ -3722,6 +3723,15 @@ dependencies = [
  "arborium-yuri",
  "arborium-zig",
  "arborium-zsh",
+]
+
+[[package]]
+name = "normalize-graph"
+version = "0.1.0"
+dependencies = [
+ "normalize-output",
+ "schemars",
+ "serde",
 ]
 
 [[package]]

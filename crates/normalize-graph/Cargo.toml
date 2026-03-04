@@ -1,0 +1,12 @@
+[package]
+name = "normalize-graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Pure graph algorithms for normalize: SCC, bridges, diamonds, chains, transitive edges"
+
+[dependencies]
+serde = { workspace = true }
+schemars = "1"
+normalize-output = { path = "../normalize-output", version = "0.1.0" }
