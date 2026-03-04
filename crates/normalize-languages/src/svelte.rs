@@ -191,13 +191,9 @@ impl Language for Svelte {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        text.contains("export ")
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
+        let text = &content[node.byte_range()];
+        if text.contains("export ") {
             Visibility::Public
         } else {
             Visibility::Private

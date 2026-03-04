@@ -161,11 +161,6 @@ impl Language for Lean {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        !text.contains("private") && !text.contains("protected")
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let text = &content[node.byte_range()];
         if text.contains("private") {

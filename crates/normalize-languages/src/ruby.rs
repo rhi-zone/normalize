@@ -120,10 +120,6 @@ impl Language for Ruby {
             line: node.start_position().row + 1,
         }]
     }
-
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

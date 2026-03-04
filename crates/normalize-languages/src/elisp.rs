@@ -196,16 +196,12 @@ impl Language for Elisp {
         format!("(require '{})", import.module)
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        !text.contains("--")
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
-            Visibility::Public
-        } else {
+        let text = &content[node.byte_range()];
+        if text.contains("--") {
             Visibility::Private
+        } else {
+            Visibility::Public
         }
     }
 

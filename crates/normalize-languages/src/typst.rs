@@ -108,10 +108,6 @@ impl Language for Typst {
             format!("#import \"{}\": {}", import.module, names_to_use.join(", "))
         }
     }
-
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

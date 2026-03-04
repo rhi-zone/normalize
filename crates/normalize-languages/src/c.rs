@@ -131,10 +131,6 @@ impl Language for C {
         }
     }
 
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true // C doesn't have visibility modifiers
-    }
-
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

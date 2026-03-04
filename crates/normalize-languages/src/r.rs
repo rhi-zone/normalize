@@ -171,13 +171,11 @@ impl Language for R {
         format!("library({})", import.module)
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        node.child(0)
-            .is_none_or(|n| !content[n.byte_range()].starts_with('.'))
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
+        if node
+            .child(0)
+            .is_none_or(|n| !content[n.byte_range()].starts_with('.'))
+        {
             Visibility::Public
         } else {
             Visibility::Private

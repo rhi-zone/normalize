@@ -182,19 +182,15 @@ impl Language for Clojure {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        if let Some((form, _)) = self.extract_def_form(node, content) {
-            !form.ends_with('-')
-        } else {
-            true
-        }
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
-            Visibility::Public
+        if let Some((form, _)) = self.extract_def_form(node, content) {
+            if form.ends_with('-') {
+                Visibility::Private
+            } else {
+                Visibility::Public
+            }
         } else {
-            Visibility::Private
+            Visibility::Public
         }
     }
 

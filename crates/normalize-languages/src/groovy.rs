@@ -164,11 +164,6 @@ impl Language for Groovy {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        !text.starts_with("private") && !text.starts_with("protected")
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let text = &content[node.byte_range()];
         if text.starts_with("private") {

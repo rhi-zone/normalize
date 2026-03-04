@@ -154,11 +154,6 @@ impl Language for VB {
         format!("Imports {}", import.module)
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        text.to_lowercase().contains("public") || !text.to_lowercase().contains("private")
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let text = &content[node.byte_range()];
         let lower = text.to_lowercase();

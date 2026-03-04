@@ -237,10 +237,6 @@ impl Language for CSharp {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        self.get_visibility(node, content) == Visibility::Public
-    }
-
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();
         match symbol.kind {

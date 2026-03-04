@@ -79,10 +79,6 @@ impl Language for Vue {
     fn extract_public_symbols(&self, _node: &Node, _content: &str) -> Vec<Export> {
         Vec::new()
     }
-
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

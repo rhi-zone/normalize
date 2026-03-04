@@ -298,7 +298,7 @@ impl Language for Rust {
         let line = node.start_position().row + 1;
 
         // Only export pub items
-        if !self.is_public(node, content) {
+        if self.get_visibility(node, content) != Visibility::Public {
             return Vec::new();
         }
 
@@ -316,17 +316,6 @@ impl Language for Rust {
         };
 
         vec![Export { name, kind, line }]
-    }
-
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "visibility_modifier" {
-                let vis = &content[child.byte_range()];
-                return vis.starts_with("pub");
-            }
-        }
-        false
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {

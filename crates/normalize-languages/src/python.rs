@@ -307,15 +307,6 @@ impl Language for Python {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        if let Some(name) = self.node_name(node, content) {
-            // Public if doesn't start with _ or is dunder method
-            !name.starts_with('_') || name.starts_with("__")
-        } else {
-            true
-        }
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         if let Some(name) = self.node_name(node, content) {
             if name.starts_with("__") && name.ends_with("__") {

@@ -170,15 +170,13 @@ impl Language for Go {
         }]
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        self.node_name(node, content)
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
+        let is_exported = self
+            .node_name(node, content)
             .and_then(|n| n.chars().next())
             .map(|c| c.is_uppercase())
-            .unwrap_or(false)
-    }
-
-    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
+            .unwrap_or(false);
+        if is_exported {
             Visibility::Public
         } else {
             Visibility::Private

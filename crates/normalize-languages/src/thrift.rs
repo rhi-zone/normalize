@@ -125,10 +125,6 @@ impl Language for Thrift {
         // Thrift: include "file.thrift"
         format!("include \"{}\"", import.module)
     }
-
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

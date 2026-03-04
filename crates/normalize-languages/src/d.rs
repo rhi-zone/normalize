@@ -49,7 +49,7 @@ impl Language for D {
                 }
             }
             "class_declaration" | "struct_declaration" | "interface_declaration" => {
-                if self.is_public(node, content)
+                if self.get_visibility(node, content) == Visibility::Public
                     && let Some(name) = self.node_name(node, content)
                 {
                     return vec![Export {
@@ -60,7 +60,7 @@ impl Language for D {
                 }
             }
             "auto_declaration" | "function_literal" => {
-                if self.is_public(node, content)
+                if self.get_visibility(node, content) == Visibility::Public
                     && let Some(name) = self.node_name(node, content)
                 {
                     return vec![Export {
@@ -214,11 +214,6 @@ impl Language for D {
         } else {
             format!("import {} : {};", import.module, names_to_use.join(", "))
         }
-    }
-
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        text.starts_with("public ") || !text.starts_with("private ")
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {

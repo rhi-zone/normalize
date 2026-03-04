@@ -223,11 +223,6 @@ impl Language for Erlang {
         }
     }
 
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        // Would need module-level export analysis
-        true
-    }
-
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

@@ -248,10 +248,6 @@ impl Language for Swift {
         format!("import {}", import.module)
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        self.get_visibility(node, content) == Visibility::Public
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }

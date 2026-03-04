@@ -139,9 +139,6 @@ pub trait Language: Send + Sync {
 
     // === Visibility ===
 
-    /// Check if a node is public/exported
-    fn is_public(&self, node: &Node, content: &str) -> bool;
-
     /// Get visibility of a node
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility;
 

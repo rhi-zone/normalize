@@ -184,12 +184,8 @@ impl Language for Gleam {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        content[node.byte_range()].starts_with("pub ")
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
+        if content[node.byte_range()].starts_with("pub ") {
             Visibility::Public
         } else {
             Visibility::Private

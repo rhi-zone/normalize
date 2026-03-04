@@ -166,19 +166,15 @@ impl Language for Scss {
         format!("@import \"{}\"", import.module)
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        if let Some(name) = self.node_name(node, content) {
-            !name.starts_with('_')
-        } else {
-            true
-        }
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
-            Visibility::Public
+        if let Some(name) = self.node_name(node, content) {
+            if name.starts_with('_') {
+                Visibility::Private
+            } else {
+                Visibility::Public
+            }
         } else {
-            Visibility::Private
+            Visibility::Public
         }
     }
 

@@ -159,13 +159,11 @@ impl Language for Vim {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        self.node_name(node, content)
-            .is_none_or(|n| !n.starts_with("s:"))
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
+        if self
+            .node_name(node, content)
+            .is_none_or(|n| !n.starts_with("s:"))
+        {
             Visibility::Public
         } else {
             Visibility::Private

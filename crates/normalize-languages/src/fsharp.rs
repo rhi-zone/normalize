@@ -22,7 +22,7 @@ impl Language for FSharp {
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if !self.is_public(node, content) {
+        if self.get_visibility(node, content) != Visibility::Public {
             return Vec::new();
         }
 
@@ -170,12 +170,6 @@ impl Language for FSharp {
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // F#: open Namespace
         format!("open {}", import.module)
-    }
-
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        // F# defaults to public in modules
-        !text.contains("private ") && !text.contains("internal ")
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {

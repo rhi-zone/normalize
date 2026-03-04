@@ -22,7 +22,7 @@ impl Language for Zig {
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if !self.is_public(node, content) {
+        if self.get_visibility(node, content) != Visibility::Public {
             return Vec::new();
         }
 
@@ -60,7 +60,7 @@ impl Language for Zig {
             .child_by_field_name("return_type")
             .map(|t| content[t.byte_range()].to_string());
 
-        let is_pub = self.is_public(node, content);
+        let is_pub = self.get_visibility(node, content) == Visibility::Public;
         let prefix = if is_pub { "pub fn" } else { "fn" };
 
         let signature = if let Some(ret) = return_type {
@@ -107,7 +107,7 @@ impl Language for Zig {
             }
         }
 
-        let is_pub = self.is_public(node, content);
+        let is_pub = self.get_visibility(node, content) == Visibility::Public;
         let prefix = if is_pub {
             format!("pub {}", keyword)
         } else {
@@ -197,21 +197,17 @@ impl Language for Zig {
         format!("@import(\"{}\")", import.module)
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         // Check for pub keyword before the declaration
         if let Some(prev) = node.prev_sibling() {
             let text = &content[prev.byte_range()];
             if text == "pub" {
-                return true;
+                return Visibility::Public;
             }
         }
         // Also check if node starts with pub
         let text = &content[node.byte_range()];
-        text.starts_with("pub ")
-    }
-
-    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
+        if text.starts_with("pub ") {
             Visibility::Public
         } else {
             Visibility::Private

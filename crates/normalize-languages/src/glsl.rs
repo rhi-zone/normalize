@@ -117,10 +117,6 @@ impl Language for Glsl {
         // GLSL has no standard import mechanism (uses #include via extensions)
         String::new()
     }
-
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

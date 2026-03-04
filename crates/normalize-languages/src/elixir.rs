@@ -219,18 +219,15 @@ impl Language for Elixir {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         if node.kind() != "call" {
-            return false;
+            return Visibility::Private;
         }
         let text = &content[node.byte_range()];
-        (text.starts_with("def ") && !text.starts_with("defp"))
+        let is_public = (text.starts_with("def ") && !text.starts_with("defp"))
             || (text.starts_with("defmacro ") && !text.starts_with("defmacrop"))
-            || text.starts_with("defmodule ")
-    }
-
-    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        if self.is_public(node, content) {
+            || text.starts_with("defmodule ");
+        if is_public {
             Visibility::Public
         } else {
             Visibility::Private

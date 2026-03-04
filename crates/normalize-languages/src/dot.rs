@@ -99,10 +99,6 @@ impl Language for Dot {
         // Graphviz DOT has no imports
         String::new()
     }
-
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

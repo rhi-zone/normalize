@@ -160,11 +160,6 @@ impl Language for Lua {
         format!("require(\"{}\")", import.module)
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        let text = &content[node.byte_range()];
-        !text.trim_start().starts_with("local ")
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let text = &content[node.byte_range()];
         if text.trim_start().starts_with("local ") {

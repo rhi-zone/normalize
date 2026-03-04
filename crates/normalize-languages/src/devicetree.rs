@@ -115,10 +115,6 @@ impl Language for DeviceTree {
         // Device Tree: /include/ "file.dtsi"
         format!("/include/ \"{}\"", import.module)
     }
-
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

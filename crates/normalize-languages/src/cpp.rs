@@ -152,10 +152,6 @@ impl Language for Cpp {
         }
     }
 
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        true // Header-based visibility
-    }
-
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

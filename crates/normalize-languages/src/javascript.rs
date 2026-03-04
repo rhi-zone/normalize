@@ -67,11 +67,6 @@ impl Language for JavaScript {
         ecmascript::extract_public_symbols(node, content)
     }
 
-    fn is_public(&self, _node: &Node, _content: &str) -> bool {
-        // JS uses export statements, not visibility modifiers on declarations
-        true
-    }
-
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

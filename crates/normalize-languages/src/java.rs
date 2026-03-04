@@ -193,10 +193,6 @@ impl Language for Java {
         }
     }
 
-    fn is_public(&self, node: &Node, content: &str) -> bool {
-        self.get_visibility(node, content) == Visibility::Public
-    }
-
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let has_test_attr = symbol.attributes.iter().any(|a| a.contains("@Test"));
         if has_test_attr {
