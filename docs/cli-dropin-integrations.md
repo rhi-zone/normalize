@@ -1,7 +1,6 @@
 # Embedded CLI Drop-in Integrations
 
-> **Work in progress.** We have one integration (`jq` via jaq) so patterns here are based on
-> a single data point and subject to change as we add `rg` and `ast-grep`.
+> Three integrations complete: `jq` (via jaq), `rg` (vendored ripgrep 14.1.1), `ast-grep`/`sg` (via ast-grep-core + normalize-languages).
 
 normalize embeds several tools as library dependencies. Rather than making users install
 those tools separately, we expose them as drop-in CLI replacements — both as subcommands
@@ -103,6 +102,8 @@ These numbers are from the first integration and inform expectations for future 
 | Baseline (server-less alpha.3, jaq v2) | ~30.0 MB |
 | After jaq v2 → v3 upgrade (server-less alpha.4) | ~32.1 MB |
 | + jq-cli feature | ~32.9 MB |
+| + rg-cli (vendored ripgrep 14.1.1) | ~34.0 MB |
+| + ast-grep-cli (ast-grep-core bridge) | ~34 MB (minimal delta) |
 
 **jq-cli feature cost: ~835 KB** (measured by building with and without the feature).
 
@@ -123,16 +124,28 @@ server-less's instantiations would cost more in maintainability than ~240 KB sav
 **jaq v2 → v3 upgrade cost: ~2.1 MB.** This is the unavoidable cost of server-less
 requiring jaq v3. It would have happened regardless of the jq subcommand.
 
-## Planned integrations
+## Integrations
 
 | Tool | Library | Status |
 |---|---|---|
 | `jq` | jaq (jaq-core + jaq-std + jaq-json) | Done |
-| `rg` | grep-matcher + grep-regex + grep-searcher | TODO |
-| `ast-grep` | ast-grep-core | TODO |
+| `rg` | Vendored ripgrep 14.1.1 (crates/core/) + grep, lexopt, termcolor | Done |
+| `ast-grep` / `sg` | ast-grep-core + DynLang bridge (normalize-languages) | Done (limited) |
 
-Note: `ripgrep` has no lib target — `normalize rg` will use the existing grep-* workspace
-deps directly rather than vendoring ripgrep's CLI source.
+### rg parity
+
+Full flag parity — vendored from ripgrep 14.1.1 (Unlicense OR MIT). 1564-line `--help`
+output. The only missing feature is PCRE2 (pcre2 feature not enabled).
+
+Symlink dispatch: `rg -> normalize` or `normalize rg`.
+
+### ast-grep parity
+
+Pattern-based structural search using ast-grep-core. Core patterns (`$X`, `$$$`) work
+with auto-detected or explicit `--lang`. JSON output via `--json`. Missing: YAML rules,
+`--rewrite`, multiple patterns, language injections.
+
+Symlink dispatch: `sg -> normalize`, `ast-grep -> normalize`, or `normalize ast-grep`.
 
 ## jq parity gaps
 
