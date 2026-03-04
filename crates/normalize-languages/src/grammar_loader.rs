@@ -912,6 +912,33 @@ mod tests {
             "php",
             "c",
             "cpp",
+            "bash",
+            "zsh",
+            "fish",
+            "perl",
+            "r",
+            "haskell",
+            "ocaml",
+            "fsharp",
+            "erlang",
+            "gleam",
+            "zig",
+            "julia",
+            "groovy",
+            "clojure",
+            "commonlisp",
+            "scheme",
+            "elisp",
+            "d",
+            "objc",
+            "vb",
+            "powershell",
+            "vim",
+            "matlab",
+            "nix",
+            "starlark",
+            "rescript",
+            "idris",
         ] {
             let query = bundled_imports_query(lang);
             assert!(query.is_some(), "Missing bundled imports query for {lang}");
@@ -943,6 +970,33 @@ mod tests {
         assert!(loader.get_imports("php").is_some());
         assert!(loader.get_imports("c").is_some());
         assert!(loader.get_imports("cpp").is_some());
+        assert!(loader.get_imports("bash").is_some());
+        assert!(loader.get_imports("zsh").is_some());
+        assert!(loader.get_imports("fish").is_some());
+        assert!(loader.get_imports("perl").is_some());
+        assert!(loader.get_imports("r").is_some());
+        assert!(loader.get_imports("haskell").is_some());
+        assert!(loader.get_imports("ocaml").is_some());
+        assert!(loader.get_imports("fsharp").is_some());
+        assert!(loader.get_imports("erlang").is_some());
+        assert!(loader.get_imports("gleam").is_some());
+        assert!(loader.get_imports("zig").is_some());
+        assert!(loader.get_imports("julia").is_some());
+        assert!(loader.get_imports("groovy").is_some());
+        assert!(loader.get_imports("clojure").is_some());
+        assert!(loader.get_imports("commonlisp").is_some());
+        assert!(loader.get_imports("scheme").is_some());
+        assert!(loader.get_imports("elisp").is_some());
+        assert!(loader.get_imports("d").is_some());
+        assert!(loader.get_imports("objc").is_some());
+        assert!(loader.get_imports("vb").is_some());
+        assert!(loader.get_imports("powershell").is_some());
+        assert!(loader.get_imports("vim").is_some());
+        assert!(loader.get_imports("matlab").is_some());
+        assert!(loader.get_imports("nix").is_some());
+        assert!(loader.get_imports("starlark").is_some());
+        assert!(loader.get_imports("rescript").is_some());
+        assert!(loader.get_imports("idris").is_some());
         assert!(loader.get_imports("unknown-lang-xyz").is_none());
     }
 
