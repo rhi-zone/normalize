@@ -1,5 +1,5 @@
 #![allow(warnings, clippy::all, unexpected_cfgs)]
-// Vendored from ripgrep 14.1.1 (MIT/Unlicense)
+// Vendored from ripgrep 15.1.0 (MIT/Unlicense)
 /*!
 Parses command line arguments into a structured and typed representation.
 */

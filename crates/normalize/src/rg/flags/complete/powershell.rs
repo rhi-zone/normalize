@@ -1,5 +1,5 @@
 #![allow(warnings, clippy::all, unexpected_cfgs)]
-// Vendored from ripgrep 14.1.1 (MIT/Unlicense)
+// Vendored from ripgrep 15.1.0 (MIT/Unlicense)
 /*!
 Provides completions for ripgrep's CLI for PowerShell.
 */
@@ -73,7 +73,7 @@ pub(crate) fn generate() -> String {
         }
 
         if let Some(negated) = flag.name_negated() {
-            let dash_name = format!("--{}", negated);
+            let dash_name = format!("--{negated}");
             flags.push_str("\n      ");
             flags.push_str(
                 &TEMPLATE_FLAG

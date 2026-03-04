@@ -1,5 +1,5 @@
 #![allow(warnings, clippy::all, unexpected_cfgs)]
-// Vendored from ripgrep 14.1.1 (MIT/Unlicense)
+// Vendored from ripgrep 15.1.0 (MIT/Unlicense)
 /*!
 Defines ripgrep's command line interface.
 

@@ -1,5 +1,5 @@
 #![allow(warnings, clippy::all, unexpected_cfgs)]
-// Vendored from ripgrep 14.1.1 (MIT/Unlicense)
+// Vendored from ripgrep 15.1.0 (MIT/Unlicense)
 /*!
 Provides completions for ripgrep's CLI for the zsh shell.
 
@@ -21,5 +21,12 @@ long as it meets criteria 3 and 4 above.
 
 /// Generate completions for zsh.
 pub(crate) fn generate() -> String {
-    include_str!("rg.zsh").replace("!ENCODINGS!", super::ENCODINGS.trim_end())
+    let hyperlink_alias_descriptions = grep::printer::hyperlink_aliases()
+        .iter()
+        .map(|alias| format!(r#"    {}:"{}""#, alias.name(), alias.description()))
+        .collect::<Vec<String>>()
+        .join("\n");
+    include_str!("rg.zsh")
+        .replace("!ENCODINGS!", super::ENCODINGS.trim_end())
+        .replace("!HYPERLINK_ALIASES!", &hyperlink_alias_descriptions)
 }
