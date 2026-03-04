@@ -484,6 +484,8 @@ fn bundled_types_query(name: &str) -> Option<&'static str> {
         "rescript" => Some(include_str!("queries/rescript.types.scm")),
         "verilog" => Some(include_str!("queries/verilog.types.scm")),
         "vhdl" => Some(include_str!("queries/vhdl.types.scm")),
+        "sql" => Some(include_str!("queries/sql.types.scm")),
+        "hcl" => Some(include_str!("queries/hcl.types.scm")),
         _ => None,
     }
 }
@@ -691,6 +693,9 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "tlaplus" => Some(include_str!("queries/tlaplus.calls.scm")),
         "verilog" => Some(include_str!("queries/verilog.calls.scm")),
         "vhdl" => Some(include_str!("queries/vhdl.calls.scm")),
+        "vb" => Some(include_str!("queries/vb.calls.scm")),
+        "commonlisp" => Some(include_str!("queries/commonlisp.calls.scm")),
+        "scss" => Some(include_str!("queries/scss.calls.scm")),
         _ => None,
     }
 }
@@ -885,6 +890,8 @@ mod tests {
             "rescript",
             "verilog",
             "vhdl",
+            "sql",
+            "hcl",
         ] {
             let query = bundled_types_query(lang);
             assert!(query.is_some(), "Missing bundled types query for {lang}");
@@ -1021,6 +1028,9 @@ mod tests {
             "tlaplus",
             "verilog",
             "vhdl",
+            "vb",
+            "commonlisp",
+            "scss",
         ] {
             let query = bundled_calls_query(lang);
             assert!(query.is_some(), "Missing bundled calls query for {lang}");

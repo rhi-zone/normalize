@@ -187,6 +187,12 @@ mod tests {
             "return",
             // Inline lambdas are not top-level definitions
             "lambda",
+            // Loop constructs — not definition kinds
+            "for", "while",
+            // Module system — not a symbol definition
+            "import",
+            // Block expression — container body, not a top-level definition
+            "block",
         ];
         validate_unused_kinds_audit(&Typst, documented_unused)
             .expect("Typst unused node kinds audit failed");

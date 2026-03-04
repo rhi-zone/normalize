@@ -263,6 +263,10 @@ mod tests {
             "keyframe_block_list", "keyframes_statement", "media_statement",
             "namespace_statement", "postcss_statement", "pseudo_class_selector",
             "return_statement", "scope_statement", "supports_statement", "warn_statement",
+            // Control flow — not definition kinds
+            "block", "each_statement", "for_statement", "if_statement", "while_statement",
+            // Module system — handled in extract_imports, not as symbols
+            "forward_statement", "import_statement", "use_statement",
         ];
         validate_unused_kinds_audit(&Scss, documented_unused)
             .expect("SCSS unused node kinds audit failed");

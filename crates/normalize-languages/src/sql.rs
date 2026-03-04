@@ -257,6 +257,8 @@ mod tests {
             "set_statement", "statement", "unary_expression", "var_declaration",
             "var_declarations", "when_clause", "while_statement", "window_clause",
             "window_function", "window_specification",
+            // Control flow in SQL procedural code — not definition kinds
+            "case",
         ];
         validate_unused_kinds_audit(&Sql, documented_unused)
             .expect("SQL unused node kinds audit failed");

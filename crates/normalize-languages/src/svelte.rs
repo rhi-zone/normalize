@@ -291,6 +291,8 @@ mod tests {
             "block_tag", "catch_block", "catch_start", "doctype", "else_block",
             "else_if_start", "else_start", "expression", "expression_tag",
             "if_end", "if_start", "key_statement", "snippet_statement", "then_block",
+            // Svelte template control flow — not symbol definitions
+            "await_statement", "each_statement", "else_if_block", "if_statement",
         ];
         validate_unused_kinds_audit(&Svelte, documented_unused)
             .expect("Svelte unused node kinds audit failed");
