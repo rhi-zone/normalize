@@ -69,10 +69,6 @@ impl Language for Haskell {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["conditional", "case", "match", "guard", "lambda"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -69,10 +69,6 @@ impl Language for Sql {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["case", "join", "where", "having"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -77,17 +77,6 @@ impl Language for VB {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "select_case_statement",
-            "while_statement",
-            "for_statement",
-            "for_each_statement",
-            "case_clause",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

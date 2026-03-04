@@ -53,20 +53,6 @@ impl Language for Go {
         VisibilityMechanism::NamingConvention
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "expression_switch_statement",
-            "type_switch_statement",
-            "select_statement",
-            "expression_case",
-            "type_case",
-            "communication_case",
-            "binary_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

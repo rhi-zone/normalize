@@ -95,19 +95,6 @@ impl Language for Php {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "foreach_statement",
-            "while_statement",
-            "do_statement",
-            "case_statement",
-            "catch_clause",
-            "conditional_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

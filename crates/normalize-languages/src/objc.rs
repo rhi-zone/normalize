@@ -80,15 +80,6 @@ impl Language for ObjC {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "switch_statement",
-            "while_statement",
-            "for_statement",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

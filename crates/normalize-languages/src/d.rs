@@ -116,17 +116,6 @@ impl Language for D {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "switch_statement",
-            "while_statement",
-            "for_statement",
-            "foreach_statement",
-            "catch",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

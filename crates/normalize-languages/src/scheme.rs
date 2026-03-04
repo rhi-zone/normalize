@@ -93,10 +93,6 @@ impl Language for Scheme {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["list"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

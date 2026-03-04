@@ -96,10 +96,6 @@ impl Language for Elisp {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["list"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

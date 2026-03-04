@@ -47,18 +47,6 @@ impl Language for Rust {
         VisibilityMechanism::AccessModifier
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "for_expression",
-            "while_expression",
-            "loop_expression",
-            "match_arm",
-            "binary_expression", // for && and ||
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

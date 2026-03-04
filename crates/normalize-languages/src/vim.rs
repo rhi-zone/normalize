@@ -65,10 +65,6 @@ impl Language for Vim {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "elseif_statement", "for_loop", "while_loop"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

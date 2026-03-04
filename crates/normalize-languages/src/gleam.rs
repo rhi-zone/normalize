@@ -75,10 +75,6 @@ impl Language for Gleam {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["case", "case_clause", "if"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

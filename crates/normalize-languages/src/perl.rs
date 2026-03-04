@@ -65,15 +65,6 @@ impl Language for Perl {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "conditional_statement",
-            "loop_statement",
-            "for_statement",
-            "conditional_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

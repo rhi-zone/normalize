@@ -62,10 +62,6 @@ impl Language for Starlark {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "conditional_expression"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

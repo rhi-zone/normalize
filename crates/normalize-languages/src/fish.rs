@@ -64,17 +64,6 @@ impl Language for Fish {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "else_if_clause",
-            "while_statement",
-            "for_statement",
-            "switch_statement",
-            "case_clause",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

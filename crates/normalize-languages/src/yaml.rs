@@ -42,9 +42,6 @@ impl Language for Yaml {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::NotApplicable
     }
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[]
-    }
 
     fn signature_suffix(&self) -> &'static str {
         ""

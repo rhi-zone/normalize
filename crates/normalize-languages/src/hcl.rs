@@ -71,10 +71,6 @@ impl Language for Hcl {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["conditional", "for_expr"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

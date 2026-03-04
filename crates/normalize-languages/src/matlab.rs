@@ -72,16 +72,6 @@ impl Language for Matlab {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "switch_statement",
-            "while_statement",
-            "for_statement",
-            "catch_clause",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

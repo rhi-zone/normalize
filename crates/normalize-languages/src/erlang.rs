@@ -62,10 +62,6 @@ impl Language for Erlang {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["cr_clause", "if_clause", "catch_clause", "guard"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

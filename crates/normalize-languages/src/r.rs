@@ -85,10 +85,6 @@ impl Language for R {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "while_statement"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

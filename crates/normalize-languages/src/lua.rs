@@ -61,18 +61,6 @@ impl Language for Lua {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "elseif_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_statement",
-            "and",
-            "or",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " end"
     }

@@ -73,10 +73,6 @@ impl Language for OCaml {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_expression", "match_expression", "match_case"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

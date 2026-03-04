@@ -92,10 +92,6 @@ impl Language for Elixir {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["call", "binary_operator"] // if, case, cond, and/or
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " end"
     }

@@ -68,10 +68,6 @@ impl Language for Nix {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_expression"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

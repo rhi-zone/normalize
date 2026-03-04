@@ -72,10 +72,6 @@ impl Language for Idris {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["exp_if", "exp_case", "alt"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

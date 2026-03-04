@@ -66,18 +66,6 @@ impl Language for Groovy {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_loop",
-            "for_in_loop",
-            "while_loop",
-            "switch_statement",
-            "case",
-            "ternary_op",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

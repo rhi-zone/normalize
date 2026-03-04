@@ -49,24 +49,6 @@ impl Language for Cpp {
         VisibilityMechanism::HeaderBased // Also has public/private in classes, but header-based is primary
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "for_range_loop",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "case_statement",
-            "try_statement",
-            "catch_clause",
-            "throw_statement",
-            "&&",
-            "||",
-            "conditional_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

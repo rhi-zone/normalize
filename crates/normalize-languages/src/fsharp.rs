@@ -73,17 +73,6 @@ impl Language for FSharp {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "rule",
-            "for_expression",
-            "while_expression",
-            "try_expression",
-            "infix_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

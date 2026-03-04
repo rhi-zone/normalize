@@ -86,16 +86,6 @@ impl Language for Julia {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "elseif_clause",
-            "ternary_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

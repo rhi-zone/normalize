@@ -76,10 +76,6 @@ impl Language for Elm {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_else_expr", "case_of_branch"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

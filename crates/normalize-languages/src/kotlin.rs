@@ -97,20 +97,6 @@ impl Language for Kotlin {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "for_statement",
-            "while_statement",
-            "do_while_statement",
-            "when_entry",
-            "catch_block",
-            "elvis_expression",
-            "conjunction_expression",
-            "disjunction_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

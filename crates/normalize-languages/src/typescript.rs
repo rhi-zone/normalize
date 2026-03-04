@@ -43,9 +43,6 @@ impl Language for TypeScript {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::ExplicitExport
     }
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        ecmascript::COMPLEXITY_NODES
-    }
 
     fn signature_suffix(&self) -> &'static str {
         " {}"
@@ -197,9 +194,6 @@ impl Language for Tsx {
     }
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::ExplicitExport
-    }
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        ecmascript::COMPLEXITY_NODES
     }
 
     fn signature_suffix(&self) -> &'static str {

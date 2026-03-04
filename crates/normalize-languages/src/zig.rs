@@ -70,17 +70,6 @@ impl Language for Zig {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "IfStatement",
-            "ForStatement",
-            "WhileStatement",
-            "SwitchExpr",
-            "ErrorUnionExpr",
-            "BinaryExpr",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

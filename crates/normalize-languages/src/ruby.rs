@@ -44,23 +44,6 @@ impl Language for Ruby {
         VisibilityMechanism::AllPublic // Ruby methods are public by default
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if",
-            "unless",
-            "case",
-            "when",
-            "while",
-            "until",
-            "for",
-            "begin", // rescue clauses
-            "rescue",
-            "and",
-            "or",
-            "conditional",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         "; end"
     }

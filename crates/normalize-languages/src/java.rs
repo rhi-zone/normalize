@@ -85,20 +85,6 @@ impl Language for Java {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "enhanced_for_statement",
-            "while_statement",
-            "do_statement",
-            "switch_label",
-            "catch_clause",
-            "ternary_expression",
-            "binary_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

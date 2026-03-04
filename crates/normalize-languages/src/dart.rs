@@ -95,20 +95,6 @@ impl Language for Dart {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement_case",
-            "catch_clause",
-            "conditional_expression",
-            "logical_and_expression",
-            "logical_or_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

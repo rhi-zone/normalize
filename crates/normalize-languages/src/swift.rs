@@ -106,19 +106,6 @@ impl Language for Swift {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "repeat_while_statement",
-            "switch_statement",
-            "catch_block",
-            "ternary_expression",
-            "nil_coalescing_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

@@ -40,9 +40,6 @@ impl Language for JavaScript {
     fn visibility_mechanism(&self) -> VisibilityMechanism {
         VisibilityMechanism::ExplicitExport
     }
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        ecmascript::COMPLEXITY_NODES
-    }
 
     fn signature_suffix(&self) -> &'static str {
         " {}"

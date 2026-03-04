@@ -67,18 +67,6 @@ impl Language for PowerShell {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "elseif_clause",
-            "while_statement",
-            "for_statement",
-            "foreach_statement",
-            "switch_statement",
-            "catch_clause",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

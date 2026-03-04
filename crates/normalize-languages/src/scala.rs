@@ -72,20 +72,6 @@ impl Language for Scala {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_expression",
-            "match_expression",
-            "case_clause",
-            "for_expression",
-            "while_expression",
-            "do_while_expression",
-            "try_expression",
-            "catch_clause",
-            "infix_expression", // for && and ||
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

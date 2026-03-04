@@ -910,12 +910,11 @@ pub fn compute_complexity(
 ) -> usize {
     let grammar_name = support.grammar_name();
     let loader = parsers::grammar_loader();
-    if let Some(scm) = loader.get_complexity(grammar_name) {
-        if let Some(grammar) = loader.get(grammar_name) {
-            if let Ok(query) = tree_sitter::Query::new(&grammar, &scm) {
-                return count_complexity_with_query(node, source, &query);
-            }
-        }
+    if let Some(scm) = loader.get_complexity(grammar_name)
+        && let Some(grammar) = loader.get(grammar_name)
+        && let Ok(query) = tree_sitter::Query::new(&grammar, &scm)
+    {
+        return count_complexity_with_query(node, source, &query);
     }
     count_complexity_with_trait(node, support)
 }

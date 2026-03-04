@@ -60,10 +60,6 @@ impl Language for Caddy {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

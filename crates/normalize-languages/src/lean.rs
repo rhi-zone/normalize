@@ -72,10 +72,6 @@ impl Language for Lean {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_then_else", "match", "match_alt"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

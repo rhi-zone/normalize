@@ -65,17 +65,6 @@ impl Language for Zsh {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "elif_clause",
-            "for_statement",
-            "while_statement",
-            "case_statement",
-            "case_item",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

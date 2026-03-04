@@ -51,26 +51,6 @@ impl Language for Python {
         VisibilityMechanism::NamingConvention
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "try_statement",
-            "except_clause",
-            "with_statement",
-            "match_statement",
-            "case_clause",
-            "and",
-            "or",
-            "conditional_expression",
-            "list_comprehension",
-            "dictionary_comprehension",
-            "set_comprehension",
-            "generator_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

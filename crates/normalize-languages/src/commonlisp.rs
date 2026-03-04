@@ -83,10 +83,6 @@ impl Language for CommonLisp {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["list_lit"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
