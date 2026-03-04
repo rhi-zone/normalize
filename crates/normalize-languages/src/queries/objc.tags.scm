@@ -1,18 +1,15 @@
 ; Objective-C tags query
+; class_interface, class_implementation, and protocol_declaration have no name field —
+; the name is a positional identifier child.
 
 (class_interface
-  name: (identifier) @name) @definition.class
+  (identifier) @name) @definition.class
 
 (class_implementation
-  name: (identifier) @name) @definition.class
+  (identifier) @name) @definition.class
 
 (protocol_declaration
-  name: (identifier) @name) @definition.interface
-
-(method_declaration
-  (method_selector
-    (keyword_declarator
-      keyword: (keyword_argument_declarator) @name))) @definition.method
+  (identifier) @name) @definition.interface
 
 (function_definition
   declarator: (function_declarator

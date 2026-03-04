@@ -53,7 +53,10 @@
 (macro_invocation
     macro: (identifier) @name) @reference.call
 
-; implementations
+; implementations (as containers so methods inside can be nested correctly)
+
+(impl_item
+    type: (type_identifier) @name) @definition.module
 
 (impl_item
     trait: (type_identifier) @name) @reference.implementation

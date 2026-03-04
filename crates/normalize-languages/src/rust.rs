@@ -58,8 +58,8 @@ impl Language for Rust {
                 SymbolKind::Function
             },
             signature,
-            docstring: None,
-            attributes: Vec::new(),
+            docstring: extract_docstring(node, content),
+            attributes: extract_attributes(node, content),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -94,7 +94,7 @@ impl Language for Rust {
                     kind: SymbolKind::Module, // impl blocks are like modules
                     signature,
                     docstring: None,
-                    attributes: Vec::new(),
+                    attributes: extract_attributes(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: Visibility::Public,
@@ -111,8 +111,8 @@ impl Language for Rust {
                     name: name.to_string(),
                     kind: SymbolKind::Trait,
                     signature: format!("{}trait {}", vis, name),
-                    docstring: None,
-                    attributes: Vec::new(),
+                    docstring: extract_docstring(node, content),
+                    attributes: extract_attributes(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: self.get_visibility(node, content),
@@ -131,8 +131,8 @@ impl Language for Rust {
                     name: name.to_string(),
                     kind: SymbolKind::Module,
                     signature: format!("{}mod {}", vis, name),
-                    docstring: None,
-                    attributes: Vec::new(),
+                    docstring: extract_docstring(node, content),
+                    attributes: extract_attributes(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: self.get_visibility(node, content),
@@ -161,8 +161,8 @@ impl Language for Rust {
             name: name.to_string(),
             kind,
             signature: format!("{}{} {}", vis, keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
+            docstring: extract_docstring(node, content),
+            attributes: extract_attributes(node, content),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
@@ -323,6 +323,63 @@ impl Rust {
         }
         String::new()
     }
+}
+
+/// Extract a Rust doc comment from a node's `attributes` child.
+///
+/// Looks for `line_outer_doc_comment` nodes (`///`) and joins their text.
+fn extract_docstring(node: &Node, content: &str) -> Option<String> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "attributes" {
+            let mut doc_lines = Vec::new();
+            let mut attr_cursor = child.walk();
+            for attr_child in child.children(&mut attr_cursor) {
+                if attr_child.kind() == "line_outer_doc_comment" {
+                    let text = &content[attr_child.byte_range()];
+                    let doc = text.trim_start_matches("///").trim();
+                    if !doc.is_empty() {
+                        doc_lines.push(doc.to_string());
+                    }
+                }
+            }
+            if !doc_lines.is_empty() {
+                return Some(doc_lines.join("\n"));
+            }
+        }
+    }
+    None
+}
+
+/// Extract Rust `#[...]` attribute items from a node.
+///
+/// Checks both the `attributes` child field and preceding sibling `attribute_item` nodes.
+fn extract_attributes(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+
+    // Check for attributes child (e.g., #[test], #[cfg(test)])
+    if let Some(attr_node) = node.child_by_field_name("attributes") {
+        let mut cursor = attr_node.walk();
+        for child in attr_node.children(&mut cursor) {
+            if child.kind() == "attribute_item" {
+                attrs.push(content[child.byte_range()].to_string());
+            }
+        }
+    }
+
+    // Also check preceding siblings for outer attributes
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "attribute_item" {
+            // Insert at beginning to maintain order
+            attrs.insert(0, content[sibling.byte_range()].to_string());
+            prev = sibling.prev_sibling();
+        } else {
+            break;
+        }
+    }
+
+    attrs
 }
 
 #[cfg(test)]

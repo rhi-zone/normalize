@@ -72,7 +72,7 @@ impl Language for Kotlin {
             name: name.to_string(),
             kind: SymbolKind::Function,
             signature: format!("fun {}{}{}", name, params, return_type),
-            docstring: None,
+            docstring: extract_kdoc(node, content),
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -106,7 +106,7 @@ impl Language for Kotlin {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: None,
+            docstring: extract_kdoc(node, content),
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -275,6 +275,42 @@ impl Language for Kotlin {
         // Kotlin default is public (unlike Java's package-private)
         Visibility::Public
     }
+}
+
+/// Extract a KDoc comment (`/** ... */`) preceding a node.
+///
+/// Walks backwards through siblings looking for a `multiline_comment` starting with `/**`.
+fn extract_kdoc(node: &Node, content: &str) -> Option<String> {
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        match sibling.kind() {
+            "multiline_comment" => {
+                let text = &content[sibling.byte_range()];
+                if text.starts_with("/**") {
+                    // Strip /** and */ and leading *
+                    let lines: Vec<&str> = text
+                        .strip_prefix("/**")
+                        .unwrap_or(text)
+                        .strip_suffix("*/")
+                        .unwrap_or(text)
+                        .lines()
+                        .map(|l| l.trim().strip_prefix("*").unwrap_or(l).trim())
+                        .filter(|l| !l.is_empty())
+                        .collect();
+                    if !lines.is_empty() {
+                        return Some(lines.join(" "));
+                    }
+                }
+                return None;
+            }
+            "line_comment" => {
+                // Skip single-line comments
+            }
+            _ => return None,
+        }
+        prev = sibling.prev_sibling();
+    }
+    None
 }
 
 #[cfg(test)]

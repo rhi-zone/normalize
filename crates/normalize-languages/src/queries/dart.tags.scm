@@ -1,5 +1,5 @@
 ; Dart tags query
-; Covers: functions, methods, classes, enums, mixins, extensions, type aliases
+; Covers: functions, methods, classes, enums, mixins, extensions
 
 ; Class definitions
 (class_definition
@@ -9,25 +9,20 @@
 (enum_declaration
   name: (identifier) @name) @definition.class
 
-; Mixin declarations (interface-like)
+; Mixin declarations (interface-like) — name is a positional identifier child, not a field
 (mixin_declaration
-  name: (identifier) @name) @definition.interface
+  (identifier) @name) @definition.interface
 
 ; Extension declarations (reference)
 (extension_declaration
   name: (identifier) @name) @reference.implementation
 
-; Type aliases
-(type_alias
-  name: (identifier) @name) @definition.type
-
 ; Top-level function signatures
 (function_signature
   name: (identifier) @name) @definition.function
 
-; Method signatures (inside classes)
-(method_signature
-  name: (identifier) @name) @definition.method
+; Method signatures inside classes are wrapped by method_signature but actual kinds are:
+; function_signature, getter_signature, setter_signature inside class_body
 
 ; Getter signatures
 (getter_signature

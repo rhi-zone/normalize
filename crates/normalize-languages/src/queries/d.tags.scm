@@ -1,23 +1,14 @@
 ; D tags query
-
-(module_declaration
-  name: (qualified_identifier) @name) @definition.module
+; D grammar nodes have no fields — names are positional identifier children
 
 (class_declaration
-  name: (identifier) @name) @definition.class
+  (identifier) @name) @definition.class
 
 (struct_declaration
-  name: (identifier) @name) @definition.class
+  (identifier) @name) @definition.class
 
 (interface_declaration
-  name: (identifier) @name) @definition.interface
-
-(auto_declaration
-  (auto_declaration_part
-    identifier: (identifier) @name)) @definition.function
+  (identifier) @name) @definition.interface
 
 (enum_declaration
-  name: (identifier) @name) @definition.type
-
-(alias_declaration
   (identifier) @name) @definition.type

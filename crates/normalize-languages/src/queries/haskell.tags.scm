@@ -25,6 +25,7 @@
 (class
   name: (name) @name) @definition.interface
 
-; Instance declarations (reference, not definition)
+; Instance declarations — captured as definition.module so extract_container
+; can populate the implements list from the typeclass name.
 (instance
-  name: (name) @name) @reference.implementation
+  name: (name) @name) @definition.module

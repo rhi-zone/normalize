@@ -63,7 +63,7 @@ impl Language for Python {
                 SymbolKind::Function
             },
             signature,
-            docstring: None,
+            docstring: extract_docstring(node, content),
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -103,7 +103,7 @@ impl Language for Python {
             name: name.to_string(),
             kind: SymbolKind::Class,
             signature,
-            docstring: None,
+            docstring: extract_docstring(node, content),
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -348,6 +348,55 @@ impl Language for Python {
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         let name_node = node.child_by_field_name("name")?;
         Some(&content[name_node.byte_range()])
+    }
+}
+
+/// Extract a Python docstring from a function or class body.
+///
+/// Looks for the first statement in the body being a string literal.
+/// Handles both old grammar style (expression_statement > string) and
+/// new arborium style (string directly, with string_content child).
+fn extract_docstring(node: &Node, content: &str) -> Option<String> {
+    let body = node.child_by_field_name("body")?;
+    let first = body.child(0)?;
+
+    // Handle both grammar versions:
+    // - Old: expression_statement > string
+    // - New (arborium): string directly, with string_content child
+    let string_node = match first.kind() {
+        "string" => Some(first),
+        "expression_statement" => first.child(0).filter(|n| n.kind() == "string"),
+        _ => None,
+    }?;
+
+    // Try string_content child (arborium style)
+    let mut cursor = string_node.walk();
+    for child in string_node.children(&mut cursor) {
+        if child.kind() == "string_content" {
+            let doc = content[child.byte_range()].trim();
+            if !doc.is_empty() {
+                return Some(doc.to_string());
+            }
+        }
+    }
+
+    // Fallback: extract from full string text (old style)
+    let text = &content[string_node.byte_range()];
+    let doc = text
+        .trim_start_matches("\"\"\"")
+        .trim_start_matches("'''")
+        .trim_start_matches('"')
+        .trim_start_matches('\'')
+        .trim_end_matches("\"\"\"")
+        .trim_end_matches("'''")
+        .trim_end_matches('"')
+        .trim_end_matches('\'')
+        .trim();
+
+    if !doc.is_empty() {
+        Some(doc.to_string())
+    } else {
+        None
     }
 }
 
