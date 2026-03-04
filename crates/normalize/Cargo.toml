@@ -16,10 +16,13 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [features]
-default = ["cli"]
+default = ["cli", "jq-cli"]
 
 # CLI binary (clap + server-less proc macro)
 cli = ["dep:clap", "dep:server-less"]
+
+# jq subcommand (embeds jaq as a drop-in jq replacement)
+jq-cli = []
 
 # Optional MCP server support
 mcp = ["rmcp"]

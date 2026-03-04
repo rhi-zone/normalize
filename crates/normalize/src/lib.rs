@@ -27,6 +27,7 @@ pub mod extract;
 pub mod filter;
 pub mod health;
 pub mod index;
+#[cfg(feature = "jq-cli")]
 pub mod jq;
 pub mod multi_repo;
 pub mod output;

@@ -36,18 +36,21 @@ fn main() -> std::process::ExitCode {
     let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
 
     // argv[0] dispatch: symlink `jq -> normalize` runs jq directly.
-    let argv0 = argv
-        .first()
-        .and_then(|p| std::path::Path::new(p).file_stem())
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
-    if argv0 == "jq" {
-        return normalize::jq::run_jq(argv[1..].iter().cloned());
-    }
+    #[cfg(feature = "jq-cli")]
+    {
+        let argv0 = argv
+            .first()
+            .and_then(|p| std::path::Path::new(p).file_stem())
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if argv0 == "jq" {
+            return normalize::jq::run_jq(argv[1..].iter().cloned());
+        }
 
-    // Subcommand dispatch: `normalize jq [args...]` bypasses server-less.
-    if argv.get(1).and_then(|s| s.to_str()) == Some("jq") {
-        return normalize::jq::run_jq(argv[2..].iter().cloned());
+        // Subcommand dispatch: `normalize jq [args...]` bypasses server-less.
+        if argv.get(1).and_then(|s| s.to_str()) == Some("jq") {
+            return normalize::jq::run_jq(argv[2..].iter().cloned());
+        }
     }
 
     // Handle --schema for Nursery integration (before clap parsing)
