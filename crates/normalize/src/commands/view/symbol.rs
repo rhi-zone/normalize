@@ -805,19 +805,46 @@ fn collect_identifiers(
 
 /// Extract type identifiers from source code (for --context feature).
 /// Returns a set of type names referenced in the source.
+///
+/// Uses a language-specific `*.types.scm` query when available; falls back to
+/// a generic cursor walk for grammars without a bundled query.
 fn extract_type_references(source: &str, grammar: &str) -> HashSet<String> {
-    let mut types = HashSet::new();
+    use streaming_iterator::StreamingIterator;
 
-    if let Some(tree) = parsers::parse_with_grammar(grammar, source) {
-        let mut cursor = tree.walk();
-        collect_type_identifiers(&mut cursor, source.as_bytes(), &mut types);
+    let loader = parsers::grammar_loader();
+
+    // Try query-based extraction first
+    if let (Some(lang), Some(types_scm)) = (loader.get(grammar), loader.get_types(grammar))
+        && let Ok(query) = tree_sitter::Query::new(&lang, &types_scm)
+        && let Some(tree) = parsers::parse_with_grammar(grammar, source)
+    {
+        let mut types = HashSet::new();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+        while let Some(m) = matches.next() {
+            for cap in m.captures {
+                if let Ok(text) = cap.node.utf8_text(source.as_bytes())
+                    && !text.is_empty()
+                {
+                    types.insert(text.to_string());
+                }
+            }
+        }
+        return types;
     }
 
+    // Fallback: generic cursor walk for grammars without a types query
+    let mut types = HashSet::new();
+    if let Some(tree) = parsers::parse_with_grammar(grammar, source) {
+        let mut cursor = tree.walk();
+        collect_type_identifiers_fallback(&mut cursor, source.as_bytes(), &mut types);
+    }
     types
 }
 
-/// Recursively collect only type identifiers from AST.
-fn collect_type_identifiers(
+/// Fallback cursor walk for grammars without a bundled types query.
+/// Captures `type_identifier` and the leaf of `scoped_type_identifier`.
+fn collect_type_identifiers_fallback(
     cursor: &mut tree_sitter::TreeCursor,
     source: &[u8],
     types: &mut HashSet<String>,
@@ -826,7 +853,6 @@ fn collect_type_identifiers(
         let node = cursor.node();
         let kind = node.kind();
 
-        // Collect type identifier nodes
         if kind == "type_identifier"
             && let Ok(text) = node.utf8_text(source)
         {
@@ -841,17 +867,8 @@ fn collect_type_identifiers(
             types.insert(text.to_string());
         }
 
-        // Generic type arguments (e.g., T in Vec<T>)
-        if kind == "generic_type"
-            // First child is usually the type name
-            && let Some(first_child) = node.child(0)
-            && let Ok(text) = first_child.utf8_text(source)
-        {
-            types.insert(text.to_string());
-        }
-
         if cursor.goto_first_child() {
-            collect_type_identifiers(cursor, source, types);
+            collect_type_identifiers_fallback(cursor, source, types);
             cursor.goto_parent();
         }
 

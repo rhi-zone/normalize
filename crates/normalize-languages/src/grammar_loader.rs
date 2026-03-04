@@ -74,6 +74,8 @@ pub struct GrammarLoader {
     complexity_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached calls queries.
     calls_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached type queries.
+    types_cache: RwLock<HashMap<String, Arc<String>>>,
 }
 
 impl GrammarLoader {
@@ -107,6 +109,7 @@ impl GrammarLoader {
             locals_cache: RwLock::new(HashMap::new()),
             complexity_cache: RwLock::new(HashMap::new()),
             calls_cache: RwLock::new(HashMap::new()),
+            types_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -120,6 +123,7 @@ impl GrammarLoader {
             locals_cache: RwLock::new(HashMap::new()),
             complexity_cache: RwLock::new(HashMap::new()),
             calls_cache: RwLock::new(HashMap::new()),
+            types_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -225,6 +229,30 @@ impl GrammarLoader {
                 }
                 Some(query)
             })
+    }
+
+    /// Get the types query for a grammar.
+    ///
+    /// Returns the bundled query for supported languages, or an external file if one
+    /// exists at `{name}.types.scm` in the grammar search paths (external wins).
+    pub fn get_types(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.types_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        // External file takes priority over bundled
+        if let Some(q) = self.load_query(name, "types", &self.types_cache) {
+            return Some(q);
+        }
+
+        // Fall back to bundled query
+        let bundled = bundled_types_query(name)?;
+        let query = Arc::new(bundled.to_string());
+        if let Ok(mut c) = self.types_cache.write() {
+            c.insert(name.to_string(), Arc::clone(&query));
+        }
+        Some(query)
     }
 
     /// Load a query file (.scm) from external file.
@@ -353,6 +381,18 @@ fn grammar_symbol_name(name: &str) -> String {
     // Most grammars use tree_sitter_{name} with hyphens replaced by underscores
     let normalized = name.replace('-', "_");
     format!("tree_sitter_{normalized}")
+}
+
+/// Return a bundled types query for languages with built-in support.
+/// Returns None for languages without a bundled query.
+fn bundled_types_query(name: &str) -> Option<&'static str> {
+    match name {
+        "rust" => Some(include_str!("queries/rust.types.scm")),
+        "typescript" => Some(include_str!("queries/typescript.types.scm")),
+        "tsx" => Some(include_str!("queries/tsx.types.scm")),
+        "python" => Some(include_str!("queries/python.types.scm")),
+        _ => None,
+    }
 }
 
 /// Get the shared library extension for the current platform.
