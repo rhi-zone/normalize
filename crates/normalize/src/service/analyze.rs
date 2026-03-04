@@ -437,7 +437,6 @@ impl AnalyzeService {
         Ok(crate::commands::analyze::check_examples::build_check_examples_report(&root_path))
     }
 
-    /// Show AST structure for a file
     /// Show callers and/or callees of a symbol
     #[cli(display_with = "display_call_graph")]
     pub fn call_graph(
