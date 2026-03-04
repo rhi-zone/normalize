@@ -2,7 +2,7 @@ use crate::extract::{ExtractOptions, Extractor};
 use crate::parsers;
 use normalize_facts_core::TypeRef;
 use normalize_facts_core::TypeRefKind;
-use normalize_languages::{Language, Symbol as LangSymbol, support_for_grammar, support_for_path};
+use normalize_languages::{Symbol as LangSymbol, support_for_path};
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
 
@@ -78,7 +78,7 @@ impl SymbolParser {
 
         // Check if this language has import support (either via query or trait)
         let loader = normalize_languages::parsers::grammar_loader();
-        if support.import_kinds().is_empty() && loader.get_imports(grammar_name).is_none() {
+        if loader.get_imports(grammar_name).is_none() {
             return Vec::new();
         }
         let tree = match parsers::parse_with_grammar(grammar_name, content) {
@@ -88,7 +88,7 @@ impl SymbolParser {
 
         let root = tree.root_node();
 
-        // Try query-based extraction first
+        // Query-based extraction
         if let Some(query_str) = loader.get_imports(grammar_name)
             && let Some(grammar) = loader.get(grammar_name)
             && let Some(imports) =
@@ -97,95 +97,7 @@ impl SymbolParser {
             return imports;
         }
 
-        // Fall back to trait-based extraction
-        let mut imports = Vec::new();
-        let mut cursor = root.walk();
-        Self::collect_imports_with_trait(&mut cursor, content, support, &mut imports);
-        imports
-    }
-
-    fn collect_imports_with_trait(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        support: &dyn Language,
-        imports: &mut Vec<FlatImport>,
-    ) {
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-
-            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
-            if let Some(embedded) = support.embedded_content(&node, content)
-                && let Some(sub_lang) = support_for_grammar(embedded.grammar)
-                && let Some(sub_tree) =
-                    parsers::parse_with_grammar(embedded.grammar, &embedded.content)
-            {
-                let mut sub_imports = Vec::new();
-                let sub_root = sub_tree.root_node();
-                let mut sub_cursor = sub_root.walk();
-                Self::collect_imports_with_trait(
-                    &mut sub_cursor,
-                    &embedded.content,
-                    sub_lang,
-                    &mut sub_imports,
-                );
-
-                // Adjust line numbers for embedded content offset
-                for mut imp in sub_imports {
-                    imp.line += embedded.start_line - 1;
-                    imports.push(imp);
-                }
-                // Don't descend into embedded nodes - we've already processed them
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-
-            // Check for import nodes
-            if support.import_kinds().contains(&kind) {
-                let lang_imports = support.extract_imports(&node, content);
-                // Flatten: each name in the import becomes a separate FlatImport entry
-                for lang_imp in lang_imports {
-                    if lang_imp.is_wildcard {
-                        imports.push(FlatImport {
-                            module: Some(lang_imp.module.clone()),
-                            name: "*".to_string(),
-                            alias: lang_imp.alias.clone(),
-                            line: lang_imp.line,
-                        });
-                    } else if lang_imp.names.is_empty() {
-                        // import X (no specific names) - module is the imported thing
-                        imports.push(FlatImport {
-                            module: None,
-                            name: lang_imp.module.clone(),
-                            alias: lang_imp.alias.clone(),
-                            line: lang_imp.line,
-                        });
-                    } else {
-                        // from X import a, b, c - each name gets an entry
-                        for name in &lang_imp.names {
-                            imports.push(FlatImport {
-                                module: Some(lang_imp.module.clone()),
-                                name: name.clone(),
-                                alias: None, // alias applies to whole import, not individual names
-                                line: lang_imp.line,
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Recurse into children
-            if cursor.goto_first_child() {
-                Self::collect_imports_with_trait(cursor, content, support, imports);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
+        Vec::new()
     }
 
     /// Query-based import extraction using `@import`, `@import.path`, `@import.name`,

@@ -203,12 +203,6 @@ impl DepsExtractor {
                 break;
             }
 
-            // Check for import nodes
-            if support.import_kinds().contains(&kind) {
-                let lang_imports = support.extract_imports(&node, content);
-                imports.extend(lang_imports);
-            }
-
             // Check for public symbol nodes
             if support.public_symbol_kinds().contains(&kind) {
                 let lang_exports = support.extract_public_symbols(&node, content);

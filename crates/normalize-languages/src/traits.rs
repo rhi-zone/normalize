@@ -111,16 +111,6 @@ pub trait Language: Send + Sync {
     /// Type definition nodes (struct, enum, interface, type alias)
     fn type_kinds(&self) -> &'static [&'static str];
 
-    /// Import statement nodes.
-    ///
-    /// Default returns `&[]`. Languages with a `.imports.scm` query file do not
-    /// need to implement this — the query takes priority in `parse_imports`.
-    /// Only implement this for languages that lack a `.imports.scm` and have
-    /// meaningful import structure.
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     /// AST node kinds that may contain publicly visible symbols.
     /// For JS/TS: export_statement nodes.
     /// For Go/Java/Python: function/class/type declaration nodes.

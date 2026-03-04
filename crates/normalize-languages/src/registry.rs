@@ -406,9 +406,6 @@ pub fn validate_unused_kinds_audit(
     for kind in lang.type_kinds() {
         used_kinds.insert(kind);
     }
-    for kind in lang.import_kinds() {
-        used_kinds.insert(kind);
-    }
     for kind in lang.public_symbol_kinds() {
         used_kinds.insert(kind);
     }
@@ -519,7 +516,6 @@ mod tests {
                 ("container_kinds", lang.container_kinds()),
                 ("function_kinds", lang.function_kinds()),
                 ("type_kinds", lang.type_kinds()),
-                ("import_kinds", lang.import_kinds()),
                 ("public_symbol_kinds", lang.public_symbol_kinds()),
             ];
 
@@ -621,9 +617,6 @@ mod tests {
                 used_kinds.insert(kind);
             }
             for kind in lang.type_kinds() {
-                used_kinds.insert(kind);
-            }
-            for kind in lang.import_kinds() {
                 used_kinds.insert(kind);
             }
             for kind in lang.public_symbol_kinds() {
