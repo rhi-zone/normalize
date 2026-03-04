@@ -900,7 +900,56 @@ fn collect_symbols_from_tags<'tree>(
 }
 
 /// Compute cyclomatic complexity for a function node.
-pub fn compute_complexity(node: &tree_sitter::Node, support: &dyn Language) -> usize {
+///
+/// Prefers a `.complexity.scm` query when available for the language (via
+/// `grammar_loader`), falling back to the trait-based `complexity_nodes()` walker.
+pub fn compute_complexity(
+    node: &tree_sitter::Node,
+    support: &dyn Language,
+    source: &[u8],
+) -> usize {
+    let grammar_name = support.grammar_name();
+    let loader = parsers::grammar_loader();
+    if let Some(scm) = loader.get_complexity(grammar_name) {
+        if let Some(grammar) = loader.get(grammar_name) {
+            if let Ok(query) = tree_sitter::Query::new(&grammar, &scm) {
+                return count_complexity_with_query(node, source, &query);
+            }
+        }
+    }
+    count_complexity_with_trait(node, support)
+}
+
+/// Count complexity using a `@complexity` query.
+fn count_complexity_with_query(
+    node: &tree_sitter::Node,
+    source: &[u8],
+    query: &tree_sitter::Query,
+) -> usize {
+    let complexity_idx = query
+        .capture_names()
+        .iter()
+        .position(|n| *n == "complexity");
+    let Some(complexity_idx) = complexity_idx else {
+        return 1;
+    };
+
+    let mut qcursor = tree_sitter::QueryCursor::new();
+    qcursor.set_byte_range(node.byte_range());
+    let mut complexity = 1usize;
+    let mut matches = qcursor.matches(query, *node, source);
+    while let Some(m) = matches.next() {
+        for capture in m.captures {
+            if capture.index as usize == complexity_idx {
+                complexity += 1;
+            }
+        }
+    }
+    complexity
+}
+
+/// Count complexity using the trait-based `complexity_nodes()` walker.
+fn count_complexity_with_trait(node: &tree_sitter::Node, support: &dyn Language) -> usize {
     let mut complexity = 1; // Base complexity
     let complexity_nodes = support.complexity_nodes();
     let mut cursor = node.walk();

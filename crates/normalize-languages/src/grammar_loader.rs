@@ -627,6 +627,19 @@ fn bundled_imports_query(name: &str) -> Option<&'static str> {
         "go" => Some(include_str!("queries/go.imports.scm")),
         "lua" => Some(include_str!("queries/lua.imports.scm")),
         "rust" => Some(include_str!("queries/rust.imports.scm")),
+        "typescript" => Some(include_str!("queries/typescript.imports.scm")),
+        "tsx" => Some(include_str!("queries/tsx.imports.scm")),
+        "java" => Some(include_str!("queries/java.imports.scm")),
+        "kotlin" => Some(include_str!("queries/kotlin.imports.scm")),
+        "c-sharp" => Some(include_str!("queries/c-sharp.imports.scm")),
+        "ruby" => Some(include_str!("queries/ruby.imports.scm")),
+        "swift" => Some(include_str!("queries/swift.imports.scm")),
+        "scala" => Some(include_str!("queries/scala.imports.scm")),
+        "elixir" => Some(include_str!("queries/elixir.imports.scm")),
+        "dart" => Some(include_str!("queries/dart.imports.scm")),
+        "php" => Some(include_str!("queries/php.imports.scm")),
+        "c" => Some(include_str!("queries/c.imports.scm")),
+        "cpp" => Some(include_str!("queries/cpp.imports.scm")),
         _ => None,
     }
 }
@@ -835,7 +848,26 @@ mod tests {
 
     #[test]
     fn test_bundled_imports_queries() {
-        for lang in &["python", "javascript", "go", "lua", "rust"] {
+        for lang in &[
+            "python",
+            "javascript",
+            "go",
+            "lua",
+            "rust",
+            "typescript",
+            "tsx",
+            "java",
+            "kotlin",
+            "c-sharp",
+            "ruby",
+            "swift",
+            "scala",
+            "elixir",
+            "dart",
+            "php",
+            "c",
+            "cpp",
+        ] {
             let query = bundled_imports_query(lang);
             assert!(query.is_some(), "Missing bundled imports query for {lang}");
             assert!(
@@ -853,6 +885,19 @@ mod tests {
         assert!(loader.get_imports("go").is_some());
         assert!(loader.get_imports("lua").is_some());
         assert!(loader.get_imports("rust").is_some());
+        assert!(loader.get_imports("typescript").is_some());
+        assert!(loader.get_imports("tsx").is_some());
+        assert!(loader.get_imports("java").is_some());
+        assert!(loader.get_imports("kotlin").is_some());
+        assert!(loader.get_imports("c-sharp").is_some());
+        assert!(loader.get_imports("ruby").is_some());
+        assert!(loader.get_imports("swift").is_some());
+        assert!(loader.get_imports("scala").is_some());
+        assert!(loader.get_imports("elixir").is_some());
+        assert!(loader.get_imports("dart").is_some());
+        assert!(loader.get_imports("php").is_some());
+        assert!(loader.get_imports("c").is_some());
+        assert!(loader.get_imports("cpp").is_some());
         assert!(loader.get_imports("unknown-lang-xyz").is_none());
     }
 
