@@ -423,6 +423,13 @@ fn bundled_types_query(name: &str) -> Option<&'static str> {
         "typescript" => Some(include_str!("queries/typescript.types.scm")),
         "tsx" => Some(include_str!("queries/tsx.types.scm")),
         "python" => Some(include_str!("queries/python.types.scm")),
+        "java" => Some(include_str!("queries/java.types.scm")),
+        "go" => Some(include_str!("queries/go.types.scm")),
+        "c" => Some(include_str!("queries/c.types.scm")),
+        "cpp" => Some(include_str!("queries/cpp.types.scm")),
+        "kotlin" => Some(include_str!("queries/kotlin.types.scm")),
+        "swift" => Some(include_str!("queries/swift.types.scm")),
+        "c_sharp" => Some(include_str!("queries/c_sharp.types.scm")),
         _ => None,
     }
 }
@@ -516,7 +523,6 @@ mod tests {
 
     #[test]
     fn test_bundled_tags_queries() {
-        // Verify all bundled tags queries are non-empty
         for lang in &[
             "rust",
             "python",
@@ -540,14 +546,51 @@ mod tests {
     }
 
     #[test]
+    fn test_bundled_types_queries() {
+        for lang in &[
+            "rust",
+            "python",
+            "typescript",
+            "tsx",
+            "java",
+            "go",
+            "c",
+            "cpp",
+            "kotlin",
+            "swift",
+            "c_sharp",
+        ] {
+            let query = bundled_types_query(lang);
+            assert!(query.is_some(), "Missing bundled types query for {lang}");
+            assert!(
+                !query.unwrap().is_empty(),
+                "Empty bundled types query for {lang}"
+            );
+        }
+    }
+
+    #[test]
     fn test_get_tags_returns_bundled() {
         let loader = GrammarLoader::with_paths(vec![]);
-        // With empty search paths, should still return bundled query
         assert!(loader.get_tags("rust").is_some());
         assert!(loader.get_tags("python").is_some());
         assert!(loader.get_tags("go").is_some());
-        // Unknown language should return None
         assert!(loader.get_tags("unknown-lang-xyz").is_none());
+    }
+
+    #[test]
+    fn test_get_types_returns_bundled() {
+        let loader = GrammarLoader::with_paths(vec![]);
+        assert!(loader.get_types("rust").is_some());
+        assert!(loader.get_types("python").is_some());
+        assert!(loader.get_types("java").is_some());
+        assert!(loader.get_types("go").is_some());
+        assert!(loader.get_types("c").is_some());
+        assert!(loader.get_types("cpp").is_some());
+        assert!(loader.get_types("kotlin").is_some());
+        assert!(loader.get_types("swift").is_some());
+        assert!(loader.get_types("c_sharp").is_some());
+        assert!(loader.get_types("unknown-lang-xyz").is_none());
     }
 
     #[test]
