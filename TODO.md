@@ -392,19 +392,38 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 | `analyze/` (non-cmd) | 1,372 | 2.6% |
 | `skeleton.rs` | 627 | 1.2% |
 
-**Primary target: extract `commands/analyze/` → `normalize-analyze` (~21k lines, 41%)**
-- Clean dep boundary: `normalize-facts`, `normalize-output`, `normalize-languages` — none depend on it
-- `service/analyze.rs` stays in main (thin `#[cli]` wiring, ~1.5k)
-- Each subcommand: Report struct + OutputFormatter + computation fn — all move together
-- After extraction: main crate ~28k lines
+**Don't bulk-extract `commands/analyze/` as a unit.** The right approach is to extract
+*generally useful functionality* into domain crates — algorithms that the LSP, external
+tools, or other commands would want. Pure "compute + format for one command" stays.
 
-**Secondary targets (lower priority):**
-- `serve/` (LSP + HTTP + MCP, 1.5k) → `normalize-serve`
-- `src/analyze/` (1.4k, pure computation) → belongs in `normalize-analyze` or `normalize-facts`
-- `commands/sessions/` (3.4k) — circular dep risk, needs care
+Audit done (2026-03) on the 10 heaviest files:
+
+| File | Lines | Verdict | Notes |
+|---|---|---|---|
+| `duplicates.rs` | 3287 | **EXTRACT** | MinHash/LSH, AST hashing, IDF Jaccard — reusable by LSP, linters |
+| `graph.rs` | 1126 | **EXTRACT** | Tarjan SCC, bridges, transitive edges — pure graph algorithms |
+| `trace.rs` | 1044 | stay | entangled with output, single consumer |
+| `provenance.rs` | 808 | stay | Normalize session analytics, too specific |
+| `report.rs` | 787 | stay | pure CLI facade, no computation |
+| `query.rs` | 676 | **EXTRACT core** | `run_sexp_query`/`run_astgrep_query`/`MatchResult` — preview rendering stays |
+| `architecture.rs` | 622 | **EXTRACT** | coupling, hub detection, layer flows — standard architectural metrics |
+| `patterns.rs` | 596 | **EXTRACT** | structural token MinHash, union-find clustering — shares code with duplicates.rs |
+| `layering.rs` | 531 | **EXTRACT** | layer compliance — pairs with architecture.rs |
+| `activity.rs` | 523 | stay | multi-repo analytics, trivial compute |
+
+**Proposed new crates:**
+- `normalize-graph` — Tarjan SCC, bridges, transitive edges, graph metrics (`graph.rs`)
+- `normalize-code-similarity` — MinHash/LSH, AST hashing, union-find (`duplicates.rs` + `patterns.rs`; they already share code)
+- `normalize-architecture` — coupling, layering, hub detection; depends on `normalize-graph` (`architecture.rs` + `layering.rs`)
+- Query execution (`run_sexp_query`, `run_astgrep_query`, `MatchResult` from `query.rs`) → into `normalize-syntax-rules` if it fits naturally for the majority of that crate's consumers, otherwise `normalize-query`
 
 **`tree.rs` + `skeleton.rs` stay in main.** Used by commands/view/, commands/analyze/, serve/,
 path_resolve.rs — no clean extraction without a new shared crate.
+
+**Secondary targets (lower priority):**
+- `serve/` (LSP + HTTP + MCP, 1.5k) → `normalize-serve`
+- `src/analyze/` (1.4k, pure computation) → belongs in `normalize-architecture` or `normalize-facts`
+- `commands/sessions/` (3.4k) — circular dep risk, needs care
 
 **Crate audit done (2026-03):**
 - `normalize-derive` merged into `normalize-core` via re-export (serde pattern)
