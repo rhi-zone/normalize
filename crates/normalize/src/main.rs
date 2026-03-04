@@ -35,22 +35,50 @@ fn main() -> std::process::ExitCode {
 
     let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
 
+    let argv0 = argv
+        .first()
+        .and_then(|p| std::path::Path::new(p).file_stem())
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
     // argv[0] dispatch: symlink `jq -> normalize` runs jq directly.
     #[cfg(feature = "jq-cli")]
-    {
-        let argv0 = argv
-            .first()
-            .and_then(|p| std::path::Path::new(p).file_stem())
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
-        if argv0 == "jq" {
-            return normalize::jq::run_jq(argv[1..].iter().cloned());
-        }
+    if argv0 == "jq" {
+        return normalize::jq::run_jq(argv[1..].iter().cloned());
+    }
 
-        // Subcommand dispatch: `normalize jq [args...]` bypasses server-less.
-        if argv.get(1).and_then(|s| s.to_str()) == Some("jq") {
-            return normalize::jq::run_jq(argv[2..].iter().cloned());
-        }
+    // argv[0] dispatch: symlink `rg -> normalize` runs rg directly.
+    #[cfg(feature = "rg-cli")]
+    if argv0 == "rg" {
+        return normalize::rg::run_rg(argv[1..].iter().cloned());
+    }
+
+    // argv[0] dispatch: symlink `ast-grep -> normalize` or `sg -> normalize` runs ast-grep.
+    #[cfg(feature = "ast-grep-cli")]
+    if argv0 == "ast-grep" || argv0 == "sg" {
+        return normalize::ast_grep::run_ast_grep(argv[1..].iter().cloned());
+    }
+
+    // Subcommand dispatch: `normalize jq [args...]` bypasses server-less.
+    #[cfg(feature = "jq-cli")]
+    if argv.get(1).and_then(|s| s.to_str()) == Some("jq") {
+        return normalize::jq::run_jq(argv[2..].iter().cloned());
+    }
+
+    // Subcommand dispatch: `normalize rg [args...]` bypasses server-less.
+    #[cfg(feature = "rg-cli")]
+    if argv.get(1).and_then(|s| s.to_str()) == Some("rg") {
+        return normalize::rg::run_rg(argv[2..].iter().cloned());
+    }
+
+    // Subcommand dispatch: `normalize ast-grep [args...]` or `normalize sg [args...]`
+    #[cfg(feature = "ast-grep-cli")]
+    if argv
+        .get(1)
+        .and_then(|s| s.to_str())
+        .is_some_and(|sub| sub == "ast-grep" || sub == "sg")
+    {
+        return normalize::ast_grep::run_ast_grep(argv[2..].iter().cloned());
     }
 
     // Handle --schema for Nursery integration (before clap parsing)

@@ -18,6 +18,8 @@
 //! ```
 
 pub mod analyze;
+#[cfg(feature = "ast-grep-cli")]
+pub mod ast_grep;
 pub mod commands;
 pub mod config;
 pub mod daemon;
@@ -34,6 +36,8 @@ pub mod output;
 pub mod parsers;
 pub mod path_resolve;
 pub mod paths;
+#[cfg(feature = "rg-cli")]
+pub mod rg;
 pub mod rules;
 pub mod serve;
 #[cfg(feature = "cli")]
