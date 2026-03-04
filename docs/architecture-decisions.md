@@ -402,3 +402,28 @@ All rules (builtin and user) compile to dylibs via `abi_stable`:
 ### Invariant
 
 The top-level fields of a report are always present and always mean the same thing. `--repos` adds a `.repos` field alongside them with per-repo breakdowns.
+
+## scm Query Files over Rust Node Lists
+
+**Decision**: Replace `Language` trait methods that return `&'static [&'static str]` node-kind lists (e.g. `complexity_nodes()`, `nesting_nodes()`) with `.scm` tree-sitter query files.
+
+### Why
+
+- **Tree-sitter queries are the native abstraction** for matching AST patterns. Node-kind lists are a subset that loses structural information (parent-child relationships, field names, anonymous nodes like `&&`/`||`).
+- **User-customizable**: `.scm` files can be overridden via `NORMALIZE_GRAMMAR_PATH` without recompiling.
+- **Consistent ecosystem**: Highlights, injections, and locals all use `.scm` files. Complexity and calls should too.
+- **Less per-language Rust code**: A generic query walker replaces N language-specific manual tree-walkers.
+
+### Pattern
+
+1. Queries are bundled at compile time via `include_str!` in `grammar_loader.rs` as fallbacks.
+2. `GrammarLoader::get_complexity(name)` / `get_calls(name)` check external search paths first, then bundled.
+3. The walker compiles the query once per analysis, then runs it on each function node.
+4. Captures: `@complexity`/`@nesting` for complexity, `@call`/`@call.qualifier` for calls.
+
+### Migration Status
+
+- `*.complexity.scm`: 12 languages (Rust, Python, Go, JS, TS, TSX, Java, C, C++, Ruby, Kotlin, Swift). Query-based walker runs alongside trait-based fallback.
+- `*.calls.scm`: 7 languages (Python, Rust, TS, TSX, JS, Java, Go). Old per-language walkers removed; generic query walker is the only path.
+- `complexity_nodes()` / `nesting_nodes()` trait methods preserved for backward compat (used by languages without `.scm` files).
+- Future: `scope_creating_kinds()`, `control_flow_kinds()` are candidates for the same migration.
