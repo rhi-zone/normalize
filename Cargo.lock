@@ -3541,8 +3541,8 @@ dependencies = [
 name = "normalize-edit"
 version = "0.1.0"
 dependencies = [
+ "normalize-facts",
  "normalize-languages",
- "normalize-view",
  "streaming-iterator",
  "tree-sitter",
 ]

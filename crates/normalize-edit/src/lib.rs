@@ -1,6 +1,6 @@
+use normalize_facts::{Extractor, Symbol};
 use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
 use normalize_languages::{Language, support_for_path};
-use normalize_view::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
 
@@ -52,11 +52,11 @@ impl Editor {
         name: &str,
         case_insensitive: bool,
     ) -> Option<SymbolLocation> {
-        let extractor = SkeletonExtractor::new();
+        let extractor = Extractor::new();
         let result = extractor.extract(path, content);
 
         fn search_symbols(
-            symbols: &[SkeletonSymbol],
+            symbols: &[Symbol],
             name: &str,
             content: &str,
             case_insensitive: bool,
