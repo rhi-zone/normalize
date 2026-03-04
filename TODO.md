@@ -411,11 +411,11 @@ Audit done (2026-03) on the 10 heaviest files:
 | `layering.rs` | 531 | **EXTRACT** | layer compliance — pairs with architecture.rs |
 | `activity.rs` | 523 | stay | multi-repo analytics, trivial compute |
 
-**Proposed new crates:**
-- `normalize-graph` — Tarjan SCC, bridges, transitive edges, graph metrics (`graph.rs`)
-- `normalize-code-similarity` — MinHash/LSH, AST hashing, union-find (`duplicates.rs` + `patterns.rs`; they already share code)
-- `normalize-architecture` — coupling, layering, hub detection; depends on `normalize-graph` (`architecture.rs` + `layering.rs`)
-- Query execution (`run_sexp_query`, `run_astgrep_query`, `MatchResult` from `query.rs`) → into `normalize-syntax-rules` if it fits naturally for the majority of that crate's consumers, otherwise `normalize-query`
+**Extracted crates (2026-03, DONE):**
+- `normalize-graph` — Tarjan SCC, bridges, transitive edges, graph metrics (`graph.rs`) ✓
+- `normalize-code-similarity` — MinHash/LSH, AST hashing, union-find (`duplicates.rs` + `patterns.rs`) ✓
+- `normalize-architecture` — coupling, layering, hub detection (`architecture.rs` + `layering.rs`) ✓
+- Query execution (`run_sexp_query`, `run_astgrep_query`, `MatchResult`) → `normalize-syntax-rules/src/query.rs` ✓
 
 **`tree.rs` + `skeleton.rs` stay in main.** Used by commands/view/, commands/analyze/, serve/,
 path_resolve.rs — no clean extraction without a new shared crate.
