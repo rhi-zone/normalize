@@ -499,6 +499,13 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "javascript" => Some(include_str!("queries/javascript.calls.scm")),
         "java" => Some(include_str!("queries/java.calls.scm")),
         "go" => Some(include_str!("queries/go.calls.scm")),
+        "c" => Some(include_str!("queries/c.calls.scm")),
+        "cpp" => Some(include_str!("queries/cpp.calls.scm")),
+        "ruby" => Some(include_str!("queries/ruby.calls.scm")),
+        "kotlin" => Some(include_str!("queries/kotlin.calls.scm")),
+        "swift" => Some(include_str!("queries/swift.calls.scm")),
+        "c_sharp" => Some(include_str!("queries/c_sharp.calls.scm")),
+        "bash" => Some(include_str!("queries/bash.calls.scm")),
         _ => None,
     }
 }
@@ -570,6 +577,33 @@ mod tests {
     }
 
     #[test]
+    fn test_bundled_calls_queries() {
+        for lang in &[
+            "python",
+            "rust",
+            "typescript",
+            "tsx",
+            "javascript",
+            "java",
+            "go",
+            "c",
+            "cpp",
+            "ruby",
+            "kotlin",
+            "swift",
+            "c_sharp",
+            "bash",
+        ] {
+            let query = bundled_calls_query(lang);
+            assert!(query.is_some(), "Missing bundled calls query for {lang}");
+            assert!(
+                !query.unwrap().is_empty(),
+                "Empty bundled calls query for {lang}"
+            );
+        }
+    }
+
+    #[test]
     fn test_get_tags_returns_bundled() {
         let loader = GrammarLoader::with_paths(vec![]);
         assert!(loader.get_tags("rust").is_some());
@@ -591,6 +625,22 @@ mod tests {
         assert!(loader.get_types("swift").is_some());
         assert!(loader.get_types("c_sharp").is_some());
         assert!(loader.get_types("unknown-lang-xyz").is_none());
+    }
+
+    #[test]
+    fn test_get_calls_returns_bundled() {
+        let loader = GrammarLoader::with_paths(vec![]);
+        assert!(loader.get_calls("rust").is_some());
+        assert!(loader.get_calls("python").is_some());
+        assert!(loader.get_calls("go").is_some());
+        assert!(loader.get_calls("c").is_some());
+        assert!(loader.get_calls("cpp").is_some());
+        assert!(loader.get_calls("ruby").is_some());
+        assert!(loader.get_calls("kotlin").is_some());
+        assert!(loader.get_calls("swift").is_some());
+        assert!(loader.get_calls("c_sharp").is_some());
+        assert!(loader.get_calls("bash").is_some());
+        assert!(loader.get_calls("unknown-lang-xyz").is_none());
     }
 
     #[test]
