@@ -23,10 +23,6 @@ impl Language for Hlsl {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "struct_specifier"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let name = match self.node_name(node, content) {
             Some(n) => n.to_string(),

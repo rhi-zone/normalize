@@ -21,15 +21,6 @@ impl Language for Scala {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_definition",
-            "object_definition",
-            "trait_definition",
-            "function_definition",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Scala: public by default, check for private/protected modifiers
         // TODO: implement proper visibility checking for Scala

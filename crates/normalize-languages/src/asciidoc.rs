@@ -21,17 +21,6 @@ impl Language for AsciiDoc {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "section_block",
-            "title1",
-            "title2",
-            "title3",
-            "title4",
-            "title5",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "section_block" | "title1" | "title2" | "title3" | "title4" | "title5" => {

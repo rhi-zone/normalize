@@ -396,10 +396,7 @@ pub fn validate_unused_kinds_audit(
     ];
 
     // Collect all kinds used by Language trait methods
-    let mut used_kinds: HashSet<&str> = HashSet::new();
-    for kind in lang.public_symbol_kinds() {
-        used_kinds.insert(kind);
-    }
+    let used_kinds: HashSet<&str> = HashSet::new();
 
     // Also collect kinds referenced in tags.scm (these replace container/function/type_kinds)
     let tags_kinds: HashSet<String> = {
@@ -534,28 +531,9 @@ mod tests {
                 }
             };
 
-            // Collect all node kinds from trait methods
-            let all_kinds: Vec<(&str, &[&str])> =
-                vec![("public_symbol_kinds", lang.public_symbol_kinds())];
-
-            for (method, kinds) in all_kinds {
-                for kind in kinds {
-                    // id_for_node_kind returns 0 if the kind doesn't exist
-                    let id = ts_lang.id_for_node_kind(kind, true);
-                    if id == 0 {
-                        // Also check unnamed nodes (like operators)
-                        let unnamed_id = ts_lang.id_for_node_kind(kind, false);
-                        if unnamed_id == 0 {
-                            errors.push(format!(
-                                "{}: {}() contains invalid node kind '{}'",
-                                lang.name(),
-                                method,
-                                kind
-                            ));
-                        }
-                    }
-                }
-            }
+            // No trait methods return node kind lists any more —
+            // export detection now uses tags.scm queries exclusively.
+            let _ = ts_lang; // suppress unused variable warning
         }
 
         if !errors.is_empty() {
@@ -629,9 +607,7 @@ mod tests {
 
             // Collect all kinds currently used by the language
             let mut used_kinds: HashSet<&str> = HashSet::new();
-            for kind in lang.public_symbol_kinds() {
-                used_kinds.insert(kind);
-            }
+            // public_symbol_kinds() removed — export detection uses tags.scm exclusively.
 
             // Get all valid named node kinds from grammar
             let mut all_kinds: Vec<&str> = Vec::new();

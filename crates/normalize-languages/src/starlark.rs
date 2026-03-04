@@ -21,10 +21,6 @@ impl Language for Starlark {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "function_definition" {
             return Vec::new();

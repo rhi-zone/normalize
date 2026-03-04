@@ -21,10 +21,6 @@ impl Language for Rust {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_item", "struct_item", "enum_item", "trait_item"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

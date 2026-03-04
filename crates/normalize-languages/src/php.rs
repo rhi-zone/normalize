@@ -21,16 +21,6 @@ impl Language for Php {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "interface_declaration",
-            "trait_declaration",
-            "function_definition",
-            "method_declaration",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if self.get_visibility(node, content) != Visibility::Public {
             return Vec::new();

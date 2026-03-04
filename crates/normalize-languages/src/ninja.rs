@@ -21,10 +21,6 @@ impl Language for Ninja {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["rule", "build"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let kind = match node.kind() {
             "rule" => SymbolKind::Function,

@@ -21,10 +21,6 @@ impl Language for Verilog {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["module_declaration"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "module_declaration" {
             return Vec::new();

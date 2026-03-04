@@ -21,10 +21,6 @@ impl Language for Ruby {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["class", "module", "method", "singleton_method"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         "; end"
     }

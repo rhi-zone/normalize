@@ -21,10 +21,6 @@ impl Language for Elixir {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["call"] // def, defmacro (not defp, defmacrop)
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "call" {
             return Vec::new();

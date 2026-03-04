@@ -21,18 +21,6 @@ impl Language for CSharp {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "struct_declaration",
-            "interface_declaration",
-            "enum_declaration",
-            "record_declaration",
-            "method_declaration",
-            "property_declaration",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if self.get_visibility(node, content) != Visibility::Public {
             return Vec::new();

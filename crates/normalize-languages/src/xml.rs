@@ -21,10 +21,6 @@ impl Language for Xml {
         false
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

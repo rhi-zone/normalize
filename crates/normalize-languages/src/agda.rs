@@ -21,10 +21,6 @@ impl Language for Agda {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["module", "data", "record", "function"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "module" => {

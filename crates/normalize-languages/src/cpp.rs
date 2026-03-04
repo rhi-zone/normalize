@@ -21,10 +21,6 @@ impl Language for Cpp {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "class_specifier", "struct_specifier"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

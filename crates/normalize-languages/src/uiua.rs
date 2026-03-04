@@ -21,10 +21,6 @@ impl Language for Uiua {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn extract_public_symbols(&self, _node: &Node, _content: &str) -> Vec<Export> {
         Vec::new()
     }

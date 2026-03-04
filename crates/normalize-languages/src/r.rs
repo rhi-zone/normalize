@@ -21,10 +21,6 @@ impl Language for R {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["binary_operator"] // assignments in R are binary operators
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Look for assignments like: foo <- function(...) or foo = function(...)
         // In R grammar, these are binary_operator nodes

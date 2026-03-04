@@ -98,17 +98,6 @@ pub trait Language: Send + Sync {
     /// Whether this language has code symbols (functions, classes, etc.)
     fn has_symbols(&self) -> bool;
 
-    // === Node Classification ===
-
-    /// AST node kinds that may contain publicly visible symbols.
-    /// For JS/TS: export_statement nodes.
-    /// For Go/Java/Python: function/class/type declaration nodes.
-    /// The extract_public_symbols() method filters by actual visibility.
-    /// Defaults to `&[]`; override only when no tags.scm covers this language.
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     // === Symbol Extraction ===
 
     /// Extract symbol from a function/method node
@@ -137,9 +126,7 @@ pub trait Language: Send + Sync {
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String;
 
     /// Extract public symbols from a node.
-    /// The node is one of the kinds from public_symbol_kinds().
-    /// For JS/TS: extracts exported names from export statements.
-    /// For Go/Java/Python: checks visibility and returns public symbols.
+    /// Used by JS/TS-specific extraction paths for export statements.
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export>;
 
     // === Display/Formatting ===

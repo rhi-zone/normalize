@@ -25,10 +25,6 @@ impl Language for Dockerfile {
 
     // No functions in Dockerfile
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["from_instruction"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "from_instruction" {
             return Vec::new();

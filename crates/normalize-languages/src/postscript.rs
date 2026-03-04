@@ -21,10 +21,6 @@ impl Language for PostScript {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["procedure"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "procedure" {
             return Vec::new();

@@ -23,9 +23,6 @@ impl Language for Json {
 
     // JSON is data, not code - no functions/types/control flow
     // "pair" nodes are key-value pairs that we extract as symbols
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
 
     fn signature_suffix(&self) -> &'static str {
         ""

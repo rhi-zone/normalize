@@ -2,11 +2,12 @@
 //!
 //! Extracts imports and exports from source files.
 
-use normalize_languages::parsers::parse_with_grammar;
+use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
 use normalize_languages::{
-    Export, Import, Language, SymbolKind, support_for_grammar, support_for_path,
+    Export, Import, Language, SymbolKind, Visibility, support_for_grammar, support_for_path,
 };
 use std::path::Path;
+use streaming_iterator::StreamingIterator;
 
 /// A re-export statement (export * from './module' or export { foo } from './module')
 #[derive(Debug, Clone)]
@@ -133,6 +134,80 @@ impl DepsExtractor {
         }
     }
 
+    /// Extract exports from a parsed tree using the language's tags.scm query.
+    ///
+    /// Finds all `@definition.*` captures, checks visibility via `get_visibility()`,
+    /// and maps the capture name to a `SymbolKind`.
+    fn extract_exports_from_tags(
+        tree: &tree_sitter::Tree,
+        content: &str,
+        support: &dyn Language,
+        grammar_name: &str,
+    ) -> Vec<Export> {
+        let loader = grammar_loader();
+        let tags_query_str = match loader.get_tags(grammar_name) {
+            Some(q) => q,
+            None => return Vec::new(),
+        };
+        let ts_lang = match loader.get(grammar_name) {
+            Some(l) => l,
+            None => return Vec::new(),
+        };
+        let query = match tree_sitter::Query::new(&ts_lang, &tags_query_str) {
+            Ok(q) => q,
+            Err(_) => return Vec::new(),
+        };
+
+        let capture_names = query.capture_names().to_vec();
+        let root = tree.root_node();
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        let mut matches = qcursor.matches(&query, root, content.as_bytes());
+
+        let mut exports = Vec::new();
+        while let Some(m) = matches.next() {
+            let mut def_node = None;
+            let mut def_kind_str = "";
+            for cap in m.captures {
+                let cn = &capture_names[cap.index as usize];
+                if cn.starts_with("definition.") {
+                    def_node = Some(cap.node);
+                    def_kind_str = cn;
+                }
+            }
+            let Some(node) = def_node else { continue };
+
+            if support.get_visibility(&node, content) != Visibility::Public {
+                continue;
+            }
+
+            let name = match support.node_name(&node, content) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+
+            let kind = match def_kind_str {
+                "definition.function" | "definition.method" | "definition.macro" => {
+                    SymbolKind::Function
+                }
+                "definition.class" => SymbolKind::Class,
+                "definition.interface" => SymbolKind::Interface,
+                "definition.module" => SymbolKind::Module,
+                "definition.type" => SymbolKind::Type,
+                "definition.constant" => SymbolKind::Constant,
+                "definition.var" => SymbolKind::Variable,
+                _ => continue,
+            };
+
+            exports.push(Export {
+                name,
+                kind,
+                line: node.start_position().row + 1,
+            });
+        }
+
+        exports
+    }
+
     /// Extract using the Language trait
     fn extract_with_trait(&self, content: &str, support: &dyn Language) -> ExtractedDeps {
         let tree = match parse_with_grammar(support.grammar_name(), content) {
@@ -147,11 +222,14 @@ impl DepsExtractor {
         };
 
         let mut imports = Vec::new();
-        let mut exports = Vec::new();
         let root = tree.root_node();
         let mut cursor = root.walk();
 
-        Self::collect_with_trait(&mut cursor, content, support, &mut imports, &mut exports);
+        Self::collect_imports_with_trait(&mut cursor, content, support, &mut imports);
+
+        let exports =
+            Self::extract_exports_from_tags(&tree, content, support, support.grammar_name());
+
         ExtractedDeps {
             imports,
             exports,
@@ -159,16 +237,14 @@ impl DepsExtractor {
         }
     }
 
-    fn collect_with_trait(
+    fn collect_imports_with_trait(
         cursor: &mut tree_sitter::TreeCursor,
         content: &str,
         support: &dyn Language,
         imports: &mut Vec<Import>,
-        exports: &mut Vec<Export>,
     ) {
         loop {
             let node = cursor.node();
-            let kind = node.kind();
 
             // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
             if let Some(embedded) = support.embedded_content(&node, content)
@@ -176,25 +252,28 @@ impl DepsExtractor {
                 && let Some(sub_tree) = parse_with_grammar(embedded.grammar, &embedded.content)
             {
                 let mut sub_imports = Vec::new();
-                let mut sub_exports = Vec::new();
                 let sub_root = sub_tree.root_node();
                 let mut sub_cursor = sub_root.walk();
-                Self::collect_with_trait(
+                Self::collect_imports_with_trait(
                     &mut sub_cursor,
                     &embedded.content,
                     sub_lang,
                     &mut sub_imports,
-                    &mut sub_exports,
                 );
+
+                // Collect exports from embedded content via tags
+                let sub_exports = Self::extract_exports_from_tags(
+                    &sub_tree,
+                    &embedded.content,
+                    sub_lang,
+                    embedded.grammar,
+                );
+                let _ = sub_exports; // Embedded exports are not propagated (only imports are)
 
                 // Adjust line numbers for embedded content offset
                 for mut imp in sub_imports {
                     imp.line += embedded.start_line - 1;
                     imports.push(imp);
-                }
-                for mut exp in sub_exports {
-                    exp.line += embedded.start_line - 1;
-                    exports.push(exp);
                 }
                 // Don't descend into embedded nodes - we've already processed them
                 if cursor.goto_next_sibling() {
@@ -203,15 +282,13 @@ impl DepsExtractor {
                 break;
             }
 
-            // Check for public symbol nodes
-            if support.public_symbol_kinds().contains(&kind) {
-                let lang_exports = support.extract_public_symbols(&node, content);
-                exports.extend(lang_exports);
-            }
+            // Extract imports from this node
+            let node_imports = support.extract_imports(&node, content);
+            imports.extend(node_imports);
 
             // Recurse into children
             if cursor.goto_first_child() {
-                Self::collect_with_trait(cursor, content, support, imports, exports);
+                Self::collect_imports_with_trait(cursor, content, support, imports);
                 cursor.goto_parent();
             }
 

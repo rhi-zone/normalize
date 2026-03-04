@@ -21,10 +21,6 @@ impl Language for Scheme {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["list"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "list" {
             return Vec::new();

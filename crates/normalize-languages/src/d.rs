@@ -37,15 +37,6 @@ impl Language for D {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "module_declaration",
-            "class_declaration",
-            "struct_declaration",
-            "auto_declaration",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "module_declaration" => {

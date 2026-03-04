@@ -22,9 +22,6 @@ impl Language for Toml {
     }
 
     // TOML is config, not code - no functions/types/control flow
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
 
     fn signature_suffix(&self) -> &'static str {
         ""

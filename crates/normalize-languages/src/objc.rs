@@ -21,14 +21,6 @@ impl Language for ObjC {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_interface",
-            "protocol_declaration",
-            "method_declaration",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "class_interface" | "class_implementation" | "protocol_declaration" => {

@@ -21,10 +21,6 @@ impl Language for Diff {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["file_change"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "file_change" {
             return Vec::new();

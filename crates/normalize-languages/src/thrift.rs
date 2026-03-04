@@ -21,10 +21,6 @@ impl Language for Thrift {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["struct_definition", "service_definition", "enum_definition"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let kind = match node.kind() {
             "struct_definition" => SymbolKind::Struct,

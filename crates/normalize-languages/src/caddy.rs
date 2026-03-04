@@ -21,10 +21,6 @@ impl Language for Caddy {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["site_block"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "site_block" {
             return Vec::new();

@@ -21,10 +21,6 @@ impl Language for Gleam {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function", "type_definition", "type_alias", "constant"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let text = &content[node.byte_range()];
 

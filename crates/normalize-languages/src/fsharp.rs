@@ -21,10 +21,6 @@ impl Language for FSharp {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_or_value_defn", "type_definition", "module_defn"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if !self.is_public(node, content) {
             return Vec::new();

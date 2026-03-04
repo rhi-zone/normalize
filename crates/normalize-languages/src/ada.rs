@@ -21,14 +21,6 @@ impl Language for Ada {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "package_declaration",
-            "subprogram_declaration",
-            "full_type_declaration",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "package_declaration" | "package_body" | "generic_package_declaration" => {

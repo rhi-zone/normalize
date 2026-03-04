@@ -21,10 +21,6 @@ impl Language for ReScript {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["let_binding", "type_declaration", "module_declaration"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "let_binding" | "external_declaration" => {

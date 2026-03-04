@@ -21,10 +21,6 @@ impl Language for Jinja2 {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn extract_public_symbols(&self, _node: &Node, _content: &str) -> Vec<Export> {
         // Jinja2 grammar is minimal - only basic tokens, no structured nodes
         Vec::new()

@@ -21,10 +21,6 @@ impl Language for CommonLisp {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "list_lit" {
             return Vec::new();

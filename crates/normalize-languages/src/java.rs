@@ -21,15 +21,6 @@ impl Language for Java {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "class_declaration",
-            "interface_declaration",
-            "enum_declaration",
-            "method_declaration",
-        ]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if self.get_visibility(node, content) != Visibility::Public {
             return Vec::new();

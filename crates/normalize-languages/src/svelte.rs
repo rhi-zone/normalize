@@ -22,10 +22,6 @@ impl Language for Svelte {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[] // JS exports are in embedded script, not Svelte grammar
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Look for export let/const/function
         let text = &content[node.byte_range()];

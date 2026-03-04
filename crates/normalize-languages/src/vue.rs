@@ -22,10 +22,6 @@ impl Language for Vue {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[] // JS exports are in embedded script, not Vue grammar
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

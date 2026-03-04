@@ -21,16 +21,6 @@ impl Language for Go {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &[
-            "function_declaration",
-            "method_declaration",
-            "type_spec",
-            "const_spec",
-            "var_spec",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

@@ -21,10 +21,6 @@ impl Language for Ini {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["section", "setting"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "section" => {

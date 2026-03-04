@@ -21,10 +21,6 @@ impl Language for Zig {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["FnProto", "ContainerDecl"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if !self.is_public(node, content) {
             return Vec::new();

@@ -21,10 +21,6 @@ impl Language for Asm {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["label"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "label" {
             return Vec::new();

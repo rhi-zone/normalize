@@ -21,10 +21,6 @@ impl Language for Prolog {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["clause_term", "directive_term"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "clause_term" {
             return Vec::new();

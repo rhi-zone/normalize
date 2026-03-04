@@ -21,10 +21,6 @@ impl Language for Wit {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["interface_item", "world_item", "func_item"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let kind = match node.kind() {
             "interface_item" => SymbolKind::Interface,

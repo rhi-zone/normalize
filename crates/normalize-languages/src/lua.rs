@@ -21,10 +21,6 @@ impl Language for Lua {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "function_definition"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Non-local functions are public
         if node.kind() == "function_declaration"

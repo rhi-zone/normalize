@@ -22,10 +22,6 @@ impl Language for JavaScript {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        ecmascript::PUBLIC_SYMBOL_KINDS
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }

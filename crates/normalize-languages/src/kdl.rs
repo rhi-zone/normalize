@@ -21,10 +21,6 @@ impl Language for Kdl {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["node"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "node" {
             return Vec::new();

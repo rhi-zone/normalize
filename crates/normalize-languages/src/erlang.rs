@@ -21,10 +21,6 @@ impl Language for Erlang {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_clause"] // Only exported functions are public
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Functions are only public if listed in -export
         // For now, return all functions as we'd need module-level analysis

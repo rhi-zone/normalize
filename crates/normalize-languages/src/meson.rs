@@ -21,10 +21,6 @@ impl Language for Meson {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["expression_statement"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() == "expression_statement"
             && let Some(name) = self.node_name(node, content)

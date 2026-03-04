@@ -21,10 +21,6 @@ impl Language for Bash {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

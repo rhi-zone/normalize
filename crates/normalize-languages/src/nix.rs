@@ -21,10 +21,6 @@ impl Language for Nix {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["binding"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "binding" {
             return Vec::new();

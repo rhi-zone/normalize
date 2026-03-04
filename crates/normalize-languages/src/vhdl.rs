@@ -21,10 +21,6 @@ impl Language for Vhdl {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["entity_declaration", "package_declaration"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let kind = match node.kind() {
             "entity_declaration" => SymbolKind::Module,

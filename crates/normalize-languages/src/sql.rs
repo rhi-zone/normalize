@@ -21,10 +21,6 @@ impl Language for Sql {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["create_table", "create_view", "create_function"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         let name = match self.extract_sql_name(node, content) {
             Some(n) => n,

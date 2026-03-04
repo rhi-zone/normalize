@@ -21,10 +21,6 @@ impl Language for Nginx {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["block", "directive"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         if node.kind() != "block" {
             return Vec::new();

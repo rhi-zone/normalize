@@ -25,10 +25,6 @@ impl Language for TypeScript {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        ecmascript::PUBLIC_SYMBOL_KINDS
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -160,10 +156,6 @@ impl Language for Tsx {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        ecmascript::PUBLIC_SYMBOL_KINDS
     }
 
     fn signature_suffix(&self) -> &'static str {

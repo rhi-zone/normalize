@@ -21,10 +21,6 @@ impl Language for VB {
         true
     }
 
-    fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["class_block", "module_block", "method_declaration"]
-    }
-
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
             "class_block" | "module_block" | "structure_block" => {
