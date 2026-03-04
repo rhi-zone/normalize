@@ -35,10 +35,6 @@ impl Language for Vim {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["source_statement", "runtime_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }

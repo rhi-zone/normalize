@@ -36,10 +36,6 @@ impl Language for Haskell {
         &["data_type", "newtype", "type_synomym"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "data_type", "newtype", "class"]
     }

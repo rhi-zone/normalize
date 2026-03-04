@@ -39,10 +39,6 @@ impl Language for Python {
         &["class_definition"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_statement", "import_from_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_definition"]
     }

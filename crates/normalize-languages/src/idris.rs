@@ -35,10 +35,6 @@ impl Language for Idris {
         &[] // Idris grammar doesn't have type alias node
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "data", "record"]
     }

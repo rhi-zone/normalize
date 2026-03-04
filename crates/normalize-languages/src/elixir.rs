@@ -35,10 +35,6 @@ impl Language for Elixir {
         &["call"] // defstruct, @type
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["call"] // import, alias, require, use
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["call"] // def, defmacro (not defp, defmacrop)
     }

@@ -35,10 +35,6 @@ impl Language for Erlang {
         &["type_alias", "record_decl"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["module_attribute"] // -import(module, [...]).
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_clause"] // Only exported functions are public
     }

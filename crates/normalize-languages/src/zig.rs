@@ -35,10 +35,6 @@ impl Language for Zig {
         &["ContainerDecl"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["SuffixExpr"] // @import("module") is a builtin call suffix
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["FnProto", "ContainerDecl"]
     }

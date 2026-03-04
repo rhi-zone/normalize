@@ -34,9 +34,6 @@ impl Language for TypeScript {
     fn type_kinds(&self) -> &'static [&'static str] {
         ecmascript::TS_TYPE_KINDS
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        ecmascript::IMPORT_KINDS
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS
     }
@@ -185,9 +182,6 @@ impl Language for Tsx {
     }
     fn type_kinds(&self) -> &'static [&'static str] {
         ecmascript::TS_TYPE_KINDS
-    }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        ecmascript::IMPORT_KINDS
     }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS

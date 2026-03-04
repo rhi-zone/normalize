@@ -35,10 +35,6 @@ impl Language for Matlab {
         &["class_definition"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["command"] // import statements are commands in MATLAB
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_definition"]
     }

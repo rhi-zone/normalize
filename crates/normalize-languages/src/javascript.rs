@@ -31,9 +31,6 @@ impl Language for JavaScript {
     fn type_kinds(&self) -> &'static [&'static str] {
         ecmascript::JS_TYPE_KINDS
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        ecmascript::IMPORT_KINDS
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS
     }

@@ -35,10 +35,6 @@ impl Language for Clojure {
         &["list_lit"] // (defrecord ...), (defprotocol ...)
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (require ...), (import ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list_lit"]
     }

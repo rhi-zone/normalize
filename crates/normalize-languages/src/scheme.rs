@@ -35,10 +35,6 @@ impl Language for Scheme {
         &["list"] // (define-record-type ...)
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (import ...), (require ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list"]
     }

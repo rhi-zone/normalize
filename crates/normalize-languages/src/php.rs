@@ -50,10 +50,6 @@ impl Language for Php {
         ]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["namespace_use_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",

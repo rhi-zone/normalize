@@ -48,10 +48,6 @@ impl Language for Julia {
         ]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_statement", "using_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "function_definition",

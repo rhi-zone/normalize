@@ -35,10 +35,6 @@ impl Language for FSharp {
         &["type_definition", "record_type_defn", "union_type_defn"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_decl"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_or_value_defn", "type_definition", "module_defn"]
     }

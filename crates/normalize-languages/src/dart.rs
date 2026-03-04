@@ -51,10 +51,6 @@ impl Language for Dart {
         ]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_specification", "library_export"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_definition",

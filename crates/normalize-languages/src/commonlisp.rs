@@ -35,10 +35,6 @@ impl Language for CommonLisp {
         &["list_lit"] // (defstruct ...), (defclass ...)
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["list_lit"] // (require ...), (use-package ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list_lit"]
     }

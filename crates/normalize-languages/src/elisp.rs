@@ -35,10 +35,6 @@ impl Language for Elisp {
         &["list"] // (cl-defstruct ...)
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["list"] // (require ...), (load ...)
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list"]
     }

@@ -35,10 +35,6 @@ impl Language for Go {
         &["type_spec"] // The actual type is in type_spec, not type_declaration
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "function_declaration",

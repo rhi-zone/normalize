@@ -40,10 +40,6 @@ impl Language for VB {
         &["enum_block", "delegate_declaration"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["imports_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class_block", "module_block", "method_declaration"]
     }

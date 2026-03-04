@@ -35,10 +35,6 @@ impl Language for Groovy {
         &["class_definition"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["groovy_import"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class_definition", "function_definition"]
     }

@@ -32,9 +32,6 @@ impl Language for C {
     fn type_kinds(&self) -> &'static [&'static str] {
         &["struct_specifier", "enum_specifier", "type_definition"]
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["preproc_include"]
-    }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]

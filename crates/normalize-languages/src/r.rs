@@ -35,10 +35,6 @@ impl Language for R {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["call"] // library(), require()
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["binary_operator"] // assignments in R are binary operators
     }

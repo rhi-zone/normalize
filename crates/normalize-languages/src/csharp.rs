@@ -55,10 +55,6 @@ impl Language for CSharp {
         ]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["using_directive"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",

@@ -40,10 +40,6 @@ impl Language for OCaml {
         &["type_definition"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["open_module"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["value_definition", "type_definition", "module_definition"]
     }

@@ -35,10 +35,6 @@ impl Language for Lua {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["function_call"] // require("module")
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_declaration", "function_definition"]
     }

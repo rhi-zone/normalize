@@ -35,10 +35,6 @@ impl Language for Starlark {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["load_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }

@@ -35,10 +35,6 @@ impl Language for Rust {
         &["struct_item", "enum_item", "type_item", "trait_item"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["use_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_item", "struct_item", "enum_item", "trait_item"]
     }

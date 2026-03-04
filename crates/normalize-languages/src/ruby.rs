@@ -32,9 +32,6 @@ impl Language for Ruby {
     fn type_kinds(&self) -> &'static [&'static str] {
         &["class", "module"]
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["call"] // require, require_relative, load are method calls
-    }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class", "module", "method", "singleton_method"]

@@ -35,10 +35,6 @@ impl Language for Perl {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["use_statement", "require_expression"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["subroutine_declaration_statement"]
     }

@@ -35,10 +35,6 @@ impl Language for ReScript {
         &["type_declaration"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["open_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["let_binding", "type_declaration", "module_declaration"]
     }

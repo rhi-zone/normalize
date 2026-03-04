@@ -57,10 +57,6 @@ impl Language for Kotlin {
         &["class_declaration", "object_declaration", "type_alias"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_header"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "class_declaration",

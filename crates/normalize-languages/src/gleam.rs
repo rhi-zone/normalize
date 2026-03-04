@@ -35,10 +35,6 @@ impl Language for Gleam {
         &["type_definition", "type_alias"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "type_definition", "type_alias", "constant"]
     }

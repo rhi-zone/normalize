@@ -39,10 +39,6 @@ impl Language for Nix {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["apply_expression"] // import ./path
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["binding"]
     }

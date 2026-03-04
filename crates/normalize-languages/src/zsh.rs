@@ -36,10 +36,6 @@ impl Language for Zsh {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["command"] // source, .
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
     }

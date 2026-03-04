@@ -61,10 +61,6 @@ impl Language for D {
         ]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "module_declaration",

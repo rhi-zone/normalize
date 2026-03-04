@@ -36,10 +36,6 @@ impl Language for PowerShell {
         &["class_statement", "enum_statement"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["pipeline"] // Import-Module is a command in a pipeline
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_statement", "class_statement"]
     }

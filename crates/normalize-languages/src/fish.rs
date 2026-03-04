@@ -34,9 +34,6 @@ impl Language for Fish {
 
     fn type_kinds(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["command"]
     } // source command
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {

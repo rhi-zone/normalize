@@ -37,9 +37,6 @@ impl Language for Cpp {
             "type_definition",
         ]
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["preproc_include"]
-    }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_specifier", "struct_specifier"]
