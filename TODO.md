@@ -102,11 +102,22 @@ For each: write the `.scm`, add to `bundled_*_query()` in `grammar_loader.rs`, v
 fixture test. Target: coverage matching `locals.scm` (65 languages).
 
 Next architecture candidates:
-- [ ] **`*.tags.scm`** — tree-sitter standard for symbol definitions/references
-  (`@name.definition.function`, `@name.definition.class`, etc.). Community-maintained
-  files exist for most languages. Would replace `container_kinds()`, `function_kinds()`,
-  `type_kinds()`, `extract_function()`, `extract_container()`, `extract_type()` — the
-  entire symbol extraction infrastructure. Highest leverage, largest deletion.
+- [x] **`*.tags.scm`** — vendored from official tree-sitter repos (MIT). 11 languages:
+  rust, python, javascript, typescript, tsx, go, java, c, cpp, ruby, kotlin.
+  `GrammarLoader::get_tags()` added. Not yet wired into symbol extraction.
+
+- [ ] **Wire tags.scm into symbol extraction — replace Language trait node-classification
+  methods entirely.** `tags.scm` makes the following trait methods redundant:
+  `container_kinds()`, `function_kinds()`, `type_kinds()`, `public_symbol_kinds()`,
+  `extract_function()`, `extract_container()`, `extract_type()`. Replace the extractor's
+  node-kind dispatch with a generic query runner: load `get_tags(grammar)`, run it, derive
+  `Symbol` from each `@name.definition.*` capture (kind from capture name, lines from
+  parent node, name from capture text). The Language trait shrinks from ~25 methods to
+  ~8 genuinely semantic ones:
+  - Keep: `extract_docstring()`, `get_visibility()`, `is_public()`, `is_test_symbol()`,
+    `test_file_globs()`, `format_import()`, `signature_suffix()`, `embedded_content()`
+  - Delete: everything that just encodes node type names as `&'static [&'static str]`
+  This is the single highest-leverage refactor remaining in the codebase.
 - [x] **`*.types.scm`** — type reference extraction. Replaced cursor-based
   `collect_type_identifiers()` in `view/symbol.rs` with query walker; fallback retained
   for grammars without a bundled query. (rust, typescript, tsx, python)
