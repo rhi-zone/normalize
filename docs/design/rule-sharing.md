@@ -2,7 +2,7 @@
 
 Import rules from URLs or shared packages.
 
-## Status: Draft
+## Status: Phase 1 complete (`normalize rules add/update/list/remove`). Phase 2+ deferred.
 
 ## Problem
 

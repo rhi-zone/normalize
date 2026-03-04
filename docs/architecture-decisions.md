@@ -88,21 +88,6 @@ crates/
 2. `~/.config/normalize/grammars/`
 3. Built-in fallback (if compiled with grammar features)
 
-## Lua for Workflows
-
-**Decision**: Use Lua (LuaJIT via mlua) for workflow scripting.
-
-### Why Not TOML/YAML?
-
-Once you need conditionals (`if is_dirty() then commit() end`), you're fighting the format. We tried TOML first and deleted ~1500 lines.
-
-### Why Lua?
-
-- ~200KB runtime, extremely fast
-- Simple syntax: `view("foo.rs")` vs TOML's `view: foo.rs`
-- Battle-tested: nginx, redis, neovim all use Lua
-- Full language when needed: loops, functions, error handling
-
 ## Index-Optional Design
 
 **Decision**: All commands work without the index (with graceful degradation).

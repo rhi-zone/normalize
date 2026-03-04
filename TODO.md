@@ -505,6 +505,8 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 - [ ] `docs`: collapse 4 commands (docs, check-refs, stale-docs, check-examples)
 - [ ] Cross-cutting `--trend` and `--diff <ref>` modifiers on any scoring command
 
+**Design pressure:** ~43 commands after Phase 2 is still too spread out. Phase 3 must happen. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
+
 ### Semantic Refactoring Infrastructure
 
 Goal: production-grade refactoring (rename, find-references, extract, inline, move) across
@@ -544,6 +546,17 @@ just: which declaration does this identifier refer to?):
       vue (already done), svelte (already done), astro
 - [ ] Niche/legacy tier: awk, sed (trivial), make, cmake, meson, nix (already done), dhall,
       cue, nickel, kdl, ron
+
+**Language implementation depth** (not a known limitation — a bug):
+Most of the 98 language impls return empty for imports, complexity, docstrings, type extraction,
+test detection etc. This is not "honest support" — it's a gap that must not be accepted. Each
+language that silently returns empty is misleading users who expect analysis and get nothing.
+- [ ] Audit: for each language, document which methods are genuinely unsupported by the grammar
+      vs which are just unimplemented (the latter must be fixed, not accepted)
+- [ ] Warning: when analysis returns empty because the language impl doesn't support it (not
+      because the file has no symbols), surface a warning rather than silent empty output
+- [ ] Prioritize: Python, JavaScript/TypeScript, Go, Java, C, C++, Ruby, Rust (already good)
+      are the high-value targets — full implementations, not boilerplate
 
 **Comprehensive language fixtures** (long-term, verification via nix flakes):
 Goal: for every language we support, a test suite that exercises the full extraction pipeline

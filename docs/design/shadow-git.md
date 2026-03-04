@@ -272,12 +272,12 @@ Uses `git filter-branch` or similar under the hood. Important for:
 ## Implementation Plan
 
 ### Phase 1: Basic Infrastructure
-- [ ] Create `.normalize/shadow/` git repo on first `normalize edit`
-- [ ] Commit file state before each edit
-- [ ] `--message`/`--reason` flag for edit descriptions
-- [ ] `normalize edit history` command (list recent edits)
-- [ ] `normalize edit history --json` for machine-readable output
-- [ ] `normalize edit history --diff <ref>` to view changes
+- [x] Create `.normalize/shadow/` git repo on first `normalize edit`
+- [x] Commit file state before each edit
+- [x] `--message`/`--reason` flag for edit descriptions
+- [x] `normalize edit history` command (list recent edits)
+- [x] `normalize edit history --json` for machine-readable output
+- [x] `normalize edit history --diff <ref>` to view changes
 
 ### Phase 2: Undo/Redo + Git Integration
 - [x] `normalize edit --undo` applies reverse patch, moves HEAD backward
