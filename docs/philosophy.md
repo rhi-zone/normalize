@@ -9,13 +9,11 @@ Normalize is **structural code intelligence as a platform**. It provides tools f
 
 | User | Interface | Use Case |
 |------|-----------|----------|
-| Developer | CLI, TUI | Understand unfamiliar code, explore structure |
-| AI Agent | MCP, Library | Get structured context, make safe modifications |
-| IDE | LSP | Code intelligence, navigation, refactoring |
+| Developer | CLI | Understand unfamiliar code, explore structure |
 | CI/CD | CLI | Quality gates, validation, analysis |
 | Tool Builder | Library | Build custom tools on structural primitives |
 
-Normalize is useful alone and powerful with AI. A human can `normalize view` to understand a file; an agent can use the same capability to build context for code generation.
+LSP integration is a future direction — the groundwork (symbol extraction, scope analysis, references) is in place, but it's not a current interface.
 
 ## Architecture
 
