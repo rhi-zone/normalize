@@ -591,6 +591,11 @@ The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mi
 
 - `normalize jq` multi-format support (YAML/CBOR/TOML/XML via `jaq-all` with `formats` feature): currently using `jaq-core/std/json` directly to avoid `jaq-fmts` bloat. Low priority — vanilla jq is JSON-only anyway.
 
+## Embedded CLI drop-in integrations (see docs/cli-dropin-integrations.md)
+
+- `normalize rg` — drop-in ripgrep using existing grep-matcher/grep-regex/grep-searcher workspace deps (ripgrep has no lib target so can't vendor directly). Feature flag: `rg-cli`.
+- `normalize ast-grep` — drop-in ast-grep using existing ast-grep-core dep. Vendor CLI source from ast-grep. Feature flag: `ast-grep-cli`.
+
 
 
 - VS Code extension: test and publish to marketplace (after first CLI release)
