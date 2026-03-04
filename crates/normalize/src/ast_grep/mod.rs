@@ -3,9 +3,11 @@
 // Embeds ast-grep as a drop-in `ast-grep`/`sg` replacement.
 // Uses normalize-languages' dynamic grammar loading instead of ast-grep-language.
 
+pub(crate) mod config;
 pub(crate) mod lang;
 pub(crate) mod print;
 pub(crate) mod run;
+pub(crate) mod scan;
 pub(crate) mod utils;
 
 use std::ffi::OsString;
@@ -14,7 +16,9 @@ use std::process::ExitCode;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+use config::ProjectConfig;
 use run::{RunArg, run_with_pattern};
+use scan::{ScanArg, run_with_config};
 use utils::exit_with_error;
 
 const LOGO: &str = r#"
@@ -38,6 +42,8 @@ struct App {
 enum Commands {
     /// Run one time search or rewrite in command line. (default command)
     Run(RunArg),
+    /// Scan the codebase with rules from sgconfig.yml or specified rule files.
+    Scan(ScanArg),
 }
 
 /// Run ast-grep with the given arguments (not including argv[0]).
@@ -88,5 +94,9 @@ fn main_with_args(args: impl Iterator<Item = String>) -> Result<ExitCode> {
     let app = App::try_parse_from(args)?;
     match app.command {
         Commands::Run(arg) => run_with_pattern(arg),
+        Commands::Scan(arg) => {
+            let project = ProjectConfig::setup(None)?;
+            run_with_config(arg, project)
+        }
     }
 }

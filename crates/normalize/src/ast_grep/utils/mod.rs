@@ -3,12 +3,14 @@ mod args;
 mod debug_query;
 mod error_context;
 mod print_diff;
+pub(crate) mod rule_overwrite;
 mod worker;
 
 pub use args::{ContextArgs, InputArgs, OutputArgs, OverwriteArgs};
 pub use debug_query::DebugFormat;
 pub use error_context::{ErrorContext, exit_with_error};
 pub use print_diff::DiffStyles;
+pub use rule_overwrite::RuleOverwrite;
 pub use worker::{Items, MaxItemCounter, PathWorker, StdInWorker, Worker};
 
 // Stub types for inspect.rs features (not vendored - used by scan/verify only)
@@ -55,7 +57,6 @@ impl ScanTrace {
 }
 #[derive(Clone, Debug, Default)]
 pub struct RuleTrace {
-    pub file_trace: ScanTrace,
     pub effective_rule_count: usize,
     pub skipped_rule_count: usize,
 }
