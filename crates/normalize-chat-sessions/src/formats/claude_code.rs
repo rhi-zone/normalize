@@ -321,11 +321,17 @@ fn parse_message(entry: &Value, role: Role) -> Message {
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
-                    let result_content = block
-                        .get("content")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
+                    let result_content = match block.get("content") {
+                        Some(v) if v.is_string() => v.as_str().unwrap_or("").to_string(),
+                        Some(v) if v.is_array() => v
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        _ => String::new(),
+                    };
                     let is_error = block
                         .get("is_error")
                         .and_then(|v| v.as_bool())

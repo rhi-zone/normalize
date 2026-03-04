@@ -34,7 +34,11 @@ impl std::fmt::Display for SessionListReport {
 
 impl std::fmt::Display for SessionShowReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
+        if self.use_pretty() {
+            write!(f, "{}", self.format_pretty())
+        } else {
+            write!(f, "{}", self.format_text())
+        }
     }
 }
 
@@ -66,7 +70,7 @@ pub enum SessionShowOutput {
 impl std::fmt::Display for SessionShowOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Report(r) => write!(f, "{}", r.format_text()),
+            Self::Report(r) => write!(f, "{}", r),
             Self::Analysis(a) => write!(f, "{}", a.format_text()),
         }
     }
@@ -147,8 +151,12 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        pretty: bool,
+        compact: bool,
     ) -> Result<SessionShowOutput, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        let is_pretty = super::resolve_pretty(resolved_root, pretty, compact);
         if analyze {
             let analysis = crate::commands::sessions::build_analyze_report(
                 &session,
@@ -165,7 +173,7 @@ impl SessionsService {
                 full,
                 exact,
             )?;
-            Ok(SessionShowOutput::Report(report))
+            Ok(SessionShowOutput::Report(report.with_pretty(is_pretty)))
         }
     }
 
