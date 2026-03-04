@@ -14,6 +14,9 @@
 //! - `go_module(content)` — extract module info from `go.mod`
 //! - `npm_entry_point(content)` — extract entry point from `package.json`
 
+#[cfg(feature = "eval")]
+pub mod eval;
+
 pub mod cabal;
 pub mod cargo;
 pub mod composer;
@@ -173,6 +176,52 @@ fn parse_manifest_by_extension_impl(filename: &str, content: &str) -> Option<Par
         "csproj" | "vbproj" | "fsproj" => nuget::CsprojParser.parse(content).ok(),
         "rockspec" => rockspec::RockspecParser.parse(content).ok(),
         _ => None,
+    }
+}
+
+// ============================================================================
+// Eval-backed parsing (feature = "eval")
+// ============================================================================
+
+/// Controls what happens when the runtime needed for eval is not available.
+#[cfg(feature = "eval")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvalPolicy {
+    /// Try eval; silently fall back to the heuristic parser if the runtime is
+    /// absent or the command fails.
+    IfAvailable,
+    /// Return `None` if eval fails instead of falling back to heuristics.
+    Required,
+}
+
+/// Parse a manifest file, preferring runtime evaluation over heuristics.
+///
+/// Dispatches to an eval-backed parser when the language runtime is available
+/// (`swift`, `go`, `ruby`/`bundle`, `elixir`/`mix`). On failure or when the
+/// runtime is absent, falls back to `parse_manifest` unless `policy` is
+/// `EvalPolicy::Required`.
+///
+/// # Supported eval targets
+///
+/// | File | Command |
+/// |------|---------|
+/// | `Package.swift` | `swift package dump-package` |
+/// | `go.mod` | `go mod edit -json` |
+/// | `Gemfile` | `bundle exec ruby -e '…'` |
+/// | `mix.exs` | `elixir -e '…'` |
+///
+/// All other filenames fall through to `parse_manifest` immediately.
+#[cfg(feature = "eval")]
+pub fn parse_manifest_eval(
+    filename: &str,
+    content: &str,
+    root: &std::path::Path,
+    policy: EvalPolicy,
+) -> Option<ParsedManifest> {
+    match eval::try_eval(filename, root) {
+        Some(m) => Some(m),
+        None if policy == EvalPolicy::IfAvailable => parse_manifest(filename, content),
+        None => None,
     }
 }
 

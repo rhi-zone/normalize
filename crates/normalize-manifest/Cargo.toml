@@ -6,6 +6,9 @@ license.workspace = true
 repository.workspace = true
 description = "Manifest file parsing for programming language ecosystems"
 
+[features]
+eval = []
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
