@@ -189,9 +189,9 @@ fn generate_types_code(
 
     let detected_format = match format {
         InputFormat::Auto => {
-            let ext = input.extension().and_then(|e| e.to_str());
-            match ext {
-                Some("ts") | Some("tsx") | Some("d.ts") => InputFormat::Typescript,
+            let lang = normalize_languages::support_for_path(&input).map(|s| s.name());
+            match lang {
+                Some("TypeScript") | Some("TSX") => InputFormat::Typescript,
                 _ => InputFormat::Auto,
             }
         }

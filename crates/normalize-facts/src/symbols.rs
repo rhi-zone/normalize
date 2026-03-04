@@ -207,10 +207,10 @@ impl SymbolParser {
         let end = symbol.end_line.min(lines.len());
         let source = lines[start..end].join("\n");
 
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        match ext {
-            "py" => self.find_python_calls(&source),
-            "rs" => self.find_rust_calls(&source),
+        let lang = support_for_path(path).map(|s| s.name());
+        match lang {
+            Some("Python") => self.find_python_calls(&source),
+            Some("Rust") => self.find_rust_calls(&source),
             _ => Vec::new(),
         }
     }
@@ -290,18 +290,17 @@ impl SymbolParser {
         let end = symbol.end_line.min(lines.len());
         let source = lines[start..end].join("\n");
 
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        match ext {
-            "py" => self.find_python_calls_with_lines(&source, symbol.start_line),
-            "rs" => self.find_rust_calls_with_lines(&source, symbol.start_line),
-            "ts" | "tsx" => {
-                self.find_typescript_calls_with_lines(&source, symbol.start_line, ext == "tsx")
+        let lang = support_for_path(path).map(|s| s.name());
+        match lang {
+            Some("Python") => self.find_python_calls_with_lines(&source, symbol.start_line),
+            Some("Rust") => self.find_rust_calls_with_lines(&source, symbol.start_line),
+            Some("TSX") => self.find_typescript_calls_with_lines(&source, symbol.start_line, true),
+            Some("TypeScript") => {
+                self.find_typescript_calls_with_lines(&source, symbol.start_line, false)
             }
-            "js" | "mjs" | "cjs" => {
-                self.find_javascript_calls_with_lines(&source, symbol.start_line)
-            }
-            "java" => self.find_java_calls_with_lines(&source, symbol.start_line),
-            "go" => self.find_go_calls_with_lines(&source, symbol.start_line),
+            Some("JavaScript") => self.find_javascript_calls_with_lines(&source, symbol.start_line),
+            Some("Java") => self.find_java_calls_with_lines(&source, symbol.start_line),
+            Some("Go") => self.find_go_calls_with_lines(&source, symbol.start_line),
             _ => Vec::new(),
         }
     }
