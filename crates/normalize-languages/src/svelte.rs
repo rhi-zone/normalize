@@ -22,10 +22,6 @@ impl Language for Svelte {
         true
     }
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         let text = &content[node.byte_range()];
@@ -147,10 +143,6 @@ impl Language for Svelte {
             crate::SymbolKind::Module => name == "tests" || name == "test" || name == "__tests__",
             _ => false,
         }
-    }
-
-    fn test_file_globs(&self) -> &'static [&'static str] {
-        &[]
     }
 
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {

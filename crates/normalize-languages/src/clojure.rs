@@ -21,10 +21,6 @@ impl Language for Clojure {
         true
     }
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "list_lit" {
             return None;
@@ -155,10 +151,6 @@ impl Language for Clojure {
 
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*_test.clj", "**/*_test.cljs", "**/*_test.cljc"]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

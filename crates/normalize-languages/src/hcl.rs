@@ -21,10 +21,6 @@ impl Language for Hcl {
         true
     }
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(
         &self,
         _node: &Node,
@@ -120,14 +116,6 @@ impl Language for Hcl {
             crate::SymbolKind::Module => name == "tests" || name == "test",
             _ => false,
         }
-    }
-
-    fn test_file_globs(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

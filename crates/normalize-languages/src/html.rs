@@ -23,10 +23,6 @@ impl Language for Html {
 
     // HTML has no functions/containers/types in the traditional sense
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(
         &self,
         _node: &Node,
@@ -57,10 +53,6 @@ impl Language for Html {
 
     fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
         false
-    }
-
-    fn test_file_globs(&self) -> &'static [&'static str] {
-        &[]
     }
 
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {

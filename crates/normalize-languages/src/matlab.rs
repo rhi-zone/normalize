@@ -21,10 +21,6 @@ impl Language for Matlab {
         true
     }
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "function_definition" {
             return None;
@@ -158,14 +154,6 @@ impl Language for Matlab {
             crate::SymbolKind::Module => name == "tests" || name == "test",
             _ => false,
         }
-    }
-
-    fn test_file_globs(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

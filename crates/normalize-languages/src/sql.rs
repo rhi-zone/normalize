@@ -21,10 +21,6 @@ impl Language for Sql {
         true
     }
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.extract_sql_name(node, content)?;
 
@@ -102,14 +98,6 @@ impl Language for Sql {
 
     fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
         false
-    }
-
-    fn test_file_globs(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

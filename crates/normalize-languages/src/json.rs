@@ -24,10 +24,6 @@ impl Language for Json {
     // JSON is data, not code - no functions/types/control flow
     // "pair" nodes are key-value pairs that we extract as symbols
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(
         &self,
         _node: &Node,
@@ -75,14 +71,6 @@ impl Language for Json {
 
     fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
         false
-    }
-
-    fn test_file_globs(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

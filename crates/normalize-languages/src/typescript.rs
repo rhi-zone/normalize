@@ -87,10 +87,6 @@ impl Language for TypeScript {
         ]
     }
 
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // Try 'body' field first, then look for interface_body or class_body child
         if let Some(body) = node.child_by_field_name("body") {

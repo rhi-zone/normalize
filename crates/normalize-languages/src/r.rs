@@ -21,10 +21,6 @@ impl Language for R {
         true
     }
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         // R functions are typically assigned: name <- function(...) {}
         // We need to look at the parent assignment (binary_operator in R grammar)
@@ -123,10 +119,6 @@ impl Language for R {
 
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/test-*.R", "**/test_*.R"]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

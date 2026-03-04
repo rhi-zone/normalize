@@ -23,10 +23,6 @@ impl Language for Yaml {
 
     // YAML is data, not code - no functions/types/control flow
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(
         &self,
         _node: &Node,
@@ -75,14 +71,6 @@ impl Language for Yaml {
 
     fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
         false
-    }
-
-    fn test_file_globs(&self) -> &'static [&'static str] {
-        &[]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

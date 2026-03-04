@@ -125,7 +125,9 @@ pub trait Language: Send + Sync {
     /// Function signatures are incomplete code fragments that need closing tokens
     /// to parse correctly (e.g., Rust `fn foo()` needs `{}`, Lua `function foo()` needs `end`).
     /// Returns the suffix to append, or empty string if none needed.
-    fn signature_suffix(&self) -> &'static str;
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
 
     // === Visibility ===
 
@@ -145,13 +147,17 @@ pub trait Language: Send + Sync {
     /// Glob patterns (relative, using `**` wildcards) that identify dedicated test files.
     /// Used to build a GlobSet for fast batch matching.
     /// Return `&[]` for languages with no dedicated test files (e.g. those using only inline tests).
-    fn test_file_globs(&self) -> &'static [&'static str];
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[]
+    }
 
     // === Embedded Languages ===
 
     /// Extract embedded content from a node (e.g., JS/CSS in Vue/HTML).
     /// Returns None for nodes that don't contain embedded code in another language.
-    fn embedded_content(&self, node: &Node, content: &str) -> Option<EmbeddedBlock>;
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<EmbeddedBlock> {
+        None
+    }
 
     // === Edit Support ===
 

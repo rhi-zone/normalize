@@ -21,10 +21,6 @@ impl Language for FSharp {
         true
     }
 
-    fn signature_suffix(&self) -> &'static str {
-        ""
-    }
-
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
 
@@ -128,10 +124,6 @@ impl Language for FSharp {
 
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*Test.fs", "**/*Tests.fs"]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
