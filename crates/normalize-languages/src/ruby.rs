@@ -123,10 +123,6 @@ impl Language for Ruby {
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
     fn analyze_container_body(
         &self,
         body_node: &Node,
@@ -134,11 +130,6 @@ impl Language for Ruby {
         inner_indent: &str,
     ) -> Option<ContainerBody> {
         crate::body::analyze_end_body(body_node, content, inner_indent)
-    }
-
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        let name_node = node.child_by_field_name("name")?;
-        Some(&content[name_node.byte_range()])
     }
 }
 

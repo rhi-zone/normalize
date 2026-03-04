@@ -113,10 +113,6 @@ impl Language for Markdown {
         // Returning it here lets collect_symbols recurse into child sections.
         Some(*node)
     }
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
     fn analyze_container_body(
         &self,
         section_node: &Node,

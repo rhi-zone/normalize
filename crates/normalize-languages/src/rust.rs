@@ -290,11 +290,6 @@ impl Language for Rust {
         node.child_by_field_name("body")
     }
 
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        // Rust doesn't have body docstrings, only outer doc comments
-        false
-    }
-
     fn analyze_container_body(
         &self,
         body_node: &Node,

@@ -150,10 +150,6 @@ impl Language for Cpp {
         node.child_by_field_name("body")
     }
 
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
     fn analyze_container_body(
         &self,
         body_node: &Node,

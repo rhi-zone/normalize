@@ -158,9 +158,6 @@ impl Language for Elisp {
         // list is itself "( ... )" — use node directly for paren analysis
         Some(*node)
     }
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
     fn analyze_container_body(
         &self,
         body_node: &Node,

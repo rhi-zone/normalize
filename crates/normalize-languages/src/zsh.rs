@@ -1,6 +1,6 @@
 //! Zsh language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, Visibility, simple_function_symbol};
+use crate::{Import, Language, Symbol, Visibility, simple_function_symbol};
 use tree_sitter::Node;
 
 /// Zsh language support.
@@ -92,24 +92,6 @@ impl Language for Zsh {
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
-    }
-
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
-    fn analyze_container_body(
-        &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
-    ) -> Option<ContainerBody> {
-        None
-    }
-
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        node.child_by_field_name("name")
-            .map(|n| &content[n.byte_range()])
     }
 }
 

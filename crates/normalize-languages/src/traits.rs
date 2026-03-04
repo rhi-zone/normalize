@@ -156,23 +156,32 @@ pub trait Language: Send + Sync {
     // === Edit Support ===
 
     /// Find the body node of a container (for prepend/append)
-    fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>>;
+    fn container_body<'a>(&self, _node: &'a Node<'a>) -> Option<Node<'a>> {
+        None
+    }
 
     /// Detect if first child of body is a docstring
-    fn body_has_docstring(&self, body: &Node, content: &str) -> bool;
+    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
+        false
+    }
 
     /// Analyze a container body node and return the editable byte range.
     /// `body_node` is the node returned by `container_body`.
     /// Returns None if this language doesn't support container body editing.
     fn analyze_container_body(
         &self,
-        body_node: &Node,
-        content: &str,
-        inner_indent: &str,
-    ) -> Option<ContainerBody>;
+        _body_node: &Node,
+        _content: &str,
+        _inner_indent: &str,
+    ) -> Option<ContainerBody> {
+        None
+    }
 
     // === Helpers ===
 
     /// Get the name of a node (typically via "name" field)
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str>;
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        node.child_by_field_name("name")
+            .map(|n| &content[n.byte_range()])
+    }
 }

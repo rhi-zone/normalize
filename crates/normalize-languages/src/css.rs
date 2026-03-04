@@ -1,6 +1,6 @@
 //! CSS language support (parse only, minimal skeleton).
 
-use crate::{ContainerBody, Import, Language, Symbol, Visibility};
+use crate::{Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// CSS language support.
@@ -64,21 +64,6 @@ impl Language for Css {
     }
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
-    }
-
-    fn container_body<'a>(&self, _node: &'a Node<'a>) -> Option<Node<'a>> {
-        None
-    }
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-    fn analyze_container_body(
-        &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
-    ) -> Option<ContainerBody> {
         None
     }
 

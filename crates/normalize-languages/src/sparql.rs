@@ -1,6 +1,6 @@
 //! SPARQL query language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, Visibility};
+use crate::{Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// SPARQL language support.
@@ -61,28 +61,6 @@ impl Language for Sparql {
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
-    }
-
-    fn container_body<'a>(&self, _node: &'a Node<'a>) -> Option<Node<'a>> {
-        None
-    }
-
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
-    fn analyze_container_body(
-        &self,
-        _body_node: &Node,
-        _content: &str,
-        _inner_indent: &str,
-    ) -> Option<ContainerBody> {
-        None
-    }
-
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        node.child_by_field_name("name")
-            .map(|n| &content[n.byte_range()])
     }
 }
 

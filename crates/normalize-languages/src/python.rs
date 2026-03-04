@@ -344,11 +344,6 @@ impl Language for Python {
             is_empty,
         })
     }
-
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        let name_node = node.child_by_field_name("name")?;
-        Some(&content[name_node.byte_range()])
-    }
 }
 
 /// Extract a Python docstring from a function or class body.

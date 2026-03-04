@@ -111,10 +111,6 @@ impl Language for DeviceTree {
         Some(*node)
     }
 
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
     fn analyze_container_body(
         &self,
         body_node: &Node,
@@ -123,11 +119,6 @@ impl Language for DeviceTree {
     ) -> Option<ContainerBody> {
         // node: "identifier { properties... }" — brace-delimited body
         crate::body::analyze_brace_body(body_node, content, inner_indent)
-    }
-
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        node.child_by_field_name("name")
-            .map(|n| &content[n.byte_range()])
     }
 }
 

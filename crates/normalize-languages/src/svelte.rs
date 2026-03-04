@@ -164,10 +164,6 @@ impl Language for Svelte {
             .find(|&child| child.kind() == "raw_text")
     }
 
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
     fn analyze_container_body(
         &self,
         body_node: &Node,

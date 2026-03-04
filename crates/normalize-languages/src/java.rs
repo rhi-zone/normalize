@@ -189,10 +189,6 @@ impl Language for Java {
         node.child_by_field_name("body")
     }
 
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
     fn analyze_container_body(
         &self,
         body_node: &Node,
@@ -200,11 +196,6 @@ impl Language for Java {
         inner_indent: &str,
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
-    }
-
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        let name_node = node.child_by_field_name("name")?;
-        Some(&content[name_node.byte_range()])
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {

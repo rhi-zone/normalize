@@ -126,10 +126,6 @@ impl Language for OCaml {
         }
     }
 
-    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool {
-        false
-    }
-
     fn analyze_container_body(
         &self,
         body_node: &Node,
@@ -139,11 +135,6 @@ impl Language for OCaml {
         // OCaml module bodies: "struct ... end" or "sig ... end" —
         // skip the opening keyword line, strip "end" from the tail
         crate::body::analyze_keyword_end_body(body_node, content, inner_indent)
-    }
-
-    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        node.child_by_field_name("name")
-            .map(|n| &content[n.byte_range()])
     }
 }
 
