@@ -262,6 +262,7 @@ pub fn build_messages_report(
     until: Option<&str>,
     project_filter: Option<&Path>,
     all_projects: bool,
+    session_filter: Option<&str>,
     max_chars: Option<usize>,
     no_truncate: bool,
     show_usage: bool,
@@ -287,6 +288,17 @@ pub fn build_messages_report(
         format.list_sessions(proj)
     };
 
+    // Session ID filtering
+    if let Some(sid) = session_filter {
+        sessions.retain(|s| {
+            s.path
+                .file_stem()
+                .and_then(|n| n.to_str())
+                .map(|n| n == sid || n.starts_with(sid))
+                .unwrap_or(false)
+        });
+    }
+
     // Date filtering
     let now = SystemTime::now();
     if let Some(d) = days {
@@ -310,7 +322,7 @@ pub fn build_messages_report(
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
-    if limit > 0 {
+    if session_filter.is_none() && limit > 0 {
         sessions.truncate(limit);
     }
 

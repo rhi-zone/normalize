@@ -214,6 +214,7 @@ impl SessionsService {
         #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
         #[param(help = "Filter by specific project path")] project: Option<String>,
         #[param(help = "Show sessions from all projects")] all_projects: bool,
+        #[param(help = "Filter to a specific session ID")] session: Option<String>,
         #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
             String,
         >,
@@ -245,6 +246,7 @@ impl SessionsService {
             until.as_deref(),
             project_path,
             all_projects,
+            session.as_deref(),
             max_chars,
             no_truncate,
             show_usage,
