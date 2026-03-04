@@ -35,10 +35,6 @@ impl Language for Batch {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[] // batch grammar doesn't have import nodes
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "variable_declaration"]
     }

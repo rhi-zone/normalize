@@ -36,10 +36,6 @@ impl Language for Glsl {
         &["struct_specifier"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "struct_specifier"]
     }

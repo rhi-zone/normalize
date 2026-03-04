@@ -73,10 +73,6 @@ impl Language for GraphQL {
         ]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "object_type_definition",

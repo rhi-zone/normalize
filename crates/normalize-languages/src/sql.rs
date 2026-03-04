@@ -35,10 +35,6 @@ impl Language for Sql {
         &["create_type"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["create_table", "create_view", "create_function"]
     }

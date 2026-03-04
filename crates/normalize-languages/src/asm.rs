@@ -35,10 +35,6 @@ impl Language for Asm {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[] // asm grammar doesn't have preprocessor includes
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["label"]
     }

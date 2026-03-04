@@ -74,19 +74,19 @@ impl SymbolParser {
             None => return Vec::new(),
         };
 
-        // Check if this language has import support
-        if support.import_kinds().is_empty() {
+        let grammar_name = support.grammar_name();
+
+        // Check if this language has import support (either via query or trait)
+        let loader = normalize_languages::parsers::grammar_loader();
+        if support.import_kinds().is_empty() && loader.get_imports(grammar_name).is_none() {
             return Vec::new();
         }
-
-        let grammar_name = support.grammar_name();
         let tree = match parsers::parse_with_grammar(grammar_name, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
 
         let root = tree.root_node();
-        let loader = normalize_languages::parsers::grammar_loader();
 
         // Try query-based extraction first
         if let Some(query_str) = loader.get_imports(grammar_name)

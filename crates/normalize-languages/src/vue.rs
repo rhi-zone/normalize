@@ -33,10 +33,6 @@ impl Language for Vue {
     fn type_kinds(&self) -> &'static [&'static str] {
         &[]
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[] // JS imports are in embedded script, not Vue grammar
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[] // JS exports are in embedded script, not Vue grammar
     }

@@ -30,9 +30,6 @@ impl Language for Yuri {
     fn type_kinds(&self) -> &'static [&'static str] {
         &[]
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }

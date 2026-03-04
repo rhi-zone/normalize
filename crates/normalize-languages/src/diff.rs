@@ -33,10 +33,6 @@ impl Language for Diff {
     fn type_kinds(&self) -> &'static [&'static str] {
         &[]
     }
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["file_change"]
     }

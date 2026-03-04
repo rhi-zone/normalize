@@ -35,10 +35,6 @@ impl Language for Ron {
         &["struct"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["struct", "struct_entry"]
     }

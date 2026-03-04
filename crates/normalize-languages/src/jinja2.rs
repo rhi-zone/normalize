@@ -33,10 +33,6 @@ impl Language for Jinja2 {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }
