@@ -80,9 +80,8 @@ flate2 = "1"
 tar = "0.4"
 zip = "2"
 regex = "1"
-jaq-core = "2"
-jaq-std = "2"
-jaq-json = { version = "1", features = ["serde_json"] }
+jaq-all.workspace = true
+tempfile = "3"
 toml = "0.8"
 toml_edit = "0.22"
 rmcp = { version = "0.12", features = ["server", "macros", "schemars", "transport-io"], optional = true }

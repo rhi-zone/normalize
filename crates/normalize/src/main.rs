@@ -30,20 +30,37 @@ fn reset_sigpipe() {
 #[cfg(not(unix))]
 fn reset_sigpipe() {}
 
-fn main() {
+fn main() -> std::process::ExitCode {
     reset_sigpipe();
+
+    let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
+
+    // argv[0] dispatch: symlink `jq -> normalize` runs jq directly.
+    let argv0 = argv
+        .first()
+        .and_then(|p| std::path::Path::new(p).file_stem())
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    if argv0 == "jq" {
+        return normalize::jq::run_jq(argv[1..].iter().cloned());
+    }
+
+    // Subcommand dispatch: `normalize jq [args...]` bypasses server-less.
+    if argv.get(1).and_then(|s| s.to_str()) == Some("jq") {
+        return normalize::jq::run_jq(argv[2..].iter().cloned());
+    }
 
     // Handle --schema for Nursery integration (before clap parsing)
     if handle_schema_flag() {
-        return;
+        return std::process::ExitCode::SUCCESS;
     }
 
     let service = normalize::service::NormalizeService::new();
     match service.cli_run() {
-        Ok(()) => {}
+        Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(1);
+            std::process::ExitCode::FAILURE
         }
     }
 }

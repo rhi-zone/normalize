@@ -207,21 +207,21 @@ pub fn aggregate_sessions(paths: &[PathBuf], format: Option<&str>) -> Option<Ses
 
 /// Apply jq filter to each line of a JSONL file.
 pub fn cmd_sessions_jq(path: &Path, filter: &str) -> i32 {
-    use jaq_core::load::{Arena, File as JaqFile, Loader};
-    use jaq_core::{Compiler, Ctx, RcIter};
-    use jaq_json::Val;
+    use jaq_all::fmts::read::json::parse_single;
+    use jaq_all::jaq_core::load::{Arena, File as JaqFile, Loader};
+    use jaq_all::jaq_core::{Compiler, Ctx, Vars, data::JustLut, unwrap_valr};
+    use jaq_all::json::Val;
 
-    // Set up loader with standard library
-    let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
+    let loader = Loader::new(jaq_all::defs());
     let arena = Arena::default();
 
-    // Parse the filter
-    let program = JaqFile {
-        code: filter,
-        path: (),
-    };
-
-    let modules = match loader.load(&arena, program) {
+    let modules = match loader.load(
+        &arena,
+        JaqFile {
+            code: filter,
+            path: (),
+        },
+    ) {
         Ok(m) => m,
         Err(errs) => {
             for e in errs {
@@ -231,9 +231,10 @@ pub fn cmd_sessions_jq(path: &Path, filter: &str) -> i32 {
         }
     };
 
-    // Compile the filter
     let filter_compiled = match Compiler::default()
-        .with_funs(jaq_std::funs().chain(jaq_json::funs()))
+        .with_funs(
+            jaq_all::jaq_std::funs::<JustLut<Val>>().chain(jaq_all::json::funs::<JustLut<Val>>()),
+        )
         .compile(modules)
     {
         Ok(f) => f,
@@ -245,7 +246,6 @@ pub fn cmd_sessions_jq(path: &Path, filter: &str) -> i32 {
         }
     };
 
-    // Process each line
     let file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
@@ -271,14 +271,13 @@ pub fn cmd_sessions_jq(path: &Path, filter: &str) -> i32 {
             continue;
         }
 
-        let json_val: serde_json::Value = match serde_json::from_str(&line) {
+        let val: Val = match parse_single(line.as_bytes()) {
             Ok(v) => v,
             Err(_) => continue,
         };
 
-        let val = Val::from(json_val);
-        let inputs = RcIter::new(core::iter::empty());
-        let out = filter_compiled.run((Ctx::new([], &inputs), val));
+        let ctx = Ctx::<JustLut<Val>>::new(&filter_compiled.lut, Vars::new([]));
+        let out = filter_compiled.id.run((ctx, val)).map(unwrap_valr);
 
         for result in out {
             match result {
