@@ -17,6 +17,63 @@ use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
 
+/// Get the daemon lock file path (~/.config/normalize/daemon.lock)
+/// Used by the daemon process to ensure only one instance runs.
+fn daemon_lock_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("normalize")
+        .join("daemon.lock")
+}
+
+/// Get the spawn lock file path (~/.config/normalize/daemon-spawn.lock)
+/// Used by clients to serialize daemon spawn attempts.
+fn spawn_lock_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("normalize")
+        .join("daemon-spawn.lock")
+}
+
+/// Try to acquire an exclusive non-blocking flock on the given path.
+/// Returns the locked File on success (caller must keep it alive to hold the lock).
+fn try_flock(path: &Path) -> Result<std::fs::File, String> {
+    use std::os::unix::io::AsRawFd;
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|e| format!("Failed to open lock file: {}", e))?;
+
+    let fd = file.as_raw_fd();
+    let ret = unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) };
+    if ret != 0 {
+        return Err("Lock already held".to_string());
+    }
+
+    Ok(file)
+}
+
+/// Acquire the daemon singleton lock. Only the daemon process should call this.
+fn acquire_daemon_lock() -> Result<std::fs::File, String> {
+    let path = daemon_lock_path();
+    let file = try_flock(&path).map_err(|_| "Another daemon is already running".to_string())?;
+
+    // Write PID for diagnostics
+    use std::io::Write as _;
+    let mut f = &file;
+    let _ = f.write_all(format!("{}\n", std::process::id()).as_bytes());
+
+    Ok(file)
+}
+
 /// Get global daemon socket path (~/.config/normalize/daemon.sock)
 pub fn global_socket_path() -> PathBuf {
     dirs::config_dir()
@@ -113,12 +170,43 @@ impl DaemonClient {
     }
 
     /// Ensure daemon is running, starting it if necessary.
+    /// Uses flock to prevent concurrent spawn races.
     pub fn ensure_running(&self) -> bool {
         if self.is_available() {
             return true;
         }
-        let _ = std::fs::remove_file(&self.socket_path);
-        self.start_daemon().is_ok()
+
+        // Take the spawn lock to prevent multiple clients from spawning
+        // concurrently. If we can't get the lock, another client is already
+        // spawning — just wait for the socket to appear.
+        match try_flock(&spawn_lock_path()) {
+            Ok(_lock) => {
+                // Re-check after acquiring lock — another client may have
+                // finished spawning while we waited.
+                if self.is_available() {
+                    return true;
+                }
+                // Clean up stale socket before spawning
+                let _ = std::fs::remove_file(&self.socket_path);
+                // Lock is released when _lock drops (after spawn + socket wait)
+                self.start_daemon().is_ok()
+            }
+            Err(_) => {
+                // Spawn lock held — another client is spawning. Wait for socket.
+                self.wait_for_socket()
+            }
+        }
+    }
+
+    /// Wait for the daemon socket to become available.
+    fn wait_for_socket(&self) -> bool {
+        for _ in 0..30 {
+            if self.is_available() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        false
     }
 
     fn start_daemon(&self) -> Result<(), String> {
@@ -142,7 +230,7 @@ impl DaemonClient {
             .spawn()
             .map_err(|e| format!("Failed to spawn daemon: {}", e))?;
 
-        // Wait for socket
+        // Wait for socket to appear (daemon holds the flock, not us after this)
         for _ in 0..20 {
             if self.socket_path.exists() {
                 std::thread::sleep(Duration::from_millis(100));
@@ -367,7 +455,16 @@ pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
         std::fs::create_dir_all(parent)?;
     }
 
-    // Remove stale socket
+    // Acquire exclusive lock — only one daemon process can run at a time.
+    // The lock is held for the lifetime of the process (leaked intentionally).
+    let lock = acquire_daemon_lock().map_err(|e| {
+        eprintln!("Cannot start daemon: {}", e);
+        e
+    })?;
+    // Leak the File so the flock is held until process exit
+    std::mem::forget(lock);
+
+    // Safe to remove socket now — we hold the lock
     let _ = std::fs::remove_file(&socket_path);
 
     // Channel for refresh requests from watchers
