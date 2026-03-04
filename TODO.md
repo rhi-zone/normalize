@@ -377,6 +377,42 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 - Session/checkpoint: workflow state persistence
 - PR/diff analysis: `normalize analyze --pr` or similar
 
+### Main Crate Size (`normalize`, 52k lines)
+
+`normalize analyze size -r crates/normalize/src` breakdown (2026-03):
+
+| Area | Lines | % |
+|---|---|---|
+| `commands/analyze/` | 21,296 | 41% |
+| `service/` | 4,372 | 8% |
+| `commands/view/` | 4,071 | 8% |
+| `commands/sessions/` | 3,383 | 6.5% |
+| `serve/` | 1,485 | 3% |
+| `tree.rs` | 1,497 | 3% |
+| `analyze/` (non-cmd) | 1,372 | 2.6% |
+| `skeleton.rs` | 627 | 1.2% |
+
+**Primary target: extract `commands/analyze/` → `normalize-analyze` (~21k lines, 41%)**
+- Clean dep boundary: `normalize-facts`, `normalize-output`, `normalize-languages` — none depend on it
+- `service/analyze.rs` stays in main (thin `#[cli]` wiring, ~1.5k)
+- Each subcommand: Report struct + OutputFormatter + computation fn — all move together
+- After extraction: main crate ~28k lines
+
+**Secondary targets (lower priority):**
+- `serve/` (LSP + HTTP + MCP, 1.5k) → `normalize-serve`
+- `src/analyze/` (1.4k, pure computation) → belongs in `normalize-analyze` or `normalize-facts`
+- `commands/sessions/` (3.4k) — circular dep risk, needs care
+
+**`tree.rs` + `skeleton.rs` stay in main.** Used by commands/view/, commands/analyze/, serve/,
+path_resolve.rs — no clean extraction without a new shared crate.
+
+**Crate audit done (2026-03):**
+- `normalize-derive` merged into `normalize-core` via re-export (serde pattern)
+- `normalize-view` folded into `normalize` (was single-dependent after normalize-edit fix)
+- `normalize-edit` decoupled from `normalize-view` — uses `normalize-facts::Extractor` directly
+- `normalize-output` correctly stays separate (shared by `normalize` + `normalize-session-analysis`)
+- `normalize-package-index` soft-finished; no action needed
+
 ## Backlog
 
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)
