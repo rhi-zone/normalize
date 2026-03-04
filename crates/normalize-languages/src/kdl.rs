@@ -50,10 +50,6 @@ impl Language for Kdl {
         })
     }
 
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // KDL: node → node_no_terminator → children field (node_children: "{ ... }")
         let mut c = node.walk();

@@ -1,6 +1,6 @@
 //! CSS language support (parse only, minimal skeleton).
 
-use crate::{Language, Symbol, Visibility};
+use crate::{Language, Symbol};
 use tree_sitter::Node;
 
 /// CSS language support.
@@ -30,10 +30,6 @@ impl Language for Css {
         _in_container: bool,
     ) -> Option<Symbol> {
         None
-    }
-
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

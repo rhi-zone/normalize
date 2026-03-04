@@ -73,10 +73,6 @@ impl Language for Markdown {
         })
     }
 
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // The section node itself contains the heading + content as children.
         // Returning it here lets collect_symbols recurse into child sections.

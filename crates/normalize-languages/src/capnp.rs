@@ -91,9 +91,6 @@ impl Language for Capnp {
         // Cap'n Proto: using import "file.capnp"
         format!("using import \"{}\"", import.module)
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")

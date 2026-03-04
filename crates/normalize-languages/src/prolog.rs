@@ -104,9 +104,6 @@ impl Language for Prolog {
             )
         }
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();

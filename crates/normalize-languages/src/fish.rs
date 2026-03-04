@@ -1,6 +1,6 @@
 //! Fish shell language support.
 
-use crate::{Import, Language, Symbol, Visibility, simple_function_symbol};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Fish shell language support.
@@ -15,11 +15,6 @@ impl Language for Fish {
     }
     fn grammar_name(&self) -> &'static str {
         "fish"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -51,9 +46,6 @@ impl Language for Fish {
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // Fish: source file
         format!("source {}", import.module)
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

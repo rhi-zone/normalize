@@ -1,6 +1,6 @@
 //! Protocol Buffers text format support.
 
-use crate::{Language, Symbol, Visibility};
+use crate::{Language, Symbol};
 use tree_sitter::Node;
 
 /// TextProto language support.
@@ -24,9 +24,6 @@ impl Language for TextProto {
         _in_container: bool,
     ) -> Option<Symbol> {
         None
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 }
 

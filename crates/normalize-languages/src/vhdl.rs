@@ -124,9 +124,6 @@ impl Language for Vhdl {
                 .join("\n")
         }
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // VHDL entity/architecture/package have no dedicated body field; use node itself

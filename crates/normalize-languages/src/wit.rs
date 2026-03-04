@@ -117,9 +117,6 @@ impl Language for Wit {
             format!("use {}.{{{}}}", import.module, names_to_use.join(", "))
         }
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")

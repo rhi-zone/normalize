@@ -79,9 +79,6 @@ impl Language for DeviceTree {
         // Device Tree: /include/ "file.dtsi"
         format!("/include/ \"{}\"", import.module)
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // DeviceTree node spans "identifier { ... };" — use node itself for brace analysis

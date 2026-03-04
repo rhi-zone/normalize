@@ -43,9 +43,6 @@ impl Language for Asm {
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new() // asm grammar doesn't have imports
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         // Labels end with ':'

@@ -1,7 +1,6 @@
 //! AWK language support.
 
-use crate::{Language, Symbol, Visibility, simple_function_symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// AWK language support.
 pub struct Awk;
@@ -15,15 +14,6 @@ impl Language for Awk {
     }
     fn grammar_name(&self) -> &'static str {
         "awk"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
-    }
-
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

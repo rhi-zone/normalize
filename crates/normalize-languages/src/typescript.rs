@@ -1,7 +1,7 @@
 //! TypeScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Import, Language, Symbol, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol};
 use tree_sitter::Node;
 
 /// TypeScript language support.
@@ -51,10 +51,6 @@ impl Language for TypeScript {
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
         ecmascript::format_import(import, names)
-    }
-
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
@@ -155,10 +151,6 @@ impl Language for Tsx {
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
         ecmascript::format_import(import, names)
-    }
-
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

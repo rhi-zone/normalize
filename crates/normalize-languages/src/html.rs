@@ -1,6 +1,6 @@
 //! HTML language support (parse only, minimal skeleton).
 
-use crate::{Language, Symbol, Visibility};
+use crate::{Language, Symbol};
 use tree_sitter::Node;
 
 /// HTML language support.
@@ -30,10 +30,6 @@ impl Language for Html {
         _in_container: bool,
     ) -> Option<Symbol> {
         None
-    }
-
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {

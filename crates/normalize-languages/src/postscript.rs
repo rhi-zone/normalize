@@ -45,10 +45,6 @@ impl Language for PostScript {
         self.extract_function(node, content, false)
     }
 
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // PostScript procedure is itself "{ ... }"; no named body field
         Some(*node)

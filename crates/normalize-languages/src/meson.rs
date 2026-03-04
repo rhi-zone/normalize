@@ -1,6 +1,6 @@
 //! Meson build system support.
 
-use crate::{Import, Language, Symbol, Visibility};
+use crate::{Import, Language, Symbol};
 use tree_sitter::Node;
 
 /// Meson language support.
@@ -49,9 +49,6 @@ impl Language for Meson {
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // Meson: subdir('path')
         format!("subdir('{}')", import.module)
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

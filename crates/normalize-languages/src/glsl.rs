@@ -1,6 +1,6 @@
 //! GLSL (OpenGL Shading Language) support.
 
-use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility, simple_function_symbol};
+use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// GLSL language support.
@@ -15,11 +15,6 @@ impl Language for Glsl {
     }
     fn grammar_name(&self) -> &'static str {
         "glsl"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -48,9 +43,6 @@ impl Language for Glsl {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

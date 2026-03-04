@@ -1,6 +1,6 @@
 //! SSH config file support.
 
-use crate::{Language, Symbol, Visibility};
+use crate::{Language, Symbol};
 use tree_sitter::Node;
 
 /// SSH config language support.
@@ -24,9 +24,6 @@ impl Language for SshConfig {
         _in_container: bool,
     ) -> Option<Symbol> {
         None
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 }
 

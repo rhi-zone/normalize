@@ -1,6 +1,6 @@
 //! Jinja2 template support.
 
-use crate::{Language, Symbol, Visibility};
+use crate::{Language, Symbol};
 use tree_sitter::Node;
 
 /// Jinja2 language support.
@@ -25,10 +25,6 @@ impl Language for Jinja2 {
     ) -> Option<Symbol> {
         // Jinja2 grammar is minimal - only basic tokens, no structured nodes
         None
-    }
-
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 }
 

@@ -1,8 +1,6 @@
 //! PowerShell language support.
 
-use crate::{
-    ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
-};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// PowerShell language support.
@@ -17,11 +15,6 @@ impl Language for PowerShell {
     }
     fn grammar_name(&self) -> &'static str {
         "powershell"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -100,9 +93,6 @@ impl Language for PowerShell {
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // PowerShell: Import-Module or using module
         format!("Import-Module {}", import.module)
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

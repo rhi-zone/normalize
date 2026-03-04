@@ -1,6 +1,6 @@
 //! CMake language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, Visibility, simple_function_symbol};
+use crate::{ContainerBody, Import, Language, Symbol};
 use tree_sitter::Node;
 
 /// CMake language support.
@@ -15,11 +15,6 @@ impl Language for CMake {
     }
     fn grammar_name(&self) -> &'static str {
         "cmake"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -60,9 +55,6 @@ impl Language for CMake {
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // CMake: include(file) or find_package(pkg)
         format!("include({})", import.module)
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

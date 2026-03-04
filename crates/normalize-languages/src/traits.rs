@@ -103,7 +103,10 @@ pub trait Language: Send + Sync {
     // === Symbol Extraction ===
 
     /// Extract symbol from a function/method node
-    fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol>;
+    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
+        let name = self.node_name(node, content)?;
+        Some(simple_function_symbol(node, content, name, None))
+    }
 
     /// Extract symbol from a container node (class, impl, module)
     fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
@@ -148,7 +151,9 @@ pub trait Language: Send + Sync {
     /// public. The alternative — calling `extract_function/container/type()` and
     /// inspecting `symbol.visibility` — would be correct but unnecessarily heavy
     /// (computes signature, docstring, etc. just to check one field).
-    fn get_visibility(&self, node: &Node, content: &str) -> Visibility;
+    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
+        Visibility::Public
+    }
 
     /// Check if a symbol is a test (for filtering).
     fn is_test_symbol(&self, _symbol: &Symbol) -> bool {

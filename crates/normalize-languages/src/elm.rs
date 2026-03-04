@@ -1,6 +1,6 @@
 //! Elm language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol};
+use crate::{Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Elm language support.
@@ -15,11 +15,6 @@ impl Language for Elm {
     }
     fn grammar_name(&self) -> &'static str {
         "elm"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -99,9 +94,6 @@ impl Language for Elm {
                 names_to_use.join(", ")
             )
         }
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

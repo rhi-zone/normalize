@@ -1,6 +1,6 @@
 //! Uiua array programming language support.
 
-use crate::{Language, Symbol, Visibility};
+use crate::{Language, Symbol};
 use tree_sitter::Node;
 
 /// Uiua language support.
@@ -24,9 +24,6 @@ impl Language for Uiua {
         _in_container: bool,
     ) -> Option<Symbol> {
         None
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

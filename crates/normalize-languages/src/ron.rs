@@ -56,9 +56,6 @@ impl Language for Ron {
         }
         self.extract_container(node, content)
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // RON struct uses ( ... ), map uses { ... }; use node itself for body analysis

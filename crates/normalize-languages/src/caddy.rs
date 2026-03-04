@@ -70,9 +70,6 @@ impl Language for Caddy {
         // Caddy: import path
         format!("import {}", import.module)
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")

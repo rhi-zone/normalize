@@ -1,6 +1,6 @@
 //! jq language support.
 
-use crate::{Import, Language, Symbol, Visibility, simple_function_symbol};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// jq language support.
@@ -15,11 +15,6 @@ impl Language for Jq {
     }
     fn grammar_name(&self) -> &'static str {
         "jq"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -57,9 +52,6 @@ impl Language for Jq {
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // jq: import "module" as name
         format!("import \"{}\"", import.module)
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

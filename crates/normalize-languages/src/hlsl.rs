@@ -1,8 +1,6 @@
 //! HLSL (High-Level Shading Language) support.
 
-use crate::{
-    ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
-};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// HLSL language support.
@@ -17,11 +15,6 @@ impl Language for Hlsl {
     }
     fn grammar_name(&self) -> &'static str {
         "hlsl"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -94,9 +87,6 @@ impl Language for Hlsl {
         } else {
             format!("#include <{}>", import.module)
         }
-    }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

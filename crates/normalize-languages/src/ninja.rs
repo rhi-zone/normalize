@@ -62,9 +62,6 @@ impl Language for Ninja {
         // Ninja: subninja or include
         format!("include {}", import.module)
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 }
 
 #[cfg(test)]

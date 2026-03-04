@@ -70,9 +70,6 @@ impl Language for Typst {
             format!("#import \"{}\": {}", import.module, names_to_use.join(", "))
         }
     }
-    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
-        Visibility::Public
-    }
 }
 
 #[cfg(test)]
