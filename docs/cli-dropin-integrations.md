@@ -1,6 +1,6 @@
 # Embedded CLI Drop-in Integrations
 
-> Three integrations complete: `jq` (via jaq), `rg` (vendored ripgrep 14.1.1), `ast-grep`/`sg` (via ast-grep-core + normalize-languages).
+> Three integrations complete: `jq` (via jaq), `rg` (vendored ripgrep 15.1.0), `ast-grep`/`sg` (via ast-grep-core + normalize-languages). ast-grep has near-full parity: run, scan, test with rewrite/interactive support.
 
 normalize embeds several tools as library dependencies. Rather than making users install
 those tools separately, we expose them as drop-in CLI replacements — both as subcommands
@@ -141,18 +141,21 @@ Symlink dispatch: `rg -> normalize` or `normalize rg`.
 
 ### ast-grep parity
 
-Vendored from ast-grep 0.41.0 (MIT). Full `sg run` CLI parity — clap-derived argument
-parsing, all flags from upstream (`--pattern`, `--lang`, `--selector`, `--strictness`,
-`--debug-query`, `--json`, `--files-with-matches`, `--heading`, `--color`, `--context`,
-`--no-ignore`, `--follow`, `--globs`, `--threads`, `--stdin`).
+Vendored from ast-grep 0.41.0 (MIT). Near-full CLI parity with upstream:
+
+- `sg run` — all flags (`--pattern`, `--lang`, `--selector`, `--strictness`,
+  `--debug-query`, `--json`, `--files-with-matches`, `--heading`, `--color`, `--context`,
+  `--no-ignore`, `--follow`, `--globs`, `--threads`, `--stdin`, `--rewrite`, `--interactive`)
+- `sg scan` — project config (sgconfig.yml), rule discovery, multi-rule scanning with
+  CombinedScan, unused suppression detection, severity overrides, `--max-results`
+- `sg test` — rule verification against YAML test cases, snapshot generation/comparison,
+  interactive snapshot review, parallel test execution
 
 Key difference from upstream: uses normalize-languages' `GrammarLoader` instead of
 `ast-grep-language`'s embedded grammars (avoids duplicating ~25 tree-sitter grammars).
 The `Lang` type replaces upstream's `SgLang`, delegating to `DynLang` + normalize-languages.
 
 Missing features (can be added later):
-- `sg scan` / `sg test` (need `ast-grep-config` dep, planned)
-- `--rewrite` / `--interactive` (need `ast-grep-config::Fixer` + `crossterm`)
 - Language injection (HTML/Vue/Svelte embedded languages)
 - `--format github` / SARIF output (need `serde-sarif`)
 - `--debug-query=pattern` (needs `DumpPattern` API from ast-grep-core 0.41.0)

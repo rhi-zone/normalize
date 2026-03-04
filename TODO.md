@@ -595,9 +595,12 @@ The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mi
 
 All three integrations complete: `jq`, `rg`, `ast-grep`.
 
+Completed:
+- `normalize ast-grep --rewrite` / `--interactive` (ast-grep-config::Fixer + crossterm)
+- `normalize ast-grep scan` (project config, rule discovery, CombinedScan)
+- `normalize ast-grep test` (rule verification, snapshots, interactive reporter)
+
 Future work:
-- `normalize ast-grep scan` / `sg test` (needs ast-grep-config dep)
-- `normalize ast-grep --rewrite` / `--interactive` (needs ast-grep-config::Fixer + crossterm)
 - `normalize rg` PCRE2 support (pcre2 feature not enabled)
 
 
