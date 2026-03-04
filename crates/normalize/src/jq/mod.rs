@@ -30,6 +30,9 @@ pub fn run_jq(args: impl Iterator<Item = OsString>) -> ExitCode {
     if cli.version {
         let _ = writeln!(out, "jq (normalize {})", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
+    } else if cli.build_configuration {
+        let _ = writeln!(out, "jaq-core={}", env!("CARGO_PKG_VERSION"));
+        return ExitCode::SUCCESS;
     } else if cli.help {
         let _ = write!(out, "{}", include_str!("help.txt"));
         return ExitCode::SUCCESS;
@@ -71,16 +74,23 @@ fn real_main(cli: &Cli) -> Result<ExitCode, String> {
     let color = cli.color_stdio(&io::stdout());
     let pp = cli.pp(color);
 
+    let raw = cli.raw_output || cli.raw_output0 || cli.join_output;
     let print = |out: &mut dyn Write, v: &Val| -> io::Result<()> {
         match v {
-            Val::Str(s, _) if cli.raw_output || cli.join_output => out.write_all(s.as_ref())?,
+            Val::Str(s, _) if raw => out.write_all(s.as_ref())?,
             _ => jaq_json::write::write(out, &pp, 0, v)?,
         }
-        if cli.join_output {
-            out.flush()
+        if cli.raw_output0 {
+            out.write_all(b"\0")?;
+        } else if cli.join_output {
+            // no terminator
         } else {
-            writeln!(out)
+            writeln!(out)?;
         }
+        if cli.unbuffered {
+            out.flush()?;
+        }
+        Ok(())
     };
 
     let last = if cli.files.is_empty() {
@@ -232,7 +242,13 @@ fn binds(cli: &Cli) -> Result<Vec<(String, Val)>, String> {
         Ok((k.clone(), vals?.into_iter().collect()))
     });
 
-    let positional: Vec<Val> = cli.args.iter().cloned().map(Val::from).collect();
+    let json_positional: Result<Vec<Val>, _> = cli
+        .jsonargs
+        .iter()
+        .map(|s| jaq_json::read::parse_single(s.as_bytes()).map_err(|e| format!("--jsonargs: {e}")))
+        .collect();
+    let mut positional: Vec<Val> = cli.args.iter().cloned().map(Val::from).collect();
+    positional.extend(json_positional?);
 
     let mut var_val: Vec<(String, Val)> = arg
         .chain(rawfile)

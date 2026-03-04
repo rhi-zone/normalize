@@ -15,6 +15,7 @@ pub struct Cli {
     // Output options
     pub compact_output: bool,
     pub raw_output: bool,
+    pub raw_output0: bool,
     pub join_output: bool,
     pub in_place: bool,
     pub sort_keys: bool,
@@ -22,6 +23,7 @@ pub struct Cli {
     pub monochrome_output: bool,
     pub tab: bool,
     pub indent: usize,
+    pub unbuffered: bool,
 
     // Compilation options
     pub from_file: bool,
@@ -37,8 +39,10 @@ pub struct Cli {
     pub filter: Option<Filter>,
     pub files: Vec<String>,
     pub args: Vec<String>,
+    pub jsonargs: Vec<String>,
     pub run_tests: Option<Vec<PathBuf>>,
     pub exit_status: bool,
+    pub build_configuration: bool,
     pub version: bool,
     pub help: bool,
 }
@@ -61,6 +65,7 @@ impl Cli {
             match mode {
                 Mode::Files => self.files.push(arg.into_string()?),
                 Mode::Args => self.args.push(arg.into_string()?),
+                Mode::JsonArgs => self.jsonargs.push(arg.into_string()?),
             }
         }
         Ok(())
@@ -82,6 +87,7 @@ impl Cli {
 
             "compact-output" => self.short('c', args)?,
             "raw-output" => self.short('r', args)?,
+            "raw-output0" => self.raw_output0 = true,
             "join-output" => self.short('j', args)?,
             "in-place" => self.short('i', args)?,
             "sort-keys" => self.short('S', args)?,
@@ -89,6 +95,7 @@ impl Cli {
             "monochrome-output" => self.short('M', args)?,
             "tab" => self.tab = true,
             "indent" => self.indent = args.next().and_then(int).ok_or(Error::Int("--indent"))?,
+            "unbuffered" => self.unbuffered = true,
 
             "from-file" => self.short('f', args)?,
             "library-path" => self.short('L', args)?,
@@ -104,8 +111,10 @@ impl Cli {
             "rawfile" => self.rawfile.push(parse_key_val("--rawfile", args)?),
 
             "args" => *mode = Mode::Args,
+            "jsonargs" => *mode = Mode::JsonArgs,
             "run-tests" => self.run_tests = Some(args.map(PathBuf::from).collect()),
             "exit-status" => self.short('e', args)?,
+            "build-configuration" => self.build_configuration = true,
             "version" => self.short('V', args)?,
             "help" => self.short('h', args)?,
 
@@ -234,5 +243,6 @@ fn parse_key_val(
 
 enum Mode {
     Args,
+    JsonArgs,
     Files,
 }

@@ -133,3 +133,16 @@ requiring jaq v3. It would have happened regardless of the jq subcommand.
 
 Note: `ripgrep` has no lib target — `normalize rg` will use the existing grep-* workspace
 deps directly rather than vendoring ripgrep's CLI source.
+
+## jq parity gaps
+
+Flags not supported due to jaq limitations:
+
+| Flag | Description |
+|---|---|
+| `-a`/`--ascii-output` | Escape non-ASCII characters — jaq_json::write::Pp has no ascii mode |
+| `--stream` / `--stream-errors` | Streaming parse mode — not in jaq |
+| `--seq` | application/json-seq format — not in jaq |
+
+These are accepted silently by real jq but would error as unknown flags in our implementation.
+If jaq adds support in a future version, they can be wired up.
