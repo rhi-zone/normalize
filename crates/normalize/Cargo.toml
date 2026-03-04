@@ -111,6 +111,8 @@ nu-ansi-term = "0.50"
 dotenvy = "0.15.7"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 ast-grep-core = "0.40.5"
+ast-grep-config = "0.40.5"
+crossterm = "0.28"
 codespan-reporting = "0.11"
 similar = { version = "2", features = ["inline"] }
 smallvec = "1"

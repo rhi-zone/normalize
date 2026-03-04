@@ -1,5 +1,6 @@
 #![allow(warnings, clippy::all, unexpected_cfgs)]
 use crate::ast_grep::lang::Lang;
+use ast_grep_config::{RuleConfig, Severity};
 use ast_grep_core::Doc;
 use ast_grep_core::{Node as SgNode, meta_var::MetaVariable, tree_sitter::StrDoc};
 
@@ -10,6 +11,7 @@ use std::collections::HashMap;
 use super::{Diff, NodeMatch, PrintProcessor, Printer};
 use anyhow::Result;
 use clap::ValueEnum;
+use codespan_reporting::files::SimpleFile;
 use serde::{Deserialize, Serialize};
 
 use std::borrow::Cow;
@@ -66,6 +68,43 @@ struct MatchJSON<'t, 'b> {
     language: Lang,
     #[serde(skip_serializing_if = "Option::is_none")]
     meta_variables: Option<MetaVariables<'t>>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RuleMatchJSON<'t, 'b> {
+    #[serde(flatten)]
+    matched: MatchJSON<'t, 'b>,
+    rule_id: &'b str,
+    severity: Severity,
+    note: Option<String>,
+    message: String,
+}
+
+impl<'t, 'b> RuleMatchJSON<'t, 'b> {
+    fn new(nm: NodeMatch<'t>, path: &'b str, rule: &'b RuleConfig<Lang>) -> Self {
+        let message = rule.get_message(&nm);
+        let matched = MatchJSON::new(nm, path, (0, 0));
+        Self {
+            matched,
+            rule_id: &rule.id,
+            severity: rule.severity.clone(),
+            note: rule.note.clone(),
+            message,
+        }
+    }
+    fn diff(diff: Diff<'t>, path: &'b str, rule: &'b RuleConfig<Lang>) -> Self {
+        let nm = &diff.node_match;
+        let message = rule.get_message(nm);
+        let matched = MatchJSON::diff(diff, path, (0, 0));
+        Self {
+            matched,
+            rule_id: &rule.id,
+            severity: rule.severity.clone(),
+            note: rule.note.clone(),
+            message,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -306,6 +345,19 @@ impl JSONProcessor {
 type Buffer = Vec<u8>;
 
 impl PrintProcessor<Buffer> for JSONProcessor {
+    fn print_rule(
+        &self,
+        matches: Vec<NodeMatch>,
+        file: SimpleFile<Cow<str>, &str>,
+        rule: &RuleConfig<Lang>,
+    ) -> Result<Buffer> {
+        let path = file.name();
+        let jsons = matches
+            .into_iter()
+            .map(|nm| RuleMatchJSON::new(nm, path, rule));
+        self.print_docs(jsons)
+    }
+
     fn print_matches(&self, matches: Vec<NodeMatch>, path: &Path) -> Result<Buffer> {
         let path = path.to_string_lossy();
         let context = self.context;
@@ -321,6 +373,18 @@ impl PrintProcessor<Buffer> for JSONProcessor {
         let jsons = diffs
             .into_iter()
             .map(|diff| MatchJSON::diff(diff, &path, context));
+        self.print_docs(jsons)
+    }
+
+    fn print_rule_diffs(
+        &self,
+        diffs: Vec<(Diff, &RuleConfig<Lang>)>,
+        path: &Path,
+    ) -> Result<Buffer> {
+        let path = path.to_string_lossy();
+        let jsons = diffs
+            .into_iter()
+            .map(|(diff, rule)| RuleMatchJSON::diff(diff, &path, rule));
         self.print_docs(jsons)
     }
 }

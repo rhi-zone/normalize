@@ -1,12 +1,12 @@
 #![allow(warnings, clippy::all, unexpected_cfgs)]
 // Vendored from ast-grep 0.41.0 (MIT)
-// Modified: SgLang → Lang, removed Fixer/rewrite, removed InteractivePrinter,
-// removed ProjectConfig dependency.
+// Modified: SgLang → Lang, removed ProjectConfig dependency.
 
 use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::{Context, Result};
+use ast_grep_config::Fixer;
 use ast_grep_core::language::Language;
 use ast_grep_core::tree_sitter::LanguageExt;
 use ast_grep_core::{MatchStrictness, Matcher, Pattern};
@@ -15,7 +15,8 @@ use ignore::WalkParallel;
 
 use crate::ast_grep::lang::Lang;
 use crate::ast_grep::print::{
-    ColoredPrinter, Diff, FileNamePrinter, Heading, JSONPrinter, PrintProcessor, Printer,
+    ColoredPrinter, Diff, FileNamePrinter, Heading, InteractivePrinter, JSONPrinter,
+    PrintProcessor, Printer,
 };
 use crate::ast_grep::utils::ErrorContext as EC;
 use crate::ast_grep::utils::{ContextArgs, InputArgs, MatchUnit, OutputArgs, filter_file_pattern};
@@ -73,6 +74,10 @@ pub struct RunArg {
     /// AST kind to extract sub-part of pattern to match.
     #[clap(long, value_name = "KIND")]
     selector: Option<String>,
+
+    /// String to replace the matched AST node.
+    #[clap(short, long, value_name = "FIX", required_if_eq("update_all", "true"))]
+    rewrite: Option<String>,
 
     /// The language of the pattern query.
     #[clap(short, long, help(lang_help()), long_help=LANG_HELP_LONG)]
@@ -151,7 +156,14 @@ pub fn run_with_pattern(arg: RunArg) -> Result<ExitCode> {
     let printer = ColoredPrinter::stdout(arg.output.color)
         .heading(arg.heading)
         .context(context);
-    run_pattern_with_printer(arg, printer)
+    let interactive = arg.output.needs_interactive();
+    if interactive {
+        let from_stdin = arg.input.stdin;
+        let printer = InteractivePrinter::new(printer, arg.output.update_all, from_stdin)?;
+        run_pattern_with_printer(arg, printer)
+    } else {
+        run_pattern_with_printer(arg, printer)
+    }
 }
 
 fn run_pattern_with_printer(arg: RunArg, printer: impl Printer + 'static) -> Result<ExitCode> {
@@ -217,9 +229,21 @@ impl PathWorker for RunWithInferredLang {
 
         let items = filter_file_pattern(path, lang, Some(&matcher), &sub_matchers)?;
         let mut ret = Vec::with_capacity(items.len());
+        let rewrite_str = self.arg.rewrite.as_ref();
 
         for unit in items {
-            let Some(processed) = match_one_file(processor, &unit)? else {
+            let i_lang = unit.grep.lang();
+            let rewrite = rewrite_str
+                .map(|s| Fixer::from_str(s, i_lang))
+                .transpose()
+                .unwrap_or_else(|e| {
+                    eprintln!(
+                        "⚠️  Rewriting was skipped because pattern fails to parse. Error detail:"
+                    );
+                    eprintln!("╰▻ {e}");
+                    None
+                });
+            let Some(processed) = match_one_file(processor, &unit, &rewrite)? else {
                 continue;
             };
             ret.push(processed);
@@ -231,6 +255,7 @@ impl PathWorker for RunWithInferredLang {
 struct RunWithSpecificLang {
     arg: RunArg,
     pattern: Pattern,
+    rewrite: Option<Fixer>,
     stats: RunTrace,
 }
 
@@ -242,9 +267,15 @@ impl RunWithSpecificLang {
             .ok_or(anyhow::anyhow!(EC::LanguageNotSpecified))?;
         let pattern_ret = arg.build_pattern(lang.clone());
         arg.debug_pattern_if_needed(&pattern_ret, lang.clone());
+        let rewrite = if let Some(s) = &arg.rewrite {
+            Some(Fixer::from_str(s, &lang).context(EC::ParsePattern)?)
+        } else {
+            None
+        };
         Ok(Self {
             arg,
             pattern: pattern_ret?,
+            rewrite,
             stats,
         })
     }
@@ -300,7 +331,7 @@ impl PathWorker for RunWithSpecificLang {
         let filtered = filter_file_pattern(path, path_lang, root_matcher, &sub_matchers)?;
         let mut ret = Vec::with_capacity(filtered.len());
         for unit in filtered {
-            let Some(processed) = match_one_file(processor, &unit)? else {
+            let Some(processed) = match_one_file(processor, &unit, &self.rewrite)? else {
                 continue;
             };
             ret.push(processed);
@@ -322,8 +353,14 @@ impl StdInWorker for RunWithSpecificLang {
         if matches.peek().is_none() {
             return Ok(vec![]);
         }
+        let rewrite = &self.rewrite;
         let path = Path::new("STDIN");
-        let processed = processor.print_matches(matches.collect(), path)?;
+        let processed = if let Some(rewrite) = rewrite {
+            let diffs = matches.map(|m| Diff::generate(m, &self.pattern, rewrite));
+            processor.print_diffs(diffs.collect(), path)?
+        } else {
+            processor.print_matches(matches.collect(), path)?
+        };
         Ok(vec![processed])
     }
 }
@@ -331,6 +368,7 @@ impl StdInWorker for RunWithSpecificLang {
 fn match_one_file<T, P: PrintProcessor<T>>(
     processor: &P,
     match_unit: &MatchUnit<impl Matcher>,
+    rewrite: &Option<Fixer>,
 ) -> Result<Option<T>> {
     let MatchUnit {
         path,
@@ -343,6 +381,11 @@ fn match_one_file<T, P: PrintProcessor<T>>(
     if matches.peek().is_none() {
         return Ok(None);
     }
-    let ret = processor.print_matches(matches.collect(), path)?;
+    let ret = if let Some(rewrite) = rewrite {
+        let diffs = matches.map(|m| Diff::generate(m, matcher, rewrite));
+        processor.print_diffs(diffs.collect(), path)?
+    } else {
+        processor.print_matches(matches.collect(), path)?
+    };
     Ok(Some(ret))
 }

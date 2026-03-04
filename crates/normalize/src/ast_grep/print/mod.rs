@@ -1,9 +1,11 @@
 #![allow(warnings, clippy::all, unexpected_cfgs)]
 mod colored_print;
 mod file_name_printer;
+pub(crate) mod interactive_print;
 mod json_print;
 
 use crate::ast_grep::lang::Lang;
+use ast_grep_config::{Fixer, RuleConfig};
 use ast_grep_core::{Matcher, NodeMatch as SgNodeMatch, tree_sitter::StrDoc};
 
 use anyhow::Result;
@@ -17,6 +19,7 @@ use codespan_reporting::term::termcolor::ColorChoice;
 use colored_print::PrintStyles;
 pub use colored_print::{ColoredPrinter, Heading, ReportStyle};
 pub use file_name_printer::FileNamePrinter;
+pub use interactive_print::InteractivePrinter;
 pub use json_print::{JSONPrinter, JsonStyle};
 
 type NodeMatch<'a> = SgNodeMatch<'a, StrDoc<Lang>>;
@@ -24,8 +27,19 @@ type NodeMatch<'a> = SgNodeMatch<'a, StrDoc<Lang>>;
 /// A trait to process nodeMatches to diff/match output
 /// it must be Send + 'static to be shared in worker thread
 pub trait PrintProcessor<Output>: Send + Sync + 'static {
+    fn print_rule(
+        &self,
+        matches: Vec<NodeMatch>,
+        file: SimpleFile<Cow<str>, &str>,
+        rule: &RuleConfig<Lang>,
+    ) -> Result<Output>;
     fn print_matches(&self, matches: Vec<NodeMatch>, path: &Path) -> Result<Output>;
     fn print_diffs(&self, diffs: Vec<Diff>, path: &Path) -> Result<Output>;
+    fn print_rule_diffs(
+        &self,
+        diffs: Vec<(Diff, &RuleConfig<Lang>)>,
+        path: &Path,
+    ) -> Result<Output>;
 }
 
 pub trait Printer {
@@ -68,6 +82,46 @@ pub struct Diff<'n> {
 }
 
 impl<'n> Diff<'n> {
+    pub fn generate(node_match: NodeMatch<'n>, matcher: &impl Matcher, rewrite: &Fixer) -> Self {
+        let edit = node_match.make_edit(matcher, rewrite);
+        let replacement = String::from_utf8(edit.inserted_text).unwrap();
+        Self {
+            node_match,
+            replacement,
+            range: edit.position..edit.position + edit.deleted_length,
+            additional_fixes: None,
+            title: rewrite.title().map(|t| t.to_string()),
+        }
+    }
+
+    pub fn multiple(
+        node_match: NodeMatch<'n>,
+        matcher: &impl Matcher,
+        fixers: &[Fixer],
+    ) -> Option<Self> {
+        let fixer = fixers.first()?;
+        let mut ret = Self::generate(node_match.clone(), matcher, fixer);
+        // no additional fixes
+        if fixers.len() == 1 {
+            return Some(ret);
+        }
+        let additional = fixers
+            .iter()
+            .skip(1)
+            .map(|f| {
+                let edit = node_match.make_edit(matcher, f);
+                AdditionalFix {
+                    replacement: String::from_utf8(edit.inserted_text).unwrap(),
+                    range: edit.position..edit.position + edit.deleted_length,
+                    title: f.title().map(|t| t.to_string()),
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        ret.additional_fixes = Some(additional);
+        Some(ret)
+    }
+
     pub fn into_list(mut self) -> Vec<Self> {
         let node_match = self.node_match.clone();
         let additional_fixes = self.additional_fixes.take();

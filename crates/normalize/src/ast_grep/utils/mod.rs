@@ -42,6 +42,24 @@ impl RunTrace {
     }
 }
 #[derive(Clone, Debug, Default)]
+pub struct ScanTrace;
+impl ScanTrace {
+    pub fn print_file(
+        &self,
+        _path: &std::path::Path,
+        _lang: super::lang::Lang,
+        _rules: &[impl std::any::Any],
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct RuleTrace {
+    pub file_trace: ScanTrace,
+    pub effective_rule_count: usize,
+    pub skipped_rule_count: usize,
+}
+#[derive(Clone, Debug, Default)]
 pub struct Granularity;
 impl Granularity {
     pub fn run_trace(&self) -> RunTrace {
@@ -49,6 +67,9 @@ impl Granularity {
     }
     pub fn project_trace(&self) -> ProjectTrace {
         ProjectTrace
+    }
+    pub fn scan_trace(&self) -> ScanTrace {
+        ScanTrace
     }
 }
 impl std::str::FromStr for Granularity {
@@ -68,6 +89,13 @@ impl ProjectTrace {
 use crate::ast_grep::lang::Lang;
 
 use anyhow::{Context, Result, anyhow};
+use crossterm::{
+    cursor::MoveTo,
+    event::{self, Event, KeyCode, KeyModifiers},
+    execute,
+    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{Clear, ClearType},
+};
 use smallvec::{SmallVec, smallvec};
 
 use ast_grep_core::Pattern;
@@ -76,12 +104,70 @@ use ast_grep_core::tree_sitter::LanguageExt;
 use ast_grep_core::{Matcher, tree_sitter::StrDoc};
 
 use std::fs::read_to_string;
+use std::io::Write;
+use std::io::stdout;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 type AstGrep = ast_grep_core::AstGrep<StrDoc<Lang>>;
 
-fn read_file(path: &Path) -> Result<String> {
+fn read_char() -> Result<char> {
+    loop {
+        if let Event::Key(evt) = event::read()? {
+            match evt.code {
+                KeyCode::Tab => break Ok('\t'),
+                KeyCode::Enter => break Ok('\n'),
+                KeyCode::Char('c') if evt.modifiers.contains(KeyModifiers::CONTROL) => {
+                    break Ok('q');
+                }
+                KeyCode::Char(c) => break Ok(c),
+                _ => (),
+            }
+        }
+    }
+}
+
+/// Prompts for user input on STDOUT
+fn prompt_reply_stdout(prompt: &str) -> Result<char> {
+    let mut stdout = std::io::stdout();
+    write!(stdout, "{prompt}")?;
+    stdout.flush()?;
+    terminal::enable_raw_mode()?;
+    let ret = read_char();
+    terminal::disable_raw_mode()?;
+    ret
+}
+
+// clear screen
+pub fn clear() -> Result<()> {
+    execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
+    Ok(())
+}
+
+pub fn run_in_alternate_screen<T>(f: impl FnOnce() -> Result<T>) -> Result<T> {
+    execute!(stdout(), EnterAlternateScreen)?;
+    clear()?;
+    let ret = f();
+    execute!(stdout(), LeaveAlternateScreen)?;
+    ret
+}
+
+pub fn prompt(prompt_text: &str, letters: &str, default: Option<char>) -> Result<char> {
+    loop {
+        let input = prompt_reply_stdout(prompt_text)?;
+        if let Some(default) = default {
+            if input == '\n' {
+                return Ok(default);
+            }
+        }
+        if letters.contains(input) {
+            return Ok(input);
+        }
+        eprintln!("Unrecognized command, try again?")
+    }
+}
+
+pub(crate) fn read_file(path: &Path) -> Result<String> {
     let file_content = read_to_string(path)
         .with_context(|| format!("Cannot read file {}", path.to_string_lossy()))?;
     // skip large files or empty file
@@ -126,6 +212,17 @@ pub fn filter_file_pattern<'a>(
         do_match(injected, matcher)
     });
     ret.extend(sub_units);
+    Ok(ret)
+}
+
+pub fn filter_file_rule(path: &Path, lang: Lang) -> Result<SmallVec<[AstGrep; 1]>> {
+    let file_content = read_file(path)?;
+    let grep = lang.ast_grep(file_content);
+    let mut ret = smallvec![grep.clone()];
+    let injections = grep.get_injections(|s| Lang::from_str(s).ok());
+    for root in injections {
+        ret.push(root);
+    }
     Ok(ret)
 }
 

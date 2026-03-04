@@ -3,6 +3,7 @@ use super::{Diff, NodeMatch, PrintProcessor, Printer};
 use crate::ast_grep::lang::Lang;
 pub(crate) use crate::ast_grep::utils::DiffStyles;
 use anyhow::Result;
+use ast_grep_config::{RuleConfig, Severity};
 use ast_grep_core::Doc;
 use clap::ValueEnum;
 use codespan_reporting::diagnostic::{self, Diagnostic, Label};
@@ -20,6 +21,7 @@ mod match_merger;
 mod styles;
 
 use match_merger::MatchMerger;
+use styles::RuleStyle;
 pub use styles::{PrintStyles, should_use_color};
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -183,7 +185,52 @@ impl ColoredProcessor {
     }
 }
 
+fn sg_label_to_code_span_label(label: ast_grep_config::Label<impl Doc>) -> Label<()> {
+    let ret = match label.style {
+        ast_grep_config::LabelStyle::Primary => Label::primary((), label.range()),
+        ast_grep_config::LabelStyle::Secondary => Label::secondary((), label.range()),
+    };
+    if let Some(message) = label.message {
+        ret.with_message(message)
+    } else {
+        ret
+    }
+}
+
 impl PrintProcessor<Buffer> for ColoredProcessor {
+    fn print_rule(
+        &self,
+        matches: Vec<NodeMatch>,
+        file: SimpleFile<Cow<str>, &str>,
+        rule: &RuleConfig<Lang>,
+    ) -> Result<Buffer> {
+        let config = &self.config;
+        let mut buffer = create_buffer(self.color);
+        let writer = &mut buffer;
+        let severity = match rule.severity {
+            Severity::Error => diagnostic::Severity::Error,
+            Severity::Warning => diagnostic::Severity::Warning,
+            Severity::Info => diagnostic::Severity::Note,
+            Severity::Hint => diagnostic::Severity::Help,
+            Severity::Off => unreachable!("turned-off rule should not have match."),
+        };
+        for m in matches {
+            let labels = rule
+                .get_labels(&m)
+                .into_iter()
+                .map(sg_label_to_code_span_label)
+                .collect();
+            let note_text: Vec<String> = rule.note.clone().into_iter().collect();
+            let diagnostic = Diagnostic::new(severity)
+                .with_code(&rule.id)
+                .with_message(rule.get_message(&m))
+                .with_notes(note_text)
+                .with_labels(labels);
+            term::emit(&mut *writer, config, &file, &diagnostic)?;
+        }
+        Ok(buffer)
+    }
+
     fn print_matches(&self, matches: Vec<NodeMatch>, path: &Path) -> Result<Buffer> {
         if self.heading.should_print() {
             print_matches_with_heading(matches, path, self)
@@ -199,6 +246,78 @@ impl PrintProcessor<Buffer> for ColoredProcessor {
         print_diffs(diffs, path, &self.styles, writer, context)?;
         Ok(buffer)
     }
+
+    fn print_rule_diffs(
+        &self,
+        diffs: Vec<(Diff<'_>, &RuleConfig<Lang>)>,
+        path: &Path,
+    ) -> Result<Buffer> {
+        let context = self.diff_context();
+        let mut buffer = create_buffer(self.color);
+        let writer = &mut buffer;
+        let mut start = 0;
+        let display_style = &self.config.display_style;
+        for (diff, rule) in diffs {
+            let range = &diff.range;
+            // skip overlapping diff
+            if range.start < start {
+                continue;
+            }
+            start = range.end;
+            if matches!(display_style, DisplayStyle::Rich) {
+                self.styles.print_prelude(path, writer)?;
+            } else {
+                let pos = diff.node_match.start_pos();
+                write!(
+                    writer,
+                    "{}:{}:{}: ",
+                    path.display(),
+                    pos.line() + 1,
+                    pos.column(&*diff.node_match) + 1
+                )?;
+            }
+            print_rule_title(rule, &diff.node_match, &self.styles.rule, writer)?;
+            if matches!(display_style, DisplayStyle::Rich) {
+                let source = diff.get_root_text();
+                let new_str = format!(
+                    "{}{}{}",
+                    &source[..range.start],
+                    diff.replacement,
+                    &source[start..],
+                );
+                self.styles
+                    .diff
+                    .print_diff(source, &new_str, writer, context)?;
+            }
+            if matches!(display_style, DisplayStyle::Medium | DisplayStyle::Rich) {
+                if let Some(ref note) = rule.note {
+                    writeln!(writer, "{}", self.styles.rule.note.paint("Note:"))?;
+                    writeln!(writer, "{note}")?;
+                }
+            }
+        }
+        Ok(buffer)
+    }
+}
+
+fn print_rule_title<W: WriteColor>(
+    rule: &RuleConfig<Lang>,
+    nm: &NodeMatch,
+    style: &RuleStyle,
+    writer: &mut W,
+) -> Result<()> {
+    let (level, level_style) = match rule.severity {
+        Severity::Error => ("error", style.error),
+        Severity::Warning => ("warning", style.warning),
+        Severity::Info => ("note", style.info),
+        Severity::Hint => ("help", style.hint),
+        Severity::Off => unreachable!("turned-off rule should not have match."),
+    };
+    let header = format!("{level}[{}]:", &rule.id);
+    let header = level_style.paint(header);
+    let message = style.message.paint(rule.get_message(nm));
+    writeln!(writer, "{header} {message}")?;
+    Ok(())
 }
 
 fn print_matches_with_heading(

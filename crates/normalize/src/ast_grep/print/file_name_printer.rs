@@ -2,6 +2,8 @@
 use super::{Diff, NodeMatch, PrintProcessor, Printer};
 use crate::ast_grep::lang::Lang;
 use anyhow::Result;
+use ast_grep_config::RuleConfig;
+use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{Buffer, ColorChoice, StandardStream, WriteColor};
 
 use std::borrow::Cow;
@@ -77,11 +79,29 @@ impl FileNameProcessor {
 }
 
 impl PrintProcessor<Buffer> for FileNameProcessor {
+    fn print_rule(
+        &self,
+        _matches: Vec<NodeMatch>,
+        file: SimpleFile<Cow<str>, &str>,
+        _rule: &RuleConfig<Lang>,
+    ) -> Result<Buffer> {
+        let path = Path::new(file.name().as_ref());
+        self.print_path(path)
+    }
+
     fn print_matches(&self, _matches: Vec<NodeMatch>, path: &Path) -> Result<Buffer> {
         self.print_path(path)
     }
 
     fn print_diffs(&self, _diffs: Vec<Diff>, path: &Path) -> Result<Buffer> {
+        self.print_path(path)
+    }
+
+    fn print_rule_diffs(
+        &self,
+        _diffs: Vec<(Diff<'_>, &RuleConfig<Lang>)>,
+        path: &Path,
+    ) -> Result<Buffer> {
         self.print_path(path)
     }
 }
