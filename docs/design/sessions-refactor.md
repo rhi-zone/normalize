@@ -118,38 +118,19 @@ pub trait LogFormat: Send + Sync {
 
 ### 3. Analysis as Consumer Code
 
-Analysis moves out of normalize-chat-sessions entirely. Consumers (normalize CLI, spore-sessions Lua bindings, Iris) compute their own metrics:
-
-```lua
--- In Lua (via spore-sessions)
-local session = sessions.parse(path)
-
--- Compute whatever metrics matter to you
-local tool_counts = {}
-for _, turn in ipairs(session.turns) do
-    for _, msg in ipairs(turn.messages) do
-        for _, block in ipairs(msg.content) do
-            if block.type == "tool_use" then
-                tool_counts[block.name] = (tool_counts[block.name] or 0) + 1
-            end
-        end
-    end
-end
-```
-
-For `normalize sessions` CLI, analysis helpers can live in normalize-cli or a separate `normalize-chat-sessions-analysis` crate that operates on `Session`.
+Analysis moves out of normalize-chat-sessions entirely. The `normalize sessions` CLI and other consumers compute their own metrics. Analysis helpers live in normalize-cli or a separate `normalize-chat-sessions-analysis` crate that operates on `Session`.
 
 ## Rationale
 
 1. **Separation of concerns** - parsing is objective (bytes → structure), analysis is subjective (structure → insights)
 
-2. **Flexibility** - Iris can iterate on what patterns matter without touching Rust. New metrics = new Lua code, not recompilation.
+2. **Flexibility** - consumers can compute different metrics without touching the parser.
 
-3. **Performance is fine** - Session files are small (KB-MB). LuaJIT analyzing a parsed session is fast enough. The bottleneck is never "computing stats over hundreds of messages."
+3. **Performance is fine** - Session files are small (KB-MB). The bottleneck is never "computing stats over hundreds of messages."
 
 4. **Simpler core** - normalize-chat-sessions becomes a pure parser. Smaller API surface, easier to maintain, clearer purpose.
 
-5. **Composability** - Different consumers can share the parser but compute different analyses. `normalize sessions --compact` and Iris insights don't need to agree on what to track.
+5. **Composability** - Different consumers can share the parser but compute different analyses.
 
 ## Migration (Complete)
 
@@ -159,39 +140,3 @@ For `normalize sessions` CLI, analysis helpers can live in normalize-cli or a se
 4. ~~Remove `analyze()` from trait~~ Done
 5. ~~`SessionAnalysis` becomes internal to normalize CLI~~ Done
 
-## spore-normalize-chat-sessions Integration
-
-With parsing exposed, `spore-normalize-chat-sessions` provides Lua bindings:
-
-```rust
-// spore-normalize-chat-sessions/src/lib.rs
-pub struct NormalizeSessionsIntegration;
-
-impl Integration for NormalizeSessionsIntegration {
-    fn register(&self, lua: &Lua) -> Result<()> {
-        let sessions = lua.create_table()?;
-
-        // sessions.parse(path) -> Session table
-        sessions.set("parse", lua.create_function(|lua, path: String| {
-            let session = moss_sessions::parse_session(Path::new(&path))?;
-            session_to_lua(lua, &session)
-        })?)?;
-
-        // sessions.list(project?) -> array of SessionFile
-        sessions.set("list", lua.create_function(|lua, project: Option<String>| {
-            let files = moss_sessions::list_all_sessions(project.as_deref().map(Path::new));
-            files_to_lua(lua, &files)
-        })?)?;
-
-        // sessions.formats() -> array of format names
-        sessions.set("formats", lua.create_function(|_, ()| {
-            Ok(moss_sessions::list_formats())
-        })?)?;
-
-        lua.globals().set("sessions", sessions)?;
-        Ok(())
-    }
-}
-```
-
-Lua gets raw session data. Analysis lives in Lua scripts that consumers (like Iris) control.

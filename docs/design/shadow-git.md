@@ -12,7 +12,7 @@ Maintain a hidden git repository (`.normalize/shadow/`) that automatically commi
 
 ## Why Shadow Git?
 
-**Primary goal: prevent catastrophic loss.** LLM-driven edits can be unpredictable. A single bad edit or a chain of "fixes" can destroy working code. Shadow git provides a safety net that doesn't rely on user discipline.
+**Primary goal: prevent catastrophic loss.** A single bad edit or a chain of "fixes" can destroy working code. Shadow git provides a safety net that doesn't rely on user discipline.
 
 Use cases:
 - **Oops recovery**: "That delete was wrong, undo it"
@@ -27,7 +27,7 @@ Philosophy:
 - **Shadow is invisible until needed** - zero friction for normal workflow
 - **Real git is source of truth** - shadow serves the gap between edits and commits
 - **Minimize friction, maximize affordances** - prompts default to the common/safe choice (e.g., global prune defaults to yes for security)
-- **Non-interactive fallbacks** - every interactive prompt has a flag equivalent for LLM/scripted usage
+- **Non-interactive fallbacks** - every interactive prompt has a flag equivalent for scripted usage
 
 ## Core Features
 
@@ -59,7 +59,7 @@ normalize edit --goto <ref>        # Jump to specific commit
 normalize edit history                  # Show recent normalize edits
 normalize edit history src/foo.rs       # Show edits for specific file
 normalize edit history --all            # Show full tree structure
-normalize edit history --json           # Machine-readable output (for LLM/scripting)
+normalize edit history --json           # Machine-readable output
 normalize edit history --status         # Uncommitted shadow edits since last git commit
 normalize edit history --diff <ref>     # Show what a commit changed
 normalize edit history --diff 2         # Diff for commit 2
