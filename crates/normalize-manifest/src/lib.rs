@@ -45,6 +45,7 @@ pub mod nuget;
 pub mod ocaml;
 pub mod perl;
 pub mod pip;
+pub mod pipfile;
 pub mod pubspec;
 pub mod purescript;
 pub mod pyproject;
@@ -144,6 +145,7 @@ pub fn parse_manifest(filename: &str, content: &str) -> Option<ParsedManifest> {
         "package.json" => npm::NpmParser.parse(content).ok(),
         // Python
         "requirements.txt" => pip::PipParser.parse(content).ok(),
+        "Pipfile" => pipfile::PipfileParser.parse(content).ok(),
         "pyproject.toml" => pyproject::PyprojectParser.parse(content).ok(),
         "setup.cfg" => setup_cfg::SetupCfgParser.parse(content).ok(),
         "setup.py" => setup_py::SetupPyParser.parse(content).ok(),

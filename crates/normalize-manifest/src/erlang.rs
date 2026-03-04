@@ -401,12 +401,7 @@ mod tests {
         assert_eq!(lager.version_req.as_deref(), Some("3.9.2"));
 
         // bare atom
-        let jsx = m
-            .dependencies
-            .iter()
-            .filter(|d| d.name == "jsx")
-            .next()
-            .unwrap();
+        let jsx = m.dependencies.iter().find(|d| d.name == "jsx").unwrap();
         assert_eq!(jsx.kind, DepKind::Normal);
 
         let recon = m.dependencies.iter().find(|d| d.name == "recon").unwrap();
