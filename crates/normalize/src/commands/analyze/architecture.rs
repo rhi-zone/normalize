@@ -10,8 +10,8 @@ pub use normalize_architecture::{
     OrphanModule, SymbolMetrics, build_import_graph,
 };
 use normalize_architecture::{
-    compute_coupling_and_hubs, compute_layer_flows, detect_cross_imports, find_cycles,
-    find_longest_chains, find_orphan_modules, find_symbol_hotspots,
+    compute_coupling_and_hubs, compute_layer_flows, detect_cross_imports, find_orphan_modules,
+    find_symbol_hotspots,
 };
 use normalize_languages::is_programming_language;
 use serde::Serialize;
