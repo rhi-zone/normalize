@@ -2,7 +2,7 @@
 
 Behavioral rules for Claude Code in this repository.
 
-**References:** `docs/philosophy.md` (design tenets), `docs/architecture-decisions.md` (technical choices), `docs/session-modes.md` (working conventions).
+**References:** `docs/philosophy.md` (design tenets), `docs/architecture-decisions.md` (technical choices), `docs/session-modes.md` (working conventions), `docs/cli-dropin-integrations.md` (embedding external tools as drop-in CLI replacements — WIP).
 
 ## Publishing
 
