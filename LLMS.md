@@ -1,6 +1,6 @@
-# Normalize for LLMs
+# Normalize Quick Reference
 
-Quick reference for AI agents working with codebases using Normalize.
+Quick reference for working with codebases using Normalize.
 
 ## Quick Start
 

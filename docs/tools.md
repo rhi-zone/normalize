@@ -2,8 +2,6 @@
 
 **CLI**: `normalize <command> [options]` — all commands support `--json`
 
-**MCP Server**: `normalize mcp-server`
-
 ## Core Primitives
 
 Three tools for all codebase operations:
