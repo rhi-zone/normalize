@@ -88,17 +88,17 @@ crates/
 2. `~/.config/normalize/grammars/`
 3. Built-in fallback (if compiled with grammar features)
 
-## Index-Optional Design
+## Index Design
 
-**Decision**: All commands work without the index (with graceful degradation).
+**Decision**: The index (SQLite via libsql) is an implementation detail — commands build it on demand, cache it in `.normalize/`, and invalidate on file changes.
 
-### Fallback Behavior
+The index is **not optional for cross-file features**. Call graphs, import resolution, cross-file references, and Datalog rules all require persistent indexed data. Commands that depend on these hard-fail without an index and prompt the user to run `normalize facts rebuild`.
 
-| Feature | With Index | Without Index |
-|---------|------------|---------------|
-| Symbol search | SQLite query | Filesystem walk + parsing |
-| Health metrics | Cached stats | Real-time file scan |
-| Path resolution | Index lookup | Glob patterns |
+Single-file operations (view, edit, within-file analysis) work without any index.
+
+### Future: ephemeral index for small repos
+
+For small repos, the index could be built in `/tmp` keyed by repo root + mtime, making it fully transparent. Not yet implemented.
 
 ### Configuration
 
