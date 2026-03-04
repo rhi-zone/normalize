@@ -527,6 +527,17 @@ fn bundled_complexity_query(name: &str) -> Option<&'static str> {
         "d" => Some(include_str!("queries/d.complexity.scm")),
         "objc" => Some(include_str!("queries/objc.complexity.scm")),
         "vb" => Some(include_str!("queries/vb.complexity.scm")),
+        "elisp" => Some(include_str!("queries/elisp.complexity.scm")),
+        "hcl" => Some(include_str!("queries/hcl.complexity.scm")),
+        "matlab" => Some(include_str!("queries/matlab.complexity.scm")),
+        "nix" => Some(include_str!("queries/nix.complexity.scm")),
+        "sql" => Some(include_str!("queries/sql.complexity.scm")),
+        "starlark" => Some(include_str!("queries/starlark.complexity.scm")),
+        "vim" => Some(include_str!("queries/vim.complexity.scm")),
+        "zsh" => Some(include_str!("queries/zsh.complexity.scm")),
+        "rescript" => Some(include_str!("queries/rescript.complexity.scm")),
+        "idris" => Some(include_str!("queries/idris.complexity.scm")),
+        "lean" => Some(include_str!("queries/lean.complexity.scm")),
         _ => None,
     }
 }
@@ -648,6 +659,71 @@ mod tests {
             assert!(
                 !query.unwrap().is_empty(),
                 "Empty bundled types query for {lang}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_bundled_complexity_queries() {
+        for lang in &[
+            "rust",
+            "python",
+            "go",
+            "javascript",
+            "typescript",
+            "tsx",
+            "java",
+            "c",
+            "cpp",
+            "ruby",
+            "kotlin",
+            "swift",
+            "c_sharp",
+            "bash",
+            "lua",
+            "elixir",
+            "scala",
+            "dart",
+            "zig",
+            "ocaml",
+            "erlang",
+            "php",
+            "haskell",
+            "r",
+            "julia",
+            "perl",
+            "groovy",
+            "elm",
+            "powershell",
+            "fish",
+            "fsharp",
+            "gleam",
+            "clojure",
+            "commonlisp",
+            "scheme",
+            "d",
+            "objc",
+            "vb",
+            "elisp",
+            "hcl",
+            "matlab",
+            "nix",
+            "sql",
+            "starlark",
+            "vim",
+            "zsh",
+            "rescript",
+            "idris",
+            "lean",
+        ] {
+            let query = bundled_complexity_query(lang);
+            assert!(
+                query.is_some(),
+                "Missing bundled complexity query for {lang}"
+            );
+            assert!(
+                !query.unwrap().is_empty(),
+                "Empty bundled complexity query for {lang}"
             );
         }
     }
