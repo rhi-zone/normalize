@@ -3877,6 +3877,7 @@ dependencies = [
 name = "normalize-syntax-rules"
 version = "0.1.0"
 dependencies = [
+ "ast-grep-core",
  "dirs",
  "glob",
  "ignore",

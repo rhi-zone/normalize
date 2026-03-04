@@ -21,6 +21,9 @@ regex = "1"
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 
+# ast-grep query execution
+ast-grep-core = "0.40.5"
+
 # Language support
 normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
 

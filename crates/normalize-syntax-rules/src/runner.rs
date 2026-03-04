@@ -648,7 +648,7 @@ fn main() {
         let grammar = loader.get("rust").expect("rust grammar");
 
         // Simulate combining multiple rule queries
-        let rules_queries = vec![
+        let rules_queries = [
             (
                 "unwrap-rule",
                 r#"((call_expression function: (field_expression field: (field_identifier) @_m) (#eq? @_m "unwrap")) @match)"#,

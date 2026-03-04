@@ -26,11 +26,13 @@
 
 mod builtin;
 mod loader;
+pub mod query;
 mod runner;
 mod sources;
 
 pub use builtin::BUILTIN_RULES;
 pub use loader::{RuleOverride, RulesConfig, load_all_rules, parse_rule_content};
+pub use query::{MatchResult, is_sexp_pattern, run_astgrep_query, run_sexp_query};
 pub use runner::{DebugFlags, Finding, apply_fixes, evaluate_predicates, run_rules};
 pub use sources::{
     EnvSource, GitSource, GoSource, PathSource, PythonSource, RuleSource, RustSource,

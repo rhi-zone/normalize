@@ -3,8 +3,8 @@
 //! Covers AST-level operations and syntax rule management.
 //! Parallel to `facts` (which covers fact extraction and fact-based rules).
 
-use crate::commands::analyze::query::MatchResult;
 use crate::service::rules::RulesService;
+use normalize_syntax_rules::MatchResult;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
