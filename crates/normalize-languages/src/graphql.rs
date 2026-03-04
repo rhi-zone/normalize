@@ -113,10 +113,6 @@ impl Language for GraphQL {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["selection_set"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

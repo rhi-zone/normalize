@@ -64,16 +64,6 @@ impl Language for Awk {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "while_statement",
-            "for_statement",
-            "for_in_statement",
-            "ternary_exp",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

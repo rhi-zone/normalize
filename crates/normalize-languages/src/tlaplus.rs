@@ -64,10 +64,6 @@ impl Language for TlaPlus {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_then_else", "case"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

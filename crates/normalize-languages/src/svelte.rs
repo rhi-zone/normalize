@@ -71,10 +71,6 @@ impl Language for Svelte {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "each_statement", "else_if_block"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -60,10 +60,6 @@ impl Language for Meson {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_command", "foreach_command", "if_condition"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

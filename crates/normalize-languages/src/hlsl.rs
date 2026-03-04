@@ -67,17 +67,6 @@ impl Language for Hlsl {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "switch_statement",
-            "case_statement",
-            "conditional_expression",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

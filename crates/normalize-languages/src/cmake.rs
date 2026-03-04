@@ -66,15 +66,6 @@ impl Language for CMake {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_condition",
-            "elseif_command",
-            "foreach_loop",
-            "while_loop",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

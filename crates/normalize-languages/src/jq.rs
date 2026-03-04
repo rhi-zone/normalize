@@ -65,10 +65,6 @@ impl Language for Jq {
         }]
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if", "try", "reduce"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -63,10 +63,6 @@ impl Language for Prolog {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["clause_term"] // Each clause adds complexity
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -97,14 +97,6 @@ impl Language for Ada {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "case_expression",
-            "if_expression",
-            "case_expression_alternative",
-        ]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

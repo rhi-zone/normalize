@@ -62,10 +62,6 @@ impl Language for Nginx {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["block_directive"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -63,10 +63,6 @@ impl Language for Typst {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if", "while", "for"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -81,10 +81,6 @@ impl Language for Agda {
         Vec::new()
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["function", "lambda_clause"] // Pattern matching
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }

@@ -45,10 +45,6 @@ impl Language for Vue {
         VisibilityMechanism::ExplicitExport
     }
 
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["directive_attribute", "interpolation"]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
