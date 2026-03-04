@@ -35,14 +35,6 @@ impl Language for Vue {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
         // Vue uses JS import syntax
         let names_to_use: Vec<&str> = names

@@ -53,10 +53,6 @@ impl Language for Glsl {
         Visibility::Public
     }
 
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }

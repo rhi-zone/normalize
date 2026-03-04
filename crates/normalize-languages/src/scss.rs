@@ -66,10 +66,6 @@ impl Language for Scss {
         None
     }
 
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         let text = &content[node.byte_range()];
         let line = node.start_position().row + 1;

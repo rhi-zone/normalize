@@ -58,13 +58,6 @@ impl Language for Lua {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         // Look for require("module") calls
         if node.kind() != "function_call" {

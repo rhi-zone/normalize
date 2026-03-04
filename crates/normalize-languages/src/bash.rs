@@ -34,14 +34,6 @@ impl Language for Bash {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // Bash: source file or . file
         format!("source {}", import.module)

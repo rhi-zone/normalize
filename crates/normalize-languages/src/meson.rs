@@ -26,13 +26,6 @@ impl Language for Meson {
         None // Meson uses function calls, not definitions
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None // Meson doesn't have containers
-    }
-
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "normal_command" {
             return Vec::new();
@@ -59,10 +52,6 @@ impl Language for Meson {
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
-    }
-
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

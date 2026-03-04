@@ -32,19 +32,8 @@ impl Language for Html {
         None
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
-    }
-
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
     }
 
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {

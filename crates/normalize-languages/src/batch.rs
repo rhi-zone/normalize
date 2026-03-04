@@ -40,13 +40,6 @@ impl Language for Batch {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // Batch: call script.bat
         format!("call {}", import.module)

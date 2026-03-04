@@ -67,10 +67,6 @@ impl Language for Idris {
         }
     }
 
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None // Type extraction handled by container for data/record
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "import" {
             return Vec::new();

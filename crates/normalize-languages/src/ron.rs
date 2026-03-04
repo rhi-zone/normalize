@@ -60,10 +60,6 @@ impl Language for Ron {
         Visibility::Public
     }
 
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // RON struct uses ( ... ), map uses { ... }; use node itself for body analysis
         Some(*node)

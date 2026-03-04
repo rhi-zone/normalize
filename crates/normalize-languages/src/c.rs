@@ -40,10 +40,6 @@ impl Language for C {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None // C doesn't have containers in the same sense
-    }
-
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         let kind = match node.kind() {

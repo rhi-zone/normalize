@@ -56,10 +56,6 @@ impl Language for Go {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None // Go types are extracted via extract_type
-    }
-
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         // Go type_spec: name field + type field (struct_type, interface_type, etc.)
         let name_node = node.child_by_field_name("name")?;

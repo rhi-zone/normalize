@@ -41,12 +41,6 @@ impl Language for Ninja {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         match node.kind() {
             "include" | "subninja" => {
@@ -70,10 +64,6 @@ impl Language for Ninja {
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
-    }
-
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
     }
 }
 

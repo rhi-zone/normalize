@@ -66,10 +66,6 @@ impl Language for Svelte {
         })
     }
 
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "import_statement" {
             return Vec::new();

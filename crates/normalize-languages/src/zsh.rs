@@ -22,13 +22,6 @@ impl Language for Zsh {
         Some(simple_function_symbol(node, content, name, None))
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "command" {
             return Vec::new();

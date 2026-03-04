@@ -106,10 +106,14 @@ pub trait Language: Send + Sync {
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol>;
 
     /// Extract symbol from a container node (class, impl, module)
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol>;
+    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
+        None
+    }
 
     /// Extract symbol from a type definition node
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol>;
+    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
+        None
+    }
 
     // === Import/Export ===
 
@@ -147,8 +151,9 @@ pub trait Language: Send + Sync {
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility;
 
     /// Check if a symbol is a test (for filtering).
-    /// Each language must implement this - test conventions are language-specific.
-    fn is_test_symbol(&self, symbol: &Symbol) -> bool;
+    fn is_test_symbol(&self, _symbol: &Symbol) -> bool {
+        false
+    }
 
     /// Glob patterns (relative, using `**` wildcards) that identify dedicated test files.
     /// Used to build a GlobSet for fast batch matching.

@@ -65,9 +65,6 @@ impl Language for Verilog {
         })
     }
 
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "package_import_declaration" {
             return Vec::new();
@@ -104,10 +101,6 @@ impl Language for Verilog {
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
-    }
-
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

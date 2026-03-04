@@ -83,10 +83,6 @@ impl Language for Sql {
         Visibility::Public
     }
 
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
-    }
-
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
     }

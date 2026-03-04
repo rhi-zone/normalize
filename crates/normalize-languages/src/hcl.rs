@@ -55,10 +55,6 @@ impl Language for Hcl {
         })
     }
 
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "block" {
             return Vec::new();

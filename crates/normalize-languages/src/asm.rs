@@ -40,21 +40,11 @@ impl Language for Asm {
         })
     }
 
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new() // asm grammar doesn't have imports
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
-    }
-
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {

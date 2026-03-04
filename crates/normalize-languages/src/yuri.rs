@@ -25,12 +25,6 @@ impl Language for Yuri {
     ) -> Option<Symbol> {
         None
     }
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
-    }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
     }

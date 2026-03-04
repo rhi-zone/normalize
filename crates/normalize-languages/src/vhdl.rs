@@ -128,10 +128,6 @@ impl Language for Vhdl {
         Visibility::Public
     }
 
-    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
-        false
-    }
-
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // VHDL entity/architecture/package have no dedicated body field; use node itself
         Some(*node)
