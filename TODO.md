@@ -76,6 +76,19 @@ Every crate should be usable both as a library and as a standalone CLI tool. Lib
 - `normalize-syntax-rules` — standalone rule runner
 - Others as needed — each crate's CLI exposes its core functionality directly
 
+### Language trait: call extraction — design gap
+
+`normalize-facts/src/symbols.rs` contains per-language inline call-finders
+(Python, Rust, TypeScript, JavaScript, Java, Go) because the `Language` trait
+has no `call_kinds()` or `extract_calls()` method. This is the reason hardcoded
+language dispatch existed there in the first place (now uses language name via
+registry, but still hardcoded to 6 languages).
+
+- [ ] Add `call_node_kinds() -> &'static [&'static str]` to `Language` trait (or equivalent)
+- [ ] Implement for all languages that have call extraction (start with the 6 already in symbols.rs)
+- [ ] Replace per-language inline walkers in `symbols.rs` with a generic walker over `call_node_kinds()`
+- [ ] This also fixes the fact that call extraction is silently missing for the other 92 languages
+
 ### Type relationship extraction (facts index) — HIGH PRIORITY
 
 Currently `analyze graph --on types` works but only uses shallow symbol-level relationships (impl/extends). Deeper type edges are needed for meaningful structural analysis.
