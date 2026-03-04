@@ -11,13 +11,13 @@ use std::cell::Cell;
 
 /// Sessions management sub-service.
 pub struct SessionsService {
-    _pretty: Cell<bool>,
+    pretty: Cell<bool>,
 }
 
 impl SessionsService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
-            _pretty: Cell::new(pretty.get()),
+            pretty: Cell::new(pretty.get()),
         }
     }
 }
@@ -58,24 +58,6 @@ impl std::fmt::Display for MessagesReport {
     }
 }
 
-/// Output type for sessions show (report or analysis).
-#[derive(serde::Serialize, schemars::JsonSchema)]
-#[serde(untagged)]
-#[allow(clippy::large_enum_variant)]
-pub enum SessionShowOutput {
-    Report(SessionShowReport),
-    Analysis(SessionAnalysis),
-}
-
-impl std::fmt::Display for SessionShowOutput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Report(r) => write!(f, "{}", r),
-            Self::Analysis(a) => write!(f, "{}", a.format_text()),
-        }
-    }
-}
-
 /// Output type for plans (list or content).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
@@ -89,6 +71,16 @@ impl std::fmt::Display for PlansOutput {
         match self {
             Self::List(r) => write!(f, "{}", r.format_text()),
             Self::Content(c) => write!(f, "{}", c),
+        }
+    }
+}
+
+impl SessionsService {
+    fn display_analyze(&self, a: &SessionAnalysis) -> String {
+        if self.pretty.get() {
+            a.format_pretty()
+        } else {
+            a.format_text()
         }
     }
 }
@@ -142,7 +134,6 @@ impl SessionsService {
     pub fn show(
         &self,
         #[param(positional, help = "Session ID or path")] session: String,
-        #[param(help = "Run full analysis instead of summary")] analyze: bool,
         #[param(help = "Show full conversation log")] full: bool,
         #[param(help = "Require exact/prefix match (disable fuzzy)")] exact: bool,
         #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
@@ -153,28 +144,46 @@ impl SessionsService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<SessionShowOutput, String> {
+    ) -> Result<SessionShowReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         let is_pretty = super::resolve_pretty(resolved_root, pretty, compact);
-        if analyze {
-            let analysis = crate::commands::sessions::build_analyze_report(
-                &session,
-                root_path,
-                format.as_deref(),
-                exact,
-            )?;
-            Ok(SessionShowOutput::Analysis(analysis))
-        } else {
-            let report = crate::commands::sessions::build_show_report(
-                &session,
-                root_path,
-                format.as_deref(),
-                full,
-                exact,
-            )?;
-            Ok(SessionShowOutput::Report(report.with_pretty(is_pretty)))
-        }
+        let report = crate::commands::sessions::build_show_report(
+            &session,
+            root_path,
+            format.as_deref(),
+            full,
+            exact,
+        )?;
+        Ok(report.with_pretty(is_pretty))
+    }
+
+    /// Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
+    #[cli(display_with = "display_analyze")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn analyze(
+        &self,
+        #[param(positional, help = "Session ID or pattern")] session: String,
+        #[param(help = "Require exact/prefix match (disable fuzzy)")] exact: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<SessionAnalysis, String> {
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        self.pretty
+            .set(super::resolve_pretty(resolved_root, pretty, compact));
+        crate::commands::sessions::build_analyze_report(
+            &session,
+            root_path,
+            format.as_deref(),
+            exact,
+        )
     }
 
     /// Show aggregate statistics across sessions

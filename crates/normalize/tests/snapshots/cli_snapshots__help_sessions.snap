@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 92
 expression: "snapshot_help(&[\"sessions\"])"
 ---
 Analyze agent session logs (Claude Code, Codex, Gemini)
@@ -10,6 +9,7 @@ Usage: normalize sessions [OPTIONS] [COMMAND]
 Commands:
   list      List available sessions
   show      Show a specific session (summary or full conversation)
+  analyze   Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
   stats     Show aggregate statistics across sessions
   messages  Extract all messages across sessions into a flat, queryable form
   plans     List and view agent plans

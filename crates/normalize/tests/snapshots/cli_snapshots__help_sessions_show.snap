@@ -10,17 +10,16 @@ Arguments:
   [session]  Session ID or path
 
 Options:
-      --analyze                    Run full analysis instead of summary
-      --jsonl                      Output one JSON object per line (for arrays)
-      --pretty                     Human-friendly output with colors and formatting
-      --compact                    Compact output without colors (overrides TTY detection)
       --full                       Show full conversation log
-      --json                       Output machine-readable JSON
+      --jsonl                      Output one JSON object per line (for arrays)
       --exact                      Require exact/prefix match (disable fuzzy)
-      --jq <jq>                    Filter output through jq expression
+      --json                       Output machine-readable JSON
       --format <format>            Force specific format: claude, codex, gemini, normalize
+      --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
   -r, --root <root>                Root directory (defaults to current directory)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --pretty                     Enable pretty
+      --compact                    Enable compact
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help

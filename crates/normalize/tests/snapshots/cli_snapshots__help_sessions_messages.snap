@@ -20,6 +20,7 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --project <project>          Filter by specific project path
       --all-projects               Show sessions from all projects
+      --session <session>          Filter to a specific session ID
       --format <format>            Force specific format: claude, codex, gemini, normalize
   -n, --limit <limit>              Maximum number of sessions
       --max-chars <max-chars>      Truncate message text to N chars (default: 200)
