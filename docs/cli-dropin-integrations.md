@@ -129,8 +129,8 @@ requiring jaq v3. It would have happened regardless of the jq subcommand.
 | Tool | Library | Status |
 |---|---|---|
 | `jq` | jaq (jaq-core + jaq-std + jaq-json) | Done |
-| `rg` | Vendored ripgrep 14.1.1 (crates/core/) + grep, lexopt, termcolor | Done |
-| `ast-grep` / `sg` | ast-grep-core + DynLang bridge (normalize-languages) | Done (limited) |
+| `rg` | Vendored ripgrep 15.1.0 (crates/core/) + grep, lexopt, termcolor | Done |
+| `ast-grep` / `sg` | Vendored ast-grep 0.41.0 CLI + ast-grep-core + DynLang bridge | Done |
 
 ### rg parity
 
@@ -141,9 +141,21 @@ Symlink dispatch: `rg -> normalize` or `normalize rg`.
 
 ### ast-grep parity
 
-Pattern-based structural search using ast-grep-core. Core patterns (`$X`, `$$$`) work
-with auto-detected or explicit `--lang`. JSON output via `--json`. Missing: YAML rules,
-`--rewrite`, multiple patterns, language injections.
+Vendored from ast-grep 0.41.0 (MIT). Full `sg run` CLI parity — clap-derived argument
+parsing, all flags from upstream (`--pattern`, `--lang`, `--selector`, `--strictness`,
+`--debug-query`, `--json`, `--files-with-matches`, `--heading`, `--color`, `--context`,
+`--no-ignore`, `--follow`, `--globs`, `--threads`, `--stdin`).
+
+Key difference from upstream: uses normalize-languages' `GrammarLoader` instead of
+`ast-grep-language`'s embedded grammars (avoids duplicating ~25 tree-sitter grammars).
+The `Lang` type replaces upstream's `SgLang`, delegating to `DynLang` + normalize-languages.
+
+Missing features (can be added later):
+- `sg scan` / `sg test` (need `ast-grep-config` dep, planned)
+- `--rewrite` / `--interactive` (need `ast-grep-config::Fixer` + `crossterm`)
+- Language injection (HTML/Vue/Svelte embedded languages)
+- `--format github` / SARIF output (need `serde-sarif`)
+- `--debug-query=pattern` (needs `DumpPattern` API from ast-grep-core 0.41.0)
 
 Symlink dispatch: `sg -> normalize`, `ast-grep -> normalize`, or `normalize ast-grep`.
 
