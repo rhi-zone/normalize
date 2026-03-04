@@ -685,6 +685,30 @@ fn bundled_imports_query(name: &str) -> Option<&'static str> {
         "starlark" => Some(include_str!("queries/starlark.imports.scm")),
         "rescript" => Some(include_str!("queries/rescript.imports.scm")),
         "idris" => Some(include_str!("queries/idris.imports.scm")),
+        "ada" => Some(include_str!("queries/ada.imports.scm")),
+        "agda" => Some(include_str!("queries/agda.imports.scm")),
+        "asciidoc" => Some(include_str!("queries/asciidoc.imports.scm")),
+        "caddy" => Some(include_str!("queries/caddy.imports.scm")),
+        "capnp" => Some(include_str!("queries/capnp.imports.scm")),
+        "cmake" => Some(include_str!("queries/cmake.imports.scm")),
+        "devicetree" => Some(include_str!("queries/devicetree.imports.scm")),
+        "dockerfile" => Some(include_str!("queries/dockerfile.imports.scm")),
+        "elm" => Some(include_str!("queries/elm.imports.scm")),
+        "hcl" => Some(include_str!("queries/hcl.imports.scm")),
+        "hlsl" => Some(include_str!("queries/hlsl.imports.scm")),
+        "jq" => Some(include_str!("queries/jq.imports.scm")),
+        "lean" => Some(include_str!("queries/lean.imports.scm")),
+        "meson" => Some(include_str!("queries/meson.imports.scm")),
+        "nginx" => Some(include_str!("queries/nginx.imports.scm")),
+        "ninja" => Some(include_str!("queries/ninja.imports.scm")),
+        "prolog" => Some(include_str!("queries/prolog.imports.scm")),
+        "scss" => Some(include_str!("queries/scss.imports.scm")),
+        "thrift" => Some(include_str!("queries/thrift.imports.scm")),
+        "tlaplus" => Some(include_str!("queries/tlaplus.imports.scm")),
+        "typst" => Some(include_str!("queries/typst.imports.scm")),
+        "verilog" => Some(include_str!("queries/verilog.imports.scm")),
+        "vhdl" => Some(include_str!("queries/vhdl.imports.scm")),
+        "wit" => Some(include_str!("queries/wit.imports.scm")),
         _ => None,
     }
 }
@@ -939,6 +963,30 @@ mod tests {
             "starlark",
             "rescript",
             "idris",
+            "ada",
+            "agda",
+            "asciidoc",
+            "caddy",
+            "capnp",
+            "cmake",
+            "devicetree",
+            "dockerfile",
+            "elm",
+            "hcl",
+            "hlsl",
+            "jq",
+            "lean",
+            "meson",
+            "nginx",
+            "ninja",
+            "prolog",
+            "scss",
+            "thrift",
+            "tlaplus",
+            "typst",
+            "verilog",
+            "vhdl",
+            "wit",
         ] {
             let query = bundled_imports_query(lang);
             assert!(query.is_some(), "Missing bundled imports query for {lang}");
@@ -997,6 +1045,30 @@ mod tests {
         assert!(loader.get_imports("starlark").is_some());
         assert!(loader.get_imports("rescript").is_some());
         assert!(loader.get_imports("idris").is_some());
+        assert!(loader.get_imports("ada").is_some());
+        assert!(loader.get_imports("agda").is_some());
+        assert!(loader.get_imports("asciidoc").is_some());
+        assert!(loader.get_imports("caddy").is_some());
+        assert!(loader.get_imports("capnp").is_some());
+        assert!(loader.get_imports("cmake").is_some());
+        assert!(loader.get_imports("devicetree").is_some());
+        assert!(loader.get_imports("dockerfile").is_some());
+        assert!(loader.get_imports("elm").is_some());
+        assert!(loader.get_imports("hcl").is_some());
+        assert!(loader.get_imports("hlsl").is_some());
+        assert!(loader.get_imports("jq").is_some());
+        assert!(loader.get_imports("lean").is_some());
+        assert!(loader.get_imports("meson").is_some());
+        assert!(loader.get_imports("nginx").is_some());
+        assert!(loader.get_imports("ninja").is_some());
+        assert!(loader.get_imports("prolog").is_some());
+        assert!(loader.get_imports("scss").is_some());
+        assert!(loader.get_imports("thrift").is_some());
+        assert!(loader.get_imports("tlaplus").is_some());
+        assert!(loader.get_imports("typst").is_some());
+        assert!(loader.get_imports("verilog").is_some());
+        assert!(loader.get_imports("vhdl").is_some());
+        assert!(loader.get_imports("wit").is_some());
         assert!(loader.get_imports("unknown-lang-xyz").is_none());
     }
 
