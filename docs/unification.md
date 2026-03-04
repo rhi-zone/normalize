@@ -17,20 +17,6 @@ See `docs/philosophy.md` for the "Generalize, Don't Multiply" tenet.
 
 **Trade-off**: Flags can be cryptic. Mitigation: `--json` + `--jq` for programmatic use, good defaults for interactive use.
 
-## Workflow Engine: Lua
-
-**Decision**: One language (Lua) instead of config-for-simple + DSL-for-complex.
-
-**Alternatives rejected**:
-- TOML for simple sequences, custom DSL for conditionals → two syntaxes, unclear boundary
-- Shell scripts → awkward composition, no structured return values
-- Rhai → smaller ecosystem
-- Custom YAML/JSON workflow format → reinventing a worse language
-
-**Why**: The boundary between "config" and "script" is fuzzy. Once you need `if is_dirty() then ...`, you need a real language. Lua is minimal (~200KB LuaJIT), widely known, and handles both simple (`view("foo")`) and complex cases.
-
-**Trade-off**: Higher initial learning curve than TOML. Mitigation: simple examples, LuaCats type definitions for IDE support.
-
 ## Path Resolution: dwim.rs
 
 **Decision**: Single path resolver for files, directories, symbols, and fuzzy matches.

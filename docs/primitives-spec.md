@@ -178,8 +178,4 @@ Returns structured results suitable for LLM consumption:
 
 2. **Multi-edit**: Batch multiple operations? Or rely on multiple invocations?
 
-3. **Dry-run**: `--dry-run` to preview changes without applying?
-
-4. **Undo**: Track edit history for reversal? Or rely on git?
-
-5. **Cross-file move**: `--move-*` across files - handle imports automatically?
+3. **Cross-file move**: `--move-*` across files - handle imports automatically?

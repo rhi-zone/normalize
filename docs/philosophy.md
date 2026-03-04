@@ -19,19 +19,9 @@ Normalize is useful alone and powerful with AI. A human can `normalize view` to 
 
 ## Architecture
 
-Core components:
-- **Event Bus**: Async communication (`UserMessage`, `PlanGenerated`, `ToolCall`, `ValidationFailed`, `ShadowCommit`)
-- **Context Host**: Manages View Providers (Skeleton, CFG, Dependency Graph) - delegates to plugins
-- **Structural Editor**: AST-based editing with fuzzy anchor matching
-- **Policy Engine**: Enforces safety rules (velocity checks, quarantine)
-- **Validator**: Domain-specific verification loop (compiler, linter, tests)
-- **Shadow Git**: Atomic commits per tool call, rollback via git reset
+Normalize is a structural codebase analysis toolkit. It understands code at the CST level via tree-sitter, extracts facts (symbols, imports, calls, complexity) into an index, and exposes them through three primary operations: `view` (read/navigate), `edit` (structural modification), and `analyze` (compute properties).
 
-Data flow: User Request → Config Engine → Planner → Context Host (Views) → Draft → Shadow Git → Validator → (retry loop if error) → Commit Handle
-
-Multi-agent model: Ticket-based (not shared chat history). Agents are isolated microservices passing Handles, not context.
-
-See `docs/spec.md` for the full specification.
+The index is an implementation detail — commands work with or without one, building what they need on demand.
 
 ---
 
@@ -47,7 +37,6 @@ Examples:
 - Three primitives (view, edit, analyze) with rich options, not 100 specialized tools
 - Log formats as plugins, not N hardcoded parsers
 - `--json` + `--jq` + `--pretty` flags, not `--format=X` for every format
-- Lua for workflows instead of TOML-for-simple + DSL-for-complex
 - Distros that compose, not fork
 
 Complexity grows linearly with primitives, exponentially with combinations. A system with 3 composable primitives is simpler than one with 30 specialized tools, even if the 30-tool system has less code per tool.
@@ -140,64 +129,6 @@ This doesn't mean keep everything forever—it means destruction requires intent
 
 ---
 
-### LLM & Agent Design
-
-#### LLM Efficiency
-
-LLM calls are expensive (cost) and slow (latency). Design everything to reduce them:
-- **Structural tools first**: Use AST, grep, validation—not LLM—for deterministic tasks
-- **LLM only for judgment**: Generation, decisions, ambiguity resolution
-- **Measure separately**: Track LLM calls vs tool calls in benchmarks
-- **Cache aggressively**: Same query → same answer (where applicable)
-
-This is why we have skeleton views (understand code without LLM) and validation loops (catch errors without LLM). The goal: an agent that calls the LLM 10x less than naive approaches.
-
-**Token efficiency in prompts**: When you do call an LLM, minimize tokens:
-- Never send full code when a skeleton or snippet suffices
-- Forbid preamble, summary, markdown formatting unless asked
-- Use structured output parsing instead of free-form text
-- Limit analysis to 5 bullet points max
-
-Result: 12x reduction in output tokens (1421 → 112) with same quality insights.
-
-**Operational efficiency**:
-- Run independent operations concurrently (parallelism)
-- Validation before commit, not after (fast feedback loops)
-- Avoid wasted retry cycles—get it right the first time
-- Future goal: diff-based editing to avoid sending unchanged code
-
-#### Never Extract Data Manually
-
-LLMs should never manually extract, enumerate, or guess data that tools can provide deterministically. This includes:
-- Symbol names (use `view` to get actual symbols)
-- File lists (use glob/find tools)
-- Function signatures (use AST-based extraction)
-- Dependencies (use import graph tools)
-
-When an LLM tries to manually enumerate symbols, it hallucinates. We've seen models generate 2000+ fake symbol names following plausible patterns (`resolve_path_command`, `resolve_path_chain`, etc.) that don't exist. The fix isn't better prompting—it's ensuring the LLM never attempts extraction in the first place.
-
-Rule: If data exists in the codebase, there must be a tool to retrieve it. The LLM's job is to decide *what* to look up, not to guess *what exists*.
-
-#### Non-Interactive Fallbacks
-
-Every interactive feature must have a non-interactive equivalent. LLMs cannot respond to prompts, and scripts need deterministic behavior.
-
-- Interactive prompts → flags that specify the choice upfront
-- `--hunk` (interactive selection) → `--hunk-id h1,h3` or `--lines 10-25`
-- Confirmation prompts → `--yes` / `--no` flags
-- Prompts with defaults → flags that match default behavior (`--all-worktrees` vs `--local`)
-
-This isn't just about LLMs—it's about scriptability, CI/CD, and reproducibility. If a human can do it interactively, automation should be able to do it non-interactively.
-
-#### Minimizing Error Rates
-
-Validation and heuristics are primary citizens in Normalize. Because LLMs are not 100% reliable, we must never trust their output implicitly:
-- **Verification First**: Every change must pass through a domain-specific validator (compiler, linter, test suite)
-- **Heuristic Guardrails**: Use structural rules to detect obvious mistakes before they reach the validator
-- **Correction over perfection**: Focus on fast feedback loops that allow the agent to correct itself based on deterministic error signals
-
----
-
 ### User Experience
 
 #### Defaults & Onboarding
@@ -221,9 +152,20 @@ Validation and heuristics are primary citizens in Normalize. Because LLMs are no
 
 This is a conscious tradeoff: defaults optimize for breadth (works for everyone), specialization optimizes for depth (works perfectly for you). Both are valid, and the system should excel at both ends of the spectrum.
 
+#### Scriptability
+
+Every interactive feature must have a non-interactive equivalent. Scripts and CI/CD need deterministic behavior with no prompts.
+
+- Interactive prompts → flags that specify the choice upfront
+- `--hunk` (interactive selection) → `--hunk-id h1,h3` or `--lines 10-25`
+- Confirmation prompts → `--yes` / `--no` flags
+- Prompts with defaults → flags that match default behavior
+
+If a human can do it interactively, automation should be able to do it non-interactively.
+
 #### Error Recovery & Affordances
 
-**Forgiving lookups**: Agents and humans make mistakes—typos, wrong conventions, forgotten paths. Every lookup should be forgiving:
+**Forgiving lookups**: Users make mistakes—typos, wrong conventions, forgotten paths. Every lookup should be forgiving:
 - Fuzzy file resolution: `prior_art` finds `prior-art.md`
 - Symbol search tolerates partial names and typos
 - Pattern: try exact → try fuzzy → try corrections → ask for clarification
