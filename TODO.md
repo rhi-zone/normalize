@@ -326,6 +326,51 @@ This eliminates: per-command `Args` structs, `run()` boilerplate, `cmd_*` middle
 
 ## Backlog
 
+### normalize-manifest: eval-backed parsing (`eval` feature gate)
+
+Heuristic parsers in `normalize-manifest` cover ~95% of real-world files but fail on
+code-as-config formats (Gemfile, mix.exs, build.gradle, flake.nix, Package.swift) where
+variables and conditionals can't be resolved from text alone.
+
+**Design**: feature-gate eval capability inside `normalize-manifest` itself (not a
+separate crate, not in `normalize-local-deps`). Eval is about parsing fidelity, not
+ecosystem discovery.
+
+```rust
+// always available — heuristic
+pub fn parse_manifest(filename, content) -> Option<ParsedManifest>
+
+// feature = "eval" — tries subprocess first, falls back to parse_manifest automatically
+pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -> Option<ParsedManifest>
+```
+
+`parse_manifest_eval` degradation order:
+1. Official dump command (runtime-native, safe) → perfect results
+2. Wrapper script executed in the runtime → declared deps with variables resolved
+3. `parse_manifest` heuristic fallback → always returns something
+
+`EvalPolicy`: `IfAvailable` (try, fall back silently) | `Required` (error if runtime absent)
+
+**Official dump commands** (safe, no arbitrary code exec):
+- `cargo metadata --format-version 1` (Rust)
+- `go list -json -m all` (Go)
+- `npm ls --json` (Node)
+- `swift package dump-package` (Swift — already outputs JSON)
+- `bundle list --format json` (Ruby, Bundler ≥ 2.4)
+- `mix deps.tree` (Elixir — needs shaping into ParsedManifest)
+
+**Wrapper scripts** (executes project code — opt-in only):
+- Gemfile: `ruby -r bundler -e 'puts Bundler.definition.dependencies.to_json'`
+- mix.exs: elixir wrapper that loads Mix.Project and captures deps config
+- flake.nix: `nix eval .#inputs --json`
+- build.gradle: inject a task that dumps resolved configurations
+
+**Tree-sitter middle tier** (no execution, better than heuristic):
+- Worth considering for code-as-config formats as a tier 1.5 between heuristic and eval
+- Handles multiline expressions, strips comments, correct block boundaries
+- Still can't resolve runtime variables, but dramatically fewer false negatives
+- Belongs in same feature gate or a separate `tree-sitter` feature in normalize-manifest
+
 ### Analysis: Understanding "Why Is This 100kloc?"
 
 Tools for structural meta-analysis of codebases — not just navigating code but understanding
