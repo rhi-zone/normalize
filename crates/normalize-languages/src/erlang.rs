@@ -1,8 +1,6 @@
 //! Erlang language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Erlang language support.
@@ -25,10 +23,6 @@ impl Language for Erlang {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_clause"] // Only exported functions are public
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport // -export([...]).
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

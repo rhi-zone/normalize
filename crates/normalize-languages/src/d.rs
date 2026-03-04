@@ -1,8 +1,6 @@
 //! D language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// D language support.
@@ -46,10 +44,6 @@ impl Language for D {
             "struct_declaration",
             "auto_declaration",
         ]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AccessModifier
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

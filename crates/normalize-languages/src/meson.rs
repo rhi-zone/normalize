@@ -1,8 +1,6 @@
 //! Meson build system support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Meson language support.
@@ -25,10 +23,6 @@ impl Language for Meson {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["expression_statement"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

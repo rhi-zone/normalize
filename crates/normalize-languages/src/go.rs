@@ -1,8 +1,6 @@
 //! Go language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Go language support.
@@ -31,10 +29,6 @@ impl Language for Go {
             "const_spec",
             "var_spec",
         ]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NamingConvention
     }
 
     fn signature_suffix(&self) -> &'static str {

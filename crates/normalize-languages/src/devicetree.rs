@@ -1,8 +1,6 @@
 //! Device Tree source file support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Device Tree language support.
@@ -25,10 +23,6 @@ impl Language for DeviceTree {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["node", "property"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

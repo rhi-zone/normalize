@@ -1,8 +1,6 @@
 //! HCL (HashiCorp Configuration Language) support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// HCL language support (Terraform, Packer, etc.).
@@ -25,10 +23,6 @@ impl Language for Hcl {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["block"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NotApplicable
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

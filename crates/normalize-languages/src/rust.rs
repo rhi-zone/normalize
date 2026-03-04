@@ -1,8 +1,6 @@
 //! Rust language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Rust language support.
@@ -25,10 +23,6 @@ impl Language for Rust {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_item", "struct_item", "enum_item", "trait_item"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AccessModifier
     }
 
     fn signature_suffix(&self) -> &'static str {

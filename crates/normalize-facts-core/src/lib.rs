@@ -13,5 +13,5 @@ mod type_ref;
 
 pub use file::IndexedFile;
 pub use import::{Export, FlatImport, Import};
-pub use symbol::{FlatSymbol, Symbol, SymbolKind, Visibility, VisibilityMechanism};
+pub use symbol::{FlatSymbol, Symbol, SymbolKind, Visibility};
 pub use type_ref::{TypeRef, TypeRefKind};

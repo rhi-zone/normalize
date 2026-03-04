@@ -1,8 +1,6 @@
 //! Diff/patch file support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Diff language support.
@@ -25,10 +23,6 @@ impl Language for Diff {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["file_change"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

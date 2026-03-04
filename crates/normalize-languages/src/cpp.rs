@@ -1,8 +1,6 @@
 //! C++ language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// C++ language support.
@@ -25,10 +23,6 @@ impl Language for Cpp {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_specifier", "struct_specifier"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::HeaderBased // Also has public/private in classes, but header-based is primary
     }
 
     fn signature_suffix(&self) -> &'static str {

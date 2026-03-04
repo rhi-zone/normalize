@@ -1,8 +1,6 @@
 //! Dockerfile language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Dockerfile language support.
@@ -29,10 +27,6 @@ impl Language for Dockerfile {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["from_instruction"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NotApplicable
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

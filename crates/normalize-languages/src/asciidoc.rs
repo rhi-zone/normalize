@@ -1,8 +1,6 @@
 //! AsciiDoc language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// AsciiDoc language support.
@@ -32,10 +30,6 @@ impl Language for AsciiDoc {
             "title4",
             "title5",
         ]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

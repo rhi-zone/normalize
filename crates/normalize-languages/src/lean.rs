@@ -1,8 +1,6 @@
 //! Lean language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Lean language support.
@@ -25,10 +23,6 @@ impl Language for Lean {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["def", "theorem", "structure", "inductive", "instance"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AccessModifier
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

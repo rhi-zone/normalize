@@ -1,8 +1,6 @@
 //! SCSS language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// SCSS language support.
@@ -25,10 +23,6 @@ impl Language for Scss {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["mixin_statement", "function_statement"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NamingConvention // _ prefix = private
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

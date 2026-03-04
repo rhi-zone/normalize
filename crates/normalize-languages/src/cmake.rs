@@ -1,8 +1,7 @@
 //! CMake language support.
 
 use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-    simple_function_symbol,
+    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
 };
 use tree_sitter::Node;
 
@@ -26,10 +25,6 @@ impl Language for CMake {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_def", "macro_def"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NotApplicable
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

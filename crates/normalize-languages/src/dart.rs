@@ -1,8 +1,6 @@
 //! Dart language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Dart language support.
@@ -30,10 +28,6 @@ impl Language for Dart {
             "method_signature",
             "enum_declaration",
         ]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NamingConvention // _ prefix = private
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

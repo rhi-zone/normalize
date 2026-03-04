@@ -19,5 +19,5 @@ pub use symbols::SymbolParser;
 
 // Re-export core types for convenience
 pub use normalize_facts_core::{
-    Export, FlatImport, FlatSymbol, Import, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+    Export, FlatImport, FlatSymbol, Import, Symbol, SymbolKind, Visibility,
 };

@@ -1,9 +1,7 @@
 //! Vue language support.
 
 use crate::component::extract_embedded_content;
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Vue language support.
@@ -26,10 +24,6 @@ impl Language for Vue {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[] // JS exports are in embedded script, not Vue grammar
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport
     }
 
     fn signature_suffix(&self) -> &'static str {

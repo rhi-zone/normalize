@@ -3,9 +3,7 @@
 use tree_sitter::Node;
 
 // Re-export core types from normalize-facts-core
-pub use normalize_facts_core::{
-    Export, Import, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+pub use normalize_facts_core::{Export, Import, Symbol, SymbolKind, Visibility};
 
 /// Location of a container's body (for prepend/append editing operations)
 #[derive(Debug)]
@@ -110,9 +108,6 @@ pub trait Language: Send + Sync {
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
     }
-
-    /// How this language determines symbol visibility
-    fn visibility_mechanism(&self) -> VisibilityMechanism;
 
     // === Symbol Extraction ===
 

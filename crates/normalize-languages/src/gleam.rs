@@ -1,8 +1,6 @@
 //! Gleam language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Gleam language support.
@@ -25,10 +23,6 @@ impl Language for Gleam {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "type_definition", "type_alias", "constant"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport // pub keyword
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

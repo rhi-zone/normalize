@@ -1,8 +1,6 @@
 //! VHDL support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// VHDL language support.
@@ -25,10 +23,6 @@ impl Language for Vhdl {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["entity_declaration", "package_declaration"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

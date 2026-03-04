@@ -1,8 +1,6 @@
 //! Ruby language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Ruby language support.
@@ -25,10 +23,6 @@ impl Language for Ruby {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class", "module", "method", "singleton_method"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic // Ruby methods are public by default
     }
 
     fn signature_suffix(&self) -> &'static str {

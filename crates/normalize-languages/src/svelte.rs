@@ -1,9 +1,7 @@
 //! Svelte language support.
 
 use crate::component::extract_embedded_content;
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Svelte language support.
@@ -26,10 +24,6 @@ impl Language for Svelte {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[] // JS exports are in embedded script, not Svelte grammar
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

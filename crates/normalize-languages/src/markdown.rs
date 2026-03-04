@@ -1,8 +1,6 @@
 //! Markdown language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Markdown language support.
@@ -27,9 +25,6 @@ impl Language for Markdown {
     // each containing an atx_heading as the first child followed by content blocks.
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NotApplicable
     }
 
     fn signature_suffix(&self) -> &'static str {

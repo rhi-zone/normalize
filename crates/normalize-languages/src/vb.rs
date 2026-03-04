@@ -1,8 +1,6 @@
 //! Visual Basic language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Visual Basic language support.
@@ -25,10 +23,6 @@ impl Language for VB {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["class_block", "module_block", "method_declaration"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AccessModifier
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

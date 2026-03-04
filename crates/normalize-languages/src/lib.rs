@@ -249,7 +249,7 @@ pub use registry::{
 };
 pub use traits::{
     ContainerBody, EmbeddedBlock, Export, Import, Language, Symbol, SymbolKind, Visibility,
-    VisibilityMechanism, simple_function_symbol, simple_symbol,
+    simple_function_symbol, simple_symbol,
 };
 
 // Re-export language structs (feature-gated)

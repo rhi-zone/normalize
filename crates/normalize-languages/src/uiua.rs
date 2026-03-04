@@ -1,6 +1,6 @@
 //! Uiua array programming language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility, VisibilityMechanism};
+use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// Uiua language support.
@@ -23,10 +23,6 @@ impl Language for Uiua {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, _node: &Node, _content: &str) -> Vec<Export> {

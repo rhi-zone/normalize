@@ -1,8 +1,6 @@
 //! Emacs Lisp language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Emacs Lisp language support.
@@ -25,10 +23,6 @@ impl Language for Elisp {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["list"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NamingConvention // prefix-- for internal
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

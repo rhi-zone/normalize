@@ -1,8 +1,6 @@
 //! Swift language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Swift language support.
@@ -47,10 +45,6 @@ impl Language for Swift {
             "protocol_declaration",
             "function_declaration",
         ]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AccessModifier
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

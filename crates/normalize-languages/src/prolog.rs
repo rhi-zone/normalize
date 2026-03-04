@@ -1,8 +1,6 @@
 //! Prolog language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Prolog language support.
@@ -25,10 +23,6 @@ impl Language for Prolog {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["clause_term", "directive_term"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

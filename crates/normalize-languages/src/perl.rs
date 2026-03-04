@@ -1,8 +1,6 @@
 //! Perl language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Perl language support.
@@ -25,10 +23,6 @@ impl Language for Perl {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["subroutine_declaration_statement"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NamingConvention // _ prefix for private
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

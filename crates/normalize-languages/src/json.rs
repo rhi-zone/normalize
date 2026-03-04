@@ -1,8 +1,6 @@
 //! JSON language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// JSON language support.
@@ -27,9 +25,6 @@ impl Language for Json {
     // "pair" nodes are key-value pairs that we extract as symbols
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NotApplicable
     }
 
     fn signature_suffix(&self) -> &'static str {

@@ -1,8 +1,6 @@
 //! Windows Batch file support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Batch language support.
@@ -25,10 +23,6 @@ impl Language for Batch {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "variable_declaration"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

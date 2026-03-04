@@ -61,24 +61,6 @@ impl Visibility {
     }
 }
 
-/// How a language determines symbol visibility
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum VisibilityMechanism {
-    /// Explicit export keyword (JS/TS: `export function foo()`)
-    ExplicitExport,
-    /// Access modifier keywords (Java, Scala, C#: `public`, `private`, `protected`)
-    AccessModifier,
-    /// Naming convention (Go: uppercase = public, Python: underscore = private)
-    NamingConvention,
-    /// Header-based (C/C++: symbols in headers are public, source files are private)
-    HeaderBased,
-    /// Everything is public by default (Ruby modules, Lua)
-    AllPublic,
-    /// Not applicable (data formats like JSON, YAML, TOML)
-    NotApplicable,
-}
-
 /// A code symbol extracted from source
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Symbol {

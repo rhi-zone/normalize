@@ -1,7 +1,7 @@
 //! TypeScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility, VisibilityMechanism};
+use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// TypeScript language support.
@@ -27,9 +27,6 @@ impl Language for TypeScript {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS
-    }
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -167,9 +164,6 @@ impl Language for Tsx {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         ecmascript::PUBLIC_SYMBOL_KINDS
-    }
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport
     }
 
     fn signature_suffix(&self) -> &'static str {

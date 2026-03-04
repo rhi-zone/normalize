@@ -1,8 +1,7 @@
 //! Julia language support.
 
 use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-    simple_function_symbol,
+    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
 };
 use tree_sitter::Node;
 
@@ -30,10 +29,6 @@ impl Language for Julia {
             "struct_definition",
             "const_statement",
         ]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

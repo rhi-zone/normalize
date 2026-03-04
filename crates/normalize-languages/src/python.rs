@@ -1,8 +1,6 @@
 //! Python language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -29,10 +27,6 @@ impl Language for Python {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition", "class_definition"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NamingConvention
     }
 
     fn signature_suffix(&self) -> &'static str {

@@ -1,8 +1,6 @@
 //! Tree-sitter query language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Tree-sitter query language support.
@@ -25,10 +23,6 @@ impl Language for Query {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["named_node", "capture"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

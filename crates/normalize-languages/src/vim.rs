@@ -1,8 +1,6 @@
 //! Vim script language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Vim script language support.
@@ -25,10 +23,6 @@ impl Language for Vim {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_definition"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NamingConvention // s: prefix for script-local
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

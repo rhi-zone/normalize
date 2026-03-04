@@ -1,8 +1,6 @@
 //! Idris language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Idris language support.
@@ -25,10 +23,6 @@ impl Language for Idris {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function", "data", "record"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::ExplicitExport
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

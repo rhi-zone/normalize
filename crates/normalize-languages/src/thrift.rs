@@ -1,8 +1,6 @@
 //! Apache Thrift IDL support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Thrift language support.
@@ -25,10 +23,6 @@ impl Language for Thrift {
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["struct_definition", "service_definition", "enum_definition"]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AllPublic
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {

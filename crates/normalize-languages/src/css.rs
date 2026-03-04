@@ -1,6 +1,6 @@
 //! CSS language support (parse only, minimal skeleton).
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility, VisibilityMechanism};
+use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// CSS language support.
@@ -24,9 +24,6 @@ impl Language for Css {
     // CSS has no functions/containers/types in the traditional sense
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[]
-    }
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::NotApplicable
     }
 
     fn signature_suffix(&self) -> &'static str {

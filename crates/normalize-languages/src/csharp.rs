@@ -1,8 +1,6 @@
 //! C# language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism,
-};
+use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// C# language support.
@@ -33,10 +31,6 @@ impl Language for CSharp {
             "method_declaration",
             "property_declaration",
         ]
-    }
-
-    fn visibility_mechanism(&self) -> VisibilityMechanism {
-        VisibilityMechanism::AccessModifier
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
