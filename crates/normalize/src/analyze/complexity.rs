@@ -447,12 +447,6 @@ impl ComplexityAnalyzer {
 
         let capture_names = tags_query.capture_names();
 
-        // Skip languages whose tags query uses `@reference.implementation` — those
-        // require the trait path for correct nesting (e.g. Rust impl blocks).
-        if capture_names.contains(&"reference.implementation") {
-            return Vec::new();
-        }
-
         let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
             let grammar = loader.get(grammar_name)?;
             tree_sitter::Query::new(&grammar, &scm).ok()

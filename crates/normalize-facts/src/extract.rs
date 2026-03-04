@@ -717,14 +717,6 @@ fn collect_symbols_from_tags<'tree>(
     let name_idx = capture_names.iter().position(|n| *n == "name")?;
     let _ = name_idx; // present but not needed — definition node gives us position
 
-    // If the query uses `@reference.implementation` patterns, it means the language
-    // uses separate "impl blocks" (e.g. Rust `impl Trait for Type`) to express
-    // interface relationships. The tags path cannot reconstruct `implements` from these
-    // references, so fall back to the trait path which handles this correctly.
-    if capture_names.contains(&"reference.implementation") {
-        return None;
-    }
-
     // Run the query and collect TagDef records.
     let root = tree.root_node();
     let mut qcursor = tree_sitter::QueryCursor::new();
