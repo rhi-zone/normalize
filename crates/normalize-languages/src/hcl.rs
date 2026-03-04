@@ -278,6 +278,8 @@ mod tests {
             "template_else_intro", "template_for", "template_for_end", "template_for_start",
             "template_if", "template_if_end", "template_if_intro", "tuple",
             "block_end", "block_start",
+            // Comprehension — not a definition construct
+            "for_expr",
         ];
         validate_unused_kinds_audit(&Hcl, documented_unused)
             .expect("HCL unused node kinds audit failed");

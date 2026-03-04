@@ -258,6 +258,8 @@ mod tests {
             "path_expression", "select_expression", "spath_expression",
             "string_expression", "unary_expression", "uri_expression",
             "variable_expression",
+            // Control flow / application — not definition constructs
+            "apply_expression", "if_expression", "with_expression",
         ];
         validate_unused_kinds_audit(&Nix, documented_unused)
             .expect("Nix unused node kinds audit failed");

@@ -264,6 +264,9 @@ mod tests {
             "throw_statement", "topleft_statement", "unknown_builtin_statement",
             "unlet_statement", "vertical_statement", "view_statement", "visual_statement",
             "wincmd_statement",
+            // Control flow — not definition constructs
+            "elseif_statement", "for_loop", "if_statement", "source_statement",
+            "try_statement", "runtime_statement", "while_loop",
         ];
         validate_unused_kinds_audit(&Vim, documented_unused)
             .expect("Vim unused node kinds audit failed");

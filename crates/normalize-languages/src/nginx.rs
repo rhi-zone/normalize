@@ -190,6 +190,9 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "lua_block", "lua_block_directive", "modifier",
+            // block_directive: captured in tags.scm; not used in Language trait methods
+            // (container_kinds uses "block" which is the inner body, not the directive wrapper)
+            "block_directive",
         ];
         validate_unused_kinds_audit(&Nginx, documented_unused)
             .expect("Nginx unused node kinds audit failed");

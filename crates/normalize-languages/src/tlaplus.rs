@@ -258,6 +258,8 @@ mod tests {
             "block_comment", "block_comment_text",
             // Other
             "lambda", "iff", "format", "subexpression",
+            // Control flow — not definition constructs
+            "case", "if_then_else",
         ];
         validate_unused_kinds_audit(&TlaPlus, documented_unused)
             .expect("TLA+ unused node kinds audit failed");
