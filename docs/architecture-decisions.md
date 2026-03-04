@@ -88,6 +88,38 @@ crates/
 2. `~/.config/normalize/grammars/`
 3. Built-in fallback (if compiled with grammar features)
 
+## .scm Query Files over Rust for Node Classification
+
+**Decision**: When classifying AST nodes by concept (functions, calls, complexity contributors, scopes, etc.), use tree-sitter `.scm` query files — not Rust methods returning `&'static [&'static str]`.
+
+### The rule
+
+If you're writing `fn complexity_nodes() -> &'static [&'static str] { &["if_expression", "match_arm", ...] }`, that's a tree-sitter query expressed as Rust data. Write it as a `.scm` file instead:
+
+```scheme
+; complexity.scm
+(if_expression) @complexity
+(match_arm) @complexity
+```
+
+### When .scm is right
+
+- Node identification: "which nodes are functions / calls / complexity contributors?"
+- Answerable with a tree-sitter query and a capture name
+- The result is "a set of matching nodes" — no structured field extraction needed
+
+### When Rust is right
+
+- Structured data extraction: getting the name, parameters, visibility *from* an identified node
+- Logic that depends on the node's children or fields (e.g. `extract_function`, `extract_imports`)
+- Anything requiring decisions, not just matching
+
+### Implication for the Language trait
+
+Methods like `complexity_nodes()`, `nesting_nodes()`, `control_flow_kinds()`, `scope_creating_kinds()`, and the missing call extraction all belong in `.scm` files, not the trait. The trait should contain only extraction methods and metadata that requires Rust logic.
+
+`locals.scm` (`*.locals.scm`) is the established pattern. New query files follow the same convention: `*.complexity.scm`, `*.calls.scm`, etc., loaded via `GrammarLoader`.
+
 ## Index Design
 
 **Decision**: The index (SQLite via libsql) is an implementation detail — commands build it on demand, cache it in `.normalize/`, and invalidate on file changes.

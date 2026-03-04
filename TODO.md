@@ -76,6 +76,27 @@ Every crate should be usable both as a library and as a standalone CLI tool. Lib
 - `normalize-syntax-rules` — standalone rule runner
 - Others as needed — each crate's CLI exposes its core functionality directly
 
+### Language trait: migrate *_kinds() methods to .scm query files
+
+The `Language` trait has several methods that return `&'static [&'static str]` — lists of
+tree-sitter node type names. These are tree-sitter queries expressed as Rust data instead of
+using the query system. See `docs/architecture-decisions.md` ("scm Query Files over Rust").
+
+Candidates for migration to `*.{concept}.scm` query files:
+- `complexity_nodes()` + `nesting_nodes()` → `*.complexity.scm` with `@complexity`/`@nesting`
+- `control_flow_kinds()` → same file or `*.control_flow.scm`
+- `scope_creating_kinds()` → already covered by `@local.scope` in `*.locals.scm`
+- call extraction (currently missing entirely) → `*.calls.scm` with `@call`
+
+Migration path per method:
+- [ ] Add `GrammarLoader::get_complexity(name)` (mirrors `get_locals`)
+- [ ] Add `GrammarLoader::get_calls(name)`
+- [ ] Write `*.complexity.scm` for high-value languages (Rust, Python, Go, JS/TS, Java, C/C++)
+- [ ] Write `*.calls.scm` for same
+- [ ] Replace `complexity_nodes()`/`nesting_nodes()` callers with query-based walker
+- [ ] Replace call-finding inline code in `symbols.rs` with query-based walker
+- [ ] Deprecate and remove migrated trait methods
+
 ### Language trait: call extraction — design gap
 
 `normalize-facts/src/symbols.rs` contains per-language inline call-finders
