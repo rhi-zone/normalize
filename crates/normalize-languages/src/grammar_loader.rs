@@ -76,6 +76,8 @@ pub struct GrammarLoader {
     calls_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached type queries.
     types_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached tags queries.
+    tags_cache: RwLock<HashMap<String, Arc<String>>>,
 }
 
 impl GrammarLoader {
@@ -110,6 +112,7 @@ impl GrammarLoader {
             complexity_cache: RwLock::new(HashMap::new()),
             calls_cache: RwLock::new(HashMap::new()),
             types_cache: RwLock::new(HashMap::new()),
+            tags_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -124,6 +127,7 @@ impl GrammarLoader {
             complexity_cache: RwLock::new(HashMap::new()),
             calls_cache: RwLock::new(HashMap::new()),
             types_cache: RwLock::new(HashMap::new()),
+            tags_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -250,6 +254,34 @@ impl GrammarLoader {
         let bundled = bundled_types_query(name)?;
         let query = Arc::new(bundled.to_string());
         if let Ok(mut c) = self.types_cache.write() {
+            c.insert(name.to_string(), Arc::clone(&query));
+        }
+        Some(query)
+    }
+
+    /// Get the tags query for a grammar.
+    ///
+    /// Tags queries use the tree-sitter tags format with `@name.definition.*` and
+    /// `@name.reference.*` captures for symbol navigation (used by GitHub Linguist,
+    /// nvim-treesitter, etc.).
+    ///
+    /// Returns the bundled query for supported languages, or an external file if one
+    /// exists at `{name}.tags.scm` in the grammar search paths (external wins).
+    pub fn get_tags(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.tags_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        // External file takes priority over bundled
+        if let Some(q) = self.load_query(name, "tags", &self.tags_cache) {
+            return Some(q);
+        }
+
+        // Fall back to bundled query
+        let bundled = bundled_tags_query(name)?;
+        let query = Arc::new(bundled.to_string());
+        if let Ok(mut c) = self.tags_cache.write() {
             c.insert(name.to_string(), Arc::clone(&query));
         }
         Some(query)
@@ -395,6 +427,28 @@ fn bundled_types_query(name: &str) -> Option<&'static str> {
     }
 }
 
+/// Return a bundled tags query for languages with built-in support.
+///
+/// Tags queries use the tree-sitter tags format (`@name.definition.*` and
+/// `@name.reference.*` captures) for symbol navigation. Sources are vendored from
+/// official tree-sitter grammar repositories (MIT licensed).
+fn bundled_tags_query(name: &str) -> Option<&'static str> {
+    match name {
+        "rust" => Some(include_str!("queries/rust.tags.scm")),
+        "python" => Some(include_str!("queries/python.tags.scm")),
+        "javascript" => Some(include_str!("queries/javascript.tags.scm")),
+        "typescript" => Some(include_str!("queries/typescript.tags.scm")),
+        "tsx" => Some(include_str!("queries/tsx.tags.scm")),
+        "go" => Some(include_str!("queries/go.tags.scm")),
+        "java" => Some(include_str!("queries/java.tags.scm")),
+        "c" => Some(include_str!("queries/c.tags.scm")),
+        "cpp" => Some(include_str!("queries/cpp.tags.scm")),
+        "ruby" => Some(include_str!("queries/ruby.tags.scm")),
+        "kotlin" => Some(include_str!("queries/kotlin.tags.scm")),
+        _ => None,
+    }
+}
+
 /// Get the shared library extension for the current platform.
 fn grammar_extension() -> &'static str {
     if cfg!(target_os = "macos") {
@@ -458,6 +512,42 @@ mod tests {
         assert_eq!(grammar_symbol_name("rust"), "tree_sitter_rust_orchard");
         assert_eq!(grammar_symbol_name("ssh-config"), "tree_sitter_ssh_config");
         assert_eq!(grammar_symbol_name("vb"), "tree_sitter_vb_dotnet");
+    }
+
+    #[test]
+    fn test_bundled_tags_queries() {
+        // Verify all bundled tags queries are non-empty
+        for lang in &[
+            "rust",
+            "python",
+            "javascript",
+            "typescript",
+            "tsx",
+            "go",
+            "java",
+            "c",
+            "cpp",
+            "ruby",
+            "kotlin",
+        ] {
+            let query = bundled_tags_query(lang);
+            assert!(query.is_some(), "Missing bundled tags query for {lang}");
+            assert!(
+                !query.unwrap().is_empty(),
+                "Empty bundled tags query for {lang}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_tags_returns_bundled() {
+        let loader = GrammarLoader::with_paths(vec![]);
+        // With empty search paths, should still return bundled query
+        assert!(loader.get_tags("rust").is_some());
+        assert!(loader.get_tags("python").is_some());
+        assert!(loader.get_tags("go").is_some());
+        // Unknown language should return None
+        assert!(loader.get_tags("unknown-lang-xyz").is_none());
     }
 
     #[test]
