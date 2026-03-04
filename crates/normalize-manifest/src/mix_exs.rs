@@ -113,8 +113,10 @@ fn parse_mix_dep(line: &str) -> Option<DeclaredDep> {
     // Determine kind from `only:` annotation
     let kind = if line.contains("only: :dev")
         || line.contains("only: :test")
+        || line.contains("only: :docs")
         || line.contains("only: [:dev")
         || line.contains("only: [:test")
+        || line.contains("only: [:docs")
     {
         DepKind::Dev
     } else {

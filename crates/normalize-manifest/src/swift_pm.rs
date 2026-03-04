@@ -116,8 +116,34 @@ fn extract_swift_version_req(line: &str) -> Option<String> {
     if let Some(s) = extract_keyword_string(line, "from:") {
         return Some(format!(">= {}", s));
     }
+    // Range form: "1.0.0" ..< "5.0.0"  (exclusive upper) or "1.0.0" ... "5.0.0" (inclusive)
+    if let Some(lo) = extract_range_version(line, "..<") {
+        return Some(lo);
+    }
+    if let Some(lo) = extract_range_version(line, "...") {
+        return Some(lo);
+    }
     // branch/revision — no semver constraint
     None
+}
+
+fn extract_range_version(line: &str, op: &str) -> Option<String> {
+    let idx = line.find(op)?;
+    let before = line[..idx].trim_end();
+    // Lower bound: last quoted string before operator
+    if !before.ends_with('"') {
+        return None;
+    }
+    let inner_end = before.len() - 1;
+    let inner_start = before[..inner_end].rfind('"')? + 1;
+    let lower = &before[inner_start..inner_end];
+    // Upper bound: first quoted string after operator
+    let after = line[idx + op.len()..].trim_start();
+    let upper_inner = after.strip_prefix('"')?;
+    let upper_end = upper_inner.find('"')?;
+    let upper = &upper_inner[..upper_end];
+    let cmp = if op == "..<" { "<" } else { "<=" };
+    Some(format!(">= {lower}, {cmp} {upper}"))
 }
 
 #[cfg(test)]
