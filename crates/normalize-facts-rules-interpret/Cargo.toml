@@ -9,7 +9,6 @@ description = "Interpreted Datalog rule evaluation for normalize code facts"
 [dependencies]
 normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
 normalize-core = { path = "../normalize-core", version = "0.1.0" }
-normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
 ascent-eval.workspace = true
 ascent-ir.workspace = true
 ascent-syntax.workspace = true

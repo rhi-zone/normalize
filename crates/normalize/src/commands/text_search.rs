@@ -4,7 +4,7 @@
 //! (`service.rs`). This module retains only the configuration type used by
 //! `NormalizeConfig`.
 
-use normalize_derive::Merge;
+use normalize_core::Merge;
 use serde::Deserialize;
 
 /// Text search command configuration.

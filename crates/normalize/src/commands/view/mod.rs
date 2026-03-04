@@ -11,7 +11,7 @@ pub mod tree;
 use crate::output::OutputFormatter;
 use crate::tree::DocstringDisplay;
 use crate::{daemon, path_resolve};
-use normalize_derive::Merge;
+use normalize_core::Merge;
 use serde::Deserialize;
 use std::path::Path;
 

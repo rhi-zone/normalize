@@ -8,7 +8,6 @@ description = "Output formatting for normalize CLI commands"
 
 [dependencies]
 normalize-core = { path = "../normalize-core", version = "0.1.0" }
-normalize-derive = { path = "../normalize-derive", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 schemars = "1"

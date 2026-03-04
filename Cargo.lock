@@ -3432,7 +3432,6 @@ dependencies = [
  "normalize-cli-parser",
  "normalize-core",
  "normalize-deps",
- "normalize-derive",
  "normalize-ecosystems",
  "normalize-edit",
  "normalize-facts",
@@ -3501,6 +3500,9 @@ dependencies = [
 [[package]]
 name = "normalize-core"
 version = "0.1.0"
+dependencies = [
+ "normalize-derive",
+]
 
 [[package]]
 name = "normalize-deps"
@@ -3600,7 +3602,6 @@ dependencies = [
  "dirs",
  "glob",
  "normalize-core",
- "normalize-derive",
  "normalize-facts-rules-api",
  "schemars",
  "serde",
@@ -3615,7 +3616,6 @@ version = "0.1.0"
 dependencies = [
  "ignore",
  "normalize-core",
- "normalize-derive",
  "normalize-language-meta",
  "schemars",
  "serde",
@@ -3775,7 +3775,6 @@ name = "normalize-output"
 version = "0.1.0"
 dependencies = [
  "normalize-core",
- "normalize-derive",
  "nu-ansi-term",
  "schemars",
  "serde",
@@ -3846,7 +3845,6 @@ name = "normalize-shadow"
 version = "0.1.0"
 dependencies = [
  "normalize-core",
- "normalize-derive",
  "schemars",
  "serde",
  "tempfile",
@@ -3874,7 +3872,6 @@ dependencies = [
  "glob",
  "ignore",
  "normalize-core",
- "normalize-derive",
  "normalize-languages",
  "regex",
  "schemars",

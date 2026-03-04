@@ -4,7 +4,7 @@
 //! refreshes their indexes. Index queries go directly to SQLite files.
 
 use crate::config::NormalizeConfig;
-use normalize_derive::Merge;
+use normalize_core::Merge;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

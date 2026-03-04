@@ -4,7 +4,6 @@
 //! JSON/jq/jsonl/schema output is handled by server-less at the CLI macro level.
 
 use normalize_core::Merge;
-use normalize_derive::Merge;
 use serde::{Deserialize, Serialize};
 use std::io::IsTerminal;
 

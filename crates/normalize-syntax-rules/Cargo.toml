@@ -29,4 +29,3 @@ schemars = "1"
 
 # Core traits
 normalize-core = { path = "../normalize-core", version = "0.1.0" }
-normalize-derive = { path = "../normalize-derive", version = "0.1.0" }

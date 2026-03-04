@@ -50,7 +50,7 @@ pub mod trend;
 pub mod uniqueness;
 
 use crate::filter::Filter;
-use normalize_derive::Merge;
+use normalize_core::Merge;
 pub use normalize_syntax_rules::{RuleOverride, RulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::Path;

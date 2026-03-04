@@ -3,7 +3,7 @@
 //! Maintains a hidden git repository (`.normalize/shadow/`) that automatically
 //! commits after each `normalize edit` operation, preserving full edit history.
 
-use normalize_derive::Merge;
+use normalize_core::Merge;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;

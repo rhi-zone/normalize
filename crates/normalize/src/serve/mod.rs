@@ -4,7 +4,7 @@
 
 use serde::Deserialize;
 
-use normalize_derive::Merge;
+use normalize_core::Merge;
 
 pub mod http;
 pub mod lsp;

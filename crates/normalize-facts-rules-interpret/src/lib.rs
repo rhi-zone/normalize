@@ -42,7 +42,7 @@ use ascent_eval::{Engine, Value};
 use ascent_ir::Program;
 use ascent_syntax::AscentProgram;
 use glob::Pattern;
-use normalize_derive::Merge;
+use normalize_core::Merge;
 use normalize_facts_rules_api::{Diagnostic, DiagnosticLevel, Relations};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

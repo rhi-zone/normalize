@@ -55,7 +55,6 @@ use crate::filter::AliasConfig;
 use crate::output::PrettyConfig;
 use crate::shadow::ShadowConfig;
 use normalize_core::Merge;
-use normalize_derive::Merge;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::Path;

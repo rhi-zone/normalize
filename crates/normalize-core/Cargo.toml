@@ -7,3 +7,4 @@ repository.workspace = true
 description = "Core traits and types for the normalize code intelligence system"
 
 [dependencies]
+normalize-derive = { path = "../normalize-derive", version = "0.1.0" }

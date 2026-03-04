@@ -5,3 +5,4 @@
 mod merge;
 
 pub use merge::Merge;
+pub use normalize_derive::Merge;

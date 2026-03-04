@@ -30,7 +30,7 @@ use std::path::Path;
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[cfg_attr(
     feature = "config",
-    derive(normalize_derive::Merge, schemars::JsonSchema)
+    derive(normalize_core::Merge, schemars::JsonSchema)
 )]
 #[serde(default)]
 pub struct AliasConfig {
