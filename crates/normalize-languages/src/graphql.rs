@@ -1,8 +1,6 @@
 //! GraphQL language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_symbol,
-};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_symbol};
 use tree_sitter::Node;
 
 /// GraphQL language support.
@@ -47,43 +45,13 @@ impl Language for GraphQL {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "object_type_definition" => SymbolKind::Struct,
-            "interface_type_definition" => SymbolKind::Interface,
-            "enum_type_definition" | "union_type_definition" => SymbolKind::Enum,
-            "input_object_type_definition" => SymbolKind::Struct,
-            "scalar_type_definition" => SymbolKind::Type,
-            "operation_definition" => SymbolKind::Function,
-            "field_definition" => SymbolKind::Method,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(simple_symbol(
-            node,
-            content,
-            name,
-            SymbolKind::Method,
-            self.extract_docstring(node, content),
-        ))
+        Some(simple_symbol(node, content, name, SymbolKind::Method, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -111,7 +79,7 @@ impl Language for GraphQL {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -124,29 +92,6 @@ impl Language for GraphQL {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // GraphQL uses """ for descriptions
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "description" || text.starts_with("\"\"\"") {
-                let inner = text
-                    .trim_start_matches("\"\"\"")
-                    .trim_end_matches("\"\"\"")
-                    .trim();
-                if !inner.is_empty() {
-                    return Some(inner.to_string());
-                }
-            }
-            prev = sibling.prev_sibling();
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {

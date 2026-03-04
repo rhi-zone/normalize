@@ -1,6 +1,6 @@
 //! C# language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// C# language support.
@@ -19,34 +19,6 @@ impl Language for CSharp {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if self.get_visibility(node, content) != Visibility::Public {
-            return Vec::new();
-        }
-
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "class_declaration" => SymbolKind::Class,
-            "struct_declaration" => SymbolKind::Struct,
-            "interface_declaration" => SymbolKind::Interface,
-            "enum_declaration" => SymbolKind::Enum,
-            "record_declaration" => SymbolKind::Class,
-            "method_declaration" | "constructor_declaration" => SymbolKind::Method,
-            "property_declaration" => SymbolKind::Variable,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -88,7 +60,7 @@ impl Language for CSharp {
                 SymbolKind::Method
             },
             signature,
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -128,7 +100,7 @@ impl Language for CSharp {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -141,57 +113,6 @@ impl Language for CSharp {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Look for XML doc comments (/// or /** */)
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" {
-                if text.starts_with("///") {
-                    // Single-line XML doc comment
-                    let line = text.strip_prefix("///").unwrap_or(text).trim();
-                    // Strip XML tags for cleaner output
-                    let clean = strip_xml_tags(line);
-                    if !clean.is_empty() {
-                        doc_lines.insert(0, clean);
-                    }
-                } else if text.starts_with("/**") {
-                    // Multi-line doc comment
-                    let inner = text
-                        .strip_prefix("/**")
-                        .unwrap_or(text)
-                        .strip_suffix("*/")
-                        .unwrap_or(text);
-                    for line in inner.lines() {
-                        let clean = line.trim().strip_prefix("*").unwrap_or(line).trim();
-                        let clean = strip_xml_tags(clean);
-                        if !clean.is_empty() {
-                            doc_lines.push(clean);
-                        }
-                    }
-                    break;
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-            prev = sibling.prev_sibling();
-        }
-
-        if doc_lines.is_empty() {
-            None
-        } else {
-            Some(doc_lines.join(" "))
-        }
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -298,40 +219,6 @@ impl Language for CSharp {
         // C# default visibility depends on context, but for skeleton purposes treat as public
         Visibility::Public
     }
-}
-
-/// Strip common XML doc comment tags for cleaner output
-fn strip_xml_tags(s: &str) -> String {
-    let mut result = s.to_string();
-    // Remove common tags
-    for tag in &[
-        "<summary>",
-        "</summary>",
-        "<param>",
-        "</param>",
-        "<returns>",
-        "</returns>",
-        "<remarks>",
-        "</remarks>",
-        "<example>",
-        "</example>",
-        "<c>",
-        "</c>",
-        "<see cref=\"",
-        "\"/>",
-        "<seealso cref=\"",
-    ] {
-        result = result.replace(tag, "");
-    }
-    // Handle self-closing see tags
-    while let Some(start) = result.find("<see ") {
-        if let Some(end) = result[start..].find("/>") {
-            result = format!("{}{}", &result[..start], &result[start + end + 2..]);
-        } else {
-            break;
-        }
-    }
-    result.trim().to_string()
 }
 
 #[cfg(test)]

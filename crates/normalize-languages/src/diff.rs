@@ -1,6 +1,6 @@
 //! Diff/patch file support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Diff language support.
@@ -19,31 +19,6 @@ impl Language for Diff {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "file_change" {
-            return Vec::new();
-        }
-
-        let text = &content[node.byte_range()];
-        // Extract filename from diff header
-        for prefix in &["--- ", "+++ ", "diff --git "] {
-            if let Some(rest) = text.strip_prefix(prefix) {
-                let name = rest
-                    .split_whitespace()
-                    .next()
-                    .map(|s| s.trim_start_matches("a/").trim_start_matches("b/"))
-                    .unwrap_or("unknown");
-                return vec![Export {
-                    name: name.to_string(),
-                    kind: SymbolKind::Module,
-                    line: node.start_position().row + 1,
-                }];
-            }
-        }
-
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -91,13 +66,6 @@ impl Language for Diff {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()

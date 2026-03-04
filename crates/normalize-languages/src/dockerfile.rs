@@ -1,6 +1,6 @@
 //! Dockerfile language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Dockerfile language support.
@@ -24,23 +24,6 @@ impl Language for Dockerfile {
     // Dockerfiles have stages (FROM ... AS name) that act as containers
 
     // No functions in Dockerfile
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "from_instruction" {
-            return Vec::new();
-        }
-
-        // Extract the stage name (FROM image AS name)
-        if let Some(name) = self.extract_stage_name(node, content) {
-            return vec![Export {
-                name,
-                kind: SymbolKind::Module,
-                line: node.start_position().row + 1,
-            }];
-        }
-
-        Vec::new()
-    }
 
     fn signature_suffix(&self) -> &'static str {
         ""
@@ -89,14 +72,6 @@ impl Language for Dockerfile {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
     }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "from_instruction" {
             return Vec::new();

@@ -1,6 +1,6 @@
 //! Lua language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Lua language support.
@@ -19,20 +19,6 @@ impl Language for Lua {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        // Non-local functions are public
-        if node.kind() == "function_declaration"
-            && let Some(name) = self.node_name(node, content)
-        {
-            return vec![Export {
-                name: name.to_string(),
-                kind: SymbolKind::Function,
-                line: node.start_position().row + 1,
-            }];
-        }
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -61,7 +47,7 @@ impl Language for Lua {
             name: name.to_string(),
             kind: SymbolKind::Function,
             signature,
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -81,42 +67,6 @@ impl Language for Lua {
     }
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Lua uses --- or --[[ ]] for documentation
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" {
-                // LDoc style: ---
-                if text.starts_with("---") {
-                    let doc = text.strip_prefix("---").unwrap_or(text).trim();
-                    if !doc.starts_with('@') {
-                        return Some(doc.to_string());
-                    }
-                }
-                // Block comment style: --[[ ]]
-                if text.starts_with("--[[") {
-                    let inner = text
-                        .strip_prefix("--[[")
-                        .unwrap_or(text)
-                        .strip_suffix("]]")
-                        .unwrap_or(text)
-                        .trim();
-                    if !inner.is_empty() {
-                        return Some(inner.to_string());
-                    }
-                }
-                break;
-            }
-            prev = sibling.prev_sibling();
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

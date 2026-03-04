@@ -1,7 +1,7 @@
 //! Svelte language support.
 
 use crate::component::extract_embedded_content;
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Svelte language support.
@@ -22,29 +22,6 @@ impl Language for Svelte {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        // Look for export let/const/function
-        let text = &content[node.byte_range()];
-
-        if (node.kind() == "export_statement" || text.contains("export "))
-            && let Some(name) = self.node_name(node, content)
-        {
-            let kind = if text.contains("function") {
-                SymbolKind::Function
-            } else {
-                SymbolKind::Variable
-            };
-
-            return vec![Export {
-                name: name.to_string(),
-                kind,
-                line: node.start_position().row + 1,
-            }];
-        }
-
-        Vec::new()
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
@@ -58,7 +35,7 @@ impl Language for Svelte {
             name: name.to_string(),
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -99,49 +76,6 @@ impl Language for Svelte {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // JavaScript-style comments
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" {
-                if text.starts_with("/**") {
-                    let inner = text
-                        .strip_prefix("/**")
-                        .unwrap_or(text)
-                        .strip_suffix("*/")
-                        .unwrap_or(text);
-                    let lines: Vec<&str> = inner
-                        .lines()
-                        .map(|l| l.trim().trim_start_matches('*').trim())
-                        .filter(|l| !l.is_empty() && !l.starts_with('@'))
-                        .collect();
-                    if !lines.is_empty() {
-                        return Some(lines.join(" "));
-                    }
-                } else if text.starts_with("//") {
-                    doc_lines.push(text.strip_prefix("//").unwrap_or(text).trim().to_string());
-                }
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        Some(doc_lines.join(" "))
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

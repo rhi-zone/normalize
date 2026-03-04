@@ -1,6 +1,6 @@
 //! Tree-sitter query language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// Tree-sitter query language support.
@@ -21,23 +21,6 @@ impl Language for Query {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let kind = match node.kind() {
-            "named_node" => SymbolKind::Type,
-            "capture" => SymbolKind::Variable,
-            _ => return Vec::new(),
-        };
-
-        if let Some(name) = self.node_name(node, content) {
-            return vec![Export {
-                name: name.to_string(),
-                kind,
-                line: node.start_position().row + 1,
-            }];
-        }
-        Vec::new()
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
@@ -56,14 +39,6 @@ impl Language for Query {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
     }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()
     }

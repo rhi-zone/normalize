@@ -1,6 +1,6 @@
 //! Java language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Java language support.
@@ -19,31 +19,6 @@ impl Language for Java {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if self.get_visibility(node, content) != Visibility::Public {
-            return Vec::new();
-        }
-
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "class_declaration" => SymbolKind::Class,
-            "interface_declaration" => SymbolKind::Interface,
-            "enum_declaration" => SymbolKind::Enum,
-            "method_declaration" | "constructor_declaration" => SymbolKind::Method,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -138,15 +113,6 @@ impl Language for Java {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        // Javadoc comments could be extracted but need special handling
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

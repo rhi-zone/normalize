@@ -1,7 +1,7 @@
 //! OCaml language support.
 
 use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
+    ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
 };
 use tree_sitter::Node;
 
@@ -23,39 +23,13 @@ impl Language for OCaml {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "value_definition" | "let_binding" => SymbolKind::Function,
-            "type_definition" => SymbolKind::Type,
-            "module_definition" => SymbolKind::Module,
-            "module_type_definition" => SymbolKind::Interface,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(
-            node,
-            content,
-            name,
-            self.extract_docstring(node, content),
-        ))
+        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -72,7 +46,7 @@ impl Language for OCaml {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -88,31 +62,6 @@ impl Language for OCaml {
             return None;
         }
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // OCaml uses (** ... *) for ocamldoc
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" && text.starts_with("(**") {
-                let inner = text
-                    .strip_prefix("(**")
-                    .unwrap_or(text)
-                    .strip_suffix("*)")
-                    .unwrap_or(text)
-                    .trim();
-                if !inner.is_empty() {
-                    return Some(inner.to_string());
-                }
-            }
-            prev = sibling.prev_sibling();
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

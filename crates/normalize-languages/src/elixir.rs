@@ -1,6 +1,6 @@
 //! Elixir language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Elixir language support.
@@ -19,51 +19,6 @@ impl Language for Elixir {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "call" {
-            return Vec::new();
-        }
-
-        let text = &content[node.byte_range()];
-
-        // Check for def (not defp)
-        if text.starts_with("def ")
-            && !text.starts_with("defp")
-            && let Some(name) = self.extract_def_name(node, content)
-        {
-            return vec![Export {
-                name,
-                kind: SymbolKind::Function,
-                line: node.start_position().row + 1,
-            }];
-        }
-
-        // Check for defmacro (not defmacrop)
-        if text.starts_with("defmacro ")
-            && !text.starts_with("defmacrop")
-            && let Some(name) = self.extract_def_name(node, content)
-        {
-            return vec![Export {
-                name,
-                kind: SymbolKind::Function,
-                line: node.start_position().row + 1,
-            }];
-        }
-
-        // Check for defmodule
-        if text.starts_with("defmodule ")
-            && let Some(name) = self.extract_module_name(node, content)
-        {
-            return vec![Export {
-                name,
-                kind: SymbolKind::Module,
-                line: node.start_position().row + 1,
-            }];
-        }
-
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -94,7 +49,7 @@ impl Language for Elixir {
             name,
             kind: SymbolKind::Function,
             signature,
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -125,7 +80,7 @@ impl Language for Elixir {
             name: name.clone(),
             kind: SymbolKind::Module,
             signature: format!("defmodule {}", name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -138,35 +93,6 @@ impl Language for Elixir {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Look for @doc or @moduledoc before the node
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if text.contains("@doc") || text.contains("@moduledoc") {
-                // Extract the string content
-                if let Some(start) = text.find("\"\"\"") {
-                    let rest = &text[start + 3..];
-                    if let Some(end) = rest.find("\"\"\"") {
-                        return Some(rest[..end].trim().to_string());
-                    }
-                }
-                if let Some(start) = text.find('"') {
-                    let rest = &text[start + 1..];
-                    if let Some(end) = rest.find('"') {
-                        return Some(rest[..end].to_string());
-                    }
-                }
-            }
-            prev = sibling.prev_sibling();
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

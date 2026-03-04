@@ -1,6 +1,6 @@
 //! Kotlin language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Kotlin language support.
@@ -37,30 +37,6 @@ impl Language for Kotlin {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if self.get_visibility(node, content) != Visibility::Public {
-            return Vec::new();
-        }
-
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "class_declaration" => SymbolKind::Class,
-            "object_declaration" => SymbolKind::Class, // object is a singleton class
-            "function_declaration" => SymbolKind::Function,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -163,44 +139,6 @@ impl Language for Kotlin {
             });
         }
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Look for KDoc comment before the node
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            match sibling.kind() {
-                "multiline_comment" => {
-                    let text = &content[sibling.byte_range()];
-                    if text.starts_with("/**") {
-                        // Strip /** and */ and leading *
-                        let lines: Vec<&str> = text
-                            .strip_prefix("/**")
-                            .unwrap_or(text)
-                            .strip_suffix("*/")
-                            .unwrap_or(text)
-                            .lines()
-                            .map(|l| l.trim().strip_prefix("*").unwrap_or(l).trim())
-                            .filter(|l| !l.is_empty())
-                            .collect();
-                        if !lines.is_empty() {
-                            return Some(lines.join(" "));
-                        }
-                    }
-                    return None;
-                }
-                "line_comment" => {
-                    // Skip single-line comments
-                }
-                _ => return None,
-            }
-            prev = sibling.prev_sibling();
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

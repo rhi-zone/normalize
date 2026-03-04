@@ -1,7 +1,7 @@
 //! Julia language support.
 
 use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
+    ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
 };
 use tree_sitter::Node;
 
@@ -23,40 +23,13 @@ impl Language for Julia {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "function_definition" | "arrow_function_expression" => SymbolKind::Function,
-            "macro_definition" => SymbolKind::Function,
-            "struct_definition" => SymbolKind::Struct,
-            "abstract_definition" => SymbolKind::Interface,
-            "module_definition" => SymbolKind::Module,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(
-            node,
-            content,
-            name,
-            self.extract_docstring(node, content),
-        ))
+        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -73,7 +46,7 @@ impl Language for Julia {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -86,33 +59,6 @@ impl Language for Julia {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Julia uses """ docstrings before definitions
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "string_literal" && text.starts_with("\"\"\"") {
-                let inner = text
-                    .trim_start_matches("\"\"\"")
-                    .trim_end_matches("\"\"\"")
-                    .trim();
-                if !inner.is_empty() {
-                    return Some(inner.lines().next().unwrap_or(inner).to_string());
-                }
-            }
-            if sibling.kind() == "comment" {
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

@@ -1,6 +1,6 @@
 //! Scheme language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Scheme language support.
@@ -19,52 +19,6 @@ impl Language for Scheme {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "list" {
-            return Vec::new();
-        }
-
-        let text = &content[node.byte_range()];
-        let line = node.start_position().row + 1;
-
-        // (define name ...) or (define (name args) ...)
-        if let Some(rest) = text.strip_prefix("(define ") {
-            let name = if let Some(inner) = rest.strip_prefix('(') {
-                // (define (name args) ...)
-                inner.split_whitespace().next()
-            } else {
-                // (define name ...)
-                rest.split_whitespace().next()
-            };
-
-            if let Some(name) = name {
-                let kind = if rest.starts_with('(') || rest.contains("(lambda") {
-                    SymbolKind::Function
-                } else {
-                    SymbolKind::Variable
-                };
-
-                return vec![Export {
-                    name: name.to_string(),
-                    kind,
-                    line,
-                }];
-            }
-        }
-
-        if let Some(rest) = text.strip_prefix("(define-syntax ")
-            && let Some(name) = rest.split_whitespace().next()
-        {
-            return vec![Export {
-                name: name.to_string(),
-                kind: SymbolKind::Function,
-                line,
-            }];
-        }
-
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -169,14 +123,6 @@ impl Language for Scheme {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
     }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "list" {
             return Vec::new();

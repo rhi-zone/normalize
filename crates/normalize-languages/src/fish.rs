@@ -1,8 +1,6 @@
 //! Fish shell language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
-};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility, simple_function_symbol};
 use tree_sitter::Node;
 
 /// Fish shell language support.
@@ -23,35 +21,13 @@ impl Language for Fish {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "function_definition" {
-            return Vec::new();
-        }
-
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind: SymbolKind::Function,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(
-            node,
-            content,
-            name,
-            self.extract_docstring(node, content),
-        ))
+        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
@@ -59,33 +35,6 @@ impl Language for Fish {
     }
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" && text.starts_with('#') {
-                let line = text.strip_prefix('#').unwrap_or(text).trim();
-                doc_lines.push(line.to_string());
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        Some(doc_lines.join(" "))
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

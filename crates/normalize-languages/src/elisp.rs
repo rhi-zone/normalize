@@ -1,6 +1,6 @@
 //! Emacs Lisp language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Emacs Lisp language support.
@@ -19,55 +19,6 @@ impl Language for Elisp {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "list" {
-            return Vec::new();
-        }
-
-        let text = &content[node.byte_range()];
-        let line = node.start_position().row + 1;
-
-        for prefix in &["(defun ", "(defmacro ", "(defsubst ", "(cl-defun "] {
-            if let Some(rest) = text.strip_prefix(prefix)
-                && let Some(name) = rest.split_whitespace().next()
-            {
-                // Skip internal functions (double dash convention)
-                if name.contains("--") {
-                    return Vec::new();
-                }
-                return vec![Export {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    line,
-                }];
-            }
-        }
-
-        if text.starts_with("(defvar ")
-            || text.starts_with("(defconst ")
-            || text.starts_with("(defcustom ")
-        {
-            let prefix_len = if text.starts_with("(defvar ") {
-                8
-            } else if text.starts_with("(defconst ") {
-                10
-            } else {
-                11
-            };
-            if let Some(name) = text[prefix_len..].split_whitespace().next()
-                && !name.contains("--")
-            {
-                return vec![Export {
-                    name: name.to_string(),
-                    kind: SymbolKind::Variable,
-                    line,
-                }];
-            }
-        }
-
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -91,7 +42,7 @@ impl Language for Elisp {
                     name: name.to_string(),
                     kind: SymbolKind::Function,
                     signature: first_line.trim().to_string(),
-                    docstring: self.extract_docstring(node, content),
+                    docstring: None,
                     attributes: Vec::new(),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
@@ -123,7 +74,7 @@ impl Language for Elisp {
                 name: name.to_string(),
                 kind: SymbolKind::Module,
                 signature: format!("(defgroup {})", name),
-                docstring: self.extract_docstring(node, content),
+                docstring: None,
                 attributes: Vec::new(),
                 start_line: node.start_position().row + 1,
                 end_line: node.end_position().row + 1,
@@ -139,25 +90,6 @@ impl Language for Elisp {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Elisp docstrings are strings after the argument list
-        let text = &content[node.byte_range()];
-        // Find first quoted string after arglist
-        if let Some(paren_end) = text.find(')') {
-            let after_args = &text[paren_end + 1..];
-            if let Some(start) = after_args.find('"')
-                && let Some(end) = after_args[start + 1..].find('"')
-            {
-                return Some(after_args[start + 1..start + 1 + end].to_string());
-            }
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

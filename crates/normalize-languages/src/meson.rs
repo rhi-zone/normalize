@@ -1,6 +1,6 @@
 //! Meson build system support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// Meson language support.
@@ -19,19 +19,6 @@ impl Language for Meson {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() == "expression_statement"
-            && let Some(name) = self.node_name(node, content)
-        {
-            return vec![Export {
-                name: name.to_string(),
-                kind: SymbolKind::Variable,
-                line: node.start_position().row + 1,
-            }];
-        }
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -54,14 +41,6 @@ impl Language for Meson {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
     }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "normal_command" {
             return Vec::new();

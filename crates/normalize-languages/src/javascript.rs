@@ -1,7 +1,7 @@
 //! JavaScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// JavaScript language support.
@@ -46,25 +46,12 @@ impl Language for JavaScript {
         self.extract_container(node, content)
     }
 
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        // JS doesn't have standardized docstrings (JSDoc would require comment parsing)
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         ecmascript::extract_imports(node, content)
     }
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
         ecmascript::format_import(import, names)
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        ecmascript::extract_public_symbols(node, content)
     }
 
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {

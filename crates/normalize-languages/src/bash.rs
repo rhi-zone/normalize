@@ -1,6 +1,6 @@
 //! Bash language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Bash language support.
@@ -49,13 +49,6 @@ impl Language for Bash {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
     }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()
     }
@@ -63,20 +56,6 @@ impl Language for Bash {
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
         // Bash: source file or . file
         format!("source {}", import.module)
-    }
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "function_definition" {
-            return Vec::new();
-        }
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-        vec![Export {
-            name,
-            kind: SymbolKind::Function,
-            line: node.start_position().row + 1,
-        }]
     }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public

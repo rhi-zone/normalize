@@ -243,12 +243,13 @@ pub mod zsh;
 
 // Re-exports (always available)
 pub use grammar_loader::GrammarLoader;
+pub use normalize_facts_core::Export;
 pub use registry::{
     is_programming_language, is_test_path, register, support_for_extension, support_for_grammar,
     support_for_path, supported_languages, test_file_globs_for_path, validate_unused_kinds_audit,
 };
 pub use traits::{
-    ContainerBody, EmbeddedBlock, Export, Import, Language, Symbol, SymbolKind, Visibility,
+    ContainerBody, EmbeddedBlock, Import, Language, Symbol, SymbolKind, Visibility,
     simple_function_symbol, simple_symbol,
 };
 

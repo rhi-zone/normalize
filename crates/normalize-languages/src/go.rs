@@ -1,6 +1,6 @@
 //! Go language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Go language support.
@@ -146,30 +146,6 @@ impl Language for Go {
         }
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        // Go exports are determined by uppercase first letter
-        let name = match self.node_name(node, content) {
-            Some(n) if n.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) => n,
-            _ => return Vec::new(),
-        };
-
-        let line = node.start_position().row + 1;
-        let kind = match node.kind() {
-            "function_declaration" => SymbolKind::Function,
-            "method_declaration" => SymbolKind::Method,
-            "type_spec" => SymbolKind::Type,
-            "const_spec" => SymbolKind::Constant,
-            "var_spec" => SymbolKind::Variable,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name: name.to_string(),
-            kind,
-            line,
-        }]
-    }
-
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let is_exported = self
             .node_name(node, content)
@@ -201,15 +177,6 @@ impl Language for Go {
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
-    }
-
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        // Go doc comments could be extracted but need special handling
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

@@ -1,6 +1,6 @@
 //! Nginx configuration file support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Nginx language support.
@@ -19,22 +19,6 @@ impl Language for Nginx {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "block" {
-            return Vec::new();
-        }
-
-        if let Some(name) = self.node_name(node, content) {
-            return vec![Export {
-                name: name.to_string(),
-                kind: SymbolKind::Module,
-                line: node.start_position().row + 1,
-            }];
-        }
-
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -77,14 +61,6 @@ impl Language for Nginx {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
     }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "directive" {
             return Vec::new();

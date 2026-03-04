@@ -1,6 +1,6 @@
 //! C language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// C language support.
@@ -71,14 +71,6 @@ impl Language for C {
         })
     }
 
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "preproc_include" {
             return Vec::new();
@@ -112,22 +104,6 @@ impl Language for C {
             format!("#include {}", import.module)
         } else {
             format!("#include \"{}\"", import.module)
-        }
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "function_definition" {
-            return Vec::new();
-        }
-
-        if let Some(name) = self.node_name(node, content) {
-            vec![Export {
-                name: name.to_string(),
-                kind: SymbolKind::Function,
-                line: node.start_position().row + 1,
-            }]
-        } else {
-            Vec::new()
         }
     }
 

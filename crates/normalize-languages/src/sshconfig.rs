@@ -1,6 +1,6 @@
 //! SSH config file support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// SSH config language support.
@@ -21,10 +21,6 @@ impl Language for SshConfig {
         true
     }
 
-    fn extract_public_symbols(&self, _node: &Node, _content: &str) -> Vec<Export> {
-        Vec::new()
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
@@ -42,13 +38,6 @@ impl Language for SshConfig {
     }
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new()

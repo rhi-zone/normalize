@@ -1,6 +1,6 @@
 //! SQL language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// SQL language support.
@@ -21,28 +21,6 @@ impl Language for Sql {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.extract_sql_name(node, content) {
-            Some(n) => n,
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "create_table" => SymbolKind::Struct,
-            "create_view" | "create_materialized_view" => SymbolKind::Struct,
-            "create_function" => SymbolKind::Function,
-            "create_type" => SymbolKind::Type,
-            "create_index" => SymbolKind::Variable,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
@@ -58,7 +36,7 @@ impl Language for Sql {
             name,
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -81,7 +59,7 @@ impl Language for Sql {
             name: name.clone(),
             kind,
             signature: format!("CREATE {} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -108,34 +86,6 @@ impl Language for Sql {
             is_interface_impl: false,
             implements: Vec::new(),
         })
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // SQL uses -- for comments
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" && text.starts_with("--") {
-                let line = text.strip_prefix("--").unwrap_or(text).trim();
-                doc_lines.push(line.to_string());
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        Some(doc_lines.join(" "))
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {

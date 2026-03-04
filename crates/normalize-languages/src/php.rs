@@ -1,6 +1,6 @@
 //! PHP language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// PHP language support.
@@ -19,33 +19,6 @@ impl Language for Php {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if self.get_visibility(node, content) != Visibility::Public {
-            return Vec::new();
-        }
-
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "class_declaration" => SymbolKind::Class,
-            "interface_declaration" => SymbolKind::Interface,
-            "trait_declaration" => SymbolKind::Class, // traits are like mixins
-            "enum_declaration" => SymbolKind::Enum,
-            "function_definition" => SymbolKind::Function,
-            "method_declaration" => SymbolKind::Method,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -81,7 +54,7 @@ impl Language for Php {
             name: name.to_string(),
             kind,
             signature,
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -120,7 +93,7 @@ impl Language for Php {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -133,40 +106,6 @@ impl Language for Php {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // PHP uses /** */ for PHPDoc comments
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" {
-                if text.starts_with("/**") {
-                    let inner = text
-                        .strip_prefix("/**")
-                        .unwrap_or(text)
-                        .strip_suffix("*/")
-                        .unwrap_or(text);
-                    let lines: Vec<&str> = inner
-                        .lines()
-                        .map(|l| l.trim().strip_prefix("*").unwrap_or(l).trim())
-                        .filter(|l| !l.is_empty() && !l.starts_with('@'))
-                        .collect();
-                    if !lines.is_empty() {
-                        return Some(lines.join(" "));
-                    }
-                }
-                break;
-            } else if sibling.kind() != "text" {
-                break;
-            }
-            prev = sibling.prev_sibling();
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

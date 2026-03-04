@@ -1,6 +1,6 @@
 //! Groovy language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Groovy language support.
@@ -21,25 +21,6 @@ impl Language for Groovy {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "class_definition" => SymbolKind::Class,
-            "function_definition" => SymbolKind::Function,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -53,7 +34,7 @@ impl Language for Groovy {
             name: name.to_string(),
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -79,7 +60,7 @@ impl Language for Groovy {
             name: name.to_string(),
             kind,
             signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -92,32 +73,6 @@ impl Language for Groovy {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Groovy uses /** */ for Javadoc-style comments
-        let mut prev = node.prev_sibling();
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" && text.starts_with("/**") {
-                let inner = text.trim_start_matches("/**").trim_end_matches("*/").trim();
-                if !inner.is_empty() {
-                    // Get first non-empty line, strip leading *
-                    for line in inner.lines() {
-                        let line = line.trim().trim_start_matches('*').trim();
-                        if !line.is_empty() && !line.starts_with('@') {
-                            return Some(line.to_string());
-                        }
-                    }
-                }
-            }
-            prev = sibling.prev_sibling();
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

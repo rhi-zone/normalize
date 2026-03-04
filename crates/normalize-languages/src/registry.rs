@@ -516,33 +516,13 @@ mod tests {
 
     /// Validate that all node kinds returned by Language trait methods
     /// actually exist in the tree-sitter grammar.
+    ///
+    /// No trait methods return node kind lists any more —
+    /// export detection now uses tags.scm queries exclusively.
+    /// This test is intentionally empty.
     #[test]
     fn validate_node_kinds() {
-        let loader = GrammarLoader::new();
-        let mut errors: Vec<String> = Vec::new();
-
-        for lang in supported_languages() {
-            let grammar_name = lang.grammar_name();
-            let ts_lang = match loader.get(grammar_name) {
-                Some(l) => l,
-                None => {
-                    // Grammar not available in search paths
-                    continue;
-                }
-            };
-
-            // No trait methods return node kind lists any more —
-            // export detection now uses tags.scm queries exclusively.
-            let _ = ts_lang; // suppress unused variable warning
-        }
-
-        if !errors.is_empty() {
-            panic!(
-                "Found {} invalid node kinds:\n{}",
-                errors.len(),
-                errors.join("\n")
-            );
-        }
+        // Nothing to validate — node kind lists were removed from the Language trait.
     }
 
     /// Cross-check grammar node kinds against Language implementations.
@@ -606,8 +586,8 @@ mod tests {
             };
 
             // Collect all kinds currently used by the language
-            let mut used_kinds: HashSet<&str> = HashSet::new();
             // public_symbol_kinds() removed — export detection uses tags.scm exclusively.
+            let used_kinds: HashSet<&str> = HashSet::new();
 
             // Get all valid named node kinds from grammar
             let mut all_kinds: Vec<&str> = Vec::new();

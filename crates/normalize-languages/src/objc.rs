@@ -1,6 +1,6 @@
 //! Objective-C language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Objective-C language support.
@@ -19,31 +19,6 @@ impl Language for ObjC {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        match node.kind() {
-            "class_interface" | "class_implementation" | "protocol_declaration" => {
-                if let Some(name) = self.node_name(node, content) {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Class,
-                        line: node.start_position().row + 1,
-                    }];
-                }
-            }
-            "method_declaration" => {
-                if let Some(name) = self.node_name(node, content) {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        line: node.start_position().row + 1,
-                    }];
-                }
-            }
-            _ => {}
-        }
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -156,14 +131,6 @@ impl Language for ObjC {
             }
             _ => None,
         }
-    }
-
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

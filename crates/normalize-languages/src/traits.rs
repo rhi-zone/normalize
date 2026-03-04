@@ -3,7 +3,7 @@
 use tree_sitter::Node;
 
 // Re-export core types from normalize-facts-core
-pub use normalize_facts_core::{Export, Import, Symbol, SymbolKind, Visibility};
+pub use normalize_facts_core::{Import, Symbol, SymbolKind, Visibility};
 
 /// Location of a container's body (for prepend/append editing operations)
 #[derive(Debug)]
@@ -109,12 +109,6 @@ pub trait Language: Send + Sync {
     /// Extract symbol from a type definition node
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol>;
 
-    /// Extract docstring/doc comment for a node
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String>;
-
-    /// Extract attributes/decorators for a node (e.g., #[test], @Test)
-    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String>;
-
     // === Import/Export ===
 
     /// Extract imports from an import node (may return multiple)
@@ -124,10 +118,6 @@ pub trait Language: Send + Sync {
     /// If `names` is Some, only include those names (for multi-import filtering).
     /// If `names` is None, format the complete import.
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String;
-
-    /// Extract public symbols from a node.
-    /// Used by JS/TS-specific extraction paths for export statements.
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export>;
 
     // === Display/Formatting ===
 

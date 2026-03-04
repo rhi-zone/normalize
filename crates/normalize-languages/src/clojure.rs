@@ -1,6 +1,6 @@
 //! Clojure language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Clojure language support.
@@ -19,35 +19,6 @@ impl Language for Clojure {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "list_lit" {
-            return Vec::new();
-        }
-
-        let (form, name) = match self.extract_def_form(node, content) {
-            Some(info) => info,
-            None => return Vec::new(),
-        };
-
-        // defn- is private
-        if form == "defn-" || form == "def-" {
-            return Vec::new();
-        }
-
-        let kind = match form.as_str() {
-            "defn" | "defmacro" | "defmethod" => SymbolKind::Function,
-            "defrecord" | "deftype" | "defprotocol" => SymbolKind::Struct,
-            "def" | "defonce" => SymbolKind::Variable,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -72,7 +43,7 @@ impl Language for Clojure {
             name,
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -105,7 +76,7 @@ impl Language for Clojure {
             name: name.clone(),
             kind,
             signature: format!("({} {})", form, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -118,27 +89,6 @@ impl Language for Clojure {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Clojure docstrings are the third element in defn forms
-        // (defn name "docstring" [...] ...)
-        let mut cursor = node.walk();
-        let children: Vec<_> = node.children(&mut cursor).collect();
-
-        // Skip first (form name) and second (symbol name), check if third is string
-        if children.len() > 2 {
-            let third = &children[2];
-            if third.kind() == "str_lit" {
-                let text = &content[third.byte_range()];
-                return Some(text.trim_matches('"').to_string());
-            }
-        }
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

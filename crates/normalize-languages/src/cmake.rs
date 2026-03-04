@@ -1,8 +1,6 @@
 //! CMake language support.
 
-use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
-};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility, simple_function_symbol};
 use tree_sitter::Node;
 
 /// CMake language support.
@@ -23,36 +21,13 @@ impl Language for CMake {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "function_def" | "macro_def" => SymbolKind::Function,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(
-            node,
-            content,
-            name,
-            self.extract_docstring(node, content),
-        ))
+        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -61,34 +36,6 @@ impl Language for CMake {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // CMake uses # for comments
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "line_comment" {
-                let line = text.strip_prefix('#').unwrap_or(text).trim();
-                doc_lines.push(line.to_string());
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        Some(doc_lines.join(" "))
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

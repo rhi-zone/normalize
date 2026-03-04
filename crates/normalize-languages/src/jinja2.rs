@@ -1,6 +1,6 @@
 //! Jinja2 template support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// Jinja2 language support.
@@ -19,11 +19,6 @@ impl Language for Jinja2 {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, _node: &Node, _content: &str) -> Vec<Export> {
-        // Jinja2 grammar is minimal - only basic tokens, no structured nodes
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -48,14 +43,6 @@ impl Language for Jinja2 {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
     }
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
-    }
-
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         // Jinja2 grammar is minimal - only basic tokens, no structured nodes
         Vec::new()

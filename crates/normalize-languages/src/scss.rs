@@ -1,6 +1,6 @@
 //! SCSS language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// SCSS language support.
@@ -21,29 +21,6 @@ impl Language for Scss {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.node_name(node, content) {
-            Some(n) => n,
-            None => return Vec::new(),
-        };
-
-        // _ prefix means private in SCSS
-        if name.starts_with('_') {
-            return Vec::new();
-        }
-
-        let kind = match node.kind() {
-            "mixin_statement" | "function_statement" => SymbolKind::Function,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name: name.to_string(),
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
@@ -57,7 +34,7 @@ impl Language for Scss {
             name: name.to_string(),
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -99,36 +76,6 @@ impl Language for Scss {
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // SCSS uses /// for SassDoc
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" && text.starts_with("///") {
-                let line = text.strip_prefix("///").unwrap_or(text).trim();
-                if !line.starts_with('@') {
-                    doc_lines.push(line.to_string());
-                }
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        Some(doc_lines.join(" "))
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

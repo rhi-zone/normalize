@@ -1,6 +1,6 @@
 //! ReScript language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// ReScript language support.
@@ -19,40 +19,6 @@ impl Language for ReScript {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        match node.kind() {
-            "let_binding" | "external_declaration" => {
-                if let Some(name) = self.node_name(node, content) {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        line: node.start_position().row + 1,
-                    }];
-                }
-            }
-            "type_declaration" => {
-                if let Some(name) = self.node_name(node, content) {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Type,
-                        line: node.start_position().row + 1,
-                    }];
-                }
-            }
-            "module_declaration" => {
-                if let Some(name) = self.node_name(node, content) {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Module,
-                        line: node.start_position().row + 1,
-                    }];
-                }
-            }
-            _ => {}
-        }
-        Vec::new()
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -130,14 +96,6 @@ impl Language for ReScript {
             is_interface_impl: false,
             implements: Vec::new(),
         })
-    }
-
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

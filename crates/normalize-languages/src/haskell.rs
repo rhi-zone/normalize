@@ -1,7 +1,7 @@
 //! Haskell language support.
 
 use crate::{
-    ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
+    ContainerBody, Import, Language, Symbol, SymbolKind, Visibility, simple_function_symbol,
 };
 use tree_sitter::Node;
 
@@ -23,39 +23,13 @@ impl Language for Haskell {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "function" | "signature" => SymbolKind::Function,
-            "data_type" | "newtype" => SymbolKind::Struct,
-            "type_synomym" => SymbolKind::Type,
-            "class" => SymbolKind::Interface,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         ""
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(
-            node,
-            content,
-            name,
-            self.extract_docstring(node, content),
-        ))
+        Some(simple_function_symbol(node, content, name, None))
     }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
@@ -94,7 +68,7 @@ impl Language for Haskell {
                     name: name.to_string(),
                     kind: SymbolKind::Class,
                     signature: sig,
-                    docstring: self.extract_docstring(node, content),
+                    docstring: None,
                     attributes: Vec::new(),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
@@ -111,7 +85,7 @@ impl Language for Haskell {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -124,43 +98,6 @@ impl Language for Haskell {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Haskell uses -- | or {- | -} for Haddock docs
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" {
-                if text.starts_with("-- |") || text.starts_with("-- ^") {
-                    let line = text
-                        .strip_prefix("-- |")
-                        .or_else(|| text.strip_prefix("-- ^"))
-                        .unwrap_or(text)
-                        .trim();
-                    doc_lines.push(line.to_string());
-                } else if text.starts_with("--") {
-                    let line = text.strip_prefix("--").unwrap_or(text).trim();
-                    doc_lines.push(line.to_string());
-                }
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        Some(doc_lines.join(" "))
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

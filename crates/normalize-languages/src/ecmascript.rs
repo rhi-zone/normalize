@@ -3,7 +3,7 @@
 //! This module contains common logic shared between JavaScript, TypeScript, and TSX.
 //! Each language struct delegates to these functions for DRY implementation.
 
-use crate::{Export, Import, Symbol, SymbolKind, Visibility};
+use crate::{Import, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -207,7 +207,7 @@ pub fn extract_type(node: &Node, name: &str) -> Option<Symbol> {
 }
 
 // ============================================================================
-// Import/Export extraction
+// Import/ extraction
 // ============================================================================
 
 /// Extract imports from an import_statement node.
@@ -297,56 +297,4 @@ fn collect_import_names(import_clause: &Node, content: &str, names: &mut Vec<Str
             _ => {}
         }
     }
-}
-
-/// Extract exports from an export_statement node.
-pub fn extract_public_symbols(node: &Node, content: &str) -> Vec<Export> {
-    if node.kind() != "export_statement" {
-        return Vec::new();
-    }
-
-    let line = node.start_position().row + 1;
-    let mut exports = Vec::new();
-
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        match child.kind() {
-            "function_declaration" | "generator_function_declaration" => {
-                if let Some(name_node) = child.child_by_field_name("name") {
-                    exports.push(Export {
-                        name: content[name_node.byte_range()].to_string(),
-                        kind: SymbolKind::Function,
-                        line,
-                    });
-                }
-            }
-            "class_declaration" => {
-                if let Some(name_node) = child.child_by_field_name("name") {
-                    exports.push(Export {
-                        name: content[name_node.byte_range()].to_string(),
-                        kind: SymbolKind::Class,
-                        line,
-                    });
-                }
-            }
-            "lexical_declaration" => {
-                // export const foo = ...
-                let mut decl_cursor = child.walk();
-                for decl_child in child.children(&mut decl_cursor) {
-                    if decl_child.kind() == "variable_declarator"
-                        && let Some(name_node) = decl_child.child_by_field_name("name")
-                    {
-                        exports.push(Export {
-                            name: content[name_node.byte_range()].to_string(),
-                            kind: SymbolKind::Variable,
-                            line,
-                        });
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    exports
 }

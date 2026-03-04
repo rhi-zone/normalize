@@ -1,6 +1,6 @@
 //! Python language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -63,7 +63,7 @@ impl Language for Python {
                 SymbolKind::Function
             },
             signature,
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -103,7 +103,7 @@ impl Language for Python {
             name: name.to_string(),
             kind: SymbolKind::Class,
             signature,
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -117,54 +117,6 @@ impl Language for Python {
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         // Python classes are both containers and types
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        let body = node.child_by_field_name("body")?;
-        let first = body.child(0)?;
-
-        // Handle both grammar versions:
-        // - Old: expression_statement > string
-        // - New (arborium): string directly, with string_content child
-        let string_node = match first.kind() {
-            "string" => Some(first),
-            "expression_statement" => first.child(0).filter(|n| n.kind() == "string"),
-            _ => None,
-        }?;
-
-        // Try string_content child (arborium style)
-        let mut cursor = string_node.walk();
-        for child in string_node.children(&mut cursor) {
-            if child.kind() == "string_content" {
-                let doc = content[child.byte_range()].trim();
-                if !doc.is_empty() {
-                    return Some(doc.to_string());
-                }
-            }
-        }
-
-        // Fallback: extract from full string text (old style)
-        let text = &content[string_node.byte_range()];
-        let doc = text
-            .trim_start_matches("\"\"\"")
-            .trim_start_matches("'''")
-            .trim_start_matches('"')
-            .trim_start_matches('\'')
-            .trim_end_matches("\"\"\"")
-            .trim_end_matches("'''")
-            .trim_end_matches('"')
-            .trim_end_matches('\'')
-            .trim();
-
-        if !doc.is_empty() {
-            Some(doc.to_string())
-        } else {
-            None
-        }
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -272,38 +224,6 @@ impl Language for Python {
             }
         } else {
             format!("from {} import {}", import.module, names_to_use.join(", "))
-        }
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        let line = node.start_position().row + 1;
-
-        match node.kind() {
-            "function_definition" => {
-                if let Some(name) = self.node_name(node, content)
-                    && !name.starts_with('_')
-                {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        line,
-                    }];
-                }
-                Vec::new()
-            }
-            "class_definition" => {
-                if let Some(name) = self.node_name(node, content)
-                    && !name.starts_with('_')
-                {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Class,
-                        line,
-                    }];
-                }
-                Vec::new()
-            }
-            _ => Vec::new(),
         }
     }
 

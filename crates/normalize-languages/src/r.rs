@@ -1,6 +1,6 @@
 //! R language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// R language support.
@@ -19,44 +19,6 @@ impl Language for R {
 
     fn has_symbols(&self) -> bool {
         true
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        // Look for assignments like: foo <- function(...) or foo = function(...)
-        // In R grammar, these are binary_operator nodes
-        if node.kind() != "binary_operator" {
-            return Vec::new();
-        }
-
-        // Check if it's an assignment (contains <- or =)
-        let text = &content[node.byte_range()];
-        if !text.contains("<-") && !text.contains("=") {
-            return Vec::new();
-        }
-
-        let name = match node.child(0).map(|n| &content[n.byte_range()]) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        // Check if RHS is a function
-        let rhs = node.child(2);
-        let is_function = rhs.is_some_and(|n| n.kind() == "function_definition");
-
-        if !is_function {
-            return Vec::new();
-        }
-
-        // . prefix is internal by convention
-        if name.starts_with('.') {
-            return Vec::new();
-        }
-
-        vec![Export {
-            name,
-            kind: SymbolKind::Function,
-            line: node.start_position().row + 1,
-        }]
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -81,7 +43,7 @@ impl Language for R {
             name: name.clone(),
             kind: SymbolKind::Function,
             signature: first_line.trim().to_string(),
-            docstring: self.extract_docstring(&parent, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: parent.start_position().row + 1,
             end_line: parent.end_position().row + 1,
@@ -101,38 +63,6 @@ impl Language for R {
     }
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
         None
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // R uses # for comments, roxygen2 uses #' for docs
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" {
-                if text.starts_with("#'") {
-                    let line = text.strip_prefix("#'").unwrap_or(text).trim();
-                    if !line.starts_with('@') {
-                        doc_lines.push(line.to_string());
-                    }
-                }
-                prev = sibling.prev_sibling();
-            } else {
-                break;
-            }
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        Some(doc_lines.join(" "))
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

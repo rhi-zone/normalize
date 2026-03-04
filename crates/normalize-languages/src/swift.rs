@@ -1,6 +1,6 @@
 //! Swift language support.
 
-use crate::{ContainerBody, Export, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// Swift language support.
@@ -39,33 +39,6 @@ impl Language for Swift {
         true
     }
 
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if self.get_visibility(node, content) != Visibility::Public {
-            return Vec::new();
-        }
-
-        let name = match self.node_name(node, content) {
-            Some(n) => n.to_string(),
-            None => return Vec::new(),
-        };
-
-        let kind = match node.kind() {
-            "class_declaration" => SymbolKind::Class,
-            "struct_declaration" => SymbolKind::Struct,
-            "protocol_declaration" => SymbolKind::Interface,
-            "enum_declaration" => SymbolKind::Enum,
-            "actor_declaration" => SymbolKind::Class,
-            "function_declaration" | "init_declaration" => SymbolKind::Function,
-            _ => return Vec::new(),
-        };
-
-        vec![Export {
-            name,
-            kind,
-            line: node.start_position().row + 1,
-        }]
-    }
-
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -100,7 +73,7 @@ impl Language for Swift {
             name: name.to_string(),
             kind: SymbolKind::Function,
             signature,
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -136,7 +109,7 @@ impl Language for Swift {
             name: name.to_string(),
             kind,
             signature: format!("{} {}", keyword, name),
-            docstring: self.extract_docstring(node, content),
+            docstring: None,
             attributes: Vec::new(),
             start_line: node.start_position().row + 1,
             end_line: node.end_position().row + 1,
@@ -169,52 +142,6 @@ impl Language for Swift {
             });
         }
         self.extract_container(node, content)
-    }
-
-    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        // Swift uses /// or /** */ for documentation
-        let mut prev = node.prev_sibling();
-        let mut doc_lines = Vec::new();
-
-        while let Some(sibling) = prev {
-            let text = &content[sibling.byte_range()];
-            if sibling.kind() == "comment" || sibling.kind() == "multiline_comment" {
-                if text.starts_with("///") {
-                    let line = text.strip_prefix("///").unwrap_or(text).trim();
-                    if !line.is_empty() {
-                        doc_lines.insert(0, line.to_string());
-                    }
-                } else if text.starts_with("/**") {
-                    let inner = text
-                        .strip_prefix("/**")
-                        .unwrap_or(text)
-                        .strip_suffix("*/")
-                        .unwrap_or(text);
-                    for line in inner.lines() {
-                        let clean = line.trim().strip_prefix("*").unwrap_or(line).trim();
-                        if !clean.is_empty() {
-                            doc_lines.push(clean.to_string());
-                        }
-                    }
-                    break;
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-            prev = sibling.prev_sibling();
-        }
-
-        if doc_lines.is_empty() {
-            None
-        } else {
-            Some(doc_lines.join(" "))
-        }
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

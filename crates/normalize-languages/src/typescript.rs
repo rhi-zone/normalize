@@ -1,7 +1,7 @@
 //! TypeScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Export, Import, Language, Symbol, Visibility};
+use crate::{ContainerBody, Import, Language, Symbol, Visibility};
 use tree_sitter::Node;
 
 /// TypeScript language support.
@@ -55,18 +55,6 @@ impl Language for TypeScript {
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
         ecmascript::format_import(import, names)
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        ecmascript::extract_public_symbols(node, content)
-    }
-
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
@@ -184,18 +172,6 @@ impl Language for Tsx {
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
         ecmascript::format_import(import, names)
-    }
-
-    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        ecmascript::extract_public_symbols(node, content)
-    }
-
-    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
-        None
-    }
-
-    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
-        Vec::new()
     }
 
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
