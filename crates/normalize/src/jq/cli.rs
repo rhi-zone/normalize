@@ -5,8 +5,6 @@ use core::fmt;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-pub use jaq_all::fmts::Format;
-
 #[derive(Debug, Default)]
 pub struct Cli {
     // Input options
@@ -24,10 +22,6 @@ pub struct Cli {
     pub monochrome_output: bool,
     pub tab: bool,
     pub indent: usize,
-
-    // Format options
-    pub from: Option<Format>,
-    pub to: Option<Format>,
 
     // Compilation options
     pub from_file: bool,
@@ -79,10 +73,6 @@ impl Cli {
         args: &mut impl Iterator<Item = OsString>,
     ) -> Result<(), Error> {
         let int = |s: OsString| s.into_string().ok()?.parse().ok();
-        let fmt = |s: OsString| -> Result<Format, Error> {
-            let s = s.into_string().map_err(Error::Utf8)?;
-            Format::parse(&s).ok_or(Error::Format(s))
-        };
         match arg {
             "" => args.try_for_each(|arg| self.positional(mode, arg))?,
 
@@ -99,9 +89,6 @@ impl Cli {
             "monochrome-output" => self.short('M', args)?,
             "tab" => self.tab = true,
             "indent" => self.indent = args.next().and_then(int).ok_or(Error::Int("--indent"))?,
-
-            "from" => self.from = Some(fmt(args.next().ok_or(Error::Path("--from"))?)?),
-            "to" => self.to = Some(fmt(args.next().ok_or(Error::Path("--to"))?)?),
 
             "from-file" => self.short('f', args)?,
             "library-path" => self.short('L', args)?,
@@ -127,11 +114,7 @@ impl Cli {
         Ok(())
     }
 
-    fn short(
-        &mut self,
-        arg: char,
-        _args: &mut impl Iterator<Item = OsString>,
-    ) -> Result<(), Error> {
+    fn short(&mut self, arg: char, args: &mut impl Iterator<Item = OsString>) -> Result<(), Error> {
         match arg {
             'n' => self.null_input = true,
             'R' => self.raw_input = true,
@@ -148,7 +131,7 @@ impl Cli {
             'f' => self.from_file = true,
             'L' => self
                 .library_path
-                .push(_args.next().ok_or(Error::Path("-L"))?.into()),
+                .push(args.next().ok_or(Error::Path("-L"))?.into()),
             'e' => self.exit_status = true,
             'V' => self.version = true,
             'h' => self.help = true,
@@ -192,11 +175,22 @@ impl Cli {
         }
     }
 
-    pub fn indent(&self) -> String {
-        if self.tab {
-            "\t".to_string()
-        } else {
-            " ".repeat(self.indent)
+    pub fn pp(&self, color: bool) -> jaq_json::write::Pp {
+        jaq_json::write::Pp {
+            indent: (!self.compact_output).then(|| {
+                if self.tab {
+                    "\t".to_string()
+                } else {
+                    " ".repeat(self.indent)
+                }
+            }),
+            sort_keys: self.sort_keys,
+            colors: if color {
+                jaq_json::write::Colors::ansi()
+            } else {
+                jaq_json::write::Colors::default()
+            },
+            sep_space: !self.compact_output,
         }
     }
 }
@@ -208,7 +202,6 @@ pub enum Error {
     KeyValue(&'static str),
     Int(&'static str),
     Path(&'static str),
-    Format(String),
 }
 
 impl fmt::Display for Error {
@@ -219,7 +212,6 @@ impl fmt::Display for Error {
             Self::KeyValue(o) => write!(f, "{o} expects a key and a value"),
             Self::Int(o) => write!(f, "{o} expects an integer"),
             Self::Path(o) => write!(f, "{o} expects a path"),
-            Self::Format(s) => write!(f, "unknown format: {s}"),
         }
     }
 }

@@ -589,6 +589,10 @@ The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mi
 
 ## Deferred
 
+- `normalize jq` multi-format support (YAML/CBOR/TOML/XML via `jaq-all` with `formats` feature): currently using `jaq-core/std/json` directly to avoid `jaq-fmts` bloat. Low priority — vanilla jq is JSON-only anyway.
+
+
+
 - VS Code extension: test and publish to marketplace (after first CLI release)
 - Remaining docs: prior-art.md, hybrid-loops.md
 - Memory system: `docs/design/memory.md` — SQLite-backed `store/recall/forget`. Deferred until concrete use case.

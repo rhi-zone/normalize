@@ -82,8 +82,10 @@ grep-matcher = "0.1"
 grep-regex = "0.1"
 grep-searcher = "0.1"
 
-# jq implementation
-jaq-all = "0.1.0-beta"
+# jq implementation (jaq-fmts excluded — vanilla jq is JSON-only, formats in TODO)
+jaq-core = "3.0.0-beta"
+jaq-std = "3.0.0-beta"
+jaq-json = "2.0.0-beta"
 
 # Dynamic loading
 libloading = "0.8"

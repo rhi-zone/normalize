@@ -4,24 +4,17 @@
 mod cli;
 mod filter;
 
-use cli::{Cli, Format};
-use core::fmt::{self, Formatter};
-use filter::run;
-use jaq_all::data::{Filter, Runner};
-use jaq_all::fmts::read;
-use jaq_all::fmts::write::{Writer, with_stdout, write};
-use jaq_all::json::Val;
-use jaq_all::json::write::{Colors, Pp};
-use jaq_all::load::{Color, FileReports, FileReportsDisp};
+use cli::Cli;
+use jaq_core::Vars;
+use jaq_json::Val;
 use std::ffi::OsString;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::io::{self, IsTerminal, Write};
+use std::path::Path;
 use std::process::ExitCode;
 
 /// Run jq with the given arguments (not including argv[0]).
 ///
-/// This is the entry point used by both `normalize jq [args...]`
-/// and when the binary is invoked as `jq` via a symlink.
+/// Entry point for both `normalize jq [args...]` and `jq -> normalize` symlink.
 pub fn run_jq(args: impl Iterator<Item = OsString>) -> ExitCode {
     let mut out = io::stdout();
     let mut err = io::stderr();
@@ -45,106 +38,84 @@ pub fn run_jq(args: impl Iterator<Item = OsString>) -> ExitCode {
     match real_main(&cli) {
         Ok(code) => code,
         Err(e) => {
-            let color = cli.color_stdio(&err);
-            let _ = write!(err, "{}", ErrorColor::new(&e, color));
-            e.report()
+            let _ = writeln!(err, "Error: {e}");
+            ExitCode::FAILURE
         }
     }
 }
 
-impl Cli {
-    fn runner(&self) -> Runner {
-        Runner {
-            null_input: self.null_input,
-            color_err: self.color_stdio(&io::stderr()),
-            writer: self.writer(),
-        }
-    }
+fn real_main(cli: &Cli) -> Result<ExitCode, String> {
+    // Resolve variable bindings
+    let (var_names, var_vals): (Vec<String>, Vec<Val>) =
+        binds(cli).map_err(|e| e.to_string())?.into_iter().unzip();
 
-    fn writer(&self) -> Writer {
-        Writer {
-            pp: self.pp(),
-            format: self.to.unwrap_or_default(),
-            join: self.join_output,
-        }
-    }
-
-    fn pp(&self) -> Pp {
-        Pp {
-            indent: (!self.compact_output).then(|| self.indent()),
-            sort_keys: self.sort_keys,
-            colors: self.colors(),
-            sep_space: !self.compact_output || matches!(self.to, Some(Format::Yaml)),
-        }
-    }
-
-    fn colors(&self) -> Colors {
-        self.color_stdio(&io::stdout())
-            .then(Colors::ansi)
-            .map(|c| match std::env::var("JQ_COLORS") {
-                Err(_) => c,
-                Ok(s) => c.parse(&s),
-            })
-            .unwrap_or_default()
-    }
-}
-
-fn real_main(cli: &Cli) -> Result<ExitCode, Error> {
-    let (var_names, mut vars): (Vec<String>, Vec<Val>) = binds(cli)?.into_iter().unzip();
-
-    let (var_vals, filter) = match &cli.filter {
-        None => (Vec::new(), Filter::default()),
-        Some(filter) => {
-            let (path, code) = match filter {
-                cli::Filter::FromFile(path) => (path.into(), std::fs::read_to_string(path)?),
-                cli::Filter::Inline(filter) => ("<inline>".into(), filter.clone()),
+    // Parse and compile the filter
+    let (extra_vals, filter) = match &cli.filter {
+        None => (Vec::new(), filter::Filter::default()),
+        Some(f) => {
+            let (path, code) = match f {
+                cli::Filter::FromFile(path) => (
+                    path.clone(),
+                    std::fs::read_to_string(path).map_err(|e| e.to_string())?,
+                ),
+                cli::Filter::Inline(s) => (std::path::PathBuf::from("<inline>"), s.clone()),
             };
-            filter::parse_compile(&path, &code, &var_names, &cli.library_path)
-                .map_err(Error::Report)?
+            filter::parse_compile(&path, &code, &var_names, &cli.library_path)?
         }
     };
-    vars.extend(var_vals);
-    let vars = jaq_all::jaq_core::Vars::new(vars);
 
-    let runner = &cli.runner();
-    let writer = &runner.writer;
+    let mut all_vals: Vec<Val> = var_vals;
+    all_vals.extend(extra_vals);
+    let vars = Vars::new(all_vals);
 
-    let unwrap_or_json = |fmt: Option<Format>| fmt.unwrap_or_default();
+    let color = cli.color_stdio(&io::stdout());
+    let pp = cli.pp(color);
+
+    let print = |out: &mut dyn Write, v: &Val| -> io::Result<()> {
+        match v {
+            Val::Str(s, _) if cli.raw_output || cli.join_output => out.write_all(s.as_ref())?,
+            _ => jaq_json::write::write(out, &pp, 0, v)?,
+        }
+        if cli.join_output {
+            out.flush()
+        } else {
+            writeln!(out)
+        }
+    };
+
     let last = if cli.files.is_empty() {
-        let format = unwrap_or_json(cli.from);
-        let s = read::read_string(format, io::stdin().lock())?;
-        let inputs = read::from_bufread(format, io::stdin().lock(), &s, cli.slurp);
-        with_stdout(|out| run(runner, &filter, vars, inputs, |v| write(out, writer, &v)))?
+        let inputs = stdin_inputs(cli);
+        with_stdout(|out| filter::run(&filter, vars, inputs, |v| print(out, &v)))
+            .map_err(|e| e.to_string())?
     } else {
         let mut last = None;
         for file in &cli.files {
             let path = Path::new(file);
-            let bytes = read::load_file(path)
-                .map_err(|e| Error::Io(Some(path.display().to_string()), e))?;
-            let format = unwrap_or_json(cli.from.or_else(|| Format::determine(path)));
-            let s = read::bytes_str(format, &bytes)?;
-            let inputs = read::from_bytes(format, &bytes, s, cli.slurp);
+            let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let inputs = file_inputs(cli, &bytes);
 
             if cli.in_place {
                 let location = path.parent().unwrap();
                 let mut tmp = tempfile::Builder::new()
                     .prefix("jaq")
-                    .tempfile_in(location)?;
+                    .tempfile_in(location)
+                    .map_err(|e| e.to_string())?;
 
-                last = run(runner, &filter, vars.clone(), inputs, |output| {
-                    write(tmp.as_file_mut(), writer, &output)
-                })?;
+                last = filter::run(&filter, vars.clone(), inputs, |v| {
+                    print(tmp.as_file_mut(), &v)
+                })
+                .map_err(|e| e.to_string())?;
 
-                std::mem::drop(bytes);
-                let perms = std::fs::metadata(path)?.permissions();
-                tmp.persist(path).map_err(|e| Error::Io(None, e.into()))?;
-                std::fs::set_permissions(path, perms)?;
+                let perms = std::fs::metadata(path)
+                    .map_err(|e| e.to_string())?
+                    .permissions();
+                tmp.persist(path).map_err(|e| e.to_string())?;
+                std::fs::set_permissions(path, perms).map_err(|e| e.to_string())?;
             } else {
                 last = with_stdout(|out| {
-                    run(runner, &filter, vars.clone(), inputs, |v| {
-                        write(out, writer, &v)
-                    })
-                })?;
+                    filter::run(&filter, vars.clone(), inputs, |v| print(out, &v))
+                })
+                .map_err(|e| e.to_string())?;
             }
         }
         last
@@ -152,116 +123,139 @@ fn real_main(cli: &Cli) -> Result<ExitCode, Error> {
 
     if cli.exit_status {
         last.map_or_else(
-            || Err(Error::NoOutput),
-            |b| b.then_some(ExitCode::SUCCESS).ok_or(Error::FalseOrNull),
+            || Err("no output".to_string()),
+            |b| {
+                if b {
+                    Ok(ExitCode::SUCCESS)
+                } else {
+                    Ok(ExitCode::from(1))
+                }
+            },
         )
     } else {
         Ok(ExitCode::SUCCESS)
     }
 }
 
-fn binds(cli: &Cli) -> Result<Vec<(String, Val)>, Error> {
+fn stdin_inputs(cli: &Cli) -> Box<dyn Iterator<Item = io::Result<Val>>> {
+    if cli.null_input {
+        return Box::new(std::iter::once(Ok(Val::Null)));
+    }
+    let mut buf = Vec::new();
+    let _ = io::Read::read_to_end(&mut io::stdin().lock(), &mut buf);
+    if cli.raw_input {
+        let s = String::from_utf8_lossy(&buf).into_owned();
+        if cli.slurp {
+            Box::new(std::iter::once(Ok(Val::from(s))))
+        } else {
+            Box::new(
+                s.lines()
+                    .map(|l| Ok(Val::from(l.to_owned())))
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            )
+        }
+    } else if cli.slurp {
+        let vals: Result<Vec<Val>, _> = jaq_json::read::parse_many(&buf)
+            .map(|r| r.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string())))
+            .collect();
+        Box::new(std::iter::once(vals.map(|vs| vs.into_iter().collect())))
+    } else {
+        Box::new(
+            jaq_json::read::parse_many(&buf)
+                .map(|r| r.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string())))
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )
+    }
+}
+
+fn file_inputs<'a>(cli: &Cli, bytes: &'a [u8]) -> Box<dyn Iterator<Item = io::Result<Val>> + 'a> {
+    if cli.raw_input {
+        let s = String::from_utf8_lossy(bytes).into_owned();
+        if cli.slurp {
+            Box::new(std::iter::once(Ok(Val::from(s))))
+        } else {
+            Box::new(
+                s.lines()
+                    .map(|l| Ok(Val::from(l.to_owned())))
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            )
+        }
+    } else if cli.slurp {
+        let vals: Result<Vec<Val>, _> = jaq_json::read::parse_many(bytes)
+            .map(|r| r.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string())))
+            .collect();
+        Box::new(std::iter::once(vals.map(|vs| vs.into_iter().collect())))
+    } else {
+        Box::new(
+            jaq_json::read::parse_many(bytes)
+                .map(|r| r.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string())))
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )
+    }
+}
+
+fn with_stdout<T, E>(f: impl FnOnce(&mut dyn Write) -> Result<T, E>) -> Result<T, E> {
+    let stdout = io::stdout();
+    if stdout.is_terminal() {
+        f(&mut stdout.lock())
+    } else {
+        f(&mut io::BufWriter::new(stdout.lock()))
+    }
+}
+
+fn binds(cli: &Cli) -> Result<Vec<(String, Val)>, String> {
     let arg = cli
         .arg
         .iter()
-        .map(|(k, s)| Ok((k.to_owned(), Val::utf8_str(s.to_owned()))));
+        .map(|(k, s)| Ok::<_, String>((k.clone(), Val::utf8_str(s.clone()))));
+
     let argjson = cli.argjson.iter().map(|(k, s)| {
-        let err = |e| Error::Parse(format!("{e} (for value passed to `--argjson {k}`)"));
-        Ok((
-            k.to_owned(),
-            read::json::parse_single(s.as_bytes()).map_err(err)?,
-        ))
+        let v = jaq_json::read::parse_single(s.as_bytes())
+            .map_err(|e| format!("--argjson {k}: {e}"))?;
+        Ok((k.clone(), v))
     });
+
     let rawfile = cli.rawfile.iter().map(|(k, path)| {
-        let err = |e| Error::Io(Some(format!("{path:?}")), e);
-        let s = read::load_file(path).map_err(err)?;
-        Ok((k.to_owned(), Val::utf8_str(s)))
+        let s = std::fs::read_to_string(path).map_err(|e| format!("{path:?}: {e}"))?;
+        Ok((k.clone(), Val::utf8_str(s)))
     });
+
     let slurpfile = cli.slurpfile.iter().map(|(k, path)| {
-        let err = |e| Error::Io(Some(format!("{path:?}")), e);
-        Ok((k.to_owned(), read::json_array(path).map_err(err)?))
+        let bytes = std::fs::read(path).map_err(|e| format!("{path:?}: {e}"))?;
+        let vals: Result<Vec<Val>, _> = jaq_json::read::parse_many(&bytes)
+            .map(|r| r.map_err(|e| format!("{path:?}: {e}")))
+            .collect();
+        Ok((k.clone(), vals?.into_iter().collect()))
     });
 
-    let positional = cli.args.iter().cloned().map(|s| Ok(Val::from(s)));
-    let positional = positional.collect::<Result<Vec<_>, Error>>()?;
+    let positional: Vec<Val> = cli.args.iter().cloned().map(Val::from).collect();
 
-    let var_val = arg.chain(rawfile).chain(slurpfile).chain(argjson);
-    let mut var_val = var_val.collect::<Result<Vec<_>, Error>>()?;
+    let mut var_val: Vec<(String, Val)> = arg
+        .chain(rawfile)
+        .chain(slurpfile)
+        .chain(argjson)
+        .collect::<Result<_, _>>()?;
 
-    var_val.push(("ARGS".to_string(), args(&positional, &var_val)));
+    var_val.push(("ARGS".to_string(), make_args(&positional, &var_val)));
     let env = std::env::vars().map(|(k, v)| (k.into(), Val::from(v)));
     var_val.push(("ENV".to_string(), Val::obj(env.collect())));
 
     Ok(var_val)
 }
 
-fn args(positional: &[Val], named: &[(String, Val)]) -> Val {
+fn make_args(positional: &[Val], named: &[(String, Val)]) -> Val {
     let key = |k: &str| k.to_string().into();
     let positional = positional.iter().cloned();
-    let named = named.iter().map(|(var, val)| (key(var), val.clone()));
+    let named = named
+        .iter()
+        .map(|(var, val)| (key(var.as_str()), val.clone()));
     let obj = [
         (key("positional"), positional.collect()),
         (key("named"), Val::obj(named.collect())),
     ];
     Val::obj(obj.into_iter().collect())
-}
-
-#[derive(Debug)]
-pub(crate) enum Error {
-    Io(Option<String>, io::Error),
-    Report(Vec<FileReports<PathBuf>>),
-    Parse(String),
-    Jaq(jaq_all::json::Error),
-    FalseOrNull,
-    NoOutput,
-}
-
-struct ErrorColor<'e>(&'e Error, fn(Color, String) -> String);
-
-impl<'e> ErrorColor<'e> {
-    fn new(e: &'e Error, color: bool) -> Self {
-        Self(e, if color { Color::ansi } else { |_, text| text })
-    }
-}
-
-impl fmt::Display for ErrorColor<'_> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let Self(error, color) = self;
-        match error {
-            Error::FalseOrNull | Error::NoOutput => Ok(()),
-            Error::Io(prefix, e) => {
-                write!(f, "Error: ")?;
-                if let Some(p) = prefix {
-                    write!(f, "{p}: ")?;
-                }
-                writeln!(f, "{e}")
-            }
-            Error::Report(reports) => reports.iter().try_for_each(|fr| {
-                FileReportsDisp::new(fr)
-                    .with_paint(*color)
-                    .with_path(|p| format!("[{}]", p.display()))
-                    .fmt(f)
-            }),
-            Error::Parse(e) => writeln!(f, "Error: failed to parse: {e}"),
-            Error::Jaq(e) => writeln!(f, "Error: {e}"),
-        }
-    }
-}
-
-impl Error {
-    fn report(self) -> ExitCode {
-        ExitCode::from(match self {
-            Self::FalseOrNull => 1,
-            Self::Io(_, _) => 2,
-            Self::Report(_) => 3,
-            Self::NoOutput => 4,
-            Self::Parse(_) | Self::Jaq(_) => 5,
-        })
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Self::Io(None, e)
-    }
 }
