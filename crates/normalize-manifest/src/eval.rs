@@ -20,6 +20,9 @@ pub(crate) fn try_eval(filename: &str, root: &Path) -> Option<ParsedManifest> {
         "Gemfile" => eval_gemfile(root),
         "mix.exs" => eval_mix_exs(root),
         "setup.py" => eval_setup_py(root),
+        "build.gradle" | "build.gradle.kts" => eval_gradle(root),
+        "flake.nix" => eval_flake_nix(root),
+        "conanfile.py" => eval_conanfile_py(root),
         _ => None,
     }
 }
@@ -373,6 +376,273 @@ fn parse_setup_py_json(json: &str) -> Option<ParsedManifest> {
     })
 }
 
+// ── Gradle — init script injection ───────────────────────────────────────────
+
+const GRADLE_INIT_SCRIPT: &str = r#"
+allprojects {
+    task __normalizeDepsJson {
+        doLast {
+            def result = []
+            configurations.each { config ->
+                try {
+                    config.resolvedConfiguration.resolvedArtifacts.each { a ->
+                        def n = a.moduleVersion.id
+                        def isTest = config.name.toLowerCase().contains('test')
+                        result << [name: "${n.group}:${n.name}", version: n.version, kind: isTest ? 'dev' : 'normal']
+                    }
+                } catch (ignored) {}
+            }
+            // deduplicate by name
+            def seen = [] as Set
+            def deduped = result.findAll { seen.add(it.name) }
+            println groovy.json.JsonOutput.toJson(deduped)
+        }
+    }
+}
+"#;
+
+fn eval_gradle(root: &Path) -> Option<ParsedManifest> {
+    // Write the init script to a temp file
+    let mut init_path = std::env::temp_dir();
+    init_path.push("normalize_gradle_init.groovy");
+    std::fs::write(&init_path, GRADLE_INIT_SCRIPT).ok()?;
+
+    let init_arg = init_path.to_str()?;
+
+    // Try ./gradlew first (wrapper), fall back to gradle
+    let stdout = run(
+        "./gradlew",
+        &[
+            "-I",
+            init_arg,
+            "--quiet",
+            "--no-daemon",
+            ":__normalizeDepsJson",
+        ],
+        root,
+    )
+    .or_else(|| {
+        run(
+            "gradle",
+            &[
+                "-I",
+                init_arg,
+                "--quiet",
+                "--no-daemon",
+                ":__normalizeDepsJson",
+            ],
+            root,
+        )
+    })?;
+
+    parse_gradle_json(&stdout)
+}
+
+fn parse_gradle_json(json: &str) -> Option<ParsedManifest> {
+    let arr: Vec<serde_json::Value> = serde_json::from_str(json.trim()).ok()?;
+
+    let deps = arr
+        .into_iter()
+        .filter_map(|v| {
+            let name = v["name"].as_str()?.to_string();
+            let version_req = v["version"].as_str().map(|s| s.to_string());
+            let kind = if v["kind"].as_str() == Some("dev") {
+                DepKind::Dev
+            } else {
+                DepKind::Normal
+            };
+            Some(DeclaredDep {
+                name,
+                version_req,
+                kind,
+            })
+        })
+        .collect();
+
+    Some(ParsedManifest {
+        ecosystem: "gradle",
+        name: None,
+        version: None,
+        dependencies: deps,
+    })
+}
+
+// ── Nix — `nix flake metadata --json` ────────────────────────────────────────
+
+fn eval_flake_nix(root: &Path) -> Option<ParsedManifest> {
+    let stdout = run("nix", &["flake", "metadata", "--json"], root)?;
+    parse_flake_metadata_json(&stdout)
+}
+
+fn parse_flake_metadata_json(json: &str) -> Option<ParsedManifest> {
+    let v: serde_json::Value = serde_json::from_str(json).ok()?;
+
+    let nodes = v["locks"]["nodes"].as_object()?;
+
+    let mut deps = Vec::new();
+    for (key, node) in nodes {
+        // Skip the root node (has "inputs" but no "locked")
+        let locked = &node["locked"];
+        if locked.is_null() || !locked.is_object() {
+            continue;
+        }
+        // Skip nodes without a "type" field in locked (shouldn't happen but be safe)
+        if locked["type"].as_str().is_none() {
+            continue;
+        }
+
+        // Version: prefer "version" field, fall back to short rev (first 7 chars)
+        let version_req = locked["version"]
+            .as_str()
+            .map(|s| s.to_string())
+            .or_else(|| {
+                locked["rev"]
+                    .as_str()
+                    .map(|rev| rev.chars().take(7).collect())
+            });
+
+        deps.push(DeclaredDep {
+            name: key.clone(),
+            version_req,
+            kind: DepKind::Normal,
+        });
+    }
+
+    Some(ParsedManifest {
+        ecosystem: "nix",
+        name: None,
+        version: None,
+        dependencies: deps,
+    })
+}
+
+// ── Conan — mock ConanFile approach ──────────────────────────────────────────
+
+const CONAN_PY_SCRIPT: &str = r#"import sys, json, types
+
+captured_requires = []
+captured_build_requires = []
+captured_name = None
+captured_version = None
+
+class FakeConanFile:
+    settings = None
+    options = {}
+    default_options = {}
+    generators = []
+    exports = []
+    exports_sources = []
+
+    def __init__(self):
+        pass
+
+    def requirements(self):
+        pass
+
+    def build_requirements(self):
+        pass
+
+class _Meta(type):
+    def __new__(mcs, name, bases, namespace):
+        cls = super().__new__(mcs, name, bases, namespace)
+        if name != 'ConanFile' and any(b.__name__ == 'ConanFile' for b in bases):
+            global captured_name, captured_version, captured_requires, captured_build_requires
+            captured_name = getattr(cls, 'name', None)
+            captured_version = getattr(cls, 'version', None)
+            requires = getattr(cls, 'requires', None)
+            build_requires = getattr(cls, 'build_requires', None)
+            if isinstance(requires, str):
+                captured_requires = [requires]
+            elif isinstance(requires, (list, tuple)):
+                captured_requires = list(requires)
+            if isinstance(build_requires, str):
+                captured_build_requires = [build_requires]
+            elif isinstance(build_requires, (list, tuple)):
+                captured_build_requires = list(build_requires)
+        return cls
+
+class ConanFile(metaclass=_Meta):
+    pass
+
+conan_mod = types.ModuleType('conans')
+conan_mod.ConanFile = ConanFile
+conan_mod.tools = types.ModuleType('tools')
+sys.modules['conans'] = conan_mod
+sys.modules['conan'] = conan_mod
+
+# Also handle 'from conan import ConanFile' style
+conan2 = types.ModuleType('conan')
+conan2.ConanFile = ConanFile
+sys.modules['conan'] = conan2
+
+try:
+    with open('conanfile.py') as f:
+        exec(compile(f.read(), 'conanfile.py', 'exec'), {'__name__': '__main__'})
+except Exception as e:
+    sys.stderr.write(str(e) + '\n')
+
+def parse_ref(r):
+    # "pkg/1.0@user/channel" or "pkg/1.0" or "pkg"
+    r = r.strip()
+    if '/' in r:
+        parts = r.split('/', 1)
+        name = parts[0]
+        ver_part = parts[1].split('@')[0]
+        return {'name': name, 'version': ver_part or None}
+    return {'name': r, 'version': None}
+
+deps = []
+for r in captured_requires:
+    p = parse_ref(r)
+    deps.append({'name': p['name'], 'version': p['version'], 'kind': 'normal'})
+for r in captured_build_requires:
+    p = parse_ref(r)
+    deps.append({'name': p['name'], 'version': p['version'], 'kind': 'build'})
+
+print(json.dumps({
+    'name': captured_name,
+    'version': captured_version,
+    'deps': deps,
+}))
+"#;
+
+fn eval_conanfile_py(root: &Path) -> Option<ParsedManifest> {
+    // Try python3 first, fall back to python
+    let stdout = run("python3", &["-c", CONAN_PY_SCRIPT], root)
+        .or_else(|| run("python", &["-c", CONAN_PY_SCRIPT], root))?;
+    parse_conan_py_json(&stdout)
+}
+
+fn parse_conan_py_json(json: &str) -> Option<ParsedManifest> {
+    let v: serde_json::Value = serde_json::from_str(json.trim()).ok()?;
+
+    let name = v["name"].as_str().map(|s| s.to_string());
+    let version = v["version"].as_str().map(|s| s.to_string());
+
+    let mut deps = Vec::new();
+    for dep in v["deps"].as_array().unwrap_or(&vec![]) {
+        let dep_name = dep["name"].as_str()?.to_string();
+        let version_req = dep["version"].as_str().map(|s| s.to_string());
+        let kind = match dep["kind"].as_str() {
+            Some("build") => DepKind::Build,
+            Some("dev") => DepKind::Dev,
+            _ => DepKind::Normal,
+        };
+        deps.push(DeclaredDep {
+            name: dep_name,
+            version_req,
+            kind,
+        });
+    }
+
+    Some(ParsedManifest {
+        ecosystem: "conan",
+        name,
+        version,
+        dependencies: deps,
+    })
+}
+
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -556,6 +826,149 @@ mod tests {
         assert!(m.name.is_none());
         assert!(m.version.is_none());
         assert!(m.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_parse_gradle_json() {
+        let json = r#"[
+            {"name": "com.google.guava:guava", "version": "32.1.2-jre", "kind": "normal"},
+            {"name": "org.springframework:spring-core", "version": "6.0.11", "kind": "normal"},
+            {"name": "junit:junit", "version": "4.13.2", "kind": "dev"}
+        ]"#;
+
+        let m = parse_gradle_json(json).unwrap();
+        assert_eq!(m.ecosystem, "gradle");
+        assert!(m.name.is_none());
+        assert!(m.version.is_none());
+        assert_eq!(m.dependencies.len(), 3);
+
+        let guava = m
+            .dependencies
+            .iter()
+            .find(|d| d.name == "com.google.guava:guava")
+            .unwrap();
+        assert_eq!(guava.version_req.as_deref(), Some("32.1.2-jre"));
+        assert_eq!(guava.kind, DepKind::Normal);
+
+        let junit = m
+            .dependencies
+            .iter()
+            .find(|d| d.name == "junit:junit")
+            .unwrap();
+        assert_eq!(junit.kind, DepKind::Dev);
+    }
+
+    #[test]
+    fn test_parse_flake_metadata_json() {
+        let json = r#"{
+            "locks": {
+                "nodes": {
+                    "root": {
+                        "inputs": {
+                            "nixpkgs": "nixpkgs",
+                            "flake-utils": "flake-utils"
+                        }
+                    },
+                    "nixpkgs": {
+                        "locked": {
+                            "lastModified": 1700000000,
+                            "narHash": "sha256-abc",
+                            "owner": "NixOS",
+                            "repo": "nixpkgs",
+                            "rev": "abcdef1234567890",
+                            "type": "github"
+                        }
+                    },
+                    "flake-utils": {
+                        "locked": {
+                            "lastModified": 1699000000,
+                            "narHash": "sha256-xyz",
+                            "owner": "numtide",
+                            "repo": "flake-utils",
+                            "rev": "1122334455667788",
+                            "type": "github"
+                        }
+                    }
+                }
+            }
+        }"#;
+
+        let m = parse_flake_metadata_json(json).unwrap();
+        assert_eq!(m.ecosystem, "nix");
+        assert!(m.name.is_none());
+        // root node must be skipped
+        assert_eq!(m.dependencies.len(), 2);
+
+        let nixpkgs = m.dependencies.iter().find(|d| d.name == "nixpkgs").unwrap();
+        assert_eq!(nixpkgs.version_req.as_deref(), Some("abcdef1")); // short rev
+        assert_eq!(nixpkgs.kind, DepKind::Normal);
+
+        let utils = m
+            .dependencies
+            .iter()
+            .find(|d| d.name == "flake-utils")
+            .unwrap();
+        assert_eq!(utils.version_req.as_deref(), Some("1122334"));
+    }
+
+    #[test]
+    fn test_parse_flake_metadata_json_with_version() {
+        // Node with a "version" field (e.g., fetched tarball with explicit version)
+        let json = r#"{
+            "locks": {
+                "nodes": {
+                    "root": {
+                        "inputs": {"crane": "crane"}
+                    },
+                    "crane": {
+                        "locked": {
+                            "type": "github",
+                            "owner": "ipetkov",
+                            "repo": "crane",
+                            "rev": "deadbeef00000000",
+                            "version": "0.16.3"
+                        }
+                    }
+                }
+            }
+        }"#;
+
+        let m = parse_flake_metadata_json(json).unwrap();
+        let crane = m.dependencies.iter().find(|d| d.name == "crane").unwrap();
+        // "version" field preferred over rev
+        assert_eq!(crane.version_req.as_deref(), Some("0.16.3"));
+    }
+
+    #[test]
+    fn test_parse_conan_py_json() {
+        let json = r#"{
+            "name": "mylib",
+            "version": "1.2.3",
+            "deps": [
+                {"name": "boost", "version": "1.82.0", "kind": "normal"},
+                {"name": "zlib", "version": "1.3", "kind": "normal"},
+                {"name": "cmake", "version": "3.25.0", "kind": "build"},
+                {"name": "gtest", "version": null, "kind": "normal"}
+            ]
+        }"#;
+
+        let m = parse_conan_py_json(json).unwrap();
+        assert_eq!(m.ecosystem, "conan");
+        assert_eq!(m.name.as_deref(), Some("mylib"));
+        assert_eq!(m.version.as_deref(), Some("1.2.3"));
+        assert_eq!(m.dependencies.len(), 4);
+
+        let boost = m.dependencies.iter().find(|d| d.name == "boost").unwrap();
+        assert_eq!(boost.version_req.as_deref(), Some("1.82.0"));
+        assert_eq!(boost.kind, DepKind::Normal);
+
+        let cmake = m.dependencies.iter().find(|d| d.name == "cmake").unwrap();
+        assert_eq!(cmake.version_req.as_deref(), Some("3.25.0"));
+        assert_eq!(cmake.kind, DepKind::Build);
+
+        let gtest = m.dependencies.iter().find(|d| d.name == "gtest").unwrap();
+        assert!(gtest.version_req.is_none());
+        assert_eq!(gtest.kind, DepKind::Normal);
     }
 
     #[test]
