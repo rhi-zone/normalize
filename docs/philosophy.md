@@ -199,31 +199,6 @@ The goal: users should never wonder "did that work?" or "what did that do?"
 
 When structure is ambiguous, make a reasonable choice. When truly unclear, ask—but aim for that to be rare. The goal: zero configuration for 90% of cases, explicit config for edge cases.
 
-#### Workflows Become Presets
-
-If you have a workflow, the intuitive way to proceed should be to codify it. Custom presets are first-class citizens:
-- **Capture patterns**: Repeated sequences of actions should become single commands
-- **User-defined skills**: `.normalize/skills/` for domain-specific behaviors
-- **Progressive formalization**: Start ad-hoc, graduate to preset when patterns emerge
-- **Shareable**: Presets should be easy to share, version, and compose
-
-The goal: reduce the distance between "I do this often" and "now it's a command."
-
-#### UX Principles
-
-- **No modals** - Everything inline, no popups blocking context
-- **No nested menus** - Flat, searchable action lists
-- **Actions visible** - Show what's possible, don't hide capabilities
-- **Direct manipulation** - Click/select to act, not navigate menus
-- **Mouse support** - Full mouse interaction everywhere (especially TUI)
-- **Progressive disclosure** - Start simple, reveal depth on demand
-
-Same mental model across all interfaces:
-1. **Start anywhere** - File, function, class, symbol, or natural language query
-2. **Traverse by relationship** - calls → called-by → imports → similar-to
-3. **Zoom fluently** - Full source ↔ skeleton ↔ signature ↔ one-liner
-4. **Context preserved** - Breadcrumbs, back/forward, history
-
 ---
 
 ### Implementation
@@ -235,7 +210,7 @@ Same mental model across all interfaces:
 - Composability: Small pieces combine flexibly
 - Refactorability: Can restructure without rewriting everything
 
-**Library-first**: The core should be a reusable Rust library (`crates/normalize/`). Interfaces (CLI, MCP, LSP) are thin wrappers around the library.
+**Library-first**: The core should be a reusable Rust library (`crates/normalize/`). The CLI is a thin wrapper around it.
 
 **Everything is a plugin**: Where possible, use plugin protocols instead of hardcoded implementations. Even "native" integrations should implement the same plugin interface as third-party ones.
 
@@ -243,8 +218,7 @@ Same mental model across all interfaces:
 
 Normalize should be extremely lightweight. High memory usage is a bug:
 - **Low RAM footprint**: Favor streaming and lazy loading over large in-memory caches
-- **Minimal context**: Never send full code when a skeleton or snippet suffices
-- **Transparent metrics**: Every command should optionally show context and RAM usage breakdowns
+- **Transparent metrics**: Every command should optionally show RAM and timing breakdowns
 
 ---
 
