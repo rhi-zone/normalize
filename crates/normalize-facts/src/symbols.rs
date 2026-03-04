@@ -65,7 +65,8 @@ impl SymbolParser {
         }
     }
 
-    /// Parse imports from any supported language file using trait-based extraction.
+    /// Parse imports from any supported language file.
+    /// Tries query-based extraction first; falls back to trait-based extraction.
     /// Returns a flattened list where each imported name gets its own FlatImport entry.
     pub fn parse_imports(&self, path: &Path, content: &str) -> Vec<FlatImport> {
         let support = match support_for_path(path) {
@@ -78,13 +79,26 @@ impl SymbolParser {
             return Vec::new();
         }
 
-        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
+        let grammar_name = support.grammar_name();
+        let tree = match parsers::parse_with_grammar(grammar_name, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
 
-        let mut imports = Vec::new();
         let root = tree.root_node();
+        let loader = normalize_languages::parsers::grammar_loader();
+
+        // Try query-based extraction first
+        if let Some(query_str) = loader.get_imports(grammar_name)
+            && let Some(grammar) = loader.get(grammar_name)
+            && let Some(imports) =
+                Self::collect_imports_with_query(root, content, &grammar, &query_str)
+        {
+            return imports;
+        }
+
+        // Fall back to trait-based extraction
+        let mut imports = Vec::new();
         let mut cursor = root.walk();
         Self::collect_imports_with_trait(&mut cursor, content, support, &mut imports);
         imports
@@ -172,6 +186,74 @@ impl SymbolParser {
                 break;
             }
         }
+    }
+
+    /// Query-based import extraction using `@import`, `@import.path`, `@import.name`,
+    /// `@import.alias`, and `@import.glob` captures.
+    fn collect_imports_with_query(
+        root: tree_sitter::Node,
+        source: &str,
+        grammar: &tree_sitter::Language,
+        query_str: &str,
+    ) -> Option<Vec<FlatImport>> {
+        let query = tree_sitter::Query::new(grammar, query_str).ok()?;
+        let path_idx = query.capture_index_for_name("import.path");
+        let name_idx = query.capture_index_for_name("import.name");
+        let alias_idx = query.capture_index_for_name("import.alias");
+        let glob_idx = query.capture_index_for_name("import.glob");
+        let stmt_idx = query.capture_index_for_name("import");
+
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        let mut results = Vec::new();
+
+        let mut matches = qcursor.matches(&query, root, source.as_bytes());
+        while let Some(m) = matches.next() {
+            let mut stmt_line: usize = 0;
+            let mut path: Option<String> = None;
+            let mut name: Option<String> = None;
+            let mut alias: Option<String> = None;
+            let mut is_glob = false;
+
+            for cap in m.captures {
+                let text = &source[cap.node.byte_range()];
+                let idx = cap.index;
+                if stmt_idx == Some(idx) {
+                    stmt_line = cap.node.start_position().row + 1;
+                } else if path_idx == Some(idx) {
+                    path = Some(strip_import_quotes(text));
+                } else if name_idx == Some(idx) {
+                    name = Some(text.to_string());
+                } else if alias_idx == Some(idx) {
+                    alias = Some(text.to_string());
+                } else if glob_idx == Some(idx) {
+                    is_glob = true;
+                }
+            }
+
+            if is_glob {
+                results.push(FlatImport {
+                    module: path,
+                    name: "*".to_string(),
+                    alias,
+                    line: stmt_line,
+                });
+            } else if let Some(n) = name {
+                results.push(FlatImport {
+                    module: path,
+                    name: n,
+                    alias,
+                    line: stmt_line,
+                });
+            } else if let Some(p) = path {
+                results.push(FlatImport {
+                    module: None,
+                    name: p,
+                    alias,
+                    line: stmt_line,
+                });
+            }
+        }
+        Some(results)
     }
 
     /// Find a symbol by name in a file
@@ -1056,6 +1138,12 @@ impl SymbolParser {
 
         callers
     }
+}
+
+/// Strip surrounding quotes from import path strings (", ', or `).
+fn strip_import_quotes(s: &str) -> String {
+    s.trim_matches(|c| c == '"' || c == '\'' || c == '`')
+        .to_string()
 }
 
 #[cfg(test)]
