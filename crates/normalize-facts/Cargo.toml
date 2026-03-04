@@ -14,6 +14,7 @@ normalize-local-deps = { path = "../normalize-local-deps", version = "0.1.0" }
 
 # Parsing
 tree-sitter = "0.26"
+streaming-iterator = "0.1"
 
 # Database
 libsql.workspace = true
