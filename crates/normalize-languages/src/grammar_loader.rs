@@ -506,6 +506,18 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "cpp" => Some(include_str!("queries/cpp.tags.scm")),
         "ruby" => Some(include_str!("queries/ruby.tags.scm")),
         "kotlin" => Some(include_str!("queries/kotlin.tags.scm")),
+        "scala" => Some(include_str!("queries/scala.tags.scm")),
+        "elixir" => Some(include_str!("queries/elixir.tags.scm")),
+        "swift" => Some(include_str!("queries/swift.tags.scm")),
+        "haskell" => Some(include_str!("queries/haskell.tags.scm")),
+        "dart" => Some(include_str!("queries/dart.tags.scm")),
+        "ocaml" => Some(include_str!("queries/ocaml.tags.scm")),
+        "fsharp" => Some(include_str!("queries/fsharp.tags.scm")),
+        "gleam" => Some(include_str!("queries/gleam.tags.scm")),
+        "zig" => Some(include_str!("queries/zig.tags.scm")),
+        "julia" => Some(include_str!("queries/julia.tags.scm")),
+        "erlang" => Some(include_str!("queries/erlang.tags.scm")),
+        "lua" => Some(include_str!("queries/lua.tags.scm")),
         _ => None,
     }
 }
@@ -771,6 +783,18 @@ mod tests {
             "cpp",
             "ruby",
             "kotlin",
+            "scala",
+            "elixir",
+            "swift",
+            "haskell",
+            "dart",
+            "ocaml",
+            "fsharp",
+            "gleam",
+            "zig",
+            "julia",
+            "erlang",
+            "lua",
         ] {
             let query = bundled_tags_query(lang);
             assert!(query.is_some(), "Missing bundled tags query for {lang}");
