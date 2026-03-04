@@ -5,8 +5,9 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use normalize_architecture::{build_import_graph, compute_depth, compute_downstream};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// One module's depth and risk metrics.
@@ -43,71 +44,11 @@ pub struct DepthMapReport {
     pub stats: DepthMapStats,
 }
 
-/// Compute depth for a single node via DFS + memoization.
-/// depth(M) = max(1 + depth(importer) for importer in importers_by_file[M]), base 0.
-pub(crate) fn compute_depth(
-    node: &str,
-    importers_by_file: &HashMap<String, HashSet<String>>,
-    memo: &mut HashMap<String, usize>,
-    in_stack: &mut HashSet<String>,
-) -> usize {
-    if let Some(&d) = memo.get(node) {
-        return d;
-    }
-    if in_stack.contains(node) {
-        // Cycle — treat as base case to avoid infinite recursion
-        return 0;
-    }
-    in_stack.insert(node.to_string());
-
-    let depth = match importers_by_file.get(node) {
-        None => 0,
-        Some(importers) if importers.is_empty() => 0,
-        Some(importers) => importers
-            .iter()
-            .map(|imp| 1 + compute_depth(imp, importers_by_file, memo, in_stack))
-            .max()
-            .unwrap_or(0),
-    };
-
-    in_stack.remove(node);
-    memo.insert(node.to_string(), depth);
-    depth
-}
-
-/// Compute downstream count for a node: BFS through importers_by_file.
-fn compute_downstream(node: &str, importers_by_file: &HashMap<String, HashSet<String>>) -> usize {
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::new();
-
-    if let Some(importers) = importers_by_file.get(node) {
-        for imp in importers {
-            if visited.insert(imp.clone()) {
-                queue.push_back(imp.clone());
-            }
-        }
-    }
-
-    while let Some(current) = queue.pop_front() {
-        if let Some(importers) = importers_by_file.get(&current) {
-            for imp in importers {
-                if visited.insert(imp.clone()) {
-                    queue.push_back(imp.clone());
-                }
-            }
-        }
-    }
-
-    visited.len()
-}
-
 /// Analyze the dependency depth map.
 pub async fn analyze_depth_map(
     idx: &FileIndex,
     limit: usize,
 ) -> Result<DepthMapReport, libsql::Error> {
-    use super::architecture::build_import_graph;
-
     let graph = build_import_graph(idx).await?;
 
     // Collect all modules (files that appear in either side of the graph)

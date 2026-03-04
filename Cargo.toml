@@ -37,6 +37,7 @@ members = [
     "crates/normalize-scope",
     "crates/normalize-graph",
     "crates/normalize-code-similarity",
+    "crates/normalize-architecture",
     "xtask",
 ]
 

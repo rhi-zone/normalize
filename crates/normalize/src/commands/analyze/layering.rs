@@ -5,6 +5,9 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use normalize_architecture::{
+    build_import_graph, compute_depth, compute_layering_compliance, extract_layer,
+};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -66,9 +69,6 @@ pub async fn analyze_layering(
     idx: &FileIndex,
     limit: usize,
 ) -> Result<LayeringReport, libsql::Error> {
-    use super::architecture::{build_import_graph, extract_layer};
-    use super::depth_map::compute_depth;
-
     let graph = build_import_graph(idx).await?;
 
     // Collect all modules
@@ -114,65 +114,22 @@ pub async fn analyze_layering(
         })
         .collect();
 
-    // Classify imports for each module
-    let mut entries: Vec<LayeringEntry> = Vec::new();
+    // Classify imports for each module using the extracted algorithm
+    let raw_entries =
+        compute_layering_compliance(&graph.imports_by_file, &all_modules, &layer_avg_depth);
 
-    for module in &all_modules {
-        let imports = match graph.imports_by_file.get(module) {
-            Some(targets) => targets,
-            None => continue, // no outgoing imports
-        };
-
-        let src_layer = extract_layer(module);
-        let src_avg = layer_avg_depth.get(&src_layer).copied().unwrap_or(0.0);
-
-        let mut downward = 0usize;
-        let mut upward = 0usize;
-        let mut self_count = 0usize;
-
-        for target in imports {
-            let tgt_layer = extract_layer(target);
-            if tgt_layer == src_layer {
-                self_count += 1;
-            } else {
-                let tgt_avg = layer_avg_depth.get(&tgt_layer).copied().unwrap_or(0.0);
-                if tgt_avg > src_avg {
-                    downward += 1;
-                } else if tgt_avg < src_avg {
-                    upward += 1;
-                } else {
-                    // Same avg depth but different layer — treat as neutral (self-like)
-                    self_count += 1;
-                }
-            }
-        }
-
-        let cross = downward + upward;
-        let compliance = if cross == 0 {
-            1.0
-        } else {
-            downward as f64 / cross as f64
-        };
-
-        entries.push(LayeringEntry {
-            module: module.clone(),
-            layer: src_layer,
-            total_imports: cross,
-            downward_imports: downward,
-            upward_imports: upward,
-            self_imports: self_count,
-            compliance,
-        });
-    }
-
-    // Sort by worst compliance first
-    entries.sort_by(|a, b| {
-        a.compliance
-            .partial_cmp(&b.compliance)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(b.upward_imports.cmp(&a.upward_imports))
-            .then(a.module.cmp(&b.module))
-    });
+    let mut entries: Vec<LayeringEntry> = raw_entries
+        .into_iter()
+        .map(|r| LayeringEntry {
+            module: r.module,
+            layer: r.layer,
+            total_imports: r.total_imports,
+            downward_imports: r.downward_imports,
+            upward_imports: r.upward_imports,
+            self_imports: r.self_imports,
+            compliance: r.compliance,
+        })
+        .collect();
 
     // Build per-layer summaries
     let mut layer_entries: HashMap<String, Vec<&LayeringEntry>> = HashMap::new();

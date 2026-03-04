@@ -3428,6 +3428,7 @@ dependencies = [
  "jaq-std",
  "libc",
  "libsql",
+ "normalize-architecture",
  "normalize-chat-sessions",
  "normalize-cli-parser",
  "normalize-code-similarity",
@@ -3476,6 +3477,17 @@ dependencies = [
  "utoipa",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "normalize-architecture"
+version = "0.1.0"
+dependencies = [
+ "libsql",
+ "normalize-facts",
+ "normalize-languages",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
