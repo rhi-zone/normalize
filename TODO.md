@@ -593,8 +593,12 @@ The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mi
 
 ## Embedded CLI drop-in integrations (see docs/cli-dropin-integrations.md)
 
-- `normalize rg` — drop-in ripgrep using existing grep-matcher/grep-regex/grep-searcher workspace deps (ripgrep has no lib target so can't vendor directly). Feature flag: `rg-cli`.
-- `normalize ast-grep` — drop-in ast-grep using existing ast-grep-core dep. Vendor CLI source from ast-grep. Feature flag: `ast-grep-cli`.
+All three integrations complete: `jq`, `rg`, `ast-grep`.
+
+Future work:
+- `normalize ast-grep scan` / `sg test` (needs ast-grep-config dep)
+- `normalize ast-grep --rewrite` / `--interactive` (needs ast-grep-config::Fixer + crossterm)
+- `normalize rg` PCRE2 support (pcre2 feature not enabled)
 
 
 
