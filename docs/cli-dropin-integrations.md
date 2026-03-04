@@ -104,6 +104,7 @@ These numbers are from the first integration and inform expectations for future 
 | + jq-cli feature | ~32.9 MB |
 | + rg-cli (vendored ripgrep 14.1.1) | ~34.0 MB |
 | + ast-grep-cli (ast-grep-core bridge) | ~34 MB (minimal delta) |
+| + ast-grep scan/test/rewrite/interactive | ~36 MB (+ast-grep-config, crossterm, serde_yaml) |
 
 **jq-cli feature cost: ~835 KB** (measured by building with and without the feature).
 
