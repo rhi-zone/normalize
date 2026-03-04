@@ -35,10 +35,6 @@ impl Language for TlaPlus {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["extends"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["module", "operator_definition"]
     }

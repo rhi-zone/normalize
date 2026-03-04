@@ -35,10 +35,6 @@ impl Language for Capnp {
         &["struct", "interface", "enum"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["struct", "interface", "enum"]
     }

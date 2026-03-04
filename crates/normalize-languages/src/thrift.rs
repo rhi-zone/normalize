@@ -35,10 +35,6 @@ impl Language for Thrift {
         &["struct_definition", "enum_definition", "typedef_definition"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["include_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["struct_definition", "service_definition", "enum_definition"]
     }

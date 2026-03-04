@@ -36,10 +36,6 @@ impl Language for Jq {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["funcdef"]
     }

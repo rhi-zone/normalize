@@ -40,10 +40,6 @@ impl Language for Elm {
         &["type_alias_declaration", "type_declaration"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_clause"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "value_declaration",

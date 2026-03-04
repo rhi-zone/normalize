@@ -35,10 +35,6 @@ impl Language for Prolog {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["directive_term"] // use_module directives
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["clause_term", "directive_term"]
     }

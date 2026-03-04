@@ -35,10 +35,6 @@ impl Language for Ninja {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["include", "subninja"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["rule", "build"]
     }

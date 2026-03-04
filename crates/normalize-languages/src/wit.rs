@@ -35,10 +35,6 @@ impl Language for Wit {
         &["type_item", "record_item"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["use_item"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["interface_item", "world_item", "func_item"]
     }

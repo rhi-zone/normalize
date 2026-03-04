@@ -34,10 +34,6 @@ impl Language for Hcl {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["block"] // module blocks are imports
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["block"]
     }

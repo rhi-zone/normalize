@@ -34,10 +34,6 @@ impl Language for Nginx {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["directive"] // include directive
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["block", "directive"]
     }

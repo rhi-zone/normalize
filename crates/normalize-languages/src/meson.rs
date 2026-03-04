@@ -35,10 +35,6 @@ impl Language for Meson {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["normal_command"] // subproject(), dependency() are function calls
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["expression_statement"]
     }

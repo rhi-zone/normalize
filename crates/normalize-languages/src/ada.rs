@@ -47,10 +47,6 @@ impl Language for Ada {
         ]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["with_clause", "use_clause"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "package_declaration",

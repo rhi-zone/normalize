@@ -36,10 +36,6 @@ impl Language for CMake {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["normal_command"] // include(), find_package()
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["function_def", "macro_def"]
     }

@@ -37,10 +37,6 @@ impl Language for Dockerfile {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["from_instruction"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["from_instruction"]
     }

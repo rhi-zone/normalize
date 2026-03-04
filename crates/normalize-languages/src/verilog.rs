@@ -35,10 +35,6 @@ impl Language for Verilog {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["package_import_declaration"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["module_declaration"]
     }

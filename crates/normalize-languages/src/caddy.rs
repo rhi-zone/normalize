@@ -34,10 +34,6 @@ impl Language for Caddy {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["site_block"]
     }

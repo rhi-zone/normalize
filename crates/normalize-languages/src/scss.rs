@@ -35,10 +35,6 @@ impl Language for Scss {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_statement", "use_statement", "forward_statement"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["mixin_statement", "function_statement"]
     }

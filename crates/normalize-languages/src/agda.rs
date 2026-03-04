@@ -35,10 +35,6 @@ impl Language for Agda {
         &["data", "record"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["import", "open"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["module", "data", "record", "function"]
     }

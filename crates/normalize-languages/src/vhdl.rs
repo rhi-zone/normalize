@@ -39,10 +39,6 @@ impl Language for Vhdl {
         &["full_type_declaration"]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["use_clause"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["entity_declaration", "package_declaration"]
     }

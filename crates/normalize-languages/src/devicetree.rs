@@ -34,10 +34,6 @@ impl Language for DeviceTree {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["preproc_include"]
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &["node", "property"]
     }

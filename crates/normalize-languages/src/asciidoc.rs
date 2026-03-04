@@ -34,10 +34,6 @@ impl Language for AsciiDoc {
         &[]
     }
 
-    fn import_kinds(&self) -> &'static [&'static str] {
-        &["block_macro"] // includes are block macros in AsciiDoc
-    }
-
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
         &[
             "section_block",
