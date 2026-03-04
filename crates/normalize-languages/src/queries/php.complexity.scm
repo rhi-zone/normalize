@@ -1,0 +1,25 @@
+; Complexity query for PHP
+; @complexity — nodes that increase cyclomatic complexity
+; @nesting — nodes that increase nesting depth
+
+; Complexity nodes
+(if_statement) @complexity
+(for_statement) @complexity
+(foreach_statement) @complexity
+(while_statement) @complexity
+(do_statement) @complexity
+(case_statement) @complexity
+(catch_clause) @complexity
+(conditional_expression) @complexity
+
+; Nesting nodes
+(if_statement) @nesting
+(for_statement) @nesting
+(foreach_statement) @nesting
+(while_statement) @nesting
+(do_statement) @nesting
+(switch_statement) @nesting
+(try_statement) @nesting
+(function_definition) @nesting
+(method_declaration) @nesting
+(class_declaration) @nesting
