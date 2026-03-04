@@ -135,6 +135,54 @@ impl ManifestParser for CsprojParser {
     }
 }
 
+/// Parser for `Directory.Packages.props` files (.NET Central Package Management).
+///
+/// Extracts `<PackageVersion Include="Name" Version="..." />` elements.
+/// All entries are `Normal` — this file declares available versions, not scopes.
+pub struct DirectoryPackagesPropsParser;
+
+impl ManifestParser for DirectoryPackagesPropsParser {
+    fn filename(&self) -> &'static str {
+        "Directory.Packages.props"
+    }
+
+    fn parse(&self, content: &str) -> Result<ParsedManifest, ManifestError> {
+        let doc = roxmltree::Document::parse(content).map_err(|e| ManifestError(e.to_string()))?;
+
+        let mut deps = Vec::new();
+
+        for node in doc
+            .descendants()
+            .filter(|n| n.has_tag_name("PackageVersion"))
+        {
+            let pkg_name = node
+                .attribute("Include")
+                .or_else(|| node.attribute("include"));
+            let Some(pkg_name) = pkg_name else {
+                continue;
+            };
+
+            let version_req = node
+                .attribute("Version")
+                .or_else(|| node.attribute("version"))
+                .map(|v| v.to_string());
+
+            deps.push(DeclaredDep {
+                name: pkg_name.to_string(),
+                version_req,
+                kind: DepKind::Normal,
+            });
+        }
+
+        Ok(ParsedManifest {
+            ecosystem: "nuget",
+            name: None,
+            version: None,
+            dependencies: deps,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,5 +254,47 @@ mod tests {
             .find(|d| d.name == "coverlet.collector")
             .unwrap();
         assert_eq!(coverlet.kind, DepKind::Dev);
+    }
+
+    #[test]
+    fn test_directory_packages_props() {
+        let content = r#"<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.0" />
+  </ItemGroup>
+</Project>"#;
+
+        let m = DirectoryPackagesPropsParser.parse(content).unwrap();
+        assert_eq!(m.ecosystem, "nuget");
+        assert_eq!(m.dependencies.len(), 3);
+
+        let json_dep = m
+            .dependencies
+            .iter()
+            .find(|d| d.name == "Newtonsoft.Json")
+            .unwrap();
+        assert_eq!(json_dep.version_req.as_deref(), Some("13.0.3"));
+        assert_eq!(json_dep.kind, DepKind::Normal);
+
+        let efcore = m
+            .dependencies
+            .iter()
+            .find(|d| d.name == "Microsoft.EntityFrameworkCore")
+            .unwrap();
+        assert_eq!(efcore.version_req.as_deref(), Some("8.0.0"));
+        assert_eq!(efcore.kind, DepKind::Normal);
+
+        let coverlet = m
+            .dependencies
+            .iter()
+            .find(|d| d.name == "coverlet.collector")
+            .unwrap();
+        assert_eq!(coverlet.version_req.as_deref(), Some("6.0.0"));
+        assert_eq!(coverlet.kind, DepKind::Normal);
     }
 }

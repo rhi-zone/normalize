@@ -18,27 +18,46 @@
 pub mod eval;
 
 pub mod cabal;
+pub mod cabal_project;
 pub mod cargo;
+pub mod clojure;
+pub mod common_lisp;
 pub mod composer;
 pub mod conan;
+pub mod crystal;
 pub mod dub;
+pub mod dune;
+pub mod elm;
+pub mod erlang;
 pub mod flake;
+pub mod fortran_fpm;
 pub mod gemfile;
+pub mod gleam;
 pub mod go_mod;
 pub mod gradle;
+pub mod gradle_libs;
+pub mod julia;
 pub mod maven;
 pub mod mix_exs;
 pub mod nimble;
 pub mod npm;
 pub mod nuget;
+pub mod ocaml;
+pub mod perl;
 pub mod pip;
 pub mod pubspec;
+pub mod purescript;
 pub mod pyproject;
+pub mod r_description;
+pub mod racket;
 pub mod rockspec;
 pub mod sbt;
 pub mod setup_cfg;
 pub mod stack;
 pub mod swift_pm;
+pub mod vcpkg;
+pub mod vlang;
+pub mod zig;
 
 pub use go_mod::GoModule;
 pub use npm::npm_entry_point;
@@ -143,6 +162,7 @@ pub fn parse_manifest(filename: &str, content: &str) -> Option<ParsedManifest> {
         "conanfile.py" => conan::ConanPyParser.parse(content).ok(),
         // .NET/NuGet
         "packages.config" => nuget::PackagesConfigParser.parse(content).ok(),
+        "Directory.Packages.props" => nuget::DirectoryPackagesPropsParser.parse(content).ok(),
         // D language
         "dub.json" => dub::DubJsonParser.parse(content).ok(),
         "dub.sdl" => dub::DubSdlParser.parse(content).ok(),
@@ -152,6 +172,41 @@ pub fn parse_manifest(filename: &str, content: &str) -> Option<ParsedManifest> {
         "flake.nix" => flake::FlakeParser.parse(content).ok(),
         // Swift
         "Package.swift" => swift_pm::SwiftPmParser.parse(content).ok(),
+        // Gradle version catalog
+        "libs.versions.toml" => gradle_libs::GradleLibsParser.parse(content).ok(),
+        // vcpkg (C/C++)
+        "vcpkg.json" => vcpkg::VcpkgParser.parse(content).ok(),
+        // Elm
+        "elm.json" => elm::ElmParser.parse(content).ok(),
+        // Gleam
+        "gleam.toml" => gleam::GleamParser.parse(content).ok(),
+        // Julia
+        "Project.toml" => julia::JuliaParser.parse(content).ok(),
+        // Fortran Package Manager
+        "fpm.toml" => fortran_fpm::FortranFpmParser.parse(content).ok(),
+        // Clojure
+        "project.clj" => clojure::LeinParser.parse(content).ok(),
+        "deps.edn" => clojure::EclojureParser.parse(content).ok(),
+        // Crystal
+        "shard.yml" => crystal::CrystalShardsParser.parse(content).ok(),
+        // R
+        "DESCRIPTION" => r_description::RDescriptionParser.parse(content).ok(),
+        // Erlang
+        "rebar.config" => erlang::RebarConfigParser.parse(content).ok(),
+        // Perl
+        "cpanfile" => perl::CpanfileParser.parse(content).ok(),
+        // OCaml/Dune
+        "dune-project" => dune::DuneParser.parse(content).ok(),
+        // Zig
+        "build.zig.zon" => zig::ZigZonParser.parse(content).ok(),
+        // PureScript
+        "spago.yaml" => purescript::SpagoParser.parse(content).ok(),
+        // Racket
+        "info.rkt" => racket::RacketInfoParser.parse(content).ok(),
+        // V language
+        "v.mod" => vlang::VModParser.parse(content).ok(),
+        // Haskell Cabal project
+        "cabal.project" => cabal_project::CabalProjectParser.parse(content).ok(),
         // Extension-based dispatch (wildcard filenames)
         _ => parse_manifest_by_extension_impl(filename, content),
     }
@@ -175,6 +230,8 @@ fn parse_manifest_by_extension_impl(filename: &str, content: &str) -> Option<Par
         "cabal" => cabal::CabalParser.parse(content).ok(),
         "csproj" | "vbproj" | "fsproj" => nuget::CsprojParser.parse(content).ok(),
         "rockspec" => rockspec::RockspecParser.parse(content).ok(),
+        "opam" => ocaml::OpamParser.parse(content).ok(),
+        "asd" => common_lisp::AsdParser.parse(content).ok(),
         _ => None,
     }
 }
