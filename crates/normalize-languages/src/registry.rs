@@ -412,10 +412,6 @@ pub fn validate_unused_kinds_audit(
     for kind in lang.public_symbol_kinds() {
         used_kinds.insert(kind);
     }
-    for kind in lang.complexity_nodes() {
-        used_kinds.insert(kind);
-    }
-
     let documented_set: HashSet<&str> = documented_unused.iter().copied().collect();
 
     // Get all valid named node kinds from grammar
@@ -525,7 +521,6 @@ mod tests {
                 ("type_kinds", lang.type_kinds()),
                 ("import_kinds", lang.import_kinds()),
                 ("public_symbol_kinds", lang.public_symbol_kinds()),
-                ("complexity_nodes", lang.complexity_nodes()),
             ];
 
             for (method, kinds) in all_kinds {
@@ -632,9 +627,6 @@ mod tests {
                 used_kinds.insert(kind);
             }
             for kind in lang.public_symbol_kinds() {
-                used_kinds.insert(kind);
-            }
-            for kind in lang.complexity_nodes() {
                 used_kinds.insert(kind);
             }
 

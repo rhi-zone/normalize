@@ -899,10 +899,8 @@ fn collect_symbols_from_tags<'tree>(
     }
 }
 
-/// Compute cyclomatic complexity for a function node.
-///
-/// Prefers a `.complexity.scm` query when available for the language (via
-/// `grammar_loader`), falling back to the trait-based `complexity_nodes()` walker.
+/// Compute cyclomatic complexity for a function node using the `.complexity.scm` query.
+/// Returns 1 (base complexity) for languages without a complexity query.
 pub fn compute_complexity(
     node: &tree_sitter::Node,
     support: &dyn Language,
@@ -916,7 +914,7 @@ pub fn compute_complexity(
     {
         return count_complexity_with_query(node, source, &query);
     }
-    count_complexity_with_trait(node, support)
+    1
 }
 
 /// Count complexity using a `@complexity` query.
@@ -945,38 +943,6 @@ fn count_complexity_with_query(
         }
     }
     complexity
-}
-
-/// Count complexity using the trait-based `complexity_nodes()` walker.
-fn count_complexity_with_trait(node: &tree_sitter::Node, support: &dyn Language) -> usize {
-    let mut complexity = 1; // Base complexity
-    let complexity_nodes = support.complexity_nodes();
-    let mut cursor = node.walk();
-
-    if !cursor.goto_first_child() {
-        return complexity;
-    }
-
-    loop {
-        if complexity_nodes.contains(&cursor.node().kind()) {
-            complexity += 1;
-        }
-
-        if cursor.goto_first_child() {
-            continue;
-        }
-        if cursor.goto_next_sibling() {
-            continue;
-        }
-        loop {
-            if !cursor.goto_parent() {
-                return complexity;
-            }
-            if cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
 }
 
 #[cfg(test)]

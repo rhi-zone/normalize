@@ -422,9 +422,7 @@ impl ComplexityAnalyzer {
                     let complexity = if let Some(query) = complexity_query {
                         self.count_complexity_with_query(&node, query, content)
                     } else {
-                        let mut c = 1;
-                        self.count_complexity_with_trait(&node, support, &mut c);
-                        c
+                        1
                     };
 
                     functions.push(FunctionComplexity {
@@ -509,48 +507,6 @@ impl ComplexityAnalyzer {
             }
         }
         complexity
-    }
-
-    fn count_complexity_with_trait(
-        &self,
-        node: &tree_sitter::Node,
-        support: &dyn Language,
-        complexity: &mut usize,
-    ) {
-        let complexity_nodes = support.complexity_nodes();
-        let mut cursor = node.walk();
-
-        if !cursor.goto_first_child() {
-            return;
-        }
-
-        loop {
-            let current = cursor.node();
-            let kind = current.kind();
-
-            // Count if this node type contributes to complexity
-            if complexity_nodes.contains(&kind) {
-                *complexity += 1;
-            }
-
-            // Depth-first traversal
-            if cursor.goto_first_child() {
-                continue;
-            }
-
-            if cursor.goto_next_sibling() {
-                continue;
-            }
-
-            loop {
-                if !cursor.goto_parent() {
-                    return;
-                }
-                if cursor.goto_next_sibling() {
-                    break;
-                }
-            }
-        }
     }
 }
 

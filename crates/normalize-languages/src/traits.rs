@@ -163,18 +163,6 @@ pub trait Language: Send + Sync {
     /// For Go/Java/Python: checks visibility and returns public symbols.
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export>;
 
-    // === Complexity ===
-
-    /// Nodes that increase cyclomatic complexity.
-    ///
-    /// Default returns `&[]`. Languages with a `.complexity.scm` query file do not
-    /// need to implement this — the query takes priority in `analyze_with_trait`.
-    /// Only implement this for languages that lack a `.complexity.scm` and have
-    /// meaningful complexity structure.
-    fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     // === Display/Formatting ===
 
     /// Suffix to append to signatures for tree-sitter parsing.
