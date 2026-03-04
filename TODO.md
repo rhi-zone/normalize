@@ -85,9 +85,23 @@ using the query system. See `docs/architecture-decisions.md` ("scm Query Files o
 Completed migrations:
 - [x] `complexity_nodes()` + `nesting_nodes()` → `*.complexity.scm` (12 languages)
 - [x] call extraction → `*.calls.scm` + generic walker in `symbols.rs` (7 languages)
-- [x] `GrammarLoader::get_complexity()` + `get_calls()` added
+- [x] `GrammarLoader::get_complexity()` + `get_calls()` + `get_types()` added
+- [x] `*.types.scm` (4 languages)
 
-Next candidates:
+**CRITICAL: Flesh out language coverage** — current counts are abysmal:
+- `*.complexity.scm`: 12 languages. Missing: all others that have `complexity_nodes()` in
+  their Language impl (kotlin, swift already done; missing: c_sharp, php, scala, haskell,
+  bash, lua, elixir, r, julia, dart, etc.). Every language that has a grammar should have one.
+- `*.calls.scm`: 7 languages. Missing: every other language with function calls — c_sharp,
+  kotlin, swift, c, cpp, ruby, php, scala, bash, lua, etc. A language without calls.scm
+  produces zero call graph data — silently broken.
+- `*.types.scm`: 4 languages. Missing: every typed language — c_sharp, java, kotlin, swift,
+  c, cpp, scala, go, etc.
+
+For each: write the `.scm`, add to `bundled_*_query()` in `grammar_loader.rs`, verify with a
+fixture test. Target: coverage matching `locals.scm` (65 languages).
+
+Next architecture candidates:
 - [ ] **`*.tags.scm`** — tree-sitter standard for symbol definitions/references
   (`@name.definition.function`, `@name.definition.class`, etc.). Community-maintained
   files exist for most languages. Would replace `container_kinds()`, `function_kinds()`,
