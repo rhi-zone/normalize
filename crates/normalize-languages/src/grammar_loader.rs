@@ -68,6 +68,10 @@ pub struct GrammarLoader {
     highlight_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached injection queries.
     injection_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached complexity queries.
+    complexity_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached calls queries.
+    calls_cache: RwLock<HashMap<String, Arc<String>>>,
 }
 
 impl GrammarLoader {
@@ -98,6 +102,8 @@ impl GrammarLoader {
             cache: RwLock::new(HashMap::new()),
             highlight_cache: RwLock::new(HashMap::new()),
             injection_cache: RwLock::new(HashMap::new()),
+            complexity_cache: RwLock::new(HashMap::new()),
+            calls_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -108,6 +114,8 @@ impl GrammarLoader {
             cache: RwLock::new(HashMap::new()),
             highlight_cache: RwLock::new(HashMap::new()),
             injection_cache: RwLock::new(HashMap::new()),
+            complexity_cache: RwLock::new(HashMap::new()),
+            calls_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -152,6 +160,54 @@ impl GrammarLoader {
         }
 
         self.load_query(name, "injections", &self.injection_cache)
+    }
+
+    /// Get the complexity query for a grammar.
+    ///
+    /// Returns None if no complexity query found for the grammar.
+    /// Query files are {name}.complexity.scm in the grammar search paths.
+    /// Uses `@complexity` captures for nodes that increase cyclomatic complexity,
+    /// and `@nesting` captures for nodes that increase nesting depth.
+    pub fn get_complexity(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.complexity_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        // Try external files, then fall back to bundled queries
+        self.load_query(name, "complexity", &self.complexity_cache)
+            .or_else(|| {
+                let content = bundled_complexity_query(name)?;
+                let query = Arc::new(content.to_string());
+                if let Ok(mut c) = self.complexity_cache.write() {
+                    c.insert(name.to_string(), Arc::clone(&query));
+                }
+                Some(query)
+            })
+    }
+
+    /// Get the calls query for a grammar.
+    ///
+    /// Returns None if no calls query found for the grammar.
+    /// Query files are {name}.calls.scm in the grammar search paths.
+    /// Uses `@call` captures for call expressions and `@call.qualifier` for
+    /// method call receivers (e.g. `foo` in `foo.bar()`).
+    pub fn get_calls(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.calls_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        // Try external files, then fall back to bundled queries
+        self.load_query(name, "calls", &self.calls_cache)
+            .or_else(|| {
+                let content = bundled_calls_query(name)?;
+                let query = Arc::new(content.to_string());
+                if let Ok(mut c) = self.calls_cache.write() {
+                    c.insert(name.to_string(), Arc::clone(&query));
+                }
+                Some(query)
+            })
     }
 
     /// Load a query file (.scm) from external file.
@@ -290,6 +346,42 @@ fn grammar_extension() -> &'static str {
         ".dll"
     } else {
         ".so"
+    }
+}
+
+/// Return a bundled complexity query for a grammar, if available.
+///
+/// These are compiled into the binary so they work without external .scm files.
+/// External files in search paths take priority (for user customization).
+fn bundled_complexity_query(name: &str) -> Option<&'static str> {
+    match name {
+        "rust" => Some(include_str!("queries/rust.complexity.scm")),
+        "python" => Some(include_str!("queries/python.complexity.scm")),
+        "go" => Some(include_str!("queries/go.complexity.scm")),
+        "javascript" => Some(include_str!("queries/javascript.complexity.scm")),
+        "typescript" => Some(include_str!("queries/typescript.complexity.scm")),
+        "tsx" => Some(include_str!("queries/tsx.complexity.scm")),
+        "java" => Some(include_str!("queries/java.complexity.scm")),
+        "c" => Some(include_str!("queries/c.complexity.scm")),
+        "cpp" => Some(include_str!("queries/cpp.complexity.scm")),
+        "ruby" => Some(include_str!("queries/ruby.complexity.scm")),
+        "kotlin" => Some(include_str!("queries/kotlin.complexity.scm")),
+        "swift" => Some(include_str!("queries/swift.complexity.scm")),
+        _ => None,
+    }
+}
+
+/// Return a bundled calls query for a grammar, if available.
+fn bundled_calls_query(name: &str) -> Option<&'static str> {
+    match name {
+        "python" => Some(include_str!("queries/python.calls.scm")),
+        "rust" => Some(include_str!("queries/rust.calls.scm")),
+        "typescript" => Some(include_str!("queries/typescript.calls.scm")),
+        "tsx" => Some(include_str!("queries/tsx.calls.scm")),
+        "javascript" => Some(include_str!("queries/javascript.calls.scm")),
+        "java" => Some(include_str!("queries/java.calls.scm")),
+        "go" => Some(include_str!("queries/go.calls.scm")),
+        _ => None,
     }
 }
 

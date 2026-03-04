@@ -8,6 +8,7 @@ use crate::parsers;
 use normalize_languages::{Language, support_for_path};
 use serde::Serialize;
 use std::path::Path;
+use streaming_iterator::StreamingIterator;
 use tree_sitter;
 
 /// Risk classification based on McCabe cyclomatic complexity.
@@ -368,21 +369,40 @@ impl ComplexityAnalyzer {
         }
     }
 
-    /// Analyze using the Language trait
+    /// Analyze using the Language trait.
+    ///
+    /// Prefers a query-based complexity walker (from `.complexity.scm` files) when
+    /// available, falling back to the trait-based `complexity_nodes()` walker.
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionComplexity> {
-        let tree = match parsers::parse_with_grammar(support.grammar_name(), content) {
+        let grammar_name = support.grammar_name();
+        let tree = match parsers::parse_with_grammar(grammar_name, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
 
         let mut functions = Vec::new();
         let root = tree.root_node();
-        let mut cursor = root.walk();
 
-        self.collect_functions_with_trait(&mut cursor, content, support, &mut functions, None);
+        // Try query-based complexity counting first
+        let loader = parsers::grammar_loader();
+        let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
+            let grammar = loader.get(grammar_name)?;
+            tree_sitter::Query::new(&grammar, &scm).ok()
+        });
+
+        let mut cursor = root.walk();
+        self.collect_functions_with_trait(
+            &mut cursor,
+            content,
+            support,
+            &mut functions,
+            None,
+            complexity_query.as_ref(),
+        );
         functions
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn collect_functions_with_trait(
         &self,
         cursor: &mut tree_sitter::TreeCursor,
@@ -390,6 +410,7 @@ impl ComplexityAnalyzer {
         support: &dyn Language,
         functions: &mut Vec<FunctionComplexity>,
         parent: Option<&str>,
+        complexity_query: Option<&tree_sitter::Query>,
     ) {
         loop {
             let node = cursor.node();
@@ -398,8 +419,13 @@ impl ComplexityAnalyzer {
             // Check if this is a function
             if support.function_kinds().contains(&kind) {
                 if let Some(name) = support.node_name(&node, content) {
-                    let mut complexity = 1; // Base complexity
-                    self.count_complexity_with_trait(&node, support, &mut complexity);
+                    let complexity = if let Some(query) = complexity_query {
+                        self.count_complexity_with_query(&node, query, content)
+                    } else {
+                        let mut c = 1;
+                        self.count_complexity_with_trait(&node, support, &mut c);
+                        c
+                    };
 
                     functions.push(FunctionComplexity {
                         name: name.to_string(),
@@ -423,6 +449,7 @@ impl ComplexityAnalyzer {
                         support,
                         functions,
                         Some(name),
+                        complexity_query,
                     );
                     cursor.goto_parent();
                 }
@@ -434,7 +461,14 @@ impl ComplexityAnalyzer {
 
             // Recurse into other nodes
             if !support.container_kinds().contains(&kind) && cursor.goto_first_child() {
-                self.collect_functions_with_trait(cursor, content, support, functions, parent);
+                self.collect_functions_with_trait(
+                    cursor,
+                    content,
+                    support,
+                    functions,
+                    parent,
+                    complexity_query,
+                );
                 cursor.goto_parent();
             }
 
@@ -442,6 +476,39 @@ impl ComplexityAnalyzer {
                 break;
             }
         }
+    }
+
+    /// Count complexity using a tree-sitter query with `@complexity` captures.
+    /// Returns base complexity (1) + number of `@complexity` matches within the node.
+    fn count_complexity_with_query(
+        &self,
+        node: &tree_sitter::Node,
+        query: &tree_sitter::Query,
+        content: &str,
+    ) -> usize {
+        let complexity_idx = query
+            .capture_names()
+            .iter()
+            .position(|n| *n == "complexity");
+
+        let Some(complexity_idx) = complexity_idx else {
+            return 1; // No @complexity capture in query
+        };
+
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        // Restrict to this function's byte range
+        qcursor.set_byte_range(node.byte_range());
+
+        let mut complexity = 1usize; // Base complexity
+        let mut matches = qcursor.matches(query, *node, content.as_bytes());
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                if capture.index as usize == complexity_idx {
+                    complexity += 1;
+                }
+            }
+        }
+        complexity
     }
 
     fn count_complexity_with_trait(
