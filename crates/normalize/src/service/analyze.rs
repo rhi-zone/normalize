@@ -972,7 +972,6 @@ impl AnalyzeService {
         )
     }
 
-    /// Detect duplicate functions (code clones)
     /// Rank repos by tech debt (churn + complexity + coupling)
     #[cli(display_with = "display_cross_repo_health")]
     pub fn cross_repo_health(
