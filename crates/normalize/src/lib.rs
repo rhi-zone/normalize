@@ -24,6 +24,7 @@ pub mod commands;
 pub mod config;
 pub mod daemon;
 pub mod deps;
+pub mod diagnostic_convert;
 pub mod edit;
 pub mod extract;
 pub mod filter;

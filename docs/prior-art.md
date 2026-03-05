@@ -536,7 +536,7 @@ Not a dependency graph, but semantic understanding through:
 
 **Normalize Observations:**
 - Their detector logic (unused code, duplication, complexity scoring) is exactly the kind of thing normalize's `.dl` rules should express declaratively — desloppify hardcodes this in Python, we make it composable
-- Their tier-weighted scoring + prioritization queue is a good model for what `normalize facts check` output could look like
+- Their tier-weighted scoring + prioritization queue is a good model for what `normalize rules run --engine fact` output could look like
 - The LLM subjective review layer is deliberately out of scope for normalize (we're the substrate, not the agent)
 - Their ~6 "deep" vs ~22 "shallow" language split is the same tension normalize faces — worth watching how they handle it
 - "Score above 98 = work a seasoned engineer would respect" is a nice framing for what normalize's quality rules are trying to achieve

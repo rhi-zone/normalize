@@ -56,6 +56,7 @@ pub struct NormalizeService {
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
     package: package::PackageService,
+    rules: rules::RulesService,
     serve: serve::ServeService,
     syntax: syntax::SyntaxService,
     sessions: sessions::SessionsService,
@@ -89,8 +90,9 @@ impl NormalizeService {
             grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
+            rules: rules::RulesService::new(&pretty),
             serve: serve::ServeService,
-            syntax: syntax::SyntaxService::new(&pretty),
+            syntax: syntax::SyntaxService::new(),
             sessions: sessions::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
             pretty,
@@ -524,12 +526,17 @@ impl NormalizeService {
         &self.generate
     }
 
-    /// Extract and query code facts (symbols, imports, calls)
-    pub fn facts(&self) -> &facts::FactsService {
+    /// Manage the structural index (symbols, imports, calls)
+    pub fn structure(&self) -> &facts::FactsService {
         &self.facts
     }
 
-    /// AST inspection and syntax rules
+    /// Manage and run analysis rules (syntax + fact)
+    pub fn rules(&self) -> &rules::RulesService {
+        &self.rules
+    }
+
+    /// AST inspection
     pub fn syntax(&self) -> &syntax::SyntaxService {
         &self.syntax
     }

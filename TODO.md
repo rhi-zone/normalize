@@ -235,11 +235,11 @@ See `docs/design/rules-unification.md` for full design.
 
 **Three threads:**
 
-1. **Unified diagnostic type** — create `normalize-diagnostics` crate with `Issue` + `DiagnosticsReport`. Three separate diagnostic types (`normalize-tools::Diagnostic`, `normalize-syntax-rules::Finding`, `normalize-facts-rules-api::Diagnostic`) plus 4 ad-hoc check structs (`BrokenRef`, `MissingExample`, `StaleDoc`, `SecurityFinding`) all converge on one format. Standard `file:line:col: severity [rule_id] message` output.
+1. **Unified diagnostic type** — DONE. `Issue` + `DiagnosticsReport` in `normalize-output::diagnostics`. Conversion functions `finding_to_issue` and `abi_diagnostic_to_issue` in `normalize::diagnostic_convert`. Ad-hoc checks (`BrokenRef`, `MissingExample`, `StaleDoc`) already converted. Remaining: `SecurityFinding` → `DiagnosticsReport`, wire native checks as `--engine native`.
 
-2. **Lift `rules` to top level** — `normalize syntax rules` already manages both syntax and fact rules (`--type` flag). Rename to `normalize rules`, rename `--type` → `--engine`. Delete redundant `normalize facts rules` and `normalize facts check`. Long-term: hardcoded checks (`check-refs`, `stale-docs`, `check-examples`, `security`) migrate into the rules engine.
+2. **Lift `rules` to top level** — DONE. `normalize rules` is now top-level. `--type` → `--engine`. `normalize facts rules` and `normalize facts check` removed. `normalize syntax` retains only `ast` and `query`.
 
-3. **Rename `facts` → `structure`** — after moving `rules`/`check` out, what remains is `rebuild`, `stats`, `files`, `packages` — all about the structural index. "facts" is a Datalog term that means nothing to users.
+3. **Rename `facts` → `structure`** — DONE. `normalize structure rebuild/stats/files/packages`.
 
 ### Semantic Refactoring Infrastructure
 
@@ -356,8 +356,8 @@ Rules (custom enforcement, future):
 
 **Facts & Rules Architecture:**
 
-- [ ] `normalize facts compile <rules.dl>` command to build custom packs (sandboxed codegen)
-- [ ] Self-install builtin dylib: `normalize facts rules` should auto-install compiled builtins to `~/.local/share/normalize/rules/` on first run (or at build/install time). Currently requires manual copy.
+- [ ] `normalize rules compile <rules.dl>` command to build custom packs (sandboxed codegen)
+- [ ] Self-install builtin dylib: `normalize rules run --engine fact` should auto-install compiled builtins to `~/.local/share/normalize/rules/` on first run (or at build/install time). Currently requires manual copy.
 
 ### Language Capability Traits
 

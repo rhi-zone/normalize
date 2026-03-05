@@ -50,7 +50,7 @@ impl RulesService {
     pub fn list(
         &self,
         #[param(help = "Show source URLs for imported rules")] sources: bool,
-        #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
+        #[param(short = 'e', help = "Filter by engine (all, syntax, fact)")] engine: Option<
             crate::commands::rules::RuleType,
         >,
         #[param(help = "Filter by tag")] tag: Option<String>,
@@ -66,7 +66,7 @@ impl RulesService {
         crate::commands::rules::cmd_list_service(
             root.as_deref(),
             sources,
-            r#type.unwrap_or_default(),
+            engine.unwrap_or_default(),
             tag.as_deref(),
             enabled,
             disabled,
@@ -88,7 +88,7 @@ impl RulesService {
         #[param(help = "Apply auto-fixes (syntax rules only)")] fix: bool,
         #[param(help = "Output in SARIF format")] sarif: bool,
         #[param(positional, help = "Target directory or file")] target: Option<String>,
-        #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
+        #[param(short = 'e', help = "Filter by engine (all, syntax, fact)")] engine: Option<
             crate::commands::rules::RuleType,
         >,
         #[param(help = "Debug flags (comma-separated)")] debug: Vec<String>,
@@ -103,7 +103,7 @@ impl RulesService {
             fix,
             sarif,
             target.as_deref(),
-            r#type.unwrap_or_default(),
+            engine.unwrap_or_default(),
             &debug,
         )
     }

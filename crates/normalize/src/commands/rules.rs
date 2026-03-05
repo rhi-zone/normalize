@@ -287,7 +287,7 @@ pub fn cmd_run_syntax(
     )
 }
 
-/// Run fact rules only (called from `normalize facts check`).
+/// Run fact rules only (called from `normalize rules run --engine fact`).
 pub fn cmd_run_facts(
     root: &Path,
     rules_file: Option<&Path>,

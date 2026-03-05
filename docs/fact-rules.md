@@ -22,10 +22,8 @@ warning("too-many-imports", file) <-- import_count(file, c), if c > 20;
 Run it:
 
 ```bash
-normalize facts check                          # Run all .dl rules (auto-discovers)
-normalize facts check my-rules.dl              # Run a specific file
-normalize syntax rules run --type fact                # Via unified rules command
-normalize syntax rules list --type fact               # List fact rules
+normalize rules run --engine fact               # Run all fact rules
+normalize rules list --engine fact              # List fact rules
 ```
 
 ## Rule File Format
@@ -379,9 +377,7 @@ warning("god-class", cls) <-- type_method_count(_, cls, c), if c > 20;
 The default. Rules are `.dl` text files run through the built-in Datalog interpreter:
 
 ```bash
-normalize facts check              # Auto-discover .dl files
-normalize facts check rules.dl     # Run specific file
-normalize syntax rules run --type fact    # Via unified command
+normalize rules run --engine fact   # Auto-discover and run .dl files
 ```
 
 Advantages: no compilation, easy to write and share, supports all Datalog features (recursion, aggregation, negation, stratification).
@@ -391,9 +387,8 @@ Advantages: no compilation, easy to write and share, supports all Datalog featur
 For advanced use, rules can be compiled as Rust dylibs using the [Ascent](https://github.com/s-arash/ascent) macro:
 
 ```bash
-normalize facts rules              # Run default rule pack
-normalize facts rules --pack my_rules.so  # Run custom pack
-normalize facts rules --list       # List compiled rules
+normalize rules run --engine fact   # Run compiled rule packs
+normalize rules list --engine fact  # List compiled rules
 ```
 
 Compiled rules get full Rust expressiveness but require building a crate against `normalize-facts-rules-api`.
@@ -409,5 +404,5 @@ Fact rules are loaded in this order (later rules override earlier ones by `id`):
 ## See Also
 
 - [Writing Syntax Rules](syntax-rules.md) — tree-sitter query-based rules for AST patterns
-- [CLI: facts](cli/facts.md) — `normalize facts` command reference
-- [CLI: rules](cli/rules.md) — `normalize syntax rules` unified command reference
+- [CLI: structure](cli/facts.md) — `normalize structure` command reference
+- [CLI: rules](cli/rules.md) — `normalize rules` command reference

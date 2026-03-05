@@ -210,7 +210,7 @@ the builtin `.dl` rules (`builtin_dl/`).
 ```
 User writes .dl file with TOML frontmatter
          ↓
-normalize facts check  (parses + interprets via ascent-eval)
+normalize rules run --engine fact  (parses + interprets via ascent-eval)
          ↓
 Diagnostics (warnings/errors)
 ```
@@ -228,7 +228,7 @@ User writes Ascent rules in Rust
          ↓
 cargo build  (compiles to .so/.dylib)
          ↓
-normalize facts rules --pack <path>  (loads dylib, runs fast)
+normalize rules run --engine fact  (loads dylib, runs fast)
 ```
 
 - **Full Ascent power** — arbitrary Rust in predicates, type safety, optimizations
@@ -412,21 +412,21 @@ If a user-defined tag name matches a built-in tag, they union — same name mean
 
 ```bash
 # Run by concept, not by rule ID
-normalize syntax rules run --tag pre-commit        # fast, all languages
-normalize syntax rules run --tag debug-print --language rust  # filters compose
+normalize rules run --tag pre-commit        # fast, all languages
+normalize rules run --tag debug-print --language rust  # filters compose
 
 # Enable/disable by concept or by ID
-normalize syntax rules enable debug-print          # enables all rules tagged debug-print
-normalize syntax rules disable js/console-log      # disables one specific rule
-normalize syntax rules enable debug-print --dry-run  # preview what would change
+normalize rules enable debug-print          # enables all rules tagged debug-print
+normalize rules disable js/console-log      # disables one specific rule
+normalize rules enable debug-print --dry-run  # preview what would change
 
 # Discover
-normalize syntax rules list                         # all rules
-normalize syntax rules list --tag debug-print       # rules matching a tag
-normalize syntax rules list --language rust --enabled  # enabled Rust rules
-normalize syntax rules tags                         # all tags (builtin + user-defined)
-normalize syntax rules tags --show-rules            # expand each tag to its member rules
-normalize syntax rules tags --tag debug-print       # show what's in one tag
+normalize rules list                         # all rules
+normalize rules list --tag debug-print       # rules matching a tag
+normalize rules list --language rust --enabled  # enabled Rust rules
+normalize rules tags                         # all tags (builtin + user-defined)
+normalize rules tags --show-rules            # expand each tag to its member rules
+normalize rules tags --tag debug-print       # show what's in one tag
 ```
 
 ### Tag display and color

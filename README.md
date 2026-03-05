@@ -164,11 +164,11 @@ normalize context --list             # Show file paths only
 Manage and run syntax + fact rules:
 
 ```bash
-normalize syntax rules list          # List all rules
-normalize syntax rules run           # Run all rules
-normalize syntax rules add <url>     # Add a rule from URL
-normalize syntax rules enable <id>   # Enable a rule
-normalize syntax rules tags          # List rule tags
+normalize rules list                 # List all rules
+normalize rules run                  # Run all rules
+normalize rules add <url>            # Add a rule from URL
+normalize rules enable <id>          # Enable a rule
+normalize rules tags                 # List rule tags
 ```
 
 ### translate - Code Translation
@@ -181,15 +181,14 @@ normalize translate src/lib.py --to lua        # Python to Lua
 normalize translate - --from ts --to lua       # Stdin with explicit langs
 ```
 
-### facts - Manage Code Facts
+### structure - Structural Index
 
-Manage the file index containing symbols, imports, calls, and other relationships:
+Manage the structural index (symbols, imports, calls):
 
 ```bash
-normalize facts stats                # Index stats
-normalize facts rebuild              # Rebuild the index
-normalize facts files                # List indexed files
-normalize facts check                # Run Datalog rules against facts
+normalize structure stats            # Index stats
+normalize structure rebuild          # Rebuild the index
+normalize structure files            # List indexed files
 ```
 
 ### sessions - Session Analysis

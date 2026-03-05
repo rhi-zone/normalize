@@ -218,8 +218,8 @@ impl std::fmt::Display for CommandResult {
 }
 
 #[cli(
-    name = "facts",
-    about = "Manage code facts (file index, symbols, calls, imports)"
+    name = "structure",
+    about = "Manage the structural index (symbols, imports, calls)"
 )]
 impl FactsService {
     /// Rebuild the file index
@@ -281,36 +281,6 @@ impl FactsService {
         >,
     ) -> Result<PackagesResult, String> {
         crate::commands::facts::cmd_packages_service(&only, clear, root.as_deref())
-    }
-
-    /// Run compiled rule packs (dylibs) against extracted facts
-    pub fn rules(
-        &self,
-        #[param(help = "Specific rule to run (runs all if not specified)")] rule: Option<String>,
-        #[param(help = "Path to a specific rule pack dylib")] pack: Option<String>,
-        #[param(help = "List available rules instead of running them")] list: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<CommandResult, String> {
-        crate::commands::facts::cmd_facts_rules_service(
-            root.as_deref(),
-            rule.as_deref(),
-            pack.as_deref(),
-            list,
-        )
-    }
-
-    /// Run Datalog rules (.dl) against extracted facts
-    pub fn check(
-        &self,
-        #[param(positional, help = "Path to a specific .dl rules file")] rules_file: Option<String>,
-        #[param(help = "List available rules instead of running them")] list: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<CommandResult, String> {
-        crate::commands::facts::cmd_check_service(root.as_deref(), rules_file.as_deref(), list)
     }
 }
 

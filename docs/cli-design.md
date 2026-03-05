@@ -7,10 +7,11 @@
 - `grep` - Fast ripgrep-based text search
 - `edit` - Structural code modifications (delete, replace, swap, insert, undo, redo, history)
 - `analyze` - Codebase analysis (40 subcommands)
-- `syntax` - AST inspection and syntax rules (ast, query, rules)
+- `syntax` - AST inspection (ast, query)
+- `rules` - Manage and run analysis rules (syntax + fact)
 
 ### Infrastructure
-- `facts` - Extract and query code facts (symbols, imports, calls)
+- `structure` - Manage the structural index (symbols, imports, calls)
 - `daemon` - Background process management
 - `grammars` - Tree-sitter grammar management
 - `init` - Initialize normalize in a directory

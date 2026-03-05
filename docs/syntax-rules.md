@@ -1,6 +1,6 @@
 # Writing Syntax Rules
 
-This guide covers writing custom syntax rules for normalize. Rules use [tree-sitter](https://tree-sitter.github.io/) queries with TOML frontmatter for metadata. Run them via `normalize syntax rules run` (unified, runs both syntax + fact rules) or `normalize analyze rules` (syntax-only).
+This guide covers writing custom syntax rules for normalize. Rules use [tree-sitter](https://tree-sitter.github.io/) queries with TOML frontmatter for metadata. Run them via `normalize rules run` (unified, runs both syntax + fact rules) or `normalize analyze rules` (syntax-only).
 
 ## Quick Start
 
@@ -20,11 +20,11 @@ Create a rule file in `.normalize/rules/`:
 Run it:
 
 ```bash
-normalize syntax rules run                             # Run all rules (syntax + fact)
-normalize syntax rules run --type syntax               # Syntax rules only
-normalize syntax rules run --rule no-todo-comment       # Run specific rule
-normalize syntax rules run --fix                        # Apply auto-fixes
-normalize syntax rules list                             # List all rules
+normalize rules run                             # Run all rules (syntax + fact)
+normalize rules run --engine syntax              # Syntax rules only
+normalize rules run --rule no-todo-comment       # Run specific rule
+normalize rules run --fix                        # Apply auto-fixes
+normalize rules list                             # List all rules
 ```
 
 ## Rule File Format
@@ -218,8 +218,8 @@ Captures from the query are available as `$capture_name`. The special `$match` r
 Run fixes:
 
 ```bash
-normalize syntax rules run --fix                                  # Fix all
-normalize syntax rules run --rule rust/unwrap-to-expect --fix     # Fix one rule
+normalize rules run --fix                                  # Fix all
+normalize rules run --rule rust/unwrap-to-expect --fix     # Fix one rule
 ```
 
 Fixes are applied in reverse byte-offset order to preserve positions. Multiple fixes to the same file are applied in one pass.
@@ -256,18 +256,18 @@ Import rules from URLs:
 
 ```bash
 # Add a rule
-normalize syntax rules add https://example.com/rules/security.scm
-normalize syntax rules add https://example.com/rules/style.scm --global
+normalize rules add https://example.com/rules/security.scm
+normalize rules add https://example.com/rules/style.scm --global
 
 # List installed rules
-normalize syntax rules list
-normalize syntax rules list --sources
+normalize rules list
+normalize rules list --sources
 
 # Update from source
-normalize syntax rules update
+normalize rules update
 
 # Remove
-normalize syntax rules remove security
+normalize rules remove security
 ```
 
 Imported rules are tracked in `.normalize/rules.lock` (project) or `~/.config/normalize/rules.lock` (global).
@@ -343,12 +343,12 @@ normalize ships with 24 builtin rules:
 - **Cross-language rules** work when the query nodes exist in the grammar. A rule without `languages` is validated per-grammar and silently skipped for incompatible languages.
 - **Test rules incrementally** with `normalize analyze query` before adding frontmatter.
 - **Prefer `#match?` over `#eq?`** when you need partial matching or case-insensitive patterns.
-- **Use `normalize syntax rules run`** instead of `normalize analyze rules` — the unified command runs both syntax and fact rules.
+- **Use `normalize rules run`** instead of `normalize analyze rules` — the unified command runs both syntax and fact rules.
 
 ## See Also
 
 - [Writing Fact Rules](fact-rules.md) — Datalog-based rules for cross-file analysis
-- [CLI: rules](cli/rules.md) — Unified `normalize syntax rules` command reference
+- [CLI: rules](cli/rules.md) — Unified `normalize rules` command reference
 - [CLI: analyze rules](cli/rules.md) — Command reference
 - [Design: syntax linting](design/syntax-linting.md) — Architecture decisions
 - [Design: builtin rules](design/builtin-rules.md) — Builtin rule development

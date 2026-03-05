@@ -1,24 +1,19 @@
 //! Syntax sub-service for server-less CLI.
 //!
-//! Covers AST-level operations and syntax rule management.
-//! Parallel to `facts` (which covers fact extraction and fact-based rules).
+//! Covers AST-level operations (ast, query).
+//! Rules management has been lifted to the top-level `rules` service.
 
-use crate::service::rules::RulesService;
 use normalize_syntax_rules::MatchResult;
 use server_less::cli;
-use std::cell::Cell;
 use std::path::PathBuf;
 
-/// Syntax sub-service — AST inspection and syntax rules.
-pub struct SyntaxService {
-    rules: RulesService,
-}
+/// Syntax sub-service — AST inspection.
+#[derive(Default)]
+pub struct SyntaxService;
 
 impl SyntaxService {
-    pub fn new(pretty: &Cell<bool>) -> Self {
-        Self {
-            rules: RulesService::new(pretty),
-        }
+    pub fn new() -> Self {
+        Self
     }
 
     fn display_ast(&self, v: &serde_json::Value) -> String {
@@ -30,7 +25,7 @@ impl SyntaxService {
     }
 }
 
-#[cli(name = "syntax", about = "AST inspection and syntax rules")]
+#[cli(name = "syntax", about = "AST inspection")]
 impl SyntaxService {
     /// Show AST structure for a file
     #[cli(display_with = "display_ast")]
@@ -71,10 +66,5 @@ impl SyntaxService {
             &root_path,
             None,
         )
-    }
-
-    /// Manage and run syntax rules
-    pub fn rules(&self) -> &RulesService {
-        &self.rules
     }
 }

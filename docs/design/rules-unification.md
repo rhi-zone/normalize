@@ -1,6 +1,6 @@
 # Rules Unification
 
-Status: **design**
+Status: **partially implemented** (steps 1–6, 10 done; 7–9 remaining)
 
 ## Problem
 
@@ -208,12 +208,12 @@ All engines produce `Vec<Issue>` (or the ABI-stable equivalent). The CLI merges,
 ## Implementation Order
 
 1. **Unified diagnostic types in `normalize-output`** — `Issue` + `DiagnosticsReport` + `OutputFormatter` (done)
-2. **Add conversions** from `Finding`, `facts-rules-api::Diagnostic`, `normalize-tools::Diagnostic`
-3. **Migrate `check-refs`, `stale-docs`, `check-examples`** to return `DiagnosticsReport`
-4. **Unify into single `check` command** under `analyze` — `normalize analyze check [--refs] [--stale] [--examples]`, default = all
-5. **Lift `rules` to top level**, rename `--type` → `--engine`, delete redundant facts subcommands
-6. **Rename `facts` → `structure`**
+2. **Add conversions** from `Finding`, `facts-rules-api::Diagnostic` (done — `diagnostic_convert.rs`)
+3. **Migrate `check-refs`, `stale-docs`, `check-examples`** to return `DiagnosticsReport` (done)
+4. **Unify into single `check` command** under `analyze` — `normalize analyze check [--refs] [--stale] [--examples]` (done)
+5. **Lift `rules` to top level**, rename `--type` → `--engine`, delete redundant facts subcommands (done)
+6. **Rename `facts` → `structure`** (done)
 7. **Migrate `security`** to `DiagnosticsReport` (different severity mapping)
 8. **Wire native checks as an engine** in `normalize rules run --engine native`
 9. **Generalize `CheckEngine` trait** for user-defined dylib engines
-10. **Revisit `coverage`/`churn` enum wrappers** — find shared data shapes or accept as separate commands
+10. **Revert `coverage`/`churn` enum wrappers** — no shared data shapes, split back to separate commands (done)
