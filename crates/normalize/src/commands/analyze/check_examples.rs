@@ -1,6 +1,7 @@
 //! Validate example references in documentation
 
 use crate::output::OutputFormatter;
+use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::Serialize;
 use std::path::Path;
 
@@ -155,6 +156,32 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
         defined_examples: defined_examples.len(),
         references_found: refs_found,
         missing,
+    }
+}
+
+impl From<CheckExamplesReport> for DiagnosticsReport {
+    fn from(report: CheckExamplesReport) -> Self {
+        DiagnosticsReport {
+            issues: report
+                .missing
+                .into_iter()
+                .map(|m| Issue {
+                    file: m.doc_file,
+                    line: Some(m.line),
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                    rule_id: "missing-example".into(),
+                    message: format!("example `{}` not found in source", m.reference),
+                    severity: Severity::Warning,
+                    source: "check-examples".into(),
+                    related: vec![],
+                    suggestion: None,
+                })
+                .collect(),
+            files_checked: 0, // not tracked separately in CheckExamplesReport
+            sources_run: vec!["check-examples".into()],
+        }
     }
 }
 

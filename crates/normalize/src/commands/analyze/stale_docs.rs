@@ -1,6 +1,7 @@
 //! Find stale documentation where covered code has changed
 
 use crate::output::OutputFormatter;
+use normalize_output::diagnostics::{DiagnosticsReport, Issue, RelatedLocation, Severity};
 use serde::Serialize;
 use std::path::Path;
 
@@ -166,6 +167,53 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
         stale_docs,
         files_checked: md_files.len(),
         files_with_covers,
+    }
+}
+
+impl From<StaleDocsReport> for DiagnosticsReport {
+    fn from(report: StaleDocsReport) -> Self {
+        DiagnosticsReport {
+            issues: report
+                .stale_docs
+                .into_iter()
+                .flat_map(|doc| {
+                    doc.stale_covers.into_iter().map(move |cover| {
+                        let days_stale = (cover.code_modified - doc.doc_modified) / 86400;
+                        Issue {
+                            file: doc.doc_path.clone(),
+                            line: None,
+                            column: None,
+                            end_line: None,
+                            end_column: None,
+                            rule_id: "stale-doc".into(),
+                            message: format!(
+                                "covers `{}` ({} files, ~{} days stale)",
+                                cover.pattern,
+                                cover.matching_files.len(),
+                                days_stale
+                            ),
+                            severity: Severity::Info,
+                            source: "stale-docs".into(),
+                            related: cover
+                                .matching_files
+                                .iter()
+                                .map(|f| RelatedLocation {
+                                    file: f.clone(),
+                                    line: None,
+                                    message: None,
+                                })
+                                .collect(),
+                            suggestion: Some(format!(
+                                "update {} to reflect recent changes",
+                                doc.doc_path
+                            )),
+                        }
+                    })
+                })
+                .collect(),
+            files_checked: report.files_checked,
+            sources_run: vec!["stale-docs".into()],
+        }
     }
 }
 

@@ -217,11 +217,25 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 **Phase 3 — Further consolidation (needs design):**
 - [ ] `duplicates` + `fragments`: collapse remaining similarity commands (duplicate-types still separate, fragments absorbed patterns)
 - [ ] `deps`: collapse 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact)
-- [ ] `docs`: collapse 4 commands (docs, check-refs, stale-docs, check-examples)
+- [ ] `docs` → unified diagnostics: `check-refs`, `stale-docs`, `check-examples` share `DiagnosticsReport` output (not enum wrapper — shared `Issue` struct). `docs` (coverage) stays separate (it's a metric/rank command, not a check). See `docs/design/rules-unification.md`
 - [ ] `git`: collapse 5 commands (ownership, contributors, activity, repo-coupling, cross-repo-health) — all git/repo-centric analysis
 - [ ] Cross-cutting `--trend` and `--diff <ref>` modifiers on any scoring command
 
 **Design pressure:** ~43 commands after Phase 2 is still too spread out. Phase 3 must happen. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
+
+**Revisit enum-return "unifications":** `CoverageOutput`, `CouplingOutput` wrap N report types in an enum — that's not real unification, just a dispatch layer with fewer CLI entry points. Each should be redesigned with a single report struct that all modes populate (shared fields, shared rendering). If the reports have nothing structurally in common, they may not belong under one command. (`DuplicatesReport` is already a single struct — it's the right pattern.)
+
+### Rules Unification & `facts` → `structure` Rename
+
+See `docs/design/rules-unification.md` for full design.
+
+**Three threads:**
+
+1. **Unified diagnostic type** — create `normalize-diagnostics` crate with `Issue` + `DiagnosticsReport`. Three separate diagnostic types (`normalize-tools::Diagnostic`, `normalize-syntax-rules::Finding`, `normalize-facts-rules-api::Diagnostic`) plus 4 ad-hoc check structs (`BrokenRef`, `MissingExample`, `StaleDoc`, `SecurityFinding`) all converge on one format. Standard `file:line:col: severity [rule_id] message` output.
+
+2. **Lift `rules` to top level** — `normalize syntax rules` already manages both syntax and fact rules (`--type` flag). Rename to `normalize rules`, rename `--type` → `--engine`. Delete redundant `normalize facts rules` and `normalize facts check`. Long-term: hardcoded checks (`check-refs`, `stale-docs`, `check-examples`, `security`) migrate into the rules engine.
+
+3. **Rename `facts` → `structure`** — after moving `rules`/`check` out, what remains is `rebuild`, `stats`, `files`, `packages` — all about the structural index. "facts" is a Datalog term that means nothing to users.
 
 ### Semantic Refactoring Infrastructure
 

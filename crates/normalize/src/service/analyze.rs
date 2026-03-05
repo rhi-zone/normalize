@@ -7,8 +7,6 @@ use crate::commands::analyze::architecture::ArchitectureReport;
 use crate::commands::analyze::call_complexity::CallComplexityReport;
 use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::ceremony::CeremonyReport;
-use crate::commands::analyze::check_examples::CheckExamplesReport;
-use crate::commands::analyze::check_refs::CheckRefsReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling_views::CouplingOutput;
 use crate::commands::analyze::coverage::CoverageOutput;
@@ -34,12 +32,12 @@ use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::size::SizeReport;
 use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
-use crate::commands::analyze::stale_docs::StaleDocsReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::surface::SurfaceReport;
 use crate::commands::analyze::trend::TrendReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
+use normalize_output::diagnostics::DiagnosticsReport;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -72,23 +70,7 @@ impl AnalyzeService {
         self.pretty.set(is_pretty);
     }
 
-    fn display_check_refs(&self, r: &CheckRefsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_stale_docs(&self, r: &StaleDocsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_check_examples(&self, r: &CheckExamplesReport) -> String {
+    fn display_check(&self, r: &DiagnosticsReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -400,45 +382,54 @@ impl AnalyzeService {
     diff = "Diff",
 ))]
 impl AnalyzeService {
-    /// Check for broken documentation references
+    /// Run documentation checks: broken refs, stale docs, missing examples
+    ///
+    /// Default: run all checks. Use flags to run specific checks only.
+    /// Use --refs for broken documentation references (requires index).
+    /// Use --stale for stale documentation (code newer than docs).
+    /// Use --examples for missing example markers.
     #[server(group = "repo")]
-    #[cli(display_with = "display_check_refs")]
-    pub fn check_refs(
+    #[cli(display_with = "display_check")]
+    pub fn check(
         &self,
+        #[param(help = "Check broken documentation references")] refs: bool,
+        #[param(help = "Check for stale documentation")] stale: bool,
+        #[param(help = "Check for missing example references")] examples: bool,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<CheckRefsReport, String> {
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DiagnosticsReport, String> {
         let root_path = Self::root_path(root);
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| format!("Failed to create runtime: {}", e))?;
-        rt.block_on(crate::commands::analyze::check_refs::build_check_refs_report(&root_path))
-    }
+        self.resolve_format(pretty, compact, &root_path);
+        let run_all = !refs && !stale && !examples;
 
-    /// Check for stale documentation
-    #[server(group = "repo")]
-    #[cli(display_with = "display_stale_docs")]
-    pub fn stale_docs(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<StaleDocsReport, String> {
-        let root_path = Self::root_path(root);
-        Ok(crate::commands::analyze::stale_docs::build_stale_docs_report(&root_path))
-    }
+        let mut report = DiagnosticsReport::new();
 
-    /// Check for missing example references in documentation
-    #[server(group = "repo")]
-    #[cli(display_with = "display_check_examples")]
-    pub fn check_examples(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<CheckExamplesReport, String> {
-        let root_path = Self::root_path(root);
-        Ok(crate::commands::analyze::check_examples::build_check_examples_report(&root_path))
+        if run_all || refs {
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("Failed to create runtime: {}", e))?;
+            let refs_report = rt.block_on(
+                crate::commands::analyze::check_refs::build_check_refs_report(&root_path),
+            )?;
+            report.merge(refs_report.into());
+        }
+
+        if run_all || stale {
+            let stale_report =
+                crate::commands::analyze::stale_docs::build_stale_docs_report(&root_path);
+            report.merge(stale_report.into());
+        }
+
+        if run_all || examples {
+            let examples_report =
+                crate::commands::analyze::check_examples::build_check_examples_report(&root_path);
+            report.merge(examples_report.into());
+        }
+
+        report.sort();
+        Ok(report)
     }
 
     /// Show callers and/or callees of a symbol

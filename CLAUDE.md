@@ -163,6 +163,7 @@ Do not:
 - Create legacy APIs - one API, update all callers
 - Add to the monolith - split by domain into sub-crates
 - Do half measures - when you introduce a new abstraction, immediately replace all existing ad-hoc code with it; don't leave old partial implementations alongside the new one
+- "Unify" commands by wrapping N report types in an enum — that's not unification, it's just a dispatch layer with fewer CLI entry points. Real consolidation means one report struct that all modes populate, with shared fields and shared rendering. If the reports have nothing in common, they shouldn't be forced under one command
 - Ask permission when philosophy is clear - just do it
 - Return tuples - use structs with named fields
 - Use trait defaults in `Language` - explicit impl required (but `LocalDeps` uses defaults by design)

@@ -26,8 +26,6 @@ mod tests {
         use crate::commands::analyze::budget::BudgetReport;
         use crate::commands::analyze::call_complexity::CallComplexityReport;
         use crate::commands::analyze::ceremony::CeremonyReport;
-        use crate::commands::analyze::check_examples::CheckExamplesReport;
-        use crate::commands::analyze::check_refs::CheckRefsReport;
         use crate::commands::analyze::contributors::ContributorsReport;
         use crate::commands::analyze::coupling::CouplingReport;
         use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
@@ -53,7 +51,6 @@ mod tests {
         use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
         use crate::commands::analyze::size::SizeReport;
         use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
-        use crate::commands::analyze::stale_docs::StaleDocsReport;
         use crate::commands::analyze::summary::SummaryReport;
         use crate::commands::analyze::surface::SurfaceReport;
         use crate::commands::analyze::test_ratio::TestRatioReport;
@@ -74,6 +71,7 @@ mod tests {
         use crate::commands::view::report::ViewOutput;
         use crate::sessions::SessionAnalysis;
         use crate::text_search::GrepResult;
+        use normalize_output::diagnostics::DiagnosticsReport;
 
         // Compile-time checks via trait bounds
         assert_output_formatter::<ActivityReport>();
@@ -86,8 +84,7 @@ mod tests {
         assert_output_formatter::<ArchitectureReport>();
         assert_output_formatter::<BudgetReport>();
         assert_output_formatter::<CeremonyReport>();
-        assert_output_formatter::<CheckExamplesReport>();
-        assert_output_formatter::<CheckRefsReport>();
+        assert_output_formatter::<DiagnosticsReport>();
         assert_output_formatter::<ComplexityReport>();
         assert_output_formatter::<ContributorsReport>();
         assert_output_formatter::<ContextListReport>();
@@ -129,7 +126,6 @@ mod tests {
         assert_output_formatter::<SessionShowReport>();
         assert_output_formatter::<SkeletonDiffReport>();
         assert_output_formatter::<SizeReport>();
-        assert_output_formatter::<StaleDocsReport>();
         assert_output_formatter::<SummaryReport>();
         assert_output_formatter::<SurfaceReport>();
         assert_output_formatter::<LayeringReport>();

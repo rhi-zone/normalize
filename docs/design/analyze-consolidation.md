@@ -262,11 +262,15 @@ This would take 44 → ~20 commands, and more importantly, make the *extension m
 
 ## Implementation Strategy
 
+**Enum wrappers are not real unification.** `CoverageOutput`, `CouplingOutput` wrap N report types in an enum with `OutputFormatter` delegation. This reduces CLI entry points but doesn't unify the data model — each variant is still its own report struct with its own rendering. Real consolidation means one report struct that all modes populate, with shared fields and shared rendering. Revisit existing enum wrappers.
+
+For pattern #4 (`check`), the right unification is the **diagnostic model**: `check-refs`, `stale-docs`, `check-examples`, `security` all produce "list of issues found in files." These should share a common diagnostic output format and ideally migrate into the rules engine over time.
+
 Each merge follows this pattern:
 
-1. Add view flag(s) to the parent command's service method
-2. Dispatch to the appropriate analysis function based on the flag
-3. Return an enum wrapper type (e.g. `CoverageOutput`) with `OutputFormatter` delegation
+1. Identify the shared data shape across modes
+2. Design a single report struct (not an enum) with optional mode-specific fields
+3. Implement `OutputFormatter` once, with mode-aware rendering
 4. **Delete the old commands** — no aliases, no backward compat at v0.1.0
 5. Update snapshot tests
 
@@ -278,8 +282,9 @@ Each merge follows this pattern:
 | After Phase 2 (coverage + churn merged, old deleted) | 44 | -6 |
 | After `duplicates` unification (5 → 1, clusters absorbed) | 39 | -5 |
 | After `fragments` absorbs `patterns` | 38 | -1 |
-| After `graph` consolidation | 33 | -4 |
-| After `check` → rules migration | ~30 | ~-3 |
+| After `check` unification (refs + stale + examples) | 36 | -2 |
+| After `graph` consolidation | 31 | -4 |
+| After further `check` → rules migration | ~28 | ~-3 |
 
 The goal isn't minimizing count for its own sake — it's making the mental model learnable and the extension model obvious.
 
@@ -309,14 +314,13 @@ The goal isn't minimizing count for its own sake — it's making the mental mode
 
 ### Pattern Learned
 
-Enum wrapper (`CoverageOutput`, `CouplingOutput`) + `OutputFormatter` delegation works well when:
-- Views share most parameters (root, limit, exclude, only)
-- View-specific params are few and can be `Option`
+**Enum wrappers were a mistake.** `CoverageOutput`, `CouplingOutput` reduce CLI entry points but don't unify the data model. Each variant is still a separate report with separate rendering — it's just dispatch with extra steps. These should be revisited: either find the shared data shape and use a single struct, or accept they're different commands.
 
-Single struct with optional fields (`DuplicatesReport`) works well when:
+**Single struct with shared fields is real unification** (`DuplicatesReport`):
 - All modes share the same output shape (groups of code locations)
 - Mode differences are which optional fields are populated
 - `serde(skip_serializing_if = "Option::is_none")` keeps JSON clean per mode
+- One `OutputFormatter` impl with mode-aware rendering
 
 It doesn't work when parameter signatures diverge — that means they're different commands, not different views. Don't force a merge with aliases or god-functions; accept that separate commands are the right design.
 
@@ -335,3 +339,13 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - `normalize analyze fragments --scope functions --skeleton --similarity 0.7 --min-members 3` → was `patterns`
 - Added `--min-members` flag, `avg_similarity` per cluster (fuzzy mode), `unclustered_count` in report
 - Old command: `patterns` — deleted
+
+**`check`** — unifies `check-refs`, `stale-docs`, `check-examples`:
+- `normalize analyze check` → run all documentation checks (default)
+- `normalize analyze check --refs` → broken documentation references
+- `normalize analyze check --stale` → stale documentation
+- `normalize analyze check --examples` → missing example markers
+- Shared `DiagnosticsReport` struct (not an enum wrapper — all checks produce the same `Issue` type)
+- `DiagnosticsReport` in `normalize-output::diagnostics` — reusable by any issue-reporting command
+- Old commands: `check-refs`, `stale-docs`, `check-examples` — deleted
+- Output format: `file:line:col: severity [rule_id] message` (standard diagnostic format)

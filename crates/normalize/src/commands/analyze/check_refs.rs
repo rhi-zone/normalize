@@ -2,6 +2,7 @@
 
 use crate::index;
 use crate::output::OutputFormatter;
+use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::Serialize;
 use std::path::Path;
 
@@ -243,6 +244,32 @@ async fn cmd_check_refs_async(root: &Path) -> i32 {
     println!("{}", report.format_text());
 
     if broken_refs.is_empty() { 0 } else { 1 }
+}
+
+impl From<CheckRefsReport> for DiagnosticsReport {
+    fn from(report: CheckRefsReport) -> Self {
+        DiagnosticsReport {
+            issues: report
+                .broken_refs
+                .into_iter()
+                .map(|r| Issue {
+                    file: r.file,
+                    line: Some(r.line),
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                    rule_id: "broken-ref".into(),
+                    message: format!("unknown symbol `{}`", r.reference),
+                    severity: Severity::Warning,
+                    source: "check-refs".into(),
+                    related: vec![],
+                    suggestion: None,
+                })
+                .collect(),
+            files_checked: report.files_checked,
+            sources_run: vec!["check-refs".into()],
+        }
+    }
 }
 
 /// Check if a string is a common non-symbol pattern (command, path, etc.)
