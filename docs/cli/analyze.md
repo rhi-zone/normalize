@@ -26,8 +26,7 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 |------------|-------------|
 | `duplicates` | Detect duplicate/similar code (`--scope functions\|blocks`, `--similar`) |
 | `duplicate-types` | Detect similar type definitions |
-| `clusters` | Group similar functions into structural clusters |
-| `patterns` | Auto-detect recurring structural code patterns |
+| `fragments` | Find repeated AST fragments (`--scope`, `--skeleton`, `--similarity`, `--min-members`) |
 
 ### Coverage & Testing
 | Subcommand | Description |

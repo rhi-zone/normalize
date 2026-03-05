@@ -72,6 +72,9 @@ pub struct FragmentCluster {
     pub node_kind: String,
     /// Structural summary: [("if", 2), ("call", 3)]
     pub label: Vec<(String, usize)>,
+    /// Average pairwise similarity within the cluster (fuzzy mode only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avg_similarity: Option<f64>,
     pub members: Vec<FragmentLocation>,
 }
 
@@ -81,6 +84,8 @@ pub struct FragmentsReport {
     pub clusters: Vec<FragmentCluster>,
     pub total_fragments_scanned: usize,
     pub total_clusters: usize,
+    /// Fragments not assigned to any cluster (below min_members threshold).
+    pub unclustered_count: usize,
     pub inline_depth: usize,
     pub min_nodes: usize,
     pub stats: normalize_analyze::ranked::RankStats,
@@ -112,6 +117,7 @@ pub fn analyze_fragments(
     similarity: f64,
     limit: usize,
     skeleton: bool,
+    min_members: usize,
     exclude: &[String],
     only: &[String],
 ) -> Result<FragmentsReport, String> {
@@ -262,22 +268,32 @@ pub fn analyze_fragments(
             clusters: Vec::new(),
             total_fragments_scanned: 0,
             total_clusters: 0,
+            unclustered_count: 0,
             inline_depth,
             min_nodes,
             stats: normalize_analyze::ranked::RankStats::from_scores(std::iter::empty()),
         });
     }
 
-    let clusters = if similarity >= 1.0 {
-        group_exact(&all_fragments)
-    } else {
+    let effective_min = min_members.max(2);
+    let is_fuzzy = similarity < 1.0;
+
+    let (clusters, pair_sims) = if is_fuzzy {
         group_fuzzy(&all_fragments, similarity)
+    } else {
+        (group_exact(&all_fragments), HashMap::new())
     };
+
+    let clustered_count: usize = clusters
+        .iter()
+        .filter(|idxs| idxs.len() >= effective_min)
+        .map(|idxs| idxs.len())
+        .sum();
 
     let mut result_clusters: Vec<FragmentCluster> = clusters
         .into_iter()
-        .filter(|idxs| idxs.len() >= 2)
-        .map(|idxs| build_cluster(&all_fragments, &idxs))
+        .filter(|idxs| idxs.len() >= effective_min)
+        .map(|idxs| build_cluster(&all_fragments, &idxs, is_fuzzy, &pair_sims))
         .collect();
 
     let stats = normalize_analyze::ranked::rank_and_truncate(
@@ -295,6 +311,7 @@ pub fn analyze_fragments(
         total_clusters: result_clusters.len(),
         clusters: result_clusters,
         total_fragments_scanned,
+        unclustered_count: total_fragments_scanned - clustered_count,
         inline_depth,
         min_nodes,
         stats,
@@ -549,7 +566,12 @@ fn group_exact(fragments: &[Fragment]) -> Vec<Vec<usize>> {
 }
 
 /// Group fragments by MinHash + LSH + union-find clustering.
-fn group_fuzzy(fragments: &[Fragment], similarity: f64) -> Vec<Vec<usize>> {
+/// Returns (clusters, pair_similarities) for avg_similarity computation.
+#[allow(clippy::type_complexity)]
+fn group_fuzzy(
+    fragments: &[Fragment],
+    similarity: f64,
+) -> (Vec<Vec<usize>>, HashMap<(usize, usize), f64>) {
     let sigs: Vec<[u64; MINHASH_N]> = fragments
         .par_iter()
         .map(|f| compute_minhash(&f.tokens))
@@ -591,10 +613,12 @@ fn group_fuzzy(fragments: &[Fragment], similarity: f64) -> Vec<Vec<usize>> {
     }
 
     let mut uf = UnionFind::new(fragments.len());
+    let mut pair_sims: HashMap<(usize, usize), f64> = HashMap::new();
     for (a, b) in &candidates {
         let sim = jaccard_estimate(&sigs[*a], &sigs[*b]);
         if sim >= similarity {
             uf.union(*a, *b);
+            pair_sims.insert((*a, *b), sim);
         }
     }
 
@@ -604,11 +628,16 @@ fn group_fuzzy(fragments: &[Fragment], similarity: f64) -> Vec<Vec<usize>> {
         clusters.entry(root_id).or_default().push(i);
     }
 
-    clusters.into_values().collect()
+    (clusters.into_values().collect(), pair_sims)
 }
 
 /// Build a FragmentCluster from a set of fragment indices.
-fn build_cluster(fragments: &[Fragment], indices: &[usize]) -> FragmentCluster {
+fn build_cluster(
+    fragments: &[Fragment],
+    indices: &[usize],
+    is_fuzzy: bool,
+    pair_sims: &HashMap<(usize, usize), f64>,
+) -> FragmentCluster {
     let mut members: Vec<FragmentLocation> = indices
         .iter()
         .map(|&i| {
@@ -648,6 +677,32 @@ fn build_cluster(fragments: &[Fragment], indices: &[usize]) -> FragmentCluster {
     // Hash representative
     let hash = format!("{:016x}", xor_fold(&fragments[indices[0]].tokens));
 
+    // Compute average pairwise similarity in fuzzy mode
+    let avg_similarity = if is_fuzzy && indices.len() >= 2 {
+        let mut sim_sum = 0.0;
+        let mut sim_count = 0usize;
+        for i in 0..indices.len() {
+            for j in i + 1..indices.len() {
+                let (a, b) = (indices[i].min(indices[j]), indices[i].max(indices[j]));
+                if let Some(&sim) = pair_sims.get(&(a, b)) {
+                    sim_sum += sim;
+                } else {
+                    // Pair not in LSH candidates but in same cluster via transitivity;
+                    // compute on demand from tokens via xor_fold Jaccard would be wrong
+                    // (we don't have MinHash sigs here). Use 0.0 as lower bound.
+                }
+                sim_count += 1;
+            }
+        }
+        Some(if sim_count > 0 {
+            sim_sum / sim_count as f64
+        } else {
+            0.0
+        })
+    } else {
+        None
+    };
+
     FragmentCluster {
         hash,
         frequency,
@@ -655,6 +710,7 @@ fn build_cluster(fragments: &[Fragment], indices: &[usize]) -> FragmentCluster {
         avg_lines,
         node_kind,
         label,
+        avg_similarity,
         members,
     }
 }
@@ -665,8 +721,8 @@ impl OutputFormatter for FragmentsReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
         lines.push(format!(
-            "# Fragment Analysis ({} fragments → {} clusters, min_nodes={}, inline_depth={})",
-            self.total_fragments_scanned, self.total_clusters, self.min_nodes, self.inline_depth
+            "# Fragment Analysis ({} fragments → {} clusters, {} unclustered, min_nodes={}, inline_depth={})",
+            self.total_fragments_scanned, self.total_clusters, self.unclustered_count, self.min_nodes, self.inline_depth
         ));
         lines.push(String::new());
 
@@ -690,14 +746,19 @@ impl OutputFormatter for FragmentsReport {
                 .map(|(k, c)| format!("{} ×{}", k, c))
                 .collect::<Vec<_>>()
                 .join(", ");
+            let sim_str = cluster
+                .avg_similarity
+                .map(|s| format!("  sim={:.0}%", s * 100.0))
+                .unwrap_or_default();
             lines.push(format!(
-                "{:<18} {:>5} {:>10} {:>10.1}  {} [{}]",
+                "{:<18} {:>5} {:>10} {:>10.1}  {} [{}]{}",
                 &cluster.hash[..12],
                 cluster.frequency,
                 cluster.total_lines,
                 cluster.avg_lines,
                 cluster.node_kind,
                 label_str,
+                sim_str,
             ));
 
             // Top 3 locations
@@ -719,8 +780,8 @@ impl OutputFormatter for FragmentsReport {
     fn format_pretty(&self) -> String {
         let mut lines = Vec::new();
         lines.push(format!(
-            "\x1b[1m# Fragment Analysis\x1b[0m ({} fragments → \x1b[36m{}\x1b[0m clusters, min_nodes={}, inline_depth={})",
-            self.total_fragments_scanned, self.total_clusters, self.min_nodes, self.inline_depth
+            "\x1b[1m# Fragment Analysis\x1b[0m ({} fragments → \x1b[36m{}\x1b[0m clusters, {} unclustered, min_nodes={}, inline_depth={})",
+            self.total_fragments_scanned, self.total_clusters, self.unclustered_count, self.min_nodes, self.inline_depth
         ));
         lines.push(String::new());
 
@@ -737,8 +798,12 @@ impl OutputFormatter for FragmentsReport {
                 .map(|(k, c)| format!("\x1b[36m{}\x1b[0m ×{}", k, c))
                 .collect::<Vec<_>>()
                 .join(", ");
+            let sim_str = cluster
+                .avg_similarity
+                .map(|s| format!("  sim=\x1b[32m{:.0}%\x1b[0m", s * 100.0))
+                .unwrap_or_default();
             lines.push(format!(
-                "\x1b[1;33m#{}\x1b[0m \x1b[2m{}\x1b[0m  freq=\x1b[1m{}\x1b[0m  lines={}  avg={:.1}  \x1b[35m{}\x1b[0m [{}]",
+                "\x1b[1;33m#{}\x1b[0m \x1b[2m{}\x1b[0m  freq=\x1b[1m{}\x1b[0m  lines={}  avg={:.1}  \x1b[35m{}\x1b[0m [{}]{}",
                 i + 1,
                 &cluster.hash[..12],
                 cluster.frequency,
@@ -746,6 +811,7 @@ impl OutputFormatter for FragmentsReport {
                 cluster.avg_lines,
                 cluster.node_kind,
                 label_str,
+                sim_str,
             ));
 
             for loc in cluster.members.iter().take(3) {

@@ -1,7 +1,6 @@
 //! Code similarity algorithms: MinHash + LSH, normalized AST hashing, and structural tokenization.
 //!
-//! Shared between `normalize analyze duplicate-functions`, `normalize analyze similar-functions`,
-//! `normalize analyze similar-blocks`, and `normalize analyze patterns`.
+//! Shared between `normalize analyze duplicates` and `normalize analyze fragments`.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};

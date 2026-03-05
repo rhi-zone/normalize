@@ -47,8 +47,7 @@ Full mapping of all 49 commands to their axis coordinates:
 |---------|--------|-------|------|-------|
 | `duplicates` | exact-hash/minhash/union-find | function/block | now | grouped/pairs |
 | `duplicate-types` | name+structure | type | now | grouped |
-| `patterns` | skeleton-minhash | function | now | grouped |
-| `fragments` | subtree-hash/minhash | any/function/block | now | grouped |
+| `fragments` | subtree-hash/minhash/skeleton | any/function/block | now | grouped |
 
 ### Coverage & Testing
 | Command | Metric | Scope | Time | Shape |
@@ -207,9 +206,9 @@ All share the same shape: compute a scalar per entity, sort, show top N. The met
 
 **2. `similar` — find structurally alike code units (open set)**
 
-Today: duplicates (5 modes via `--mode`/`--scope`), duplicate-types, patterns, fragments. All ask "which code units look alike?"
+Today: duplicates (5 modes via `--mode`/`--scope`), duplicate-types, fragments. All ask "which code units look alike?"
 
-`duplicates` already unified: `--mode exact|similar|clusters --scope functions|blocks`. Could further absorb `patterns` and `fragments` under a broader `similar` command.
+`duplicates` already unified: `--mode exact|similar|clusters --scope functions|blocks`. `patterns` absorbed into `fragments` (use `--scope functions --skeleton --similarity 0.7 --min-members 3`). Could further absorb under a broader `similar` command.
 
 **3. `graph <symbol>` — walk relations from a starting point (open set)**
 
@@ -278,7 +277,7 @@ Each merge follows this pattern:
 | Start | 50 | — |
 | After Phase 2 (coverage + churn merged, old deleted) | 44 | -6 |
 | After `duplicates` unification (5 → 1, clusters absorbed) | 39 | -5 |
-| After `similar` consolidation (fragments absorbs patterns) | 37 | -2 |
+| After `fragments` absorbs `patterns` | 38 | -1 |
 | After `graph` consolidation | 33 | -4 |
 | After `check` → rules migration | ~30 | ~-3 |
 
@@ -331,3 +330,8 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - `normalize analyze duplicates --mode clusters` → function clusters (was standalone `clusters` command)
 - Single `DuplicatesReport` struct with mode-aware `OutputFormatter`
 - Old commands: `duplicate-functions`, `duplicate-blocks`, `similar-functions`, `similar-blocks`, `clusters` — deleted
+
+**`fragments` absorbs `patterns`**:
+- `normalize analyze fragments --scope functions --skeleton --similarity 0.7 --min-members 3` → was `patterns`
+- Added `--min-members` flag, `avg_similarity` per cluster (fuzzy mode), `unclustered_count` in report
+- Old command: `patterns` — deleted
