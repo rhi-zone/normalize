@@ -398,8 +398,19 @@ impl AnalyzeService {
     name = "analyze",
     about = "Analyze codebase (health, complexity, security, duplicates, docs)"
 )]
+#[server(groups(
+    code = "Code quality",
+    modules = "Module structure",
+    repo = "Repository",
+    graph = "Graph analysis",
+    git = "Git history",
+    test = "Testing",
+    security = "Security",
+    diff = "Diff",
+))]
 impl AnalyzeService {
     /// Check for broken documentation references
+    #[server(group = "repo")]
     #[cli(display_with = "display_check_refs")]
     pub fn check_refs(
         &self,
@@ -414,6 +425,7 @@ impl AnalyzeService {
     }
 
     /// Check for stale documentation
+    #[server(group = "repo")]
     #[cli(display_with = "display_stale_docs")]
     pub fn stale_docs(
         &self,
@@ -426,6 +438,7 @@ impl AnalyzeService {
     }
 
     /// Check for missing example references in documentation
+    #[server(group = "repo")]
     #[cli(display_with = "display_check_examples")]
     pub fn check_examples(
         &self,
@@ -438,6 +451,7 @@ impl AnalyzeService {
     }
 
     /// Show callers and/or callees of a symbol
+    #[server(group = "graph")]
     #[cli(display_with = "display_call_graph")]
     pub fn call_graph(
         &self,
@@ -464,6 +478,7 @@ impl AnalyzeService {
     }
 
     /// Trace value provenance for a symbol
+    #[server(group = "graph")]
     #[cli(display_with = "display_trace")]
     pub fn trace(
         &self,
@@ -488,6 +503,7 @@ impl AnalyzeService {
     }
 
     /// Show architecture analysis (coupling, cycles, hubs)
+    #[server(group = "graph")]
     #[cli(display_with = "display_architecture")]
     pub fn architecture(
         &self,
@@ -507,6 +523,7 @@ impl AnalyzeService {
     }
 
     /// What-if impact analysis: reverse-dependency closure + blast radius
+    #[server(group = "graph")]
     #[cli(display_with = "display_impact")]
     pub fn impact(
         &self,
@@ -595,6 +612,7 @@ impl AnalyzeService {
     }
 
     /// Run security analysis
+    #[server(group = "security")]
     #[cli(display_with = "display_security")]
     pub fn security(
         &self,
@@ -610,6 +628,7 @@ impl AnalyzeService {
     }
 
     /// Run complexity analysis
+    #[server(group = "code")]
     #[cli(display_with = "display_complexity")]
     #[allow(clippy::too_many_arguments)]
     pub fn complexity(
@@ -654,6 +673,7 @@ impl AnalyzeService {
     }
 
     /// Run function length analysis
+    #[server(group = "code")]
     #[cli(display_with = "display_length")]
     #[allow(clippy::too_many_arguments)]
     pub fn length(
@@ -690,6 +710,7 @@ impl AnalyzeService {
     }
 
     /// Analyze documentation coverage
+    #[server(group = "repo")]
     #[cli(display_with = "display_doc_coverage")]
     pub fn docs(
         &self,
@@ -714,6 +735,7 @@ impl AnalyzeService {
     }
 
     /// Show longest files in codebase
+    #[server(group = "repo")]
     #[cli(display_with = "display_file_length")]
     pub fn files(
         &self,
@@ -734,6 +756,7 @@ impl AnalyzeService {
     }
 
     /// Show hierarchical LOC breakdown (ncdu-style)
+    #[server(group = "modules")]
     #[cli(display_with = "display_size")]
     pub fn size(
         &self,
@@ -749,6 +772,7 @@ impl AnalyzeService {
     }
 
     /// Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+    #[server(group = "code")]
     #[cli(display_with = "display_ceremony")]
     pub fn ceremony(
         &self,
@@ -767,6 +791,7 @@ impl AnalyzeService {
     }
 
     /// Group similar functions into structural clusters (connected components of similar-functions pairs)
+    #[server(group = "code")]
     #[cli(display_with = "display_clusters")]
     #[allow(clippy::too_many_arguments)]
     pub fn clusters(
@@ -802,6 +827,7 @@ impl AnalyzeService {
     /// Default: coupling pairs (files that change together).
     /// Use --cluster for change-clusters (connected components).
     /// Use --hotspots for churn × complexity hotspots.
+    #[server(group = "git")]
     #[cli(display_with = "display_coupling_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn churn(
@@ -873,6 +899,7 @@ impl AnalyzeService {
     }
 
     /// Show per-file ownership concentration from git blame
+    #[server(group = "git")]
     #[cli(display_with = "display_ownership")]
     pub fn ownership(
         &self,
@@ -923,6 +950,7 @@ impl AnalyzeService {
     }
 
     /// Analyze contributors across repos
+    #[server(group = "git")]
     #[cli(display_with = "display_contributors")]
     pub fn contributors(
         &self,
@@ -934,6 +962,7 @@ impl AnalyzeService {
     }
 
     /// Analyze cross-repo activity over time
+    #[server(group = "git")]
     #[cli(display_with = "display_activity")]
     pub fn activity(
         &self,
@@ -953,6 +982,7 @@ impl AnalyzeService {
     }
 
     /// Analyze cross-repo coupling
+    #[server(group = "graph")]
     #[cli(display_with = "display_repo_coupling")]
     pub fn repo_coupling(
         &self,
@@ -983,6 +1013,7 @@ impl AnalyzeService {
     }
 
     /// Detect duplicate/similar code (functions or blocks)
+    #[server(group = "code")]
     #[cli(display_with = "display_duplicates")]
     #[allow(clippy::too_many_arguments)]
     pub fn duplicates(
@@ -1097,6 +1128,7 @@ impl AnalyzeService {
     }
 
     /// Detect duplicate type definitions
+    #[server(group = "code")]
     #[cli(display_with = "display_dup_types")]
     pub fn duplicate_types(
         &self,
@@ -1124,6 +1156,7 @@ impl AnalyzeService {
     /// Default: test-ratio (test/impl line ratio per module).
     /// Use --gaps to find untested public functions.
     /// Use --budget for line budget breakdown by purpose.
+    #[server(group = "test")]
     #[cli(display_with = "display_coverage")]
     #[allow(clippy::too_many_arguments)]
     pub fn coverage(
@@ -1190,6 +1223,7 @@ impl AnalyzeService {
     }
 
     /// Measure information density (compression ratio + token uniqueness) per module
+    #[server(group = "modules")]
     #[cli(display_with = "display_density")]
     pub fn density(
         &self,
@@ -1218,6 +1252,7 @@ impl AnalyzeService {
     }
 
     /// Measure what fraction of functions have no structural near-twin per module
+    #[server(group = "code")]
     #[cli(display_with = "display_uniqueness")]
     #[allow(clippy::too_many_arguments)]
     pub fn uniqueness(
@@ -1260,6 +1295,7 @@ impl AnalyzeService {
     }
 
     /// Compute effective (reachable) cyclomatic complexity via call-graph BFS
+    #[server(group = "code")]
     #[cli(display_with = "display_call_complexity")]
     pub fn call_complexity(
         &self,
@@ -1290,6 +1326,7 @@ impl AnalyzeService {
     }
 
     /// Score each module across test ratio, uniqueness, and density (worst first)
+    #[server(group = "modules")]
     #[cli(display_with = "display_module_health")]
     pub fn module_health(
         &self,
@@ -1346,6 +1383,7 @@ impl AnalyzeService {
     }
 
     /// Rank modules by import fan-in (requires facts index)
+    #[server(group = "modules")]
     #[cli(display_with = "display_imports")]
     pub fn imports(
         &self,
@@ -1372,6 +1410,7 @@ impl AnalyzeService {
     }
 
     /// Per-module dependency depth + ripple risk
+    #[server(group = "modules")]
     #[cli(display_with = "display_depth_map")]
     pub fn depth_map(
         &self,
@@ -1393,6 +1432,7 @@ impl AnalyzeService {
     }
 
     /// Graph-theoretic properties of the dependency graph
+    #[server(group = "graph")]
     #[cli(display_with = "display_graph")]
     pub fn graph(
         &self,
@@ -1415,6 +1455,7 @@ impl AnalyzeService {
     }
 
     /// Per-module public symbol count, public ratio, and constraint score
+    #[server(group = "modules")]
     #[cli(display_with = "display_surface")]
     pub fn surface(
         &self,
@@ -1436,6 +1477,7 @@ impl AnalyzeService {
     }
 
     /// Per-module import layering compliance — are imports flowing downward?
+    #[server(group = "modules")]
     #[cli(display_with = "display_layering")]
     pub fn layering(
         &self,
@@ -1457,6 +1499,7 @@ impl AnalyzeService {
     }
 
     /// Provenance graph: git blame → session mapping + code relations
+    #[server(group = "git")]
     #[cli(display_with = "display_provenance")]
     #[allow(clippy::too_many_arguments)]
     pub fn provenance(
@@ -1491,6 +1534,7 @@ impl AnalyzeService {
     }
 
     /// Show structural changes between a base ref and HEAD
+    #[server(group = "diff")]
     #[cli(display_with = "display_skeleton_diff")]
     pub fn skeleton_diff(
         &self,
@@ -1512,6 +1556,7 @@ impl AnalyzeService {
     }
 
     /// Track health metrics over git history at regular intervals
+    #[server(group = "git")]
     #[cli(display_with = "display_trend")]
     pub fn trend(
         &self,
@@ -1529,6 +1574,7 @@ impl AnalyzeService {
     }
 
     /// Auto-detect recurring structural code patterns
+    #[server(group = "code")]
     #[cli(display_with = "display_patterns")]
     #[allow(clippy::too_many_arguments)]
     pub fn patterns(

@@ -5056,9 +5056,9 @@ dependencies = [
 
 [[package]]
 name = "server-less"
-version = "0.2.1-alpha.4"
+version = "0.2.1-alpha.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3b58c5eec946489d54d025226efd9f45796f17aa6ad69854659cb54eacf6b63"
+checksum = "be7fd704b3b03f7ba010b830018a35d73e7a6db9f27970eb1452534dce6d569c"
 dependencies = [
  "clap",
  "serde",
@@ -5087,9 +5087,9 @@ dependencies = [
 
 [[package]]
 name = "server-less-macros"
-version = "0.2.1-alpha.4"
+version = "0.2.1-alpha.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5abfb9c2b811535ec7dc57a7b39c71666eabb954f97b48c956ae8abeb070daa"
+checksum = "b3ab1e39251ec0930e8de5295d929586c9f36fc0e0128cca40616557330f0e4b"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -5101,9 +5101,9 @@ dependencies = [
 
 [[package]]
 name = "server-less-parse"
-version = "0.2.1-alpha.4"
+version = "0.2.1-alpha.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8da3faaed017a57bd968f0910d13dfe26fe59834dcca2e0f1e4cb60ba0f2d886"
+checksum = "27e60694a4b8fd7fe17172829650308c2d965f1db73c9ceb4e3fbb14b3233fe2"
 dependencies = [
  "proc-macro2",
  "quote",
