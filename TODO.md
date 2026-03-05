@@ -217,13 +217,20 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 **Phase 3 — Further consolidation (needs design):**
 - [ ] `duplicates` + `fragments`: collapse remaining similarity commands (duplicate-types still separate, fragments absorbed patterns)
 - [ ] `deps`: collapse 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact)
-- [ ] `docs` → unified diagnostics: `check-refs`, `stale-docs`, `check-examples` share `DiagnosticsReport` output (not enum wrapper — shared `Issue` struct). `docs` (coverage) stays separate (it's a metric/rank command, not a check). See `docs/design/rules-unification.md`
+- [x] `docs` → unified `check` command: `check-refs`, `stale-docs`, `check-examples` → `normalize analyze check [--refs] [--stale] [--examples]`. Shared `DiagnosticsReport` in `normalize-output::diagnostics`. `docs` (coverage) stays separate (metric/rank). See `docs/design/rules-unification.md`
 - [ ] `git`: collapse 5 commands (ownership, contributors, activity, repo-coupling, cross-repo-health) — all git/repo-centric analysis
 - [ ] Cross-cutting `--trend` and `--diff <ref>` modifiers on any scoring command
 
 **Design pressure:** ~43 commands after Phase 2 is still too spread out. Phase 3 must happen. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
 
-**Revisit enum-return "unifications":** `CoverageOutput`, `CouplingOutput` wrap N report types in an enum — that's not real unification, just a dispatch layer with fewer CLI entry points. Each should be redesigned with a single report struct that all modes populate (shared fields, shared rendering). If the reports have nothing structurally in common, they may not belong under one command. (`DuplicatesReport` is already a single struct — it's the right pattern.)
+**Revisit enum-return "unifications" — NEXT SESSION:**
+
+`CoverageOutput`, `CouplingOutput` wrap N report types in an enum — not real unification. Each should be redesigned with a single report struct or accepted as separate commands.
+
+- [ ] `CoverageOutput` (test-ratio, test-gaps, budget) — find shared shape or split back
+- [ ] `CouplingOutput` (coupling-pairs, coupling-clusters, hotspots) — find shared shape or split back
+
+Approach: for each, read the inner report structs, identify common fields, design a single struct. If no shared shape exists, revert to separate commands (that's fine — don't force it).
 
 ### Rules Unification & `facts` → `structure` Rename
 
