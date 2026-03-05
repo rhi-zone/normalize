@@ -202,7 +202,7 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 
 See `docs/design/analyze-consolidation.md` for full design (axis decomposition, phased plan).
 
-**The CLI is too big.** 43 flat subcommands under `analyze` (now grouped via `#[server(groups(...))]` in `--help`, but still 43 separate commands). Users can't hold this in working memory. Grouping helps discoverability but doesn't reduce the surface.
+**The CLI is too big.** ~38 subcommands under `analyze` (down from 50 after coverage/churn/duplicates/patterns merges; now grouped via `#[server(groups(...))]` in `--help`). Users can't hold this in working memory. Grouping helps discoverability but doesn't reduce the surface enough.
 
 **Current state (2026-03):**
 - `--help` output is now grouped into 8 sections (code, modules, repo, graph, git, test, security, diff) via server-less `#[server(groups(...))]`
@@ -215,7 +215,7 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 - [ ] **2c. `density`**: needs design — `uniqueness` has 8 extra params
 
 **Phase 3 — Further consolidation (needs design):**
-- [ ] `duplicates`: collapse 8 commands (duplicate-functions/blocks/types, similar-functions/blocks, clusters, patterns, fragments)
+- [ ] `duplicates` + `fragments`: collapse remaining similarity commands (duplicate-types still separate, fragments absorbed patterns)
 - [ ] `deps`: collapse 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact)
 - [ ] `docs`: collapse 4 commands (docs, check-refs, stale-docs, check-examples)
 - [ ] `git`: collapse 5 commands (ownership, contributors, activity, repo-coupling, cross-repo-health) — all git/repo-centric analysis
