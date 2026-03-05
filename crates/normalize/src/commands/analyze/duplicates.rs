@@ -1,5 +1,6 @@
 //! Duplicate function and type detection.
 
+use super::duplicates_views::DuplicatesReport;
 use crate::extract::Extractor;
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
@@ -11,23 +12,6 @@ use normalize_code_similarity::{
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use serde::Serialize;
-
-/// Resolve a (potentially repo-prefixed) relative path to an absolute path.
-/// When multi-repo, `rel` is like `repo-name/src/lib.rs` and `roots` contains `/path/to/repo-name`.
-fn resolve_file_path(roots: &[PathBuf], rel: &str) -> PathBuf {
-    if roots.len() == 1 {
-        return roots[0].join(rel);
-    }
-    let path = std::path::Path::new(rel);
-    let mut components = path.components();
-    if let Some(first) = components.next() {
-        let repo_name = first.as_os_str();
-        if let Some(root) = roots.iter().find(|r| r.file_name() == Some(repo_name)) {
-            return root.join(components.as_path());
-        }
-    }
-    roots[0].join(rel)
-}
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -55,103 +39,6 @@ struct DuplicateFunctionLocation {
     symbol: String,
     start_line: usize,
     end_line: usize,
-}
-
-/// Duplicate functions analysis report
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct DuplicateFunctionsReport {
-    files_scanned: usize,
-    functions_hashed: usize,
-    #[serde(skip)]
-    total_duplicates: usize,
-    duplicated_lines: usize,
-    elide_identifiers: bool,
-    elide_literals: bool,
-    groups: Vec<DuplicateFunctionGroup>,
-    #[serde(skip)]
-    suppressed_same_name: usize,
-    #[serde(skip)]
-    roots: Vec<PathBuf>,
-    #[serde(skip)]
-    show_source: bool,
-}
-
-impl DuplicateFunctionsReport {
-    /// Number of duplicate function groups found.
-    pub fn group_count(&self) -> usize {
-        self.groups.len()
-    }
-
-    /// Total lines of code involved in duplicates.
-    pub fn duplicated_line_count(&self) -> usize {
-        self.duplicated_lines
-    }
-}
-
-impl OutputFormatter for DuplicateFunctionsReport {
-    fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-        lines.push("Duplicate Function Detection".to_string());
-        lines.push(String::new());
-        lines.push(format!("Files scanned: {}", self.files_scanned));
-        lines.push(format!("Functions hashed: {}", self.functions_hashed));
-        lines.push(format!("Duplicate groups: {}", self.groups.len()));
-        lines.push(format!("Total duplicates: {}", self.total_duplicates));
-        lines.push(format!("Duplicated lines: ~{}", self.duplicated_lines));
-        if self.suppressed_same_name > 0 {
-            lines.push(format!(
-                "Suppressed: {} same-name groups (likely trait impls; use --include-trait-impls to show)",
-                self.suppressed_same_name
-            ));
-        }
-        lines.push(String::new());
-
-        if self.groups.is_empty() {
-            lines.push("No duplicate functions detected.".to_string());
-        } else {
-            lines.push("Duplicate Groups (sorted by size):".to_string());
-            lines.push(String::new());
-
-            for (i, group) in self.groups.iter().take(20).enumerate() {
-                lines.push(format!(
-                    "{}. {} lines, {} instances:",
-                    i + 1,
-                    group.line_count,
-                    group.locations.len()
-                ));
-
-                for loc in &group.locations {
-                    lines.push(format!(
-                        "   {}:{}-{} ({})",
-                        loc.file, loc.start_line, loc.end_line, loc.symbol
-                    ));
-
-                    if self.show_source {
-                        let file_path = resolve_file_path(&self.roots, &loc.file);
-                        if let Ok(content) = std::fs::read_to_string(&file_path) {
-                            let file_lines: Vec<&str> = content.lines().collect();
-                            let start = loc.start_line.saturating_sub(1);
-                            let end = loc.end_line.min(file_lines.len());
-                            for (j, line) in file_lines[start..end].iter().enumerate() {
-                                lines.push(format!("        {:4} │ {}", start + j + 1, line));
-                            }
-                            lines.push(String::new());
-                        }
-                    }
-                }
-                lines.push(String::new());
-            }
-
-            if self.groups.len() > 20 {
-                lines.push(format!("... and {} more groups", self.groups.len() - 20));
-            }
-
-            lines.push(String::new());
-            lines.push("To suppress: normalize analyze duplicate-functions --allow <file:symbol> --reason \"explanation\"".to_string());
-        }
-
-        lines.join("\n")
-    }
 }
 
 /// Type information
@@ -794,76 +681,6 @@ pub struct DuplicateBlockGroup {
     pub line_count: usize,
 }
 
-/// Duplicate blocks analysis report
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct DuplicateBlocksReport {
-    files_scanned: usize,
-    blocks_hashed: usize,
-    pub groups: Vec<DuplicateBlockGroup>,
-    #[serde(skip)]
-    show_source: bool,
-    #[serde(skip)]
-    root: PathBuf,
-}
-
-impl OutputFormatter for DuplicateBlocksReport {
-    fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-        lines.push("Duplicate Block Detection".to_string());
-        lines.push(String::new());
-        lines.push(format!("Files scanned: {}", self.files_scanned));
-        lines.push(format!("Blocks hashed: {}", self.blocks_hashed));
-        lines.push(format!("Duplicate groups: {}", self.groups.len()));
-
-        if self.groups.is_empty() {
-            lines.push(String::new());
-            lines.push("No duplicate blocks detected.".to_string());
-            return lines.join("\n");
-        }
-
-        lines.push(String::new());
-
-        for (i, group) in self.groups.iter().take(30).enumerate() {
-            lines.push(format!(
-                "{}. {} lines × {} locations",
-                i + 1,
-                group.line_count,
-                group.locations.len()
-            ));
-            for loc in &group.locations {
-                lines.push(format!(
-                    "   {}:{}-{}",
-                    loc.file, loc.start_line, loc.end_line
-                ));
-            }
-            if self.show_source
-                && let Some(first) = group.locations.first()
-            {
-                let full_path = self.root.join(&first.file);
-                if let Ok(content) = std::fs::read_to_string(&full_path) {
-                    let src_lines: Vec<&str> = content.lines().collect();
-                    let start = first.start_line.saturating_sub(1);
-                    let end = first.end_line.min(src_lines.len());
-                    lines.push(String::new());
-                    for src_line in &src_lines[start..end] {
-                        lines.push(format!("   {}", src_line));
-                    }
-                }
-            }
-            lines.push(String::new());
-        }
-
-        if self.groups.len() > 30 {
-            lines.push(format!("... and {} more groups", self.groups.len() - 30));
-        }
-
-        lines.push(String::new());
-        lines.push("To suppress: normalize analyze duplicate-blocks --allow <file[:symbol]:start-end> --reason \"explanation\"".to_string());
-
-        lines.join("\n")
-    }
-}
-
 /// Walk every node in the tree and hash subtrees at or above min_lines.
 fn is_function_kind(kind: &str) -> bool {
     kind.contains("function") || kind.contains("method")
@@ -920,53 +737,6 @@ fn load_block_allowlist(root: &Path, filename: &str) -> HashSet<String> {
         }
     }
     allowed
-}
-
-fn write_allow_entry(root: &Path, filename: &str, entries: &[String], reason: Option<&str>) -> i32 {
-    let allow_path = root.join(".normalize").join(filename);
-    let existing = std::fs::read_to_string(&allow_path).unwrap_or_default();
-    let existing_lines: Vec<&str> = existing.lines().collect();
-
-    let to_add: Vec<&str> = entries
-        .iter()
-        .map(|e| e.as_str())
-        .filter(|e| !existing_lines.iter().any(|l| l.trim() == *e))
-        .collect();
-
-    if to_add.is_empty() {
-        println!("All entries already in allowlist.");
-        return 0;
-    }
-
-    let moss_dir = root.join(".normalize");
-    if !moss_dir.exists()
-        && let Err(e) = std::fs::create_dir_all(&moss_dir)
-    {
-        eprintln!("Failed to create .normalize directory: {}", e);
-        return 1;
-    }
-
-    let mut new_lines: Vec<String> = existing_lines.iter().map(|s| s.to_string()).collect();
-    if !new_lines.is_empty() && !new_lines.last().is_none_or(|l| l.is_empty()) {
-        new_lines.push(String::new());
-    }
-    if let Some(r) = reason {
-        new_lines.push(format!("# {}", r));
-    }
-    for entry in &to_add {
-        new_lines.push(entry.to_string());
-    }
-
-    let new_content = new_lines.join("\n") + "\n";
-    if let Err(e) = std::fs::write(&allow_path, new_content) {
-        eprintln!("Failed to write {}: {}", allow_path.display(), e);
-        return 1;
-    }
-
-    for entry in &to_add {
-        println!("Added to .normalize/{}: {}", filename, entry);
-    }
-    0
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1067,158 +837,6 @@ pub struct DuplicateBlocksConfig<'a> {
     pub filter: Option<&'a Filter>,
 }
 
-pub fn cmd_duplicate_blocks(cfg: DuplicateBlocksConfig<'_>) -> i32 {
-    let DuplicateBlocksConfig {
-        root,
-        min_lines,
-        elide_identifiers,
-        elide_literals,
-        skip_functions,
-        show_source,
-        allow,
-        reason,
-        filter,
-    } = cfg;
-    let extractor = Extractor::new();
-    let mut hash_groups: HashMap<u64, Vec<DuplicateBlockLocation>> = HashMap::new();
-    // Map file -> extraction result for allow-key computation.
-    let mut file_extractions: HashMap<String, normalize_facts::extract::ExtractResult> =
-        HashMap::new();
-    let mut files_scanned = 0usize;
-    let mut blocks_hashed = 0usize;
-
-    let walker = ignore::WalkBuilder::new(root)
-        .hidden(true)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .build();
-
-    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-        let path = e.path();
-        path.is_file() && super::is_source_file(path)
-    }) {
-        let path = entry.path();
-
-        if let Some(f) = filter {
-            let rel_path = path.strip_prefix(root).unwrap_or(path);
-            if !f.matches(rel_path) {
-                continue;
-            }
-        }
-
-        let content = match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let support = match support_for_path(path) {
-            Some(s) => s,
-            None => continue,
-        };
-
-        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
-            Some(t) => t,
-            None => continue,
-        };
-
-        files_scanned += 1;
-        let rel_path = path
-            .strip_prefix(root)
-            .unwrap_or(path)
-            .display()
-            .to_string();
-
-        file_extractions.insert(rel_path.clone(), extractor.extract(path, &content));
-
-        let before = hash_groups.values().map(|v| v.len()).sum::<usize>();
-        collect_block_hashes(
-            &tree.root_node(),
-            content.as_bytes(),
-            &rel_path,
-            min_lines,
-            elide_identifiers,
-            elide_literals,
-            skip_functions,
-            &mut hash_groups,
-        );
-        let after = hash_groups.values().map(|v| v.len()).sum::<usize>();
-        blocks_hashed += after - before;
-    }
-
-    let groups_raw: Vec<DuplicateBlockGroup> = hash_groups
-        .into_iter()
-        .filter(|(_, locs)| locs.len() >= 2)
-        .map(|(hash, locations)| {
-            let line_count = locations
-                .first()
-                .map(|l| l.end_line.saturating_sub(l.start_line) + 1)
-                .unwrap_or(0);
-            DuplicateBlockGroup {
-                hash,
-                locations,
-                line_count,
-            }
-        })
-        .collect();
-
-    let groups = suppress_contained_blocks(groups_raw);
-
-    // Build a closure that resolves the allow key for a location.
-    let allow_key = |loc: &DuplicateBlockLocation| {
-        let func = file_extractions
-            .get(&loc.file)
-            .and_then(|r| containing_function(r, loc.start_line));
-        block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
-    };
-
-    if let Some(location) = allow {
-        // --allow mode: find the group containing this location, write its keys.
-        let target = groups
-            .iter()
-            .find(|g| g.locations.iter().any(|loc| allow_key(loc) == location));
-        let group = match target {
-            Some(g) => g,
-            None => {
-                eprintln!("No duplicate block group found containing: {}", location);
-                eprintln!("Run `normalize analyze duplicate-blocks` to see available groups.");
-                return 1;
-            }
-        };
-        if reason.is_none() {
-            eprintln!("Reason required for new groups. Use --reason \"...\"");
-            return 1;
-        }
-        let entries: Vec<String> = group.locations.iter().map(&allow_key).collect();
-        return write_allow_entry(root, "duplicate-blocks-allow", &entries, reason.as_deref());
-    }
-
-    // Filter out allowed groups.
-    let allowlist = load_block_allowlist(root, "duplicate-blocks-allow");
-    let loc_allowed = |loc: &DuplicateBlockLocation| {
-        allowlist.contains(&allow_key(loc))
-            || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
-    };
-    let groups: Vec<DuplicateBlockGroup> = groups
-        .into_iter()
-        .filter(|g| {
-            // A group is allowed if ALL its locations appear in the allowlist.
-            !g.locations.iter().all(&loc_allowed)
-        })
-        .collect();
-
-    let report = DuplicateBlocksReport {
-        files_scanned,
-        blocks_hashed,
-        groups,
-        show_source,
-        root: root.to_path_buf(),
-    };
-
-    println!("{}", report.format_text());
-    if report.groups.is_empty() { 0 } else { 1 }
-}
-
 // ── Fuzzy / partial clone detection (MinHash LSH) ─────────────────────────────
 
 /// A pair of similar (but not necessarily identical) blocks.
@@ -1229,82 +847,6 @@ pub struct SimilarBlockPair {
     /// Estimated Jaccard similarity of their AST token shingles (0.0–1.0)
     pub similarity: f64,
     pub line_count: usize,
-}
-
-/// Report from fuzzy block similarity detection.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct SimilarBlocksReport {
-    files_scanned: usize,
-    blocks_analyzed: usize,
-    threshold: f64,
-    pub pairs: Vec<SimilarBlockPair>,
-    #[serde(skip)]
-    show_source: bool,
-    #[serde(skip)]
-    root: PathBuf,
-}
-
-impl OutputFormatter for SimilarBlocksReport {
-    fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-        lines.push("Similar Block Detection (fuzzy)".to_string());
-        lines.push(String::new());
-        lines.push(format!("Files scanned:   {}", self.files_scanned));
-        lines.push(format!("Blocks analyzed: {}", self.blocks_analyzed));
-        lines.push(format!("Threshold:       {:.0}%", self.threshold * 100.0));
-        lines.push(format!("Similar pairs:   {}", self.pairs.len()));
-
-        if self.pairs.is_empty() {
-            lines.push(String::new());
-            lines.push("No similar blocks detected.".to_string());
-            return lines.join("\n");
-        }
-
-        lines.push(String::new());
-
-        for (i, pair) in self.pairs.iter().take(30).enumerate() {
-            lines.push(format!(
-                "{}. {:.0}% similar  ({} lines)",
-                i + 1,
-                pair.similarity * 100.0,
-                pair.line_count,
-            ));
-            lines.push(format!(
-                "   {}:{}-{}",
-                pair.location_a.file, pair.location_a.start_line, pair.location_a.end_line
-            ));
-            lines.push(format!(
-                "   {}:{}-{}",
-                pair.location_b.file, pair.location_b.start_line, pair.location_b.end_line
-            ));
-
-            if self.show_source {
-                for loc in [&pair.location_a, &pair.location_b] {
-                    let full_path = self.root.join(&loc.file);
-                    if let Ok(content) = std::fs::read_to_string(&full_path) {
-                        let src_lines: Vec<&str> = content.lines().collect();
-                        let start = loc.start_line.saturating_sub(1);
-                        let end = loc.end_line.min(src_lines.len());
-                        lines.push(String::new());
-                        lines.push(format!("   --- {} ---", loc.file));
-                        for src_line in &src_lines[start..end] {
-                            lines.push(format!("   {}", src_line));
-                        }
-                    }
-                }
-            }
-            lines.push(String::new());
-        }
-
-        if self.pairs.len() > 30 {
-            lines.push(format!("... and {} more pairs", self.pairs.len() - 30));
-        }
-
-        lines.push(String::new());
-        lines.push("To suppress: normalize analyze similar-blocks --allow <file[:symbol]:start-end> --reason \"explanation\"".to_string());
-
-        lines.join("\n")
-    }
 }
 
 /// Collect all subtrees above min_lines, returning (location, minhash signature).
@@ -1442,255 +984,6 @@ pub struct SimilarBlocksConfig<'a> {
     pub filter: Option<&'a Filter>,
 }
 
-pub fn cmd_similar_blocks(cfg: SimilarBlocksConfig<'_>) -> i32 {
-    let SimilarBlocksConfig {
-        root,
-        min_lines,
-        similarity,
-        elide_identifiers,
-        elide_literals,
-        skeleton,
-        show_source,
-        include_trait_impls,
-        allow,
-        reason,
-        filter,
-    } = cfg;
-    let extractor = Extractor::new();
-    let mut all_blocks: Vec<(DuplicateBlockLocation, [u64; MINHASH_N])> = Vec::new();
-    let mut file_extractions: HashMap<String, normalize_facts::extract::ExtractResult> =
-        HashMap::new();
-    let mut files_scanned = 0usize;
-
-    let walker = ignore::WalkBuilder::new(root)
-        .hidden(true)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .build();
-
-    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-        let path = e.path();
-        path.is_file() && super::is_source_file(path)
-    }) {
-        let path = entry.path();
-
-        if let Some(f) = filter {
-            let rel_path = path.strip_prefix(root).unwrap_or(path);
-            if !f.matches(rel_path) {
-                continue;
-            }
-        }
-
-        let content = match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let support = match support_for_path(path) {
-            Some(s) => s,
-            None => continue,
-        };
-
-        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
-            Some(t) => t,
-            None => continue,
-        };
-
-        files_scanned += 1;
-        let rel_path = path
-            .strip_prefix(root)
-            .unwrap_or(path)
-            .display()
-            .to_string();
-
-        file_extractions.insert(rel_path.clone(), extractor.extract(path, &content));
-
-        collect_block_signatures(
-            &tree.root_node(),
-            content.as_bytes(),
-            &rel_path,
-            min_lines,
-            elide_identifiers,
-            elide_literals,
-            skeleton,
-            &mut all_blocks,
-        );
-    }
-
-    let blocks_analyzed = all_blocks.len();
-
-    // LSH: for each band, bucket block indices by their band hash.
-    let mut band_buckets: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (idx, (_, sig)) in all_blocks.iter().enumerate() {
-        for band in 0..LSH_BANDS {
-            let bh = lsh_band_hash(sig, band);
-            // Mix band id into bucket key to avoid cross-band collisions.
-            let key = bh.wrapping_add((band as u64).wrapping_mul(0x9e3779b97f4a7c15));
-            band_buckets.entry(key).or_default().push(idx);
-        }
-    }
-
-    // Collect candidate pairs (deduplicated).
-    let mut seen: HashSet<(usize, usize)> = HashSet::new();
-    let mut candidates: Vec<(usize, usize)> = Vec::new();
-    for bucket in band_buckets.values() {
-        if bucket.len() < 2 {
-            continue;
-        }
-        for i in 0..bucket.len() {
-            for j in i + 1..bucket.len() {
-                let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
-                if seen.insert((a, b)) {
-                    candidates.push((a, b));
-                }
-            }
-        }
-    }
-
-    // Score candidates, filter by threshold.
-    let mut pairs: Vec<SimilarBlockPair> = candidates
-        .into_iter()
-        .filter_map(|(i, j)| {
-            let (loc_a, sig_a) = &all_blocks[i];
-            let (loc_b, sig_b) = &all_blocks[j];
-
-            // Skip same-location pairs (a subtree always matches itself).
-            if loc_a.file == loc_b.file
-                && loc_a.start_line == loc_b.start_line
-                && loc_a.end_line == loc_b.end_line
-            {
-                return None;
-            }
-
-            // Skip containment pairs: one subtree fully contains the other in
-            // the same file. These are parent/child AST nodes — not useful signal.
-            if loc_a.file == loc_b.file {
-                let a_contains_b =
-                    loc_a.start_line <= loc_b.start_line && loc_b.end_line <= loc_a.end_line;
-                let b_contains_a =
-                    loc_b.start_line <= loc_a.start_line && loc_a.end_line <= loc_b.end_line;
-                if a_contains_b || b_contains_a {
-                    return None;
-                }
-            }
-
-            // Skip pairs with very different sizes. In skeleton mode bodies are
-            // elided so size differences are expected — relax from 0.5 to 0.1
-            // (allow up to 10× difference) rather than disabling entirely.
-            {
-                let len_a = loc_a.end_line.saturating_sub(loc_a.start_line) + 1;
-                let len_b = loc_b.end_line.saturating_sub(loc_b.start_line) + 1;
-                let ratio = len_a.min(len_b) as f64 / len_a.max(len_b) as f64;
-                let min_ratio = if skeleton { 0.2 } else { 0.5 };
-                if ratio < min_ratio {
-                    return None;
-                }
-            }
-
-            let sim = jaccard_estimate(sig_a, sig_b);
-            if sim >= 1.0 || sim < similarity {
-                return None;
-            }
-
-            let line_count = loc_a
-                .end_line
-                .saturating_sub(loc_a.start_line)
-                .max(loc_b.end_line.saturating_sub(loc_b.start_line))
-                + 1;
-
-            Some(SimilarBlockPair {
-                location_a: loc_a.clone(),
-                location_b: loc_b.clone(),
-                similarity: sim,
-                line_count,
-            })
-        })
-        .collect();
-
-    pairs.sort_by(|a, b| {
-        b.similarity
-            .partial_cmp(&a.similarity)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| b.line_count.cmp(&a.line_count))
-    });
-
-    let pairs = suppress_overlapping_pairs(pairs);
-
-    // Suppress pairs where both blocks live inside same-name functions (trait implementations).
-    let pairs = if include_trait_impls {
-        pairs
-    } else {
-        pairs
-            .into_iter()
-            .filter(|p| {
-                let fn_a = file_extractions
-                    .get(&p.location_a.file)
-                    .and_then(|r| containing_function(r, p.location_a.start_line));
-                let fn_b = file_extractions
-                    .get(&p.location_b.file)
-                    .and_then(|r| containing_function(r, p.location_b.start_line));
-                !(fn_a.is_some() && fn_a == fn_b)
-            })
-            .collect()
-    };
-
-    let pair_allow_key = |loc: &DuplicateBlockLocation| {
-        let func = file_extractions
-            .get(&loc.file)
-            .and_then(|r| containing_function(r, loc.start_line));
-        block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
-    };
-
-    if let Some(location) = allow {
-        // Find the pair containing this location and write both sides.
-        let target = pairs.iter().find(|p| {
-            pair_allow_key(&p.location_a) == location || pair_allow_key(&p.location_b) == location
-        });
-        let pair = match target {
-            Some(p) => p,
-            None => {
-                eprintln!("No similar block pair found containing: {}", location);
-                eprintln!("Run `normalize analyze similar-blocks` to see available pairs.");
-                return 1;
-            }
-        };
-        if reason.is_none() {
-            eprintln!("Reason required. Use --reason \"...\"");
-            return 1;
-        }
-        let entries = vec![
-            pair_allow_key(&pair.location_a),
-            pair_allow_key(&pair.location_b),
-        ];
-        return write_allow_entry(root, "similar-blocks-allow", &entries, reason.as_deref());
-    }
-
-    // Filter out allowed pairs.
-    let allowlist = load_block_allowlist(root, "similar-blocks-allow");
-    let loc_in_allowlist = |loc: &DuplicateBlockLocation| {
-        allowlist.contains(&pair_allow_key(loc))
-            || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
-    };
-    let pairs: Vec<SimilarBlockPair> = pairs
-        .into_iter()
-        .filter(|p| !(loc_in_allowlist(&p.location_a) && loc_in_allowlist(&p.location_b)))
-        .collect();
-
-    let empty = pairs.is_empty();
-    let report = SimilarBlocksReport {
-        files_scanned,
-        blocks_analyzed,
-        threshold: similarity,
-        pairs,
-        show_source,
-        root: root.to_path_buf(),
-    };
-
-    println!("{}", report.format_text());
-    if empty { 0 } else { 1 }
-}
-
 // ── Similar functions (fuzzy function-level matching) ─────────────────────────
 
 /// A pair of similar functions.
@@ -1706,88 +999,6 @@ pub struct SimilarFunctionPair {
     pub end_line_b: usize,
     pub similarity: f64,
     pub line_count: usize,
-}
-
-/// Report from fuzzy function similarity detection.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct SimilarFunctionsReport {
-    files_scanned: usize,
-    functions_analyzed: usize,
-    threshold: f64,
-    pub pairs: Vec<SimilarFunctionPair>,
-    #[serde(skip)]
-    show_source: bool,
-    #[serde(skip)]
-    roots: Vec<PathBuf>,
-}
-
-impl OutputFormatter for SimilarFunctionsReport {
-    fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-        lines.push("Similar Function Detection (fuzzy)".to_string());
-        lines.push(String::new());
-        lines.push(format!("Files scanned:      {}", self.files_scanned));
-        lines.push(format!("Functions analyzed: {}", self.functions_analyzed));
-        lines.push(format!(
-            "Threshold:          {:.0}%",
-            self.threshold * 100.0
-        ));
-        lines.push(format!("Similar pairs:      {}", self.pairs.len()));
-
-        if self.pairs.is_empty() {
-            lines.push(String::new());
-            lines.push("No similar functions detected.".to_string());
-            return lines.join("\n");
-        }
-
-        lines.push(String::new());
-
-        for (i, pair) in self.pairs.iter().take(30).enumerate() {
-            lines.push(format!(
-                "{}. {:.0}% similar  ({} lines)",
-                i + 1,
-                pair.similarity * 100.0,
-                pair.line_count,
-            ));
-            lines.push(format!(
-                "   {}:{}  ({}:{}-{})",
-                pair.file_a, pair.symbol_a, pair.file_a, pair.start_line_a, pair.end_line_a
-            ));
-            lines.push(format!(
-                "   {}:{}  ({}:{}-{})",
-                pair.file_b, pair.symbol_b, pair.file_b, pair.start_line_b, pair.end_line_b
-            ));
-
-            if self.show_source {
-                for (file, start, end) in [
-                    (&pair.file_a, pair.start_line_a, pair.end_line_a),
-                    (&pair.file_b, pair.start_line_b, pair.end_line_b),
-                ] {
-                    let full_path = resolve_file_path(&self.roots, file);
-                    if let Ok(content) = std::fs::read_to_string(&full_path) {
-                        let src_lines: Vec<&str> = content.lines().collect();
-                        let s = start.saturating_sub(1);
-                        let e = end.min(src_lines.len());
-                        lines.push(String::new());
-                        lines.push(format!("   --- {} ---", file));
-                        for src_line in &src_lines[s..e] {
-                            lines.push(format!("   {}", src_line));
-                        }
-                    }
-                }
-            }
-            lines.push(String::new());
-        }
-
-        if self.pairs.len() > 30 {
-            lines.push(format!("... and {} more pairs", self.pairs.len() - 30));
-        }
-
-        lines.push(String::new());
-        lines.push("To suppress: normalize analyze similar-functions --allow <file:symbol:start-end> --reason \"explanation\"".to_string());
-
-        lines.join("\n")
-    }
 }
 
 pub struct SimilarFunctionsConfig<'a> {
@@ -2062,133 +1273,12 @@ pub(crate) fn find_similar_function_pairs(
     }
 }
 
-pub fn cmd_similar_functions(cfg: SimilarFunctionsConfig<'_>) -> i32 {
-    let SimilarFunctionsConfig {
-        roots,
-        min_lines,
-        similarity,
-        elide_identifiers,
-        elide_literals,
-        skeleton,
-        show_source,
-        include_trait_impls,
-        allow,
-        reason,
-        filter,
-    } = cfg;
-
-    let multi_repo = roots.len() > 1;
-    let result = find_similar_function_pairs(
-        roots,
-        min_lines,
-        similarity,
-        elide_identifiers,
-        elide_literals,
-        skeleton,
-        include_trait_impls,
-        filter,
-    );
-    let files_scanned = result.files_scanned;
-    let functions_analyzed = result.functions_analyzed;
-    let pairs = result.pairs;
-
-    let fn_allow_key = |file: &str, symbol: &str, start: usize, end: usize| {
-        format!("{}:{}:{}-{}", file, symbol, start, end)
-    };
-
-    if let Some(location) = allow {
-        let target = pairs.iter().find(|p| {
-            fn_allow_key(&p.file_a, &p.symbol_a, p.start_line_a, p.end_line_a) == location
-                || fn_allow_key(&p.file_b, &p.symbol_b, p.start_line_b, p.end_line_b) == location
-        });
-        let pair = match target {
-            Some(p) => p,
-            None => {
-                eprintln!("No similar function pair found containing: {}", location);
-                eprintln!("Run `normalize analyze similar-functions` to see available pairs.");
-                return 1;
-            }
-        };
-        if reason.is_none() {
-            eprintln!("Reason required. Use --reason \"...\"");
-            return 1;
-        }
-        let entries = vec![
-            fn_allow_key(
-                &pair.file_a,
-                &pair.symbol_a,
-                pair.start_line_a,
-                pair.end_line_a,
-            ),
-            fn_allow_key(
-                &pair.file_b,
-                &pair.symbol_b,
-                pair.start_line_b,
-                pair.end_line_b,
-            ),
-        ];
-        return write_allow_entry(
-            roots.first().map(|p| p.as_path()).unwrap_or(Path::new(".")),
-            "similar-functions-allow",
-            &entries,
-            reason.as_deref(),
-        );
-    }
-
-    let combined_allowlist: HashSet<String> = roots
-        .iter()
-        .flat_map(|root| {
-            let repo_name = root
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-            load_block_allowlist(root, "similar-functions-allow")
-                .into_iter()
-                .map(move |k| {
-                    if multi_repo {
-                        format!("{}/{}", repo_name, k)
-                    } else {
-                        k
-                    }
-                })
-        })
-        .collect();
-    let pairs: Vec<SimilarFunctionPair> = pairs
-        .into_iter()
-        .filter(|p| {
-            !(combined_allowlist.contains(&fn_allow_key(
-                &p.file_a,
-                &p.symbol_a,
-                p.start_line_a,
-                p.end_line_a,
-            )) && combined_allowlist.contains(&fn_allow_key(
-                &p.file_b,
-                &p.symbol_b,
-                p.start_line_b,
-                p.end_line_b,
-            )))
-        })
-        .collect();
-
-    let empty = pairs.is_empty();
-    let report = SimilarFunctionsReport {
-        files_scanned,
-        functions_analyzed,
-        threshold: similarity,
-        pairs,
-        show_source,
-        roots: roots.to_vec(),
-    };
-
-    println!("{}", report.format_text());
-    if empty { 0 } else { 1 }
-}
-
 /// Build duplicate functions report without printing (for service layer).
-pub fn build_duplicate_functions_report(
-    cfg: DuplicateFunctionsConfig<'_>,
-) -> DuplicateFunctionsReport {
+pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> DuplicatesReport {
+    use crate::commands::analyze::duplicates_views::{
+        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
+    };
+
     let DuplicateFunctionsConfig {
         roots,
         elide_identifiers,
@@ -2337,28 +1427,55 @@ pub fn build_duplicate_functions_report(
             .then_with(|| b.locations.len().cmp(&a.locations.len()))
     });
 
-    let total_duplicates: usize = groups.iter().map(|g| g.locations.len()).sum();
     let duplicated_lines: usize = groups
         .iter()
         .map(|g| g.line_count * g.locations.len())
         .sum();
 
-    DuplicateFunctionsReport {
+    let unified_groups: Vec<DuplicateGroup> = groups
+        .into_iter()
+        .map(|g| DuplicateGroup {
+            locations: g
+                .locations
+                .into_iter()
+                .map(|l| CodeLocation {
+                    file: l.file,
+                    symbol: Some(l.symbol),
+                    start_line: l.start_line,
+                    end_line: l.end_line,
+                })
+                .collect(),
+            line_count: g.line_count,
+            hash: Some(format!("{:016x}", g.hash)),
+            similarity: None,
+            pair_count: None,
+        })
+        .collect();
+
+    DuplicatesReport {
+        mode: DuplicateMode::Exact,
+        scope: DuplicateScope::Functions,
         files_scanned,
-        functions_hashed,
-        total_duplicates,
-        duplicated_lines,
-        elide_identifiers,
-        elide_literals,
-        groups,
-        suppressed_same_name,
-        roots: roots.to_vec(),
+        items_analyzed: functions_hashed,
+        pairs_analyzed: None,
+        threshold: None,
+        elide_identifiers: Some(elide_identifiers),
+        elide_literals: Some(elide_literals),
+        duplicated_lines: Some(duplicated_lines),
+        suppressed_same_name: Some(suppressed_same_name),
+        stats: None,
+        groups: unified_groups,
         show_source,
+        roots: roots.to_vec(),
     }
 }
 
 /// Build duplicate blocks report without printing (for service layer).
-pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> DuplicateBlocksReport {
+pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> DuplicatesReport {
+    use crate::commands::analyze::duplicates_views::{
+        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
+    };
+
     let DuplicateBlocksConfig {
         root,
         min_lines,
@@ -2471,17 +1588,50 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         .filter(|g| !g.locations.iter().all(&loc_allowed))
         .collect();
 
-    DuplicateBlocksReport {
+    let unified_groups: Vec<DuplicateGroup> = groups
+        .into_iter()
+        .map(|g| DuplicateGroup {
+            locations: g
+                .locations
+                .into_iter()
+                .map(|l| CodeLocation {
+                    file: l.file,
+                    symbol: None,
+                    start_line: l.start_line,
+                    end_line: l.end_line,
+                })
+                .collect(),
+            line_count: g.line_count,
+            hash: Some(format!("{:016x}", g.hash)),
+            similarity: None,
+            pair_count: None,
+        })
+        .collect();
+
+    DuplicatesReport {
+        mode: DuplicateMode::Exact,
+        scope: DuplicateScope::Blocks,
         files_scanned,
-        blocks_hashed,
-        groups,
+        items_analyzed: blocks_hashed,
+        pairs_analyzed: None,
+        threshold: None,
+        elide_identifiers: Some(elide_identifiers),
+        elide_literals: Some(elide_literals),
+        duplicated_lines: None,
+        suppressed_same_name: None,
+        stats: None,
+        groups: unified_groups,
         show_source,
-        root: root.to_path_buf(),
+        roots: vec![root.to_path_buf()],
     }
 }
 
 /// Build similar functions report without printing (for service layer).
-pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> SimilarFunctionsReport {
+pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> DuplicatesReport {
+    use crate::commands::analyze::duplicates_views::{
+        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
+    };
+
     let SimilarFunctionsConfig {
         roots,
         min_lines,
@@ -2551,18 +1701,54 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Simila
         })
         .collect();
 
-    SimilarFunctionsReport {
+    let unified_groups: Vec<DuplicateGroup> = pairs
+        .into_iter()
+        .map(|p| DuplicateGroup {
+            locations: vec![
+                CodeLocation {
+                    file: p.file_a,
+                    symbol: Some(p.symbol_a),
+                    start_line: p.start_line_a,
+                    end_line: p.end_line_a,
+                },
+                CodeLocation {
+                    file: p.file_b,
+                    symbol: Some(p.symbol_b),
+                    start_line: p.start_line_b,
+                    end_line: p.end_line_b,
+                },
+            ],
+            line_count: p.line_count,
+            hash: None,
+            similarity: Some(p.similarity),
+            pair_count: None,
+        })
+        .collect();
+
+    DuplicatesReport {
+        mode: DuplicateMode::Similar,
+        scope: DuplicateScope::Functions,
         files_scanned,
-        functions_analyzed,
-        threshold: similarity,
-        pairs,
+        items_analyzed: functions_analyzed,
+        pairs_analyzed: None,
+        threshold: Some(similarity),
+        elide_identifiers: None,
+        elide_literals: None,
+        duplicated_lines: None,
+        suppressed_same_name: None,
+        stats: None,
+        groups: unified_groups,
         show_source,
         roots: roots.to_vec(),
     }
 }
 
 /// Build similar blocks report without printing (for service layer).
-pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> SimilarBlocksReport {
+pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesReport {
+    use crate::commands::analyze::duplicates_views::{
+        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
+    };
+
     let SimilarBlocksConfig {
         root,
         min_lines,
@@ -2761,13 +1947,45 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> SimilarBlock
         .filter(|p| !(loc_in_allowlist(&p.location_a) && loc_in_allowlist(&p.location_b)))
         .collect();
 
-    SimilarBlocksReport {
+    let unified_groups: Vec<DuplicateGroup> = pairs
+        .into_iter()
+        .map(|p| DuplicateGroup {
+            locations: vec![
+                CodeLocation {
+                    file: p.location_a.file,
+                    symbol: None,
+                    start_line: p.location_a.start_line,
+                    end_line: p.location_a.end_line,
+                },
+                CodeLocation {
+                    file: p.location_b.file,
+                    symbol: None,
+                    start_line: p.location_b.start_line,
+                    end_line: p.location_b.end_line,
+                },
+            ],
+            line_count: p.line_count,
+            hash: None,
+            similarity: Some(p.similarity),
+            pair_count: None,
+        })
+        .collect();
+
+    DuplicatesReport {
+        mode: DuplicateMode::Similar,
+        scope: DuplicateScope::Blocks,
         files_scanned,
-        blocks_analyzed,
-        threshold: similarity,
-        pairs,
+        items_analyzed: blocks_analyzed,
+        pairs_analyzed: None,
+        threshold: Some(similarity),
+        elide_identifiers: None,
+        elide_literals: None,
+        duplicated_lines: None,
+        suppressed_same_name: None,
+        stats: None,
+        groups: unified_groups,
         show_source,
-        root: root.to_path_buf(),
+        roots: vec![root.to_path_buf()],
     }
 }
 

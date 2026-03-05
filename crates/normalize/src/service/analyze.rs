@@ -9,7 +9,6 @@ use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::ceremony::CeremonyReport;
 use crate::commands::analyze::check_examples::CheckExamplesReport;
 use crate::commands::analyze::check_refs::CheckRefsReport;
-use crate::commands::analyze::clusters::ClustersReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling_views::CouplingOutput;
 use crate::commands::analyze::coverage::CoverageOutput;
@@ -21,7 +20,7 @@ use crate::commands::analyze::duplicates::{
     DuplicateBlocksConfig, DuplicateFunctionsConfig, DuplicateTypesReport, SimilarBlocksConfig,
     SimilarFunctionsConfig,
 };
-use crate::commands::analyze::duplicates_views::{DuplicateScope, DuplicatesOutput};
+use crate::commands::analyze::duplicates_views::{DuplicateMode, DuplicateScope, DuplicatesReport};
 use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::fragments::{FragmentScope, FragmentsReport};
 use crate::commands::analyze::graph::{GraphReport, GraphTarget};
@@ -190,14 +189,6 @@ impl AnalyzeService {
         }
     }
 
-    fn display_clusters(&self, r: &ClustersReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
     fn display_ownership(&self, r: &OwnershipReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
@@ -238,7 +229,7 @@ impl AnalyzeService {
         }
     }
 
-    fn display_duplicates(&self, r: &DuplicatesOutput) -> String {
+    fn display_duplicates(&self, r: &DuplicatesReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -799,38 +790,6 @@ impl AnalyzeService {
         ))
     }
 
-    /// Group similar functions into structural clusters (connected components of similar-functions pairs)
-    #[server(group = "code")]
-    #[cli(display_with = "display_clusters")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn clusters(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Minimum lines for a function to be considered")] min_lines: Option<usize>,
-        #[param(help = "Minimum similarity threshold (0.0–1.0)")] similarity: Option<f64>,
-        #[param(short = 'l', help = "Maximum number of clusters to show (0=no limit)")]
-        limit: Option<usize>,
-        #[param(help = "Match on control-flow structure only")] skeleton: bool,
-        #[param(help = "Include same-name clusters (likely interface implementations)")]
-        include_trait_impls: bool,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-    ) -> Result<ClustersReport, String> {
-        let root_path = Self::root_path(root);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
-        Ok(crate::commands::analyze::clusters::build_clusters_report(
-            &root_path,
-            min_lines.unwrap_or(10),
-            similarity.unwrap_or(0.85),
-            skeleton,
-            include_trait_impls,
-            limit.unwrap_or(20),
-            filter.as_ref(),
-        ))
-    }
-
     /// Temporal churn analysis: coupling pairs, change-clusters, or hotspots
     ///
     /// Default: coupling pairs (files that change together).
@@ -1022,13 +981,16 @@ impl AnalyzeService {
     }
 
     /// Detect duplicate/similar code (functions or blocks)
+    ///
+    /// Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).
     #[server(group = "code")]
     #[cli(display_with = "display_duplicates")]
     #[allow(clippy::too_many_arguments)]
     pub fn duplicates(
         &self,
         #[param(help = "Scope: functions (default) or blocks")] scope: Option<DuplicateScope>,
-        #[param(help = "Use fuzzy MinHash matching instead of exact hash")] similar: bool,
+        #[param(help = "Detection mode: exact (default), similar (fuzzy), or clusters")]
+        mode: Option<DuplicateMode>,
         #[param(help = "Elide identifier names when comparing")] elide_identifiers: bool,
         #[param(help = "Elide literal values when comparing")] elide_literals: bool,
         #[param(help = "Show source code for matches")] show_source: bool,
@@ -1042,28 +1004,34 @@ impl AnalyzeService {
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
         compact: bool,
-        #[param(help = "Minimum similarity threshold (0.0-1.0, similar mode only)")]
+        #[param(help = "Minimum similarity threshold (0.0-1.0, similar/clusters mode)")]
         similarity: Option<f64>,
-        #[param(help = "Match on control-flow structure (similar mode only)")] skeleton: bool,
+        #[param(help = "Match on control-flow structure (similar/clusters mode)")] skeleton: bool,
         #[param(help = "Scan across all git repos under DIR (functions scope only)")] repos: Option<
             String,
         >,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
         #[param(help = "Skip function/method nodes (blocks scope only)")] skip_functions: bool,
-    ) -> Result<DuplicatesOutput, String> {
+        #[param(
+            short = 'l',
+            help = "Maximum number of results to show (0=no limit, clusters mode)"
+        )]
+        limit: Option<usize>,
+    ) -> Result<DuplicatesReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         let scope = scope.unwrap_or(DuplicateScope::Functions);
+        let mode = mode.unwrap_or(DuplicateMode::Exact);
         let filter = Self::build_filter(&root_path, &exclude, &only);
 
-        match (scope, similar) {
-            (DuplicateScope::Functions, false) => {
+        match (mode, scope) {
+            (DuplicateMode::Exact, DuplicateScope::Functions) => {
                 let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
                     discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
                 } else {
                     vec![root_path.clone()]
                 };
-                Ok(DuplicatesOutput::DuplicateFunctions(
+                Ok(
                     crate::commands::analyze::duplicates::build_duplicate_functions_report(
                         DuplicateFunctionsConfig {
                             roots: &roots,
@@ -1075,9 +1043,9 @@ impl AnalyzeService {
                             filter: filter.as_ref(),
                         },
                     ),
-                ))
+                )
             }
-            (DuplicateScope::Blocks, false) => Ok(DuplicatesOutput::DuplicateBlocks(
+            (DuplicateMode::Exact, DuplicateScope::Blocks) => Ok(
                 crate::commands::analyze::duplicates::build_duplicate_blocks_report(
                     DuplicateBlocksConfig {
                         root: &root_path,
@@ -1091,14 +1059,14 @@ impl AnalyzeService {
                         filter: filter.as_ref(),
                     },
                 ),
-            )),
-            (DuplicateScope::Functions, true) => {
+            ),
+            (DuplicateMode::Similar, DuplicateScope::Functions) => {
                 let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
                     discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
                 } else {
                     vec![root_path.clone()]
                 };
-                Ok(DuplicatesOutput::SimilarFunctions(
+                Ok(
                     crate::commands::analyze::duplicates::build_similar_functions_report(
                         SimilarFunctionsConfig {
                             roots: &roots,
@@ -1114,9 +1082,9 @@ impl AnalyzeService {
                             filter: filter.as_ref(),
                         },
                     ),
-                ))
+                )
             }
-            (DuplicateScope::Blocks, true) => Ok(DuplicatesOutput::SimilarBlocks(
+            (DuplicateMode::Similar, DuplicateScope::Blocks) => Ok(
                 crate::commands::analyze::duplicates::build_similar_blocks_report(
                     SimilarBlocksConfig {
                         root: &root_path,
@@ -1132,7 +1100,26 @@ impl AnalyzeService {
                         filter: filter.as_ref(),
                     },
                 ),
-            )),
+            ),
+            (DuplicateMode::Clusters, _) => {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+                    discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
+                } else {
+                    vec![root_path.clone()]
+                };
+                Ok(
+                    crate::commands::analyze::clusters::build_clusters_report_multi(
+                        &roots,
+                        min_lines.unwrap_or(10),
+                        similarity.unwrap_or(0.85),
+                        elide_identifiers,
+                        skeleton,
+                        include_trait_impls,
+                        limit.unwrap_or(20),
+                        filter.as_ref(),
+                    ),
+                )
+            }
         }
     }
 

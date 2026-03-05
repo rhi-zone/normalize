@@ -5,8 +5,8 @@
 //! Ranked by total line count (largest families first).
 
 use crate::commands::analyze::duplicates::find_similar_function_pairs;
+use crate::commands::analyze::duplicates_views::DuplicatesReport;
 use crate::filter::Filter;
-use crate::output::OutputFormatter;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -37,61 +37,6 @@ pub struct FunctionCluster {
     pub avg_similarity: f64,
     /// Number of similar-function pairs within this cluster.
     pub pair_count: usize,
-}
-
-/// Report from structural clustering analysis.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct ClustersReport {
-    pub files_scanned: usize,
-    pub functions_analyzed: usize,
-    pub pairs_analyzed: usize,
-    pub cluster_count: usize,
-    pub total_clustered_functions: usize,
-    pub clusters: Vec<FunctionCluster>,
-}
-
-impl OutputFormatter for ClustersReport {
-    fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-
-        lines.push("# Structural Clusters".to_string());
-        lines.push(String::new());
-        lines.push(format!("Files scanned:       {}", self.files_scanned));
-        lines.push(format!("Functions analyzed:  {}", self.functions_analyzed));
-        lines.push(format!("Pairs analyzed:      {}", self.pairs_analyzed));
-        lines.push(format!(
-            "Clusters found:      {}  ({} functions)",
-            self.cluster_count, self.total_clustered_functions
-        ));
-
-        if self.clusters.is_empty() {
-            lines.push(String::new());
-            lines.push("No function clusters detected.".to_string());
-            return lines.join("\n");
-        }
-
-        lines.push(String::new());
-
-        for (i, cluster) in self.clusters.iter().enumerate() {
-            lines.push(format!(
-                "{}. {} functions  {} lines  avg {:.0}% similar  ({} pairs)",
-                i + 1,
-                cluster.members.len(),
-                cluster.total_lines,
-                cluster.avg_similarity * 100.0,
-                cluster.pair_count,
-            ));
-            for member in &cluster.members {
-                lines.push(format!(
-                    "   {}:{}  (lines {}-{})",
-                    member.file, member.symbol, member.start_line, member.end_line,
-                ));
-            }
-            lines.push(String::new());
-        }
-
-        lines.join("\n")
-    }
 }
 
 /// Union-Find for grouping functions into connected components.
@@ -132,17 +77,6 @@ impl UnionFind {
     }
 }
 
-pub struct ClustersConfig<'a> {
-    pub roots: &'a [PathBuf],
-    pub min_lines: usize,
-    pub similarity: f64,
-    pub elide_identifiers: bool,
-    pub skeleton: bool,
-    pub include_trait_impls: bool,
-    pub limit: usize,
-    pub filter: Option<&'a Filter>,
-}
-
 /// Build a clusters report from the given root (single-repo convenience wrapper).
 pub fn build_clusters_report(
     root: &std::path::Path,
@@ -152,7 +86,7 @@ pub fn build_clusters_report(
     include_trait_impls: bool,
     limit: usize,
     filter: Option<&Filter>,
-) -> ClustersReport {
+) -> DuplicatesReport {
     let roots_vec = vec![root.to_path_buf()];
     build_clusters_report_multi(
         &roots_vec,
@@ -167,7 +101,7 @@ pub fn build_clusters_report(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn build_clusters_report_multi(
+pub(crate) fn build_clusters_report_multi(
     roots: &[PathBuf],
     min_lines: usize,
     similarity: f64,
@@ -176,7 +110,11 @@ fn build_clusters_report_multi(
     include_trait_impls: bool,
     limit: usize,
     filter: Option<&Filter>,
-) -> ClustersReport {
+) -> DuplicatesReport {
+    use crate::commands::analyze::duplicates_views::{
+        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
+    };
+
     let result = find_similar_function_pairs(
         roots,
         min_lines,
@@ -302,42 +240,40 @@ fn build_clusters_report_multi(
         |c| c.total_lines as f64,
     );
 
-    let cluster_count = clusters.len();
-    let total_clustered_functions: usize = clusters.iter().map(|c| c.members.len()).sum();
+    let unified_groups: Vec<DuplicateGroup> = clusters
+        .into_iter()
+        .map(|c| DuplicateGroup {
+            locations: c
+                .members
+                .into_iter()
+                .map(|m| CodeLocation {
+                    file: m.file,
+                    symbol: Some(m.symbol),
+                    start_line: m.start_line,
+                    end_line: m.end_line,
+                })
+                .collect(),
+            line_count: c.total_lines,
+            hash: None,
+            similarity: Some(c.avg_similarity),
+            pair_count: Some(c.pair_count),
+        })
+        .collect();
 
-    ClustersReport {
+    DuplicatesReport {
+        mode: DuplicateMode::Clusters,
+        scope: DuplicateScope::Functions,
         files_scanned,
-        functions_analyzed,
-        pairs_analyzed,
-        cluster_count,
-        total_clustered_functions,
-        clusters,
+        items_analyzed: functions_analyzed,
+        pairs_analyzed: Some(pairs_analyzed),
+        threshold: Some(similarity),
+        elide_identifiers: None,
+        elide_literals: None,
+        duplicated_lines: None,
+        suppressed_same_name: None,
+        stats: None,
+        groups: unified_groups,
+        show_source: false,
+        roots: roots.to_vec(),
     }
-}
-
-pub fn cmd_clusters(cfg: ClustersConfig<'_>) -> i32 {
-    let ClustersConfig {
-        roots,
-        min_lines,
-        similarity,
-        elide_identifiers,
-        skeleton,
-        include_trait_impls,
-        limit,
-        filter,
-    } = cfg;
-
-    let report = build_clusters_report_multi(
-        roots,
-        min_lines,
-        similarity,
-        elide_identifiers,
-        skeleton,
-        include_trait_impls,
-        limit,
-        filter,
-    );
-
-    println!("{}", report.format_text());
-    0
 }

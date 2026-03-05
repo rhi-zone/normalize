@@ -45,12 +45,8 @@ Full mapping of all 49 commands to their axis coordinates:
 ### Duplicates & Similarity
 | Command | Metric | Scope | Time | Shape |
 |---------|--------|-------|------|-------|
-| `duplicate-functions` | exact-hash | function | now | grouped |
-| `duplicate-blocks` | exact-hash | block | now | grouped |
+| `duplicates` | exact-hash/minhash/union-find | function/block | now | grouped/pairs |
 | `duplicate-types` | name+structure | type | now | grouped |
-| `similar-functions` | minhash-lsh | function | now | pairs |
-| `similar-blocks` | minhash-lsh | block | now | pairs |
-| `clusters` | minhash-union-find | function | now | grouped |
 | `patterns` | skeleton-minhash | function | now | grouped |
 | `fragments` | subtree-hash/minhash | any/function/block | now | grouped |
 
@@ -211,9 +207,9 @@ All share the same shape: compute a scalar per entity, sort, show top N. The met
 
 **2. `similar` — find structurally alike code units (open set)**
 
-Today: duplicate-functions, duplicate-blocks, duplicate-types, similar-functions, similar-blocks, clusters, patterns, fragments. All 8 ask "which code units look alike?" Parameters are scope (function/block/type), method (exact/fuzzy/skeleton), and grouping (pairs/groups/clusters).
+Today: duplicates (5 modes via `--mode`/`--scope`), duplicate-types, patterns, fragments. All ask "which code units look alike?"
 
-Could become: `similar --scope functions|blocks|types --mode exact|fuzzy|skeleton [--cluster]`
+`duplicates` already unified: `--mode exact|similar|clusters --scope functions|blocks`. Could further absorb `patterns` and `fragments` under a broader `similar` command.
 
 **3. `graph <symbol>` — walk relations from a starting point (open set)**
 
@@ -281,7 +277,8 @@ Each merge follows this pattern:
 |-------|----------|-----------|
 | Start | 50 | — |
 | After Phase 2 (coverage + churn merged, old deleted) | 44 | -6 |
-| After `similar` consolidation (fragments absorbs patterns) | 37 | -7 |
+| After `duplicates` unification (5 → 1, clusters absorbed) | 39 | -5 |
+| After `similar` consolidation (fragments absorbs patterns) | 37 | -2 |
 | After `graph` consolidation | 33 | -4 |
 | After `check` → rules migration | ~30 | ~-3 |
 
@@ -317,6 +314,20 @@ Enum wrapper (`CoverageOutput`, `CouplingOutput`) + `OutputFormatter` delegation
 - Views share most parameters (root, limit, exclude, only)
 - View-specific params are few and can be `Option`
 
+Single struct with optional fields (`DuplicatesReport`) works well when:
+- All modes share the same output shape (groups of code locations)
+- Mode differences are which optional fields are populated
+- `serde(skip_serializing_if = "Option::is_none")` keeps JSON clean per mode
+
 It doesn't work when parameter signatures diverge — that means they're different commands, not different views. Don't force a merge with aliases or god-functions; accept that separate commands are the right design.
 
 **No aliases.** We're at v0.1.0 with no external users depending on old names. Old commands get deleted, not aliased. Aliases double surface area and never get cleaned up.
+
+**`duplicates`** — unifies `duplicate-functions`, `duplicate-blocks`, `similar-functions`, `similar-blocks`, `clusters`:
+- `normalize analyze duplicates` → exact duplicate functions (default)
+- `normalize analyze duplicates --scope blocks` → exact duplicate blocks
+- `normalize analyze duplicates --mode similar` → similar functions
+- `normalize analyze duplicates --mode similar --scope blocks` → similar blocks
+- `normalize analyze duplicates --mode clusters` → function clusters (was standalone `clusters` command)
+- Single `DuplicatesReport` struct with mode-aware `OutputFormatter`
+- Old commands: `duplicate-functions`, `duplicate-blocks`, `similar-functions`, `similar-blocks`, `clusters` — deleted

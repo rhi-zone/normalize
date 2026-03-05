@@ -28,7 +28,6 @@ mod tests {
         use crate::commands::analyze::ceremony::CeremonyReport;
         use crate::commands::analyze::check_examples::CheckExamplesReport;
         use crate::commands::analyze::check_refs::CheckRefsReport;
-        use crate::commands::analyze::clusters::ClustersReport;
         use crate::commands::analyze::contributors::ContributorsReport;
         use crate::commands::analyze::coupling::CouplingReport;
         use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
@@ -38,11 +37,8 @@ mod tests {
         use crate::commands::analyze::density::DensityReport;
         use crate::commands::analyze::depth_map::DepthMapReport;
         use crate::commands::analyze::docs::DocCoverageReport;
-        use crate::commands::analyze::duplicates::{
-            DuplicateBlocksReport, DuplicateFunctionsReport, DuplicateTypesReport,
-            SimilarBlocksReport, SimilarFunctionsReport,
-        };
-        use crate::commands::analyze::duplicates_views::DuplicatesOutput;
+        use crate::commands::analyze::duplicates::DuplicateTypesReport;
+        use crate::commands::analyze::duplicates_views::DuplicatesReport;
         use crate::commands::analyze::files::FileLengthReport;
         use crate::commands::analyze::fragments::FragmentsReport;
         use crate::commands::analyze::graph::GraphReport;
@@ -93,7 +89,6 @@ mod tests {
         assert_output_formatter::<CeremonyReport>();
         assert_output_formatter::<CheckExamplesReport>();
         assert_output_formatter::<CheckRefsReport>();
-        assert_output_formatter::<ClustersReport>();
         assert_output_formatter::<ComplexityReport>();
         assert_output_formatter::<ContributorsReport>();
         assert_output_formatter::<ContextListReport>();
@@ -104,10 +99,8 @@ mod tests {
         assert_output_formatter::<CouplingReport>();
         assert_output_formatter::<CrossRepoHealthReport>();
         assert_output_formatter::<DocCoverageReport>();
-        assert_output_formatter::<DuplicateBlocksReport>();
-        assert_output_formatter::<DuplicateFunctionsReport>();
         assert_output_formatter::<DuplicateTypesReport>();
-        assert_output_formatter::<DuplicatesOutput>();
+        assert_output_formatter::<DuplicatesReport>();
         assert_output_formatter::<FileLengthReport>();
         assert_output_formatter::<FragmentsReport>();
         assert_output_formatter::<ReferencesReport>();
@@ -136,8 +129,6 @@ mod tests {
         assert_output_formatter::<SessionAnalysis>();
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();
-        assert_output_formatter::<SimilarBlocksReport>();
-        assert_output_formatter::<SimilarFunctionsReport>();
         assert_output_formatter::<SkeletonDiffReport>();
         assert_output_formatter::<SizeReport>();
         assert_output_formatter::<StaleDocsReport>();
