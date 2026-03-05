@@ -6,6 +6,7 @@ use crate::parsers::grammar_loader;
 use normalize_syntax_rules::{
     DebugFlags, Finding, Rule, RulesConfig, Severity, apply_fixes, load_all_rules, run_rules,
 };
+use std::collections::HashSet;
 use std::path::Path;
 
 /// Summary of a single rule (for listing).
@@ -92,6 +93,31 @@ pub fn build_rules_output(
     })
 }
 
+/// Run syntax rules and return raw findings (no printing).
+pub fn run_syntax_rules(
+    root: &Path,
+    filter_rule: Option<&str>,
+    filter_tag: Option<&str>,
+    filter_ids: Option<&HashSet<String>>,
+    config: &RulesConfig,
+    debug: &DebugFlags,
+) -> Vec<Finding> {
+    let rules = load_all_rules(root, config);
+    if rules.is_empty() {
+        return Vec::new();
+    }
+    let loader = grammar_loader();
+    run_rules(
+        &rules,
+        root,
+        &loader,
+        filter_rule,
+        filter_tag,
+        filter_ids,
+        debug,
+    )
+}
+
 /// Run the rules command.
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_rules(
@@ -151,17 +177,7 @@ pub fn cmd_rules(
         return 0;
     }
 
-    // Run rules with the global grammar loader
-    let loader = grammar_loader();
-    let findings = run_rules(
-        &rules,
-        root,
-        &loader,
-        filter_rule,
-        filter_tag,
-        filter_ids,
-        debug,
-    );
+    let findings = run_syntax_rules(root, filter_rule, filter_tag, filter_ids, config, debug);
 
     // Apply fixes if requested
     if fix {

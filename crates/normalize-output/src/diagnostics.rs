@@ -5,10 +5,12 @@
 //! converge on these types.
 
 use crate::OutputFormatter;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Severity level for a diagnostic issue.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Hint,
@@ -29,7 +31,7 @@ impl std::fmt::Display for Severity {
 }
 
 /// A secondary location related to an issue (e.g., the other file in a circular dep).
-#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RelatedLocation {
     pub file: String,
     pub line: Option<usize>,
@@ -37,7 +39,7 @@ pub struct RelatedLocation {
 }
 
 /// A single diagnostic issue found during a check.
-#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Issue {
     pub file: String,
     pub line: Option<usize>,
@@ -70,7 +72,7 @@ impl Issue {
 }
 
 /// Report containing diagnostic issues from one or more checks.
-#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DiagnosticsReport {
     pub issues: Vec<Issue>,
     pub files_checked: usize,
@@ -107,6 +109,79 @@ impl DiagnosticsReport {
                 .then(a.line.cmp(&b.line))
                 .then(b.severity.cmp(&a.severity))
         });
+    }
+
+    /// Format as SARIF 2.1.0 JSON.
+    pub fn format_sarif(&self) -> String {
+        // Collect unique rule IDs to build the tool.driver.rules array
+        let mut rule_ids: Vec<String> = Vec::new();
+        for issue in &self.issues {
+            if !rule_ids.contains(&issue.rule_id) {
+                rule_ids.push(issue.rule_id.clone());
+            }
+        }
+
+        let sarif_rules: Vec<serde_json::Value> = rule_ids
+            .iter()
+            .map(|id| {
+                // Find the first issue with this rule_id to derive default severity
+                let first = self.issues.iter().find(|i| &i.rule_id == id);
+                let level = first.map_or("warning", |i| severity_to_sarif_level(i.severity));
+                serde_json::json!({
+                    "id": id,
+                    "defaultConfiguration": { "level": level }
+                })
+            })
+            .collect();
+
+        let results: Vec<serde_json::Value> = self
+            .issues
+            .iter()
+            .map(|issue| {
+                let mut region = serde_json::Map::new();
+                if let Some(line) = issue.line {
+                    region.insert("startLine".into(), serde_json::json!(line));
+                }
+                if let Some(col) = issue.column {
+                    region.insert("startColumn".into(), serde_json::json!(col));
+                }
+                if let Some(end_line) = issue.end_line {
+                    region.insert("endLine".into(), serde_json::json!(end_line));
+                }
+                if let Some(end_col) = issue.end_column {
+                    region.insert("endColumn".into(), serde_json::json!(end_col));
+                }
+
+                serde_json::json!({
+                    "ruleId": issue.rule_id,
+                    "level": severity_to_sarif_level(issue.severity),
+                    "message": { "text": issue.message },
+                    "locations": [{
+                        "physicalLocation": {
+                            "artifactLocation": { "uri": issue.file },
+                            "region": region
+                        }
+                    }]
+                })
+            })
+            .collect();
+
+        let sarif = serde_json::json!({
+            "version": "2.1.0",
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "runs": [{
+                "tool": {
+                    "driver": {
+                        "name": "normalize",
+                        "informationUri": "https://github.com/rhi-zone/normalize",
+                        "rules": sarif_rules
+                    }
+                },
+                "results": results
+            }]
+        });
+
+        serde_json::to_string_pretty(&sarif).unwrap()
     }
 
     /// Count issues by severity.
@@ -301,6 +376,16 @@ impl OutputFormatter for DiagnosticsReport {
         }
 
         out
+    }
+}
+
+/// Convert diagnostic `Severity` to SARIF level string.
+fn severity_to_sarif_level(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Error => "error",
+        Severity::Warning => "warning",
+        Severity::Info => "note",
+        Severity::Hint => "note",
     }
 }
 

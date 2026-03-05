@@ -55,8 +55,13 @@ Options:
 - `--rule <RULE>` — Specific rule ID to run
 - `--engine <ENGINE>` — Filter by rule engine: `all`, `syntax`, `fact` (default: `all`)
 - `--fix` — Apply auto-fixes (syntax rules only)
-- `--sarif` — Output in SARIF format
+- `--sarif` — Output in SARIF 2.1.0 format (for IDE/CI integration)
+- `--pretty` — Colored terminal output
+- `--compact` — Plain text output (default)
+- `--json` — JSON output (automatic from `DiagnosticsReport`)
 - `--debug <FLAGS>` — Debug flags (comma-separated)
+
+Output goes through `DiagnosticsReport`, so all standard output formats (`--json`, `--jsonl`, `--jq`, `--schema`, `--pretty`, `--sarif`) work consistently. Both syntax and fact engine findings are merged, sorted by file/line/severity, and rendered through the same pipeline.
 
 ### add
 

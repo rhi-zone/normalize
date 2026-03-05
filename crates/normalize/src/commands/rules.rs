@@ -1137,6 +1137,114 @@ fn cmd_run(
     exit_code
 }
 
+/// Collect fact rule diagnostics without printing (returns raw diagnostics).
+pub async fn collect_fact_diagnostics(
+    root: &Path,
+    config: &interpret::FactsRulesConfig,
+    filter_ids: Option<&HashSet<String>>,
+) -> Vec<normalize_facts_rules_api::Diagnostic> {
+    let all_rules_unfiltered = interpret::load_all_rules(root, config);
+    let all_rules: Vec<_> = all_rules_unfiltered
+        .into_iter()
+        .filter(|r| r.enabled)
+        .filter(|r| filter_ids.is_none_or(|ids| ids.contains(&r.id)))
+        .collect();
+
+    if all_rules.is_empty() {
+        return Vec::new();
+    }
+
+    let relations = match ensure_relations(root).await {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error building relations: {}", e);
+            return Vec::new();
+        }
+    };
+
+    let mut all_diagnostics = Vec::new();
+    for rule in &all_rules {
+        match interpret::run_rule(rule, &relations) {
+            Ok(diagnostics) => all_diagnostics.extend(diagnostics),
+            Err(e) => {
+                eprintln!("Error running rule '{}': {}", rule.id, e);
+            }
+        }
+    }
+
+    interpret::filter_inline_allowed(&mut all_diagnostics, root);
+    all_diagnostics
+}
+
+/// Run all rules (syntax + fact) and return a unified DiagnosticsReport.
+pub fn run_rules_report(
+    root: &Path,
+    filter_rule: Option<&str>,
+    filter_tag: Option<&str>,
+    engine: &RuleType,
+    debug: &[String],
+    config: &crate::config::NormalizeConfig,
+) -> normalize_output::diagnostics::DiagnosticsReport {
+    use crate::diagnostic_convert::{abi_diagnostic_to_issue, finding_to_issue};
+    use normalize_output::diagnostics::DiagnosticsReport;
+
+    let mut report = DiagnosticsReport::new();
+
+    // Expand user-defined tags to concrete rule IDs
+    let rule_tags = &config.rule_tags.0;
+    let filter_ids: Option<HashSet<String>> = filter_tag.and_then(|tag| {
+        if rule_tags.contains_key(tag) {
+            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+            let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+            let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
+            let mut visited = HashSet::new();
+            let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
+            Some(ids.iter().map(|s| s.to_string()).collect())
+        } else {
+            None
+        }
+    });
+    let effective_tag = if filter_ids.is_some() {
+        None
+    } else {
+        filter_tag
+    };
+
+    // Syntax rules
+    if matches!(engine, RuleType::All | RuleType::Syntax) {
+        let debug_flags = DebugFlags::from_args(debug);
+        let findings = crate::commands::analyze::rules_cmd::run_syntax_rules(
+            root,
+            filter_rule,
+            effective_tag,
+            filter_ids.as_ref(),
+            &config.analyze.rules,
+            &debug_flags,
+        );
+        for f in &findings {
+            report.issues.push(finding_to_issue(f, root));
+        }
+        report.sources_run.push("syntax-rules".into());
+    }
+
+    // Fact rules
+    if matches!(engine, RuleType::All | RuleType::Fact) {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let diagnostics = rt.block_on(collect_fact_diagnostics(
+            root,
+            &config.analyze.facts_rules,
+            filter_ids.as_ref(),
+        ));
+        for d in &diagnostics {
+            report.issues.push(abi_diagnostic_to_issue(d));
+        }
+        report.sources_run.push("fact-rules".into());
+    }
+
+    report.sort();
+    report
+}
+
 /// Run fact rules (interpreted) against the index.
 async fn run_fact_rules(
     root: &Path,

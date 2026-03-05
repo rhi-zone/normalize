@@ -1,6 +1,6 @@
 # Rules Unification
 
-Status: **partially implemented** (steps 1–6, 10 done; 7–9 remaining)
+Status: **partially implemented** (steps 1–6, 10 done; `rules run` now returns `DiagnosticsReport` with `--sarif`; 7–9 remaining)
 
 ## Problem
 

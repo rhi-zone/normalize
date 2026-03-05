@@ -1,19 +1,33 @@
 //! Rules management service for server-less CLI.
 
 use super::resolve_pretty;
+use normalize_output::OutputFormatter;
+use normalize_output::diagnostics::DiagnosticsReport;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::Path;
 
 /// Rules management sub-service.
 pub struct RulesService {
-    _pretty: Cell<bool>,
+    pretty: Cell<bool>,
+    sarif: Cell<bool>,
 }
 
 impl RulesService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
-            _pretty: Cell::new(pretty.get()),
+            pretty: Cell::new(pretty.get()),
+            sarif: Cell::new(false),
+        }
+    }
+
+    fn display_rules_run(&self, r: &DiagnosticsReport) -> String {
+        if self.sarif.get() {
+            r.format_sarif()
+        } else if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
         }
     }
 }
@@ -81,6 +95,7 @@ impl RulesService {
 
     /// Run rules against the codebase
     #[allow(clippy::too_many_arguments)]
+    #[cli(display_with = "display_rules_run")]
     pub fn run(
         &self,
         #[param(help = "Specific rule ID to run")] rule: Option<String>,
@@ -95,17 +110,68 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_run_service(
-            root.as_deref(),
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DiagnosticsReport, String> {
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let target_root = target
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| effective_root.clone());
+        let config = crate::config::NormalizeConfig::load(&effective_root);
+
+        self.pretty
+            .set(resolve_pretty(&target_root, pretty, compact));
+        self.sarif.set(sarif);
+
+        // --fix is a separate mutation path: apply fixes and return a simple message
+        if fix {
+            let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
+            let findings = crate::commands::analyze::rules_cmd::run_syntax_rules(
+                &target_root,
+                rule.as_deref(),
+                tag.as_deref(),
+                None,
+                &config.analyze.rules,
+                &debug_flags,
+            );
+            let fixable: Vec<_> = findings.iter().filter(|f| f.fix.is_some()).collect();
+            if fixable.is_empty() {
+                return Ok(DiagnosticsReport {
+                    issues: Vec::new(),
+                    files_checked: 0,
+                    sources_run: vec!["syntax-rules (fix: no fixable issues)".into()],
+                });
+            }
+            match normalize_syntax_rules::apply_fixes(&findings) {
+                Ok(files_modified) => {
+                    return Ok(DiagnosticsReport {
+                        issues: Vec::new(),
+                        files_checked: files_modified,
+                        sources_run: vec![format!(
+                            "syntax-rules (fixed {} issue(s) in {} file(s))",
+                            fixable.len(),
+                            files_modified
+                        )],
+                    });
+                }
+                Err(e) => return Err(format!("Error applying fixes: {e}")),
+            }
+        }
+
+        let engine_filter = engine.unwrap_or_default();
+        let report = crate::commands::rules::run_rules_report(
+            &target_root,
             rule.as_deref(),
             tag.as_deref(),
-            fix,
-            sarif,
-            target.as_deref(),
-            engine.unwrap_or_default(),
+            &engine_filter,
             &debug,
-        )
+            &config,
+        );
+        Ok(report)
     }
 
     /// Enable a rule or all rules matching a tag
