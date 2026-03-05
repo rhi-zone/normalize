@@ -23,6 +23,7 @@ use crate::commands::analyze::duplicates::{
 };
 use crate::commands::analyze::duplicates_views::{DuplicateScope, DuplicatesOutput};
 use crate::commands::analyze::files::FileLengthReport;
+use crate::commands::analyze::fragments::{FragmentScope, FragmentsReport};
 use crate::commands::analyze::graph::{GraphReport, GraphTarget};
 use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
@@ -358,6 +359,14 @@ impl AnalyzeService {
     }
 
     fn display_patterns(&self, r: &PatternsReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_fragments(&self, r: &FragmentsReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1603,6 +1612,60 @@ impl AnalyzeService {
             similarity.unwrap_or(0.7),
             min_members.unwrap_or(3),
             limit.unwrap_or(20),
+            &exclude,
+            &only,
+        )
+    }
+
+    /// Find repeated AST fragments across the codebase
+    #[server(group = "code")]
+    #[cli(display_with = "display_fragments")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn fragments(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Minimum subtree size to consider (default: 10)")]
+        min_nodes: Option<usize>,
+        #[param(
+            short = 's',
+            help = "What to hash: all|functions|blocks (default: all)"
+        )]
+        scope: Option<String>,
+        #[param(
+            short = 'e',
+            help = "Only analyze symbols matching unified path glob (requires --scope functions)"
+        )]
+        entry: Option<String>,
+        #[param(help = "Resolve calls and inline callee bodies (default: 0, requires index)")]
+        inline_depth: Option<usize>,
+        #[param(help = "MinHash similarity threshold for fuzzy grouping (default: 1.0 = exact)")]
+        similarity: Option<f64>,
+        #[param(short = 'l', help = "Max clusters to report (0=no limit, default: 30)")]
+        limit: Option<usize>,
+        #[param(help = "Match on control-flow structure only")] skeleton: bool,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<FragmentsReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let scope_val: FragmentScope = scope
+            .as_deref()
+            .unwrap_or("all")
+            .parse()
+            .map_err(|e: String| e)?;
+        crate::commands::analyze::fragments::analyze_fragments(
+            &root_path,
+            min_nodes.unwrap_or(10),
+            scope_val,
+            entry.as_deref(),
+            inline_depth.unwrap_or(0),
+            similarity.unwrap_or(1.0),
+            limit.unwrap_or(30),
+            skeleton,
             &exclude,
             &only,
         )

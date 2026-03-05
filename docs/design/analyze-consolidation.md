@@ -4,7 +4,7 @@ Status: **design** — phased implementation in progress.
 
 ## Problem
 
-`normalize analyze` has 49 subcommands. Each is a hardcoded point in a 4-dimensional space:
+`normalize analyze` has 50 subcommands. Each is a hardcoded point in a 4-dimensional space:
 
 | Axis | Values |
 |------|--------|
@@ -52,6 +52,7 @@ Full mapping of all 49 commands to their axis coordinates:
 | `similar-blocks` | minhash-lsh | block | now | pairs |
 | `clusters` | minhash-union-find | function | now | grouped |
 | `patterns` | skeleton-minhash | function | now | grouped |
+| `fragments` | subtree-hash/minhash | any/function/block | now | grouped |
 
 ### Coverage & Testing
 | Command | Metric | Scope | Time | Shape |
@@ -199,7 +200,7 @@ uniqueness(mod)   = 1 - fraction_with_similar_to(mod)
 
 #### Four extensible patterns
 
-All 44 commands decompose into 4 extensible patterns + specific features + composites:
+All 45 commands decompose into 4 extensible patterns + specific features + composites:
 
 **1. `rank <metric>` — score entities, show worst-first (open set)**
 
@@ -210,7 +211,7 @@ All share the same shape: compute a scalar per entity, sort, show top N. The met
 
 **2. `similar` — find structurally alike code units (open set)**
 
-Today: duplicate-functions, duplicate-blocks, duplicate-types, similar-functions, similar-blocks, clusters, patterns. All 7 ask "which code units look alike?" Parameters are scope (function/block/type), method (exact/fuzzy/skeleton), and grouping (pairs/groups/clusters).
+Today: duplicate-functions, duplicate-blocks, duplicate-types, similar-functions, similar-blocks, clusters, patterns, fragments. All 8 ask "which code units look alike?" Parameters are scope (function/block/type), method (exact/fuzzy/skeleton), and grouping (pairs/groups/clusters).
 
 Could become: `similar --scope functions|blocks|types --mode exact|fuzzy|skeleton [--cluster]`
 
@@ -278,9 +279,9 @@ Each merge follows this pattern:
 
 | Phase | Commands | Reduction |
 |-------|----------|-----------|
-| Start | 49 | — |
-| After Phase 2 (coverage + churn merged, old deleted) | 43 | -6 |
-| After `similar` consolidation | 37 | -6 |
+| Start | 50 | — |
+| After Phase 2 (coverage + churn merged, old deleted) | 44 | -6 |
+| After `similar` consolidation (fragments absorbs patterns) | 37 | -7 |
 | After `graph` consolidation | 33 | -4 |
 | After `check` → rules migration | ~30 | ~-3 |
 

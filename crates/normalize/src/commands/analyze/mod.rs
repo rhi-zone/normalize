@@ -23,6 +23,7 @@ pub mod docs;
 pub mod duplicates;
 pub mod duplicates_views;
 pub mod files;
+pub mod fragments;
 pub mod graph;
 pub mod hotspots;
 pub mod impact;

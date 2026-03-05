@@ -202,7 +202,7 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 
 See `docs/design/analyze-consolidation.md` for full design (axis decomposition, phased plan).
 
-**The CLI is too big.** 42 flat subcommands under `analyze` (now grouped via `#[server(groups(...))]` in `--help`, but still 42 separate commands). Users can't hold this in working memory. Grouping helps discoverability but doesn't reduce the surface.
+**The CLI is too big.** 43 flat subcommands under `analyze` (now grouped via `#[server(groups(...))]` in `--help`, but still 43 separate commands). Users can't hold this in working memory. Grouping helps discoverability but doesn't reduce the surface.
 
 **Current state (2026-03):**
 - `--help` output is now grouped into 8 sections (code, modules, repo, graph, git, test, security, diff) via server-less `#[server(groups(...))]`
@@ -215,7 +215,7 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 - [ ] **2c. `density`**: needs design — `uniqueness` has 8 extra params
 
 **Phase 3 — Further consolidation (needs design):**
-- [ ] `duplicates`: collapse 7 commands (duplicate-functions/blocks/types, similar-functions/blocks, clusters, patterns)
+- [ ] `duplicates`: collapse 8 commands (duplicate-functions/blocks/types, similar-functions/blocks, clusters, patterns, fragments)
 - [ ] `deps`: collapse 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact)
 - [ ] `docs`: collapse 4 commands (docs, check-refs, stale-docs, check-examples)
 - [ ] `git`: collapse 5 commands (ownership, contributors, activity, repo-coupling, cross-repo-health) — all git/repo-centric analysis
@@ -428,8 +428,8 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - PR/diff analysis: `normalize analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
-- **Structural fragment frequency analysis** (`analyze fragments`?): Extract every AST subtree with >N nodes, elide identifiers/literals/types, hash, rank by frequency. Finds the most-repeated structural patterns at any granularity — N=3 catches `if err != nil { return err }`, N=20 catches sort+truncate, N=50 catches full collect→scan→sort→truncate→report pipelines. Generalizes `patterns` from function-level to arbitrary subtree level. Building blocks exist: tree-sitter gives ASTs, `clusters --elide-identifiers` proves the normalization works. Missing piece: subtree extraction + hashing at scale.
-- **CLI entrypoint duplication analysis**: Compare CLI entrypoint function bodies after inlining one level of callees. Two entrypoints following the same operational sequence (collect files → parallel scan → sort → truncate → build report) show up as structurally similar even when they operate on different types. Entrypoints are already enumerated (service methods), call graph gives callee tree. Inline one level → elide identifiers/types → compare with existing similarity tools. Focuses duplication search on the code that matters (entry points) rather than exhaustive pairwise comparison.
+- ~~**Structural fragment frequency analysis**~~: Done — `normalize analyze fragments`. Supports `--scope all|functions|blocks`, `--min-nodes N`, `--similarity` for fuzzy matching, `--skeleton`, `--entry` for symbol glob filtering. `--inline-depth` scaffolded but not yet wired (requires async index access in sync context).
+- ~~**CLI entrypoint duplication analysis**~~: Partially done — `normalize analyze fragments --scope functions --entry 'pattern'` handles the filtering. Full callee inlining (`--inline-depth`) requires async index access, deferred.
 - Remaining duplicate/clone detection improvements:
   - Per-subcommand excludes in config: `[analyze.similar-blocks] exclude = [...]` so language-file exclusion doesn't affect `analyze rules`, `analyze complexity`, etc. (currently the global `[analyze] exclude` is too coarse)
   - "Parallel impl directory" heuristic: if >N pairs originate from the same directory pair, fold them into a single suppressed note (e.g., "48 pairs suppressed within normalize-languages/ — likely parallel Language trait implementations")
