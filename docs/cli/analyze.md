@@ -31,7 +31,9 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 ### Coverage & Testing
 | Subcommand | Description |
 |------------|-------------|
-| `coverage` | Test coverage: ratio (default), `--gaps` for untested functions, `--budget` for line breakdown |
+| `test-ratio` | Test/impl line ratio per module |
+| `test-gaps` | Untested public functions ranked by risk |
+| `budget` | Line budget breakdown by purpose (logic, tests, docs, config) |
 
 ### Information Density
 | Subcommand | Description |
@@ -43,7 +45,9 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 ### Churn & Coupling
 | Subcommand | Description |
 |------------|-------------|
-| `churn` | Temporal churn: coupling pairs (default), `--cluster` for change-clusters, `--hotspots` for churn × complexity |
+| `coupling` | Temporal coupling: file pairs that change together |
+| `coupling-clusters` | Change-clusters: connected components of coupled files |
+| `hotspots` | Churn × complexity hotspots |
 | `ownership` | Per-file ownership concentration from git blame |
 
 ### Dependencies & Structure
@@ -83,15 +87,15 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 # Quick health check
 normalize analyze
 
-# Test coverage — three views
-normalize analyze coverage                    # test/impl ratio per module
-normalize analyze coverage --gaps             # untested public functions
-normalize analyze coverage --budget           # line budget breakdown
+# Test coverage
+normalize analyze test-ratio                  # test/impl ratio per module
+normalize analyze test-gaps                   # untested public functions
+normalize analyze budget                      # line budget breakdown
 
-# Churn analysis — three views
-normalize analyze churn                       # temporal coupling pairs
-normalize analyze churn --cluster             # change-clusters
-normalize analyze churn --hotspots            # churn × complexity hotspots
+# Churn analysis
+normalize analyze coupling                    # temporal coupling pairs
+normalize analyze coupling-clusters           # change-clusters
+normalize analyze hotspots                    # churn × complexity hotspots
 
 # Architecture analysis
 normalize analyze architecture
@@ -146,17 +150,15 @@ normalize analyze impact src/main.rs
 - `-t, --threshold <N>` - Only show functions above threshold
 - `--kind <TYPE>` - Filter by: function, method
 
-**coverage:**
-- `--gaps` - Show untested public functions
-- `--budget` - Show line budget breakdown by purpose
-- `--all` - Show all functions including tested (gaps view)
-- `--min-risk <N>` - Risk threshold (gaps view)
+**test-gaps:**
+- `--all` - Show all functions including tested
+- `--min-risk <N>` - Risk threshold
 
-**churn:**
-- `--cluster` - Show change-clusters (connected components)
-- `--hotspots` - Show churn × complexity hotspots
-- `--recency` - Weight recent changes higher (hotspots view)
-- `--min-commits <N>` - Minimum shared commits for coupling
+**coupling / coupling-clusters:**
+- `--min-commits <N>` - Minimum shared commits for edges
+
+**hotspots:**
+- `--recency` - Weight recent changes higher (exponential decay)
 
 **files:**
 - `--allow <PATTERN>` - Add pattern to allow file
@@ -188,10 +190,10 @@ Patterns can be excluded via `.normalize/` allow files:
 | File | Purpose |
 |------|---------|
 | `.normalize/large-files-allow` | Exclude from `analyze files` |
-| `.normalize/hotspots-allow` | Exclude from `analyze churn --hotspots` |
+| `.normalize/hotspots-allow` | Exclude from `analyze hotspots` |
 | `.normalize/duplicate-functions-allow` | Exclude from `analyze duplicates` |
 | `.normalize/duplicate-types-allow` | Exclude type pairs |
-| `.normalize/test-gaps-allow` | Exclude from `analyze coverage --gaps` |
+| `.normalize/test-gaps-allow` | Exclude from `analyze test-gaps` |
 
 Add via CLI:
 ```bash

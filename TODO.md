@@ -223,14 +223,11 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 
 **Design pressure:** ~43 commands after Phase 2 is still too spread out. Phase 3 must happen. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
 
-**Revisit enum-return "unifications" — NEXT SESSION:**
+**Enum-return "unifications" — DONE:**
 
-`CoverageOutput`, `CouplingOutput` wrap N report types in an enum — not real unification. Each should be redesigned with a single report struct or accepted as separate commands.
-
-- [ ] `CoverageOutput` (test-ratio, test-gaps, budget) — find shared shape or split back
-- [ ] `CouplingOutput` (coupling-pairs, coupling-clusters, hotspots) — find shared shape or split back
-
-Approach: for each, read the inner report structs, identify common fields, design a single struct. If no shared shape exists, revert to separate commands (that's fine — don't force it).
+`CoverageOutput` and `CouplingOutput` were enum wrappers — not real unification. No shared shape existed between inner report structs. Split back to separate commands:
+- [x] `CoverageOutput` → `test-ratio`, `test-gaps`, `budget` (3 separate service methods)
+- [x] `CouplingOutput` → `coupling`, `coupling-clusters`, `hotspots` (3 separate service methods)
 
 ### Rules Unification & `facts` → `structure` Rename
 

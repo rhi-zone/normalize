@@ -98,7 +98,7 @@ normalize view -d 2                # Depth 2 (nested symbols)
 normalize analyze health           # Health metrics
 normalize analyze complexity       # Cyclomatic complexity
 normalize analyze security         # Security scan
-normalize analyze churn --hotspots # High-churn files
+normalize analyze hotspots         # High-churn files
 normalize analyze call-graph symbol --callers  # What calls this?
 normalize analyze call-graph symbol --callees  # What does this call?
 normalize analyze graph            # Dependency graph analysis
@@ -124,7 +124,7 @@ normalize grep "TODO" --only "*.rs"
 ## Key Insights
 
 - `normalize view` is the primary navigation command - works on dirs, files, and symbols
-- `normalize analyze` is the primary analysis command with 40 subcommands: health, complexity, security, churn, graph, duplicates, etc.
+- `normalize analyze` is the primary analysis command with 40 subcommands: health, complexity, security, hotspots, coupling, graph, duplicates, etc.
 - `normalize grep` for text search, `normalize view` for structural navigation
 - Use `--json` when you need to parse output programmatically
 - The facts DB (`.normalize/facts.db`) caches symbols for fast lookups

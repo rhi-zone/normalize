@@ -119,22 +119,11 @@ Merge commands that share most parameters into a single command with view flags.
 
 **2a. ~~`health` family~~** — NOT MERGING. `health`, `module-health`, `cross-repo-health` have divergent params (target vs limit+min_lines vs repos_dir). Keep separate.
 
-**2b. `coverage` family** (done):
-```
-normalize analyze coverage                   # was: test-ratio (default)
-normalize analyze coverage --gaps            # was: test-gaps
-normalize analyze coverage --budget          # was: budget
-```
+**2b. ~~`coverage` family~~** — REVERTED. The three views (test-ratio, test-gaps, budget) had no shared data shape. Split back to separate commands: `test-ratio`, `test-gaps`, `budget`.
 
 **2c. ~~`density` family~~** — NOT MERGING. `uniqueness` has 8 unique params. Keep `density`, `uniqueness`, `ceremony` separate.
 
-**2d. `churn` family** (done):
-```
-normalize analyze churn                      # was: coupling (default)
-normalize analyze churn --cluster            # was: coupling-clusters
-normalize analyze churn --hotspots           # was: hotspots
-```
-All three are temporal co-change analyses from git history.
+**2d. ~~`churn` family~~** — REVERTED. The three views (coupling, coupling-clusters, hotspots) had no shared data shape. Split back to separate commands: `coupling`, `coupling-clusters`, `hotspots`.
 
 ### Phase 3 — Concept graph decomposition
 
@@ -262,7 +251,7 @@ This would take 44 → ~20 commands, and more importantly, make the *extension m
 
 ## Implementation Strategy
 
-**Enum wrappers are not real unification.** `CoverageOutput`, `CouplingOutput` wrap N report types in an enum with `OutputFormatter` delegation. This reduces CLI entry points but doesn't unify the data model — each variant is still its own report struct with its own rendering. Real consolidation means one report struct that all modes populate, with shared fields and shared rendering. Revisit existing enum wrappers.
+**Enum wrappers are not real unification.** `CoverageOutput` and `CouplingOutput` were enum wrappers that reduced CLI entry points without unifying the data model. Each variant was still its own report struct with its own rendering. These have been reverted to separate commands (`test-ratio`/`test-gaps`/`budget` and `coupling`/`coupling-clusters`/`hotspots`).
 
 For pattern #4 (`check`), the right unification is the **diagnostic model**: `check-refs`, `stale-docs`, `check-examples`, `security` all produce "list of issues found in files." These should share a common diagnostic output format and ideally migrate into the rules engine over time.
 
@@ -279,10 +268,10 @@ Each merge follows this pattern:
 | Phase | Commands | Reduction |
 |-------|----------|-----------|
 | Start | 50 | — |
-| After Phase 2 (coverage + churn merged, old deleted) | 44 | -6 |
-| After `duplicates` unification (5 → 1, clusters absorbed) | 39 | -5 |
-| After `fragments` absorbs `patterns` | 38 | -1 |
-| After `check` unification (refs + stale + examples) | 36 | -2 |
+| After `duplicates` unification (5 → 1, clusters absorbed) | 45 | -5 |
+| After `fragments` absorbs `patterns` | 44 | -1 |
+| After `check` unification (refs + stale + examples) | 42 | -2 |
+| After `coverage`/`churn` enum reverts (+4 commands, -2 wrappers) | 42 | ±0 |
 | After `graph` consolidation | 31 | -4 |
 | After further `check` → rules migration | ~28 | ~-3 |
 
@@ -292,19 +281,11 @@ The goal isn't minimizing count for its own sake — it's making the mental mode
 
 ### Done
 
-**`coverage`** — unifies `test-ratio`, `test-gaps`, `budget`:
-- `normalize analyze coverage` → test-ratio (default)
-- `normalize analyze coverage --gaps` → test-gaps
-- `normalize analyze coverage --budget` → budget
-- Enum: `CoverageOutput` in `commands/analyze/coverage.rs`
-- Old commands: `test-ratio`, `test-gaps`, `budget` — delete once coverage is proven
-
-**`churn`** — unifies `coupling`, `coupling-clusters`, `hotspots`:
-- `normalize analyze churn` → coupling pairs (default)
-- `normalize analyze churn --cluster` → coupling-clusters
-- `normalize analyze churn --hotspots` → hotspots
-- Enum: `CouplingOutput` in `commands/analyze/coupling_views.rs`
-- Old commands: `coupling`, `coupling-clusters`, `hotspots` — delete once churn is proven
+**`coverage`/`churn` enum wrappers** — REVERTED:
+- `CoverageOutput` and `CouplingOutput` wrapped unrelated report types in enums
+- No shared data shape existed between inner reports
+- Split back to separate commands: `test-ratio`, `test-gaps`, `budget`, `coupling`, `coupling-clusters`, `hotspots`
+- Enum wrapper files deleted
 
 ### Not merging (by design)
 
@@ -314,7 +295,7 @@ The goal isn't minimizing count for its own sake — it's making the mental mode
 
 ### Pattern Learned
 
-**Enum wrappers were a mistake.** `CoverageOutput`, `CouplingOutput` reduce CLI entry points but don't unify the data model. Each variant is still a separate report with separate rendering — it's just dispatch with extra steps. These should be revisited: either find the shared data shape and use a single struct, or accept they're different commands.
+**Enum wrappers were a mistake.** `CoverageOutput`, `CouplingOutput` reduced CLI entry points but didn't unify the data model. Each variant was a separate report with separate rendering — just dispatch with extra steps. Reverted: no shared data shape existed, so they're now separate commands again.
 
 **Single struct with shared fields is real unification** (`DuplicatesReport`):
 - All modes share the same output shape (groups of code locations)
