@@ -198,11 +198,17 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 - Still can't resolve runtime variables, but dramatically fewer false negatives
 - Belongs in same feature gate or a separate `tree-sitter` feature in normalize-manifest
 
-### Analyze Command Consolidation
+### Analyze Command Consolidation — HIGH PRIORITY
 
 See `docs/design/analyze-consolidation.md` for full design (axis decomposition, phased plan).
 
-49 flat subcommands → composable families. Each command is a point in metric × scope × time × shape space. Users shouldn't memorize 49 names.
+**The CLI is too big.** 42 flat subcommands under `analyze` (now grouped via `#[server(groups(...))]` in `--help`, but still 42 separate commands). Users can't hold this in working memory. Grouping helps discoverability but doesn't reduce the surface.
+
+**Current state (2026-03):**
+- `--help` output is now grouped into 8 sections (code, modules, repo, graph, git, test, security, diff) via server-less `#[server(groups(...))]`
+- `normalize-analyze` crate provides shared rank infrastructure: `Entity` trait, `Scored<E>`, `rank_pipeline`, `rank_and_truncate`, `truncate_path`
+- 16 commands migrated to shared rank infrastructure (complexity, length, density + 13 via rank_and_truncate)
+- Output formats remain per-command (too heterogeneous to unify into one generic formatter — each has different columns, stats, grouping)
 
 **Phase 2 — Merge obvious families:**
 - [ ] **2a. `health`**: needs design — `health` is default command, param signatures diverge
@@ -422,6 +428,8 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - PR/diff analysis: `normalize analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
 - Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
+- **Structural fragment frequency analysis** (`analyze fragments`?): Extract every AST subtree with >N nodes, elide identifiers/literals/types, hash, rank by frequency. Finds the most-repeated structural patterns at any granularity — N=3 catches `if err != nil { return err }`, N=20 catches sort+truncate, N=50 catches full collect→scan→sort→truncate→report pipelines. Generalizes `patterns` from function-level to arbitrary subtree level. Building blocks exist: tree-sitter gives ASTs, `clusters --elide-identifiers` proves the normalization works. Missing piece: subtree extraction + hashing at scale.
+- **CLI entrypoint duplication analysis**: Compare CLI entrypoint function bodies after inlining one level of callees. Two entrypoints following the same operational sequence (collect files → parallel scan → sort → truncate → build report) show up as structurally similar even when they operate on different types. Entrypoints are already enumerated (service methods), call graph gives callee tree. Inline one level → elide identifiers/types → compare with existing similarity tools. Focuses duplication search on the code that matters (entry points) rather than exhaustive pairwise comparison.
 - Remaining duplicate/clone detection improvements:
   - Per-subcommand excludes in config: `[analyze.similar-blocks] exclude = [...]` so language-file exclusion doesn't affect `analyze rules`, `analyze complexity`, etc. (currently the global `[analyze] exclude` is too coarse)
   - "Parallel impl directory" heuristic: if >N pairs originate from the same directory pair, fold them into a single suppressed note (e.g., "48 pairs suppressed within normalize-languages/ — likely parallel Language trait implementations")
