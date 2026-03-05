@@ -1,0 +1,11 @@
+[package]
+name = "normalize-analyze"
+description = "Shared entity types and ranking infrastructure for normalize analyze commands"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+schemars = "1"

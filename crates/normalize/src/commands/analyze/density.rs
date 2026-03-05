@@ -1,4 +1,5 @@
 use flate2::{Compression, write::GzEncoder};
+use normalize_analyze::ranked::{Scored, rank_pipeline};
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -10,7 +11,7 @@ use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
 
 /// Per-file density metrics.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FileDensity {
     pub path: String,
     pub total_bytes: usize,
@@ -27,7 +28,7 @@ pub struct FileDensity {
 }
 
 /// Per-module density summary.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct ModuleDensity {
     pub module: String,
     pub avg_compression_ratio: f64,
@@ -36,6 +37,18 @@ pub struct ModuleDensity {
     pub density_score: f64,
     pub total_files: usize,
     pub total_lines: usize,
+}
+
+impl normalize_analyze::Entity for FileDensity {
+    fn label(&self) -> &str {
+        &self.path
+    }
+}
+
+impl normalize_analyze::Entity for ModuleDensity {
+    fn label(&self) -> &str {
+        &self.module
+    }
 }
 
 /// Report returned by `analyze density`.
@@ -311,7 +324,7 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
         entry.3 += fd.lines;
     }
 
-    let mut modules: Vec<ModuleDensity> = module_data
+    let modules: Vec<ModuleDensity> = module_data
         .into_iter()
         .map(
             |(module, (comp_ratios, tok_uniqs, total_files, total_lines))| {
@@ -330,21 +343,23 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
         )
         .collect();
 
-    // Sort by density ascending (most repetitive = lowest score first)
-    modules.sort_by(|a, b| {
-        a.density_score
-            .partial_cmp(&b.density_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    if module_limit > 0 {
-        modules.truncate(module_limit);
-    }
+    // Use rank_pipeline: sort ascending (most repetitive = lowest score first) + truncate
+    let mut scored_modules: Vec<Scored<_>> = modules
+        .into_iter()
+        .map(|m| {
+            let score = m.density_score;
+            Scored::new(m, score)
+        })
+        .collect();
+    rank_pipeline(&mut scored_modules, module_limit, true);
+    let modules: Vec<ModuleDensity> = scored_modules.into_iter().map(|s| s.entity).collect();
 
-    // Overall aggregates
+    // Overall aggregates (computed before file_metrics is consumed)
+    let files_analyzed = file_metrics.len();
     let (overall_comp, overall_tok) = if file_metrics.is_empty() {
         (1.0, 1.0)
     } else {
-        let n = file_metrics.len() as f64;
+        let n = files_analyzed as f64;
         let c = file_metrics
             .iter()
             .map(|f| f.compression_ratio)
@@ -354,35 +369,23 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
         (c, t)
     };
 
-    // Worst files by density_score (ascending)
-    let mut worst: Vec<&FileDensity> = file_metrics.iter().collect();
-    worst.sort_by(|a, b| {
-        a.density_score
-            .partial_cmp(&b.density_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    let worst_files: Vec<FileDensity> = worst
+    // Worst files by density_score (ascending) via rank_pipeline
+    let mut scored_files: Vec<Scored<_>> = file_metrics
         .into_iter()
-        .take(worst_limit)
-        .map(|fd| FileDensity {
-            path: fd.path.clone(),
-            total_bytes: fd.total_bytes,
-            compressed_bytes: fd.compressed_bytes,
-            compression_ratio: fd.compression_ratio,
-            total_tokens: fd.total_tokens,
-            unique_tokens: fd.unique_tokens,
-            token_uniqueness: fd.token_uniqueness,
-            density_score: fd.density_score,
-            lines: fd.lines,
+        .map(|f| {
+            let score = f.density_score;
+            Scored::new(f, score)
         })
         .collect();
+    rank_pipeline(&mut scored_files, worst_limit, true);
+    let worst_files: Vec<FileDensity> = scored_files.into_iter().map(|s| s.entity).collect();
 
     DensityReport {
         root: root
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| root.to_string_lossy().into_owned()),
-        files_analyzed: file_metrics.len(),
+        files_analyzed,
         overall_compression_ratio: overall_comp,
         overall_token_uniqueness: overall_tok,
         modules,

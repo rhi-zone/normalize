@@ -73,6 +73,7 @@ normalize-scope = { path = "../normalize-scope", version = "0.1.0" }
 normalize-graph = { path = "../normalize-graph", version = "0.1.0" }
 normalize-code-similarity = { path = "../normalize-code-similarity", version = "0.1.0" }
 normalize-tools = { path = "../normalize-tools", version = "0.1.0" }
+normalize-analyze = { path = "../normalize-analyze", version = "0.1.0" }
 normalize-architecture = { path = "../normalize-architecture", version = "0.1.0" }
 server-less = { workspace = true, optional = true }
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }

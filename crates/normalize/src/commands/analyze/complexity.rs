@@ -3,6 +3,7 @@
 use crate::analyze::complexity::{ComplexityAnalyzer, ComplexityReport};
 use crate::filter::Filter;
 use crate::path_resolve;
+use normalize_analyze::ranked::{Scored, rank_pipeline};
 use rayon::prelude::*;
 use std::path::Path;
 
@@ -65,24 +66,29 @@ pub fn analyze_codebase_complexity(
         });
     }
 
-    filtered.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+    // Wrap in Scored for rank_pipeline
+    let mut scored: Vec<Scored<_>> = filtered
+        .into_iter()
+        .map(|f| {
+            let score = f.complexity as f64;
+            Scored::new(f, score)
+        })
+        .collect();
 
-    // Compute full stats before truncation
-    let full_stats = if !filtered.is_empty() {
-        let total_count = filtered.len();
-        let total_sum: usize = filtered.iter().map(|f| f.complexity).sum();
-        let total_avg = total_sum as f64 / total_count as f64;
-        let total_max = filtered.first().map(|f| f.complexity).unwrap_or(0);
-        let critical_count = filtered.iter().filter(|f| f.complexity > 20).count();
-        let high_count = filtered
-            .iter()
-            .filter(|f| f.complexity >= 11 && f.complexity <= 20)
-            .count();
+    // Count categories before pipeline truncates
+    let critical_count = scored.iter().filter(|s| s.entity.complexity > 20).count();
+    let high_count = scored
+        .iter()
+        .filter(|s| s.entity.complexity >= 11 && s.entity.complexity <= 20)
+        .count();
 
+    let stats = rank_pipeline(&mut scored, limit, false);
+
+    let full_stats = if stats.total_count > 0 {
         Some(crate::analyze::FullStats {
-            total_count,
-            total_avg,
-            total_max,
+            total_count: stats.total_count,
+            total_avg: stats.avg,
+            total_max: stats.max as usize,
             critical_count,
             high_count,
         })
@@ -90,10 +96,10 @@ pub fn analyze_codebase_complexity(
         None
     };
 
-    filtered.truncate(limit);
+    let functions = scored.into_iter().map(|s| s.entity).collect();
 
     ComplexityReport {
-        functions: filtered,
+        functions,
         file_path: root.to_string_lossy().to_string(),
         full_stats,
     }

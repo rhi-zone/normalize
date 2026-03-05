@@ -3583,6 +3583,7 @@ dependencies = [
  "libc",
  "libsql",
  "log",
+ "normalize-analyze",
  "normalize-architecture",
  "normalize-chat-sessions",
  "normalize-cli-parser",
@@ -3637,6 +3638,14 @@ dependencies = [
  "utoipa",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "normalize-analyze"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
 ]
 
 [[package]]

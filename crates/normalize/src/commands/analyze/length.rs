@@ -1,8 +1,11 @@
 //! Function length analysis - find long functions in codebase
 
-use crate::analyze::function_length::{FunctionLength, LengthAnalyzer, LengthReport};
+use crate::analyze::function_length::{
+    FunctionLength, LengthAnalyzer, LengthCategory, LengthReport,
+};
 use crate::filter::Filter;
 use crate::path_resolve;
+use normalize_analyze::ranked::{Scored, rank_pipeline};
 use rayon::prelude::*;
 use std::path::Path;
 
@@ -47,7 +50,7 @@ pub fn analyze_codebase_length(
         .collect();
 
     // Filter by allowlist
-    let mut sorted: Vec<_> = if allowlist.is_empty() {
+    let filtered: Vec<_> = if allowlist.is_empty() {
         all_functions
     } else {
         all_functions
@@ -59,29 +62,32 @@ pub fn analyze_codebase_length(
             .collect()
     };
 
-    sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
+    // Wrap in Scored for rank_pipeline
+    let mut scored: Vec<Scored<_>> = filtered
+        .into_iter()
+        .map(|f| {
+            let score = f.lines as f64;
+            Scored::new(f, score)
+        })
+        .collect();
 
-    // Compute full stats before truncation
-    // For length: critical = too_long (>100), high = long (51-100)
-    let full_stats = if !sorted.is_empty() {
-        use crate::analyze::function_length::LengthCategory;
-        let total_count = sorted.len();
-        let total_sum: usize = sorted.iter().map(|f| f.lines).sum();
-        let total_avg = total_sum as f64 / total_count as f64;
-        let total_max = sorted.first().map(|f| f.lines).unwrap_or(0);
-        let critical_count = sorted
-            .iter()
-            .filter(|f| f.category() == LengthCategory::TooLong)
-            .count();
-        let high_count = sorted
-            .iter()
-            .filter(|f| f.category() == LengthCategory::Long)
-            .count();
+    // Count categories before pipeline truncates
+    let critical_count = scored
+        .iter()
+        .filter(|s| s.entity.category() == LengthCategory::TooLong)
+        .count();
+    let high_count = scored
+        .iter()
+        .filter(|s| s.entity.category() == LengthCategory::Long)
+        .count();
 
+    let stats = rank_pipeline(&mut scored, limit, false);
+
+    let full_stats = if stats.total_count > 0 {
         Some(crate::analyze::FullStats {
-            total_count,
-            total_avg,
-            total_max,
+            total_count: stats.total_count,
+            total_avg: stats.avg,
+            total_max: stats.max as usize,
             critical_count,
             high_count,
         })
@@ -89,10 +95,10 @@ pub fn analyze_codebase_length(
         None
     };
 
-    sorted.truncate(limit);
+    let functions = scored.into_iter().map(|s| s.entity).collect();
 
     LengthReport {
-        functions: sorted,
+        functions,
         file_path: root.to_string_lossy().to_string(),
         full_stats,
     }

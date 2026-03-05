@@ -57,6 +57,12 @@ pub struct FunctionComplexity {
     pub file_path: Option<String>, // file path for codebase-wide reports
 }
 
+impl normalize_analyze::Entity for FunctionComplexity {
+    fn label(&self) -> &str {
+        &self.name
+    }
+}
+
 impl FunctionComplexity {
     pub fn qualified_name(&self) -> String {
         let base = if let Some(parent) = &self.parent {

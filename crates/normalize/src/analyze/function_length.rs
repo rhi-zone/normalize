@@ -48,6 +48,12 @@ pub struct FunctionLength {
     pub parent: Option<String>,
     pub file_path: Option<String>,
 }
+impl normalize_analyze::Entity for FunctionLength {
+    fn label(&self) -> &str {
+        &self.name
+    }
+}
+
 impl FunctionLength {
     pub fn qualified_name(&self) -> String {
         let base = if let Some(parent) = &self.parent {
