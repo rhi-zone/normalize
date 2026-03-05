@@ -19,6 +19,26 @@ extract, inline, move — correct, without LSPs, without false positives.
    - Proxy mode: `normalize serve lsp --proxy 'rust-analyzer'`
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
+## Immediate Fixes
+
+### Failing skeleton tests (4 tests)
+- `skeleton::tests::test_filter_types_go`
+- `skeleton::tests::test_filter_types_java`
+- `skeleton::tests::test_filter_types_ruby`
+- `skeleton::tests::test_markdown_skeleton`
+
+Pre-existing failures on master. Need investigation — likely tree-sitter grammar or skeleton extraction regression.
+
+### LSP diagnostics for all rule engines
+Design: `normalize serve lsp` should publish diagnostics from all rule engines (syntax, fact, native) via `textDocument/publishDiagnostics`. Key concerns:
+- **Performance:** Rule engines are not incremental — full re-run on every save is expensive. Need file-level caching or incremental strategies.
+- **Memory:** Fact engine requires full index + relations in memory. For large repos, this is significant.
+- **Approach options:**
+  1. Run on save with debounce, cache per-file results, invalidate on dependency changes
+  2. Background thread with configurable interval
+  3. On-demand only (code action or manual trigger)
+- SARIF→LSP Diagnostic mapping already trivial since `Issue` fields match LSP `Diagnostic`
+
 ## Next Up
 
 ### Feature-gate CLI behind `cli` feature (workspace-wide)
