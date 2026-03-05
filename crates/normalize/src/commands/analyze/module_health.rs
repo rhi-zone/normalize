@@ -325,17 +325,19 @@ pub fn analyze_module_health(root: &Path, limit: usize, min_lines: usize) -> Mod
         })
         .collect();
 
-    entries.sort_by(|a, b| {
-        a.score
-            .partial_cmp(&b.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| b.total_lines.cmp(&a.total_lines))
-    });
-
     let modules_scored = entries.len();
-    if limit > 0 {
-        entries.truncate(limit);
-    }
+
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut entries,
+        limit,
+        |a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.total_lines.cmp(&a.total_lines))
+        },
+        |e| e.score,
+    );
 
     ModuleHealthReport {
         root: root

@@ -101,13 +101,6 @@ pub async fn analyze_surface(
         })
         .collect();
 
-    entries.sort_by(|a, b| {
-        b.constraint_score
-            .cmp(&a.constraint_score)
-            .then(b.public_symbols.cmp(&a.public_symbols))
-            .then(a.module.cmp(&b.module))
-    });
-
     // 4. Compute stats before truncation
     let total_files = entries.len();
     let avg_public_ratio = if total_files > 0 {
@@ -132,7 +125,17 @@ pub async fn analyze_surface(
         fully_public_count,
     };
 
-    entries.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut entries,
+        limit,
+        |a, b| {
+            b.constraint_score
+                .cmp(&a.constraint_score)
+                .then(b.public_symbols.cmp(&a.public_symbols))
+                .then(a.module.cmp(&b.module))
+        },
+        |e| e.constraint_score as f64,
+    );
 
     Ok(SurfaceReport {
         modules: entries,

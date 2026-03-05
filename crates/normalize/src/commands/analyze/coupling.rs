@@ -3,6 +3,7 @@
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
+use normalize_analyze::truncate_path;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -94,14 +95,6 @@ impl OutputFormatter for CouplingReport {
             return "No temporal coupling found (no files change together frequently)".to_string();
         }
         format_coupling_data(&self.pairs)
-    }
-}
-
-fn truncate_path(path: &str, max_len: usize) -> String {
-    if path.len() > max_len {
-        format!("...{}", &path[path.len() - (max_len - 3)..])
-    } else {
-        path.to_string()
     }
 }
 
@@ -213,12 +206,18 @@ pub fn analyze_coupling(
         .collect();
 
     // Sort by shared commits descending, then confidence descending
-    pairs.sort_by(|a, b| {
-        b.shared_commits
-            .cmp(&a.shared_commits)
-            .then_with(|| b.confidence.partial_cmp(&a.confidence).unwrap())
-    });
-    pairs.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut pairs,
+        limit,
+        |a, b| {
+            b.shared_commits.cmp(&a.shared_commits).then_with(|| {
+                b.confidence
+                    .partial_cmp(&a.confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        },
+        |p| p.shared_commits as f64,
+    );
 
     Ok(CouplingReport { pairs, repos: None })
 }

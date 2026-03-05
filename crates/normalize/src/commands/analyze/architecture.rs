@@ -5,6 +5,7 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use normalize_analyze::truncate_path;
 pub use normalize_architecture::{
     CrossImport, Cycle, HubModule, ImportChain, ImportGraph, LayerFlow, ModuleCoupling,
     OrphanModule, SymbolMetrics, build_import_graph,
@@ -159,14 +160,6 @@ impl OutputFormatter for ArchitectureReport {
         }
 
         lines.join("\n")
-    }
-}
-
-fn truncate_path(path: &str, max_len: usize) -> String {
-    if path.len() <= max_len {
-        path.to_string()
-    } else {
-        format!("...{}", &path[path.len() - (max_len - 3)..])
     }
 }
 

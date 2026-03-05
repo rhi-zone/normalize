@@ -107,13 +107,7 @@ pub async fn analyze_depth_map(
         })
         .collect();
 
-    entries.sort_by(|a, b| {
-        b.ripple_score
-            .cmp(&a.ripple_score)
-            .then(b.depth.cmp(&a.depth))
-            .then(a.module.cmp(&b.module))
-    });
-
+    // Compute stats on full list before truncation
     let total_modules = entries.len();
     let max_depth = entries.iter().map(|e| e.depth).max().unwrap_or(0);
     let avg_depth = if total_modules > 0 {
@@ -132,7 +126,17 @@ pub async fn analyze_depth_map(
         modules_at_depth_0,
     };
 
-    entries.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut entries,
+        limit,
+        |a, b| {
+            b.ripple_score
+                .cmp(&a.ripple_score)
+                .then(b.depth.cmp(&a.depth))
+                .then(a.module.cmp(&b.module))
+        },
+        |e| e.ripple_score as f64,
+    );
 
     Ok(DepthMapReport {
         modules: entries,

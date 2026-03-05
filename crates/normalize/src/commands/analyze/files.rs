@@ -108,8 +108,12 @@ pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengt
     }
 
     let mut sorted = file_lengths;
-    sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
-    sorted.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut sorted,
+        limit,
+        |a, b| b.lines.cmp(&a.lines),
+        |f| f.lines as f64,
+    );
 
     FileLengthReport {
         files: sorted,

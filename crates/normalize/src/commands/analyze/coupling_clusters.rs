@@ -168,12 +168,16 @@ pub fn analyze_coupling_clusters(
     }
 
     // Sort by total shared commits descending
-    clusters.sort_by(|a, b| {
-        b.total_shared_commits
-            .cmp(&a.total_shared_commits)
-            .then_with(|| b.files.len().cmp(&a.files.len()))
-    });
-    clusters.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut clusters,
+        limit,
+        |a, b| {
+            b.total_shared_commits
+                .cmp(&a.total_shared_commits)
+                .then_with(|| b.files.len().cmp(&a.files.len()))
+        },
+        |c| c.total_shared_commits as f64,
+    );
 
     let total_clusters = clusters.len();
 

@@ -291,12 +291,16 @@ fn build_clusters_report_multi(
         .collect();
 
     // Sort by total lines descending (largest families first)
-    clusters.sort_by(|a, b| {
-        b.total_lines
-            .cmp(&a.total_lines)
-            .then_with(|| b.members.len().cmp(&a.members.len()))
-    });
-    clusters.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut clusters,
+        limit,
+        |a, b| {
+            b.total_lines
+                .cmp(&a.total_lines)
+                .then_with(|| b.members.len().cmp(&a.members.len()))
+        },
+        |c| c.total_lines as f64,
+    );
 
     let cluster_count = clusters.len();
     let total_clustered_functions: usize = clusters.iter().map(|c| c.members.len()).sum();

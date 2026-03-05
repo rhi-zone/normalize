@@ -102,6 +102,25 @@ pub fn rank_pipeline<E: Entity>(
     stats
 }
 
+/// Sort by custom comparator, compute stats from a score function, and truncate.
+///
+/// Like [`rank_pipeline`] but works directly on `Vec<T>` with multi-key sorts
+/// where a single `f64` score doesn't capture the full ordering.
+/// A `limit` of 0 means no truncation.
+pub fn rank_and_truncate<T>(
+    items: &mut Vec<T>,
+    limit: usize,
+    cmp: impl Fn(&T, &T) -> Ordering,
+    score: impl Fn(&T) -> f64,
+) -> RankStats {
+    items.sort_by(|a, b| cmp(a, b));
+    let stats = RankStats::from_scores(items.iter().map(&score));
+    if limit > 0 && items.len() > limit {
+        items.truncate(limit);
+    }
+    stats
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,6 +224,28 @@ mod tests {
 
         assert_eq!(stats.total_count, 0);
         assert!((stats.avg - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_rank_and_truncate() {
+        let mut items = vec![
+            ("a.rs", 3usize, 10usize),
+            ("b.rs", 1, 20),
+            ("c.rs", 3, 5),
+            ("d.rs", 2, 15),
+        ];
+        // Sort by first key ascending, then second key descending
+        let stats = rank_and_truncate(
+            &mut items,
+            3,
+            |a, b| a.1.cmp(&b.1).then(b.2.cmp(&a.2)),
+            |item| item.1 as f64,
+        );
+
+        assert_eq!(stats.total_count, 4);
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].0, "b.rs"); // lowest first key
+        assert_eq!(items[1].0, "d.rs"); // second lowest
     }
 
     #[test]

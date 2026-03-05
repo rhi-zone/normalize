@@ -321,8 +321,12 @@ pub fn analyze_patterns(
     }
 
     // Sort by frequency descending
-    patterns.sort_by(|a, b| b.frequency.cmp(&a.frequency));
-    patterns.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut patterns,
+        limit,
+        |a, b| b.frequency.cmp(&a.frequency),
+        |p| p.frequency as f64,
+    );
 
     // Deduplicate labels by appending a numeric suffix
     let mut label_counts: HashMap<String, usize> = HashMap::new();

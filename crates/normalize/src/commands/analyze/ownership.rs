@@ -3,6 +3,7 @@
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
+use normalize_analyze::truncate_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -93,14 +94,6 @@ impl OutputFormatter for OwnershipReport {
             return "No ownership data found".to_string();
         }
         format_ownership_data(&self.files)
-    }
-}
-
-fn truncate_path(path: &str, max_len: usize) -> String {
-    if path.len() > max_len {
-        format!("...{}", &path[path.len() - (max_len - 3)..])
-    } else {
-        path.to_string()
     }
 }
 
@@ -211,17 +204,21 @@ pub fn analyze_ownership(
         .collect();
 
     // Sort by bus factor ascending (riskiest first), then by top_author_pct descending
-    files.sort_by(|a, b| {
-        a.bus_factor
-            .cmp(&b.bus_factor)
-            .then_with(|| {
-                b.top_author_pct
-                    .partial_cmp(&a.top_author_pct)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .then_with(|| b.total_lines.cmp(&a.total_lines))
-    });
-    files.truncate(limit);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut files,
+        limit,
+        |a, b| {
+            a.bus_factor
+                .cmp(&b.bus_factor)
+                .then_with(|| {
+                    b.top_author_pct
+                        .partial_cmp(&a.top_author_pct)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .then_with(|| b.total_lines.cmp(&a.total_lines))
+        },
+        |f| f.bus_factor as f64,
+    );
 
     Ok(OwnershipReport { files, repos: None })
 }

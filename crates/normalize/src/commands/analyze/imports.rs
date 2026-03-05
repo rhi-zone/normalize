@@ -162,8 +162,12 @@ pub fn analyze_import_centrality(
             })
             .collect();
 
-        entries.sort_by(|a, b| b.fan_in.cmp(&a.fan_in).then(a.module.cmp(&b.module)));
-        entries.truncate(limit);
+        normalize_analyze::ranked::rank_and_truncate(
+            &mut entries,
+            limit,
+            |a, b| b.fan_in.cmp(&a.fan_in).then(a.module.cmp(&b.module)),
+            |e| e.fan_in as f64,
+        );
 
         Ok(ImportCentralityReport {
             total_modules,

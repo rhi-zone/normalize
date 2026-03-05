@@ -54,3 +54,14 @@ impl Entity for FileEntity {
         &self.path
     }
 }
+
+/// Truncate a path for display, replacing the beginning with "..." if too long.
+///
+/// Used by many ranked-list formatters to keep tabular output aligned.
+pub fn truncate_path(path: &str, max_len: usize) -> String {
+    if path.len() > max_len {
+        format!("...{}", &path[path.len() - (max_len - 3)..])
+    } else {
+        path.to_string()
+    }
+}

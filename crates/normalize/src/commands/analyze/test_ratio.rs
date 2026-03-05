@@ -213,16 +213,17 @@ pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
         .collect();
 
     // Sort: lowest ratio first (least tested at top), then largest impl for ties
-    entries.sort_by(|a, b| {
-        a.ratio
-            .partial_cmp(&b.ratio)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| b.impl_lines.cmp(&a.impl_lines))
-    });
-
-    if limit > 0 {
-        entries.truncate(limit);
-    }
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut entries,
+        limit,
+        |a, b| {
+            a.ratio
+                .partial_cmp(&b.ratio)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.impl_lines.cmp(&a.impl_lines))
+        },
+        |e| e.ratio,
+    );
 
     TestRatioReport {
         root: root

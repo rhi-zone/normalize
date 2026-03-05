@@ -4,6 +4,7 @@ use super::is_source_file;
 use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::output::OutputFormatter;
 use glob::Pattern;
+use normalize_analyze::truncate_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -73,11 +74,7 @@ fn format_hotspots_data(
 
     for h in hotspots {
         let churn = h.lines_added + h.lines_deleted;
-        let display_path = if h.path.len() > 48 {
-            format!("...{}", &h.path[h.path.len() - 45..])
-        } else {
-            h.path.clone()
-        };
+        let display_path = truncate_path(&h.path, 48);
         if has_complexity {
             let cplx_str = match h.max_complexity {
                 Some(c) => format!("{}", c),
@@ -350,8 +347,16 @@ pub fn analyze_hotspots(
         })
         .collect();
 
-    hotspots.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-    hotspots.truncate(20);
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut hotspots,
+        20,
+        |a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        },
+        |h| h.score,
+    );
 
     Ok(HotspotsReport {
         hotspots,
