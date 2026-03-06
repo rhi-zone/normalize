@@ -301,6 +301,11 @@ language that silently returns empty is misleading users who expect analysis and
       function containing `val x = ...` silently breaks the entire file parse (no symbols extracted)
 - [ ] Kotlin/Scala/Groovy: import queries produce no results — import.scm patterns may not match
       actual grammar node structure (needs AST inspection to verify node kinds)
+- [ ] Elixir: tags.scm doesn't match `def name do ... end` (no-args functions) — only matches
+      `def name(args) do ... end` pattern. The `(arguments (call target: (identifier) @name))`
+      pattern requires a call node, but no-args defs use `(arguments (identifier))`
+- [ ] Haskell: type signatures and function definitions produce duplicate symbols (same name
+      appears twice — once for `signature`, once for `function`). Should deduplicate.
 
 **Comprehensive language fixtures** (long-term, verification via nix flakes):
 Goal: for every language we support, a test suite that exercises the full extraction pipeline
