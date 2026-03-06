@@ -1,0 +1,30 @@
+[
+  {
+    "file": "MathUtils.fs",
+    "kind": "Module",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "MathUtils.fs",
+    "kind": "Method",
+    "name": "add",
+    "parent": "MathUtils",
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.fs",
+    "kind": "Method",
+    "name": "multiply",
+    "parent": "MathUtils",
+    "start_line": 5
+  },
+  {
+    "file": "Program.fs",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 3
+  }
+]

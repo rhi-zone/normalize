@@ -14,9 +14,8 @@
 ; Module definitions
 (module_definition
   (module_binding
-    name: (module_name) @name)) @definition.module
+    (module_name) @name)) @definition.module
 
 ; Module type definitions (signatures = interfaces)
 (module_type_definition
-  (module_type_binding
-    name: (module_type_name) @name)) @definition.interface
+  (module_type_name) @name) @definition.interface

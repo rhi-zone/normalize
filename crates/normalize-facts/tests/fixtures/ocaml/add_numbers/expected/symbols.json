@@ -1,0 +1,30 @@
+[
+  {
+    "file": "main.ml",
+    "kind": "Function",
+    "name": "sum",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "main.ml",
+    "kind": "Function",
+    "name": "product",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "math_utils.ml",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.ml",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 3
+  }
+]

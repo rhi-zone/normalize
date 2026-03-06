@@ -82,6 +82,68 @@ impl Language for OCaml {
         // skip the opening keyword line, strip "end" from the tail
         crate::body::analyze_keyword_end_body(body_node, content, inner_indent)
     }
+
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // Try standard field names first
+        if let Some(n) = node.child_by_field_name("name") {
+            return Some(&content[n.byte_range()]);
+        }
+
+        let kind = node.kind();
+        let mut cursor = node.walk();
+
+        match kind {
+            // value_definition > let_binding > value_name (first)
+            "value_definition" => {
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "let_binding" {
+                        let mut inner = child.walk();
+                        for c in child.children(&mut inner) {
+                            if c.kind() == "value_name" {
+                                return Some(&content[c.byte_range()]);
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            // module_definition > module_binding > module_name
+            "module_definition" => {
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "module_binding" {
+                        let mut inner = child.walk();
+                        for c in child.children(&mut inner) {
+                            if c.kind() == "module_name" {
+                                return Some(&content[c.byte_range()]);
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            // module_type_definition > module_type_name (direct child)
+            "module_type_definition" => {
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "module_type_name" {
+                        return Some(&content[child.byte_range()]);
+                    }
+                }
+                None
+            }
+            // type_definition > type_binding > type_constructor (via name: field)
+            "type_definition" => {
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "type_binding"
+                        && let Some(n) = child.child_by_field_name("name")
+                    {
+                        return Some(&content[n.byte_range()]);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
 }
 
 /// Extract an OCamldoc comment (`(** ... *)`) preceding a definition node.

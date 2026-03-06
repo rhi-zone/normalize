@@ -1,0 +1,51 @@
+[
+  {
+    "file": "MathUtils.cs",
+    "kind": "Module",
+    "name": "AddNumbers",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "MathUtils.cs",
+    "kind": "Class",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.cs",
+    "kind": "Method",
+    "name": "Add",
+    "parent": "MathUtils",
+    "start_line": 5
+  },
+  {
+    "file": "MathUtils.cs",
+    "kind": "Method",
+    "name": "Multiply",
+    "parent": "MathUtils",
+    "start_line": 10
+  },
+  {
+    "file": "Program.cs",
+    "kind": "Module",
+    "name": "AddNumbers",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "Program.cs",
+    "kind": "Class",
+    "name": "Program",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "Program.cs",
+    "kind": "Method",
+    "name": "Main",
+    "parent": "Program",
+    "start_line": 8
+  }
+]

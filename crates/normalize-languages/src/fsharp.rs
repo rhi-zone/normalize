@@ -134,9 +134,84 @@ impl Language for FSharp {
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        node.child_by_field_name("name")
+        // Try standard field names first
+        if let Some(n) = node
+            .child_by_field_name("name")
             .or_else(|| node.child_by_field_name("identifier"))
-            .map(|n| &content[n.byte_range()])
+        {
+            return Some(&content[n.byte_range()]);
+        }
+
+        let kind = node.kind();
+        let mut cursor = node.walk();
+
+        match kind {
+            // function_or_value_defn > function_declaration_left > identifier (first child)
+            "function_or_value_defn" => {
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "function_declaration_left"
+                        || child.kind() == "value_declaration_left"
+                    {
+                        let mut inner = child.walk();
+                        for c in child.children(&mut inner) {
+                            if c.kind() == "identifier" {
+                                return Some(&content[c.byte_range()]);
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            // named_module > long_identifier > identifier (first)
+            "named_module" => {
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "long_identifier" {
+                        let mut inner = child.walk();
+                        for c in child.children(&mut inner) {
+                            if c.kind() == "identifier" {
+                                return Some(&content[c.byte_range()]);
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            // type_definition > *_type_defn > type_name > identifier
+            "type_definition" => {
+                for child in node.children(&mut cursor) {
+                    let ck = child.kind();
+                    if ck.ends_with("_type_defn") || ck == "type_abbrev_defn" {
+                        let mut inner = child.walk();
+                        for c in child.children(&mut inner) {
+                            if c.kind() == "type_name" {
+                                let mut inner2 = c.walk();
+                                for c2 in c.children(&mut inner2) {
+                                    if c2.kind() == "identifier" {
+                                        return Some(&content[c2.byte_range()]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            // member_defn > method_or_prop_defn > identifier (first)
+            "member_defn" => {
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "method_or_prop_defn" {
+                        let mut inner = child.walk();
+                        for c in child.children(&mut inner) {
+                            if c.kind() == "identifier" {
+                                return Some(&content[c.byte_range()]);
+                            }
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
     }
 }
 
