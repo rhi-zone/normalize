@@ -630,6 +630,29 @@ The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mi
 - `ast_grep_core::tree_sitter::LanguageExt` trait may need explicit import or implementation
 - Pre-existing issue, not caused by feature flag changes
 
+## Long-Term Goals
+
+### Incremental-first architecture
+The current architecture is batch-oriented: commands scan the whole workspace, produce a report, and exit. This works for CLI but is wrong for LSP and other interactive consumers. The goal is to make incrementality a first-class concern throughout the stack.
+
+**Where batch hurts today:**
+- LSP diagnostics re-run all rule engines on every save (syntax rules re-parse every file, fact rules rebuild the full index)
+- `FileIndex` is rebuilt from scratch — no way to update a single file's symbols/imports/calls
+- Syntax rules load and compile all tree-sitter queries on every invocation
+
+**Target architecture:**
+- **FileIndex**: `update_file(path, content)` — re-index one file, update SQLite incrementally (delete old rows, insert new). Dependency graph tracks which files' diagnostics to invalidate.
+- **Syntax rules**: per-file evaluation. On save, re-run rules only on the saved file. Cache compiled queries across invocations (already cached per-process via `GrammarLoader`, but lost between LSP requests).
+- **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking, or accept batch for fact rules and optimize syntax rules first.
+- **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another.
+
+**Incremental steps (not all-or-nothing):**
+1. `FileIndex::update_file()` — single-file re-index without full rebuild
+2. Per-file syntax rule evaluation in LSP (run rules only on saved file)
+3. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
+4. File-level dependency tracking for diagnostic invalidation
+5. Incremental fact rule evaluation (long-term, research needed)
+
 ## Deferred
 
 - `normalize jq` multi-format support (YAML/CBOR/TOML/XML via `jaq-all` with `formats` feature): currently using `jaq-core/std/json` directly to avoid `jaq-fmts` bloat. Low priority — vanilla jq is JSON-only anyway.
