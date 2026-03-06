@@ -410,7 +410,6 @@ pub fn resolve(
                 .collect();
         }
         // Fallback: walk filesystem for extension matches
-        let ext = query;
         let walker = WalkBuilder::new(root)
             .hidden(false)
             .git_ignore(true)
@@ -421,7 +420,7 @@ pub fn resolve(
                 let path = entry.path();
                 if path.is_file() {
                     let path_str = path.to_string_lossy();
-                    if path_str.ends_with(ext)
+                    if path_str.ends_with(query)
                         && let Ok(rel) = path.strip_prefix(root)
                     {
                         return Some(PathMatch {

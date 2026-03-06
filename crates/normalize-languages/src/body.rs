@@ -78,12 +78,11 @@ pub(crate) fn analyze_end_body(
         body_start
     };
 
-    let content_end = body_end;
-    let is_empty = content[content_start..content_end].trim().is_empty();
+    let is_empty = content[content_start..body_end].trim().is_empty();
 
     Some(ContainerBody {
         content_start,
-        content_end,
+        content_end: body_end,
         inner_indent: inner_indent.to_string(),
         is_empty,
     })

@@ -308,8 +308,6 @@ pub fn build_view_filtered_service(
     scope: &str,
     kind: &SymbolKindFilter,
 ) -> Result<ViewOutput, String> {
-    let kind_filter = kind;
-
     let files_to_search: Vec<std::path::PathBuf> = if scope == "." {
         path_resolve::all_files(root)
             .into_iter()
@@ -343,7 +341,7 @@ pub fn build_view_filtered_service(
         let syms = parser.parse_file(&file_path, &content);
         for sym in syms {
             let sym_kind = sym.kind.as_str();
-            if sym_kind != kind_filter.as_str() {
+            if sym_kind != kind.as_str() {
                 continue;
             }
             all_symbols.push((

@@ -49,22 +49,21 @@ impl ManifestParser for SpagoParser {
             // Indented keys within the `package:` section.
             if section == Section::Package {
                 // Two-space indented keys: name, version, dependencies.
-                let stripped = trimmed;
-                if let Some(rest) = stripped.strip_prefix("name:") {
+                if let Some(rest) = trimmed.strip_prefix("name:") {
                     let v = rest.trim().trim_matches('"').trim_matches('\'').to_string();
                     if !v.is_empty() && name.is_none() {
                         name = Some(v);
                     }
                     continue;
                 }
-                if let Some(rest) = stripped.strip_prefix("version:") {
+                if let Some(rest) = trimmed.strip_prefix("version:") {
                     let v = rest.trim().trim_matches('"').trim_matches('\'').to_string();
                     if !v.is_empty() && version.is_none() {
                         version = Some(v);
                     }
                     continue;
                 }
-                if stripped.starts_with("dependencies:") {
+                if trimmed.starts_with("dependencies:") {
                     section = Section::Dependencies;
                     // The value might be on the same line (unlikely for lists).
                     continue;

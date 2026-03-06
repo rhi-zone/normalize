@@ -209,8 +209,7 @@ pub fn filter_file_pattern<'a>(
     let injections = grep.get_injections(|s| Lang::from_str(s).ok());
     let sub_units = injections.into_iter().filter_map(|inner| {
         let (_, matcher) = sub_matchers.iter().find(|i| *inner.lang() == i.0)?;
-        let injected = inner;
-        do_match(injected, matcher)
+        do_match(inner, matcher)
     });
     ret.extend(sub_units);
     Ok(ret)

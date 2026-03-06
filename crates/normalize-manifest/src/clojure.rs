@@ -173,7 +173,6 @@ fn extract_dep_vectors(s: &str, kind: DepKind) -> DepVectors {
                 depth += 1;
                 if depth == 2 {
                     // Start of a dep vector — collect until matching `]`
-                    let start = i;
                     let mut j = i + 1;
                     let mut inner_depth = 1i32;
                     while j < total {
@@ -189,7 +188,7 @@ fn extract_dep_vectors(s: &str, kind: DepKind) -> DepVectors {
                         }
                         j += 1;
                     }
-                    let vec_str: String = chars[start..=j].iter().collect();
+                    let vec_str: String = chars[i..=j].iter().collect();
                     if let Some(dep) = parse_lein_dep_vector(&vec_str, kind) {
                         deps.push(dep);
                     }

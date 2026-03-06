@@ -626,11 +626,8 @@ impl LanguageServer for MossBackend {
             return Ok(None);
         }
 
-        // Convert to WorkspaceEdit
-        let changes: std::collections::HashMap<Url, Vec<TextEdit>> = file_edits;
-
         Ok(Some(WorkspaceEdit {
-            changes: Some(changes),
+            changes: Some(file_edits),
             document_changes: None,
             change_annotations: None,
         }))

@@ -24,12 +24,23 @@
 # readability is a legitimate use — disable per file or expression as needed.
 
 ; Detects: let x = y; where both are simple identifiers
-; Excludes: let mut (mutable), underscore-prefixed names, None (Option variant)
-; This may be intentional for clarity, so severity is info
+; Excludes:
+;   let mut (mutable)
+;   underscore-prefixed names (unused markers)
+;   None (Option variant)
+;   uppercase RHS (unit structs / enum variants like `let x = MyStruct;`)
+;   same-name rebindings (let x = x; — intentional move into closure)
+;
+; Known false positives (require dataflow to detect):
+;   Index snapshot pattern: `let start = i; while i < ... { i += 1; }`
+;   Here `start` captures a position before `i` changes — the alias is essential.
+;   Cannot be excluded without dataflow analysis; accept or use the allow list.
 (let_declaration
   (mutable_specifier)? @_mut
   pattern: (identifier) @_alias
   value: (identifier) @_value
   (#not-eq? @_mut "mut")
   (#not-match? @_alias "^_")
-  (#not-eq? @_value "None")) @match
+  (#not-eq? @_value "None")
+  (#not-match? @_value "^[A-Z]")
+  (#not-eq? @_alias @_value)) @match

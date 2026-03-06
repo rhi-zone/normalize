@@ -195,7 +195,6 @@ fn parse_gemini_message(msg: &Value) -> Message {
 
             // Tool result (Gemini includes result in the same message)
             if let Some(result) = tc.get("result") {
-                let tool_use_id = id;
                 let result_content = if let Some(s) = result.as_str() {
                     s.to_string()
                 } else {
@@ -203,7 +202,7 @@ fn parse_gemini_message(msg: &Value) -> Message {
                 };
                 let is_error = tc.get("status").and_then(|s| s.as_str()) == Some("error");
                 content.push(ContentBlock::ToolResult {
-                    tool_use_id,
+                    tool_use_id: id,
                     content: result_content,
                     is_error,
                 });

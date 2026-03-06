@@ -330,7 +330,6 @@ pub fn build_messages_report(
         return Err("No sessions found".to_string());
     }
 
-    let role_filter = role;
     let max_text_len = if no_truncate {
         usize::MAX
     } else {
@@ -363,7 +362,7 @@ pub fn build_messages_report(
             for msg in &turn.messages {
                 // Role filter
                 let role_str = msg.role.to_string();
-                match role_filter {
+                match role {
                     RoleFilter::All => {}
                     RoleFilter::User => {
                         if role_str != "user" {

@@ -526,14 +526,13 @@ impl AnalyzeService {
     ) -> Result<Vec<CallEntry>, String> {
         let root_path = Self::root_path(root);
         let show_callers = callers || !callees;
-        let show_callees = callees;
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| format!("Failed to create runtime: {}", e))?;
         rt.block_on(crate::commands::analyze::call_graph::build_call_graph(
             &root_path,
             &target,
             show_callers,
-            show_callees,
+            callees,
             case_insensitive,
         ))
     }
