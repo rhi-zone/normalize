@@ -107,6 +107,39 @@ Future improvements:
 
 ## Next Up
 
+### Audit `rust/unwrap-in-impl` (1,608 violations)
+
+Rule is disabled — too noisy to enable without triage. Goal: categorize all violations,
+fix genuine ones, suppress legitimate ones inline or via allow, then enable at warning.
+
+**Approach: parallel subagent audit by crate**
+
+Run `normalize rules run --engine syntax --rule rust/unwrap-in-impl <crate-path>` per
+crate, dispatch one subagent per crate (or per group of small crates), have each agent:
+1. Read every violation location
+2. Categorize as: (a) genuine smell — fix by returning `Result`/`Option`, (b) infallible
+   context — add `// normalize-syntax-allow: rust/unwrap-in-impl - <reason>`, (c) test
+   helper — move to `#[cfg(test)]` or test module (rule already excludes tests)
+3. Apply fixes/suppressions
+4. Report back summary (N fixed, N suppressed, N remaining)
+
+**Common legitimate patterns** (suppress, don't fix):
+- Lock acquisition: `.unwrap()` on `Mutex::lock()` — poison = programmer error, panic correct
+- Regex compilation: `Regex::new("...").unwrap()` in `OnceLock`/`lazy_static` context
+- `from_utf8` on known-good bytes (e.g. ASCII constants)
+- `parse::<u32>()` on validated input (e.g. from tree-sitter integer nodes)
+- `unwrap_or_else(|_| unreachable!())` equivalents
+
+**Common fixable patterns**:
+- `.unwrap()` on `Option` from map/find — propagate with `?` or `ok_or`
+- `.unwrap()` in a function that already returns `Result` — use `?`
+- `.unwrap()` on env vars — return `Result<_, VarError>` instead
+- Error formatting helpers that swallow errors silently
+
+**Crate breakdown** (run `normalize rules run --engine syntax --rule rust/unwrap-in-impl <crate>`
+to get per-crate counts before dispatching agents):
+Expect heaviest: `normalize` (main), `normalize-facts`, `normalize-languages`, `normalize-manifest`
+
 ### Feature-gate CLI behind `cli` feature (workspace-wide)
 
 Every crate should be usable both as a library and as a standalone CLI tool. Library consumers shouldn't pull in clap; CLI users get a binary. This is a workspace-wide convention, not a one-off.
