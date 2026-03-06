@@ -68,19 +68,24 @@ enabled = true
 
 [analyze.rules."js/console-log"]
 enabled = true
-allow = ["**/fixtures/**"]
+# editors/vscode/: console.log is intentional lifecycle logging for VSCode extension host
+allow = ["**/fixtures/**", "editors/vscode/**"]
 
 [analyze.rules."js/unnecessary-const"]
 enabled = true
 
 [analyze.rules."python/print-debug"]
 enabled = true
+# cli-parser fixtures are example scripts showing what the parser handles, not production code
+allow = ["**/fixtures/**"]
 
 [analyze.rules."python/tuple-return"]
 enabled = true
 
 [analyze.rules."go/fmt-print"]
 enabled = true
+# cli-parser fixtures are example scripts showing what the parser handles, not production code
+allow = ["**/fixtures/**"]
 
 [analyze.rules."go/many-returns"]
 enabled = true
