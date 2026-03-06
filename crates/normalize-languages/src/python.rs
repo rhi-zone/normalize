@@ -1,6 +1,6 @@
 //! Python language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -21,66 +21,11 @@ impl Language for Python {
         "python"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        // Skip private methods unless they're dunder methods
-        // (visibility filtering can be done by caller)
-
-        // Check for async keyword as first child token
-        let is_async = node
-            .child(0)
-            .map(|c| &content[c.byte_range()] == "async")
-            .unwrap_or(false);
-        let prefix = if is_async { "async def" } else { "def" };
-
-        let params = node
-            .child_by_field_name("parameters")
-            .map(|p| &content[p.byte_range()])
-            .unwrap_or("()");
-
-        let return_type = node
-            .child_by_field_name("return_type")
-            .map(|r| format!(" -> {}", &content[r.byte_range()]))
-            .unwrap_or_default();
-
-        let signature = format!("{} {}{}{}", prefix, name, params, return_type);
-        let visibility = self.get_visibility(node, content);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: if in_container {
-                SymbolKind::Method
-            } else {
-                SymbolKind::Function
-            },
-            signature,
-            docstring: extract_docstring(node, content),
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_docstring(node, content)
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let bases = node
-            .child_by_field_name("superclasses")
-            .map(|b| &content[b.byte_range()])
-            .unwrap_or("");
-
-        let signature = if bases.is_empty() {
-            format!("class {}", name)
-        } else {
-            format!("class {}{}", name, bases)
-        };
-
-        // Extract superclasses from argument_list children
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         if let Some(superclasses) = node.child_by_field_name("superclasses") {
             let mut cursor = superclasses.walk();
@@ -90,25 +35,49 @@ impl Language for Python {
                 }
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Class,
-            signature,
-            docstring: extract_docstring(node, content),
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(), // Caller fills this in
-            is_interface_impl: false,
-            implements,
-        })
+        (false, implements)
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // Python classes are both containers and types
-        self.extract_container(node, content)
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        };
+
+        if node.kind() == "class_definition" {
+            let bases = node
+                .child_by_field_name("superclasses")
+                .map(|b| &content[b.byte_range()])
+                .unwrap_or("");
+            if bases.is_empty() {
+                format!("class {}", name)
+            } else {
+                format!("class {}{}", name, bases)
+            }
+        } else {
+            // function_definition / decorated_definition
+            let is_async = node
+                .child(0)
+                .map(|c| &content[c.byte_range()] == "async")
+                .unwrap_or(false);
+            let prefix = if is_async { "async def" } else { "def" };
+            let params = node
+                .child_by_field_name("parameters")
+                .map(|p| &content[p.byte_range()])
+                .unwrap_or("()");
+            let return_type = node
+                .child_by_field_name("return_type")
+                .map(|r| format!(" -> {}", &content[r.byte_range()]))
+                .unwrap_or_default();
+            format!("{} {}{}{}", prefix, name, params, return_type)
+        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -423,11 +392,11 @@ mod tests {
             .find(|n| n.kind() == "function_definition")
             .unwrap();
 
-        let sym = support.extract_function(&func, content, false).unwrap();
-        assert_eq!(sym.name, "foo");
-        assert_eq!(sym.kind, SymbolKind::Function);
-        assert!(sym.signature.contains("def foo(x: int) -> str"));
-        assert_eq!(sym.docstring, Some("Convert to string.".to_string()));
+        let sig = support.build_signature(&func, content);
+        let doc = support.extract_docstring(&func, content);
+        assert_eq!(support.node_name(&func, content), Some("foo"));
+        assert!(sig.contains("def foo(x: int) -> str"));
+        assert_eq!(doc, Some("Convert to string.".to_string()));
     }
 
     #[test]
@@ -446,11 +415,11 @@ mod tests {
             .find(|n| n.kind() == "class_definition")
             .unwrap();
 
-        let sym = support.extract_container(&class, content).unwrap();
-        assert_eq!(sym.name, "Foo");
-        assert_eq!(sym.kind, SymbolKind::Class);
-        assert!(sym.signature.contains("class Foo(Bar)"));
-        assert_eq!(sym.docstring, Some("A foo class.".to_string()));
+        let sig = support.build_signature(&class, content);
+        let doc = support.extract_docstring(&class, content);
+        assert_eq!(support.node_name(&class, content), Some("Foo"));
+        assert!(sig.contains("class Foo(Bar)"));
+        assert_eq!(doc, Some("A foo class.".to_string()));
     }
 
     #[test]

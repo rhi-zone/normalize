@@ -1,6 +1,6 @@
 //! Dart language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Dart language support.
@@ -21,72 +21,7 @@ impl Language for Dart {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let return_type = node
-            .child_by_field_name("return_type")
-            .map(|t| content[t.byte_range()].to_string());
-
-        let params = node
-            .child_by_field_name("formal_parameters")
-            .or_else(|| node.child_by_field_name("parameters"))
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        let is_method = node.kind().contains("method");
-        let kind = if is_method {
-            SymbolKind::Method
-        } else {
-            SymbolKind::Function
-        };
-
-        let signature = if let Some(ret) = return_type {
-            format!("{} {}{}", ret, name, params)
-        } else {
-            format!("{}{}", name, params)
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "enum_declaration" => (SymbolKind::Enum, "enum"),
-            "mixin_declaration" => (SymbolKind::Class, "mixin"),
-            "extension_declaration" => (SymbolKind::Class, "extension"),
-            _ => (SymbolKind::Class, "class"),
-        };
-
-        // Check for abstract
-        let is_abstract = node
-            .parent()
-            .map(|p| {
-                let text = &content[p.byte_range()];
-                text.contains("abstract ")
-            })
-            .unwrap_or(false);
-
-        let prefix = if is_abstract {
-            format!("abstract {}", keyword)
-        } else {
-            keyword.to_string()
-        };
-
-        // Extract extends (superclass) and implements (interfaces)
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -99,24 +34,56 @@ impl Language for Dart {
                 }
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", prefix, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
+        (false, implements)
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        };
+        match node.kind() {
+            k if k.contains("function") || k.contains("method") => {
+                let return_type = node
+                    .child_by_field_name("return_type")
+                    .map(|t| content[t.byte_range()].to_string());
+                let params = node
+                    .child_by_field_name("formal_parameters")
+                    .or_else(|| node.child_by_field_name("parameters"))
+                    .map(|p| content[p.byte_range()].to_string())
+                    .unwrap_or_else(|| "()".to_string());
+                if let Some(ret) = return_type {
+                    format!("{} {}{}", ret, name, params)
+                } else {
+                    format!("{}{}", name, params)
+                }
+            }
+            "class_declaration" => {
+                let is_abstract = node
+                    .parent()
+                    .map(|p| content[p.byte_range()].contains("abstract "))
+                    .unwrap_or(false);
+                if is_abstract {
+                    format!("abstract class {}", name)
+                } else {
+                    format!("class {}", name)
+                }
+            }
+            "enum_declaration" => format!("enum {}", name),
+            "mixin_declaration" => format!("mixin {}", name),
+            "extension_declaration" => format!("extension {}", name),
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
+        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -236,7 +203,7 @@ mod tests {
             "extension_body", "extension_type_declaration", "factory_constructor_signature",
             "finally_clause", "for_element", "for_loop_parts", "formal_parameter",
             "formal_parameter_list", "function_expression_body", "function_type",
-            "identifier", "identifier_dollar_escaped", "identifier_list",
+            "identifier_dollar_escaped", "identifier_list",
             "if_element", "if_null_expression", "import_or_export", "increment_operator",
             "inferred_type", "initialized_identifier", "initialized_identifier_list",
             "initialized_variable_definition", "initializer_list_entry", "interface",
@@ -284,6 +251,8 @@ mod tests {
             "library_export",
             "while_statement",
             "import_specification",
+            "method_signature",
+            "type_alias",
         ];
         validate_unused_kinds_audit(&Dart, documented_unused)
             .expect("Dart unused node kinds audit failed");

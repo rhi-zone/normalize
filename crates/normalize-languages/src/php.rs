@@ -1,6 +1,6 @@
 //! PHP language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// PHP language support.
@@ -21,57 +21,35 @@ impl Language for Php {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let params = node
-            .child_by_field_name("parameters")
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        let return_type = node
-            .child_by_field_name("return_type")
-            .map(|t| format!(": {}", content[t.byte_range()].trim()));
-
-        let kind = if node.kind() == "method_declaration" {
-            SymbolKind::Method
-        } else {
-            SymbolKind::Function
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                let text = &content[node.byte_range()];
+                return text.lines().next().unwrap_or(text).trim().to_string();
+            }
         };
-
-        let signature = format!(
-            "function {}{}{}",
-            name,
-            params,
-            return_type.unwrap_or_default()
-        );
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+        match node.kind() {
+            "function_declaration" | "method_declaration" => {
+                let params = node
+                    .child_by_field_name("parameters")
+                    .map(|p| content[p.byte_range()].to_string())
+                    .unwrap_or_else(|| "()".to_string());
+                let return_type = node
+                    .child_by_field_name("return_type")
+                    .map(|t| format!(": {}", content[t.byte_range()].trim()))
+                    .unwrap_or_default();
+                format!("function {}{}{}", name, params, return_type)
+            }
+            "interface_declaration" => format!("interface {}", name),
+            "trait_declaration" => format!("trait {}", name),
+            "enum_declaration" => format!("enum {}", name),
+            "namespace_definition" => format!("namespace {}", name),
+            _ => format!("class {}", name),
+        }
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "interface_declaration" => (SymbolKind::Interface, "interface"),
-            "trait_declaration" => (SymbolKind::Class, "trait"),
-            "enum_declaration" => (SymbolKind::Enum, "enum"),
-            "namespace_definition" => (SymbolKind::Module, "namespace"),
-            _ => (SymbolKind::Class, "class"),
-        };
-
-        // Extract base_clause (extends) and class_interface_clause (implements)
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -84,24 +62,7 @@ impl Language for Php {
                 }
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+        (false, implements)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

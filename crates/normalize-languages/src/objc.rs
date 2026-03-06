@@ -1,6 +1,6 @@
 //! Objective-C language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// Objective-C language support.
@@ -17,112 +17,9 @@ impl Language for ObjC {
         "objc"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        match node.kind() {
-            "method_declaration" | "function_definition" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "class_interface" | "class_implementation" | "protocol_declaration" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                // Extract superclass (second identifier after class name) and protocols
-                let mut implements = Vec::new();
-                let mut found_name = false;
-                for i in 0..node.child_count() {
-                    if let Some(child) = node.child(i as u32) {
-                        if child.kind() == "identifier" {
-                            if found_name {
-                                // Second identifier = superclass
-                                implements.push(content[child.byte_range()].to_string());
-                            } else {
-                                found_name = true;
-                            }
-                        } else if child.kind() == "parameterized_arguments"
-                            || child.kind() == "protocol_qualifiers"
-                        {
-                            for j in 0..child.child_count() {
-                                if let Some(proto) = child.child(j as u32)
-                                    && proto.kind() == "type_name"
-                                {
-                                    for k in 0..proto.child_count() {
-                                        if let Some(t) = proto.child(k as u32)
-                                            && t.kind() == "type_identifier"
-                                        {
-                                            implements.push(content[t.byte_range()].to_string());
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Class,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements,
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "struct_specifier" | "enum_specifier" | "type_definition" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Type,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let text = &content[node.byte_range()];
+        text.lines().next().unwrap_or(text).trim().to_string()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -294,8 +191,9 @@ mod tests {
             "preproc_else", "preproc_ifdef",
             // Other
             "method_parameter", "block_pointer_declarator", "abstract_function_declarator",
-            "bitfield_clause", "identifier", "struct_declarator", "gnu_asm_qualifier",
+            "bitfield_clause", "struct_declarator", "gnu_asm_qualifier",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "method_declaration",
             "while_statement",
             "for_statement",
             "switch_statement",

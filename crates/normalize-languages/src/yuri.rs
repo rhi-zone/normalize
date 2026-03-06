@@ -1,7 +1,6 @@
 //! Yuri language support (tree-sitter-yuri).
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// Yuri language support.
 pub struct Yuri;
@@ -15,15 +14,6 @@ impl Language for Yuri {
     }
     fn grammar_name(&self) -> &'static str {
         "yuri"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

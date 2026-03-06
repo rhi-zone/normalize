@@ -1,6 +1,6 @@
 //! Idris language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// Idris language support.
@@ -15,56 +15,6 @@ impl Language for Idris {
     }
     fn grammar_name(&self) -> &'static str {
         "idris"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        match node.kind() {
-            "function" | "signature" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "data" | "record" | "interface" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Type,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

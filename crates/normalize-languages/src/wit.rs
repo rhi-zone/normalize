@@ -1,6 +1,6 @@
 //! WebAssembly Interface Types (WIT) support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// WIT language support.
@@ -15,79 +15,6 @@ impl Language for Wit {
     }
     fn grammar_name(&self) -> &'static str {
         "wit"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "func_item" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: text.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let kind = match node.kind() {
-            "interface_item" => SymbolKind::Interface,
-            "world_item" => SymbolKind::Module,
-            _ => return None,
-        };
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let kind = match node.kind() {
-            "type_item" | "record_item" => SymbolKind::Type,
-            _ => return None,
-        };
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: text.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -151,6 +78,9 @@ mod tests {
             "resource_method",
             // Other
             "definitions", "body", "block_comment",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "interface_item",
+            "type_item",
         ];
         validate_unused_kinds_audit(&Wit, documented_unused)
             .expect("WIT unused node kinds audit failed");

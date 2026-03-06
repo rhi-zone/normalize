@@ -1,7 +1,6 @@
 //! Tree-sitter query language support.
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// Tree-sitter query language support.
 pub struct Query;
@@ -15,15 +14,6 @@ impl Language for Query {
     }
     fn grammar_name(&self) -> &'static str {
         "query"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
     }
 }
 

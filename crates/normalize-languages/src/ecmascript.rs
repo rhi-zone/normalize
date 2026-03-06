@@ -3,8 +3,68 @@
 //! This module contains common logic shared between JavaScript, TypeScript, and TSX.
 //! Each language struct delegates to these functions for DRY implementation.
 
-use crate::{Import, Symbol, SymbolKind, Visibility};
+use crate::Import;
 use tree_sitter::Node;
+
+// ============================================================================
+// Semantic hook helpers (for Language trait build_signature / extract_implements)
+// ============================================================================
+
+/// Build signature for a JS/TS function, method, or class node.
+pub fn build_signature(node: &Node, content: &str, name: &str) -> String {
+    match node.kind() {
+        "method_definition" | "method_signature" => {
+            let params = node
+                .child_by_field_name("parameters")
+                .map(|p| content[p.byte_range()].to_string())
+                .unwrap_or_else(|| "()".to_string());
+            format!("{}{}", name, params)
+        }
+        "function_declaration" | "generator_function_declaration" => {
+            let params = node
+                .child_by_field_name("parameters")
+                .map(|p| content[p.byte_range()].to_string())
+                .unwrap_or_else(|| "()".to_string());
+            format!("function {}{}", name, params)
+        }
+        "class_declaration" | "class" => format!("class {}", name),
+        "interface_declaration" => format!("interface {}", name),
+        "type_alias_declaration" => format!("type {}", name),
+        "enum_declaration" => format!("enum {}", name),
+        _ => {
+            let text = &content[node.byte_range()];
+            text.lines().next().unwrap_or(text).trim().to_string()
+        }
+    }
+}
+
+/// Extract implements/extends list for a JS/TS class or interface node.
+pub fn extract_implements(node: &Node, content: &str) -> (bool, Vec<String>) {
+    let mut implements = Vec::new();
+    for i in 0..node.child_count() as u32 {
+        if let Some(heritage) = node.child(i)
+            && heritage.kind() == "class_heritage"
+        {
+            for j in 0..heritage.child_count() as u32 {
+                if let Some(clause) = heritage.child(j) {
+                    if clause.kind() == "extends_clause" || clause.kind() == "implements_clause" {
+                        for k in 0..clause.child_count() as u32 {
+                            if let Some(type_node) = clause.child(k)
+                                && (type_node.kind() == "type_identifier"
+                                    || type_node.kind() == "identifier")
+                            {
+                                implements.push(content[type_node.byte_range()].to_string());
+                            }
+                        }
+                    } else if clause.kind() == "type_identifier" || clause.kind() == "identifier" {
+                        implements.push(content[clause.byte_range()].to_string());
+                    }
+                }
+            }
+        }
+    }
+    (false, implements)
+}
 
 // ============================================================================
 // Node kind constants
@@ -86,128 +146,7 @@ pub const NESTING_NODES: &[&str] = &[
 ];
 
 // ============================================================================
-// Symbol extraction
-// ============================================================================
-
-/// Extract a function/method symbol from a node.
-pub fn extract_function(node: &Node, content: &str, in_container: bool, name: &str) -> Symbol {
-    let params = node
-        .child_by_field_name("parameters")
-        .map(|p| content[p.byte_range()].to_string())
-        .unwrap_or_else(|| "()".to_string());
-
-    let signature = if node.kind() == "method_definition" {
-        format!("{}{}", name, params)
-    } else {
-        format!("function {}{}", name, params)
-    };
-
-    // Check for explicit override modifier (TypeScript)
-    let is_override = {
-        let mut cursor = node.walk();
-        let children: Vec<_> = node.children(&mut cursor).collect();
-        children
-            .iter()
-            .any(|child| child.kind() == "override_modifier")
-    };
-
-    Symbol {
-        name: name.to_string(),
-        kind: if in_container {
-            SymbolKind::Method
-        } else {
-            SymbolKind::Function
-        },
-        signature,
-        docstring: None,
-        attributes: Vec::new(),
-        start_line: node.start_position().row + 1,
-        end_line: node.end_position().row + 1,
-        visibility: Visibility::Public,
-        children: Vec::new(),
-        is_interface_impl: is_override,
-        implements: Vec::new(),
-    }
-}
-
-/// Extract a class or interface container symbol from a node.
-pub fn extract_container(node: &Node, content: &str, name: &str) -> Symbol {
-    let (kind, keyword) = if node.kind() == "interface_declaration" {
-        (SymbolKind::Interface, "interface")
-    } else {
-        (SymbolKind::Class, "class")
-    };
-
-    // Extract implements/extends clauses for semantic interface detection
-    let mut implements = Vec::new();
-    // Find class_heritage child node (not a field)
-    for i in 0..node.child_count() as u32 {
-        if let Some(heritage) = node.child(i)
-            && heritage.kind() == "class_heritage"
-        {
-            for j in 0..heritage.child_count() as u32 {
-                if let Some(clause) = heritage.child(j) {
-                    if clause.kind() == "extends_clause" || clause.kind() == "implements_clause" {
-                        // TypeScript: heritage > extends_clause/implements_clause > type_identifier
-                        for k in 0..clause.child_count() as u32 {
-                            if let Some(type_node) = clause.child(k)
-                                && (type_node.kind() == "type_identifier"
-                                    || type_node.kind() == "identifier")
-                            {
-                                implements.push(content[type_node.byte_range()].to_string());
-                            }
-                        }
-                    } else if clause.kind() == "type_identifier" || clause.kind() == "identifier" {
-                        // JavaScript: heritage > identifier (no clause wrapper)
-                        implements.push(content[clause.byte_range()].to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    Symbol {
-        name: name.to_string(),
-        kind,
-        signature: format!("{} {}", keyword, name),
-        docstring: None,
-        attributes: Vec::new(),
-        start_line: node.start_position().row + 1,
-        end_line: node.end_position().row + 1,
-        visibility: Visibility::Public,
-        children: Vec::new(),
-        is_interface_impl: false,
-        implements,
-    }
-}
-
-/// Extract a TypeScript type symbol (interface, type alias, enum).
-pub fn extract_type(node: &Node, name: &str) -> Option<Symbol> {
-    let (kind, keyword) = match node.kind() {
-        "interface_declaration" => (SymbolKind::Interface, "interface"),
-        "type_alias_declaration" => (SymbolKind::Type, "type"),
-        "enum_declaration" => (SymbolKind::Enum, "enum"),
-        "class_declaration" => (SymbolKind::Class, "class"),
-        _ => return None,
-    };
-
-    Some(Symbol {
-        name: name.to_string(),
-        kind,
-        signature: format!("{} {}", keyword, name),
-        docstring: None,
-        attributes: Vec::new(),
-        start_line: node.start_position().row + 1,
-        end_line: node.end_position().row + 1,
-        visibility: Visibility::Public,
-        children: Vec::new(),
-        is_interface_impl: false,
-        implements: Vec::new(),
-    })
-}
-
-// ============================================================================
-// Import/ extraction
+// Import/export extraction
 // ============================================================================
 
 /// Extract imports from an import_statement node.

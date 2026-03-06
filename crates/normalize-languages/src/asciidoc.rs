@@ -1,6 +1,6 @@
 //! AsciiDoc language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// AsciiDoc language support.
@@ -15,39 +15,6 @@ impl Language for AsciiDoc {
     }
     fn grammar_name(&self) -> &'static str {
         "asciidoc"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "section_block" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Module,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -111,6 +78,7 @@ mod tests {
             // Other content
             "body", "ident_block_line", "admonition_important",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "section_block",
             "block_macro",
         ];
         validate_unused_kinds_audit(&AsciiDoc, documented_unused)

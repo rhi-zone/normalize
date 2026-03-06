@@ -1,6 +1,6 @@
 //! Rust language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Rust language support.
@@ -21,151 +21,116 @@ impl Language for Rust {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        // Get visibility modifier
-        let mut vis = String::new();
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "visibility_modifier" {
-                vis = format!("{} ", &content[child.byte_range()]);
-                break;
-            }
-        }
-
-        let params = node
-            .child_by_field_name("parameters")
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        let return_type = node
-            .child_by_field_name("return_type")
-            .map(|r| format!(" -> {}", &content[r.byte_range()]))
-            .unwrap_or_default();
-
-        let signature = format!("{}fn {}{}{}", vis, name, params, return_type);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: if in_container {
-                SymbolKind::Method
-            } else {
-                SymbolKind::Function
-            },
-            signature,
-            docstring: extract_docstring(node, content),
-            attributes: extract_attributes(node, content),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_docstring(node, content)
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_attributes(node, content)
+    }
+
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+        if node.kind() == "impl_item" {
+            let type_node = match node.child_by_field_name("type") {
+                Some(n) => n,
+                None => return (false, Vec::new()),
+            };
+            let _ = &content[type_node.byte_range()]; // used below
+            let is_trait_impl = node.child_by_field_name("trait").is_some();
+            let implements = if let Some(trait_node) = node.child_by_field_name("trait") {
+                vec![content[trait_node.byte_range()].to_string()]
+            } else {
+                Vec::new()
+            };
+            (is_trait_impl, implements)
+        } else {
+            (false, Vec::new())
+        }
+    }
+
+    fn refine_kind(
+        &self,
+        node: &Node,
+        _content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
         match node.kind() {
+            "struct_item" => crate::SymbolKind::Struct,
+            "enum_item" => crate::SymbolKind::Enum,
+            "type_item" => crate::SymbolKind::Type,
+            "union_item" => crate::SymbolKind::Struct,
+            "trait_item" => crate::SymbolKind::Trait,
+            _ => tag_kind,
+        }
+    }
+
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        match node.kind() {
+            "function_item" | "function_signature_item" => {
+                let name = match self.node_name(node, content) {
+                    Some(n) => n,
+                    None => {
+                        return content[node.byte_range()]
+                            .lines()
+                            .next()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+                    }
+                };
+                let vis = self.extract_visibility_prefix(node, content);
+                let params = node
+                    .child_by_field_name("parameters")
+                    .map(|p| content[p.byte_range()].to_string())
+                    .unwrap_or_else(|| "()".to_string());
+                let return_type = node
+                    .child_by_field_name("return_type")
+                    .map(|r| format!(" -> {}", &content[r.byte_range()]))
+                    .unwrap_or_default();
+                format!("{}fn {}{}{}", vis, name, params, return_type)
+            }
             "impl_item" => {
-                let type_node = node.child_by_field_name("type")?;
-                let type_name = &content[type_node.byte_range()];
-
-                // Check if this is a trait impl (impl Trait for Type)
-                let is_trait_impl = node.child_by_field_name("trait").is_some();
-
-                let (signature, implements) =
-                    if let Some(trait_node) = node.child_by_field_name("trait") {
-                        let trait_name = &content[trait_node.byte_range()];
-                        (
-                            format!("impl {} for {}", trait_name, type_name),
-                            vec![trait_name.to_string()],
-                        )
-                    } else {
-                        (format!("impl {}", type_name), Vec::new())
-                    };
-
-                Some(Symbol {
-                    name: type_name.to_string(),
-                    kind: SymbolKind::Module, // impl blocks are like modules
-                    signature,
-                    docstring: None,
-                    attributes: extract_attributes(node, content),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: is_trait_impl,
-                    implements,
-                })
+                let type_node = node.child_by_field_name("type");
+                let type_name = type_node
+                    .map(|n| content[n.byte_range()].to_string())
+                    .unwrap_or_default();
+                if let Some(trait_node) = node.child_by_field_name("trait") {
+                    let trait_name = &content[trait_node.byte_range()];
+                    format!("impl {} for {}", trait_name, type_name)
+                } else {
+                    format!("impl {}", type_name)
+                }
             }
             "trait_item" => {
-                let name = self.node_name(node, content)?;
+                let name = self.node_name(node, content).unwrap_or("");
                 let vis = self.extract_visibility_prefix(node, content);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Trait,
-                    signature: format!("{}trait {}", vis, name),
-                    docstring: extract_docstring(node, content),
-                    attributes: extract_attributes(node, content),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
+                format!("{}trait {}", vis, name)
             }
             "mod_item" => {
-                // Only extract inline mod blocks (with declaration_list), not `mod foo;` declarations
-                node.child_by_field_name("body")?;
-                let name = self.node_name(node, content)?;
+                let name = self.node_name(node, content).unwrap_or("");
                 let vis = self.extract_visibility_prefix(node, content);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Module,
-                    signature: format!("{}mod {}", vis, name),
-                    docstring: extract_docstring(node, content),
-                    attributes: extract_attributes(node, content),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
+                format!("{}mod {}", vis, name)
             }
-            _ => None,
+            "struct_item" => {
+                let name = self.node_name(node, content).unwrap_or("");
+                let vis = self.extract_visibility_prefix(node, content);
+                format!("{}struct {}", vis, name)
+            }
+            "enum_item" => {
+                let name = self.node_name(node, content).unwrap_or("");
+                let vis = self.extract_visibility_prefix(node, content);
+                format!("{}enum {}", vis, name)
+            }
+            "type_item" => {
+                let name = self.node_name(node, content).unwrap_or("");
+                let vis = self.extract_visibility_prefix(node, content);
+                format!("{}type {}", vis, name)
+            }
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
         }
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let vis = self.extract_visibility_prefix(node, content);
-
-        let (kind, keyword) = match node.kind() {
-            "struct_item" => (SymbolKind::Struct, "struct"),
-            "enum_item" => (SymbolKind::Enum, "enum"),
-            "type_item" => (SymbolKind::Type, "type"),
-            "trait_item" => (SymbolKind::Trait, "trait"),
-            _ => return None,
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{}{} {}", vis, keyword, name),
-            docstring: extract_docstring(node, content),
-            attributes: extract_attributes(node, content),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

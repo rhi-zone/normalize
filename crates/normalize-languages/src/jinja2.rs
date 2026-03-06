@@ -1,7 +1,6 @@
 //! Jinja2 template support.
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// Jinja2 language support.
 pub struct Jinja2;
@@ -15,16 +14,6 @@ impl Language for Jinja2 {
     }
     fn grammar_name(&self) -> &'static str {
         "jinja2"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        // Jinja2 grammar is minimal - only basic tokens, no structured nodes
-        None
     }
 }
 

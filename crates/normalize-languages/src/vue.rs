@@ -1,7 +1,7 @@
 //! Vue language support.
 
 use crate::component::extract_embedded_content;
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// Vue language support.
@@ -16,23 +16,6 @@ impl Language for Vue {
     }
     fn grammar_name(&self) -> &'static str {
         "vue"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: format!("function {}", name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {

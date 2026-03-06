@@ -1,6 +1,6 @@
 //! Elixir language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Elixir language support.
@@ -21,70 +21,20 @@ impl Language for Elixir {
         " end"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
+    fn build_signature(&self, node: &Node, content: &str) -> String {
         if node.kind() != "call" {
-            return None;
+            let text = &content[node.byte_range()];
+            return text.lines().next().unwrap_or(text).trim().to_string();
         }
-
         let text = &content[node.byte_range()];
-        let is_private = if text.starts_with("defp ") || text.starts_with("defmacrop ") {
-            true
-        } else if text.starts_with("def ") || text.starts_with("defmacro ") {
-            false
-        } else {
-            return None;
-        };
-
-        let name = self.extract_def_name(node, content)?;
-
-        // Extract first line as signature
-        let first_line = text.lines().next().unwrap_or(text);
-        let signature = first_line.trim_end_matches(" do").to_string();
-
-        Some(Symbol {
-            name,
-            kind: SymbolKind::Function,
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if is_private {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "call" {
-            return None;
+        if text.starts_with("defmodule ")
+            && let Some(name) = self.extract_module_name(node, content)
+        {
+            return format!("defmodule {}", name);
         }
-
-        let text = &content[node.byte_range()];
-        if !text.starts_with("defmodule ") {
-            return None;
-        }
-
-        let name = self.extract_module_name(node, content)?;
-
-        Some(Symbol {
-            name: name.clone(),
-            kind: SymbolKind::Module,
-            signature: format!("defmodule {}", name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+        // For def/defp/defmacro: take first line, trim trailing " do"
+        let first_line = text.lines().next().unwrap_or(text).trim();
+        first_line.trim_end_matches(" do").to_string()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -187,27 +137,6 @@ impl Language for Elixir {
 }
 
 impl Elixir {
-    fn extract_def_name(&self, node: &Node, content: &str) -> Option<String> {
-        // Look for the function name after def/defp
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "call" || child.kind() == "identifier" {
-                let text = &content[child.byte_range()];
-                // Extract just the name (before parentheses)
-                let name = text.split('(').next().unwrap_or(text).trim();
-                if !name.is_empty()
-                    && name != "def"
-                    && name != "defp"
-                    && name != "defmacro"
-                    && name != "defmacrop"
-                {
-                    return Some(name.to_string());
-                }
-            }
-        }
-        None
-    }
-
     fn extract_module_name(&self, node: &Node, content: &str) -> Option<String> {
         // Look for the module name after defmodule
         let mut cursor = node.walk();

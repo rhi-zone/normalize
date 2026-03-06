@@ -1,6 +1,6 @@
 //! Gleam language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Gleam language support.
@@ -15,70 +15,6 @@ impl Language for Gleam {
     }
     fn grammar_name(&self) -> &'static str {
         "gleam"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "function" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-        let is_public = text.starts_with("pub ");
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if is_public {
-                Visibility::Public
-            } else {
-                Visibility::Private
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-        let is_public = text.starts_with("pub ");
-
-        let kind = match node.kind() {
-            "type_definition" => SymbolKind::Type,
-            "type_alias" => SymbolKind::Type,
-            _ => return None,
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if is_public {
-                Visibility::Public
-            } else {
-                Visibility::Private
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

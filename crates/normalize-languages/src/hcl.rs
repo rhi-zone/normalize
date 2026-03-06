@@ -1,6 +1,6 @@
 //! HCL (HashiCorp Configuration Language) support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// HCL language support (Terraform, Packer, etc.).
@@ -15,44 +15,6 @@ impl Language for Hcl {
     }
     fn grammar_name(&self) -> &'static str {
         "hcl"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "block" {
-            return None;
-        }
-
-        let (block_type, name) = self.extract_block_info(node, content)?;
-
-        let kind = match block_type.as_str() {
-            "resource" | "data" => SymbolKind::Struct,
-            "module" => SymbolKind::Module,
-            "provider" => SymbolKind::Class,
-            _ => SymbolKind::Variable,
-        };
-
-        Some(Symbol {
-            name: name.clone(),
-            kind,
-            signature: format!("{} \"{}\"", block_type, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -171,6 +133,8 @@ mod tests {
             "block_end", "block_start",
             // Comprehension — not a definition construct
             "for_expr",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "block",
         ];
         validate_unused_kinds_audit(&Hcl, documented_unused)
             .expect("HCL unused node kinds audit failed");

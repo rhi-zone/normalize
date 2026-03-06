@@ -1,6 +1,6 @@
 //! XML language support.
 
-use crate::{Language, Symbol, SymbolKind, Visibility};
+use crate::Language;
 use tree_sitter::Node;
 
 /// XML language support.
@@ -19,48 +19,6 @@ impl Language for Xml {
 
     fn has_symbols(&self) -> bool {
         false
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "element" {
-            return None;
-        }
-
-        // Find the tag name from start_tag
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "start_tag" || child.kind() == "self_closing_tag" {
-                let mut inner_cursor = child.walk();
-                for inner in child.children(&mut inner_cursor) {
-                    if inner.kind() == "tag_name" {
-                        let name = content[inner.byte_range()].to_string();
-                        return Some(Symbol {
-                            name: name.clone(),
-                            kind: SymbolKind::Module,
-                            signature: format!("<{}>", name),
-                            docstring: None,
-                            attributes: Vec::new(),
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            visibility: Visibility::Public,
-                            children: Vec::new(),
-                            is_interface_impl: false,
-                            implements: Vec::new(),
-                        });
-                    }
-                }
-            }
-        }
-        None
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

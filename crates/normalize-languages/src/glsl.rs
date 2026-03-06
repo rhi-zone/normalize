@@ -1,6 +1,6 @@
 //! GLSL (OpenGL Shading Language) support.
 
-use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Language};
 use tree_sitter::Node;
 
 /// GLSL language support.
@@ -15,34 +15,6 @@ impl Language for Glsl {
     }
     fn grammar_name(&self) -> &'static str {
         "glsl"
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "struct_specifier" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Struct,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -101,6 +73,8 @@ mod tests {
             "type_descriptor", "type_identifier", "type_qualifier", "unary_expression",
             "union_specifier", "update_expression",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "function_definition",
+            "struct_specifier",
             "switch_statement",
             "if_statement",
             "while_statement",

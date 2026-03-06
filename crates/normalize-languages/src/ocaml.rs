@@ -1,6 +1,6 @@
 //! OCaml language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// OCaml language support.
@@ -15,38 +15,6 @@ impl Language for OCaml {
     }
     fn grammar_name(&self) -> &'static str {
         "ocaml"
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let (kind, keyword) = match node.kind() {
-            "module_definition" => (SymbolKind::Module, "module"),
-            "module_type_definition" => (SymbolKind::Interface, "module type"),
-            "type_definition" => (SymbolKind::Type, "type"),
-            _ => return None,
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "type_definition" {
-            return None;
-        }
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

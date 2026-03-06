@@ -1,7 +1,6 @@
 //! SPARQL query language support.
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// SPARQL language support.
 pub struct Sparql;
@@ -15,15 +14,6 @@ impl Language for Sparql {
     }
     fn grammar_name(&self) -> &'static str {
         "sparql"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
     }
 }
 

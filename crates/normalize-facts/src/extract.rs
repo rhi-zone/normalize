@@ -552,11 +552,46 @@ struct TagDef<'tree> {
     end_line: usize,
 }
 
+/// Build a `Symbol` from a single `TagDef` using the Language semantic hooks.
+fn build_symbol_from_def<'tree>(
+    def: &TagDef<'tree>,
+    content: &str,
+    support: &dyn Language,
+    in_container: bool,
+) -> Option<Symbol> {
+    let name = support.node_name(&def.node, content)?;
+    let tag_kind = support.refine_kind(&def.node, content, def.kind);
+    let kind =
+        if def.is_method_capture || (in_container && matches!(tag_kind, SymbolKind::Function)) {
+            SymbolKind::Method
+        } else {
+            tag_kind
+        };
+    let (is_interface_impl, implements) = if def.is_container {
+        support.extract_implements(&def.node, content)
+    } else {
+        (false, Vec::new())
+    };
+    Some(Symbol {
+        name: name.to_string(),
+        kind,
+        signature: support.build_signature(&def.node, content),
+        docstring: support.extract_docstring(&def.node, content),
+        attributes: support.extract_attributes(&def.node, content),
+        start_line: def.node.start_position().row + 1,
+        end_line: def.node.end_position().row + 1,
+        visibility: support.get_visibility(&def.node, content),
+        children: Vec::new(),
+        is_interface_impl,
+        implements,
+    })
+}
+
 /// Extract symbols from a parsed tree using a tags query.
 ///
 /// Uses the tags query for *node classification* (which nodes are which kind of def),
-/// then calls the standard `Language` trait extraction methods on those nodes for
-/// symbol content (name, signature, visibility, docstring, implements, etc.).
+/// then calls the Language semantic hooks on those nodes for symbol content
+/// (name, signature, visibility, docstring, implements, attributes, etc.).
 ///
 /// Nesting is reconstructed by line-range containment: a def whose line range is
 /// fully enclosed by a container def is placed as a child of that container.
@@ -661,65 +696,24 @@ fn collect_symbols_from_tags<'tree>(
 
         let in_container = enclosing_ci.is_some();
 
-        if def.is_container {
-            // Use extract_container for the full Symbol (includes implements, etc.).
-            // Fall back to extract_type if the Language impl doesn't handle this node
-            // kind as a container (e.g. Rust's struct_item is typed, not a container).
-            // If neither works, the tags query classified a node incorrectly for this
-            // language — signal failure so the caller falls back to the trait path.
-            let sym_opt = support
-                .extract_container(&def.node, content)
-                .or_else(|| support.extract_type(&def.node, content));
-            // The tags query identified this node as a container but the Language
-            // impl doesn't know how to extract it. Abort and fall back.
-            let mut sym = sym_opt?;
-            if !include_private
-                && matches!(
-                    sym.visibility,
-                    Visibility::Private | Visibility::Protected | Visibility::Internal
-                )
-            {
-                continue;
-            }
-            // Container body children will be filled by the leaf pass below.
-            // Clear any children that extract_container may have populated
-            // (we reconstruct nesting ourselves from the tags list).
-            sym.children.clear();
+        let mut sym = build_symbol_from_def(def, content, support, in_container)?;
 
+        if !include_private
+            && matches!(
+                sym.visibility,
+                Visibility::Private | Visibility::Protected | Visibility::Internal
+            )
+        {
+            continue;
+        }
+
+        if def.is_container {
+            // Container body children will be filled by the leaf pass below.
+            sym.children.clear();
             let pos = top_level.len();
             container_top_idx.insert(i, pos);
             top_level.push(sym);
         } else {
-            // Leaf: function, method, type, constant.
-            let sym_opt = match def.kind {
-                SymbolKind::Type => support
-                    .extract_type(&def.node, content)
-                    .or_else(|| support.extract_function(&def.node, content, in_container)),
-                SymbolKind::Constant | SymbolKind::Variable => support
-                    .extract_type(&def.node, content)
-                    .or_else(|| support.extract_function(&def.node, content, in_container)),
-                _ => support.extract_function(&def.node, content, in_container),
-            };
-
-            let mut sym = match sym_opt {
-                Some(s) => s,
-                None => continue,
-            };
-
-            if !include_private
-                && matches!(
-                    sym.visibility,
-                    Visibility::Private | Visibility::Protected | Visibility::Internal
-                )
-            {
-                continue;
-            }
-
-            // Re-classify to Method if this def is inside a container or was tagged method.
-            if def.is_method_capture || in_container {
-                sym.kind = SymbolKind::Method;
-            }
-
             match enclosing_ci.and_then(|&ci| container_top_idx.get(&ci)) {
                 Some(&pos) => top_level[pos].children.push(sym),
                 None => top_level.push(sym),

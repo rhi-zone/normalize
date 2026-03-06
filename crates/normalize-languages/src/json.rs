@@ -1,6 +1,6 @@
 //! JSON language support.
 
-use crate::{Language, Symbol, SymbolKind, Visibility};
+use crate::Language;
 use tree_sitter::Node;
 
 /// JSON language support.
@@ -23,36 +23,6 @@ impl Language for Json {
 
     // JSON is data, not code - no functions/types/control flow
     // "pair" nodes are key-value pairs that we extract as symbols
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // Extract JSON key-value pairs as symbols
-        // node.kind() is already "pair" from container_kinds()
-        let key = node.child_by_field_name("key")?;
-        let key_text = content[key.byte_range()].trim_matches('"');
-
-        Some(Symbol {
-            name: key_text.to_string(),
-            kind: SymbolKind::Variable,
-            signature: key_text.to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None

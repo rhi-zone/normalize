@@ -1,6 +1,6 @@
 //! C++ language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// C++ language support.
@@ -21,38 +21,7 @@ impl Language for Cpp {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
-        let declarator = node.child_by_field_name("declarator")?;
-        let name = find_identifier(&declarator, content)?;
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: if in_container {
-                SymbolKind::Method
-            } else {
-                SymbolKind::Function
-            },
-            signature: name.to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let kind = if node.kind() == "class_specifier" {
-            SymbolKind::Class
-        } else {
-            SymbolKind::Struct
-        };
-
-        // Extract base classes from base_class_clause
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -65,24 +34,33 @@ impl Language for Cpp {
                 }
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", kind.as_str(), name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
+        (false, implements)
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        match node.kind() {
+            "function_definition" => {
+                if let Some(declarator) = node.child_by_field_name("declarator")
+                    && let Some(name) = find_identifier(&declarator, content)
+                {
+                    return name.to_string();
+                }
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
+            "class_specifier" => {
+                let name = self.node_name(node, content).unwrap_or("");
+                format!("class {}", name)
+            }
+            "struct_specifier" => {
+                let name = self.node_name(node, content).unwrap_or("");
+                format!("struct {}", name)
+            }
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
+        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -335,6 +313,7 @@ mod tests {
             "seh_leave_statement",     // __leave
             "seh_try_statement",       // __try
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "function_definition",
             "case_statement",
             "for_range_loop",
             "conditional_expression",

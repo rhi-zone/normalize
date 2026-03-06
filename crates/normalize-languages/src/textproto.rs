@@ -1,7 +1,6 @@
 //! Protocol Buffers text format support.
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// TextProto language support.
 pub struct TextProto;
@@ -15,15 +14,6 @@ impl Language for TextProto {
     }
     fn grammar_name(&self) -> &'static str {
         "textproto"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
     }
 }
 

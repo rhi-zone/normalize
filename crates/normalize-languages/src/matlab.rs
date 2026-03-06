@@ -1,6 +1,6 @@
 //! MATLAB language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// MATLAB language support.
@@ -15,100 +15,6 @@ impl Language for Matlab {
     }
     fn grammar_name(&self) -> &'static str {
         "matlab"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "function_definition" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "class_definition" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        // Extract superclasses from superclasses > property_name > identifier
-        let mut implements = Vec::new();
-        for i in 0..node.child_count() {
-            if let Some(child) = node.child(i as u32)
-                && child.kind() == "superclasses"
-            {
-                for j in 0..child.child_count() {
-                    if let Some(prop) = child.child(j as u32)
-                        && prop.kind() == "property_name"
-                    {
-                        for k in 0..prop.child_count() {
-                            if let Some(id) = prop.child(k as u32)
-                                && id.kind() == "identifier"
-                            {
-                                implements.push(content[id.byte_range()].to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Class,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "class_definition" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Type,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -203,6 +109,8 @@ mod tests {
             "function_call", "function_output", "function_signature", "identifier", "lambda",
             "parfor_options", "validation_functions",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "class_definition",
+            "function_definition",
             "if_statement",
             "catch_clause",
             "switch_statement",

@@ -1,6 +1,6 @@
 //! Vim script language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Vim script language support.
@@ -15,57 +15,6 @@ impl Language for Vim {
     }
     fn grammar_name(&self) -> &'static str {
         "vim"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        let visibility = if name.starts_with("s:") {
-            Visibility::Private
-        } else {
-            Visibility::Public
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() == "augroup" {
-            let text = &content[node.byte_range()];
-            let name = text
-                .split_whitespace()
-                .nth(1)
-                .unwrap_or("unnamed")
-                .to_string();
-            return Some(Symbol {
-                name: name.clone(),
-                kind: SymbolKind::Module,
-                signature: format!("augroup {}", name),
-                docstring: None,
-                attributes: Vec::new(),
-                start_line: node.start_position().row + 1,
-                end_line: node.end_position().row + 1,
-                visibility: Visibility::Public,
-                children: Vec::new(),
-                is_interface_impl: false,
-                implements: Vec::new(),
-            });
-        }
-        self.extract_function(node, content, false)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -156,6 +105,8 @@ mod tests {
             // Control flow — not definition constructs
             "elseif_statement", "for_loop", "if_statement", "source_statement",
             "try_statement", "runtime_statement", "while_loop",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "function_definition",
         ];
         validate_unused_kinds_audit(&Vim, documented_unused)
             .expect("Vim unused node kinds audit failed");

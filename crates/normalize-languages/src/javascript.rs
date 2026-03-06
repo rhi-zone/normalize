@@ -1,7 +1,7 @@
 //! JavaScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Import, Language, Symbol};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// JavaScript language support.
@@ -22,24 +22,23 @@ impl Language for JavaScript {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(ecmascript::extract_function(
-            node,
-            content,
-            in_container,
-            name,
-        ))
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+        ecmascript::extract_implements(node, content)
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(ecmascript::extract_container(node, content, name))
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // JS classes are the only type-like construct
-        self.extract_container(node, content)
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        };
+        ecmascript::build_signature(node, content, name)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

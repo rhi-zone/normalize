@@ -1,6 +1,6 @@
 //! GraphQL language support.
 
-use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility, simple_symbol};
+use crate::{ContainerBody, Language};
 use tree_sitter::Node;
 
 /// GraphQL language support.
@@ -41,49 +41,29 @@ impl Language for GraphQL {
         "graphql"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_symbol(node, content, name, SymbolKind::Method, None))
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = self.node_name(node, content).unwrap_or("");
+        let keyword = match node.kind() {
+            "interface_type_definition" => "interface",
+            "enum_type_definition" => "enum",
+            "union_type_definition" => "union",
+            "input_object_type_definition" => "input",
+            "scalar_type_definition" => "scalar",
+            _ => "type",
+        };
+        format!("{} {}", keyword, name)
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "interface_type_definition" => (SymbolKind::Interface, "interface"),
-            "enum_type_definition" => (SymbolKind::Enum, "enum"),
-            "union_type_definition" => (SymbolKind::Enum, "union"),
-            "input_object_type_definition" => (SymbolKind::Struct, "input"),
-            "scalar_type_definition" => (SymbolKind::Type, "scalar"),
-            _ => (SymbolKind::Struct, "type"),
-        };
-
-        // Extract implements_interfaces (recursive: implements_interfaces > named_type > name)
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i as u32)
                 && child.kind() == "implements_interfaces"
             {
-                Self::collect_named_types(&child, &mut implements, content);
+                GraphQL::collect_named_types(&child, &mut implements, content);
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+        (false, implements)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -128,7 +108,7 @@ mod tests {
         let documented_unused: &[&str] = &[
             "argument", "directive", "enum_value", "enum_value_definition",
             "enum_values_definition", "executable_definition", "field",
-            "fields_definition", "fragment_definition", "fragment_spread",
+            "fields_definition", "fragment_spread",
             "implements_interfaces", "inline_fragment", "input_fields_definition",
             "input_value_definition", "named_type", "type", "type_condition",
             "type_definition", "type_extension", "type_system_definition",
@@ -138,12 +118,6 @@ mod tests {
             "root_operation_type_definition", "scalar_type_extension", "schema_definition",
             "enum_type_extension", "input_object_type_extension", "interface_type_extension",
             "type_system_directive_location", "union_type_extension", "variable_definitions",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "scalar_type_definition",
-            "union_type_definition",
-            "field_definition",
-            "input_object_type_definition",
-            "enum_type_definition",
         ];
         validate_unused_kinds_audit(&GraphQL, documented_unused)
             .expect("GraphQL unused node kinds audit failed");

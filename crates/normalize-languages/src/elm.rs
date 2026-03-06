@@ -1,6 +1,6 @@
 //! Elm language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Elm language support.
@@ -15,35 +15,6 @@ impl Language for Elm {
     }
     fn grammar_name(&self) -> &'static str {
         "elm"
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let (kind, keyword) = match node.kind() {
-            "module_declaration" => (SymbolKind::Module, "module"),
-            "type_alias_declaration" => (SymbolKind::Type, "type alias"),
-            "type_declaration" => (SymbolKind::Enum, "type"),
-            _ => return None,
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

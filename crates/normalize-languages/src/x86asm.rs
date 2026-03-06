@@ -1,7 +1,6 @@
 //! x86 assembly support.
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// x86 Assembly language support.
 pub struct X86Asm;
@@ -15,15 +14,6 @@ impl Language for X86Asm {
     }
     fn grammar_name(&self) -> &'static str {
         "x86asm"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
     }
 }
 

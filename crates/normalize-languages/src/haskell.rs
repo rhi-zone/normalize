@@ -1,6 +1,6 @@
 //! Haskell language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// Haskell language support.
@@ -15,74 +15,6 @@ impl Language for Haskell {
     }
     fn grammar_name(&self) -> &'static str {
         "haskell"
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let (kind, keyword) = match node.kind() {
-            "data_type" => (SymbolKind::Struct, "data"),
-            "newtype" => (SymbolKind::Struct, "newtype"),
-            "type_synomym" => (SymbolKind::Type, "type"),
-            "class" => (SymbolKind::Interface, "class"),
-            "instance" => {
-                // instance MyClass Foo where ...
-                // name = "MyClass" (typeclass), type_patterns contains "Foo" (implementing type)
-                let implements = vec![name.to_string()];
-                // Try to get the implementing type from type_patterns for a better signature
-                let mut type_name = None;
-                for i in 0..node.child_count() {
-                    if let Some(child) = node.child(i as u32)
-                        && child.kind() == "type_patterns"
-                    {
-                        let mut cursor = child.walk();
-                        for tp_child in child.children(&mut cursor) {
-                            if tp_child.kind() == "name" {
-                                type_name = Some(content[tp_child.byte_range()].to_string());
-                                break;
-                            }
-                        }
-                    }
-                }
-                let sig = if let Some(ref tn) = type_name {
-                    format!("instance {} {}", name, tn)
-                } else {
-                    format!("instance {}", name)
-                };
-                return Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Class,
-                    signature: sig,
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: true,
-                    implements,
-                });
-            }
-            _ => return None,
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

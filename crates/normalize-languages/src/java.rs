@@ -1,6 +1,6 @@
 //! Java language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Java language support.
@@ -21,52 +21,7 @@ impl Language for Java {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let params = node
-            .child_by_field_name("parameters")
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        // Check for @Override annotation
-        let is_override = if let Some(mods) = node.child_by_field_name("modifiers") {
-            let mut cursor = mods.walk();
-            let children: Vec<_> = mods.children(&mut cursor).collect();
-            children.iter().any(|child| {
-                child.kind() == "marker_annotation"
-                    && child
-                        .child(1)
-                        .map(|id| &content[id.byte_range()] == "Override")
-                        .unwrap_or(false)
-            })
-        } else {
-            false
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Method,
-            signature: format!("{}{}", name, params),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: is_override,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let kind = match node.kind() {
-            "interface_declaration" => SymbolKind::Interface,
-            "enum_declaration" => SymbolKind::Enum,
-            _ => SymbolKind::Class,
-        };
-
-        // Extract extends (superclass) and implements (super_interfaces > type_list)
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -91,24 +46,37 @@ impl Language for Java {
                 }
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", kind.as_str(), name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
+        (false, implements)
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        };
+        match node.kind() {
+            "method_declaration" | "constructor_declaration" => {
+                let params = node
+                    .child_by_field_name("parameters")
+                    .map(|p| content[p.byte_range()].to_string())
+                    .unwrap_or_else(|| "()".to_string());
+                format!("{}{}", name, params)
+            }
+            "class_declaration" => format!("class {}", name),
+            "interface_declaration" => format!("interface {}", name),
+            "enum_declaration" => format!("enum {}", name),
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
+        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

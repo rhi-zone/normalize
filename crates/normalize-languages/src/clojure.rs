@@ -1,6 +1,6 @@
 //! Clojure language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Clojure language support.
@@ -15,72 +15,6 @@ impl Language for Clojure {
     }
     fn grammar_name(&self) -> &'static str {
         "clojure"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "list_lit" {
-            return None;
-        }
-
-        let (form, name) = self.extract_def_form(node, content)?;
-
-        if !matches!(form.as_str(), "defn" | "defn-" | "defmacro" | "defmethod") {
-            return None;
-        }
-
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name,
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if form == "defn-" {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "list_lit" {
-            return None;
-        }
-
-        let (form, name) = self.extract_def_form(node, content)?;
-
-        let kind = match form.as_str() {
-            "ns" => SymbolKind::Module,
-            "defrecord" | "deftype" => SymbolKind::Struct,
-            "defprotocol" => SymbolKind::Interface,
-            _ => return None,
-        };
-
-        Some(Symbol {
-            name: name.clone(),
-            kind,
-            signature: format!("({} {})", form, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

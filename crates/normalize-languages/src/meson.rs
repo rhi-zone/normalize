@@ -1,6 +1,6 @@
 //! Meson build system support.
 
-use crate::{Import, Language, Symbol};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Meson language support.
@@ -15,15 +15,6 @@ impl Language for Meson {
     }
     fn grammar_name(&self) -> &'static str {
         "meson"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None // Meson uses function calls, not definitions
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -86,6 +77,7 @@ mod tests {
             // Expression-related
             "formatunit", "identifier", "operatorunit", "ternaryoperator",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "expression_statement",
             "foreach_command",
             "if_condition",
             "if_command",

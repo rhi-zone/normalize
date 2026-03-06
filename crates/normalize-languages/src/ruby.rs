@@ -1,6 +1,6 @@
 //! Ruby language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// Ruby language support.
@@ -21,32 +21,7 @@ impl Language for Ruby {
         "; end"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Method,
-            signature: format!("def {}", name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let kind = if node.kind() == "module" {
-            SymbolKind::Module
-        } else {
-            SymbolKind::Class
-        };
-
-        // Extract superclass from superclass node (Ruby: constant, not identifier)
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -59,24 +34,30 @@ impl Language for Ruby {
                 }
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", kind.as_str(), name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
+        (false, implements)
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        };
+        match node.kind() {
+            "method" | "singleton_method" => format!("def {}", name),
+            "class" => format!("class {}", name),
+            "module" => format!("module {}", name),
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
+        }
     }
 
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {

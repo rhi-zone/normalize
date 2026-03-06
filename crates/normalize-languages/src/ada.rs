@@ -1,6 +1,6 @@
 //! Ada language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// Ada language support.
@@ -15,83 +15,6 @@ impl Language for Ada {
     }
     fn grammar_name(&self) -> &'static str {
         "ada"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        match node.kind() {
-            "subprogram_declaration" | "subprogram_body" | "expression_function_declaration" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "package_declaration" | "package_body" | "generic_package_declaration" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Module,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "full_type_declaration"
-            | "private_type_declaration"
-            | "incomplete_type_declaration" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Type,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

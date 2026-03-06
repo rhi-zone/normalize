@@ -1,6 +1,6 @@
 //! F# language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// F# language support.
@@ -17,61 +17,9 @@ impl Language for FSharp {
         "fsharp"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        // Extract first line as signature
+    fn build_signature(&self, node: &Node, content: &str) -> String {
         let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        let is_member = node.kind() == "member_defn";
-        let kind = if is_member {
-            SymbolKind::Method
-        } else {
-            SymbolKind::Function
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "union_type_defn" => (SymbolKind::Enum, "type"),
-            "record_type_defn" => (SymbolKind::Struct, "type"),
-            "module_defn" => (SymbolKind::Module, "module"),
-            _ => (SymbolKind::Struct, "type"),
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+        text.lines().next().unwrap_or(text).trim().to_string()
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

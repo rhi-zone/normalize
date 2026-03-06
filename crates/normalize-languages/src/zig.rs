@@ -1,6 +1,6 @@
 //! Zig language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Zig language support.
@@ -15,91 +15,6 @@ impl Language for Zig {
     }
     fn grammar_name(&self) -> &'static str {
         "zig"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let params = node
-            .child_by_field_name("parameters")
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        let return_type = node
-            .child_by_field_name("return_type")
-            .map(|t| content[t.byte_range()].to_string());
-
-        let is_pub = self.get_visibility(node, content) == Visibility::Public;
-        let prefix = if is_pub { "pub fn" } else { "fn" };
-
-        let signature = if let Some(ret) = return_type {
-            format!("{} {}{} {}", prefix, name, params, ret)
-        } else {
-            format!("{} {}{}", prefix, name, params)
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        // Detect struct/enum/union from ContainerDeclType child's first token
-        let mut cursor = node.walk();
-        let mut kind = SymbolKind::Struct;
-        let mut keyword = "struct";
-        for child in node.children(&mut cursor) {
-            if child.kind() == "ContainerDeclType" {
-                // First child of ContainerDeclType is the keyword token
-                if let Some(keyword_node) = child.child(0) {
-                    let kw = &content[keyword_node.byte_range()];
-                    if kw == "enum" {
-                        kind = SymbolKind::Enum;
-                        keyword = "enum";
-                    } else if kw == "union" {
-                        keyword = "union";
-                    }
-                }
-                break;
-            }
-        }
-
-        let is_pub = self.get_visibility(node, content) == Visibility::Public;
-        let prefix = if is_pub {
-            format!("pub {}", keyword)
-        } else {
-            keyword.to_string()
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", prefix, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

@@ -1,6 +1,6 @@
 //! HTML language support (parse only, minimal skeleton).
 
-use crate::{Language, Symbol};
+use crate::Language;
 use tree_sitter::Node;
 
 /// HTML language support.
@@ -22,15 +22,6 @@ impl Language for Html {
     }
 
     // HTML has no functions/containers/types in the traditional sense
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
 
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
         match node.kind() {

@@ -1,6 +1,6 @@
 //! Windows Batch file support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Batch language support.
@@ -15,29 +15,6 @@ impl Language for Batch {
     }
     fn grammar_name(&self) -> &'static str {
         "batch"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "function_definition" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: text.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
@@ -78,6 +55,9 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "identifier",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "function_definition",
+            "variable_declaration",
         ];
         validate_unused_kinds_audit(&Batch, documented_unused)
             .expect("Batch unused node kinds audit failed");

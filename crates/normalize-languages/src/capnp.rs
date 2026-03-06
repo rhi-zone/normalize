@@ -1,6 +1,6 @@
 //! Cap'n Proto schema support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Cap'n Proto language support.
@@ -15,60 +15,6 @@ impl Language for Capnp {
     }
     fn grammar_name(&self) -> &'static str {
         "capnp"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "method" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: text.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let kind = match node.kind() {
-            "struct" => SymbolKind::Struct,
-            "interface" => SymbolKind::Interface,
-            "enum" => SymbolKind::Enum,
-            _ => return None,
-        };
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -122,6 +68,10 @@ mod tests {
             "annotation_definition_identifier", "unique_id_statement",
             "top_level_annotation_body", "block_text",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "enum",
+            "interface",
+            "method",
+            "struct",
             "import",
         ];
         validate_unused_kinds_audit(&Capnp, documented_unused)

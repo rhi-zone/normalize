@@ -1,6 +1,6 @@
 //! Nix language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Nix language support.
@@ -15,73 +15,6 @@ impl Language for Nix {
     }
     fn grammar_name(&self) -> &'static str {
         "nix"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "function_expression" {
-            return None;
-        }
-
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        // Try to get name from parent binding
-        let name = node
-            .parent()
-            .filter(|p| p.kind() == "binding")
-            .and_then(|p| p.child_by_field_name("attrpath"))
-            .map(|n| content[n.byte_range()].to_string())
-            .unwrap_or_else(|| "<lambda>".to_string());
-
-        Some(Symbol {
-            name,
-            kind: SymbolKind::Function,
-            signature: first_line.trim().chars().take(80).collect(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let kind_str = node.kind();
-        if !matches!(
-            kind_str,
-            "attrset_expression" | "let_expression" | "rec_attrset_expression"
-        ) {
-            return None;
-        }
-
-        // Try to get name from parent binding
-        let name = node
-            .parent()
-            .filter(|p| p.kind() == "binding")
-            .and_then(|p| p.child_by_field_name("attrpath"))
-            .map(|n| content[n.byte_range()].to_string())
-            .unwrap_or_else(|| match kind_str {
-                "let_expression" => "let".to_string(),
-                "rec_attrset_expression" => "rec { }".to_string(),
-                _ => "{ }".to_string(),
-            });
-
-        Some(Symbol {
-            name: name.clone(),
-            kind: SymbolKind::Module,
-            signature: name,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

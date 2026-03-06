@@ -1,6 +1,6 @@
 //! Scheme language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// Scheme language support.
@@ -15,101 +15,6 @@ impl Language for Scheme {
     }
     fn grammar_name(&self) -> &'static str {
         "scheme"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "list" {
-            return None;
-        }
-
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        if let Some(rest) = text.strip_prefix("(define ") {
-            // Only extract function definitions
-            if rest.starts_with('(') || rest.contains("(lambda") {
-                let name = if let Some(inner) = rest.strip_prefix('(') {
-                    inner.split_whitespace().next()
-                } else {
-                    rest.split_whitespace().next()
-                }?;
-
-                return Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                });
-            }
-        }
-
-        if let Some(rest) = text.strip_prefix("(define-syntax ") {
-            let name = rest.split_whitespace().next()?;
-            return Some(Symbol {
-                name: name.to_string(),
-                kind: SymbolKind::Function,
-                signature: first_line.trim().to_string(),
-                docstring: None,
-                attributes: Vec::new(),
-                start_line: node.start_position().row + 1,
-                end_line: node.end_position().row + 1,
-                visibility: Visibility::Public,
-                children: Vec::new(),
-                is_interface_impl: false,
-                implements: Vec::new(),
-            });
-        }
-
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "list" {
-            return None;
-        }
-
-        let text = &content[node.byte_range()];
-
-        if text.starts_with("(define-library ")
-            || text.starts_with("(library ")
-            || text.starts_with("(module ")
-        {
-            let prefix_len = if text.starts_with("(define-library ") {
-                16
-            } else if text.starts_with("(library ") {
-                9
-            } else {
-                8
-            };
-
-            let name = text[prefix_len..]
-                .split(|c: char| c.is_whitespace() || c == ')')
-                .next()?
-                .to_string();
-
-            return Some(Symbol {
-                name: name.clone(),
-                kind: SymbolKind::Module,
-                signature: format!("(library {})", name),
-                docstring: None,
-                attributes: Vec::new(),
-                start_line: node.start_position().row + 1,
-                end_line: node.end_position().row + 1,
-                visibility: Visibility::Public,
-                children: Vec::new(),
-                is_interface_impl: false,
-                implements: Vec::new(),
-            });
-        }
-
-        None
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

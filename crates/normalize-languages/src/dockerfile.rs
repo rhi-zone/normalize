@@ -1,6 +1,6 @@
 //! Dockerfile language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Dockerfile language support.
@@ -20,46 +20,6 @@ impl Language for Dockerfile {
     // Dockerfiles have stages (FROM ... AS name) that act as containers
 
     // No functions in Dockerfile
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "from_instruction" {
-            return None;
-        }
-
-        // Extract base image
-        let image_name = self.extract_image_name(node, content)?;
-        let stage_name = self.extract_stage_name(node, content);
-
-        let name = stage_name.clone().unwrap_or_else(|| image_name.clone());
-        let signature = if let Some(stage) = stage_name {
-            format!("FROM {} AS {}", image_name, stage)
-        } else {
-            format!("FROM {}", image_name)
-        };
-
-        Some(Symbol {
-            name,
-            kind: SymbolKind::Module,
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "from_instruction" {
@@ -134,6 +94,8 @@ mod tests {
             "label_instruction", "maintainer_instruction", "onbuild_instruction",
             "run_instruction", "shell_instruction", "stopsignal_instruction",
             "user_instruction", "volume_instruction", "workdir_instruction",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "from_instruction",
         ];
 
         validate_unused_kinds_audit(&Dockerfile, documented_unused)

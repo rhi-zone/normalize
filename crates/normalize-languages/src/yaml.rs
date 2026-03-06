@@ -1,6 +1,6 @@
 //! YAML language support.
 
-use crate::{Language, Symbol, SymbolKind, Visibility};
+use crate::Language;
 use tree_sitter::Node;
 
 /// YAML language support.
@@ -23,37 +23,6 @@ impl Language for Yaml {
 
     // YAML is data, not code - no functions/types/control flow
 
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() == "block_mapping_pair" {
-            let key = node.child_by_field_name("key")?;
-            let key_text = &content[key.byte_range()];
-
-            return Some(Symbol {
-                name: key_text.to_string(),
-                kind: SymbolKind::Variable,
-                signature: key_text.to_string(),
-                docstring: None,
-                attributes: Vec::new(),
-                start_line: node.start_position().row + 1,
-                end_line: node.end_position().row + 1,
-                visibility: Visibility::Public,
-                children: Vec::new(),
-                is_interface_impl: false,
-                implements: Vec::new(),
-            });
-        }
-        None
-    }
-
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
     }
@@ -70,6 +39,8 @@ mod tests {
         let documented_unused: &[&str] = &[
             "block_mapping_pair", "block_node", "block_scalar",
             "block_sequence", "block_sequence_item",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "block_mapping",
         ];
         validate_unused_kinds_audit(&Yaml, documented_unused)
             .expect("YAML unused node kinds audit failed");

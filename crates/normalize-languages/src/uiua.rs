@@ -1,7 +1,6 @@
 //! Uiua array programming language support.
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// Uiua language support.
 pub struct Uiua;
@@ -15,15 +14,6 @@ impl Language for Uiua {
     }
     fn grammar_name(&self) -> &'static str {
         "uiua"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

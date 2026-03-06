@@ -1,6 +1,6 @@
 //! Go language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Go language support.
@@ -21,77 +21,32 @@ impl Language for Go {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let params = node
-            .child_by_field_name("parameters")
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: if in_container {
-                SymbolKind::Method
-            } else {
-                SymbolKind::Function
-            },
-            signature: format!("func {}{}", name, params),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if name
-                .chars()
-                .next()
-                .map(|c| c.is_uppercase())
-                .unwrap_or(false)
-            {
-                Visibility::Public
-            } else {
-                Visibility::Private
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // Go type_spec: name field + type field (struct_type, interface_type, etc.)
-        let name_node = node.child_by_field_name("name")?;
-        let name = content[name_node.byte_range()].to_string();
-
-        let type_node = node.child_by_field_name("type");
-        let type_kind = type_node.map(|t| t.kind()).unwrap_or("");
-
-        let kind = match type_kind {
-            "struct_type" => SymbolKind::Struct,
-            "interface_type" => SymbolKind::Interface,
-            _ => SymbolKind::Type,
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
         };
-
-        Some(Symbol {
-            name: name.clone(),
-            kind,
-            signature: format!("type {}", name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if name
-                .chars()
-                .next()
-                .map(|c| c.is_uppercase())
-                .unwrap_or(false)
-            {
-                Visibility::Public
-            } else {
-                Visibility::Private
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+        match node.kind() {
+            "function_declaration" | "method_declaration" => {
+                let params = node
+                    .child_by_field_name("parameters")
+                    .map(|p| content[p.byte_range()].to_string())
+                    .unwrap_or_else(|| "()".to_string());
+                format!("func {}{}", name, params)
+            }
+            "type_spec" => format!("type {}", name),
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
+        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

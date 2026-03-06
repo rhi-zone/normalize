@@ -1,6 +1,6 @@
 //! Kotlin language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Kotlin language support.
@@ -39,56 +39,11 @@ impl Language for Kotlin {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let params = node
-            .child_by_field_name("value_parameters")
-            .or_else(|| node.child_by_field_name("parameters"))
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        let return_type = node
-            .child_by_field_name("type")
-            .map(|t| format!(": {}", content[t.byte_range()].trim()))
-            .unwrap_or_default();
-
-        // Check for override modifier
-        let is_override = if let Some(mods) = node.child_by_field_name("modifiers") {
-            let mut cursor = mods.walk();
-            let children: Vec<_> = mods.children(&mut cursor).collect();
-            children.iter().any(|child| {
-                child.kind() == "member_modifier"
-                    && child.child(0).map(|c| c.kind()) == Some("override")
-            })
-        } else {
-            false
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: format!("fun {}{}{}", name, params, return_type),
-            docstring: extract_kdoc(node, content),
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: is_override,
-            implements: Vec::new(),
-        })
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_kdoc(node, content)
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "object_declaration" => (SymbolKind::Class, "object"),
-            _ => (SymbolKind::Class, "class"),
-        };
-
-        // Extract supertypes from delegation_specifier nodes
-        // Structure: delegation_specifier > user_type > type_identifier
-        //   or: delegation_specifier > constructor_invocation > user_type > type_identifier
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i as u32)
@@ -97,44 +52,48 @@ impl Language for Kotlin {
                 Self::find_type_identifier(&child, content, &mut implements);
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: extract_kdoc(node, content),
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
+        (false, implements)
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() == "type_alias" {
-            let name = self.node_name(node, content)?;
-            let target = node
-                .child_by_field_name("type")
-                .map(|t| content[t.byte_range()].to_string())
-                .unwrap_or_default();
-            return Some(Symbol {
-                name: name.to_string(),
-                kind: SymbolKind::Type,
-                signature: format!("typealias {} = {}", name, target),
-                docstring: None,
-                attributes: Vec::new(),
-                start_line: node.start_position().row + 1,
-                end_line: node.end_position().row + 1,
-                visibility: self.get_visibility(node, content),
-                children: Vec::new(),
-                is_interface_impl: false,
-                implements: Vec::new(),
-            });
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        };
+        match node.kind() {
+            "function_declaration" | "function_definition" => {
+                let params = node
+                    .child_by_field_name("value_parameters")
+                    .or_else(|| node.child_by_field_name("parameters"))
+                    .map(|p| content[p.byte_range()].to_string())
+                    .unwrap_or_else(|| "()".to_string());
+                let return_type = node
+                    .child_by_field_name("type")
+                    .map(|t| format!(": {}", content[t.byte_range()].trim()))
+                    .unwrap_or_default();
+                format!("fun {}{}{}", name, params, return_type)
+            }
+            "class_declaration" => format!("class {}", name),
+            "object_declaration" => format!("object {}", name),
+            "type_alias" => {
+                let target = node
+                    .child_by_field_name("type")
+                    .map(|t| content[t.byte_range()].to_string())
+                    .unwrap_or_default();
+                format!("typealias {} = {}", name, target)
+            }
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
         }
-        self.extract_container(node, content)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

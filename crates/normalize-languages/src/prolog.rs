@@ -1,6 +1,6 @@
 //! Prolog language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Prolog language support.
@@ -15,58 +15,6 @@ impl Language for Prolog {
     }
     fn grammar_name(&self) -> &'static str {
         "prolog"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "clause_term" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "directive_term" {
-            return None;
-        }
-
-        let text = &content[node.byte_range()];
-        if !text.contains("module(") {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Module,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -152,6 +100,8 @@ mod tests {
         let documented_unused: &[&str] = &[
             "binary_operator", "functional_notation",
             "operator_notation", "prefix_operator", "prexif_operator",
+                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "clause_term",
         ];
         validate_unused_kinds_audit(&Prolog, documented_unused)
             .expect("Prolog unused node kinds audit failed");

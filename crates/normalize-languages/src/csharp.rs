@@ -1,6 +1,6 @@
 //! C# language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// C# language support.
@@ -21,64 +21,7 @@ impl Language for CSharp {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
-        let params = node
-            .child_by_field_name("parameters")
-            .map(|p| content[p.byte_range()].to_string())
-            .unwrap_or_else(|| "()".to_string());
-
-        let return_type = node
-            .child_by_field_name("type")
-            .or_else(|| node.child_by_field_name("returns"))
-            .map(|t| content[t.byte_range()].to_string());
-
-        let signature = match return_type {
-            Some(ret) => format!("{} {}{}", ret, name, params),
-            None => format!("{}{}", name, params),
-        };
-
-        // Check for override modifier
-        let is_override = {
-            let mut cursor = node.walk();
-            let children: Vec<_> = node.children(&mut cursor).collect();
-            children.iter().any(|child| {
-                child.kind() == "modifier" && child.child(0).map(|c| c.kind()) == Some("override")
-            })
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: if node.kind() == "property_declaration" {
-                SymbolKind::Variable
-            } else {
-                SymbolKind::Method
-            },
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: is_override,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "struct_declaration" => (SymbolKind::Struct, "struct"),
-            "interface_declaration" => (SymbolKind::Interface, "interface"),
-            "enum_declaration" => (SymbolKind::Enum, "enum"),
-            "record_declaration" => (SymbolKind::Class, "record"),
-            "namespace_declaration" => (SymbolKind::Module, "namespace"),
-            _ => (SymbolKind::Class, "class"),
-        };
-
-        // Extract base types from base_list
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -91,24 +34,47 @@ impl Language for CSharp {
                 }
             }
         }
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: format!("{} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements,
-        })
+        (false, implements)
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_container(node, content)
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                return content[node.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        };
+        match node.kind() {
+            "method_declaration" | "constructor_declaration" | "property_declaration" => {
+                let params = node
+                    .child_by_field_name("parameters")
+                    .map(|p| content[p.byte_range()].to_string())
+                    .unwrap_or_default();
+                let return_type = node
+                    .child_by_field_name("type")
+                    .or_else(|| node.child_by_field_name("returns"))
+                    .map(|t| content[t.byte_range()].to_string());
+                match return_type {
+                    Some(ret) => format!("{} {}{}", ret, name, params),
+                    None => format!("{}{}", name, params),
+                }
+            }
+            "class_declaration" => format!("class {}", name),
+            "struct_declaration" => format!("struct {}", name),
+            "interface_declaration" => format!("interface {}", name),
+            "enum_declaration" => format!("enum {}", name),
+            "record_declaration" => format!("record {}", name),
+            "namespace_declaration" => format!("namespace {}", name),
+            _ => {
+                let text = &content[node.byte_range()];
+                text.lines().next().unwrap_or(text).trim().to_string()
+            }
+        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

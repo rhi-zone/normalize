@@ -1,6 +1,6 @@
 //! Lean language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Lean language support.
@@ -15,81 +15,6 @@ impl Language for Lean {
     }
     fn grammar_name(&self) -> &'static str {
         "lean"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        match node.kind() {
-            "def" | "theorem" | "constant" | "axiom" | "example" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "structure" | "inductive" | "class" | "namespace" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Type,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "abbrev" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Type,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

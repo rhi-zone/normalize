@@ -1,6 +1,6 @@
 //! Perl language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Perl language support.
@@ -15,57 +15,6 @@ impl Language for Perl {
     }
     fn grammar_name(&self) -> &'static str {
         "perl"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if name.starts_with('_') {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "package_statement" {
-            return None;
-        }
-
-        let text = &content[node.byte_range()];
-        let name = text
-            .strip_prefix("package ")
-            .and_then(|s| s.split(';').next())
-            .map(|s| s.trim().to_string())
-            .unwrap_or_else(|| "main".to_string());
-
-        Some(Symbol {
-            name: name.clone(),
-            kind: SymbolKind::Module,
-            signature: format!("package {}", name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

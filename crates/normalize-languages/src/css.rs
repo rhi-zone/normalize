@@ -1,6 +1,6 @@
 //! CSS language support (parse only, minimal skeleton).
 
-use crate::{Language, Symbol};
+use crate::Language;
 use tree_sitter::Node;
 
 /// CSS language support.
@@ -22,15 +22,6 @@ impl Language for Css {
     }
 
     // CSS has no functions/containers/types in the traditional sense
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None

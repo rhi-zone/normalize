@@ -1,6 +1,6 @@
 //! Erlang language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language};
 use tree_sitter::Node;
 
 /// Erlang language support.
@@ -15,100 +15,6 @@ impl Language for Erlang {
     }
     fn grammar_name(&self) -> &'static str {
         "erlang"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "function_clause" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-
-        // Get arity from parameters
-        let arity = node
-            .child_by_field_name("arguments")
-            .map(|args| {
-                let mut cursor = args.walk();
-                args.children(&mut cursor).count()
-            })
-            .unwrap_or(0);
-
-        let signature = format!("{}/{}", name, arity);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public, // Would need export analysis for accuracy
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "module_attribute" {
-            return None;
-        }
-
-        let text = &content[node.byte_range()];
-        if !text.starts_with("-module(") {
-            return None;
-        }
-
-        // Extract module name from -module(name).
-        if let Some(start) = text.find('(') {
-            let rest = &text[start + 1..];
-            if let Some(end) = rest.find(')') {
-                let name = rest[..end].trim().to_string();
-                return Some(Symbol {
-                    name: name.clone(),
-                    kind: SymbolKind::Module,
-                    signature: format!("-module({}).", name),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                });
-            }
-        }
-
-        None
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "type_alias" && node.kind() != "record_decl" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let kind = if node.kind() == "record_decl" {
-            SymbolKind::Struct
-        } else {
-            SymbolKind::Type
-        };
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind,
-            signature: content[node.byte_range()].lines().next()?.to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -168,6 +74,24 @@ impl Language for Erlang {
         } else {
             format!("-import({}, [{}]).", import.module, names_to_use.join(", "))
         }
+    }
+
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        if node.kind() == "function_clause"
+            && let Some(name_node) = node.child_by_field_name("name")
+        {
+            let name = &content[name_node.byte_range()];
+            let arity = node
+                .child_by_field_name("arguments")
+                .map(|args| {
+                    let mut cursor = args.walk();
+                    args.children(&mut cursor).count()
+                })
+                .unwrap_or(0);
+            return format!("{}/{}", name, arity);
+        }
+        let text = &content[node.byte_range()];
+        text.lines().next().unwrap_or(text).trim().to_string()
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

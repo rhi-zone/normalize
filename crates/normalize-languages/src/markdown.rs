@@ -1,6 +1,6 @@
 //! Markdown language support.
 
-use crate::{ContainerBody, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Language};
 use tree_sitter::Node;
 
 /// Markdown language support.
@@ -19,59 +19,6 @@ impl Language for Markdown {
 
     // Markdown sections are modeled as `section` nodes in the grammar,
     // each containing an atx_heading as the first child followed by content blocks.
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // `node` is a `section` node; its first child is `atx_heading`.
-        let heading = node.child(0).filter(|c| c.kind() == "atx_heading")?;
-
-        let mut cursor = heading.walk();
-        let text = heading
-            .children(&mut cursor)
-            .find(|c| c.kind() == "inline")
-            .map(|c| content[c.byte_range()].trim().to_string())
-            .unwrap_or_default();
-
-        if text.is_empty() {
-            return None;
-        }
-
-        let mut cursor2 = heading.walk();
-        let level = heading
-            .children(&mut cursor2)
-            .find_map(|c| match c.kind() {
-                "atx_h1_marker" => Some(1),
-                "atx_h2_marker" => Some(2),
-                "atx_h3_marker" => Some(3),
-                "atx_h4_marker" => Some(4),
-                "atx_h5_marker" => Some(5),
-                "atx_h6_marker" => Some(6),
-                _ => None,
-            })
-            .unwrap_or(1);
-
-        Some(Symbol {
-            name: text.clone(),
-            kind: SymbolKind::Heading,
-            signature: format!("{} {}", "#".repeat(level), text),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // The section node itself contains the heading + content as children.

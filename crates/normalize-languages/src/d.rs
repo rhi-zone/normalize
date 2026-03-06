@@ -1,6 +1,6 @@
 //! D language support.
 
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// D language support.
@@ -37,105 +37,26 @@ impl Language for D {
         " {}"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = self.node_name(node, content).unwrap_or("");
         match node.kind() {
-            "function_literal" | "auto_declaration" => {
-                let name = self.node_name(node, content)?;
+            "module_declaration" => format!("module {}", name),
+            _ => {
                 let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
+                text.lines().next().unwrap_or(text).trim().to_string()
             }
-            _ => None,
         }
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "module_declaration" => {
-                let name = self.node_name(node, content)?;
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Module,
-                    signature: format!("module {}", name),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: Visibility::Public,
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
+    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+        let mut implements = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "base_class_list" {
+                D::collect_identifiers(&child, content, &mut implements);
             }
-            "class_declaration" | "struct_declaration" | "interface_declaration" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                // Extract base classes/interfaces from base_class_list
-                // Structure: base_class_list > super_class_or_interface/interfaces > ... > identifier
-                let mut implements = Vec::new();
-                let mut cursor = node.walk();
-                for child in node.children(&mut cursor) {
-                    if child.kind() == "base_class_list" {
-                        Self::collect_identifiers(&child, content, &mut implements);
-                    }
-                }
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Class,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements,
-                })
-            }
-            _ => None,
         }
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        match node.kind() {
-            "alias_declaration" | "enum_declaration" => {
-                let name = self.node_name(node, content)?;
-                let text = &content[node.byte_range()];
-                let first_line = text.lines().next().unwrap_or(text);
-
-                Some(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Type,
-                    signature: first_line.trim().to_string(),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: node.start_position().row + 1,
-                    end_line: node.end_position().row + 1,
-                    visibility: self.get_visibility(node, content),
-                    children: Vec::new(),
-                    is_interface_impl: false,
-                    implements: Vec::new(),
-                })
-            }
-            _ => None,
-        }
+        (false, implements)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -287,6 +208,9 @@ mod tests {
             "traits_arguments", "traits_keyword", "var_declarator_identifier", "vector_base_type",
             "attribute_specifier",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "alias_declaration",
+            "auto_declaration",
+            "module_declaration",
             "block_statement",
             "import_declaration",
             "while_statement",

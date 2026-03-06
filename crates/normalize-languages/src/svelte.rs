@@ -1,7 +1,7 @@
 //! Svelte language support.
 
 use crate::component::extract_embedded_content;
-use crate::{ContainerBody, Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Svelte language support.
@@ -16,54 +16,6 @@ impl Language for Svelte {
     }
     fn grammar_name(&self) -> &'static str {
         "svelte"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: self.get_visibility(node, content),
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, _content: &str) -> Option<Symbol> {
-        let kind = match node.kind() {
-            "script_element" => SymbolKind::Module,
-            "style_element" => SymbolKind::Class,
-            _ => return None,
-        };
-
-        let name = if node.kind() == "script_element" {
-            "<script>".to_string()
-        } else {
-            "<style>".to_string()
-        };
-
-        Some(Symbol {
-            name: name.clone(),
-            kind,
-            signature: name,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

@@ -100,22 +100,44 @@ pub trait Language: Send + Sync {
         true
     }
 
-    // === Symbol Extraction ===
+    // === Symbol Building ===
 
-    /// Extract symbol from a function/method node
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-        Some(simple_function_symbol(node, content, name, None))
-    }
-
-    /// Extract symbol from a container node (class, impl, module)
-    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
+    /// Extract the docstring for a definition node.
+    /// Called by generic extraction for every tagged symbol.
+    /// Returns None if this language has no docstring convention or the node has no docstring.
+    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
         None
     }
 
-    /// Extract symbol from a type definition node
-    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
-        None
+    /// Extract attributes/annotations/decorators attached to a definition node.
+    /// Called by generic extraction for every tagged symbol.
+    /// Returns empty vec if this language has no attribute convention.
+    fn extract_attributes(&self, _node: &Node, _content: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Extract interfaces/traits/superclasses that a container node implements/extends.
+    /// Called by generic extraction for container nodes only.
+    /// Returns (is_interface_impl, implements_list).
+    fn extract_implements(&self, _node: &Node, _content: &str) -> (bool, Vec<String>) {
+        (false, Vec::new())
+    }
+
+    /// Build the display signature for a definition node.
+    /// Default: first line of the node's source text (trimmed).
+    /// Override for languages where first-line is incomplete (e.g. Rust, Go, Java).
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let text = &content[node.byte_range()];
+        text.lines().next().unwrap_or(text).trim().to_string()
+    }
+
+    /// Refine the symbol kind for a tagged node.
+    /// Called after tag classification assigns an initial kind (e.g. `definition.class` → `Class`).
+    /// Languages can override this to return a more specific kind based on the node's concrete type.
+    /// Default: return `tag_kind` unchanged.
+    fn refine_kind(&self, node: &Node, _content: &str, tag_kind: SymbolKind) -> SymbolKind {
+        let _ = node;
+        tag_kind
     }
 
     // === Import/Export ===

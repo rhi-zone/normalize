@@ -1,6 +1,6 @@
 //! R language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// R language support.
@@ -15,39 +15,6 @@ impl Language for R {
     }
     fn grammar_name(&self) -> &'static str {
         "r"
-    }
-
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        // R functions are typically assigned: name <- function(...) {}
-        // We need to look at the parent assignment (binary_operator in R grammar)
-        let parent = node.parent()?;
-        if parent.kind() != "binary_operator" {
-            return None;
-        }
-
-        let name = parent
-            .child(0)
-            .map(|n| content[n.byte_range()].to_string())?;
-        let text = &content[parent.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.clone(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: parent.start_position().row + 1,
-            end_line: parent.end_position().row + 1,
-            visibility: if name.starts_with('.') {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

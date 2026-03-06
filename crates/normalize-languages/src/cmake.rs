@@ -1,6 +1,6 @@
 //! CMake language support.
 
-use crate::{ContainerBody, Import, Language, Symbol};
+use crate::{ContainerBody, Import, Language};
 use tree_sitter::Node;
 
 /// CMake language support.
@@ -15,10 +15,6 @@ impl Language for CMake {
     }
     fn grammar_name(&self) -> &'static str {
         "cmake"
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        self.extract_function(node, content, false)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -101,6 +97,7 @@ mod tests {
             "function_command", "identifier", "if", "if_command", "while",
             "while_command",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "function_def",
             "if_condition",
             "foreach_loop",
             "while_loop",

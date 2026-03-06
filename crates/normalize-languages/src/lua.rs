@@ -1,6 +1,6 @@
 //! Lua language support.
 
-use crate::{Import, Language, Symbol, SymbolKind, Visibility};
+use crate::{Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// Lua language support.
@@ -21,15 +21,18 @@ impl Language for Lua {
         " end"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.node_name(node, content)?;
-
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        let name = match self.node_name(node, content) {
+            Some(n) => n,
+            None => {
+                let text = &content[node.byte_range()];
+                return text.lines().next().unwrap_or(text).trim().to_string();
+            }
+        };
         let params = node
             .child_by_field_name("parameters")
             .map(|p| content[p.byte_range()].to_string())
             .unwrap_or_else(|| "()".to_string());
-
-        // Check if function text starts with "local"
         let text = &content[node.byte_range()];
         let is_local = text.trim_start().starts_with("local ");
         let keyword = if is_local {
@@ -37,25 +40,7 @@ impl Language for Lua {
         } else {
             "function"
         };
-        let signature = format!("{} {}{}", keyword, name, params);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature,
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: if is_local {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            },
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+        format!("{} {}{}", keyword, name, params)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

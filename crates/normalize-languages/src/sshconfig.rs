@@ -1,7 +1,6 @@
 //! SSH config file support.
 
-use crate::{Language, Symbol};
-use tree_sitter::Node;
+use crate::Language;
 
 /// SSH config language support.
 pub struct SshConfig;
@@ -15,15 +14,6 @@ impl Language for SshConfig {
     } // Matched by filename
     fn grammar_name(&self) -> &'static str {
         "ssh-config"
-    }
-
-    fn extract_function(
-        &self,
-        _node: &Node,
-        _content: &str,
-        _in_container: bool,
-    ) -> Option<Symbol> {
-        None
     }
 }
 

@@ -1,6 +1,6 @@
 //! SQL language support.
 
-use crate::{Language, Symbol, SymbolKind, Visibility};
+use crate::Language;
 use tree_sitter::Node;
 
 /// SQL language support.
@@ -17,91 +17,13 @@ impl Language for Sql {
         "sql"
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        let name = self.extract_sql_name(node, content)?;
-
-        // Extract first line as signature
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        // SQL: use first line as signature (CREATE TABLE foo...)
         let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name,
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.extract_sql_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "create_view" | "create_materialized_view" => (SymbolKind::Struct, "VIEW"),
-            "create_schema" => (SymbolKind::Module, "SCHEMA"),
-            _ => (SymbolKind::Struct, "TABLE"),
-        };
-
-        Some(Symbol {
-            name: name.clone(),
-            kind,
-            signature: format!("CREATE {} {}", keyword, name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
-    }
-
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        let name = self.extract_sql_name(node, content)?;
-
-        Some(Symbol {
-            name: name.clone(),
-            kind: SymbolKind::Type,
-            signature: format!("CREATE TYPE {}", name),
-            docstring: None,
-            attributes: Vec::new(),
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-            is_interface_impl: false,
-            implements: Vec::new(),
-        })
+        text.lines().next().unwrap_or(text).trim().to_string()
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
-        None
-    }
-}
-
-impl Sql {
-    fn extract_sql_name(&self, node: &Node, content: &str) -> Option<String> {
-        // Look for identifier after CREATE TABLE/VIEW/FUNCTION etc.
-        let mut cursor = node.walk();
-        let mut found_create = false;
-        for child in node.children(&mut cursor) {
-            if child.kind() == "keyword" {
-                let text = &content[child.byte_range()].to_uppercase();
-                if text == "CREATE" {
-                    found_create = true;
-                }
-            }
-            if found_create && (child.kind() == "identifier" || child.kind() == "object_reference")
-            {
-                return Some(content[child.byte_range()].to_string());
-            }
-        }
         None
     }
 }
@@ -137,6 +59,7 @@ mod tests {
             // Control flow in SQL procedural code — not definition kinds
             "case",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            "create_function",
             "create_type",
         ];
         validate_unused_kinds_audit(&Sql, documented_unused)
