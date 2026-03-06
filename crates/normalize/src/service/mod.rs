@@ -444,10 +444,11 @@ impl NormalizeService {
     pub fn init(
         &self,
         #[param(help = "Index the codebase after initialization")] index: bool,
+        #[param(help = "Run interactive rule setup wizard after initialization")] setup: bool,
     ) -> Result<InitResult, String> {
         let root = std::env::current_dir()
             .map_err(|e| format!("Failed to get current directory: {}", e))?;
-        let exit_code = commands::init::cmd_init(&root, index);
+        let exit_code = commands::init::cmd_init(&root, index, setup);
         if exit_code == 0 {
             Ok(InitResult {
                 success: true,

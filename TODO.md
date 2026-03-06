@@ -53,29 +53,23 @@ Info ≠ noise in principle, but 1827 of them is noise in practice right now.
 genuine architectural smell (unwrap-heavy code is a fragility signal) or could be legitimate
 in infallible/parsing contexts. Audit and triage before re-enabling. See §Audit rust/unwrap-in-impl.
 
-### Guided rule setup (`normalize rules setup`) — HIGH PRIORITY
+### Guided rule setup — DONE (`normalize init --setup`)
 
-A guided setup flow for configuring rules on a new project. Two modes:
+Implemented as `normalize init --setup` (interactive terminal wizard).
 
-**Human-interactive:** For each useful rule, show the top N violations from the codebase,
-then prompt "enable? [y/n/skip]". After user selects, run `normalize rules enable <id>` or
-`normalize rules disable <id>` to persist the config. Think: a wizard that walks through
-the rule catalogue once, pruning noise before it accumulates.
+**What it does:** Runs all rules against the codebase, groups violations by rule (sorted by
+count desc), and walks the user through each — showing rule metadata and up to 5 example
+violations — then prompting [e]nable / [d]isable / [s]kip / [q]uit. Persists decisions via
+`normalize rules enable/disable`.
 
-**LLM-stateful:** Same flow but driven by an agent. The agent:
-1. Runs `normalize rules list` to enumerate candidates
-2. For each, runs `normalize rules run --rule <id>` and reviews top violations
-3. Decides enable/disable based on signal quality
-4. Calls `normalize rules enable/disable <id>` to update config (CLI entry point ensures
-   idempotent, human-reviewable config changes)
+**LLM-stateful flow** (already works via existing CLI):
+1. `normalize rules list --json` to enumerate candidates
+2. `normalize rules run --rule <id>` to review top violations per rule
+3. `normalize rules enable/disable <id>` to update config
 
-The `normalize rules enable/disable` commands already exist — they're the right API for
-agents and humans alike. The missing piece is the "show me what this rule would flag,
-then let me decide" UX layer. Implement as `normalize rules setup` or `normalize rules configure`.
-
-Also: review the default-enabled rule set. Currently several rules are enabled project-wide
-that generate high noise without clear quality benefit at scale. Guided setup is the cure:
-make it easy for users/agents to audit and prune.
+**Remaining:** Review default-enabled rule set. Several rules generate high noise; guided
+setup is the cure. Also: `normalize init --setup` currently only covers rules — extend to
+other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md enforcement).
 
 ### Actionable output for all diagnostic commands — HIGH PRIORITY
 
