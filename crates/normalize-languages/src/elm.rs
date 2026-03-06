@@ -67,6 +67,10 @@ impl Language for Elm {
         }
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_elm_doc_comment(node, content)
+    }
+
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();
         match symbol.kind {
@@ -75,6 +79,22 @@ impl Language for Elm {
             _ => false,
         }
     }
+}
+
+/// Extract Elm doc comments (`{-| ... -}`) preceding a declaration.
+/// The Elm tree-sitter grammar parses these as `block_comment` nodes.
+fn extract_elm_doc_comment(node: &Node, content: &str) -> Option<String> {
+    let prev = node.prev_sibling()?;
+
+    if prev.kind() != "block_comment" {
+        return None;
+    }
+
+    let text = &content[prev.byte_range()];
+    // Elm doc comments start with {-| and end with -}
+    let inner = text.strip_prefix("{-|")?;
+    let inner = inner.strip_suffix("-}").unwrap_or(inner).trim().to_string();
+    if inner.is_empty() { None } else { Some(inner) }
 }
 
 #[cfg(test)]

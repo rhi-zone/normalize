@@ -102,8 +102,46 @@ impl Language for Lua {
         }
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_lua_doc_comment(node, content)
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
+    }
+}
+
+/// Extract LuaDoc comments (`---` triple-dash) preceding a node.
+fn extract_lua_doc_comment(node: &Node, content: &str) -> Option<String> {
+    let mut doc_lines: Vec<String> = Vec::new();
+    let mut prev = node.prev_sibling();
+
+    while let Some(sibling) = prev {
+        if sibling.kind() == "comment" {
+            let text = &content[sibling.byte_range()];
+            // LuaDoc comments start with ---
+            if let Some(line) = text.strip_prefix("---") {
+                let line = line.strip_prefix(' ').unwrap_or(line);
+                doc_lines.push(line.to_string());
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+        prev = sibling.prev_sibling();
+    }
+
+    if doc_lines.is_empty() {
+        return None;
+    }
+
+    doc_lines.reverse();
+    let joined = doc_lines.join("\n").trim().to_string();
+    if joined.is_empty() {
+        None
+    } else {
+        Some(joined)
     }
 }
 
